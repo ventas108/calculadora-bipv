@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `custom_panels` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`userId` int NOT NULL,\n\t`name` varchar(255) NOT NULL,\n\t`powerRating` float NOT NULL,\n\t`efficiency` float NOT NULL,\n\t`tempCoeff` float NOT NULL,\n\t`noct` float NOT NULL,\n\t`area` float NOT NULL,\n\t`degradationAnnual` float NOT NULL,\n\t`voc` float,\n\t`isc` float,\n\t`vmp` float,\n\t`imp` float,\n\t`lengthMm` float,\n\t`widthMm` float,\n\t`weightKg` float,\n\t`systemLoss` float,\n\t`application` text,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `custom_panels_id` PRIMARY KEY(`id`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway06.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3nXaVcrDovTqo14.root --database gVMaRxJDkAvANkjR3y5xoD --execute CREATE TABLE `custom_panels` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`userId` int NOT NULL,\n\t`name` varchar(255) NOT NULL,\n\t`powerRating` float NOT NULL,\n\t`efficiency` float NOT NULL,\n\t`tempCoeff` float NOT NULL,\n\t`noct` float NOT NULL,\n\t`area` float NOT NULL,\n\t`degradationAnnual` float NOT NULL,\n\t`voc` float,\n\t`isc` float,\n\t`vmp` float,\n\t`imp` float,\n\t`lengthMm` float,\n\t`widthMm` float,\n\t`weightKg` float,\n\t`systemLoss` float,\n\t`application` text,\n\t`createdAt` timestamp NOT NULL DEFAULT (now()),\n\t`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `custom_panels_id` PRIMARY KEY(`id`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1093
+}

@@ -1,0 +1,35 @@
+IEC 61724-1:2021 - Métricas de Rendimiento PV (Fuente: Solargis KB)
+===================================================================
+
+1. Performance Ratio (PR):
+   PR_period = E_period / (POA_period / G_ref × P_nom)
+   Donde:
+   - E_period = energía AC medida (kWh)
+   - POA_period = irradiación POA medida (kWh/m²)
+   - G_ref = 1000 W/m² (STC)
+   - P_nom = capacidad DC nominal (kWp)
+
+2. Temperature-corrected PR (PR_T):
+   PR_T = Σ(E_j) / Σ(P_nom × G_j/G_ref × [1 + γ × (T_mod_j - T_ref)])
+   Donde:
+   - E_j = energía medida en paso j (kWh)
+   - G_j = irradiancia POA en paso j (W/m²)
+   - γ = coeficiente de temperatura del módulo (%/°C)
+   - T_mod_j = temperatura del módulo en paso j (°C)
+   - T_ref = 25°C
+
+3. Energy Performance Index (EPI):
+   EPI = Y_measured / Y_expected
+   Donde:
+   - Y_measured = specific yield medido (kWh/kWp)
+   - Y_expected = specific yield esperado del modelo PV
+
+4. Métricas derivadas (IEC 61724):
+   - Reference Yield: Yr = H_POA / G_ref (horas equivalentes)
+   - Final Yield: Yf = E_AC / P_nom (kWh/kWp)
+   - Array Yield: Ya = E_DC / P_nom (kWh/kWp)
+   - Capture Losses: Lc = Yr - Ya
+   - System Losses: Ls = Ya - Yf
+   - BOS Efficiency: η_BOS = E_AC / E_DC
+   - Capacity Factor: CF = E_AC / (P_nom × 8760)
+   - Specific Yield: SY = Yf (kWh/kWp/año)

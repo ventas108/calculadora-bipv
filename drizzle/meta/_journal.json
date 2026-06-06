@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1778639876079,
+      "tag": "0000_nice_leader",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1779504891272,
+      "tag": "0001_many_amazoness",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1780179482985,
+      "tag": "0002_thankful_blockbuster",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1780179892676,
+      "tag": "0003_big_shape",
+      "breakpoints": true
+    }
+  ]
+}
