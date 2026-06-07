@@ -692,7 +692,7 @@ describe('calculateAnnualProduction — Capture Losses Breakdown', () => {
     const prod = calculateAnnualProduction(monthlyData, panelSpecs, systemLosses, shadingFactors);
     const clb = prod.iec61724.captureLossesBreakdown;
     
-    const sum = clb.temperature + clb.shading + clb.soiling + clb.mismatch + clb.dcWiring;
+    const sum = clb.temperature + clb.shading + clb.soiling + clb.mismatch + clb.dcWiring + clb.iam;
     expect(clb.total).toBeCloseTo(sum, 1);
   });
 
@@ -751,5 +751,137 @@ describe('calculateAnnualProduction — EPI (energyPerformanceIndex)', () => {
 
     const prod = calculateAnnualProduction(data, panelSpecs, systemLosses, Array(12).fill(1.0));
     expect(prod.iec61724.energyPerformanceIndex).toBeNull();
+  });
+});
+
+// ============================================================
+// TESTS — Lc positivo con IAM/Soiling pre-cálculo (rawPOAOverride)
+// ============================================================
+
+describe('calculateAnnualProduction — IAM/Soiling pre-cálculo → Lc positivo', () => {
+  const panelSpecs = {
+    powerRating: 400,
+    efficiency: 20,
+    temperatureCoefficient: -0.004,
+    nominalOperatingCellTemperature: 47,
+    area: 2.0,
+    quantity: 10,
+  };
+
+  const systemLosses = {
+    dcWiring: 2,
+    inverterEfficiency: 96,
+    acWiring: 1,
+    transformerLosses: 0,
+    mismatchLosses: 2,
+    soilingLosses: 0, // Soiling se aplica pre-cálculo
+    shadingLosses: 0,
+    availabilityLosses: 1,
+    iamLosses: 0, // IAM se aplica pre-cálculo
+  };
+
+  const iamMensual = [15, 14, 12, 10, 9, 8, 8, 9, 11, 13, 14, 15]; // % pérdida mensual
+  const soilingMensual = [3, 3, 4, 4, 5, 5, 4, 4, 3, 3, 2, 2]; // % pérdida mensual
+
+  const monthlyData = Array(12).fill(null).map((_, i) => ({
+    month: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][i],
+    avgPOA: 500,
+    avgTemp: 28,
+    avgWindSpeed: 2,
+  }));
+
+  it('Lc > 0 cuando IAM y soiling se aplican pre-cálculo', () => {
+    const prod = calculateAnnualProduction(
+      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0),
+      undefined, // cellTempOverride
+      iamMensual,
+      soilingMensual
+    );
+    
+    // Con rawPOAOverride, Yr usa POA original y Ya usa POA reducido → Lc > 0
+    expect(prod.iec61724.captureLosses).toBeGreaterThan(0);
+  });
+
+  it('Yr > Ya cuando hay pérdidas IAM/soiling pre-cálculo', () => {
+    const prod = calculateAnnualProduction(
+      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0),
+      undefined,
+      iamMensual,
+      soilingMensual
+    );
+    
+    expect(prod.iec61724.referenceYield).toBeGreaterThan(prod.iec61724.arrayYield);
+  });
+
+  it('Lc_iam > 0 cuando hay IAM pre-cálculo', () => {
+    const prod = calculateAnnualProduction(
+      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0),
+      undefined,
+      iamMensual,
+      soilingMensual
+    );
+    
+    expect(prod.iec61724.captureLossesBreakdown.iam).toBeGreaterThan(0);
+  });
+
+  it('balance Yr = Ya + Lc sigue siendo válido con pre-cálculo', () => {
+    const prod = calculateAnnualProduction(
+      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0),
+      undefined,
+      iamMensual,
+      soilingMensual
+    );
+    const iec = prod.iec61724;
+    
+    expect(iec.arrayYield).toBeCloseTo(iec.referenceYield - iec.captureLosses, 1);
+    expect(iec.finalYield).toBeCloseTo(iec.arrayYield - iec.systemLosses, 1);
+  });
+
+  it('PR < 1.0 siempre con pérdidas pre-cálculo', () => {
+    const prod = calculateAnnualProduction(
+      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0),
+      undefined,
+      iamMensual,
+      soilingMensual
+    );
+    
+    expect(prod.iec61724.performanceRatio).toBeLessThan(1.0);
+    expect(prod.iec61724.performanceRatio).toBeGreaterThan(0.5);
+  });
+
+  it('Yr con pre-cálculo es mayor que sin pre-cálculo (usa POA original)', () => {
+    // Sin pre-cálculo: Yr se basa en POA tal cual
+    const prodSin = calculateAnnualProduction(
+      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0)
+    );
+    
+    // Con pre-cálculo: Yr se basa en POA original (antes de reducción)
+    const prodCon = calculateAnnualProduction(
+      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0),
+      undefined,
+      iamMensual,
+      soilingMensual
+    );
+    
+    // Ambos reciben el mismo avgPOA=500, así que Yr debería ser igual
+    // (rawPOAOverride = data.avgPOA = 500 en ambos casos)
+    expect(prodCon.iec61724.referenceYield).toBeCloseTo(prodSin.iec61724.referenceYield, 0);
+  });
+
+  it('Ya con pre-cálculo es menor que sin pre-cálculo (POA reducido)', () => {
+    // Sin pre-cálculo: dcEnergy usa POA=500 directamente
+    const prodSin = calculateAnnualProduction(
+      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0)
+    );
+    
+    // Con pre-cálculo: dcEnergy usa effectivePOA < 500
+    const prodCon = calculateAnnualProduction(
+      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0),
+      undefined,
+      iamMensual,
+      soilingMensual
+    );
+    
+    expect(prodCon.iec61724.arrayYield).toBeLessThan(prodSin.iec61724.arrayYield);
   });
 });

@@ -54,7 +54,7 @@ function makeSimProduction(acPerMonth: number = 500, dcPerMonth: number = 550): 
       finalYield: 1500,
       arrayYield: 1650,
       captureLosses: 150,
-      captureLossesBreakdown: { temperature: 50, shading: 30, soiling: 20, mismatch: 15, dcWiring: 10, total: 125 },
+      captureLossesBreakdown: { temperature: 50, shading: 30, soiling: 20, mismatch: 15, dcWiring: 10, iam: 0, total: 125 },
       systemLosses: 150,
       performanceRatio: 0.82,
       prTemperatureCorrected: 0.85,

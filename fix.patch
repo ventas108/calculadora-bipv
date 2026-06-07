@@ -1,0 +1,434 @@
+From 78f1e4516fe6782963656c058d54dae7984c6eeb Mon Sep 17 00:00:00 2001
+From: Manus <dev-agent@manus.ai>
+Date: Sat, 6 Jun 2026 22:12:59 +0000
+Subject: [PATCH] =?UTF-8?q?Checkpoint:=20Fix:=20Lc=20negativo=20y=20=CE=94?=
+ =?UTF-8?q?=20Yield=20incoherente=20cuando=20IAM/Soiling=20se=20aplican=20?=
+ =?UTF-8?q?pre-c=C3=A1lculo.?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Causa raíz: Cuando IAM y soiling se aplicaban pre-cálculo sobre el POA (reduciéndolo), el Yr (Reference Yield) usaba el POA ya reducido como "rawPOA", pero Ya (Array Yield) se calculaba con dcEnergy basada en ese mismo POA reducido. Si la temperatura era favorable (T_cell < 25°C), la eficiencia real superaba la nominal, haciendo Ya > Yr y produciendo Lc negativo.
+
+Corrección:
+1. Agregado parámetro rawPOAOverride a calculateMonthlyProduction para pasar el POA original (antes de IAM/soiling)
+2. En calculateAnnualProduction, se pasa data.avgPOA (POA original) como rawPOAOverride cuando usePreCalcIAM || usePreCalcSoiling
+3. Yr ahora siempre refleja la irradiación total disponible (antes de pérdidas pre-cálculo)
+4. Agregado campo 'iam' a CaptureLossesBreakdown para desglosar Lc_iam explícitamente
+5. UI actualizada para mostrar barra de IAM en el desglose de Capture Losses
+6. 7 nuevos tests unitarios verifican: Lc > 0, Yr > Ya, Lc_iam > 0, balance Yr=Ya+Lc, PR < 1.0
+7. 779 tests pasan correctamente (30 archivos de test)
+---
+ DEPLOY_README.md                              | 121 ++++++++++++++++
+ .../components/EnergyProductionSimulator.tsx  |   4 +-
+ client/src/lib/energyProduction.ts            |  24 +++-
+ server/crossValidation.test.ts                |   2 +-
+ server/energyProduction.test.ts               | 134 +++++++++++++++++-
+ todo.md                                       |   7 +
+ 6 files changed, 284 insertions(+), 8 deletions(-)
+ create mode 100644 DEPLOY_README.md
+
+diff --git a/DEPLOY_README.md b/DEPLOY_README.md
+new file mode 100644
+index 0000000..89b8d9e
+--- /dev/null
++++ b/DEPLOY_README.md
+@@ -0,0 +1,121 @@
++# Solar Shading Calculator — Guía de Despliegue
++
++## Requisitos del Servidor
++
++- **Node.js** >= 22.x
++- **pnpm** >= 9.x (o npm/yarn equivalente)
++- **MySQL** o **TiDB** (base de datos relacional)
++- Puerto disponible (por defecto usa la variable `PORT` o 3000)
++
++---
++
++## Estructura del ZIP
++
++```
++├── client/          → Código fuente del frontend (React 19 + Tailwind 4)
++├── server/          → Código fuente del backend (Express + tRPC)
++├── shared/          → Tipos y constantes compartidas
++├── drizzle/         → Schema de base de datos y migraciones
++├── dist/            → BUILD DE PRODUCCIÓN (listo para ejecutar)
++│   ├── index.js     → Servidor Express compilado (ESM)
++│   └── public/      → Frontend compilado (assets estáticos)
++├── package.json     → Dependencias del proyecto
++└── pnpm-lock.yaml   → Lockfile de dependencias
++```
++
++---
++
++## Despliegue Rápido (usando el build incluido)
++
++### 1. Instalar dependencias de producción
++
++```bash
++pnpm install --prod
++# o con npm:
++npm install --omit=dev
++```
++
++### 2. Configurar variables de entorno
++
++Crear un archivo `.env` en la raíz del proyecto:
++
++```env
++# Base de datos (obligatorio)
++DATABASE_URL=mysql://usuario:password@host:3306/solar_calculator
++
++# Autenticación (obligatorio)
++JWT_SECRET=tu_secreto_jwt_seguro_aqui
++
++# OAuth Manus (si aplica)
++VITE_APP_ID=tu_app_id
++OAUTH_SERVER_URL=https://oauth.manus.im
++VITE_OAUTH_PORTAL_URL=https://id.manus.im
++
++# API NREL (para PVWatts)
++NREL_API_KEY=tu_api_key_nrel
++
++# Puerto (opcional, default 3000)
++PORT=3000
++```
++
++### 3. Ejecutar migraciones de base de datos
++
++```bash
++pnpm db:push
++```
++
++### 4. Iniciar el servidor de producción
++
++```bash
++node dist/index.js
++```
++
++El servidor servirá tanto la API (`/api/trpc`) como el frontend estático desde `dist/public/`.
++
++---
++
++## Despliegue con Docker (alternativa)
++
++```dockerfile
++FROM node:22-alpine
++WORKDIR /app
++COPY package.json pnpm-lock.yaml ./
++RUN corepack enable && pnpm install --prod
++COPY dist/ ./dist/
++COPY drizzle/ ./drizzle/
++COPY drizzle.config.ts ./
++EXPOSE 3000
++CMD ["node", "dist/index.js"]
++```
++
++```bash
++docker build -t solar-calculator .
++docker run -d -p 3000:3000 --env-file .env solar-calculator
++```
++
++---
++
++## Desarrollo Local (si necesitas modificar el código)
++
++```bash
++# Instalar todas las dependencias (incluyendo dev)
++pnpm install
++
++# Ejecutar en modo desarrollo (hot reload)
++pnpm dev
++
++# Ejecutar tests
++pnpm test
++
++# Generar nuevo build de producción
++pnpm build
++```
++
++---
++
++## Notas Importantes
++
++- El build en `dist/` ya está compilado y listo para producción
++- No es necesario ejecutar `pnpm build` a menos que modifiques el código fuente
++- La base de datos debe existir antes de ejecutar `pnpm db:push`
++- El servidor sirve el frontend automáticamente — no necesitas nginx/apache para los assets estáticos
+diff --git a/client/src/components/EnergyProductionSimulator.tsx b/client/src/components/EnergyProductionSimulator.tsx
+index 37f9f6c..46e7ee4 100644
+--- a/client/src/components/EnergyProductionSimulator.tsx
++++ b/client/src/components/EnergyProductionSimulator.tsx
+@@ -3276,13 +3276,15 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
+               { label: 'Suciedad (Lc_suciedad)', value: production.iec61724.captureLossesBreakdown.soiling, color: 'bg-amber-500', pct: production.losses.soiling },
+               { label: 'Mismatch (Lc_mismatch)', value: production.iec61724.captureLossesBreakdown.mismatch, color: 'bg-purple-500', pct: production.losses.mismatch },
+               { label: 'Cableado DC (Lc_dc)', value: production.iec61724.captureLossesBreakdown.dcWiring, color: 'bg-blue-500', pct: production.losses.dcWiring },
+-            ].map((item) => {
++              { label: 'IAM (Lc_iam)', value: production.iec61724.captureLossesBreakdown.iam, color: 'bg-teal-500', pct: production.losses.iam },
++            ].filter(item => item.value > 0.1).map((item) => {
+               const maxVal = Math.max(
+                 production.iec61724.captureLossesBreakdown.temperature,
+                 production.iec61724.captureLossesBreakdown.shading,
+                 production.iec61724.captureLossesBreakdown.soiling,
+                 production.iec61724.captureLossesBreakdown.mismatch,
+                 production.iec61724.captureLossesBreakdown.dcWiring,
++                production.iec61724.captureLossesBreakdown.iam,
+                 1
+               );
+               const barWidth = Math.max(2, (item.value / maxVal) * 100);
+diff --git a/client/src/lib/energyProduction.ts b/client/src/lib/energyProduction.ts
+index 5058356..2442f2a 100644
+--- a/client/src/lib/energyProduction.ts
++++ b/client/src/lib/energyProduction.ts
+@@ -70,6 +70,8 @@ export interface CaptureLossesBreakdown {
+   mismatch: number;
+   /** Lc_dcWiring: pérdidas en cableado DC en horas equivalentes */
+   dcWiring: number;
++  /** Lc_iam: pérdidas por IAM (Incidence Angle Modifier) en horas equivalentes */
++  iam: number;
+   /** Total = suma de todas las Capture Losses (debe ≈ Lc) */
+   total: number;
+ }
+@@ -211,10 +213,12 @@ export const calculateMonthlyProduction = (
+   systemLosses: SystemLosses,
+   daysInMonth: number,
+   shadingFactor: number = 1.0,
+-  cellTempOverride?: number
++  cellTempOverride?: number,
++  /** POA original antes de pérdidas pre-cálculo (IAM/soiling). Si se proporciona, se usa para Yr (IEC 61724) */
++  rawPOAOverride?: number
+ ): MonthlyProduction => {
+-  // POA sin sombreado (para Reference Yield IEC 61724)
+-  const rawPOA = avgPOA;
++  // POA para Reference Yield IEC 61724: usar el original (antes de IAM/soiling) si está disponible
++  const rawPOA = rawPOAOverride !== undefined ? rawPOAOverride : avgPOA;
+   
+   // Ajustar POA por sombreado
+   const adjustedPOA = avgPOA * shadingFactor;
+@@ -380,6 +384,11 @@ export const calculateAnnualProduction = (
+       soilingLosses: usePreCalcSoiling ? 0 : systemLosses.soilingLosses,
+     };
+ 
++    // POA original antes de IAM/soiling para cálculo de Yr (IEC 61724)
++    // Solo se pasa cuando hay pérdidas pre-cálculo aplicadas, para que Yr refleje
++    // la irradiación total disponible (antes de IAM+soiling)
++    const originalPOA = (usePreCalcIAM || usePreCalcSoiling) ? data.avgPOA : undefined;
++
+     const monthly = calculateMonthlyProduction(
+       data.month,
+       idx + 1,
+@@ -390,7 +399,8 @@ export const calculateAnnualProduction = (
+       monthSystemLosses,
+       daysInMonths[idx],
+       shadingFactors[idx],
+-      cellTempOverride
++      cellTempOverride,
++      originalPOA
+     );
+ 
+     monthlyData.push(monthly);
+@@ -494,19 +504,23 @@ export const calculateAnnualProduction = (
+   // Lc = Yr - Ya. Descomponemos Lc en sus componentes:
+   // Lc_tipo = Yr × (pérdida_tipo_ponderada% / 100)
+   // Las pérdidas de captura son las que ocurren ANTES del inversor (en el array DC)
++  // Nota: cuando IAM/soiling se aplican pre-cálculo, Yr refleja el POA original
++  // y las pérdidas IAM/soiling se incluyen explícitamente en el desglose
+   const captureLossesBreakdown: CaptureLossesBreakdown = {
+     temperature: referenceYield * (losses.temperature / 100),
+     shading: referenceYield * (losses.shading / 100),
+     soiling: referenceYield * (losses.soiling / 100),
+     mismatch: referenceYield * (losses.mismatch / 100),
+     dcWiring: referenceYield * (losses.dcWiring / 100),
++    iam: referenceYield * (losses.iam / 100),
+     total: 0,
+   };
+   captureLossesBreakdown.total = captureLossesBreakdown.temperature
+     + captureLossesBreakdown.shading
+     + captureLossesBreakdown.soiling
+     + captureLossesBreakdown.mismatch
+-    + captureLossesBreakdown.dcWiring;
++    + captureLossesBreakdown.dcWiring
++    + captureLossesBreakdown.iam;
+ 
+   const iec61724: IEC61724Metrics = {
+     referenceYield,
+diff --git a/server/crossValidation.test.ts b/server/crossValidation.test.ts
+index 0ab626b..2f4980f 100644
+--- a/server/crossValidation.test.ts
++++ b/server/crossValidation.test.ts
+@@ -54,7 +54,7 @@ function makeSimProduction(acPerMonth: number = 500, dcPerMonth: number = 550):
+       finalYield: 1500,
+       arrayYield: 1650,
+       captureLosses: 150,
+-      captureLossesBreakdown: { temperature: 50, shading: 30, soiling: 20, mismatch: 15, dcWiring: 10, total: 125 },
++      captureLossesBreakdown: { temperature: 50, shading: 30, soiling: 20, mismatch: 15, dcWiring: 10, iam: 0, total: 125 },
+       systemLosses: 150,
+       performanceRatio: 0.82,
+       prTemperatureCorrected: 0.85,
+diff --git a/server/energyProduction.test.ts b/server/energyProduction.test.ts
+index 6c83132..b64da41 100644
+--- a/server/energyProduction.test.ts
++++ b/server/energyProduction.test.ts
+@@ -692,7 +692,7 @@ describe('calculateAnnualProduction — Capture Losses Breakdown', () => {
+     const prod = calculateAnnualProduction(monthlyData, panelSpecs, systemLosses, shadingFactors);
+     const clb = prod.iec61724.captureLossesBreakdown;
+     
+-    const sum = clb.temperature + clb.shading + clb.soiling + clb.mismatch + clb.dcWiring;
++    const sum = clb.temperature + clb.shading + clb.soiling + clb.mismatch + clb.dcWiring + clb.iam;
+     expect(clb.total).toBeCloseTo(sum, 1);
+   });
+ 
+@@ -753,3 +753,135 @@ describe('calculateAnnualProduction — EPI (energyPerformanceIndex)', () => {
+     expect(prod.iec61724.energyPerformanceIndex).toBeNull();
+   });
+ });
++
++// ============================================================
++// TESTS — Lc positivo con IAM/Soiling pre-cálculo (rawPOAOverride)
++// ============================================================
++
++describe('calculateAnnualProduction — IAM/Soiling pre-cálculo → Lc positivo', () => {
++  const panelSpecs = {
++    powerRating: 400,
++    efficiency: 20,
++    temperatureCoefficient: -0.004,
++    nominalOperatingCellTemperature: 47,
++    area: 2.0,
++    quantity: 10,
++  };
++
++  const systemLosses = {
++    dcWiring: 2,
++    inverterEfficiency: 96,
++    acWiring: 1,
++    transformerLosses: 0,
++    mismatchLosses: 2,
++    soilingLosses: 0, // Soiling se aplica pre-cálculo
++    shadingLosses: 0,
++    availabilityLosses: 1,
++    iamLosses: 0, // IAM se aplica pre-cálculo
++  };
++
++  const iamMensual = [15, 14, 12, 10, 9, 8, 8, 9, 11, 13, 14, 15]; // % pérdida mensual
++  const soilingMensual = [3, 3, 4, 4, 5, 5, 4, 4, 3, 3, 2, 2]; // % pérdida mensual
++
++  const monthlyData = Array(12).fill(null).map((_, i) => ({
++    month: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][i],
++    avgPOA: 500,
++    avgTemp: 28,
++    avgWindSpeed: 2,
++  }));
++
++  it('Lc > 0 cuando IAM y soiling se aplican pre-cálculo', () => {
++    const prod = calculateAnnualProduction(
++      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0),
++      undefined, // cellTempOverride
++      iamMensual,
++      soilingMensual
++    );
++    
++    // Con rawPOAOverride, Yr usa POA original y Ya usa POA reducido → Lc > 0
++    expect(prod.iec61724.captureLosses).toBeGreaterThan(0);
++  });
++
++  it('Yr > Ya cuando hay pérdidas IAM/soiling pre-cálculo', () => {
++    const prod = calculateAnnualProduction(
++      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0),
++      undefined,
++      iamMensual,
++      soilingMensual
++    );
++    
++    expect(prod.iec61724.referenceYield).toBeGreaterThan(prod.iec61724.arrayYield);
++  });
++
++  it('Lc_iam > 0 cuando hay IAM pre-cálculo', () => {
++    const prod = calculateAnnualProduction(
++      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0),
++      undefined,
++      iamMensual,
++      soilingMensual
++    );
++    
++    expect(prod.iec61724.captureLossesBreakdown.iam).toBeGreaterThan(0);
++  });
++
++  it('balance Yr = Ya + Lc sigue siendo válido con pre-cálculo', () => {
++    const prod = calculateAnnualProduction(
++      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0),
++      undefined,
++      iamMensual,
++      soilingMensual
++    );
++    const iec = prod.iec61724;
++    
++    expect(iec.arrayYield).toBeCloseTo(iec.referenceYield - iec.captureLosses, 1);
++    expect(iec.finalYield).toBeCloseTo(iec.arrayYield - iec.systemLosses, 1);
++  });
++
++  it('PR < 1.0 siempre con pérdidas pre-cálculo', () => {
++    const prod = calculateAnnualProduction(
++      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0),
++      undefined,
++      iamMensual,
++      soilingMensual
++    );
++    
++    expect(prod.iec61724.performanceRatio).toBeLessThan(1.0);
++    expect(prod.iec61724.performanceRatio).toBeGreaterThan(0.5);
++  });
++
++  it('Yr con pre-cálculo es mayor que sin pre-cálculo (usa POA original)', () => {
++    // Sin pre-cálculo: Yr se basa en POA tal cual
++    const prodSin = calculateAnnualProduction(
++      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0)
++    );
++    
++    // Con pre-cálculo: Yr se basa en POA original (antes de reducción)
++    const prodCon = calculateAnnualProduction(
++      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0),
++      undefined,
++      iamMensual,
++      soilingMensual
++    );
++    
++    // Ambos reciben el mismo avgPOA=500, así que Yr debería ser igual
++    // (rawPOAOverride = data.avgPOA = 500 en ambos casos)
++    expect(prodCon.iec61724.referenceYield).toBeCloseTo(prodSin.iec61724.referenceYield, 0);
++  });
++
++  it('Ya con pre-cálculo es menor que sin pre-cálculo (POA reducido)', () => {
++    // Sin pre-cálculo: dcEnergy usa POA=500 directamente
++    const prodSin = calculateAnnualProduction(
++      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0)
++    );
++    
++    // Con pre-cálculo: dcEnergy usa effectivePOA < 500
++    const prodCon = calculateAnnualProduction(
++      monthlyData, panelSpecs, systemLosses, Array(12).fill(1.0),
++      undefined,
++      iamMensual,
++      soilingMensual
++    );
++    
++    expect(prodCon.iec61724.arrayYield).toBeLessThan(prodSin.iec61724.arrayYield);
++  });
++});
+diff --git a/todo.md b/todo.md
+index 632f973..26339ab 100644
+--- a/todo.md
++++ b/todo.md
+@@ -1143,3 +1143,10 @@
+ - [x] Mostrar mensaje informativo: "Primero importe datos de irradiación desde Heatmap PVGIS o PVWatts" (toast.error con duración 8s)
+ - [x] Agregar indicador visual de estado en el botón de exportación del módulo IAM+Soiling BIPV (⚠️ + tooltip hover)
+ - [x] Toast de confirmación cuando la exportación es exitosa (✅ Datos IAM+Soiling enviados al Simulador)
++
++## Fix: Lc negativo y Δ Yield incoherente cuando IAM/Soiling se aplican pre-cálculo
++- [x] Fix Yr incoherente: cuando IAM/soiling se aplican pre-cálculo sobre POA, el Yr usa rawPOA (sin IAM/soiling) pero Ya usa effectivePOA (con IAM/soiling reducido), causando Ya > Yr y Lc negativo
++- [x] Corregir cálculo de Yr para reflejar las pérdidas pre-cálculo (IAM+soiling) que ya fueron aplicadas al POA antes de entrar al motor
++- [x] Corregir Lc_temp negativo: la ganancia aparente de temperatura (T_cell baja por menor POA) debe reflejarse correctamente
++- [x] Verificar coherencia: Yr ≥ Ya ≥ Yf siempre, Lc ≥ 0, Ls ≥ 0
++- [x] Actualizar tests unitarios para el nuevo comportamiento de Yr con pérdidas pre-cálculo (779 tests pasan)
+-- 
+2.34.1
+

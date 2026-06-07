@@ -3276,13 +3276,15 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
               { label: 'Suciedad (Lc_suciedad)', value: production.iec61724.captureLossesBreakdown.soiling, color: 'bg-amber-500', pct: production.losses.soiling },
               { label: 'Mismatch (Lc_mismatch)', value: production.iec61724.captureLossesBreakdown.mismatch, color: 'bg-purple-500', pct: production.losses.mismatch },
               { label: 'Cableado DC (Lc_dc)', value: production.iec61724.captureLossesBreakdown.dcWiring, color: 'bg-blue-500', pct: production.losses.dcWiring },
-            ].map((item) => {
+              { label: 'IAM (Lc_iam)', value: production.iec61724.captureLossesBreakdown.iam, color: 'bg-teal-500', pct: production.losses.iam },
+            ].filter(item => item.value > 0.1).map((item) => {
               const maxVal = Math.max(
                 production.iec61724.captureLossesBreakdown.temperature,
                 production.iec61724.captureLossesBreakdown.shading,
                 production.iec61724.captureLossesBreakdown.soiling,
                 production.iec61724.captureLossesBreakdown.mismatch,
                 production.iec61724.captureLossesBreakdown.dcWiring,
+                production.iec61724.captureLossesBreakdown.iam,
                 1
               );
               const barWidth = Math.max(2, (item.value / maxVal) * 100);

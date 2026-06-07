@@ -70,6 +70,8 @@ export interface CaptureLossesBreakdown {
   mismatch: number;
   /** Lc_dcWiring: pérdidas en cableado DC en horas equivalentes */
   dcWiring: number;
+  /** Lc_iam: pérdidas por IAM (Incidence Angle Modifier) en horas equivalentes */
+  iam: number;
   /** Total = suma de todas las Capture Losses (debe ≈ Lc) */
   total: number;
 }
@@ -211,10 +213,12 @@ export const calculateMonthlyProduction = (
   systemLosses: SystemLosses,
   daysInMonth: number,
   shadingFactor: number = 1.0,
-  cellTempOverride?: number
+  cellTempOverride?: number,
+  /** POA original antes de pérdidas pre-cálculo (IAM/soiling). Si se proporciona, se usa para Yr (IEC 61724) */
+  rawPOAOverride?: number
 ): MonthlyProduction => {
-  // POA sin sombreado (para Reference Yield IEC 61724)
-  const rawPOA = avgPOA;
+  // POA para Reference Yield IEC 61724: usar el original (antes de IAM/soiling) si está disponible
+  const rawPOA = rawPOAOverride !== undefined ? rawPOAOverride : avgPOA;
   
   // Ajustar POA por sombreado
   const adjustedPOA = avgPOA * shadingFactor;
@@ -380,6 +384,11 @@ export const calculateAnnualProduction = (
       soilingLosses: usePreCalcSoiling ? 0 : systemLosses.soilingLosses,
     };
 
+    // POA original antes de IAM/soiling para cálculo de Yr (IEC 61724)
+    // Solo se pasa cuando hay pérdidas pre-cálculo aplicadas, para que Yr refleje
+    // la irradiación total disponible (antes de IAM+soiling)
+    const originalPOA = (usePreCalcIAM || usePreCalcSoiling) ? data.avgPOA : undefined;
+
     const monthly = calculateMonthlyProduction(
       data.month,
       idx + 1,
@@ -390,7 +399,8 @@ export const calculateAnnualProduction = (
       monthSystemLosses,
       daysInMonths[idx],
       shadingFactors[idx],
-      cellTempOverride
+      cellTempOverride,
+      originalPOA
     );
 
     monthlyData.push(monthly);
@@ -494,19 +504,23 @@ export const calculateAnnualProduction = (
   // Lc = Yr - Ya. Descomponemos Lc en sus componentes:
   // Lc_tipo = Yr × (pérdida_tipo_ponderada% / 100)
   // Las pérdidas de captura son las que ocurren ANTES del inversor (en el array DC)
+  // Nota: cuando IAM/soiling se aplican pre-cálculo, Yr refleja el POA original
+  // y las pérdidas IAM/soiling se incluyen explícitamente en el desglose
   const captureLossesBreakdown: CaptureLossesBreakdown = {
     temperature: referenceYield * (losses.temperature / 100),
     shading: referenceYield * (losses.shading / 100),
     soiling: referenceYield * (losses.soiling / 100),
     mismatch: referenceYield * (losses.mismatch / 100),
     dcWiring: referenceYield * (losses.dcWiring / 100),
+    iam: referenceYield * (losses.iam / 100),
     total: 0,
   };
   captureLossesBreakdown.total = captureLossesBreakdown.temperature
     + captureLossesBreakdown.shading
     + captureLossesBreakdown.soiling
     + captureLossesBreakdown.mismatch
-    + captureLossesBreakdown.dcWiring;
+    + captureLossesBreakdown.dcWiring
+    + captureLossesBreakdown.iam;
 
   const iec61724: IEC61724Metrics = {
     referenceYield,

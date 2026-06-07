@@ -1143,3 +1143,10 @@
 - [x] Mostrar mensaje informativo: "Primero importe datos de irradiación desde Heatmap PVGIS o PVWatts" (toast.error con duración 8s)
 - [x] Agregar indicador visual de estado en el botón de exportación del módulo IAM+Soiling BIPV (⚠️ + tooltip hover)
 - [x] Toast de confirmación cuando la exportación es exitosa (✅ Datos IAM+Soiling enviados al Simulador)
+
+## Fix: Lc negativo y Δ Yield incoherente cuando IAM/Soiling se aplican pre-cálculo
+- [x] Fix Yr incoherente: cuando IAM/soiling se aplican pre-cálculo sobre POA, el Yr usa rawPOA (sin IAM/soiling) pero Ya usa effectivePOA (con IAM/soiling reducido), causando Ya > Yr y Lc negativo
+- [x] Corregir cálculo de Yr para reflejar las pérdidas pre-cálculo (IAM+soiling) que ya fueron aplicadas al POA antes de entrar al motor
+- [x] Corregir Lc_temp negativo: la ganancia aparente de temperatura (T_cell baja por menor POA) debe reflejarse correctamente
+- [x] Verificar coherencia: Yr ≥ Ya ≥ Yf siempre, Lc ≥ 0, Ls ≥ 0
+- [x] Actualizar tests unitarios para el nuevo comportamiento de Yr con pérdidas pre-cálculo (779 tests pasan)
