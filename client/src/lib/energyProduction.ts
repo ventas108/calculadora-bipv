@@ -36,6 +36,7 @@ export interface MonthlyProduction {
   avgTemp: number;
   avgPOA: number; // POA efectivo después de sombreado (W/m²)
   rawPOA: number; // POA antes de sombreado (W/m²) — para cálculo de Yr
+  H_i_m: number; // Irradiación mensual POA (kWh/m²/mes) — para Yr IEC 61724
   cellTemperature: number;
   panelEfficiency: number;
   dcPower: number;
@@ -215,7 +216,8 @@ export const calculateMonthlyProduction = (
   shadingFactor: number = 1.0,
   cellTempOverride?: number,
   /** POA original antes de pérdidas pre-cálculo (IAM/soiling). Si se proporciona, se usa para Yr (IEC 61724) */
-  rawPOAOverride?: number
+  rawPOAOverride?: number,
+  H_i_m?: number
 ): MonthlyProduction => {
   // POA para Reference Yield IEC 61724: usar el original (antes de IAM/soiling) si está disponible
   const rawPOA = rawPOAOverride !== undefined ? rawPOAOverride : avgPOA;
@@ -249,16 +251,13 @@ export const calculateMonthlyProduction = (
   const acPower = calculateACPower(dcPower, systemLosses);
 
   // Calcular energía (kWh)
-  const hoursInMonth = daysInMonth * 24;
-  const dcEnergy = (dcPower * hoursInMonth) / 1000; // kWh
-  const acEnergy = (acPower * hoursInMonth) / 1000; // kWh
+  const solarHoursMonth = (H_i_m ?? (rawPOA * daysInMonth * 24 / 1000)) / (rawPOA > 0 ? rawPOA / 1000 : 1);
+  const dcEnergy = (dcPower * solarHoursMonth) / 1000; // kWh
+  const acEnergy = (acPower * solarHoursMonth) / 1000; // kWh
 
   // Energía de referencia STC: lo que produciría el sistema a eficiencia nominal
-  // E_ref = POA_raw × horas × P_nom / G_ref
-  // Equivalente a: POA_raw(W/m²) × horas × A_total(m²) × η_nom / 1000
-  // O más simple: (POA_raw / G_ref) × P_nom_total × horas / 1000
   const installedCapacityW = panelSpecs.powerRating * panelSpecs.quantity;
-  const referenceEnergy = (rawPOA / 1000) * (installedCapacityW / 1000) * hoursInMonth; // kWh
+  const referenceEnergy = (rawPOA / 1000) * (installedCapacityW / 1000) * solarHoursMonth; // kWh
 
   // Calcular pérdidas individuales
   const losses = {
@@ -278,6 +277,7 @@ export const calculateMonthlyProduction = (
     avgTemp,
     avgPOA: adjustedPOA,
     rawPOA,
+    H_i_m: H_i_m ?? (rawPOA * daysInMonth * 24) / 1000,
     cellTemperature: cellTemp,
     panelEfficiency,
     dcPower,
@@ -314,6 +314,7 @@ export const calculateAnnualProduction = (
     diffusePOA?: number;
     /** Componente reflejada del POA (W/m²) — no afectada por IAM */
     reflectedPOA?: number;
+    H_i_m?: number;
   }>,
   panelSpecs: PanelSpecifications,
   systemLosses: SystemLosses,
@@ -400,8 +401,12 @@ export const calculateAnnualProduction = (
       daysInMonths[idx],
       shadingFactors[idx],
       cellTempOverride,
-      originalPOA
+      originalPOA,
+      data.H_i_m
     );
+
+    // Sobreescribir H_i_m con el valor real de PVGIS si está disponible
+    if (data.H_i_m !== undefined) monthly.H_i_m = data.H_i_m;
 
     monthlyData.push(monthly);
     totalDCEnergy += monthly.dcEnergy;
@@ -452,7 +457,7 @@ export const calculateAnnualProduction = (
   // Reference Yield: Yr = H_POA / G_ref
   // H_POA = Σ(POA_raw_i × horas_i) en Wh/m², dividido por 1000 para kWh/m²
   const totalPOAIrradiation = monthlyData.reduce((sum, m, idx) => {
-    return sum + (m.rawPOA * daysInMonths[idx] * 24) / 1000; // kWh/m²
+    return sum + (m.H_i_m ?? (m.rawPOA * daysInMonths[idx] * 24) / 1000); // kWh/m²
   }, 0);
   const referenceYield = totalPOAIrradiation / (G_REF / 1000); // horas equivalentes = kWh/m² / (kW/m²)
 
