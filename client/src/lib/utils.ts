@@ -4,3 +4,12 @@ import { twMerge } from "tailwind-merge";
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+export function sanitizeFilename(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // remove accents
+    .replace(/[^a-zA-Z0-9-_]/g, "_") // replace non-alphanumeric/dash/underscore with _
+    .replace(/_+/g, "_")             // merge consecutive underscores
+    .replace(/^_+|_+$/g, "");        // trim leading/trailing underscores
+}
