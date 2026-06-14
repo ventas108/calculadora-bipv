@@ -110,6 +110,24 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
   const [selectedTech, setSelectedTech] = useState<PanelTechnology>(DEFAULT_PANEL_TECHNOLOGIES[0]);
   const [yearsFromInstall, setYearsFromInstall] = useState(0);
 
+  // Toggle for 3D model vs manual shading
+  const [use3DShading, setUse3DShading] = useState(!!facadeAnalysis3D);
+
+  useEffect(() => {
+    if (facadeAnalysis3D) {
+      setUse3DShading(true);
+    } else {
+      setUse3DShading(false);
+    }
+  }, [facadeAnalysis3D]);
+
+  const activeShadingFactors = useMemo(() => {
+    if (use3DShading && facadeAnalysis3D) {
+      return facadeAnalysis3D.monthlyShadingFactors;
+    }
+    return shadingFactors;
+  }, [use3DShading, facadeAnalysis3D, shadingFactors]);
+
   // Auto-detección de región climática colombiana
   const detectedRegion = useMemo(() => {
     return detectColombianRegion(weatherData.location.latitude, weatherData.location.longitude);
@@ -868,8 +886,8 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
     const cellTempFieldOverride = (fieldMeasurementsEnabled && fieldCellTemp !== null)
       ? fieldCellTemp
       : undefined;
-    return calculateAnnualProduction(monthlyPOAData, panelSpecs, systemLosses, shadingFactors, cellTempFieldOverride, iamMensualData, soilingMensualData);
-  }, [monthlyPOAData, panelSpecs, systemLosses, shadingFactors, fieldMeasurementsEnabled, fieldCellTemp, iamMensualData, soilingMensualData]);
+    return calculateAnnualProduction(monthlyPOAData, panelSpecs, systemLosses, activeShadingFactors, cellTempFieldOverride, iamMensualData, soilingMensualData);
+  }, [monthlyPOAData, panelSpecs, systemLosses, activeShadingFactors, fieldMeasurementsEnabled, fieldCellTemp, iamMensualData, soilingMensualData]);
 
   // ===== ENERGY PERFORMANCE INDEX (EPI) - IEC 61724-1:2021 =====
   // EPI = E_AC_simulador / E_AC_benchmark (PVWatts como benchmark satelital)
@@ -977,8 +995,8 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
 
   const COLORS = ['#EF4444', '#F97316', '#F59E0B', '#FBBF24', '#A3E635', '#4ADE80', '#22C55E', '#10B981'];
 
-  const hasShadingData = shadingFactors.some(f => f < 1.0);
-  const avgShadingFactor = shadingFactors.reduce((a, b) => a + b, 0) / 12;
+  const hasShadingData = activeShadingFactors.some(f => f < 1.0);
+  const avgShadingFactor = activeShadingFactors.reduce((a, b) => a + b, 0) / 12;
 
   return (
     <div className="space-y-6">
@@ -1592,10 +1610,10 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
           Integración del Simulador
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-          <div className={`flex items-center gap-2 p-2 rounded ${facadeAnalysis3D ? 'bg-purple-100 text-purple-800' : hasShadingData ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+          <div className={`flex items-center gap-2 p-2 rounded ${(use3DShading && facadeAnalysis3D) ? 'bg-purple-100 text-purple-800' : hasShadingData ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
             <Shield size={14} />
             <span>
-              <strong>Sombreado:</strong> {facadeAnalysis3D
+              <strong>Sombreado:</strong> {(use3DShading && facadeAnalysis3D)
                 ? `Modelo 3D: ${facadeAnalysis3D.facadeName} (FS=${(facadeAnalysis3D.annualFS * 100).toFixed(1)}%, Pérdida=${facadeAnalysis3D.annualShadingLoss.toFixed(1)}%)`
                 : hasShadingData
                 ? `Activo (FS prom. ${(avgShadingFactor * 100).toFixed(1)}%)`
@@ -1630,48 +1648,67 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
       {/* ===== SELECTOR DE FACHADA DEL MODELO 3D ===== */}
       {modelFacades.length > 0 && onFacadeSelectFromSimulator && (
         <div className="bg-gradient-to-r from-purple-50 to-fuchsia-50 border border-purple-200 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-purple-900 mb-3 flex items-center gap-2">
-            <Building2 size={16} className="text-purple-600" />
-            Selector de Superficie BIPV — Modelo 3D ({modelFacades.length} superficies)
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {modelFacades.map((facade, idx) => {
-              const isActive = facadeAnalysis3D?.facadeIdx === idx;
-              return (
-                <button
-                  key={idx}
-                  onClick={() => onFacadeSelectFromSimulator(idx)}
-                  className={`flex items-center gap-2 p-2.5 rounded-lg border text-left transition-all text-xs ${
-                    isActive
-                      ? 'bg-purple-100 border-purple-400 ring-2 ring-purple-300 shadow-sm'
-                      : 'bg-white/80 border-gray-200 hover:bg-purple-50 hover:border-purple-300'
-                  }`}
-                >
-                  <div
-                    className="w-3.5 h-3.5 rounded-full flex-shrink-0 border border-gray-300"
-                    style={{ backgroundColor: facade.color }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-gray-800 truncate">
-                      {facade.name}
-                      {isActive && <span className="ml-1 text-purple-600">✓</span>}
-                    </div>
-                    <div className="text-[10px] text-gray-500">
-                      Az: {facade.azimuthNormal.toFixed(0)}° | Incl: {facade.tilt.toFixed(0)}° | {facade.area.toFixed(1)} m²
-                    </div>
-                    {isActive && facadeAnalysis3D && (
-                      <div className="text-[10px] text-purple-700 font-medium mt-0.5">
-                        FS={( facadeAnalysis3D.annualFS * 100).toFixed(1)}% | Pérdida={facadeAnalysis3D.annualShadingLoss.toFixed(1)}%
-                      </div>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h3 className="text-sm font-semibold text-purple-900 flex items-center gap-2">
+              <Building2 size={16} className="text-purple-600" />
+              Selector de Superficie BIPV — Modelo 3D ({modelFacades.length} superficies)
+            </h3>
+            <label className="flex items-center gap-2 text-xs text-purple-700 font-semibold cursor-pointer">
+              <input
+                type="checkbox"
+                checked={use3DShading}
+                onChange={(e) => setUse3DShading(e.target.checked)}
+                className="rounded border-purple-400 text-purple-600 focus:ring-purple-400 accent-purple-600"
+              />
+              Usar sombreado y fachada del modelo 3D
+            </label>
           </div>
-          <p className="text-[10px] text-purple-600 mt-2">
-            Haz clic en una superficie para recalcular la producción BIPV desde esa perspectiva. Los FS mensuales se actualizan automáticamente.
-          </p>
+          {use3DShading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {modelFacades.map((facade, idx) => {
+                const isActive = facadeAnalysis3D?.facadeIdx === idx;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => onFacadeSelectFromSimulator(idx)}
+                    className={`flex items-center gap-2 p-2.5 rounded-lg border text-left transition-all text-xs ${
+                      isActive
+                        ? 'bg-purple-100 border-purple-400 ring-2 ring-purple-300 shadow-sm'
+                        : 'bg-white/80 border-gray-200 hover:bg-purple-50 hover:border-purple-300'
+                    }`}
+                  >
+                    <div
+                      className="w-3.5 h-3.5 rounded-full flex-shrink-0 border border-gray-300"
+                      style={{ backgroundColor: facade.color }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-800 truncate">
+                        {facade.name}
+                        {isActive && <span className="ml-1 text-purple-600">✓</span>}
+                      </div>
+                      <div className="text-[10px] text-gray-500">
+                        Az: {facade.azimuthNormal.toFixed(0)}° | Incl: {facade.tilt.toFixed(0)}° | {facade.area.toFixed(1)} m²
+                      </div>
+                      {isActive && facadeAnalysis3D && (
+                        <div className="text-[10px] text-purple-700 font-medium mt-0.5">
+                          FS={( facadeAnalysis3D.annualFS * 100).toFixed(1)}% | Pérdida={facadeAnalysis3D.annualShadingLoss.toFixed(1)}%
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-[10px] text-amber-600 font-medium">
+              ⚠️ Se está aplicando la orientación manual del panel/POA y los factores de sombreado de la Calculadora.
+            </p>
+          )}
+          {use3DShading && (
+            <p className="text-[10px] text-purple-600 mt-2">
+              Haz clic en una superficie para recalcular la producción BIPV desde esa perspectiva. Los FS mensuales se actualizan automáticamente.
+            </p>
+          )}
         </div>
       )}
 
@@ -2629,27 +2666,33 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
       </div>
 
       {/* Shading Factors Display */}
-      <div style={{ display: (hasShadingData || facadeAnalysis3D) ? 'block' : 'none' }}>
-        <div className={`${facadeAnalysis3D ? 'bg-purple-50 border-purple-200' : 'bg-amber-50 border-amber-200'} border rounded-lg p-4`}>
-          <h4 className={`font-semibold ${facadeAnalysis3D ? 'text-purple-900' : 'text-amber-900'} mb-2 text-sm flex items-center gap-2`}>
+      <div style={{ display: (hasShadingData || (use3DShading && facadeAnalysis3D)) ? 'block' : 'none' }}>
+        <div className={`${(use3DShading && facadeAnalysis3D) ? 'bg-purple-50 border-purple-200' : 'bg-amber-50 border-amber-200'} border rounded-lg p-4`}>
+          <h4 className={`font-semibold ${(use3DShading && facadeAnalysis3D) ? 'text-purple-900' : 'text-amber-900'} mb-2 text-sm flex items-center gap-2`}>
             <Shield size={14} />
-            {facadeAnalysis3D
+            {(use3DShading && facadeAnalysis3D)
               ? `Factores de Sombreado — Modelo 3D: ${facadeAnalysis3D.facadeName} (Az ${facadeAnalysis3D.azimuth.toFixed(0)}°, Incl ${facadeAnalysis3D.tilt.toFixed(0)}°, ${facadeAnalysis3D.area.toFixed(1)} m²)`
               : 'Factores de Sombreado Aplicados (desde Calculadora)'}
           </h4>
-          {facadeAnalysis3D && (
+          {(use3DShading && facadeAnalysis3D) && (
             <p className="text-xs text-purple-700 mb-2">
               FS anual: <strong>{(facadeAnalysis3D.annualFS * 100).toFixed(1)}%</strong> | 
               Pérdida por sombra: <strong>{facadeAnalysis3D.annualShadingLoss.toFixed(1)}%</strong> | 
               Horas sol efectivas: <strong>{facadeAnalysis3D.monthlyData.reduce((a, m) => a + m.effectiveSunHours, 0).toFixed(0)}h</strong> de {facadeAnalysis3D.monthlyData.reduce((a, m) => a + m.totalSunHours, 0).toFixed(0)}h disponibles
             </p>
           )}
+          {(!use3DShading && hasShadingData) && (
+            <p className="text-xs text-amber-700 mb-2">
+              FS anual promedio: <strong>{(avgShadingFactor * 100).toFixed(1)}%</strong> | 
+              Pérdida promedio de sombreado: <strong>{((1 - avgShadingFactor) * 100).toFixed(1)}%</strong>
+            </p>
+          )}
           <div className="grid grid-cols-6 md:grid-cols-12 gap-1">
             {MONTHS.map((m, i) => (
               <div key={m} className="text-center">
                 <p className="text-[10px] text-gray-500">{m}</p>
-                <p className={`text-xs font-mono font-bold ${shadingFactors[i] < 0.9 ? 'text-red-600' : shadingFactors[i] < 1.0 ? 'text-amber-600' : 'text-green-600'}`}>
-                  {(shadingFactors[i] * 100).toFixed(0)}%
+                <p className={`text-xs font-mono font-bold ${activeShadingFactors[i] < 0.9 ? 'text-red-600' : activeShadingFactors[i] < 1.0 ? 'text-amber-600' : 'text-green-600'}`}>
+                  {(activeShadingFactors[i] * 100).toFixed(0)}%
                 </p>
               </div>
             ))}
