@@ -484,7 +484,7 @@ export function MapView({
     const observer = new ResizeObserver(() => {
       if ((map.current as any)?._leafletMap) {
         (map.current as any)._leafletMap.invalidateSize();
-      } else if (window.google?.maps?.event) {
+      } else if (window.google?.maps?.event && map.current) {
         window.google.maps.event.trigger(map.current, "resize");
       }
     });

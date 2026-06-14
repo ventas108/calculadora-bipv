@@ -16,7 +16,7 @@ import PVGISAnalyzer, { PVGISToSimulatorData } from '@/components/PVGISAnalyzer'
 import BIPVDiagnostic from '@/components/BIPVDiagnostic';
 import BIPVGlassSimulator from '@/components/BIPVGlassSimulator';
 import { BIPVToEnergyData } from '@/lib/bipvToEnergyBridge';
-import { EPWData } from '@/lib/epwParser';
+import { EPWData, getWeatherCorrectionFactor } from '@/lib/epwParser';
 import { runBIPVSimulation, type WeatherHourData, type BIPVSimulationConfig } from '@/lib/iamSoilingEngine';
 import { BIPV_GLASS_CATALOG } from '@/lib/bipvGlassCatalog';
 import { calculateHourlyPOA } from '@/lib/liuJordanModel';
@@ -42,7 +42,35 @@ export default function Home() {
   const [weatherData, setWeatherData] = useState<EPWData | null>(null);
   const [selectedCity, setSelectedCity] = useState<CityWeatherData | null>(null);
   const [shadingPoints, setShadingPoints] = useState<any[]>([]);
-  const [monthlyShadingFactors, setMonthlyShadingFactors] = useState<number[]>(Array(12).fill(1.0));
+
+  // Calcular factores de sombreado mensuales promedio de manera reactiva (con o sin meteorología)
+  const monthlyShadingFactors = useMemo(() => {
+    const monthlyFactors = Array(12).fill(1.0);
+    const monthCounts = Array(12).fill(0);
+    const monthSums = Array(12).fill(0);
+    const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    
+    shadingPoints.forEach(p => {
+      const idx = MONTH_NAMES.indexOf(p.month);
+      if (idx >= 0) {
+        let finalFS = p.fs;
+        if (weatherData) {
+          const monthNum = idx + 1;
+          const correction = getWeatherCorrectionFactor(weatherData, monthNum, p.day, p.hour);
+          finalFS = p.fs * correction;
+        }
+        monthSums[idx] += finalFS;
+        monthCounts[idx]++;
+      }
+    });
+    for (let i = 0; i < 12; i++) {
+      if (monthCounts[i] > 0) {
+        monthlyFactors[i] = monthSums[i] / monthCounts[i];
+      }
+    }
+    return monthlyFactors;
+  }, [shadingPoints, weatherData]);
+
   // Análisis 3D de fachada activa (prioridad sobre puntos manuales)
   const [facadeAnalysis3D, setFacadeAnalysis3D] = useState<FacadeFullAnalysis | null>(null);
   // Lista de fachadas del modelo 3D para el selector en el Simulador
@@ -105,24 +133,6 @@ export default function Home() {
   // Callback para recibir factores de sombreado de la calculadora
   const handleShadingPointsChange = useCallback((points: Array<{month: string; day: number; hour: number; solarHeight: number; solarAzimuth: number; obstacle: string; shadedArea: number; fs: number}>) => {
     setShadingPoints(points);
-    // Calcular factores de sombreado mensuales promedio
-    const monthlyFactors = Array(12).fill(1.0);
-    const monthCounts = Array(12).fill(0);
-    const monthSums = Array(12).fill(0);
-    const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-    points.forEach(p => {
-      const idx = MONTH_NAMES.indexOf(p.month);
-      if (idx >= 0) {
-        monthSums[idx] += p.fs;
-        monthCounts[idx]++;
-      }
-    });
-    for (let i = 0; i < 12; i++) {
-      if (monthCounts[i] > 0) {
-        monthlyFactors[i] = monthSums[i] / monthCounts[i];
-      }
-    }
-    setMonthlyShadingFactors(monthlyFactors);
   }, []);
 
   // Mark PVGISAnalyzer as ever-shown when navigating to it
@@ -844,6 +854,7 @@ export default function Home() {
               annualFS: facadeAnalysis3D.monthlyShadingFactors.reduce((a, b) => a + b, 0) / 12,
               annualShadingLoss: (1 - facadeAnalysis3D.monthlyShadingFactors.reduce((a, b) => a + b, 0) / 12) * 100,
             } : undefined}
+            shadingFactors={facadeAnalysis3D ? facadeAnalysis3D.monthlyShadingFactors : monthlyShadingFactors}
             obstacleVertices3D={modelObstacles3D}
             onSendToEnergySimulator={handleBipvToSimulator}
             hasIrradianceData={!!(weatherData || prospectorData)}

@@ -125,7 +125,7 @@ export default function CityMapExplorer({ cities, onSelectCity, onAddCity, onDel
 
       geocoder.geocode(
         { address: searchQuery },
-        (results: google.maps.GeocoderResult[] | null, status: google.maps.GeocoderStatus) => {
+        (results, status) => {
           setSearching(false);
 
           if (status === window.google.maps.GeocoderStatus.OK && results && results.length > 0) {

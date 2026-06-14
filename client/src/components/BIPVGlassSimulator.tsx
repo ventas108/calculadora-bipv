@@ -148,6 +148,8 @@ interface BIPVGlassSimulatorProps {
     annualFS: number;
     annualShadingLoss: number;
   } | null;
+  /** Factores de sombreado mensuales (manuales o de fachada) */
+  shadingFactors?: number[];
   /** Indica si hay datos de irradiación cargados (EPW/PVGIS/PVWatts) para validar orden de importación */
   hasIrradianceData?: boolean;
 }
@@ -195,6 +197,7 @@ export default function BIPVGlassSimulator({
   obstacleVertices3D,
   modelNorthOffset = 0,
   facadeAnalysis3D,
+  shadingFactors,
   onSendToEnergySimulator,
   hasIrradianceData = false,
 }: BIPVGlassSimulatorProps) {
@@ -381,13 +384,24 @@ export default function BIPVGlassSimulator({
     return [];
   }, [obstacles, obstaclePolygons]);
 
-  // ─── Factores de sombreado mensuales desde análisis 3D ────────────────────
+  // ─── Factores de sombreado mensuales desde análisis 3D o manual ────────────────────
+  const { hasManualShading, annualManualLoss } = useMemo(() => {
+    const hasShading = !!(shadingFactors && shadingFactors.some(f => f < 1.0));
+    const annualLoss = hasShading ? (1 - shadingFactors!.reduce((a, b) => a + b, 0) / 12) * 100 : 0;
+    return { hasManualShading: hasShading, annualManualLoss: annualLoss };
+  }, [shadingFactors]);
+
   const monthlyShadingFactors3D = useMemo<number[]>(() => {
-    if (facadeAnalysis3D && applyShadingFactors) {
-      return facadeAnalysis3D.monthlyShadingFactors;
+    if (applyShadingFactors) {
+      if (facadeAnalysis3D) {
+        return facadeAnalysis3D.monthlyShadingFactors;
+      }
+      if (shadingFactors) {
+        return shadingFactors;
+      }
     }
     return Array(12).fill(1.0); // Sin sombreado
-  }, [facadeAnalysis3D, applyShadingFactors]);
+  }, [facadeAnalysis3D, shadingFactors, applyShadingFactors]);
 
   const facadeParams = useMemo(() => {
     if (useFacadeFromModel && facades && facades[selectedFacadeIdx]) {
@@ -810,10 +824,10 @@ export default function BIPVGlassSimulator({
             Obstáculos ({effectiveObstacles.length})
           </div>
           <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${
-            facadeAnalysis3D ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-50 text-gray-400 border border-gray-200'
+            (facadeAnalysis3D || hasManualShading) ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-50 text-gray-400 border border-gray-200'
           }`}>
-            <span>{facadeAnalysis3D ? '✅' : '⚪'}</span>
-            Sombreado 3D {facadeAnalysis3D ? `(${(facadeAnalysis3D.annualShadingLoss).toFixed(0)}%)` : '(No)'}
+            <span>{(facadeAnalysis3D || hasManualShading) ? '✅' : '⚪'}</span>
+            Sombreado {facadeAnalysis3D ? `3D (${(facadeAnalysis3D.annualShadingLoss).toFixed(0)}%)` : hasManualShading ? `Manual (${annualManualLoss.toFixed(0)}%)` : '(No)'}
           </div>
           <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${
             latitude !== 6.25 ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'
@@ -1259,16 +1273,22 @@ export default function BIPVGlassSimulator({
             )}
           </div>
 
-          {/* Sombreado 3D */}
-          {facadeAnalysis3D && (
+          {/* Sombreado 3D o Manual */}
+          {(facadeAnalysis3D || hasManualShading) && (
             <div className="bg-white border-2 border-orange-100 rounded-xl p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">🌤️</span>
                   <div>
-                    <h4 className="text-sm font-bold text-gray-800">Sombreado 3D Aplicado</h4>
+                    <h4 className="text-sm font-bold text-gray-800">
+                      Sombreado {facadeAnalysis3D ? '3D' : 'Manual'} Aplicado
+                    </h4>
                     <p className="text-xs text-gray-600">
-                      Fachada: <strong>{facadeAnalysis3D.facadeName}</strong> — Pérdida anual: <strong className="text-orange-600">{(facadeAnalysis3D.annualShadingLoss).toFixed(1)}%</strong> — FS medio: {facadeAnalysis3D.annualFS.toFixed(3)}
+                      {facadeAnalysis3D ? (
+                        <>Fachada: <strong>{facadeAnalysis3D.facadeName}</strong> — Pérdida anual: <strong className="text-orange-600">{(facadeAnalysis3D.annualShadingLoss).toFixed(1)}%</strong> — FS medio: {facadeAnalysis3D.annualFS.toFixed(3)}</>
+                      ) : (
+                        <>Pérdida anual: <strong className="text-orange-600">{annualManualLoss.toFixed(1)}%</strong> — FS medio: {(shadingFactors!.reduce((a, b) => a + b, 0) / 12).toFixed(3)}</>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -1284,17 +1304,20 @@ export default function BIPVGlassSimulator({
               </div>
               {applyShadingFactors && (
                 <div className="mt-2 grid grid-cols-12 gap-1">
-                  {['E','F','M','A','M','J','J','A','S','O','N','D'].map((m, i) => (
-                    <div key={i} className="text-center">
-                      <div className="text-[9px] text-gray-500">{m}</div>
-                      <div className={`text-[10px] font-bold ${
-                        facadeAnalysis3D.monthlyShadingFactors[i] < 0.8 ? 'text-red-600' :
-                        facadeAnalysis3D.monthlyShadingFactors[i] < 0.95 ? 'text-orange-600' : 'text-green-600'
-                      }`}>
-                        {(facadeAnalysis3D.monthlyShadingFactors[i] * 100).toFixed(0)}%
+                  {['E','F','M','A','M','J','J','A','S','O','N','D'].map((m, i) => {
+                    const factor = facadeAnalysis3D ? facadeAnalysis3D.monthlyShadingFactors[i] : shadingFactors![i];
+                    return (
+                      <div key={i} className="text-center">
+                        <div className="text-[9px] text-gray-500">{m}</div>
+                        <div className={`text-[10px] font-bold ${
+                          factor < 0.8 ? 'text-red-600' :
+                          factor < 0.95 ? 'text-orange-600' : 'text-green-600'
+                        }`}>
+                          {(factor * 100).toFixed(0)}%
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
