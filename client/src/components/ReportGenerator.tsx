@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FileText, Download, Loader, AlertTriangle, Save, Trash2, BarChart3 } from 'lucide-react';
-import { sanitizeFilename } from '@/lib/utils';
+import { sanitizeFilename, downloadFile } from '@/lib/utils';
 import { toast } from 'sonner';
 import { generateSolarReport, MultiFacadeData } from '@/lib/reportGenerator';
 import { generateGlobalReport } from '@/lib/globalReportGenerator';
@@ -180,7 +180,8 @@ export default function ReportGenerator({
 
       const pdf = generateSolarReport(reportData);
       const safeName = sanitizeFilename(reportName) || 'Reporte_Solar';
-      pdf.save(`${safeName}.pdf`);
+      const blob = pdf.output('blob');
+      downloadFile(blob, `${safeName}.pdf`);
 
       toast.success(`✓ Reporte generado: ${safeName}.pdf`);
     } catch (error) {
@@ -278,7 +279,8 @@ export default function ReportGenerator({
         elevation,
       });
       const safeCityName = sanitizeFilename(city) || 'Global';
-      pdf.save(`Reporte_Global_Comparativo_${safeCityName}_${new Date().getFullYear()}.pdf`);
+      const blob = pdf.output('blob');
+      downloadFile(blob, `Reporte_Global_Comparativo_${safeCityName}_${new Date().getFullYear()}.pdf`);
       toast.success('✓ Reporte global comparativo generado');
     } catch (error) {
       console.error('Global report error:', error);

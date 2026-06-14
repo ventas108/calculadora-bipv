@@ -13,3 +13,17 @@ export function sanitizeFilename(name: string): string {
     .replace(/_+/g, "_")             // merge consecutive underscores
     .replace(/^_+|_+$/g, "");        // trim leading/trailing underscores
 }
+
+export function downloadFile(blob: Blob, filename: string) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}

@@ -33,6 +33,7 @@ vi.mock('jspdf', () => {
     getNumberOfPages: () => 1,
     setPage: vi.fn(),
     save: vi.fn(),
+    output: vi.fn(() => new Blob()),
     getTextWidth: () => 50,
     lastAutoTable: { finalY: 50 },
   };
