@@ -20,6 +20,7 @@ async function startServer() {
 
   // Handle client-side routing - serve index.html for all routes
   app.get("*", (_req, res) => {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
     res.sendFile(path.join(staticPath, "index.html"));
   });
 

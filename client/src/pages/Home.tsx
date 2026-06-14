@@ -747,7 +747,7 @@ export default function Home() {
       </header>
 
       <main className="container py-12">
-        {view === 'calculator' && <ShadingCalculator templateData={templateData} weatherData={weatherData} onPointsChange={handleShadingPointsChange} onWeatherDataOverride={setWeatherData} onFacadeAnalysis3D={setFacadeAnalysis3D} onModelDataReady={(data) => { setModelFacades(data.facades); setModelObstacles3D(data.obstacleVertices3D); setModelNorthOffset(data.northOffset); }} externalActiveFacadeIdx={externalFacadeIdx} />}
+        {view === 'calculator' && <ShadingCalculator initialPoints={shadingPoints} templateData={templateData} weatherData={weatherData} onPointsChange={handleShadingPointsChange} onWeatherDataOverride={setWeatherData} onFacadeAnalysis3D={setFacadeAnalysis3D} onModelDataReady={(data) => { setModelFacades(data.facades); setModelObstacles3D(data.obstacleVertices3D); setModelNorthOffset(data.northOffset); }} externalActiveFacadeIdx={externalFacadeIdx} />}
         {view === 'templates' && <TemplateManager onLoadTemplate={handleLoadTemplate} />}
         {view === 'cities' && <CityWeatherLibrary onSelectCity={handleSelectCity} selectedCityId={selectedCity?.id || null} />}
         {view === 'map' && <CityMapExplorer cities={mapCities} onSelectCity={(city) => {
