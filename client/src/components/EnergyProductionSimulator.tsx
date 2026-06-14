@@ -110,14 +110,19 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
   const [selectedTech, setSelectedTech] = useState<PanelTechnology>(DEFAULT_PANEL_TECHNOLOGIES[0]);
   const [yearsFromInstall, setYearsFromInstall] = useState(0);
 
-  // Toggle for 3D model vs manual shading
-  const [use3DShading, setUse3DShading] = useState(!!facadeAnalysis3D);
+  // Toggle for 3D model vs manual shading (default to false/manual on mount)
+  const [use3DShading, setUse3DShading] = useState(false);
+  const lastFacadeIdxRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (facadeAnalysis3D) {
-      setUse3DShading(true);
+      if (lastFacadeIdxRef.current !== null && facadeAnalysis3D.facadeIdx !== lastFacadeIdxRef.current) {
+        setUse3DShading(true);
+      }
+      lastFacadeIdxRef.current = facadeAnalysis3D.facadeIdx;
     } else {
       setUse3DShading(false);
+      lastFacadeIdxRef.current = null;
     }
   }, [facadeAnalysis3D]);
 
