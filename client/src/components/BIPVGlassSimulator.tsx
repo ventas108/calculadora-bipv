@@ -1306,7 +1306,7 @@ export default function BIPVGlassSimulator({
               </div>
               {applyShadingFactors && (
                 <div className="mt-2 grid grid-cols-12 gap-1">
-                  {['E','F','M','A','M','J','J','A','S','O','N','D'].map((m, i) => {
+                  {['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'].map((m, i) => {
                     const factor = is3DActive ? facadeAnalysis3D.monthlyShadingFactors[i] : shadingFactors![i];
                     return (
                       <div key={i} className="text-center">
@@ -1494,7 +1494,7 @@ export default function BIPVGlassSimulator({
                   {(() => {
                     const r = results[selectedResultIdx] || results[0];
                     const maxMonth = Math.max(...r.produccionMensualKwh);
-                    const months = ['E','F','M','A','M','J','J','A','S','O','N','D'];
+                    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
                     return r.produccionMensualKwh.map((kwh, i) => (
                       <div key={i} className="flex flex-col items-center">
                         <div className="w-full bg-gray-100 rounded-t relative" style={{ height: '80px' }}>
