@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import ShadingCalculator from '@/components/ShadingCalculator';
 import TemplateManager from '@/components/TemplateManager';
@@ -121,6 +121,17 @@ export default function Home() {
   });
   // Parámetros financieros del Simulador (editables por el usuario)
   const [financialParams, setFinancialParams] = useState({ electricityRate: 0.15, systemCost: 0, costPerWp: 4500 });
+
+  // Sincronizar inclinación y azimut del BIPV con los ángulos activos de POA
+  useEffect(() => {
+    if (poaTilt !== null) {
+      setBipvToEnergyData(prev => prev ? { ...prev, tilt: poaTilt } : null);
+    }
+  }, [poaTilt]);
+
+  useEffect(() => {
+    setBipvToEnergyData(prev => prev ? { ...prev, azimuth: poaAzimuth } : null);
+  }, [poaAzimuth]);
 
   const handleSelectCity = (city: CityWeatherData) => {
     setSelectedCity(city);

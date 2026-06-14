@@ -152,7 +152,7 @@ function calculateMonthlyForOrientation(
       sumWind += w.windSpeed;
     }
 
-    const n = validCount || 1;
+    const n = monthData.length || 1;
     return {
       month,
       totalPOA: Math.round(sumTotal / n),

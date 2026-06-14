@@ -167,12 +167,26 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
   const [installAzimuth, setInstallAzimuth] = useState(poaConfig?.azimuth ?? getDefaultInstallationConfig().defaultAzimuth);
   const [installConfigExpanded, setInstallConfigExpanded] = useState(true);
 
+  // Sincronizar estado local del simulador con los props del padre (poaConfig)
+  useEffect(() => {
+    if (poaConfig) {
+      if (poaConfig.tilt !== null && poaConfig.tilt !== installTilt) {
+        setInstallTilt(poaConfig.tilt);
+      }
+      if (poaConfig.azimuth !== installAzimuth) {
+        setInstallAzimuth(poaConfig.azimuth);
+      }
+    }
+  }, [poaConfig?.tilt, poaConfig?.azimuth]);
+
   // Sincronizar cambios de tilt/azimuth con el cálculo POA en Home.tsx
   useEffect(() => {
     if (onPoaConfigChange) {
-      onPoaConfigChange({ tilt: installTilt, azimuth: installAzimuth });
+      if (!poaConfig || poaConfig.tilt !== installTilt || poaConfig.azimuth !== installAzimuth) {
+        onPoaConfigChange({ tilt: installTilt, azimuth: installAzimuth });
+      }
     }
-  }, [installTilt, installAzimuth]);
+  }, [installTilt, installAzimuth, poaConfig, onPoaConfigChange]);
 
   const INSTALL_ICONS: Record<string, React.ReactNode> = {
     rooftop_tilted: <Home size={18} />,

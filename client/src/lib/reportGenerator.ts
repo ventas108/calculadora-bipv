@@ -526,7 +526,7 @@ export function generateSolarReport(data: ReportData): jsPDF {
     // Resumen de irradiancia
     doc.setFontSize(9);
     doc.setTextColor(60, 60, 60);
-    doc.text(`Irradiancia POA Total Anual: ${(totalTotalPOA * 8.76).toFixed(0)} kWh/m2/ano | HSP Promedio Diario: ${avgHSPDaily.toFixed(2)} kWh/m2/dia | HSP Anual: ${annualHSP.toFixed(0)} h`, margin, yPosition);
+    doc.text(`Irradiancia POA Total Anual: ${annualHSP.toFixed(0)} kWh/m2/ano | HSP Promedio Diario: ${avgHSPDaily.toFixed(2)} kWh/m2/dia | HSP Anual: ${annualHSP.toFixed(0)} h`, margin, yPosition);
     yPosition += 10;
   } else {
     checkSpace(30);
