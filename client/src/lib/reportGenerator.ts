@@ -38,6 +38,10 @@ interface EnergyData {
   paybackPeriod: number;
   roi10Year: number;
   roi25Year: number;
+  shadingLoss?: number;
+  annualFS?: number;
+  shadingSource?: '3d' | 'manual';
+  surfaceName?: string;
 }
 
 interface MultiFacadeResult {
@@ -246,7 +250,12 @@ export function generateSolarReport(data: ReportData): jsPDF {
     doc.setFontSize(11);
     doc.text(`Azimut: ${data.facadeAnalysis3D!.azimuth.toFixed(0)} deg | Inclinacion: ${data.facadeAnalysis3D!.tilt.toFixed(0)} deg | Area: ${data.facadeAnalysis3D!.area.toFixed(1)} m2`, pageWidth / 2, yPosition, { align: 'center' });
   } else {
-    doc.text('Calculo de Sombreado, Radiacion POA y Proyecciones Energeticas BIPV', pageWidth / 2, yPosition, { align: 'center' });
+    const manualSurfaceName = data.energyData.surfaceName || 'Cubierta / Fachada';
+    doc.text(`Superficie Evaluada (Manual): ${manualSurfaceName}`, pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 7;
+    doc.setFontSize(11);
+    const estimatedArea = (data.energyData.panelArea * data.energyData.quantity).toFixed(1);
+    doc.text(`Azimut: ${data.energyData.azimuth.toFixed(0)} deg | Inclinacion: ${data.energyData.tilt.toFixed(0)} deg | Area Estimada: ${estimatedArea} m2`, pageWidth / 2, yPosition, { align: 'center' });
   }
   yPosition += 18;
 
@@ -275,9 +284,11 @@ export function generateSolarReport(data: ReportData): jsPDF {
   doc.setFontSize(10);
   doc.setTextColor(0, 0, 0);
 
-  const avgFS = data.shadingPoints.length > 0
-    ? (data.shadingPoints.reduce((a, p) => a + (p.fs ?? 1), 0) / data.shadingPoints.length).toFixed(3)
-    : '1.000 (sin obstaculos)';
+  const avgFS = data.energyData.annualFS !== undefined
+    ? data.energyData.annualFS.toFixed(3)
+    : data.shadingPoints.length > 0
+      ? (data.shadingPoints.reduce((a, p) => a + (p.fs ?? 1), 0) / data.shadingPoints.length).toFixed(3)
+      : '1.000 (sin obstaculos)';
   const avgPOA = hasPoaData
     ? `${(data.poaData.reduce((a, p) => a + (p.totalPOA ?? 0), 0) / data.poaData.length).toFixed(0)} W/m2`
     : 'N/A';
@@ -290,6 +301,7 @@ export function generateSolarReport(data: ReportData): jsPDF {
     ['Factor de Capacidad', capFactorPct > 0 ? `${capFactorPct.toFixed(1)}%` : 'N/A'],
     ['Ratio de Desempeno (PR)', perfRatioPct > 0 ? `${perfRatioPct.toFixed(1)}%` : 'N/A'],
     ['Factor de Sombreado Promedio', avgFS],
+    ['Perdida por Sombreado Ponderada', data.energyData.shadingLoss !== undefined ? `${data.energyData.shadingLoss.toFixed(1)}%` : data.shadingPoints.length > 0 ? `${((1 - data.shadingPoints.reduce((a, p) => a + (p.fs ?? 1), 0) / data.shadingPoints.length) * 100).toFixed(1)}%` : '0.0%'],
     ['Radiacion POA Promedio', avgPOA],
     ['Horas Sol Pico Anuales', annualHSP > 0 ? `${annualHSP.toFixed(0)} h` : 'N/A'],
     ['CO2 Evitado', co2Avoided > 0 ? `${co2Avoided.toFixed(2)} ton/ano` : 'N/A'],
@@ -311,7 +323,7 @@ export function generateSolarReport(data: ReportData): jsPDF {
   yPosition = (doc as any).lastAutoTable.finalY + 10;
 
   // ===== 2. ANÁLISIS DE SOMBREADO =====
-  const hasFacadeShading = isFacadeSpecific && data.facadeAnalysis3D!.monthlyData.length > 0;
+  const hasFacadeShading = isFacadeSpecific && data.energyData.shadingSource !== 'manual' && data.facadeAnalysis3D!.monthlyData && data.facadeAnalysis3D!.monthlyData.length > 0;
   const hasManualShading = data.shadingPoints.length > 0;
 
   if (hasFacadeShading) {

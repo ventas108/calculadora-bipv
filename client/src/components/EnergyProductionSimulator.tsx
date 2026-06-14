@@ -979,13 +979,16 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
       paybackPeriod: financials.paybackPeriod,
       roi10Year: financials.roi10Years,
       roi25Year: financials.roi25Years,
+      shadingLoss: production.losses.shading,
+      annualFS: 1 - (production.losses.shading / 100),
+      shadingSource: (use3DShading && facadeAnalysis3D) ? '3d' as const : 'manual' as const,
     };
     const key = JSON.stringify(newData);
     if (key !== prevEnergyDataRef.current) {
       prevEnergyDataRef.current = key;
       onEnergyDataChangeRef.current(newData);
     }
-  }, [panelPower, panelEfficiency, panelArea, panelQuantity, installTilt, installAzimuth, poaConfig?.tilt, poaConfig?.azimuth, production.totalACEnergy, production.capacityFactor, production.performanceRatio, financials.paybackPeriod, financials.roi10Years, financials.roi25Years, dcWiring, inverterEfficiency, acWiring, mismatchLosses, soilingLosses, availabilityLosses]);
+  }, [panelPower, panelEfficiency, panelArea, panelQuantity, installTilt, installAzimuth, poaConfig?.tilt, poaConfig?.azimuth, production.totalACEnergy, production.capacityFactor, production.performanceRatio, financials.paybackPeriod, financials.roi10Years, financials.roi25Years, dcWiring, inverterEfficiency, acWiring, mismatchLosses, soilingLosses, availabilityLosses, production.losses.shading, use3DShading, facadeAnalysis3D]);
 
   const lossesData = [
     { name: 'Temperatura', value: Math.round(production.losses.temperature * 10) / 10 },

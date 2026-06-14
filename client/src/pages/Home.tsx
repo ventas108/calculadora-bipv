@@ -782,7 +782,21 @@ export default function Home() {
             roi10Year={energyData.roi10Year}
             roi25Year={energyData.roi25Year}
             multiFacadeData={multiFacadeReportData}
-            facadeAnalysis3D={facadeAnalysis3D}
+            shadingLoss={energyData.shadingLoss}
+            annualFS={energyData.annualFS}
+            shadingSource={energyData.shadingSource}
+            surfaceName={facadeAnalysis3D ? facadeAnalysis3D.facadeName : installTypeName}
+            facadeAnalysis3D={facadeAnalysis3D ? {
+              facadeName: facadeAnalysis3D.facadeName || 'Fachada',
+              facadeIdx: facadeAnalysis3D.facadeIdx ?? 0,
+              azimuth: facadeAnalysis3D.azimuth ?? 180,
+              tilt: facadeAnalysis3D.tilt ?? 90,
+              area: facadeAnalysis3D.area ?? 30,
+              monthlyData: facadeAnalysis3D.monthlyData,
+              monthlyShadingFactors: facadeAnalysis3D.monthlyShadingFactors,
+              annualFS: facadeAnalysis3D.monthlyShadingFactors.reduce((a, b) => a + b, 0) / 12,
+              annualShadingLoss: (1 - facadeAnalysis3D.monthlyShadingFactors.reduce((a, b) => a + b, 0) / 12) * 100,
+            } : undefined}
           />
         )}
         {/* IrradianceHeatmap: once mounted, stays mounted (hidden via CSS) to prevent map/DOM errors */}
