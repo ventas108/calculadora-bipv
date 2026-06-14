@@ -40,6 +40,7 @@ import FacadeComparisonTable from './FacadeComparisonTable';
 import { parseGLTF, validateGLTF, getGLTFSummary } from '@/lib/gltfParser';
 import { detectFormat, isUnsupportedFormat, getConversionAdvice, parseMultiFormat } from '@/lib/multiFormatParser';
 import { FacadeFullAnalysis, calculateMonthlyShadingFactorsForFacade } from '@/lib/facadeShadingAnalysis';
+import { normalizeMonthToAbbr } from '@/lib/monthHelper';
 
 interface AnalysisPoint {
   id: string;
@@ -207,7 +208,7 @@ export default function ShadingCalculator({ templateData, weatherData, onPointsC
       
       for (let i = 1; i < templateData.length; i++) {
         const values = templateData[i];
-        const month = values[0] || 'Ene';
+        const month = normalizeMonthToAbbr(values[0]);
         const day = parseInt(values[1]) || 21;
         const hour = parseInt(values[2]) || 12;
         const pos = getSolarPos(month, day, hour);
@@ -532,16 +533,7 @@ export default function ShadingCalculator({ templateData, weatherData, onPointsC
 
   // Mapeo de nombres de mes completos/abreviados a abreviatura de 3 letras
   const monthNameToAbbr = (name: string): string => {
-    const map: Record<string, string> = {
-      'enero': 'Ene', 'febrero': 'Feb', 'marzo': 'Mar', 'abril': 'Abr',
-      'mayo': 'May', 'junio': 'Jun', 'julio': 'Jul', 'agosto': 'Ago',
-      'septiembre': 'Sep', 'octubre': 'Oct', 'noviembre': 'Nov', 'diciembre': 'Dic',
-      'ene': 'Ene', 'feb': 'Feb', 'mar': 'Mar', 'abr': 'Abr',
-      'may': 'May', 'jun': 'Jun', 'jul': 'Jul', 'ago': 'Ago',
-      'sep': 'Sep', 'oct': 'Oct', 'nov': 'Nov', 'dic': 'Dic',
-    };
-    const lower = name.toLowerCase().trim();
-    return map[lower] || name.substring(0, 3);
+    return normalizeMonthToAbbr(name);
   };
 
   // Normalizar números con locale colombiano (punto=miles, coma=decimal)
@@ -611,7 +603,7 @@ export default function ShadingCalculator({ templateData, weatherData, onPointsC
 
       if (isExtendedFormat) {
         const evento = values[0] || '';
-        const month = monthNameToAbbr(values[1]);
+        const month = normalizeMonthToAbbr(values[1]);
         const day = parseInt(values[2]) || 21;
         const hourStr = values[3] || '12:00';
         const hour = parseInt(hourStr.split(':')[0]) || 12;
@@ -645,7 +637,7 @@ export default function ShadingCalculator({ templateData, weatherData, onPointsC
         });
       } else {
         // Formato simple (7-8 columnas): Mes, Dia, Hora, Altura, Azimut, Obstaculo, AreaSombreada, [FS]
-        const month = values[0] || 'Ene';
+        const month = normalizeMonthToAbbr(values[0]);
         const day = parseInt(values[1]) || 21;
         const hour = parseInt(values[2]) || 12;
         const pos = getSolarPos(month, day, hour);

@@ -5,6 +5,8 @@
  * Precisión: ±0.5° para altitud y azimut (suficiente para análisis de sombreado).
  */
 
+import { normalizeMonthToAbbr } from './monthHelper';
+
 export interface SolarPosition {
   altitude: number;   // Altura solar en grados (0° = horizonte, 90° = cénit)
   azimuth: number;    // Azimut solar en grados (0° = Sur, negativo = Este, positivo = Oeste)
@@ -185,8 +187,9 @@ export function calculateSolarPosition(
   hour: number,
   year: number = 2024,
 ): SolarPosition {
-  // Convertir mes si es string
-  const monthNum = typeof month === 'string' ? (MONTH_MAP[month] || 1) : month;
+  // Convertir mes si es string normalizándolo primero
+  const normalizedMonth = typeof month === 'string' ? normalizeMonthToAbbr(month) : month;
+  const monthNum = typeof normalizedMonth === 'string' ? (MONTH_MAP[normalizedMonth] || 1) : normalizedMonth;
 
   // Día juliano
   const JD = julianDay(year, monthNum, day) + (hour - timezone) / 24;

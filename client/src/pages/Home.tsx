@@ -22,6 +22,7 @@ import { BIPV_GLASS_CATALOG } from '@/lib/bipvGlassCatalog';
 import { calculateHourlyPOA } from '@/lib/liuJordanModel';
 import { ProspectorToSimulatorData } from '@/components/SolarProspector';
 import { FacadeFullAnalysis, calculateMonthlyShadingFactorsForFacade } from '@/lib/facadeShadingAnalysis';
+import { normalizeMonthToAbbr } from '@/lib/monthHelper';
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
@@ -51,7 +52,8 @@ export default function Home() {
     const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     
     shadingPoints.forEach(p => {
-      const idx = MONTH_NAMES.indexOf(p.month);
+      const normalizedMonth = normalizeMonthToAbbr(p.month);
+      const idx = MONTH_NAMES.indexOf(normalizedMonth);
       if (idx >= 0) {
         let finalFS = p.fs;
         if (weatherData) {
@@ -68,6 +70,7 @@ export default function Home() {
         monthlyFactors[i] = monthSums[i] / monthCounts[i];
       }
     }
+    console.log('Integración Calculadora - Puntos:', shadingPoints.length, 'Factores mensuales:', monthlyFactors);
     return monthlyFactors;
   }, [shadingPoints, weatherData]);
 
