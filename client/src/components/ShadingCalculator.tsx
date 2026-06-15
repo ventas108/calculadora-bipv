@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import * as XLSX from 'xlsx';
 import { Input } from '@/components/ui/input';
-import { Trash2, Plus, Download, Upload, Sun, Zap, MapPin, Building2, FileText } from 'lucide-react';
+import { Trash2, Plus, Download, Upload, Sun, Zap, MapPin, Building2, FileText, RefreshCw } from 'lucide-react';
 import { FSDistributionChart } from './ShadingChart';
 import { toast } from 'sonner';
 import { EPWData, getWeatherForDateTime, getWeatherCorrectionFactor } from '@/lib/epwParser';
