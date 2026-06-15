@@ -167,14 +167,22 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
   const [installAzimuth, setInstallAzimuth] = useState(poaConfig?.azimuth ?? getDefaultInstallationConfig().defaultAzimuth);
   const [installConfigExpanded, setInstallConfigExpanded] = useState(true);
 
+  // Ref para rastrear los últimos valores de orientación sincronizados y evitar bucles infinitos de renderizado
+  const lastSyncedRef = useRef<{ tilt: number | null; azimuth: number | null }>({
+    tilt: poaConfig?.tilt ?? null,
+    azimuth: poaConfig?.azimuth ?? null,
+  });
+
   // Sincronizar estado local del simulador con los props del padre (poaConfig)
   useEffect(() => {
     if (poaConfig) {
       if (poaConfig.tilt !== null && poaConfig.tilt !== installTilt) {
         setInstallTilt(poaConfig.tilt);
+        lastSyncedRef.current.tilt = poaConfig.tilt;
       }
       if (poaConfig.azimuth !== installAzimuth) {
         setInstallAzimuth(poaConfig.azimuth);
+        lastSyncedRef.current.azimuth = poaConfig.azimuth;
       }
     }
   }, [poaConfig?.tilt, poaConfig?.azimuth]);
@@ -182,11 +190,17 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
   // Sincronizar cambios de tilt/azimuth con el cálculo POA en Home.tsx
   useEffect(() => {
     if (onPoaConfigChange) {
-      if (!poaConfig || poaConfig.tilt !== installTilt || poaConfig.azimuth !== installAzimuth) {
+      const hasChanged = 
+        installTilt !== lastSyncedRef.current.tilt || 
+        installAzimuth !== lastSyncedRef.current.azimuth;
+      
+      if (hasChanged) {
+        lastSyncedRef.current.tilt = installTilt;
+        lastSyncedRef.current.azimuth = installAzimuth;
         onPoaConfigChange({ tilt: installTilt, azimuth: installAzimuth });
       }
     }
-  }, [installTilt, installAzimuth, poaConfig, onPoaConfigChange]);
+  }, [installTilt, installAzimuth, onPoaConfigChange]);
 
   const INSTALL_ICONS: Record<string, React.ReactNode> = {
     rooftop_tilted: <Home size={18} />,

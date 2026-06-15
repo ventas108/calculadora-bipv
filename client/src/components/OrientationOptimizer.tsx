@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Slider } from '@/components/ui/slider';
 import { Card } from '@/components/ui/card';
 import { EPWData } from '@/lib/epwParser';
+import { calculateHourlyPOA } from '@/lib/liuJordanModel';
 import {
   LineChart,
   Line,
@@ -45,6 +46,8 @@ interface OrientationOptimizerProps {
   // Sincronización con estado compartido POA
   sharedTilt?: number;
   sharedAzimuth?: number;
+  sharedAlbedo?: number;
+  sharedUsePerez?: boolean;
   onConfigChange?: (config: { tilt: number; azimuth: number }) => void;
   // Restricciones de instalación del Simulador
   tiltRange?: [number, number];
@@ -55,53 +58,22 @@ interface OrientationOptimizerProps {
 }
 
 /**
- * Calcula la irradiancia en una superficie inclinada
- * Usando modelo de ángulo de incidencia + isotrópico difuso + reflejado
- */
-const calculateInclinedIrradiance = (
-  directNormal: number,
-  diffuseHorizontal: number,
-  zenithAngle: number,
-  tiltAngle: number,
-  azimuthSurface: number,
-  azimuthSun: number,
-  albedo: number = 0.2
-): { direct: number; diffuse: number; reflected: number; total: number } => {
-  // Ángulo de incidencia
-  const incidenceAngle = Math.acos(
-    Math.min(1, Math.max(-1,
-      Math.cos(zenithAngle) * Math.cos(tiltAngle) +
-      Math.sin(zenithAngle) * Math.sin(tiltAngle) *
-      Math.cos(azimuthSun - azimuthSurface)
-    ))
-  );
-
-  // Componente directa
-  const direct = directNormal * Math.max(0, Math.cos(incidenceAngle));
-
-  // Componente difusa (isotrópica)
-  const diffuse = diffuseHorizontal * (1 + Math.cos(tiltAngle)) / 2;
-
-  // Componente reflejada
-  const ghi = directNormal * Math.max(0, Math.cos(zenithAngle)) + diffuseHorizontal;
-  const reflected = ghi * albedo * (1 - Math.cos(tiltAngle)) / 2;
-
-  const total = Math.max(0, direct + diffuse + reflected);
-  return { direct, diffuse, reflected, total };
-};
-
-/**
  * Calcula irradiancia mensual promedio para una orientación dada
+ * Utilizando el modelo de radiación completo calculateHourlyPOA para perfecta coherencia
  */
 function calculateMonthlyForOrientation(
   weatherData: EPWData,
   tilt: number,
   azimuth: number,
-  albedo: number = 0.2
+  albedo: number = 0.2,
+  usePerezModel: boolean = false
 ): Array<{ month: string; totalPOA: number; directPOA: number; diffusePOA: number; reflectedPOA: number; avgTemp: number; avgWindSpeed: number }> {
   const tiltRad = (tilt * Math.PI) / 180;
   const azimuthRad = (azimuth * Math.PI) / 180;
-  const latitude = weatherData.location.latitude * (Math.PI / 180);
+
+  const lat = weatherData.location.latitude;
+  const lon = weatherData.location.longitude;
+  const stdMeridian = weatherData.location.timezone * 15;
 
   return MONTHS.map((month, monthIdx) => {
     const monthData = weatherData.weatherData.filter(w => w.month === monthIdx + 1);
@@ -112,41 +84,30 @@ function calculateMonthlyForOrientation(
 
     let sumDirect = 0, sumDiffuse = 0, sumReflected = 0, sumTotal = 0;
     let sumTemp = 0, sumWind = 0;
-    let validCount = 0;
 
     for (const w of monthData) {
       if (w.globalHorizontalIrradiance > 0 || w.directNormalIrradiance > 0) {
         const dayOfYear = Math.floor((monthIdx * 30.44) + (w.day || 15));
-        const solarDeclination = 23.45 * Math.sin((2 * Math.PI * (dayOfYear - 81)) / 365) * (Math.PI / 180);
-        const hourAngle = ((w.hour + (w.minute || 0) / 60) - 12) * 15 * (Math.PI / 180);
-
-        const zenithAngle = Math.acos(
-          Math.min(1, Math.max(-1,
-            Math.sin(latitude) * Math.sin(solarDeclination) +
-            Math.cos(latitude) * Math.cos(solarDeclination) * Math.cos(hourAngle)
-          ))
-        );
-
-        const azimuthSun = Math.atan2(
-          Math.sin(hourAngle),
-          Math.cos(latitude) * Math.tan(solarDeclination) - Math.sin(latitude) * Math.cos(hourAngle)
-        );
-
-        const result = calculateInclinedIrradiance(
+        const result = calculateHourlyPOA(
+          lat,
+          lon,
+          stdMeridian,
+          dayOfYear,
+          w.hour - 1, // EPW usa 1-24, calculateHourlyPOA usa 0-23
+          w.minute || 0,
           w.directNormalIrradiance,
           w.diffuseHorizontalIrradiance,
-          zenithAngle,
+          w.globalHorizontalIrradiance,
           tiltRad,
           azimuthRad,
-          azimuthSun,
-          albedo
+          albedo,
+          usePerezModel
         );
 
-        sumDirect += result.direct;
-        sumDiffuse += result.diffuse;
-        sumReflected += result.reflected;
-        sumTotal += result.total;
-        validCount++;
+        sumDirect += result.directPOA;
+        sumDiffuse += result.diffusePOA;
+        sumReflected += result.reflectedPOA;
+        sumTotal += result.totalPOA;
       }
       sumTemp += w.temperature;
       sumWind += w.windSpeed;
@@ -172,9 +133,10 @@ function calculateAnnualPOA(
   weatherData: EPWData,
   tilt: number,
   azimuth: number,
-  albedo: number = 0.2
+  albedo: number = 0.2,
+  usePerezModel: boolean = false
 ): number {
-  const monthly = calculateMonthlyForOrientation(weatherData, tilt, azimuth, albedo);
+  const monthly = calculateMonthlyForOrientation(weatherData, tilt, azimuth, albedo, usePerezModel);
   return monthly.reduce((sum, m) => sum + m.totalPOA, 0) / 12;
 }
 
@@ -182,6 +144,8 @@ export default function OrientationOptimizer({
   weatherData,
   sharedTilt,
   sharedAzimuth,
+  sharedAlbedo = 0.2,
+  sharedUsePerez = false,
   onConfigChange,
   tiltRange,
   azimuthLocked,
@@ -216,8 +180,8 @@ export default function OrientationOptimizer({
 
   // Datos mensuales para la orientación actual
   const monthlyData = useMemo(() => {
-    return calculateMonthlyForOrientation(weatherData, tilt, azimuth);
-  }, [weatherData, tilt, azimuth]);
+    return calculateMonthlyForOrientation(weatherData, tilt, azimuth, sharedAlbedo, sharedUsePerez);
+  }, [weatherData, tilt, azimuth, sharedAlbedo, sharedUsePerez]);
 
   const stats = useMemo(() => {
     const productions = monthlyData.map(d => d.totalPOA);
@@ -235,8 +199,8 @@ export default function OrientationOptimizer({
   // Datos mensuales para la orientación óptima (si se encontró)
   const optimalMonthlyData = useMemo(() => {
     if (!optimumFound) return null;
-    return calculateMonthlyForOrientation(weatherData, optimumFound.tilt, optimumFound.azimuth);
-  }, [weatherData, optimumFound]);
+    return calculateMonthlyForOrientation(weatherData, optimumFound.tilt, optimumFound.azimuth, sharedAlbedo, sharedUsePerez);
+  }, [weatherData, optimumFound, sharedAlbedo, sharedUsePerez]);
 
   // === BÚSQUEDA AUTOMÁTICA DEL ÓPTIMO ===
   const searchOptimum = useCallback(() => {
@@ -257,7 +221,7 @@ export default function OrientationOptimizer({
 
       for (let t = tiltMin; t <= tiltMax; t += 5) {
         for (let a = azMin; a <= azMax; a += azStep) {
-          const poa = calculateAnnualPOA(weatherData, t, a);
+          const poa = calculateAnnualPOA(weatherData, t, a, sharedAlbedo, sharedUsePerez);
           if (poa > bestPOA) {
             bestPOA = poa;
             bestTilt = t;
@@ -271,7 +235,7 @@ export default function OrientationOptimizer({
       const fineRangeAz = effectiveAzimuthLocked ? 0 : 10;
       for (let t = Math.max(tiltMin, bestTilt - fineRangeTilt); t <= Math.min(tiltMax, bestTilt + fineRangeTilt); t += 1) {
         for (let a = Math.max(azMin, bestAzimuth - fineRangeAz); a <= Math.min(azMax, bestAzimuth + fineRangeAz); a += 1) {
-          const poa = calculateAnnualPOA(weatherData, t, a);
+          const poa = calculateAnnualPOA(weatherData, t, a, sharedAlbedo, sharedUsePerez);
           if (poa > bestPOA) {
             bestPOA = poa;
             bestTilt = t;
@@ -284,7 +248,7 @@ export default function OrientationOptimizer({
       setIsSearching(false);
       setShowComparison(true);
     }, 50);
-  }, [weatherData, tilt, azimuth, effectiveTiltRange, effectiveAzimuthLocked]);
+  }, [weatherData, tilt, azimuth, effectiveTiltRange, effectiveAzimuthLocked, sharedAlbedo, sharedUsePerez]);
 
   // Aplicar orientación óptima
   const applyOptimum = useCallback(() => {
@@ -505,7 +469,7 @@ export default function OrientationOptimizer({
                   applyOptimum();
                   // Pequeño delay para que el estado se actualice antes de enviar
                   setTimeout(() => {
-                    const optMonthly = calculateMonthlyForOrientation(weatherData, optimumFound.tilt, optimumFound.azimuth);
+                    const optMonthly = calculateMonthlyForOrientation(weatherData, optimumFound.tilt, optimumFound.azimuth, sharedAlbedo, sharedUsePerez);
                     onSendToSimulator({
                       optimalTilt: optimumFound.tilt,
                       optimalAzimuth: optimumFound.azimuth,

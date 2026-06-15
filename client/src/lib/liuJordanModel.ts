@@ -53,7 +53,7 @@ export const calculateSolarAngles = (
 
   // Hora solar local (minutos desde medianoche)
   const timeOffset = (lon - stdMer) * 180 / Math.PI * 4; // Conversión a minutos
-  const solarTime = hourOfDay * 60 + minute + E + timeOffset / 60;
+  const solarTime = hourOfDay * 60 + minute + E + timeOffset;
   const solarHour = solarTime / 60;
 
   // Ángulo horario (radianes)
