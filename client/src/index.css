@@ -185,3 +185,98 @@
     }
   }
 }
+
+/* Custom premium styles for native HTML5 range sliders */
+.custom-range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+  padding: 8px 0; /* Expanded touch target */
+}
+
+.custom-range-slider:focus {
+  outline: none;
+}
+
+/* Webkit (Chrome, Safari, Edge, Opera) Track */
+.custom-range-slider::-webkit-slider-runnable-track {
+  background: #e5e7eb; /* tailwind gray-200 */
+  height: 6px;
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+.custom-range-slider:disabled::-webkit-slider-runnable-track {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Webkit Thumb */
+.custom-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -5px; /* Center the thumb vertically on track */
+  background-color: #0066CC; /* primary color */
+  height: 16px;
+  width: 16px;
+  border-radius: 9999px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  transition: transform 0.1s ease, background-color 0.1s ease, box-shadow 0.1s ease;
+}
+
+.custom-range-slider:hover:not(:disabled)::-webkit-slider-thumb {
+  transform: scale(1.15);
+  background-color: #0052a3;
+  box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.2);
+}
+
+.custom-range-slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.3);
+}
+
+.custom-range-slider:disabled::-webkit-slider-thumb {
+  background-color: #9ca3af; /* gray-400 */
+  cursor: not-allowed;
+}
+
+/* Firefox Track */
+.custom-range-slider::-moz-range-track {
+  background: #e5e7eb;
+  height: 6px;
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+.custom-range-slider:disabled::-moz-range-track {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Firefox Thumb */
+.custom-range-slider::-moz-range-thumb {
+  background-color: #0066CC;
+  height: 16px;
+  width: 16px;
+  border-radius: 9999px;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  transition: transform 0.1s ease, background-color 0.1s ease, box-shadow 0.1s ease;
+}
+
+.custom-range-slider:hover:not(:disabled)::-moz-range-thumb {
+  transform: scale(1.15);
+  background-color: #0052a3;
+  box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.2);
+}
+
+.custom-range-slider:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.3);
+}
+
+.custom-range-slider:disabled::-moz-range-thumb {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
