@@ -34,12 +34,10 @@ export function registerPVWattsProxy(app: Express) {
   // Endpoint principal: /api/pvwatts
   app.get('/api/pvwatts', async (req: Request, res: Response) => {
     try {
-      const apiKey = process.env.NREL_API_KEY;
+      let apiKey = process.env.NREL_API_KEY;
       if (!apiKey) {
-        res.status(500).json({
-          error: 'NREL API key no configurada. Configure la variable de entorno NREL_API_KEY.',
-        });
-        return;
+        console.warn('[PVWatts Proxy] WARNING: NREL_API_KEY is not set. Falling back to DEMO_KEY.');
+        apiKey = 'DEMO_KEY';
       }
 
       // Filtrar y construir parámetros

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import {
   Settings2, ChevronDown, ChevronUp, Save, RotateCcw, Info,
@@ -80,6 +80,26 @@ export default function PanelTechSelector({
   const [customTemplates, setCustomTemplates] = useState<PanelTechnology[]>([]);
   const [brandFilter, setBrandFilter] = useState<PanelBrand | 'all'>('all');
   const [internalRegion, setInternalRegion] = useState<keyof Omit<RegionalCompatibility, 'notes'>>('andina');
+
+  const selectorRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (showSelector && selectorRef.current) {
+      // Small timeout to allow the element to display and render before scrolling
+      setTimeout(() => {
+        selectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
+    }
+  }, [showSelector]);
+
+  useEffect(() => {
+    if (showEditor && editorRef.current) {
+      setTimeout(() => {
+        editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
+    }
+  }, [showEditor]);
 
   const activeRegion = selectedRegion ?? internalRegion;
   const handleRegionChange = (r: keyof Omit<RegionalCompatibility, 'notes'>) => {
@@ -380,7 +400,7 @@ export default function PanelTechSelector({
       </div>
 
       {/* Selector de tecnologías */}
-      <div style={{ display: showSelector ? 'block' : 'none' }}>
+      <div ref={selectorRef} style={{ display: showSelector ? 'block' : 'none' }}>
         <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4 max-h-[600px] overflow-y-auto">
           {/* Header con filtros de marca */}
           <div className="sticky top-0 bg-white pb-2 z-10 space-y-3">
@@ -503,7 +523,7 @@ export default function PanelTechSelector({
       </div>
 
       {/* Editor de plantilla */}
-      <div style={{ display: showEditor && editingTech ? 'block' : 'none' }}>
+      <div ref={editorRef} style={{ display: showEditor && editingTech ? 'block' : 'none' }}>
         {editingTech && (
           <div className="bg-white border-2 border-indigo-200 rounded-lg p-4 space-y-4">
             <div className="flex items-center justify-between">
