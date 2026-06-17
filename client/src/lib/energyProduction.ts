@@ -175,8 +175,21 @@ export const calculateDCPower = (
     25,
     panelSpecs.temperatureCoefficient
   );
+  
+  // Enforce consistency between physical specs (area * efficiency) and nominal power (powerRating).
+  // The physical nominal power at STC is P_phys = area * efficiency * 10 (since efficiency is in %).
+  // If they differ significantly (> 1%), we scale the power to match the nominal capacity rating
+  // which is what yields and Performance Ratio use for normalization.
+  const physicalNominalPower = panelSpecs.area * panelSpecs.efficiency * 10;
+  const nominalPower = panelSpecs.powerRating;
+  
   const totalArea = panelSpecs.area * panelSpecs.quantity;
-  const dcPower = (poaIrradiance * totalArea * panelEfficiency) / 100;
+  let dcPower = (poaIrradiance * totalArea * panelEfficiency) / 100;
+  
+  if (physicalNominalPower > 0 && Math.abs(physicalNominalPower - nominalPower) / nominalPower > 0.01) {
+    dcPower = dcPower * (nominalPower / physicalNominalPower);
+  }
+  
   return Math.max(0, dcPower);
 };
 

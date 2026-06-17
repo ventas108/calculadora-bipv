@@ -135,7 +135,25 @@ export default function PanelTechSelector({
 
   const handleEditField = (field: keyof PanelTechnology, value: any) => {
     if (!editingTech) return;
-    setEditingTech({ ...editingTech, [field]: value });
+    const updated = { ...editingTech, [field]: value };
+
+    // Calculate module area in m2
+    const areaM2 = (updated.lengthMm * updated.widthMm) / 1_000_000;
+
+    if (field === 'pmax') {
+      // If pmax changes, recalculate efficiency: Efic = Pmax / (Area * 10)
+      if (areaM2 > 0) {
+        updated.efficiencySTC = parseFloat((value / (areaM2 * 10)).toFixed(2));
+      }
+    } else if (field === 'efficiencySTC') {
+      // If efficiencySTC changes, recalculate pmax: Pmax = Area * Efic * 10
+      updated.pmax = parseFloat((areaM2 * value * 10).toFixed(1));
+    } else if (field === 'lengthMm' || field === 'widthMm') {
+      // If dimensions change, recalculate pmax keeping the efficiency constant
+      updated.pmax = parseFloat((areaM2 * updated.efficiencySTC * 10).toFixed(1));
+    }
+
+    setEditingTech(updated);
   };
 
   const handleEditCurrent = () => {
