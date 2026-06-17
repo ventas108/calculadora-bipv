@@ -407,7 +407,7 @@ describe('BIPV Glass Catalog', () => {
 describe('Transparency Levels', () => {
   it('all levels are between 0 and 1', () => {
     for (const level of TRANSPARENCY_LEVELS) {
-      expect(level.value).toBeGreaterThan(0);
+      expect(level.value).toBeGreaterThanOrEqual(0);
       expect(level.value).toBeLessThan(1);
     }
   });

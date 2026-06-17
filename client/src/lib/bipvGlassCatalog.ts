@@ -113,6 +113,7 @@ export interface TransparencyLevel {
 }
 
 export const TRANSPARENCY_LEVELS: TransparencyLevel[] = [
+  { value: 0.0, label: '0% (Opaco)', description: 'Totalmente opaco - Máxima generación eléctrica (ej: tejas, fachada opaca, revestimiento)' },
   { value: 0.10, label: '10%', description: 'Mínima transparencia - Máxima generación eléctrica' },
   { value: 0.20, label: '20%', description: 'Baja transparencia - Alta generación con algo de luz natural' },
   { value: 0.30, label: '30%', description: 'Transparencia moderada-baja - Balance generación/iluminación' },

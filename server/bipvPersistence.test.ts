@@ -376,9 +376,9 @@ describe('Catálogo BIPV y presets', () => {
     }
   });
 
-  it('TRANSPARENCY_LEVELS tiene 6 niveles entre 10% y 60%', () => {
-    expect(TRANSPARENCY_LEVELS.length).toBe(6);
-    expect(TRANSPARENCY_LEVELS[0].value).toBe(0.10);
+  it('TRANSPARENCY_LEVELS tiene 7 niveles entre 0% y 60%', () => {
+    expect(TRANSPARENCY_LEVELS.length).toBe(7);
+    expect(TRANSPARENCY_LEVELS[0].value).toBe(0.0);
     expect(TRANSPARENCY_LEVELS[TRANSPARENCY_LEVELS.length - 1].value).toBe(0.60);
   });
 });
