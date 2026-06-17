@@ -30,10 +30,43 @@ const ALLOWED_PARAMS = [
   'albedo',            // Ground albedo
 ];
 
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
+
+const pvwattsCache = new Map<string, CacheEntry>();
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 horas
+
 export function registerPVWattsProxy(app: Express) {
   // Endpoint principal: /api/pvwatts
   app.get('/api/pvwatts', async (req: Request, res: Response) => {
+    let cacheKey = '';
     try {
+      const lat = req.query.lat;
+      const lon = req.query.lon;
+      const system_capacity = req.query.system_capacity || '1';
+      const azimuth = req.query.azimuth || '180';
+      const tilt = req.query.tilt || '10';
+      const losses = req.query.losses || '14';
+      const timeframe = req.query.timeframe || 'monthly';
+      const dataset = req.query.dataset || 'default';
+
+      if (typeof lat === 'string' && typeof lon === 'string') {
+        const latRounded = parseFloat(lat).toFixed(3);
+        const lonRounded = parseFloat(lon).toFixed(3);
+        cacheKey = `${latRounded}_${lonRounded}_${system_capacity}_${azimuth}_${tilt}_${losses}_${timeframe}_${dataset}`;
+
+        const cached = pvwattsCache.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+          console.log(`[PVWatts Proxy] Cache HIT for key: ${cacheKey}`);
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.setHeader('X-Cache', 'HIT');
+          res.json(cached.data);
+          return;
+        }
+      }
+
       let apiKey = process.env.NREL_API_KEY;
       if (!apiKey) {
         console.warn('[PVWatts Proxy] WARNING: NREL_API_KEY is not set. Falling back to DEMO_KEY.');
@@ -86,6 +119,27 @@ export function registerPVWattsProxy(app: Express) {
           details: data.errors,
         });
         return;
+      }
+
+      // Guardar en la caché en memoria
+      if (cacheKey) {
+        // Evitar crecimiento infinito de la memoria
+        if (pvwattsCache.size > 1000) {
+          const now = Date.now();
+          for (const [k, v] of pvwattsCache.entries()) {
+            if (now - v.timestamp > CACHE_TTL) {
+              pvwattsCache.delete(k);
+            }
+          }
+          if (pvwattsCache.size > 1000) {
+            pvwattsCache.clear();
+          }
+        }
+        pvwattsCache.set(cacheKey, {
+          data,
+          timestamp: Date.now(),
+        });
+        console.log(`[PVWatts Proxy] Cache STORED for key: ${cacheKey} (Total: ${pvwattsCache.size})`);
       }
 
       // Cache headers para reducir llamadas repetidas
