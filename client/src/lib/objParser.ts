@@ -384,93 +384,44 @@ const OBJ_COLORS = [
  * @param swapYZ Whether to swap Y and Z axes (common in some 3D tools where Y is up)
  * @param scaleFactor Scale factor to apply to all coordinates (e.g., 0.001 for mm→m)
  */
-function remapAxes(v: Vertex3D, upAxis: 'X' | 'Y' | 'Z' | 'Y_simple'): Vertex3D {
-  switch (upAxis) {
-    case 'Z': return v;
-    case 'Y': return { x: v.x, y: -v.z, z: v.y }; // Y-up → Z-up (rotación matemática)
-    case 'Y_simple': return { x: v.x, y: v.z, z: v.y }; // Simple swap (legacy)
-    case 'X': return { x: v.y, y: v.z, z: v.x };
-  }
-}
-
-function rotateAroundVertical(v: Vertex3D, degrees: number): Vertex3D {
-  if (degrees === 0) return v;
-  const rad = (degrees * Math.PI) / 180;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-  return {
-    x: v.x * cos - v.y * sin,
-    y: v.x * sin + v.y * cos,
-    z: v.z,
-  };
-}
-
-/**
- * Convert parsed OBJ data to solar obstacle polygons.
- *
- * @param parseResult The parsed OBJ file data
- * @param observerPoint Custom observation point. If not provided, uses
- *   the center of the bounding box at ground level (z=min + 1.5m)
- * @param northOffsetDeg Rotation of north from Y-axis in degrees (clockwise)
- * @param swapYZOrUpAxis Whether to swap Y and Z axes or the specific up axis
- * @param scaleFactor Scale factor to apply to all coordinates (e.g., 0.001 for mm→m)
- * @param rotationDeg Additional horizontal rotation in degrees
- */
 export function convertOBJToObstacles(
   parseResult: OBJParseResult,
   observerPoint?: Vertex3D,
   northOffsetDeg: number = 0,
-  swapYZOrUpAxis: boolean | 'X' | 'Y' | 'Z' | 'Y_simple' | 'auto' = false,
-  scaleFactor: number = 1.0,
-  rotationDeg: number = 0
+  swapYZ: boolean = false,
+  scaleFactor: number = 1.0
 ): OBJObstacleResult {
-  // Determinar eje vertical efectivo
-  let effectiveUpAxis: 'X' | 'Y' | 'Z' | 'Y_simple' = 'Z';
-  if (typeof swapYZOrUpAxis === 'boolean') {
-    effectiveUpAxis = swapYZOrUpAxis ? 'Y_simple' : 'Z';
-  } else if (swapYZOrUpAxis === 'auto') {
-    effectiveUpAxis = 'Z'; // Por defecto Z
-  } else {
-    effectiveUpAxis = swapYZOrUpAxis;
+  // Apply scale and optional Y/Z swap to vertices
+  let vertices = parseResult.vertices;
+  if (scaleFactor !== 1.0 || swapYZ) {
+    vertices = parseResult.vertices.map(v => {
+      const scaled = {
+        x: v.x * scaleFactor,
+        y: v.y * scaleFactor,
+        z: v.z * scaleFactor,
+      };
+      if (swapYZ) {
+        return { x: scaled.x, y: scaled.z, z: scaled.y };
+      }
+      return scaled;
+    });
   }
-
-  // Apply scale, axis remapping and rotation to vertices
-  const vertices = parseResult.vertices.map(v => {
-    let scaled = {
-      x: v.x * scaleFactor,
-      y: v.y * scaleFactor,
-      z: v.z * scaleFactor,
-    };
-    scaled = remapAxes(scaled, effectiveUpAxis);
-    if (rotationDeg !== 0) {
-      scaled = rotateAroundVertical(scaled, rotationDeg);
-    }
-    return scaled;
-  });
 
   // Recompute bounding box with transformed vertices
   const bbox = computeBoundingBox(vertices);
 
   // Determine observation point
-  let observer: Vertex3D;
-  if (observerPoint) {
-    let obsTransformed = {
-      x: observerPoint.x * scaleFactor,
-      y: observerPoint.y * scaleFactor,
-      z: observerPoint.z * scaleFactor,
-    };
-    obsTransformed = remapAxes(obsTransformed, effectiveUpAxis);
-    if (rotationDeg !== 0) {
-      obsTransformed = rotateAroundVertical(obsTransformed, rotationDeg);
-    }
-    observer = obsTransformed;
-  } else {
-    observer = {
-      x: bbox.center.x,
-      y: bbox.center.y,
-      z: bbox.min.z + 1.5, // 1.5m eye height above ground
-    };
-  }
+  const observer: Vertex3D = observerPoint
+    ? {
+        x: observerPoint.x * scaleFactor,
+        y: (swapYZ ? observerPoint.z : observerPoint.y) * scaleFactor,
+        z: (swapYZ ? observerPoint.y : observerPoint.z) * scaleFactor,
+      }
+    : {
+        x: bbox.center.x,
+        y: bbox.center.y,
+        z: bbox.min.z + 1.5, // 1.5m eye height above ground
+      };
 
   const obstacles: ObstaclePolygon[] = [];
 

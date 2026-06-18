@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { StoredFacadeReport } from '@/components/ReportGenerator';
+import { StoredFacadeReport } from '@/lib/reportTypes';
 
 // Factor de emisión de CO2 para Colombia (kg CO2/kWh)
 const CO2_FACTOR_COLOMBIA = 0.126;

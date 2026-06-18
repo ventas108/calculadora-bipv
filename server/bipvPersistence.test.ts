@@ -351,12 +351,12 @@ describe('Modelo térmico confinado BIPV', () => {
 });
 
 describe('Catálogo BIPV y presets', () => {
-  it('BIPV_GLASS_CATALOG tiene 30 tecnologías (1G + 2G + 3G + HIITIO + EINNOVA + SOLTECH)', () => {
-    expect(BIPV_GLASS_CATALOG.length).toBe(30);
-    // Verificar que incluye las 3 generaciones originales + 4 HIITIO + 1 EINNOVA + 22 SOLTECH/NCL
+  it('BIPV_GLASS_CATALOG tiene 8 tecnologías (1G + 2G + 3G + HIITIO + EINNOVA)', () => {
+    expect(BIPV_GLASS_CATALOG.length).toBe(8);
+    // Verificar que incluye las 3 generaciones originales + 4 HIITIO + 1 EINNOVA
     const generations = BIPV_GLASS_CATALOG.map(t => t.generation);
     expect(generations.filter(g => g === '1G').length).toBe(1);
-    expect(generations.filter(g => g === '2G').length).toBe(28); // CdTe genérico + 4 HIITIO + 1 EINNOVA + 22 SOLTECH/NCL
+    expect(generations.filter(g => g === '2G').length).toBe(6); // CdTe genérico + 4 HIITIO + 1 EINNOVA
     expect(generations.filter(g => g === '3G').length).toBe(1);
     // Verificar que los HIITIO están presentes
     expect(BIPV_GLASS_CATALOG.find(t => t.id === 'HIITIO_H12_CdTe_0T')).toBeDefined();
@@ -376,9 +376,9 @@ describe('Catálogo BIPV y presets', () => {
     }
   });
 
-  it('TRANSPARENCY_LEVELS tiene 7 niveles entre 0% y 60%', () => {
-    expect(TRANSPARENCY_LEVELS.length).toBe(7);
-    expect(TRANSPARENCY_LEVELS[0].value).toBe(0.0);
+  it('TRANSPARENCY_LEVELS tiene 6 niveles entre 10% y 60%', () => {
+    expect(TRANSPARENCY_LEVELS.length).toBe(6);
+    expect(TRANSPARENCY_LEVELS[0].value).toBe(0.10);
     expect(TRANSPARENCY_LEVELS[TRANSPARENCY_LEVELS.length - 1].value).toBe(0.60);
   });
 });

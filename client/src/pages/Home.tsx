@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import ShadingCalculator from '@/components/ShadingCalculator';
 import TemplateManager from '@/components/TemplateManager';
@@ -121,17 +121,6 @@ export default function Home() {
   });
   // Parámetros financieros del Simulador (editables por el usuario)
   const [financialParams, setFinancialParams] = useState({ electricityRate: 0.15, systemCost: 0, costPerWp: 4500 });
-
-  // Sincronizar inclinación y azimut del BIPV con los ángulos activos de POA
-  useEffect(() => {
-    if (poaTilt !== null) {
-      setBipvToEnergyData(prev => prev ? { ...prev, tilt: poaTilt } : null);
-    }
-  }, [poaTilt]);
-
-  useEffect(() => {
-    setBipvToEnergyData(prev => prev ? { ...prev, azimuth: poaAzimuth } : null);
-  }, [poaAzimuth]);
 
   const handleSelectCity = (city: CityWeatherData) => {
     setSelectedCity(city);
@@ -766,7 +755,7 @@ export default function Home() {
         }} />}
         {view === 'weather' && <WeatherDataManager onWeatherDataLoaded={setWeatherData} weatherData={weatherData} />}
         {view === 'radiation' && weatherData && <SolarRadiationChart weatherData={weatherData} />}
-        {view === 'optimizer' && weatherData && <OrientationOptimizer weatherData={weatherData} sharedTilt={effectiveTilt} sharedAzimuth={poaAzimuth} sharedAlbedo={poaAlbedo} sharedUsePerez={poaUsePerez} onConfigChange={(cfg) => { setPoaTilt(cfg.tilt); setPoaAzimuth(cfg.azimuth); }} tiltRange={installTiltRange} azimuthLocked={installAzimuthLocked} installationType={installTypeName} onSendToSimulator={(result) => { setOptimizerResult(result); setPoaTilt(result.optimalTilt); setPoaAzimuth(result.optimalAzimuth); handleSetView('energy'); }} />}
+        {view === 'optimizer' && weatherData && <OrientationOptimizer weatherData={weatherData} sharedTilt={effectiveTilt} sharedAzimuth={poaAzimuth} onConfigChange={(cfg) => { setPoaTilt(cfg.tilt); setPoaAzimuth(cfg.azimuth); }} tiltRange={installTiltRange} azimuthLocked={installAzimuthLocked} installationType={installTypeName} onSendToSimulator={(result) => { setOptimizerResult(result); setPoaTilt(result.optimalTilt); setPoaAzimuth(result.optimalAzimuth); handleSetView('energy'); }} />}
         {view === 'poa' && weatherData && <POAAnalyzer weatherData={weatherData} tiltAngle={effectiveTilt} surfaceAzimuth={poaAzimuth} sharedAlbedo={poaAlbedo} sharedUsePerez={poaUsePerez} onConfigChange={(cfg) => { if (cfg.tilt !== undefined) setPoaTilt(cfg.tilt); if (cfg.azimuth !== undefined) setPoaAzimuth(cfg.azimuth); if (cfg.albedo !== undefined) setPoaAlbedo(cfg.albedo); if (cfg.usePerez !== undefined) setPoaUsePerez(cfg.usePerez); }} />}
         {view === 'energy' && weatherData && poaData.length > 0 && <EnergyProductionSimulator weatherData={weatherData} poaData={poaData} shadingFactors={monthlyShadingFactors} facadeAnalysis3D={facadeAnalysis3D} prospectorData={prospectorData} onDiscardProspector={() => setProspectorData(null)} optimizerResult={optimizerResult} onDiscardOptimizer={() => setOptimizerResult(null)} pvgisData={pvgisData} onDiscardPvgis={() => setPvgisData(null)} pvwattsData={pvwattsData} onDiscardPvwatts={() => setPvwattsData(null)} onInstallConfigChange={(cfg) => { if (cfg.tiltRange) setInstallTiltRange(cfg.tiltRange); if (cfg.azimuthLocked !== undefined) setInstallAzimuthLocked(cfg.azimuthLocked); if (cfg.name) setInstallTypeName(cfg.name); }} poaConfig={{ tilt: effectiveTilt, azimuth: poaAzimuth, albedo: poaAlbedo, usePerez: poaUsePerez, source: optimizerResult ? 'optimizer' : prospectorData ? 'prospector' : 'epw_hourly' }} onPoaConfigChange={(cfg) => { if (cfg.tilt !== undefined) setPoaTilt(cfg.tilt); if (cfg.azimuth !== undefined) setPoaAzimuth(cfg.azimuth); if (cfg.albedo !== undefined) setPoaAlbedo(cfg.albedo); if (cfg.usePerez !== undefined) setPoaUsePerez(cfg.usePerez); }} modelFacades={modelFacades} modelObstacles3D={modelObstacles3D} modelNorthOffset={modelNorthOffset} onFacadeSelectFromSimulator={(idx) => { setExternalFacadeIdx(idx); if (modelFacades && modelFacades[idx] && weatherData) { const analysis = calculateMonthlyShadingFactorsForFacade(modelFacades[idx], weatherData, modelObstacles3D || [], modelNorthOffset); analysis.facadeIdx = idx; setFacadeAnalysis3D(analysis); /* Sincronizar POA con ángulos de la fachada seleccionada (ya en grados) */ setPoaTilt(Math.round(modelFacades[idx].tilt)); setPoaAzimuth(Math.round(modelFacades[idx].azimuthNormal)); } }} onFinancialParamsChange={setFinancialParams} onEnergyDataChange={setEnergyData} bipvData={bipvToEnergyData} onDiscardBipv={() => setBipvToEnergyData(null)} onReturnToBIPV={() => handleSetView('bipvglass')} onResimultateBIPV={handleResimultateBIPV} />}
         {view === 'report' && weatherData && (
@@ -793,21 +782,7 @@ export default function Home() {
             roi10Year={energyData.roi10Year}
             roi25Year={energyData.roi25Year}
             multiFacadeData={multiFacadeReportData}
-            shadingLoss={energyData.shadingLoss}
-            annualFS={energyData.annualFS}
-            shadingSource={energyData.shadingSource}
-            surfaceName={facadeAnalysis3D ? facadeAnalysis3D.facadeName : installTypeName}
-            facadeAnalysis3D={facadeAnalysis3D ? {
-              facadeName: facadeAnalysis3D.facadeName || 'Fachada',
-              facadeIdx: facadeAnalysis3D.facadeIdx ?? 0,
-              azimuth: facadeAnalysis3D.azimuth ?? 180,
-              tilt: facadeAnalysis3D.tilt ?? 90,
-              area: facadeAnalysis3D.area ?? 30,
-              monthlyData: facadeAnalysis3D.monthlyData,
-              monthlyShadingFactors: facadeAnalysis3D.monthlyShadingFactors,
-              annualFS: facadeAnalysis3D.monthlyShadingFactors.reduce((a, b) => a + b, 0) / 12,
-              annualShadingLoss: (1 - facadeAnalysis3D.monthlyShadingFactors.reduce((a, b) => a + b, 0) / 12) * 100,
-            } : undefined}
+            facadeAnalysis3D={facadeAnalysis3D}
           />
         )}
         {/* IrradianceHeatmap: once mounted, stays mounted (hidden via CSS) to prevent map/DOM errors */}

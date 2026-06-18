@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
   Settings2, ChevronDown, ChevronUp, Save, RotateCcw, Info,
   Zap, Thermometer, Shield, PenLine, Ruler, Weight, Box,
-  MapPin, CheckCircle2, AlertTriangle, XCircle, Trash2,
+  MapPin, CheckCircle2, AlertTriangle, XCircle,
 } from 'lucide-react';
 import PDFPanelImporter from './PDFPanelImporter';
 import {
@@ -43,7 +43,7 @@ const BRAND_LABELS: Record<PanelBrand, string> = {
 const BRAND_COLORS: Record<PanelBrand, { bg: string; text: string; border: string; activeBg: string }> = {
   hiitio: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-300', activeBg: 'bg-blue-600 text-white' },
   einnova: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-300', activeBg: 'bg-emerald-600 text-white' },
-  soltech: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-300', activeBg: 'bg-amber-600 text-white' },
+  soltech: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-300', activeBg: 'bg-purple-600 text-white' },
   generic: { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-300', activeBg: 'bg-gray-600 text-white' },
 };
 
@@ -82,26 +82,6 @@ export default function PanelTechSelector({
   const [customTemplates, setCustomTemplates] = useState<PanelTechnology[]>([]);
   const [brandFilter, setBrandFilter] = useState<PanelBrand | 'all'>('all');
   const [internalRegion, setInternalRegion] = useState<keyof Omit<RegionalCompatibility, 'notes'>>('andina');
-
-  const selectorRef = useRef<HTMLDivElement>(null);
-  const editorRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (showSelector && selectorRef.current) {
-      // Small timeout to allow the element to display and render before scrolling
-      setTimeout(() => {
-        selectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 50);
-    }
-  }, [showSelector]);
-
-  useEffect(() => {
-    if (showEditor && editorRef.current) {
-      setTimeout(() => {
-        editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 50);
-    }
-  }, [showEditor]);
 
   const activeRegion = selectedRegion ?? internalRegion;
   const handleRegionChange = (r: keyof Omit<RegionalCompatibility, 'notes'>) => {
@@ -157,25 +137,7 @@ export default function PanelTechSelector({
 
   const handleEditField = (field: keyof PanelTechnology, value: any) => {
     if (!editingTech) return;
-    const updated = { ...editingTech, [field]: value };
-
-    // Calculate module area in m2
-    const areaM2 = (updated.lengthMm * updated.widthMm) / 1_000_000;
-
-    if (field === 'pmax') {
-      // If pmax changes, recalculate efficiency: Efic = Pmax / (Area * 10)
-      if (areaM2 > 0) {
-        updated.efficiencySTC = parseFloat((value / (areaM2 * 10)).toFixed(2));
-      }
-    } else if (field === 'efficiencySTC') {
-      // If efficiencySTC changes, recalculate pmax: Pmax = Area * Efic * 10
-      updated.pmax = parseFloat((areaM2 * value * 10).toFixed(1));
-    } else if (field === 'lengthMm' || field === 'widthMm') {
-      // If dimensions change, recalculate pmax keeping the efficiency constant
-      updated.pmax = parseFloat((areaM2 * updated.efficiencySTC * 10).toFixed(1));
-    }
-
-    setEditingTech(updated);
+    setEditingTech({ ...editingTech, [field]: value });
   };
 
   const handleEditCurrent = () => {
@@ -236,7 +198,7 @@ export default function PanelTechSelector({
               {selectedTech.brand !== 'generic' && (
                 <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${
                   selectedTech.brand === 'einnova' ? 'bg-emerald-100 text-emerald-700' :
-                  selectedTech.brand === 'soltech' ? 'bg-amber-100 text-amber-700' :
+                  selectedTech.brand === 'soltech' ? 'bg-purple-100 text-purple-700' :
                   'bg-blue-100 text-blue-700'
                 }`}>
                   {BRAND_LABELS[selectedTech.brand]}
@@ -404,7 +366,7 @@ export default function PanelTechSelector({
       </div>
 
       {/* Selector de tecnologías */}
-      <div ref={selectorRef} style={{ display: showSelector ? 'block' : 'none' }}>
+      <div style={{ display: showSelector ? 'block' : 'none' }}>
         <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4 max-h-[600px] overflow-y-auto">
           {/* Header con filtros de marca */}
           <div className="sticky top-0 bg-white pb-2 z-10 space-y-3">
@@ -485,52 +447,38 @@ export default function PanelTechSelector({
                     const compat = tech.regionalCompatibility?.[activeRegion];
                     const compatInfo = compat ? COMPAT_ICONS[compat] : null;
                     return (
-                      <div key={tech.id} className="flex items-center gap-1.5 w-full">
-                        <button
-                          onClick={() => handleSelectTech(tech)}
-                          className={`text-left p-2.5 rounded-lg border transition-all hover:shadow-sm flex-1 min-w-0 ${
-                            selectedTech.id === tech.id
-                              ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-200'
-                              : 'border-gray-200 hover:border-gray-300 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-8 h-8 rounded flex items-center justify-center text-[9px] font-bold flex-shrink-0"
-                              style={{ backgroundColor: tech.color + '20', border: `1.5px solid ${tech.color}`, color: tech.color }}
-                            >
-                              {tech.hiitioId || 'GEN'}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <p className="text-xs font-medium text-gray-900 truncate">{tech.name}</p>
-                                {compatInfo && (
-                                  <span className={`flex items-center gap-0.5 text-[9px] font-bold ${compatInfo.color} flex-shrink-0`}>
-                                    <compatInfo.icon size={10} />
-                                    {compat}/3
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[10px] text-gray-500">
-                                <span>{tech.pmax}W · η={tech.efficiencySTC}% · γ={tech.tempCoeffPmax}%/°C · {tech.pvgisTechchoice}</span>
-                              </p>
-                            </div>
-                          </div>
-                        </button>
-                        {tech.isCustom && onDeletePanel && (
-                          <button
-                            onClick={() => {
-                              if (confirm(`¿Estás seguro de eliminar el panel personalizado "${tech.name}"?`)) {
-                                onDeletePanel(tech.id);
-                              }
-                            }}
-                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100 flex-shrink-0"
-                            title="Eliminar panel"
+                      <button
+                        key={tech.id}
+                        onClick={() => handleSelectTech(tech)}
+                        className={`text-left p-2.5 rounded-lg border transition-all hover:shadow-sm ${
+                          selectedTech.id === tech.id
+                            ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-200'
+                            : 'border-gray-200 hover:border-gray-300 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-8 h-8 rounded flex items-center justify-center text-[9px] font-bold flex-shrink-0"
+                            style={{ backgroundColor: tech.color + '20', border: `1.5px solid ${tech.color}`, color: tech.color }}
                           >
-                            <Trash2 size={16} />
-                          </button>
-                        )}
-                      </div>
+                            {tech.hiitioId || 'GEN'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-xs font-medium text-gray-900 truncate">{tech.name}</p>
+                              {compatInfo && (
+                                <span className={`flex items-center gap-0.5 text-[9px] font-bold ${compatInfo.color} flex-shrink-0`}>
+                                  <compatInfo.icon size={10} />
+                                  {compat}/3
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-gray-500">
+                              <span>{tech.pmax}W · η={tech.efficiencySTC}% · γ={tech.tempCoeffPmax}%/°C · {tech.pvgisTechchoice}</span>
+                            </p>
+                          </div>
+                        </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -541,7 +489,7 @@ export default function PanelTechSelector({
       </div>
 
       {/* Editor de plantilla */}
-      <div ref={editorRef} style={{ display: showEditor && editingTech ? 'block' : 'none' }}>
+      <div style={{ display: showEditor && editingTech ? 'block' : 'none' }}>
         {editingTech && (
           <div className="bg-white border-2 border-indigo-200 rounded-lg p-4 space-y-4">
             <div className="flex items-center justify-between">

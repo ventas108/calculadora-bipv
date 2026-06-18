@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import * as XLSX from 'xlsx';
 import { Input } from '@/components/ui/input';
-import { Trash2, Plus, Download, Upload, Sun, Zap, MapPin, Building2, FileText, RefreshCw } from 'lucide-react';
+import { Trash2, Plus, Download, Upload, Sun, Zap, MapPin, Building2, FileText } from 'lucide-react';
 import { FSDistributionChart } from './ShadingChart';
 import { toast } from 'sonner';
 import { EPWData, getWeatherForDateTime, getWeatherCorrectionFactor } from '@/lib/epwParser';
@@ -79,8 +79,6 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
   const [objPreview, setObjPreview] = useState<OBJObstacleResult | null>(null);
   const [objFileName, setObjFileName] = useState<string>('');
   const [objSwapYZ, setObjSwapYZ] = useState(false);
-  const [objUpAxis, setObjUpAxis] = useState<'X' | 'Y' | 'Z' | 'Y_simple'>('Z');
-  const [objRotationDeg, setObjRotationDeg] = useState(0);
   const [objScale, setObjScale] = useState(1.0);
   const [objNorthOffset, setObjNorthOffset] = useState(0);
   const [isDraggingObj, setIsDraggingObj] = useState(false);
@@ -1052,26 +1050,6 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
     const file = event.target.files?.[0];
     if (!file) return;
 
-    let initialScale = objScale;
-    let initialUpAxis = objUpAxis;
-    let initialRot = objRotationDeg;
-
-    // Si ya existe un modelo de edificio cargado, inicializar la configuración de importación del obstáculo con la del edificio
-    if (evaluationModel) {
-      const buildScale = evaluationModel.config.scaleFactor;
-      const buildUpAxis = evaluationModel.config.upAxis === 'auto' ? 'Z' : evaluationModel.config.upAxis;
-      const buildRot = evaluationModel.config.rotationDeg;
-      
-      initialScale = buildScale;
-      initialUpAxis = buildUpAxis as any;
-      initialRot = buildRot;
-
-      setObjScale(buildScale);
-      setObjUpAxis(buildUpAxis as any);
-      setObjRotationDeg(buildRot);
-      setObjSwapYZ(buildUpAxis === 'Y_simple');
-    }
-
     setObjFileName(file.name);
     const ext = file.name.toLowerCase().split('.').pop() || '';
     const isGLTFFile = ext === 'gltf' || ext === 'glb';
@@ -1103,7 +1081,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
             setObjRawParse(parsed);
 
             const northOff = sunPath3DPreview?.location.northOffset || objNorthOffset;
-            const result = convertOBJToObstacles(parsed, undefined, northOff, initialUpAxis, initialScale, initialRot);
+            const result = convertOBJToObstacles(parsed, undefined, northOff, objSwapYZ, objScale);
             setObjPreview(result);
 
             toast.info(
@@ -1141,7 +1119,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
           setObjRawParse(parsed);
 
           const northOff = sunPath3DPreview?.location.northOffset || objNorthOffset;
-          const result = convertOBJToObstacles(parsed, undefined, northOff, initialUpAxis, initialScale, initialRot);
+          const result = convertOBJToObstacles(parsed, undefined, northOff, objSwapYZ, objScale);
           setObjPreview(result);
 
           const summary = getGLTFSummary(gltfResult);
@@ -1162,7 +1140,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
           setObjRawParse(parsed);
 
           const northOff = sunPath3DPreview?.location.northOffset || objNorthOffset;
-          const result = convertOBJToObstacles(parsed, undefined, northOff, initialUpAxis, initialScale, initialRot);
+          const result = convertOBJToObstacles(parsed, undefined, northOff, objSwapYZ, objScale);
           setObjPreview(result);
 
           const summary = getOBJSummary(parsed);
@@ -1193,9 +1171,9 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
   const reconvertOBJ = useCallback(() => {
     if (!objRawParse) return;
     const northOff = sunPath3DPreview?.location.northOffset || objNorthOffset;
-    const result = convertOBJToObstacles(objRawParse, undefined, northOff, objUpAxis, objScale, objRotationDeg);
+    const result = convertOBJToObstacles(objRawParse, undefined, northOff, objSwapYZ, objScale);
     setObjPreview(result);
-  }, [objRawParse, objUpAxis, objScale, objRotationDeg, objNorthOffset, sunPath3DPreview]);
+  }, [objRawParse, objSwapYZ, objScale, objNorthOffset, sunPath3DPreview]);
 
   const confirmOBJImport = () => {
     if (!objPreview) return;
@@ -1209,31 +1187,12 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
           for (const idx of face.vertexIndices) {
             const v = objRawParse.vertices[idx];
             if (v) {
-              let pt = {
+              const scaled = {
                 x: v.x * objScale,
-                y: v.y * objScale,
-                z: v.z * objScale,
+                y: objSwapYZ ? v.z * objScale : v.y * objScale,
+                z: objSwapYZ ? v.y * objScale : v.z * objScale,
               };
-              // remapAxes logic
-              if (objUpAxis === 'Y_simple') {
-                pt = { x: pt.x, y: pt.z, z: pt.y };
-              } else if (objUpAxis === 'Y') {
-                pt = { x: pt.x, y: -pt.z, z: pt.y };
-              } else if (objUpAxis === 'X') {
-                pt = { x: pt.y, y: pt.z, z: pt.x };
-              }
-              // rotateAroundVertical logic
-              if (objRotationDeg !== 0) {
-                const rad = (objRotationDeg * Math.PI) / 180;
-                const cos = Math.cos(rad);
-                const sin = Math.sin(rad);
-                pt = {
-                  x: pt.x * cos - pt.y * sin,
-                  y: pt.x * sin + pt.y * cos,
-                  z: pt.z,
-                };
-              }
-              objVerts.push(pt);
+              objVerts.push(scaled);
             }
           }
         }
@@ -1734,45 +1693,20 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
             {/* OBJ Settings */}
             <div className="flex flex-wrap items-center gap-4 bg-gray-50 rounded-lg p-3">
               <label className="flex items-center gap-2 text-xs">
-                <span className="text-gray-700 font-medium">Eje Vertical:</span>
-                <select
-                  value={objUpAxis}
-                  onChange={(e) => {
-                    const val = e.target.value as 'X' | 'Y' | 'Z' | 'Y_simple';
-                    setObjUpAxis(val);
-                    setObjSwapYZ(val === 'Y_simple');
-                    if (objRawParse) {
-                      const northOff = sunPath3DPreview?.location.northOffset || objNorthOffset;
-                      const result = convertOBJToObstacles(objRawParse, undefined, northOff, val, objScale, objRotationDeg);
-                      setObjPreview(result);
-                    }
-                  }}
-                  className="px-2 py-1 border border-gray-300 rounded text-xs bg-white"
-                >
-                  <option value="Z">Z-up (SketchUp, standard)</option>
-                  <option value="Y">Y-up (Blender, glTF, Rhino)</option>
-                  <option value="Y_simple">Intercambio Y/Z simple (Legacy)</option>
-                  <option value="X">X-up (Raro)</option>
-                </select>
-              </label>
-              <label className="flex items-center gap-2 text-xs">
-                <span className="text-gray-700 font-medium">Rotación:</span>
                 <input
-                  type="number"
-                  value={objRotationDeg}
+                  type="checkbox"
+                  checked={objSwapYZ}
                   onChange={(e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    setObjRotationDeg(val);
+                    setObjSwapYZ(e.target.checked);
                     if (objRawParse) {
                       const northOff = sunPath3DPreview?.location.northOffset || objNorthOffset;
-                      const result = convertOBJToObstacles(objRawParse, undefined, northOff, objUpAxis, objScale, val);
+                      const result = convertOBJToObstacles(objRawParse, undefined, northOff, e.target.checked, objScale);
                       setObjPreview(result);
                     }
                   }}
-                  className="w-16 px-2 py-1 border border-gray-300 rounded text-xs font-mono bg-white"
-                  step="90"
+                  className="accent-emerald-600 w-3.5 h-3.5"
                 />
-                <span className="text-gray-500">°</span>
+                <span className="text-gray-700">Intercambiar Y/Z</span>
               </label>
               <label className="flex items-center gap-2 text-xs">
                 <span className="text-gray-700">Escala:</span>
@@ -1783,7 +1717,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                     setObjScale(newScale);
                     if (objRawParse) {
                       const northOff = sunPath3DPreview?.location.northOffset || objNorthOffset;
-                      const result = convertOBJToObstacles(objRawParse, undefined, northOff, objUpAxis, newScale, objRotationDeg);
+                      const result = convertOBJToObstacles(objRawParse, undefined, northOff, objSwapYZ, newScale);
                       setObjPreview(result);
                     }
                   }}
@@ -1805,7 +1739,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                     const newOffset = parseFloat(e.target.value) || 0;
                     setObjNorthOffset(newOffset);
                     if (objRawParse) {
-                      const result = convertOBJToObstacles(objRawParse, undefined, newOffset, objUpAxis, objScale, objRotationDeg);
+                      const result = convertOBJToObstacles(objRawParse, undefined, newOffset, objSwapYZ, objScale);
                       setObjPreview(result);
                     }
                   }}
@@ -1814,33 +1748,6 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                 />
                 <span className="text-gray-500">°</span>
               </label>
-              {evaluationModel && (
-                <button
-                  type="button"
-                  className="text-xs h-7 bg-violet-50 hover:bg-violet-100 border border-violet-200 text-violet-700 flex items-center gap-1 ml-auto px-2 rounded-md font-medium transition-colors"
-                  onClick={() => {
-                    const buildScale = evaluationModel.config.scaleFactor;
-                    const buildUpAxis = evaluationModel.config.upAxis === 'auto' ? 'Z' : evaluationModel.config.upAxis;
-                    const buildRot = evaluationModel.config.rotationDeg;
-                    
-                    setObjScale(buildScale);
-                    setObjUpAxis(buildUpAxis as any);
-                    setObjRotationDeg(buildRot);
-                    setObjSwapYZ(buildUpAxis === 'Y_simple');
-                    
-                    if (objRawParse) {
-                      const northOff = sunPath3DPreview?.location.northOffset || objNorthOffset;
-                      const result = convertOBJToObstacles(objRawParse, undefined, northOff, buildUpAxis as any, buildScale, buildRot);
-                      setObjPreview(result);
-                    }
-                    
-                    toast.success("¡Configuración del Edificio sincronizada con el Obstáculo!");
-                  }}
-                >
-                  <RefreshCw size={10} className="mr-1" />
-                  Sincronizar con Edificio
-                </button>
-              )}
             </div>
 
             {/* Objects table */}

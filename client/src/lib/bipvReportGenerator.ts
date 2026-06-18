@@ -13,7 +13,6 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { sanitizeFilename, downloadFile } from './utils';
 import type { BIPVPanelConfig, BIPVSiteConfig, BIPVMonthlyExpected, BIPVComparisonResult, BIPVAnnualSummary } from './bipvDiagnostic';
 import type { PerformanceAlert, DiagnosticCause } from '@shared/performanceDiagnostic';
 import { addShadingCrossingSectionToDoc, type ShadingCrossingReportData } from './shadingCrossingReportSection';
@@ -443,8 +442,6 @@ export function generateBIPVReport(data: BIPVReportData): void {
   }
 
   // Guardar
-  const safeSiteName = sanitizeFilename(data.siteConfig.siteName) || 'Sistema_BIPV';
-  const filename = `Diagnostico_BIPV_${safeSiteName}_${new Date().toISOString().slice(0, 10)}.pdf`;
-  const blob = doc.output('blob');
-  downloadFile(blob, filename);
+  const filename = `Diagnostico_BIPV_${data.siteConfig.siteName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+  doc.save(filename);
 }

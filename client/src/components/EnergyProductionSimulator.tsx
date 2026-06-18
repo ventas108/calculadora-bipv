@@ -167,40 +167,12 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
   const [installAzimuth, setInstallAzimuth] = useState(poaConfig?.azimuth ?? getDefaultInstallationConfig().defaultAzimuth);
   const [installConfigExpanded, setInstallConfigExpanded] = useState(true);
 
-  // Ref para rastrear los últimos valores de orientación sincronizados y evitar bucles infinitos de renderizado
-  const lastSyncedRef = useRef<{ tilt: number | null; azimuth: number | null }>({
-    tilt: poaConfig?.tilt ?? null,
-    azimuth: poaConfig?.azimuth ?? null,
-  });
-
-  // Sincronizar estado local del simulador con los props del padre (poaConfig)
-  useEffect(() => {
-    if (poaConfig) {
-      if (poaConfig.tilt !== null && poaConfig.tilt !== installTilt) {
-        setInstallTilt(poaConfig.tilt);
-        lastSyncedRef.current.tilt = poaConfig.tilt;
-      }
-      if (poaConfig.azimuth !== installAzimuth) {
-        setInstallAzimuth(poaConfig.azimuth);
-        lastSyncedRef.current.azimuth = poaConfig.azimuth;
-      }
-    }
-  }, [poaConfig?.tilt, poaConfig?.azimuth]);
-
   // Sincronizar cambios de tilt/azimuth con el cálculo POA en Home.tsx
   useEffect(() => {
     if (onPoaConfigChange) {
-      const hasChanged = 
-        installTilt !== lastSyncedRef.current.tilt || 
-        installAzimuth !== lastSyncedRef.current.azimuth;
-      
-      if (hasChanged) {
-        lastSyncedRef.current.tilt = installTilt;
-        lastSyncedRef.current.azimuth = installAzimuth;
-        onPoaConfigChange({ tilt: installTilt, azimuth: installAzimuth });
-      }
+      onPoaConfigChange({ tilt: installTilt, azimuth: installAzimuth });
     }
-  }, [installTilt, installAzimuth, onPoaConfigChange]);
+  }, [installTilt, installAzimuth]);
 
   const INSTALL_ICONS: Record<string, React.ReactNode> = {
     rooftop_tilted: <Home size={18} />,
@@ -1007,16 +979,13 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
       paybackPeriod: financials.paybackPeriod,
       roi10Year: financials.roi10Years,
       roi25Year: financials.roi25Years,
-      shadingLoss: production.losses.shading,
-      annualFS: 1 - (production.losses.shading / 100),
-      shadingSource: (use3DShading && facadeAnalysis3D) ? '3d' as const : 'manual' as const,
     };
     const key = JSON.stringify(newData);
     if (key !== prevEnergyDataRef.current) {
       prevEnergyDataRef.current = key;
       onEnergyDataChangeRef.current(newData);
     }
-  }, [panelPower, panelEfficiency, panelArea, panelQuantity, installTilt, installAzimuth, poaConfig?.tilt, poaConfig?.azimuth, production.totalACEnergy, production.capacityFactor, production.performanceRatio, financials.paybackPeriod, financials.roi10Years, financials.roi25Years, dcWiring, inverterEfficiency, acWiring, mismatchLosses, soilingLosses, availabilityLosses, production.losses.shading, use3DShading, facadeAnalysis3D]);
+  }, [panelPower, panelEfficiency, panelArea, panelQuantity, installTilt, installAzimuth, poaConfig?.tilt, poaConfig?.azimuth, production.totalACEnergy, production.capacityFactor, production.performanceRatio, financials.paybackPeriod, financials.roi10Years, financials.roi25Years, dcWiring, inverterEfficiency, acWiring, mismatchLosses, soilingLosses, availabilityLosses]);
 
   const lossesData = [
     { name: 'Temperatura', value: Math.round(production.losses.temperature * 10) / 10 },

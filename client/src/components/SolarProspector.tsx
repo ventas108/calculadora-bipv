@@ -1,8 +1,6 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { PanelTechnology, DEFAULT_PANEL_TECHNOLOGIES } from '@/lib/panelTechnologies';
 import { detectColombianRegion, COLOMBIAN_REGION_OPTIONS, ColombianRegionKey } from '@/lib/colombianRegions';
-import { useCustomPanels } from '@/hooks/useCustomPanels';
-import PanelTechSelector from './PanelTechSelector';
 import {
   quickEstimate,
   calculateMulcuePR,
@@ -111,74 +109,6 @@ export default function SolarProspector({
 }: SolarProspectorProps) {
   // Estado del panel seleccionado
   const [selectedPanel, setSelectedPanel] = useState<PanelTechnology>(DEFAULT_PANEL_TECHNOLOGIES[0]);
-  const [yearsFromInstall, setYearsFromInstall] = useState(0);
-
-  // === PANELES PERSONALIZADOS PERSISTENTES ===
-  const { panels: savedPanelsRaw, savePanel: savePanelPersist, deletePanel: deletePanelPersist } = useCustomPanels();
-
-  // Convertir CustomPanelLocal[] a PanelTechnology[] para el selector
-  const savedPanelsTech = useMemo<PanelTechnology[]>(() => {
-    return savedPanelsRaw.map(p => ({
-      id: `saved_${p.localId}`,
-      name: p.name,
-      category: 'generic' as const,
-      brand: 'generic' as const,
-      description: `Panel personalizado guardado`,
-      pmax: p.powerRating,
-      voc: p.voc ?? 40,
-      isc: p.isc ?? 10,
-      vmp: p.vmp ?? 33,
-      imp: p.imp ?? 9.5,
-      efficiencySTC: p.efficiency,
-      tempCoeffPmax: p.tempCoeff,
-      lengthMm: p.lengthMm ?? 1700,
-      widthMm: p.widthMm ?? 1000,
-      weightKg: p.weightKg ?? 20,
-      noct: p.noct,
-      systemLoss: p.systemLoss ?? 14,
-      degradationAnnual: p.degradationAnnual,
-      pvgisTechchoice: 'crystSi',
-      pvgisMountingplace: 'building' as const,
-      priceUSD: 0,
-      pricePerWp: 0,
-      application: p.application ?? 'BIPV personalizado',
-      color: '#6B7280',
-      isCustom: true,
-      hiitioId: '' as any,
-      regionalCompatibility: {
-        caribe: 2 as const, andina: 3 as const, pacifica: 2 as const,
-        orinoquia: 2 as const, amazonia: 2 as const, insular: 2 as const,
-        notes: 'Panel personalizado guardado',
-      },
-    }));
-  }, [savedPanelsRaw]);
-
-  const handleSavePanelPersist = useCallback((panel: PanelTechnology) => {
-    savePanelPersist({
-      name: panel.name,
-      powerRating: panel.pmax,
-      efficiency: panel.efficiencySTC,
-      tempCoeff: panel.tempCoeffPmax,
-      noct: panel.noct,
-      area: (panel.lengthMm * panel.widthMm) / 1e6,
-      degradationAnnual: panel.degradationAnnual,
-      voc: panel.voc,
-      isc: panel.isc,
-      vmp: panel.vmp,
-      imp: panel.imp,
-      lengthMm: panel.lengthMm,
-      widthMm: panel.widthMm,
-      weightKg: panel.weightKg,
-      systemLoss: panel.systemLoss,
-      application: panel.application,
-    });
-  }, [savePanelPersist]);
-
-  const handleDeletePanelPersist = useCallback((panelId: string) => {
-    const localId = panelId.replace('saved_', '');
-    deletePanelPersist(localId);
-  }, [deletePanelPersist]);
-
   const [moduleCount, setModuleCount] = useState(10);
   const [shadowFactor, setShadowFactor] = useState(0.90);
   const [customAmbientTemp, setCustomAmbientTemp] = useState<number | null>(null);
@@ -357,18 +287,26 @@ export default function SolarProspector({
           </h4>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Panel seleccionado con selector rico */}
-            <div className="md:col-span-2 lg:col-span-3 border-b border-gray-100 pb-3 mb-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Tecnología del Panel (Catálogo y Personalizados)</label>
-              <PanelTechSelector
-                selectedTech={selectedPanel}
-                onSelectTech={setSelectedPanel}
-                yearsFromInstall={yearsFromInstall}
-                onYearsChange={setYearsFromInstall}
-                savedPanels={savedPanelsTech}
-                onSavePanel={handleSavePanelPersist}
-                onDeletePanel={handleDeletePanelPersist}
-              />
+            {/* Panel seleccionado */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Panel BIPV</label>
+              <select
+                value={selectedPanel.id}
+                onChange={(e) => {
+                  const panel = DEFAULT_PANEL_TECHNOLOGIES.find(p => p.id === e.target.value);
+                  if (panel) setSelectedPanel(panel);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs bg-white"
+              >
+                {DEFAULT_PANEL_TECHNOLOGIES.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.pmax}W, γ={p.tempCoeffPmax}%/°C)
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">
+                {selectedPanel.pmax}W | η={selectedPanel.efficiencySTC}% | γ={selectedPanel.tempCoeffPmax}%/°C
+              </p>
             </div>
 
             {/* Cantidad de módulos */}

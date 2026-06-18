@@ -13,7 +13,7 @@ export type PanelCategory =
   | 'einnova_antirreflejo' | 'einnova_bifacial' | 'einnova_teja_bc' | 'einnova_teja_plana'
   | 'einnova_color_panel' | 'einnova_fachada' | 'einnova_flexible' | 'einnova_agripv'
   | 'einnova_pavimento' | 'einnova_vidrio'
-  | 'soltech_dvh' | 'soltech_laminado' | 'soltech_opaco' | 'soltech_st' | 'soltech_teja' | 'soltech_ncl'
+  | 'soltech_laminado' | 'soltech_dvh' | 'soltech_opaco' | 'soltech_transparente' | 'soltech_teja'
   | 'generic';
 
 export type PanelBrand = 'hiitio' | 'einnova' | 'soltech' | 'generic';
@@ -591,6 +591,445 @@ export const DEFAULT_PANEL_TECHNOLOGIES: PanelTechnology[] = [
     regionalCompatibility: { caribe: 3, andina: 3, pacifica: 2, orinoquia: 2, amazonia: 1, insular: 3, notes: 'Claraboyas, curtain wall LEED/EDGE' },
   },
 
+  // ===== SOLTECH — Vidrio Laminado Activo (ASP-LAM3) =====
+  {
+    id: 'S01', hiitioId: 'S01', name: 'S01 · SOLTECH Laminado ASP-LAM3-T0 (Opaco)',
+    category: 'soltech_laminado', brand: 'soltech',
+    description: 'Vidrio laminado activo opaco (ASP-LAM3) de 216W (1200x1200mm). Excelente acabado estético y alta resistencia.',
+    pmax: 216, voc: 181.4, isc: 1.75, vmp: 145.0, imp: 1.49,
+    efficiencySTC: 15.0, tempCoeffPmax: -0.32,
+    lengthMm: 1200, widthMm: 1200, weightKg: 52,
+    noct: 46, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Fachadas integradas, lucernarios opacos y antepechos',
+    priceUSD: 230, pricePerWp: 1.06,
+    isCustom: false, color: '#6d28d9',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Tecnología CdTe de película delgada. Coeficiente de temperatura excepcional y excelente respuesta a radiación difusa, óptimo para regiones cálidas y nubladas de Colombia.'
+    }
+  },
+  {
+    id: 'S02', hiitioId: 'S02', name: 'S02 · SOLTECH Laminado ASP-LAM3-T10 (10% T)',
+    category: 'soltech_laminado', brand: 'soltech',
+    description: 'Vidrio laminado activo semitransparente con 10% de transmitancia lumínica (ASP-LAM3) de 194W (1200x1200mm).',
+    pmax: 194, voc: 181.4, isc: 1.58, vmp: 145.0, imp: 1.34,
+    efficiencySTC: 13.47, tempCoeffPmax: -0.32,
+    lengthMm: 1200, widthMm: 1200, weightKg: 52,
+    noct: 46, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Fachadas semitransparentes, lucernarios y pérgolas con control solar',
+    priceUSD: 240, pricePerWp: 1.24,
+    isCustom: false, color: '#7c3aed',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Tecnología CdTe de película delgada. Coeficiente de temperatura excepcional y excelente respuesta a radiación difusa, óptimo para regiones cálidas y nubladas de Colombia.'
+    }
+  },
+  {
+    id: 'S03', hiitioId: 'S03', name: 'S03 · SOLTECH Laminado ASP-LAM3-T20 (20% T)',
+    category: 'soltech_laminado', brand: 'soltech',
+    description: 'Vidrio laminado activo semitransparente con 20% de transmitancia lumínica (ASP-LAM3) de 173W (1200x1200mm).',
+    pmax: 173, voc: 181.4, isc: 1.40, vmp: 145.0, imp: 1.19,
+    efficiencySTC: 12.01, tempCoeffPmax: -0.32,
+    lengthMm: 1200, widthMm: 1200, weightKg: 52,
+    noct: 46, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Muros cortina, claraboyas y marquesinas',
+    priceUSD: 250, pricePerWp: 1.45,
+    isCustom: false, color: '#8b5cf6',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Tecnología CdTe de película delgada. Coeficiente de temperatura excepcional y excelente respuesta a radiación difusa, óptimo para regiones cálidas y nubladas de Colombia.'
+    }
+  },
+  {
+    id: 'S04', hiitioId: 'S04', name: 'S04 · SOLTECH Laminado ASP-LAM3-T30 (30% T)',
+    category: 'soltech_laminado', brand: 'soltech',
+    description: 'Vidrio laminado activo semitransparente con 30% de transmitancia lumínica (ASP-LAM3) de 151W (1200x1200mm).',
+    pmax: 151, voc: 181.4, isc: 1.22, vmp: 145.0, imp: 1.04,
+    efficiencySTC: 10.49, tempCoeffPmax: -0.32,
+    lengthMm: 1200, widthMm: 1200, weightKg: 52,
+    noct: 46, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Acristalamientos arquitectónicos de alta visibilidad',
+    priceUSD: 260, pricePerWp: 1.72,
+    isCustom: false, color: '#a78bfa',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Tecnología CdTe de película delgada. Coeficiente de temperatura excepcional y excelente respuesta a radiación difusa, óptimo para regiones cálidas y nubladas de Colombia.'
+    }
+  },
+  {
+    id: 'S05', hiitioId: 'S05', name: 'S05 · SOLTECH Laminado ASP-LAM3-T40 (40% T)',
+    category: 'soltech_laminado', brand: 'soltech',
+    description: 'Vidrio laminado activo semitransparente con 40% de transmitancia lumínica (ASP-LAM3) de 130W (1200x1200mm).',
+    pmax: 130, voc: 181.4, isc: 1.06, vmp: 145.0, imp: 0.90,
+    efficiencySTC: 9.03, tempCoeffPmax: -0.32,
+    lengthMm: 1200, widthMm: 1200, weightKg: 52,
+    noct: 46, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Ventanas solares y fachadas con luz natural',
+    priceUSD: 270, pricePerWp: 2.08,
+    isCustom: false, color: '#c084fc',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Tecnología CdTe de película delgada. Coeficiente de temperatura excepcional y excelente respuesta a radiación difusa, óptimo para regiones cálidas y nubladas de Colombia.'
+    }
+  },
+  {
+    id: 'S06', hiitioId: 'S06', name: 'S06 · SOLTECH Laminado ASP-LAM3-T50 (50% T)',
+    category: 'soltech_laminado', brand: 'soltech',
+    description: 'Vidrio laminado activo de alta transparencia con 50% de transmitancia lumínica (ASP-LAM3) de 108W (1200x1200mm).',
+    pmax: 108, voc: 181.4, isc: 0.87, vmp: 145.0, imp: 0.74,
+    efficiencySTC: 7.50, tempCoeffPmax: -0.32,
+    lengthMm: 1200, widthMm: 1200, weightKg: 52,
+    noct: 46, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Vidrios de visión y fachadas comerciales LEED',
+    priceUSD: 280, pricePerWp: 2.59,
+    isCustom: false, color: '#ddd6fe',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Tecnología CdTe de película delgada. Coeficiente de temperatura excepcional y excelente respuesta a radiación difusa, óptimo para regiones cálidas y nubladas de Colombia.'
+    }
+  },
+
+  // ===== SOLTECH — Vidrio Laminado Activo Grande (ASP-LAM3) =====
+  {
+    id: 'S07', hiitioId: 'S07', name: 'S07 · SOLTECH Laminado ASP-LAM3-1800-T0 (Opaco)',
+    category: 'soltech_laminado', brand: 'soltech',
+    description: 'Vidrio laminado activo opaco de gran formato (ASP-LAM3) de 326W (1200x1800mm).',
+    pmax: 326, voc: 181.4, isc: 2.65, vmp: 145.0, imp: 2.25,
+    efficiencySTC: 15.09, tempCoeffPmax: -0.32,
+    lengthMm: 1800, widthMm: 1200, weightKg: 89,
+    noct: 46, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Fachadas de gran formato y muros cortina industriales',
+    priceUSD: 330, pricePerWp: 1.01,
+    isCustom: false, color: '#5b21b6',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Tecnología CdTe de película delgada. Coeficiente de temperatura excepcional y excelente respuesta a radiación difusa, óptimo para regiones cálidas y nubladas de Colombia.'
+    }
+  },
+  {
+    id: 'S08', hiitioId: 'S08', name: 'S08 · SOLTECH Laminado ASP-LAM3-1800-T30 (30% T)',
+    category: 'soltech_laminado', brand: 'soltech',
+    description: 'Vidrio laminado activo semitransparente de gran formato (ASP-LAM3) de 228W (1200x1800mm).',
+    pmax: 228, voc: 181.4, isc: 1.85, vmp: 145.0, imp: 1.57,
+    efficiencySTC: 10.56, tempCoeffPmax: -0.32,
+    lengthMm: 1800, widthMm: 1200, weightKg: 89,
+    noct: 46, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Lucernarios y cubiertas semitransparentes de gran superficie',
+    priceUSD: 360, pricePerWp: 1.58,
+    isCustom: false, color: '#7c3aed',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Tecnología CdTe de película delgada. Coeficiente de temperatura excepcional y excelente respuesta a radiación difusa, óptimo para regiones cálidas y nubladas de Colombia.'
+    }
+  },
+  {
+    id: 'S09', hiitioId: 'S09', name: 'S09 · SOLTECH Laminado ASP-LAM3-1800-T50 (50% T)',
+    category: 'soltech_laminado', brand: 'soltech',
+    description: 'Vidrio laminado activo de alta transparencia y gran formato (ASP-LAM3) de 163W (1200x1800mm).',
+    pmax: 163, voc: 181.4, isc: 1.32, vmp: 145.0, imp: 1.12,
+    efficiencySTC: 7.55, tempCoeffPmax: -0.32,
+    lengthMm: 1800, widthMm: 1200, weightKg: 89,
+    noct: 46, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Fachadas acristaladas de oficinas y centros comerciales',
+    priceUSD: 380, pricePerWp: 2.33,
+    isCustom: false, color: '#c084fc',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Tecnología CdTe de película delgada. Coeficiente de temperatura excepcional y excelente respuesta a radiación difusa, óptimo para regiones cálidas y nubladas de Colombia.'
+    }
+  },
+  {
+    id: 'S10', hiitioId: 'S10', name: 'S10 · SOLTECH Laminado ASP-LAM3-2300-T0 (Opaco)',
+    category: 'soltech_laminado', brand: 'soltech',
+    description: 'Vidrio laminado activo opaco de formato gigante (ASP-LAM3) de 423W (1215x2300mm).',
+    pmax: 423, voc: 184.0, isc: 3.39, vmp: 147.0, imp: 2.88,
+    efficiencySTC: 15.14, tempCoeffPmax: -0.32,
+    lengthMm: 2300, widthMm: 1215, weightKg: 115,
+    noct: 46, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Integración estructural de fachadas a gran escala',
+    priceUSD: 450, pricePerWp: 1.06,
+    isCustom: false, color: '#4c1d95',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Tecnología CdTe de película delgada. Coeficiente de temperatura excepcional y excelente respuesta a radiación difusa, óptimo para regiones cálidas y nubladas de Colombia.'
+    }
+  },
+  {
+    id: 'S11', hiitioId: 'S11', name: 'S11 · SOLTECH Laminado ASP-LAM3-2300-T30 (30% T)',
+    category: 'soltech_laminado', brand: 'soltech',
+    description: 'Vidrio laminado activo semitransparente de formato gigante (ASP-LAM3) de 296W (1215x2300mm).',
+    pmax: 296, voc: 184.0, isc: 2.36, vmp: 147.0, imp: 2.01,
+    efficiencySTC: 10.59, tempCoeffPmax: -0.32,
+    lengthMm: 2300, widthMm: 1215, weightKg: 115,
+    noct: 46, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Muros cortina de gran escala y lucernarios monumentales',
+    priceUSD: 490, pricePerWp: 1.66,
+    isCustom: false, color: '#6d28d9',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Tecnología CdTe de película delgada. Coeficiente de temperatura excepcional y excelente respuesta a radiación difusa, óptimo para regiones cálidas y nubladas de Colombia.'
+    }
+  },
+  {
+    id: 'S12', hiitioId: 'S12', name: 'S12 · SOLTECH Laminado ASP-LAM3-2300-T50 (50% T)',
+    category: 'soltech_laminado', brand: 'soltech',
+    description: 'Vidrio laminado activo de alta transparencia y formato gigante (ASP-LAM3) de 211W (1215x2300mm).',
+    pmax: 211, voc: 184.0, isc: 1.69, vmp: 147.0, imp: 1.44,
+    efficiencySTC: 7.55, tempCoeffPmax: -0.32,
+    lengthMm: 2300, widthMm: 1215, weightKg: 115,
+    noct: 46, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Grandes acristalamientos solares en edificios de oficinas',
+    priceUSD: 520, pricePerWp: 2.46,
+    isCustom: false, color: '#a78bfa',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Tecnología CdTe de película delgada. Coeficiente de temperatura excepcional y excelente respuesta a radiación difusa, óptimo para regiones cálidas y nubladas de Colombia.'
+    }
+  },
+
+  // ===== SOLTECH — Vidrio DVH Doble Vidrio (ASP-DVH) =====
+  {
+    id: 'S13', hiitioId: 'S13', name: 'S13 · SOLTECH DVH ASP-DVH-T0 (Opaco)',
+    category: 'soltech_dvh', brand: 'soltech',
+    description: 'Doble vidrio hermético (DVH) aislante con capa activa opaca (ASP-DVH) de 216W (1200x1200mm). Alto aislamiento térmico y acústico.',
+    pmax: 216, voc: 181.4, isc: 1.75, vmp: 145.0, imp: 1.49,
+    efficiencySTC: 15.0, tempCoeffPmax: -0.32,
+    lengthMm: 1200, widthMm: 1200, weightKg: 67,
+    noct: 48, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Fachadas aislantes, antepechos y lucernarios con exigencia de climatización',
+    priceUSD: 320, pricePerWp: 1.48,
+    isCustom: false, color: '#1e1b4b',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Unidad de Doble Vidrio Hermético (DVH) con CdTe. Ofrece excelente aislamiento térmico (U = 4.89) y alto control solar (factor g = 0.25 a 0.54).'
+    }
+  },
+  {
+    id: 'S14', hiitioId: 'S14', name: 'S14 · SOLTECH DVH ASP-DVH-T10 (10% T)',
+    category: 'soltech_dvh', brand: 'soltech',
+    description: 'Doble vidrio hermético (DVH) aislante con 10% de transparencia (ASP-DVH) de 194W (1200x1200mm).',
+    pmax: 194, voc: 181.4, isc: 1.58, vmp: 145.0, imp: 1.34,
+    efficiencySTC: 13.47, tempCoeffPmax: -0.32,
+    lengthMm: 1200, widthMm: 1200, weightKg: 67,
+    noct: 48, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Fachadas arquitectónicas eficientes y pérgolas bioclimáticas',
+    priceUSD: 340, pricePerWp: 1.75,
+    isCustom: false, color: '#311084',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Unidad de Doble Vidrio Hermético (DVH) con CdTe. Ofrece excelente aislamiento térmico (U = 4.89) y alto control solar (factor g = 0.25 a 0.54).'
+    }
+  },
+  {
+    id: 'S15', hiitioId: 'S15', name: 'S15 · SOLTECH DVH ASP-DVH-T30 (30% T)',
+    category: 'soltech_dvh', brand: 'soltech',
+    description: 'Doble vidrio hermético (DVH) aislante con 30% de transparencia (ASP-DVH) de 151W (1200x1200mm).',
+    pmax: 151, voc: 181.4, isc: 1.22, vmp: 145.0, imp: 1.04,
+    efficiencySTC: 10.49, tempCoeffPmax: -0.32,
+    lengthMm: 1200, widthMm: 1200, weightKg: 67,
+    noct: 48, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Muros cortina bioclimáticos y claraboyas de oficinas',
+    priceUSD: 370, pricePerWp: 2.45,
+    isCustom: false, color: '#4c1d95',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Unidad de Doble Vidrio Hermético (DVH) con CdTe. Ofrece excelente aislamiento térmico (U = 4.89) y alto control solar (factor g = 0.25 a 0.54).'
+    }
+  },
+  {
+    id: 'S16', hiitioId: 'S16', name: 'S16 · SOLTECH DVH ASP-DVH-T50 (50% T)',
+    category: 'soltech_dvh', brand: 'soltech',
+    description: 'Doble vidrio hermético (DVH) de alta transparencia con 50% de transmitancia (ASP-DVH) de 108W (1200x1200mm).',
+    pmax: 108, voc: 181.4, isc: 0.87, vmp: 145.0, imp: 0.74,
+    efficiencySTC: 7.50, tempCoeffPmax: -0.32,
+    lengthMm: 1200, widthMm: 1200, weightKg: 67,
+    noct: 48, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Ventanas y fachadas integradas en edificios LEED',
+    priceUSD: 410, pricePerWp: 3.80,
+    isCustom: false, color: '#7c3aed',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Unidad de Doble Vidrio Hermético (DVH) con CdTe. Ofrece excelente aislamiento térmico (U = 4.89) y alto control solar (factor g = 0.25 a 0.54).'
+    }
+  },
+
+  // ===== SOLTECH — Vidrio Opaco BIPV (ASP-S1) =====
+  {
+    id: 'S17', hiitioId: 'S17', name: 'S17 · SOLTECH Opaco ASP-S1-105',
+    category: 'soltech_opaco', brand: 'soltech',
+    description: 'Vidrio fotovoltaico opaco de seguridad (ASP-S1) de 105W (1200x600mm). Perfecto para fachadas ventiladas e integración en zonas no transitadas.',
+    pmax: 105, voc: 116.0, isc: 1.39, vmp: 92.0, imp: 1.14,
+    efficiencySTC: 14.58, tempCoeffPmax: -0.321,
+    lengthMm: 1200, widthMm: 600, weightKg: 12,
+    noct: 48, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Fachadas ventiladas, antepechos, revestimientos ciegos',
+    priceUSD: 160, pricePerWp: 1.52,
+    isCustom: false, color: '#311042',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Módulo de CdTe opaco premium para revestimientos ciegos y antepechos.'
+    }
+  },
+  {
+    id: 'S18', hiitioId: 'S18', name: 'S18 · SOLTECH Opaco ASP-S1-115',
+    category: 'soltech_opaco', brand: 'soltech',
+    description: 'Vidrio fotovoltaico opaco de seguridad y alta tensión (ASP-S1) de 115W (1200x600mm). Optimizado para cadenas de string de alta eficiencia.',
+    pmax: 115, voc: 180.49, isc: 0.918, vmp: 145.0, imp: 0.793,
+    efficiencySTC: 15.97, tempCoeffPmax: -0.321,
+    lengthMm: 1200, widthMm: 600, weightKg: 12,
+    noct: 48, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Sistemas fotovoltaicos arquitectónicos ciegos de alta tensión',
+    priceUSD: 175, pricePerWp: 1.52,
+    isCustom: false, color: '#1e1b4b',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Módulo de CdTe opaco premium para revestimientos ciegos y antepechos.'
+    }
+  },
+
+  // ===== SOLTECH — Vidrio Transparente BIPV (ASP-ST1) =====
+  {
+    id: 'S19', hiitioId: 'S19', name: 'S19 · SOLTECH Transparente ASP-ST1-T10 (10% T)',
+    category: 'soltech_transparente', brand: 'soltech',
+    description: 'Vidrio fotovoltaico semitransparente (ASP-ST1) de 94W (1200x600mm) con un 10% de transmitancia de luz visible.',
+    pmax: 94, voc: 116.0, isc: 1.19, vmp: 92.0, imp: 1.02,
+    efficiencySTC: 13.06, tempCoeffPmax: -0.321,
+    lengthMm: 1200, widthMm: 600, weightKg: 12.5,
+    noct: 48, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Claraboyas, viseras solares, sombreadores de ventanas',
+    priceUSD: 170, pricePerWp: 1.81,
+    isCustom: false, color: '#581c87',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Transparencia equilibrada con captación de energía CdTe.'
+    }
+  },
+  {
+    id: 'S20', hiitioId: 'S20', name: 'S20 · SOLTECH Transparente ASP-ST1-T30 (30% T)',
+    category: 'soltech_transparente', brand: 'soltech',
+    description: 'Vidrio fotovoltaico semitransparente (ASP-ST1) de 73W (1200x600mm) con un 30% de transmitancia de luz visible.',
+    pmax: 73, voc: 116.0, isc: 0.93, vmp: 92.0, imp: 0.79,
+    efficiencySTC: 10.14, tempCoeffPmax: -0.321,
+    lengthMm: 1200, widthMm: 600, weightKg: 12.5,
+    noct: 48, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Fachadas ventiladas vidriadas, pérgolas de sombreado medio',
+    priceUSD: 180, pricePerWp: 2.47,
+    isCustom: false, color: '#7e22ce',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Transparencia equilibrada con captación de energía CdTe.'
+    }
+  },
+  {
+    id: 'S21', hiitioId: 'S21', name: 'S21 · SOLTECH Transparente ASP-ST1-T50 (50% T)',
+    category: 'soltech_transparente', brand: 'soltech',
+    description: 'Vidrio fotovoltaico semitransparente (ASP-ST1) de 52W (1200x600mm) con un 50% de transmitancia de luz visible.',
+    pmax: 52, voc: 116.0, isc: 0.66, vmp: 92.0, imp: 0.56,
+    efficiencySTC: 7.22, tempCoeffPmax: -0.321,
+    lengthMm: 1200, widthMm: 600, weightKg: 12.5,
+    noct: 48, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Vidrios de visión, ventanas de edificios de oficinas LEED',
+    priceUSD: 195, pricePerWp: 3.75,
+    isCustom: false, color: '#a855f7',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Transparencia equilibrada con captación de energía CdTe.'
+    }
+  },
+
+  // ===== SOLTECH — Teja Curva CIGS (HW-MQSB) =====
+  {
+    id: 'S22', hiitioId: 'S22', name: 'S22 · SOLTECH Teja CIGS HW-MQSB-V2 Negra (32W)',
+    category: 'soltech_teja', brand: 'soltech',
+    description: 'Teja curva fotovoltaica CIGS de color Negro (32W). Ideal para cubiertas residenciales inclinadas respetando la estética clásica.',
+    pmax: 32, voc: 10.8, isc: 4.10, vmp: 8.90, imp: 3.60,
+    efficiencySTC: 8.89, tempCoeffPmax: -0.30,
+    lengthMm: 720, widthMm: 500, weightKg: 6.5,
+    noct: 45, systemLoss: 18, degradationAnnual: 0.60,
+    pvgisTechchoice: 'CIS', pvgisMountingplace: 'building',
+    application: 'Cubiertas inclinadas residenciales en zonas patrimoniales urbanas',
+    priceUSD: 65, pricePerWp: 2.03,
+    isCustom: false, color: '#1e1b4b',
+    regionalCompatibility: {
+      caribe: 2, andina: 3, pacifica: 2, orinoquia: 1, amazonia: 2, insular: 2,
+      notes: 'Estética premium colonial. Excelente para la región Andina y zonas patrimoniales.'
+    }
+  },
+  {
+    id: 'S23', hiitioId: 'S23', name: 'S23 · SOLTECH Teja CIGS HW-MQSB-V2 Terracota (28W)',
+    category: 'soltech_teja', brand: 'soltech',
+    description: 'Teja curva fotovoltaica CIGS de color Terracota/Rojo (28W). Integración patrimonial perfecta en tejados tradicionales.',
+    pmax: 28, voc: 10.5, isc: 3.90, vmp: 8.40, imp: 3.40,
+    efficiencySTC: 7.78, tempCoeffPmax: -0.30,
+    lengthMm: 720, widthMm: 500, weightKg: 6.5,
+    noct: 45, systemLoss: 18, degradationAnnual: 0.60,
+    pvgisTechchoice: 'CIS', pvgisMountingplace: 'building',
+    application: 'Cubiertas inclinadas coloniales y restauración de centros históricos',
+    priceUSD: 75, pricePerWp: 2.68,
+    isCustom: false, color: '#c2703e',
+    regionalCompatibility: {
+      caribe: 2, andina: 3, pacifica: 2, orinoquia: 1, amazonia: 2, insular: 2,
+      notes: 'Estética premium colonial. Excelente para la región Andina y zonas patrimoniales.'
+    }
+  },
+  {
+    id: 'S24', hiitioId: 'S24', name: 'S24 · SOLTECH Teja CIGS HW-MQSB-V2 Verde (28W)',
+    category: 'soltech_teja', brand: 'soltech',
+    description: 'Teja curva fotovoltaica CIGS de color Verde (28W). Para proyectos arquitectónicos de diseño bioclimático.',
+    pmax: 28, voc: 10.5, isc: 3.90, vmp: 8.40, imp: 3.40,
+    efficiencySTC: 7.78, tempCoeffPmax: -0.30,
+    lengthMm: 720, widthMm: 500, weightKg: 6.5,
+    noct: 45, systemLoss: 18, degradationAnnual: 0.60,
+    pvgisTechchoice: 'CIS', pvgisMountingplace: 'building',
+    application: 'Arquitectura verde integrada y techos ajardinados combinados',
+    priceUSD: 75, pricePerWp: 2.68,
+    isCustom: false, color: '#15803d',
+    regionalCompatibility: {
+      caribe: 2, andina: 3, pacifica: 2, orinoquia: 1, amazonia: 2, insular: 2,
+      notes: 'Estética premium colonial. Excelente para la región Andina y zonas patrimoniales.'
+    }
+  },
+
+  // ===== NEXTCITY LABS — BIPV Transparente (NCL-BIPV) =====
+  {
+    id: 'S25', hiitioId: 'S25', name: 'S25 · NextCity Labs Transparente (NCL-BIPV-Transparente)',
+    category: 'soltech_transparente', brand: 'soltech',
+    description: 'Vidrio solar transparente de telururo de cadmio (CdTe) con diseño de tamaño personalizado y hasta 160 W/m² (80W para tamaño estándar 1200x600mm).',
+    pmax: 80, voc: 120.0, isc: 1.00, vmp: 96.0, imp: 0.83,
+    efficiencySTC: 11.11, tempCoeffPmax: -0.29,
+    lengthMm: 1200, widthMm: 600, weightKg: 21,
+    noct: 48, systemLoss: 18, degradationAnnual: 0.40,
+    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
+    application: 'Fachadas, marquesinas, barandillas y ventanas personalizables de alto rendimiento',
+    priceUSD: 190, pricePerWp: 2.38,
+    isCustom: false, color: '#10b981',
+    regionalCompatibility: {
+      caribe: 3, andina: 2, pacifica: 3, orinoquia: 3, amazonia: 3, insular: 3,
+      notes: 'Vidrio transparente de CdTe personalizable con espesor de 21 mm para alta seguridad arquitectónica.'
+    }
+  },
+
   // ===== Tecnologías Genéricas de Referencia =====
   {
     id: 'GEN_CSI', hiitioId: '', name: 'Genérico · c-Si Mono PERC',
@@ -630,350 +1069,6 @@ export const DEFAULT_PANEL_TECHNOLOGIES: PanelTechnology[] = [
     application: 'Instalaciones a gran escala, climas cálidos',
     priceUSD: 175, pricePerWp: 0.38,
     isCustom: false, color: '#d1d5db', brand: 'generic',
-  },
-  // ===== SOLTECH — DVH Doble Vidrio (ASP-DVH) =====
-  {
-    id: 'SOL_DVH_T0', hiitioId: '', name: 'SOLTECH · ASP-DVH-T0 (216W)',
-    category: 'soltech_dvh',
-    description: 'Doble Vidrio Hermético BIPV 0% transparencia. Aislamiento térmico y acústico reforzado (U=4.89, SC=0.29).',
-    pmax: 216, voc: 181.4, isc: 1.39, vmp: 150.0, imp: 1.25,
-    efficiencySTC: 15.0, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 1200, weightKg: 60.0,
-    noct: 46, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Ventanas fijas y muros cortina con aislamiento térmico reforzado',
-    priceUSD: 480, pricePerWp: 2.22,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_DVH_T10', hiitioId: '', name: 'SOLTECH · ASP-DVH-T10 (194W)',
-    category: 'soltech_dvh',
-    description: 'Doble Vidrio Hermético BIPV 10% transparencia. Confort visual y aislamiento (U=4.89, SC=0.32).',
-    pmax: 194, voc: 181.4, isc: 1.19, vmp: 150.0, imp: 1.12,
-    efficiencySTC: 13.5, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 1200, weightKg: 60.0,
-    noct: 46, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Fachadas vidriadas, lucernarios de baja transparencia',
-    priceUSD: 490, pricePerWp: 2.53,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_DVH_T30', hiitioId: '', name: 'SOLTECH · ASP-DVH-T30 (151W)',
-    category: 'soltech_dvh',
-    description: 'Doble Vidrio Hermético BIPV 30% transparencia. Óptimo balance luz/generación (U=4.89, SC=0.41).',
-    pmax: 151, voc: 181.4, isc: 0.93, vmp: 150.0, imp: 0.88,
-    efficiencySTC: 10.5, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 1200, weightKg: 60.0,
-    noct: 46, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Fachadas, ventanas de oficinas y áreas de trabajo',
-    priceUSD: 510, pricePerWp: 3.38,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_DVH_T50', hiitioId: '', name: 'SOLTECH · ASP-DVH-T50 (108W)',
-    category: 'soltech_dvh',
-    description: 'Doble Vidrio Hermético BIPV 50% transparencia. Alta luminosidad para fachadas y ventanas (U=4.89, SC=0.53).',
-    pmax: 108, voc: 181.4, isc: 0.66, vmp: 150.0, imp: 0.62,
-    efficiencySTC: 7.5, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 1200, weightKg: 60.0,
-    noct: 46, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Ventanas y áreas residenciales con requerimiento de luz natural',
-    priceUSD: 530, pricePerWp: 4.91,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_DVH_T60', hiitioId: '', name: 'SOLTECH · ASP-DVH-T60 (84W)',
-    category: 'soltech_dvh',
-    description: 'Doble Vidrio Hermético BIPV 60% transparencia. Máxima transmisión de luz (U=4.89, SC=0.57).',
-    pmax: 84, voc: 181.4, isc: 0.53, vmp: 150.0, imp: 0.49,
-    efficiencySTC: 5.8, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 1200, weightKg: 60.0,
-    noct: 46, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Muros cortina con alta visibilidad y confort térmico',
-    priceUSD: 540, pricePerWp: 6.43,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_DVH_T70', hiitioId: '', name: 'SOLTECH · ASP-DVH-T70 (62W)',
-    category: 'soltech_dvh',
-    description: 'Doble Vidrio Hermético BIPV 70% transparencia. Vista panorámica y control térmico (U=4.89, SC=0.62).',
-    pmax: 62, voc: 181.4, isc: 0.40, vmp: 150.0, imp: 0.36,
-    efficiencySTC: 4.3, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 1200, weightKg: 60.0,
-    noct: 46, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Grandes ventanales, vitrinas y fachadas norte/sur',
-    priceUSD: 550, pricePerWp: 8.87,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  // ===== SOLTECH — Laminated Vidrio (ASP-LAM3) =====
-  {
-    id: 'SOL_LAM3_T0_1200', hiitioId: '', name: 'SOLTECH · ASP-LAM3-T0 (1200x1200mm, 216W)',
-    category: 'soltech_laminado',
-    description: 'Vidrio laminado BIPV 1200x1200mm, 0% transparencia. Máxima densidad de potencia.',
-    pmax: 216, voc: 181.4, isc: 1.39, vmp: 150.0, imp: 1.25,
-    efficiencySTC: 15.0, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 1200, weightKg: 52.0,
-    noct: 45, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Revestimiento de fachadas, antepechos y lucernarios opacos',
-    priceUSD: 360, pricePerWp: 1.67,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_LAM3_T10_1200', hiitioId: '', name: 'SOLTECH · ASP-LAM3-T10 (1200x1200mm, 194W)',
-    category: 'soltech_laminado',
-    description: 'Vidrio laminado BIPV 1200x1200mm, 10% transparencia.',
-    pmax: 194, voc: 181.4, isc: 1.19, vmp: 150.0, imp: 1.12,
-    efficiencySTC: 13.5, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 1200, weightKg: 52.0,
-    noct: 45, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Pérgolas, marquesinas de acceso, control de deslumbramiento',
-    priceUSD: 370, pricePerWp: 1.91,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_LAM3_T20_1200', hiitioId: '', name: 'SOLTECH · ASP-LAM3-T20 (1200x1200mm, 173W)',
-    category: 'soltech_laminado',
-    description: 'Vidrio laminado BIPV 1200x1200mm, 20% transparencia.',
-    pmax: 173, voc: 181.4, isc: 1.07, vmp: 150.0, imp: 1.01,
-    efficiencySTC: 12.0, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 1200, weightKg: 52.0,
-    noct: 45, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Cubiertas de vidrio comerciales, pérgolas de sombreado',
-    priceUSD: 380, pricePerWp: 2.20,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_LAM3_T30_1200', hiitioId: '', name: 'SOLTECH · ASP-LAM3-T30 (1200x1200mm, 151W)',
-    category: 'soltech_laminado',
-    description: 'Vidrio laminado BIPV 1200x1200mm, 30% transparencia.',
-    pmax: 151, voc: 181.4, isc: 0.93, vmp: 150.0, imp: 0.88,
-    efficiencySTC: 10.5, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 1200, weightKg: 52.0,
-    noct: 45, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Pasamanos, barandas de balcones y parasoles en fachada',
-    priceUSD: 395, pricePerWp: 2.62,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_LAM3_T40_1200', hiitioId: '', name: 'SOLTECH · ASP-LAM3-T40 (1200x1200mm, 130W)',
-    category: 'soltech_laminado',
-    description: 'Vidrio laminado BIPV 1200x1200mm, 40% transparencia.',
-    pmax: 130, voc: 181.4, isc: 0.80, vmp: 150.0, imp: 0.76,
-    efficiencySTC: 9.0, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 1200, weightKg: 52.0,
-    noct: 45, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Claraboyas de gran tamaño, atrios y pasarelas cubiertas',
-    priceUSD: 410, pricePerWp: 3.15,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_LAM3_T50_1200', hiitioId: '', name: 'SOLTECH · ASP-LAM3-T50 (1200x1200mm, 108W)',
-    category: 'soltech_laminado',
-    description: 'Vidrio laminado BIPV 1200x1200mm, 50% transparencia.',
-    pmax: 108, voc: 181.4, isc: 0.66, vmp: 150.0, imp: 0.62,
-    efficiencySTC: 7.5, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 1200, weightKg: 52.0,
-    noct: 45, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Vidrios de fachada translucida, atrios residenciales',
-    priceUSD: 420, pricePerWp: 3.89,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_LAM3_T0_1800', hiitioId: '', name: 'SOLTECH · ASP-LAM3-T0 (1200x1800mm, 326W)',
-    category: 'soltech_laminado',
-    description: 'Vidrio laminado BIPV 1200x1800mm, 0% transparencia. Alta potencia para áreas rectangulares grandes.',
-    pmax: 326, voc: 181.4, isc: 2.10, vmp: 150.0, imp: 1.88,
-    efficiencySTC: 15.1, tempCoeffPmax: -0.321,
-    lengthMm: 1800, widthMm: 1200, weightKg: 89.0,
-    noct: 45, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Revestimiento de fachadas altas y muros ciegos',
-    priceUSD: 540, pricePerWp: 1.66,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_LAM3_T30_1800', hiitioId: '', name: 'SOLTECH · ASP-LAM3-T30 (1200x1800mm, 228W)',
-    category: 'soltech_laminado',
-    description: 'Vidrio laminado BIPV 1200x1800mm, 30% transparencia. Formato vertical panorámico.',
-    pmax: 228, voc: 181.4, isc: 1.40, vmp: 150.0, imp: 1.30,
-    efficiencySTC: 10.6, tempCoeffPmax: -0.321,
-    lengthMm: 1800, widthMm: 1200, weightKg: 89.0,
-    noct: 45, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Muros cortina de gran altura, fachadas de doble piel',
-    priceUSD: 580, pricePerWp: 2.54,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_LAM3_T0_2300', hiitioId: '', name: 'SOLTECH · ASP-LAM3-T0 (1215x2300mm, 423W)',
-    category: 'soltech_laminado',
-    description: 'Vidrio laminado BIPV 1215x2300mm, 0% transparencia. Formato gigante de alto rendimiento.',
-    pmax: 423, voc: 184.0, isc: 2.65, vmp: 152.0, imp: 2.45,
-    efficiencySTC: 15.1, tempCoeffPmax: -0.321,
-    lengthMm: 2300, widthMm: 1215, weightKg: 115.0,
-    noct: 45, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Integración en muro cortina estructural de grandes dimensiones',
-    priceUSD: 720, pricePerWp: 1.70,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_LAM3_T30_2300', hiitioId: '', name: 'SOLTECH · ASP-LAM3-T30 (1215x2300mm, 296W)',
-    category: 'soltech_laminado',
-    description: 'Vidrio laminado BIPV 1215x2300mm, 30% transparencia. Máxima expresión e integración arquitectónica.',
-    pmax: 296, voc: 184.0, isc: 1.90, vmp: 152.0, imp: 1.72,
-    efficiencySTC: 10.6, tempCoeffPmax: -0.321,
-    lengthMm: 2300, widthMm: 1215, weightKg: 115.0,
-    noct: 45, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Fachadas estructurales acristaladas de oficinas corporativas',
-    priceUSD: 780, pricePerWp: 2.64,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  // ===== SOLTECH — Vidrio Opaco (ASP-S1) =====
-  {
-    id: 'SOL_S1_105', hiitioId: '', name: 'SOLTECH · ASP-S1-105 (105W)',
-    category: 'soltech_opaco',
-    description: 'Vidrio solar opaco BIPV de 105W en formato compacto de 1200x600mm. Ideal para revestimiento exterior.',
-    pmax: 105, voc: 116.0, isc: 1.39, vmp: 90.0, imp: 1.17,
-    efficiencySTC: 14.6, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 600, weightKg: 12.0,
-    noct: 46, systemLoss: 16, degradationAnnual: 0.45,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Spandrel, revestimiento de fachadas ventiladas modulares',
-    priceUSD: 190, pricePerWp: 1.81,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_S1_115', hiitioId: '', name: 'SOLTECH · ASP-S1-115 (115W)',
-    category: 'soltech_opaco',
-    description: 'Vidrio solar opaco BIPV de 115W en formato compacto 1200x600mm. Eficiencia de 16.0%.',
-    pmax: 115, voc: 180.49, isc: 0.918, vmp: 142.0, imp: 0.81,
-    efficiencySTC: 16.0, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 600, weightKg: 12.0,
-    noct: 46, systemLoss: 16, degradationAnnual: 0.45,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Antepechos de fachada, fachadas ventiladas opacas de alto rendimiento',
-    priceUSD: 210, pricePerWp: 1.83,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  // ===== SOLTECH — CdTe Transparente (ASP-ST1) =====
-  {
-    id: 'SOL_ST1_T10', hiitioId: '', name: 'SOLTECH · ASP-ST1-T10 (94W)',
-    category: 'soltech_st',
-    description: 'Vidrio CdTe compacto 1200x600mm con 10% transparencia y 94W. U=5.13.',
-    pmax: 94, voc: 116.0, isc: 1.19, vmp: 90.0, imp: 1.04,
-    efficiencySTC: 13.1, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 600, weightKg: 12.5,
-    noct: 45, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Lucernarios industriales, marquesinas, sombreado en atrios',
-    priceUSD: 195, pricePerWp: 2.07,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_ST1_T30', hiitioId: '', name: 'SOLTECH · ASP-ST1-T30 (73W)',
-    category: 'soltech_st',
-    description: 'Vidrio CdTe compacto 1200x600mm con 30% transparencia y 73W. U=5.13.',
-    pmax: 73, voc: 116.0, isc: 0.93, vmp: 90.0, imp: 0.81,
-    efficiencySTC: 10.1, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 600, weightKg: 12.5,
-    noct: 45, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Pasamanos solares, barandas de balcones de vidrio, fachadas',
-    priceUSD: 205, pricePerWp: 2.81,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_ST1_T50', hiitioId: '', name: 'SOLTECH · ASP-ST1-T50 (52W)',
-    category: 'soltech_st',
-    description: 'Vidrio CdTe compacto 1200x600mm con 50% transparencia y 52W. U=5.13.',
-    pmax: 52, voc: 116.0, isc: 0.66, vmp: 90.0, imp: 0.58,
-    efficiencySTC: 7.2, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 600, weightKg: 12.5,
-    noct: 45, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Ventanas residenciales, marquesinas translucidas para luz natural',
-    priceUSD: 215, pricePerWp: 4.13,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_ST1_T70', hiitioId: '', name: 'SOLTECH · ASP-ST1-T70 (31W)',
-    category: 'soltech_st',
-    description: 'Vidrio CdTe compacto 1200x600mm con 70% transparencia y 31W. Alta iluminación.',
-    pmax: 31, voc: 116.0, isc: 0.40, vmp: 90.0, imp: 0.34,
-    efficiencySTC: 4.3, tempCoeffPmax: -0.321,
-    lengthMm: 1200, widthMm: 600, weightKg: 12.5,
-    noct: 45, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Ventanas y fachadas transparentes con máxima visibilidad',
-    priceUSD: 230, pricePerWp: 7.42,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  // ===== SOLTECH — Teja Curva CIGS (HW-MQSB) =====
-  {
-    id: 'SOL_TEJA_V2_BLACK', hiitioId: '', name: 'SOLTECH · HW-MQSB-V2-Black (32W)',
-    category: 'soltech_teja',
-    description: 'Teja fotovoltaica curva CIGS de 32W, color negro. Clasificación Fuego Clase A, resistencia granizo Nivel 4.',
-    pmax: 32, voc: 10.8, isc: 4.10, vmp: 8.9, imp: 3.60,
-    efficiencySTC: 8.9, tempCoeffPmax: -0.38,
-    lengthMm: 720, widthMm: 500, weightKg: 10.8,
-    noct: 47, systemLoss: 16, degradationAnnual: 0.50,
-    pvgisTechchoice: 'CIS', pvgisMountingplace: 'building',
-    application: 'Cubiertas y techos residenciales de tejas curvas premium',
-    priceUSD: 65, pricePerWp: 2.03,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_TEJA_V2_GREEN', hiitioId: '', name: 'SOLTECH · HW-MQSB-V2-Green (28W)',
-    category: 'soltech_teja',
-    description: 'Teja fotovoltaica curva CIGS de 28W, color verde. Diseño estético para integración histórica.',
-    pmax: 28, voc: 10.5, isc: 3.90, vmp: 8.4, imp: 3.40,
-    efficiencySTC: 7.8, tempCoeffPmax: -0.38,
-    lengthMm: 720, widthMm: 500, weightKg: 10.5,
-    noct: 47, systemLoss: 16, degradationAnnual: 0.50,
-    pvgisTechchoice: 'CIS', pvgisMountingplace: 'building',
-    application: 'Cubiertas con exigencia de integración paisajística o ecológica',
-    priceUSD: 70, pricePerWp: 2.50,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  {
-    id: 'SOL_TEJA_V2_RED', hiitioId: '', name: 'SOLTECH · HW-MQSB-V2-Red (28W)',
-    category: 'soltech_teja',
-    description: 'Teja fotovoltaica curva CIGS de 28W, color rojo terracota. Reemplaza tejas de arcilla tradicionales.',
-    pmax: 28, voc: 10.5, isc: 3.90, vmp: 8.4, imp: 3.40,
-    efficiencySTC: 7.8, tempCoeffPmax: -0.38,
-    lengthMm: 720, widthMm: 500, weightKg: 10.5,
-    noct: 47, systemLoss: 16, degradationAnnual: 0.50,
-    pvgisTechchoice: 'CIS', pvgisMountingplace: 'building',
-    application: 'Cubiertas de estilo español/mediterráneo tradicionales',
-    priceUSD: 70, pricePerWp: 2.50,
-    isCustom: false, color: '#d97706', brand: 'soltech',
-  },
-  // ===== SOLTECH — NextCity Labs (NCL) =====
-  {
-    id: 'SOL_NCL_TRANS', hiitioId: '', name: 'SOLTECH · NextCity Labs (CdTe 160W/m²)',
-    category: 'soltech_ncl',
-    description: 'NextCity Labs BIPV Transparente: Módulo solar de CdTe personalizable hasta 160W/m² (espesor 21mm).',
-    pmax: 160, voc: 150.0, isc: 1.50, vmp: 120.0, imp: 1.33,
-    efficiencySTC: 16.0, tempCoeffPmax: -0.25,
-    lengthMm: 1000, widthMm: 1000, weightKg: 25.0,
-    noct: 45, systemLoss: 14, degradationAnnual: 0.40,
-    pvgisTechchoice: 'CdTe', pvgisMountingplace: 'building',
-    application: 'Proyectos arquitectónicos a medida, vidrios de seguridad solar',
-    priceUSD: 450, pricePerWp: 2.81,
-    isCustom: false, color: '#d97706', brand: 'soltech',
   },
 ];
 
@@ -1082,12 +1177,11 @@ export const CATEGORY_LABELS: Record<string, string> = {
   einnova_agripv: 'EINNOVA — AgriPV Transparente',
   einnova_pavimento: 'EINNOVA — Pavimento Solar',
   einnova_vidrio: 'EINNOVA — Vidrio FV',
-  soltech_dvh: 'SOLTECH — DVH Doble Vidrio (ASP-DVH)',
-  soltech_laminado: 'SOLTECH — Laminated Vidrio (ASP-LAM3)',
-  soltech_opaco: 'SOLTECH — Vidrio Opaco (ASP-S1)',
-  soltech_st: 'SOLTECH — CdTe Transparente (ASP-ST1)',
+  soltech_laminado: 'SOLTECH — Vidrio Laminado Activo (ASP-LAM3)',
+  soltech_dvh: 'SOLTECH — Vidrio DVH Doble Vidrio (ASP-DVH)',
+  soltech_opaco: 'SOLTECH — Vidrio Opaco BIPV (ASP-S1)',
+  soltech_transparente: 'SOLTECH — Vidrio Transparente BIPV (ASP-ST1)',
   soltech_teja: 'SOLTECH — Teja Curva CIGS (HW-MQSB)',
-  soltech_ncl: 'SOLTECH — NextCity Labs (NCL)',
   generic: 'Tecnologías Genéricas de Referencia',
 };
 

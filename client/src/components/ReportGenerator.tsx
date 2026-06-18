@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { FileText, Download, Loader, AlertTriangle, Save, Trash2, BarChart3 } from 'lucide-react';
-import { sanitizeFilename, downloadFile } from '@/lib/utils';
 import { toast } from 'sonner';
 import { generateSolarReport, MultiFacadeData } from '@/lib/reportGenerator';
 import { generateGlobalReport } from '@/lib/globalReportGenerator';
 import { EPWData } from '@/lib/epwParser';
 import { FacadeFullAnalysis } from '@/lib/facadeShadingAnalysis';
+import { StoredFacadeReport } from '@/lib/reportTypes';
 
 interface ShadingPoint {
   month: string;
@@ -25,38 +25,6 @@ interface POAData {
   reflectedPOA: number;
   totalPOA: number;
   avgTemp: number;
-}
-
-export interface StoredFacadeReport {
-  id: string;
-  facadeName: string;
-  timestamp: number;
-  data: {
-    city: string;
-    country: string;
-    latitude: number;
-    longitude: number;
-    elevation: number;
-    tilt: number;
-    azimuth: number;
-    area: number;
-    panelPower: number;
-    panelEfficiency: number;
-    panelQuantity: number;
-    annualProduction: number;
-    capacityFactor: number;
-    performanceRatio: number;
-    systemLosses: number;
-    paybackPeriod: number;
-    roi10Year: number;
-    roi25Year: number;
-    annualFS: number;
-    annualShadingLoss: number;
-    annualPOA: number;
-    annualPOANoShading: number;
-    fsJunSolstice: number;
-    fsDecSolstice: number;
-  };
 }
 
 interface ReportGeneratorProps {
@@ -83,10 +51,6 @@ interface ReportGeneratorProps {
   roi25Year: number;
   multiFacadeData?: MultiFacadeData;
   facadeAnalysis3D?: FacadeFullAnalysis | null;
-  shadingLoss?: number;
-  annualFS?: number;
-  shadingSource?: '3d' | 'manual';
-  surfaceName?: string;
 }
 
 const STORAGE_KEY = 'solar_facade_reports';
@@ -128,10 +92,6 @@ export default function ReportGenerator({
   roi25Year,
   multiFacadeData,
   facadeAnalysis3D,
-  shadingLoss,
-  annualFS,
-  shadingSource,
-  surfaceName,
 }: ReportGeneratorProps) {
   const [generating, setGenerating] = useState(false);
   const [generatingGlobal, setGeneratingGlobal] = useState(false);
@@ -180,10 +140,6 @@ export default function ReportGenerator({
           paybackPeriod,
           roi10Year,
           roi25Year,
-          shadingLoss,
-          annualFS,
-          shadingSource,
-          surfaceName,
         },
         weatherData,
         multiFacadeData,
@@ -191,11 +147,9 @@ export default function ReportGenerator({
       };
 
       const pdf = generateSolarReport(reportData);
-      const safeName = sanitizeFilename(reportName) || 'Reporte_Solar';
-      const blob = pdf.output('blob');
-      downloadFile(blob, `${safeName}.pdf`);
+      pdf.save(`${reportName}.pdf`);
 
-      toast.success(`✓ Reporte generado: ${safeName}.pdf`);
+      toast.success(`✓ Reporte generado: ${reportName}.pdf`);
     } catch (error) {
       console.error('Report generation error:', error);
       toast.error(`Error al generar el reporte: ${error instanceof Error ? error.message : 'Error desconocido'}`);
@@ -290,9 +244,7 @@ export default function ReportGenerator({
         longitude,
         elevation,
       });
-      const safeCityName = sanitizeFilename(city) || 'Global';
-      const blob = pdf.output('blob');
-      downloadFile(blob, `Reporte_Global_Comparativo_${safeCityName}_${new Date().getFullYear()}.pdf`);
+      pdf.save(`Reporte_Global_Comparativo_${city.replace(/\s+/g, '_')}_${new Date().getFullYear()}.pdf`);
       toast.success('✓ Reporte global comparativo generado');
     } catch (error) {
       console.error('Global report error:', error);
@@ -311,7 +263,7 @@ export default function ReportGenerator({
           Reporte Individual por Superficie
         </h3>
 
-        {isFacadeSpecific ? (
+        {isFacadeSpecific && (
           <div className="bg-purple-100 border border-purple-300 rounded-lg p-3 mb-4">
             <p className="text-sm font-medium text-purple-900">
               Superficie activa: <strong>{facadeAnalysis3D!.facadeName}</strong>
@@ -320,13 +272,13 @@ export default function ReportGenerator({
               Azimut: {facadeAnalysis3D!.azimuth.toFixed(0)}° | Tilt: {facadeAnalysis3D!.tilt.toFixed(0)}° | Área: {facadeAnalysis3D!.area.toFixed(1)} m²
             </p>
           </div>
-        ) : (
+        )}
+
+        {!isFacadeSpecific && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-            <p className="text-sm font-medium text-amber-900">
-              Superficie activa (Manual): <strong>{surfaceName || 'Cubierta / Fachada'}</strong>
-            </p>
-            <p className="text-xs text-amber-700 mt-1">
-              Azimut: {azimuth.toFixed(0)}° | Tilt: {tilt.toFixed(0)}° | Área Estimada: {(panelArea * panelQuantity).toFixed(1)} m²
+            <p className="text-sm text-amber-800">
+              <AlertTriangle size={14} className="inline mr-1" />
+              No hay fachada seleccionada del modelo 3D. El reporte será genérico. Para un reporte específico, selecciona una fachada en el Simulador.
             </p>
           </div>
         )}
@@ -351,22 +303,12 @@ export default function ReportGenerator({
                 <p><strong>Producción Anual:</strong> {annualProduction > 0 ? `${annualProduction.toFixed(0)} kWh` : 'No calculada'}</p>
                 <p><strong>Factor de Capacidad:</strong> {capacityFactor > 0 ? `${capacityFactor.toFixed(1)}%` : 'N/A'}</p>
                 <p><strong>Payback:</strong> {paybackPeriod > 0 ? `${paybackPeriod.toFixed(1)} años` : 'N/A'}</p>
-                {(shadingLoss !== undefined || annualFS !== undefined) ? (
-                  <>
-                    <p><strong>FS Anual:</strong> {((annualFS ?? 1) * 100).toFixed(1)}%</p>
-                    <p><strong>Pérdida Sombra:</strong> {(shadingLoss ?? 0).toFixed(1)}%</p>
-                  </>
-                ) : isFacadeSpecific ? (
+                {isFacadeSpecific && (
                   <>
                     <p><strong>FS Anual:</strong> {(facadeAnalysis3D!.annualFS * 100).toFixed(1)}%</p>
                     <p><strong>Pérdida Sombra:</strong> {facadeAnalysis3D!.annualShadingLoss.toFixed(1)}%</p>
                   </>
-                ) : shadingPoints.length > 0 ? (
-                  <>
-                    <p><strong>FS Anual:</strong> {((shadingPoints.reduce((a, p) => a + (p.fs ?? 1), 0) / shadingPoints.length) * 100).toFixed(1)}%</p>
-                    <p><strong>Pérdida Sombra:</strong> {((1 - shadingPoints.reduce((a, p) => a + (p.fs ?? 1), 0) / shadingPoints.length) * 100).toFixed(1)}%</p>
-                  </>
-                ) : null}
+                )}
               </div>
             </div>
 

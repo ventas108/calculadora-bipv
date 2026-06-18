@@ -11,7 +11,6 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { sanitizeFilename, downloadFile } from './utils';
 import type { CrossingResult, FacadeDefinition } from './shadingMaskCrossing';
 import type { EvaluationModel } from './buildingModelImporter';
 
@@ -644,8 +643,6 @@ export function generateShadingCrossingReport(data: ShadingCrossingReportData): 
   }
 
   // Guardar
-  const safeCityName = sanitizeFilename(data.cityName || 'Solar') || 'Solar';
-  const filename = `Analisis_Sombreado_${safeCityName}_${new Date().toISOString().slice(0, 10)}.pdf`;
-  const blob = doc.output('blob');
-  downloadFile(blob, filename);
+  const filename = `Analisis_Sombreado_${(data.cityName || 'Solar').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+  doc.save(filename);
 }
