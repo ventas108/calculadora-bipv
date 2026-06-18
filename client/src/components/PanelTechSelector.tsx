@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import {
   Settings2, ChevronDown, ChevronUp, Save, RotateCcw, Info,
   Zap, Thermometer, Shield, PenLine, Ruler, Weight, Box,
-  MapPin, CheckCircle2, AlertTriangle, XCircle,
+  MapPin, CheckCircle2, AlertTriangle, XCircle, Trash2,
 } from 'lucide-react';
 import PDFPanelImporter from './PDFPanelImporter';
 import {
@@ -481,38 +481,52 @@ export default function PanelTechSelector({
                     const compat = tech.regionalCompatibility?.[activeRegion];
                     const compatInfo = compat ? COMPAT_ICONS[compat] : null;
                     return (
-                      <button
-                        key={tech.id}
-                        onClick={() => handleSelectTech(tech)}
-                        className={`text-left p-2.5 rounded-lg border transition-all hover:shadow-sm ${
-                          selectedTech.id === tech.id
-                            ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-200'
-                            : 'border-gray-200 hover:border-gray-300 bg-white'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-8 h-8 rounded flex items-center justify-center text-[9px] font-bold flex-shrink-0"
-                            style={{ backgroundColor: tech.color + '20', border: `1.5px solid ${tech.color}`, color: tech.color }}
-                          >
-                            {tech.hiitioId || 'GEN'}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <p className="text-xs font-medium text-gray-900 truncate">{tech.name}</p>
-                              {compatInfo && (
-                                <span className={`flex items-center gap-0.5 text-[9px] font-bold ${compatInfo.color} flex-shrink-0`}>
-                                  <compatInfo.icon size={10} />
-                                  {compat}/3
-                                </span>
-                              )}
+                      <div key={tech.id} className="flex items-center gap-1.5 w-full">
+                        <button
+                          onClick={() => handleSelectTech(tech)}
+                          className={`text-left p-2.5 rounded-lg border transition-all hover:shadow-sm flex-1 min-w-0 ${
+                            selectedTech.id === tech.id
+                              ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-200'
+                              : 'border-gray-200 hover:border-gray-300 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-8 h-8 rounded flex items-center justify-center text-[9px] font-bold flex-shrink-0"
+                              style={{ backgroundColor: tech.color + '20', border: `1.5px solid ${tech.color}`, color: tech.color }}
+                            >
+                              {tech.hiitioId || 'GEN'}
                             </div>
-                            <p className="text-[10px] text-gray-500">
-                              <span>{tech.pmax}W · η={tech.efficiencySTC}% · γ={tech.tempCoeffPmax}%/°C · {tech.pvgisTechchoice}</span>
-                            </p>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-xs font-medium text-gray-900 truncate">{tech.name}</p>
+                                {compatInfo && (
+                                  <span className={`flex items-center gap-0.5 text-[9px] font-bold ${compatInfo.color} flex-shrink-0`}>
+                                    <compatInfo.icon size={10} />
+                                    {compat}/3
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-gray-500">
+                                <span>{tech.pmax}W · η={tech.efficiencySTC}% · γ={tech.tempCoeffPmax}%/°C · {tech.pvgisTechchoice}</span>
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      </button>
+                        </button>
+                        {tech.isCustom && onDeletePanel && (
+                          <button
+                            onClick={() => {
+                              if (confirm(`¿Estás seguro de eliminar el panel personalizado "${tech.name}"?`)) {
+                                onDeletePanel(tech.id);
+                              }
+                            }}
+                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100 flex-shrink-0"
+                            title="Eliminar panel"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>

@@ -15,6 +15,8 @@
  */
 
 import { useState, useMemo, useCallback } from 'react';
+import { Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useCustomPanels, CustomPanelLocal } from '@/hooks/useCustomPanels';
 import PanelTechSelector from '@/components/PanelTechSelector';
 import PDFPanelImporter from '@/components/PDFPanelImporter';
@@ -271,8 +273,10 @@ export default function BIPVGlassSimulator({
   }, [savePanel]);
 
   const handleDeletePanelPersist = useCallback((panelId: string) => {
-    const localId = panelId.replace('saved_', '');
+    const localId = panelId.replace('saved_', '').replace('custom_', '');
     deletePanel(localId);
+    setSelectedTechs(prev => prev.filter(id => id !== panelId && id !== `custom_${localId}`));
+    toast.success('Panel personalizado eliminado');
   }, [deletePanel]);
 
   // Panel seleccionado para agregar a la simulación BIPV
@@ -972,23 +976,38 @@ export default function BIPVGlassSimulator({
                         : 'border-gray-200 bg-gray-50 hover:border-teal-300'
                     }`}
                   >
-                    <div className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedTechs.includes(tech.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedTechs([...selectedTechs, tech.id]);
-                          } else {
-                            setSelectedTechs(selectedTechs.filter(id => id !== tech.id));
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={selectedTechs.includes(tech.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedTechs([...selectedTechs, tech.id]);
+                            } else {
+                              setSelectedTechs(selectedTechs.filter(id => id !== tech.id));
+                            }
+                          }}
+                          className="rounded border-gray-400 text-teal-600"
+                        />
+                        <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-700 flex-shrink-0">
+                          Custom
+                        </span>
+                        <span className="text-sm font-semibold text-gray-800 truncate" title={tech.name}>{tech.name}</span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (confirm(`¿Estás seguro de eliminar el panel personalizado "${tech.name}"?`)) {
+                            handleDeletePanelPersist(tech.id);
                           }
                         }}
-                        className="rounded border-gray-400 text-teal-600"
-                      />
-                      <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-700">
-                        Custom
-                      </span>
-                      <span className="text-sm font-semibold text-gray-800 truncate">{tech.name}</span>
+                        className="p-1 text-gray-400 hover:text-red-500 rounded-md hover:bg-gray-100 transition-colors flex-shrink-0"
+                        title="Eliminar panel"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                     <div className="text-xs text-gray-600 space-y-0.5">
                       <div>η = {(tech.eficienciaBase * 100).toFixed(1)}% | b₀ = {tech.b0Ashrae}</div>
