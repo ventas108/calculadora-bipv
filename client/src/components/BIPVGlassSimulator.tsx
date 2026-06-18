@@ -251,6 +251,12 @@ export default function BIPVGlassSimulator({
     return savedPanelsRaw.map(customPanelToBIPVGlass);
   }, [savedPanelsRaw]);
 
+  // Filtrar catálogo de vidrios predefinidos por marca
+  const filteredGlassCatalog = useMemo(() => {
+    if (glassBrandFilter === 'all') return BIPV_GLASS_CATALOG;
+    return BIPV_GLASS_CATALOG.filter(t => t.brand === glassBrandFilter);
+  }, [glassBrandFilter]);
+
   const handleSavePanelPersist = useCallback((panel: PanelTechnology) => {
     savePanel({
       name: panel.name,
@@ -284,6 +290,7 @@ export default function BIPVGlassSimulator({
   const [customPanelYears, setCustomPanelYears] = useState(0);
 
   // ─── Estado ─────────────────────────────────────────────────────────────
+  const [glassBrandFilter, setGlassBrandFilter] = useState<'all' | 'soltech' | 'hiitio' | 'einnova' | 'generic'>('all');
   const [selectedTechs, setSelectedTechs] = useState<string[]>(
     BIPV_GLASS_CATALOG.map(t => t.id)
   );
@@ -921,45 +928,109 @@ export default function BIPVGlassSimulator({
           {/* Tecnologías */}
           <div className="bg-white border-2 border-purple-100 rounded-xl p-5 shadow-sm">
             <h4 className="text-sm font-bold text-gray-800 mb-3">Tecnologías de Vidrio BIPV</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {BIPV_GLASS_CATALOG.map(tech => (
-                <label
-                  key={tech.id}
-                  className={`flex flex-col p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                    selectedTechs.includes(tech.id)
-                      ? 'border-purple-500 bg-purple-50 shadow-sm'
-                      : 'border-gray-200 bg-gray-50 hover:border-purple-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <input
-                      type="checkbox"
-                      checked={selectedTechs.includes(tech.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedTechs([...selectedTechs, tech.id]);
-                        } else {
-                          setSelectedTechs(selectedTechs.filter(id => id !== tech.id));
-                        }
-                      }}
-                      className="rounded border-gray-400 text-purple-600"
-                    />
-                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-                      tech.generation === '1G' ? 'bg-emerald-100 text-emerald-700' :
-                      tech.generation === '2G' ? 'bg-blue-100 text-blue-700' :
-                      'bg-orange-100 text-orange-700'
-                    }`}>
-                      {tech.generation}
-                    </span>
-                    <span className="text-sm font-semibold text-gray-800">{tech.name}</span>
-                  </div>
-                  <div className="text-xs text-gray-600 space-y-0.5">
-                    <div>η = {(tech.eficienciaBase * 100).toFixed(0)}% | b₀ = {tech.b0Ashrae}</div>
-                    <div>γ = {(tech.coefTemperatura * 100).toFixed(2)}%/°C | NOCT = {tech.noct}°C</div>
-                  </div>
-                </label>
-              ))}
+            
+            {/* Filtros de marca para vidrios BIPV */}
+            <div className="flex gap-1.5 flex-wrap mb-4">
+              <button
+                type="button"
+                onClick={() => setGlassBrandFilter('all')}
+                className={`text-xs px-3 py-1.5 rounded-md border transition-all font-medium ${
+                  glassBrandFilter === 'all'
+                    ? 'bg-purple-600 text-white border-purple-600'
+                    : 'bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-300'
+                }`}
+              >
+                Todos ({BIPV_GLASS_CATALOG.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setGlassBrandFilter('soltech')}
+                className={`text-xs px-3 py-1.5 rounded-md border transition-all font-medium ${
+                  glassBrandFilter === 'soltech'
+                    ? 'bg-amber-600 text-white border-amber-600'
+                    : 'bg-amber-50 text-amber-700 border-amber-200 hover:border-amber-300'
+                }`}
+              >
+                SOLTECH ({BIPV_GLASS_CATALOG.filter(t => t.brand === 'soltech').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setGlassBrandFilter('hiitio')}
+                className={`text-xs px-3 py-1.5 rounded-md border transition-all font-medium ${
+                  glassBrandFilter === 'hiitio'
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-blue-50 text-blue-700 border-blue-200 hover:border-blue-300'
+                }`}
+              >
+                HIITIO ({BIPV_GLASS_CATALOG.filter(t => t.brand === 'hiitio').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setGlassBrandFilter('einnova')}
+                className={`text-xs px-3 py-1.5 rounded-md border transition-all font-medium ${
+                  glassBrandFilter === 'einnova'
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:border-emerald-300'
+                }`}
+              >
+                EINNOVA ({BIPV_GLASS_CATALOG.filter(t => t.brand === 'einnova').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setGlassBrandFilter('generic')}
+                className={`text-xs px-3 py-1.5 rounded-md border transition-all font-medium ${
+                  glassBrandFilter === 'generic'
+                    ? 'bg-gray-600 text-white border-gray-600'
+                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                Genéricos ({BIPV_GLASS_CATALOG.filter(t => t.brand === 'generic').length})
+              </button>
             </div>
+
+            {filteredGlassCatalog.length === 0 ? (
+              <p className="text-xs text-gray-500 italic py-4 text-center">No hay vidrios BIPV para esta categoría.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {filteredGlassCatalog.map(tech => (
+                  <label
+                    key={tech.id}
+                    className={`flex flex-col p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                      selectedTechs.includes(tech.id)
+                        ? 'border-purple-500 bg-purple-50 shadow-sm'
+                        : 'border-gray-200 bg-gray-50 hover:border-purple-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedTechs.includes(tech.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedTechs([...selectedTechs, tech.id]);
+                          } else {
+                            setSelectedTechs(selectedTechs.filter(id => id !== tech.id));
+                          }
+                        }}
+                        className="rounded border-gray-400 text-purple-600"
+                      />
+                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                        tech.generation === '1G' ? 'bg-emerald-100 text-emerald-700' :
+                        tech.generation === '2G' ? 'bg-blue-100 text-blue-700' :
+                        'bg-orange-100 text-orange-700'
+                      }`}>
+                        {tech.generation}
+                      </span>
+                      <span className="text-sm font-semibold text-gray-800">{tech.name}</span>
+                    </div>
+                    <div className="text-xs text-gray-600 space-y-0.5">
+                      <div>η = {(tech.eficienciaBase * 100).toFixed(1)}% | b₀ = {tech.b0Ashrae}</div>
+                      <div>γ = {(tech.coefTemperatura * 100).toFixed(2)}%/°C | NOCT = {tech.noct}°C</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Paneles Personalizados / HIITIO / EINNOVA */}

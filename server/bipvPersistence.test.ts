@@ -351,12 +351,12 @@ describe('Modelo térmico confinado BIPV', () => {
 });
 
 describe('Catálogo BIPV y presets', () => {
-  it('BIPV_GLASS_CATALOG tiene 8 tecnologías (1G + 2G + 3G + HIITIO + EINNOVA)', () => {
-    expect(BIPV_GLASS_CATALOG.length).toBe(8);
-    // Verificar que incluye las 3 generaciones originales + 4 HIITIO + 1 EINNOVA
+  it('BIPV_GLASS_CATALOG tiene 30 tecnologías (1G + 2G + 3G + HIITIO + EINNOVA + SOLTECH)', () => {
+    expect(BIPV_GLASS_CATALOG.length).toBe(30);
+    // Verificar que incluye las 3 generaciones originales + 4 HIITIO + 1 EINNOVA + 22 SOLTECH/NCL
     const generations = BIPV_GLASS_CATALOG.map(t => t.generation);
     expect(generations.filter(g => g === '1G').length).toBe(1);
-    expect(generations.filter(g => g === '2G').length).toBe(6); // CdTe genérico + 4 HIITIO + 1 EINNOVA
+    expect(generations.filter(g => g === '2G').length).toBe(28); // CdTe genérico + 4 HIITIO + 1 EINNOVA + 22 SOLTECH/NCL
     expect(generations.filter(g => g === '3G').length).toBe(1);
     // Verificar que los HIITIO están presentes
     expect(BIPV_GLASS_CATALOG.find(t => t.id === 'HIITIO_H12_CdTe_0T')).toBeDefined();

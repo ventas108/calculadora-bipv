@@ -21,6 +21,7 @@ const RAD2DEG = 180 / Math.PI;
 export interface BIPVGlassTechnology {
   id: string;
   name: string;
+  brand?: 'hiitio' | 'einnova' | 'soltech' | 'generic';
   generation: '1G' | '2G' | '3G';
   generationLabel: string;
   eficienciaBase: number;       // Eficiencia STC base (0-1)

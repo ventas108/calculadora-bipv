@@ -36,12 +36,14 @@ const COMPAT_ICONS = {
 const BRAND_LABELS: Record<PanelBrand, string> = {
   hiitio: 'HIITIO',
   einnova: 'EINNOVA',
+  soltech: 'SOLTECH',
   generic: 'Genérico',
 };
 
 const BRAND_COLORS: Record<PanelBrand, { bg: string; text: string; border: string; activeBg: string }> = {
   hiitio: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-300', activeBg: 'bg-blue-600 text-white' },
   einnova: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-300', activeBg: 'bg-emerald-600 text-white' },
+  soltech: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-300', activeBg: 'bg-amber-600 text-white' },
   generic: { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-300', activeBg: 'bg-gray-600 text-white' },
 };
 
@@ -233,7 +235,9 @@ export default function PanelTechSelector({
               <p className="font-medium text-gray-900 text-sm">{selectedTech.name}</p>
               {selectedTech.brand !== 'generic' && (
                 <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${
-                  selectedTech.brand === 'einnova' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
+                  selectedTech.brand === 'einnova' ? 'bg-emerald-100 text-emerald-700' :
+                  selectedTech.brand === 'soltech' ? 'bg-amber-100 text-amber-700' :
+                  'bg-blue-100 text-blue-700'
                 }`}>
                   {BRAND_LABELS[selectedTech.brand]}
                 </span>
@@ -427,7 +431,7 @@ export default function PanelTechSelector({
               >
                 Todos ({allTechnologies.length})
               </button>
-              {(['hiitio', 'einnova', 'generic'] as PanelBrand[]).map(brand => {
+              {(['hiitio', 'einnova', 'soltech', 'generic'] as PanelBrand[]).map(brand => {
                 const count = allTechnologies.filter(t => t.brand === brand).length;
                 const bc = BRAND_COLORS[brand];
                 return (
