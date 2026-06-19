@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import {
   Settings2, ChevronDown, ChevronUp, Save, RotateCcw, Info,
   Zap, Thermometer, Shield, PenLine, Ruler, Weight, Box,
-  MapPin, CheckCircle2, AlertTriangle, XCircle,
+  MapPin, CheckCircle2, AlertTriangle, XCircle, Trash2,
 } from 'lucide-react';
 import PDFPanelImporter from './PDFPanelImporter';
 import {
@@ -446,39 +446,60 @@ export default function PanelTechSelector({
                   {techs.map(tech => {
                     const compat = tech.regionalCompatibility?.[activeRegion];
                     const compatInfo = compat ? COMPAT_ICONS[compat] : null;
+                    const isCustom = tech.isCustom || tech.brand === 'generic';
                     return (
-                      <button
-                        key={tech.id}
-                        onClick={() => handleSelectTech(tech)}
-                        className={`text-left p-2.5 rounded-lg border transition-all hover:shadow-sm ${
-                          selectedTech.id === tech.id
-                            ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-200'
-                            : 'border-gray-200 hover:border-gray-300 bg-white'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-8 h-8 rounded flex items-center justify-center text-[9px] font-bold flex-shrink-0"
-                            style={{ backgroundColor: tech.color + '20', border: `1.5px solid ${tech.color}`, color: tech.color }}
-                          >
-                            {tech.hiitioId || 'GEN'}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <p className="text-xs font-medium text-gray-900 truncate">{tech.name}</p>
-                              {compatInfo && (
-                                <span className={`flex items-center gap-0.5 text-[9px] font-bold ${compatInfo.color} flex-shrink-0`}>
-                                  <compatInfo.icon size={10} />
-                                  {compat}/3
-                                </span>
-                              )}
+                      <div key={tech.id} className="relative group">
+                        <button
+                          onClick={() => handleSelectTech(tech)}
+                          className={`w-full text-left p-2.5 rounded-lg border transition-all hover:shadow-sm ${
+                            selectedTech.id === tech.id
+                              ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-200'
+                              : 'border-gray-200 hover:border-gray-300 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-8 h-8 rounded flex items-center justify-center text-[9px] font-bold flex-shrink-0"
+                              style={{ backgroundColor: tech.color + '20', border: `1.5px solid ${tech.color}`, color: tech.color }}
+                            >
+                              {tech.hiitioId || 'GEN'}
                             </div>
-                            <p className="text-[10px] text-gray-500">
-                              <span>{tech.pmax}W · η={tech.efficiencySTC}% · γ={tech.tempCoeffPmax}%/°C · {tech.pvgisTechchoice}</span>
-                            </p>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-xs font-medium text-gray-900 truncate">{tech.name}</p>
+                                {compatInfo && (
+                                  <span className={`flex items-center gap-0.5 text-[9px] font-bold ${compatInfo.color} flex-shrink-0`}>
+                                    <compatInfo.icon size={10} />
+                                    {compat}/3
+                                  </span>
+                                )}
+                                {isCustom && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 font-semibold flex-shrink-0">Custom</span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-gray-500">
+                                <span>{tech.pmax}W · η={tech.efficiencySTC}% · γ={tech.tempCoeffPmax}%/°C · {tech.pvgisTechchoice}</span>
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      </button>
+                        </button>
+                        {/* Botón eliminar — solo para paneles personalizados */}
+                        {isCustom && onDeletePanel && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`¿Eliminar la ficha técnica "${tech.name}"? Esta acción no se puede deshacer.`)) {
+                                onDeletePanel(tech.id);
+                                toast.success(`Ficha técnica "${tech.name}" eliminada`);
+                              }
+                            }}
+                            title="Eliminar ficha técnica"
+                            className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 border border-red-200"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
