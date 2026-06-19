@@ -964,37 +964,53 @@ export default function BIPVGlassSimulator({
               <h4 className="text-sm font-bold text-gray-800 mb-3">Paneles Personalizados / Otras Marcas</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {customBIPVTechs.map(tech => (
-                  <label
-                    key={tech.id}
-                    className={`flex flex-col p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                      selectedTechs.includes(tech.id)
-                        ? 'border-teal-500 bg-teal-50 shadow-sm'
-                        : 'border-gray-200 bg-gray-50 hover:border-teal-300'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedTechs.includes(tech.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedTechs([...selectedTechs, tech.id]);
-                          } else {
-                            setSelectedTechs(selectedTechs.filter(id => id !== tech.id));
-                          }
-                        }}
-                        className="rounded border-gray-400 text-teal-600"
-                      />
-                      <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-700">
-                        Custom
-                      </span>
-                      <span className="text-sm font-semibold text-gray-800 truncate">{tech.name}</span>
-                    </div>
-                    <div className="text-xs text-gray-600 space-y-0.5">
-                      <div>η = {(tech.eficienciaBase * 100).toFixed(1)}% | b₀ = {tech.b0Ashrae}</div>
-                      <div>γ = {(tech.coefTemperatura * 100).toFixed(2)}%/°C | NOCT = {tech.noct}°C</div>
-                    </div>
-                  </label>
+                  <div key={tech.id} className="relative group">
+                    <label
+                      className={`flex flex-col p-3 rounded-xl border-2 cursor-pointer transition-all w-full ${
+                        selectedTechs.includes(tech.id)
+                          ? 'border-teal-500 bg-teal-50 shadow-sm'
+                          : 'border-gray-200 bg-gray-50 hover:border-teal-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedTechs.includes(tech.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedTechs([...selectedTechs, tech.id]);
+                            } else {
+                              setSelectedTechs(selectedTechs.filter(id => id !== tech.id));
+                            }
+                          }}
+                          className="rounded border-gray-400 text-teal-600"
+                        />
+                        <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-700">
+                          Custom
+                        </span>
+                        <span className="text-sm font-semibold text-gray-800 truncate pr-5">{tech.name}</span>
+                      </div>
+                      <div className="text-xs text-gray-600 space-y-0.5">
+                        <div>η = {(tech.eficienciaBase * 100).toFixed(1)}% | b₀ = {tech.b0Ashrae}</div>
+                        <div>γ = {(tech.coefTemperatura * 100).toFixed(2)}%/°C | NOCT = {tech.noct}°C</div>
+                      </div>
+                    </label>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (window.confirm(`¿Eliminar la ficha técnica "${tech.name}"? Esta acción no se puede deshacer.`)) {
+                          const localId = tech.id.replace('custom_', '');
+                          deletePanel(localId);
+                          setSelectedTechs(prev => prev.filter(id => id !== tech.id));
+                        }
+                      }}
+                      title="Eliminar ficha técnica"
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 border border-red-200"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
