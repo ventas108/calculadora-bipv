@@ -980,7 +980,45 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
 
     const { location, dateTime } = sunPath3DPreview;
 
-    // Create a synthetic EPWData with the location from Sun Path 3D
+    // Create a synthetic EPWData with clear-sky hourly records for Sun Path 3D
+    // We generate one record per hour for the 4 critical days (equinoxes + solstices)
+    // using the clear-sky model so the Crossing modal can produce results.
+    const criticalMonthDays = [
+      { month: 3, day: 20 }, { month: 6, day: 21 },
+      { month: 9, day: 22 }, { month: 12, day: 21 },
+    ];
+    const syntheticWeatherRecords: import('@/lib/epwParser').WeatherData[] = [];
+    for (const { month, day } of criticalMonthDays) {
+      for (let h = 1; h <= 24; h++) {
+        const hourDecimal = h - 0.5;
+        let dniClear = 0;
+        let dhiClear = 0;
+        let ghiClear = 0;
+        try {
+          const pos = calculateSolarPosition(location.latitude, location.longitude, location.timezone, month, day, hourDecimal);
+          if (pos.altitude > 0) {
+            const sinAlt = Math.sin(pos.altitude * Math.PI / 180);
+            const A = 0; // sea level
+            const a0 = 0.4237 - 0.00821 * (6 - A) ** 2;
+            const a1 = 0.5055 + 0.00595 * (6.5 - A) ** 2;
+            const k = 0.2711 + 0.01858 * (2.5 - A) ** 2;
+            const tauB = a0 + a1 * Math.exp(-k / sinAlt);
+            dniClear = 1367 * tauB;
+            dhiClear = 0.136 * dniClear * sinAlt + 30;
+            ghiClear = dniClear * sinAlt + dhiClear;
+          }
+        } catch { /* skip */ }
+        syntheticWeatherRecords.push({
+          year: 2024, month, day, hour: h, minute: 0,
+          temperature: 20, dewPoint: 10, relativeHumidity: 60,
+          atmosphericPressure: 101325,
+          directNormalIrradiance: Math.round(dniClear),
+          diffuseHorizontalIrradiance: Math.round(dhiClear),
+          globalHorizontalIrradiance: Math.round(ghiClear),
+          windSpeed: 2, cloudCover: 0,
+        });
+      }
+    }
     const syntheticEPW: EPWData = {
       location: {
         city: `Sun Path 3D (${location.latitude.toFixed(2)}°, ${location.longitude.toFixed(2)}°)`,
@@ -991,7 +1029,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
         timezone: location.timezone,
         elevation: 0,
       },
-      weatherData: [], // No hourly weather data from Sun Path 3D
+      weatherData: syntheticWeatherRecords, // Clear-sky synthetic records for crossing
     };
 
     // Notify parent to update global weather data
@@ -1240,13 +1278,13 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
             <div>
               <h3 className="font-semibold text-gray-900 text-sm">
                 {weatherData
-                  ? `Posición Solar Automática — ${weatherData.location.city}, ${weatherData.location.country}`
+                  ? `Posición Solar Automática — ${weatherData.location.city}${weatherData.location.country ? ', ' + weatherData.location.country : ''}`
                   : 'Posición Solar Automática — Sin datos EPW'
                 }
               </h3>
               <p className="text-xs text-gray-600">
                 {weatherData
-                  ? `Lat: ${weatherData.location.latitude.toFixed(2)}° | Lon: ${weatherData.location.longitude.toFixed(2)}° | UTC${weatherData.location.timezone >= 0 ? '+' : ''}${weatherData.location.timezone} | Elev: ${weatherData.location.elevation}m`
+                  ? `Lat: ${weatherData.location.latitude.toFixed(2)}° | Lon: ${weatherData.location.longitude.toFixed(2)}° | UTC${weatherData.location.timezone >= 0 ? '+' : ''}${weatherData.location.timezone} | Elev: ${weatherData.location.elevation}m${weatherData.weatherData.length === 0 ? ' ⚠ Sin datos horarios — carga un EPW real para FS climático' : weatherData.weatherData.length < 200 ? ' · Datos sintéticos (cielo claro)' : ` · ${weatherData.weatherData.length} registros horarios`}`
                   : 'Carga un archivo EPW en "Datos Meteorológicos" para activar el cálculo automático de altura y azimut solar'
                 }
               </p>
@@ -1541,9 +1579,11 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
               </div>
             </div>
 
-            <div className="text-xs text-gray-500 bg-gray-50 rounded p-2">
-              <strong>Al confirmar:</strong> Se aplicará la ubicación ({sunPath3DPreview.location.latitude.toFixed(2)}°, {sunPath3DPreview.location.longitude.toFixed(2)}°) como datos de localización para la calculadora, y se agregará un punto de análisis para {sunPath3DPreview.dateTime.monthName} {sunPath3DPreview.dateTime.day} a las {sunPath3DPreview.dateTime.hour}:00h.
-              {sunPath3DPreview.shadowsEnabled && ' Las sombras estaban habilitadas en Sun Path 3D.'}
+            <div className="text-xs text-gray-500 bg-gray-50 rounded p-2 space-y-1">
+              <p><strong>Al confirmar:</strong> Se aplicará la ubicación ({sunPath3DPreview.location.latitude.toFixed(2)}°, {sunPath3DPreview.location.longitude.toFixed(2)}°) y se agregará un punto de análisis para {sunPath3DPreview.dateTime.monthName} {sunPath3DPreview.dateTime.day} a las {sunPath3DPreview.dateTime.hour}:00h.</p>
+              <p className="text-amber-700"><strong>Punto de origen:</strong> El observador se ubica automáticamente en el centro del bounding box del modelo 3D (z = suelo + 1.5 m). Para usar el punto de origen de SketchUp, asegúrate de que el modelo OBJ tenga el origen en la posición correcta antes de exportar.</p>
+              <p className="text-teal-700"><strong>Datos sintéticos:</strong> Se generarán registros de cielo claro para los 4 días críticos (equinoccios + solsticios), permitiendo ejecutar el cruce Máscara+EPW. Para FS climático real, carga un archivo EPW en "Datos Meteorológicos".</p>
+              {sunPath3DPreview.shadowsEnabled && <p>✓ Las sombras estaban habilitadas en Sun Path 3D.</p>}
             </div>
           </div>
         )}
@@ -1683,10 +1723,11 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                 </p>
               </div>
               <div className="bg-emerald-50 rounded-lg p-3">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wide">Observador</p>
+                <p className="text-[10px] text-gray-500 uppercase tracking-wide">Punto de Origen (Observador)</p>
                 <p className="text-[11px] font-mono font-semibold text-emerald-800">
-                  ({objPreview.observationPoint.x.toFixed(1)}, {objPreview.observationPoint.y.toFixed(1)}, {objPreview.observationPoint.z.toFixed(1)})
+                  ({objPreview.observationPoint.x.toFixed(2)}, {objPreview.observationPoint.y.toFixed(2)}, {objPreview.observationPoint.z.toFixed(2)}) m
                 </p>
+                <p className="text-[9px] text-gray-400 mt-0.5">Centro bbox + 1.5 m altura</p>
               </div>
             </div>
 
@@ -1799,6 +1840,12 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                 <strong>Nota:</strong> No se generaron obstáculos visibles. Prueba ajustando la escala, intercambiando Y/Z, o modificando el North Offset.
               </div>
             )}
+
+            {/* Nota sobre punto de origen de SketchUp */}
+            <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded p-2 space-y-1">
+              <p><strong>📍 Punto de origen en SketchUp:</strong> Para que el observador coincida con el punto de análisis de tu proyecto, el modelo debe exportarse con el <strong>origen (0,0,0) ubicado en el punto de observación</strong> (ej: centro del panel BIPV a evaluar).</p>
+              <p>En SketchUp: selecciona el punto de referencia → <em>Axes &gt; Place</em> o usa el plugin <em>SketchUp Axes</em> para reubicar el origen antes de exportar a OBJ. El eje Y debe apuntar al Norte geográfico (ajusta con North Offset si es necesario).</p>
+            </div>
           </div>
         )}
       </div>

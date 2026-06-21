@@ -209,12 +209,24 @@ export default function CrossingModal({
 
         {/* Status indicators */}
         <div className="space-y-2 py-2">
-          <div className={`flex items-center gap-2 text-sm ${weatherData ? 'text-green-700' : 'text-red-600'}`}>
-            {weatherData ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+          <div className={`flex items-center gap-2 text-sm ${
+            !weatherData ? 'text-red-600' :
+            (weatherData.weatherData?.length || 0) === 0 ? 'text-amber-600' :
+            (weatherData.weatherData?.length || 0) < 200 ? 'text-blue-600' :
+            'text-green-700'
+          }`}>
+            {!weatherData ? <AlertCircle size={14} /> :
+             (weatherData.weatherData?.length || 0) === 0 ? <AlertCircle size={14} /> :
+             <CheckCircle2 size={14} />}
             <span>
-              {weatherData
-                ? `EPW cargado: ${weatherData.location.city} (${weatherData.location.latitude.toFixed(2)}°, ${weatherData.location.longitude.toFixed(2)}°, elev. ${weatherData.location.elevation}m)`
-                : 'No hay archivo EPW cargado — requerido para FS climático'}
+              {!weatherData
+                ? 'No hay archivo EPW cargado — requerido para FS climático'
+                : (weatherData.weatherData?.length || 0) === 0
+                  ? `Ubicación: ${weatherData.location.city} — Sin datos horarios (reimporta Sun Path 3D para generar datos sintéticos)`
+                  : (weatherData.weatherData?.length || 0) < 200
+                    ? `EPW sintético (cielo claro): ${weatherData.location.city} — ${weatherData.weatherData.length} registros para días críticos`
+                    : `EPW real: ${weatherData.location.city} (${weatherData.location.latitude.toFixed(2)}°, ${weatherData.location.longitude.toFixed(2)}°, elev. ${weatherData.location.elevation}m, ${weatherData.weatherData.length} registros)`
+              }
             </span>
           </div>
           <div className={`flex items-center gap-2 text-sm ${hasObstacles ? 'text-green-700' : 'text-amber-600'}`}>
@@ -419,10 +431,13 @@ export default function CrossingModal({
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs space-y-2">
               <p><strong>Posibles causas:</strong></p>
               <p>• El archivo EPW no contiene datos para los días críticos seleccionados ({weatherData?.weatherData?.length || 0} registros totales)</p>
+              {(weatherData?.weatherData?.length || 0) === 0 && (
+                <p className="text-red-700 font-medium">⚠ La ubicación fue importada desde Sun Path 3D pero sin datos horarios. Confirma la importación de Sun Path 3D nuevamente — ahora genera datos sintéticos de cielo claro automáticamente.</p>
+              )}
               <p>• Las fachadas seleccionadas no reciben sol directo en el rango horario configurado</p>
               <p>• Verifique que el EPW corresponde a la ubicación del proyecto</p>
               <p className="mt-1 text-amber-700 font-medium">
-                Sugerencia: Intente ampliar el rango horario, seleccionar más días críticos,
+                Sugerencia: Intente ampliar el rango horario (6–18h), seleccionar más días críticos,
                 o verificar que el archivo EPW se cargó correctamente.
               </p>
             </div>
