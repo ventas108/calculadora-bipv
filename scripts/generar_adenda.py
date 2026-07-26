@@ -320,6 +320,218 @@ add_conversion(30,
     'Convertir irradiación global en km² a m² para proyectar potencia instalable:',
     'km2 = 0.05\nm2 = km2 * 1000000\nprint("Área disponible:", m2, "m²")   # → 50000.0 m²')
 
+# ─────────────────────────────────────────────
+#  PARTE 3 — HORAS DE SOL PICO E IRRADIANCIA
+# ─────────────────────────────────────────────
+add_seccion_titulo('PARTE 3 — HORAS DE SOL PICO (HSP) E IRRADIANCIA SOLAR')
+
+p_def = doc.add_paragraph()
+r_def = p_def.add_run('Conceptos clave antes de programar:')
+r_def.bold = True
+r_def.font.size = Pt(11)
+r_def.font.color.rgb = RGBColor(0x6E, 0x27, 0x94)
+doc.add_paragraph('')
+
+# Definición HSP
+h_hsp = doc.add_heading('¿Qué es la Hora de Sol Pico (HSP)?', level=2)
+h_hsp.runs[0].font.size = Pt(11)
+h_hsp.runs[0].font.color.rgb = RGBColor(0x6E, 0x27, 0x94)
+
+p_hsp = doc.add_paragraph(
+    'Una HSP equivale a 1 hora de irradiancia constante a 1 000 W/m² (condición estándar). '
+    'Es decir, si tu zona recibe 5 HSP al día, significa que la energía solar acumulada '
+    'de ese día es equivalente a tener el sol al máximo durante 5 horas seguidas. '
+    'Se obtiene de bases de datos como NASA POWER, PVGIS o SolarGIS, ingresando la '
+    'latitud/longitud del proyecto.'
+)
+p_hsp.runs[0].font.size = Pt(10)
+doc.add_paragraph('')
+
+# Definición Irradiancia
+h_irr = doc.add_heading('¿Qué es la Irradiancia?', level=2)
+h_irr.runs[0].font.size = Pt(11)
+h_irr.runs[0].font.color.rgb = RGBColor(0x6E, 0x27, 0x94)
+
+p_irr = doc.add_paragraph(
+    'La irradiancia es la potencia del sol que llega a 1 m² de superficie en un instante, '
+    'medida en W/m². La irradiación es la energía acumulada en un período (Wh/m² o kWh/m²). '
+    'La relación fundamental es: Irradiación (kWh/m²) = HSP × 1 kW/m².'
+)
+p_irr.runs[0].font.size = Pt(10)
+doc.add_paragraph('')
+
+add_seccion_titulo('  E) Cálculos y Conversiones de HSP e Irradiancia')
+
+# ── Conversión 31: kWh/m²/día → HSP
+add_conversion(31,
+    'Irradiación diaria (kWh/m²/día)', 'HSP del lugar',
+    'HSP = kWh/m²/día  (son numéricamente iguales, solo cambia la interpretación)',
+    'hsp = irradiacion_kwh_m2',
+    'El atlas solar indica 5.2 kWh/m²/día para tu ciudad — ese valor ES las HSP:',
+    'irradiacion_kwh_m2 = 5.2   # dato de NASA POWER o PVGIS\n'
+    'hsp = irradiacion_kwh_m2\n'
+    'print("HSP del lugar:", hsp, "h/día")   # → 5.2 h/día')
+
+# ── Conversión 32: Wh/m²/día → HSP
+add_conversion(32,
+    'Irradiación en Wh/m²/día', 'HSP',
+    'HSP = Wh/m²/día ÷ 1 000',
+    'hsp = irradiacion_wh_m2 / 1000',
+    'Un sensor registró 5 200 Wh/m²/día. Convertir a HSP:',
+    'irradiacion_wh_m2 = 5200\n'
+    'hsp = irradiacion_wh_m2 / 1000\n'
+    'print("HSP:", hsp, "h/día")   # → 5.2 h/día')
+
+# ── Conversión 33: HSP → Energía generada (Wh)
+add_conversion(33,
+    'HSP + Potencia del sistema (W)', 'Energía diaria generada (Wh)',
+    'Energía (Wh) = Potencia_pico (W) × HSP',
+    'energia_wh = potencia_pico_w * hsp',
+    'Sistema de 2 000 W en zona con 5.2 HSP. ¿Cuánto genera al día?',
+    'potencia_pico_w = 2000   # 5 paneles × 400 W\n'
+    'hsp = 5.2\n'
+    'energia_wh = potencia_pico_w * hsp\n'
+    'print("Energía diaria:", energia_wh, "Wh")   # → 10400 Wh → 10.4 kWh')
+
+# ── Conversión 34: Energía real con pérdidas (PR)
+add_conversion(34,
+    'Energía ideal (Wh) + Factor de rendimiento (PR)', 'Energía real entregada (Wh)',
+    'Energía_real = Potencia_pico × HSP × PR    (PR típico: 0.75 a 0.85)',
+    'energia_real_wh = potencia_pico_w * hsp * pr',
+    'Calcular energía real considerando pérdidas del sistema (PR = 0.80):',
+    'potencia_pico_w = 2000\n'
+    'hsp = 5.2\n'
+    'pr  = 0.80   # 80% de rendimiento real (pérdidas por calor, cableado, inversor)\n'
+    'energia_real_wh = potencia_pico_w * hsp * pr\n'
+    'print("Energía real:", energia_real_wh, "Wh")   # → 8320 Wh')
+
+# ── Conversión 35: Potencia pico necesaria
+add_conversion(35,
+    'Consumo diario (kWh) + HSP + PR', 'Potencia pico necesaria (kWp)',
+    'Potencia_pico (kWp) = Consumo_diario (kWh) ÷ (HSP × PR)',
+    'potencia_kWp = consumo_kwh / (hsp * pr)',
+    'Hogar con 18 kWh/día de consumo, zona con 5 HSP y PR 0.78. ¿Cuántos kWp instalar?',
+    'consumo_kwh = 18\n'
+    'hsp = 5.0\n'
+    'pr  = 0.78\n'
+    'potencia_kWp = consumo_kwh / (hsp * pr)\n'
+    'print("Potencia necesaria:", round(potencia_kWp, 2), "kWp")   # → 4.62 kWp')
+
+# ── Conversión 36: Número de paneles necesarios
+add_conversion(36,
+    'Potencia pico (kWp) + Potencia por panel (W)', 'Número de paneles',
+    'N_paneles = Potencia_pico (W) ÷ Potencia_panel (W)  → redondear hacia arriba',
+    'import math\nn_paneles = math.ceil(potencia_w / potencia_panel_w)',
+    'Sistema de 4.62 kWp con paneles de 400 W. ¿Cuántos paneles se necesitan?',
+    'import math\n'
+    'potencia_w = 4620        # 4.62 kWp convertido a W\n'
+    'potencia_panel_w = 400\n'
+    'n_paneles = math.ceil(potencia_w / potencia_panel_w)\n'
+    'print("Paneles necesarios:", n_paneles)   # → 12 paneles')
+
+# ── Conversión 37: Irradiancia W/m² → kW/m²
+add_conversion(37,
+    'Irradiancia (W/m²)', 'Irradiancia (kW/m²)',
+    'kW/m² = W/m² ÷ 1 000',
+    'irr_kw_m2 = irr_w_m2 / 1000',
+    'Sensor registra 850 W/m² en el mediodía. Convertir a kW/m²:',
+    'irr_w_m2 = 850\n'
+    'irr_kw_m2 = irr_w_m2 / 1000\n'
+    'print("Irradiancia:", irr_kw_m2, "kW/m²")   # → 0.85 kW/m²')
+
+# ── Conversión 38: Eficiencia real del panel según temperatura
+add_conversion(38,
+    'Eficiencia nominal + temperatura real (°C)', 'Eficiencia real del panel (%)',
+    'Efic_real = Efic_nom × (1 + Coef_temp × (T_real − 25))\n'
+    '   Coef_temp típico: −0.0035 por °C  (pérdida del 0.35 % por cada °C sobre 25°C)',
+    'efic_real = efic_nom * (1 + coef_temp * (temp_c - 25))',
+    'Panel con eficiencia nominal 20 %, operando a 45 °C. ¿Cuál es su eficiencia real?',
+    'efic_nom  = 0.20        # 20% de eficiencia en condición estándar\n'
+    'coef_temp = -0.0035     # coeficiente de temperatura del fabricante\n'
+    'temp_c    = 45          # temperatura real de operación\n'
+    'efic_real = efic_nom * (1 + coef_temp * (temp_c - 25))\n'
+    'print("Eficiencia real:", round(efic_real * 100, 2), "%")   # → 18.6 %')
+
+# ── Conversión 39: Irradiación mensual → producción mensual
+add_conversion(39,
+    'Irradiación mensual (kWh/m²/mes) + Potencia pico + PR', 'Producción mensual (kWh)',
+    'Producción_mes (kWh) = Potencia_pico (kWp) × Irradiación_mes (kWh/m²) × PR',
+    'prod_mes_kwh = potencia_kWp * irradiacion_mes * pr',
+    'Sistema de 3 kWp, mes con 150 kWh/m² de irradiación, PR 0.80:',
+    'potencia_kWp     = 3.0\n'
+    'irradiacion_mes  = 150   # kWh/m²/mes (dato de PVGIS o NASA)\n'
+    'pr               = 0.80\n'
+    'prod_mes_kwh = potencia_kWp * irradiacion_mes * pr\n'
+    'print("Producción mensual:", prod_mes_kwh, "kWh")   # → 360.0 kWh')
+
+# ── Conversión 40: Producción anual estimada
+add_conversion(40,
+    'Producción mensual (kWh/mes)', 'Producción anual (kWh/año)',
+    'Producción_año = suma de los 12 meses  (o simplificada: promedio × 12)',
+    'prod_anual = sum(producciones_por_mes)',
+    'Calcular producción anual con irradiación mensual variable por estación:',
+    '# Irradiación mensual típica de una ciudad (kWh/m²/mes)\n'
+    'irradiacion_meses = [130, 140, 160, 170, 180, 175, 185, 178, 165, 150, 135, 125]\n'
+    'potencia_kWp = 3.0\n'
+    'pr = 0.80\n'
+    'producciones = [potencia_kWp * irr * pr for irr in irradiacion_meses]\n'
+    'prod_anual = round(sum(producciones), 1)\n'
+    'print("Producción anual:", prod_anual, "kWh/año")')
+
+# ── EJEMPLO INTEGRADOR COMPLETO HSP ──
+add_seccion_titulo('EJEMPLO INTEGRADOR COMPLETO — HSP + Irradiancia + Temperatura + Dimensionado')
+
+p_ej2 = doc.add_paragraph()
+r_t2 = p_ej2.add_run('Caso: Dimensionar un sistema solar desde cero usando todos los conceptos de HSP')
+r_t2.bold = True
+r_t2.font.size = Pt(11)
+r_t2.font.color.rgb = RGBColor(0x6E, 0x27, 0x94)
+
+codigo_hsp = (
+    'import math\n\n'
+    '# ── DATOS DEL PROYECTO ──\n'
+    'consumo_kwh_dia   = 20.0    # consumo diario del hogar (kWh/día)\n'
+    'hsp               = 5.2     # HSP del lugar (dato de NASA POWER o PVGIS)\n'
+    'pr                = 0.80    # rendimiento del sistema (80%)\n'
+    'potencia_panel_w  = 400     # potencia nominal de cada panel (W)\n'
+    'efic_nom          = 0.20    # eficiencia nominal del panel (20%)\n'
+    'coef_temp         = -0.0035 # coeficiente de temperatura (/°C)\n'
+    'temp_f            = 95      # temperatura ambiente del lugar (°F)\n\n'
+    '# ── PASO 1: Convertir temperatura ──\n'
+    'temp_c = (temp_f - 32) * 5/9\n'
+    'print("Temperatura de operación:", round(temp_c, 1), "°C")\n\n'
+    '# ── PASO 2: Eficiencia real según temperatura ──\n'
+    'efic_real = efic_nom * (1 + coef_temp * (temp_c - 25))\n'
+    'print("Eficiencia real del panel:", round(efic_real * 100, 2), "%")\n\n'
+    '# ── PASO 3: Potencia pico necesaria ──\n'
+    'potencia_kWp = consumo_kwh_dia / (hsp * pr)\n'
+    'print("Potencia pico necesaria:", round(potencia_kWp, 2), "kWp")\n\n'
+    '# ── PASO 4: Número de paneles ──\n'
+    'potencia_w = potencia_kWp * 1000\n'
+    'n_paneles  = math.ceil(potencia_w / potencia_panel_w)\n'
+    'print("Paneles necesarios:", n_paneles, "unidades")\n\n'
+    '# ── PASO 5: Energía real que generará el sistema ──\n'
+    'potencia_real_w  = n_paneles * potencia_panel_w\n'
+    'energia_real_wh  = potencia_real_w * hsp * pr\n'
+    'energia_real_kwh = energia_real_wh / 1000\n'
+    'print("Energía real generada:", round(energia_real_kwh, 2), "kWh/día")\n\n'
+    '# ── PASO 6: ¿Cubre el consumo? ──\n'
+    'if energia_real_kwh >= consumo_kwh_dia:\n'
+    '    excedente = round(energia_real_kwh - consumo_kwh_dia, 2)\n'
+    '    print("Sistema suficiente. Excedente:", excedente, "kWh/día")\n'
+    'else:\n'
+    '    faltante = round(consumo_kwh_dia - energia_real_kwh, 2)\n'
+    '    print("Sistema insuficiente. Faltan:", faltante, "kWh/día")\n'
+)
+
+p_c2 = doc.add_paragraph()
+cr2 = p_c2.add_run(codigo_hsp)
+cr2.font.name = 'Courier New'
+cr2.font.size = Pt(9.5)
+cr2.font.color.rgb = RGBColor(0x10, 0x10, 0x60)
+
+doc.add_paragraph('')
+
 # ── EJEMPLO INTEGRADOR ──
 add_seccion_titulo('EJEMPLO INTEGRADOR — Uso combinado de conversiones')
 
