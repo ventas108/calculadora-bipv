@@ -6,3 +6,9 @@ id = "S3J5m3o3KB5KkmGl_LiEL"
 uri = "file://Adenda_Python_Fotovoltaico.docx"
 type = "word_document"
 title = "Adenda Python Fotovoltaico — Edición Completa con Gráficos"
+
+[[outputs]]
+id = "aAslzPHTRxjtFWyDCxz4H"
+uri = "file://Algoritmo_paso_a_paso_BIPV.docx"
+type = "word_document"
+title = "Algoritmo paso a paso BIPV"
