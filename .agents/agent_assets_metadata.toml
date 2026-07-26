@@ -12,3 +12,9 @@ id = "aAslzPHTRxjtFWyDCxz4H"
 uri = "file://Algoritmo_paso_a_paso_BIPV.docx"
 type = "word_document"
 title = "Algoritmo paso a paso BIPV"
+
+[[outputs]]
+id = "SYLwLWF8-SonIN-06c8QD"
+uri = "file://Diagnostico_Mejoras_Calculadora_BIPV.docx"
+type = "word_document"
+title = "Diagnóstico y Mejoras — Calculadora BIPV"
