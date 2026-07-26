@@ -571,6 +571,362 @@ cr.font.color.rgb = RGBColor(0x10, 0x10, 0x60)
 
 doc.add_paragraph('')
 
+# ─────────────────────────────────────────────
+#  PARTE 4 — DIMENSIONADO ELÉCTRICO (como PVsyst)
+# ─────────────────────────────────────────────
+add_seccion_titulo('PARTE 4 — DIMENSIONADO ELÉCTRICO DEL SISTEMA')
+
+p_intro4 = doc.add_paragraph(
+    'PVsyst calcula la arquitectura eléctrica del sistema: cuántos paneles van en serie '
+    '(string), cuántos strings en paralelo, si el inversor es compatible en tensión y '
+    'corriente, y cuál es la temperatura real de la celda. Estos cálculos evitan errores '
+    'graves de diseño. A continuación, los mismos cálculos en Python.'
+)
+p_intro4.runs[0].font.size = Pt(10)
+p_intro4.runs[0].italic = True
+doc.add_paragraph('')
+
+add_conversion(41,
+    'Temperatura ambiente (°C) + NOCT', 'Temperatura real de la celda (°C)',
+    'T_celda = T_amb + (NOCT − 20) × Irradiancia / 800\n'
+    '   NOCT típico: 45°C  |  Irradiancia de referencia: 800 W/m²',
+    'T_celda = T_amb + ((NOCT - 20) / 800) * irradiancia_w_m2',
+    'Panel con NOCT 45°C, T_amb 30°C, irradiancia al mediodía 950 W/m²:',
+    'T_amb          = 30\n'
+    'NOCT           = 45\n'
+    'irradiancia    = 950   # W/m²\n'
+    'T_celda = T_amb + ((NOCT - 20) / 800) * irradiancia\n'
+    'print("Temperatura de celda:", round(T_celda, 1), "°C")   # → 56.6 °C')
+
+add_conversion(42,
+    'Tensión Voc nominal + temperatura de celda', 'Voc real del panel (V)',
+    'Voc_real = Voc_nom × (1 + CoefV × (T_celda − 25))\n'
+    '   CoefV típico: −0.0029 /°C  (pérdida del 0.29 % por cada °C sobre 25°C)',
+    'Voc_real = Voc_nom * (1 + coef_v * (T_celda - 25))',
+    'Panel con Voc 49 V, CoefV −0.0029, celda a 56.6°C:',
+    'Voc_nom  = 49.0\n'
+    'coef_v   = -0.0029\n'
+    'T_celda  = 56.6\n'
+    'Voc_real = Voc_nom * (1 + coef_v * (T_celda - 25))\n'
+    'print("Voc real:", round(Voc_real, 2), "V")   # → 43.47 V')
+
+add_conversion(43,
+    'Tensión Voc real + Rango de tensión del inversor (V)', 'Número de paneles en serie (string)',
+    'N_serie_max = Vdc_max_inv ÷ Voc_real_min_temp\n'
+    'N_serie_min = Vmppt_min_inv ÷ Vmp_real_max_temp\n'
+    '   Elegir N_serie dentro de ese rango (valor entero)',
+    'import math\n'
+    'n_max = math.floor(Vdc_max / Voc_fria)\n'
+    'n_min = math.ceil(Vmppt_min / Vmp_caliente)',
+    'Inversor con Vdc_max 1000V, MPPT_min 200V. Voc en frío 52V, Vmp en caliente 36V:',
+    'import math\n'
+    'Vdc_max     = 1000   # tensión máxima del inversor\n'
+    'Vmppt_min   = 200    # tensión mínima del rango MPPT\n'
+    'Voc_fria    = 52.0   # Voc del panel a temperatura mínima (-10°C)\n'
+    'Vmp_caliente= 36.0   # Vmp del panel a temperatura máxima (70°C)\n'
+    'n_max = math.floor(Vdc_max / Voc_fria)\n'
+    'n_min = math.ceil(Vmppt_min / Vmp_caliente)\n'
+    'print(f"Paneles en serie: entre {n_min} y {n_max}")   # → entre 6 y 19')
+
+add_conversion(44,
+    'Corriente Isc del string + Corriente máx del inversor (A)', 'Número de strings en paralelo',
+    'N_strings = floor(Idc_max_inv ÷ Isc_string)\n'
+    '   Isc_string ≈ Isc_panel  (para un string; se multiplica por strings en paralelo)',
+    'import math\n'
+    'n_strings = math.floor(Idc_max_inv / Isc_panel)',
+    'Inversor con Idc_max 30 A, panel con Isc 10.5 A. ¿Cuántos strings en paralelo?',
+    'import math\n'
+    'Idc_max_inv = 30.0   # corriente máxima DC del inversor\n'
+    'Isc_panel   = 10.5   # corriente de cortocircuito del panel\n'
+    'n_strings = math.floor(Idc_max_inv / Isc_panel)\n'
+    'print("Strings en paralelo:", n_strings)   # → 2 strings')
+
+add_conversion(45,
+    'Potencia DC total (kWp) + Potencia AC del inversor (kW)', 'Ratio DC/AC (Sizing Ratio)',
+    'Ratio_DC_AC = Potencia_DC (kWp) ÷ Potencia_AC (kW)\n'
+    '   Rango ideal PVsyst: 1.10 a 1.30  (sobredimensionar DC compensa pérdidas)',
+    'ratio_dc_ac = potencia_dc_kWp / potencia_ac_kW',
+    'Sistema de 4.8 kWp con inversor de 4 kW AC:',
+    'potencia_dc_kWp = 4.8\n'
+    'potencia_ac_kW  = 4.0\n'
+    'ratio_dc_ac = potencia_dc_kWp / potencia_ac_kW\n'
+    'print("Ratio DC/AC:", round(ratio_dc_ac, 2))   # → 1.2  ✓ dentro del rango ideal')
+
+add_conversion(46,
+    'Potencia DC del sistema + Eficiencia del inversor (%)', 'Potencia AC entregada a la red (kW)',
+    'P_AC = P_DC × Eficiencia_inversor\n'
+    '   Eficiencia típica de inversores modernos: 97–98.5 %',
+    'P_ac_kW = P_dc_kW * efic_inv',
+    'Inversor recibe 3.6 kW DC con eficiencia del 97%:',
+    'P_dc_kW  = 3.6\n'
+    'efic_inv = 0.97\n'
+    'P_ac_kW  = P_dc_kW * efic_inv\n'
+    'print("Potencia AC entregada:", round(P_ac_kW, 3), "kW")   # → 3.492 kW')
+
+add_conversion(47,
+    'Energía diaria + Voltaje del banco de baterías + DOD', 'Capacidad del banco de baterías (Ah)',
+    'C_Ah = Energía_Wh ÷ (V_banco × DOD)\n'
+    '   DOD: profundidad de descarga (0.5 para plomo-ácido, 0.8 para litio)',
+    'C_ah = energia_wh_autonomia / (v_banco * dod)',
+    'Consumo de autonomía 2 días = 10 000 Wh, banco 48V, baterías litio (DOD 80%):',
+    'energia_wh_autonomia = 10000   # Wh para N días de autonomía\n'
+    'v_banco              = 48      # voltaje del banco de baterías\n'
+    'dod                  = 0.80    # profundidad de descarga litio\n'
+    'C_ah = energia_wh_autonomia / (v_banco * dod)\n'
+    'print("Capacidad banco:", round(C_ah, 1), "Ah")   # → 260.4 Ah')
+
+# ─────────────────────────────────────────────
+#  PARTE 5 — PÉRDIDAS DEL SISTEMA (Loss Diagram PVsyst)
+# ─────────────────────────────────────────────
+add_seccion_titulo('PARTE 5 — PÉRDIDAS DEL SISTEMA (Loss Diagram de PVsyst en Python)')
+
+p_intro5 = doc.add_paragraph(
+    'El diagrama de pérdidas (Loss Diagram) es uno de los resultados más importantes de PVsyst. '
+    'Muestra cómo la energía solar se va reduciendo en cada etapa hasta llegar al contador. '
+    'Cada factor de pérdida se aplica como un coeficiente multiplicador. En Python se puede '
+    'replicar este cálculo paso a paso, partiendo de la energía teórica y aplicando cada pérdida.'
+)
+p_intro5.runs[0].font.size = Pt(10)
+p_intro5.runs[0].italic = True
+doc.add_paragraph('')
+
+add_conversion(48,
+    'Energía ideal (sin pérdidas)', 'Energía real paso a paso aplicando cada pérdida',
+    'E_real = E_ideal × (1 − pérdida_1) × (1 − pérdida_2) × ... × (1 − pérdida_N)',
+    'e = e_ideal * (1-p_temp) * (1-p_suciedad) * (1-p_sombra) * (1-p_mismatch) * (1-p_cableado) * efic_inv',
+    'Calcular energía entregada a la red aplicando el loss diagram completo:',
+    '# Energía ideal (STC)\n'
+    'e_ideal_kwh  = 20.0    # kWh/día en condición ideal\n\n'
+    '# Factores de pérdida (valores típicos de PVsyst)\n'
+    'p_temperatura = 0.048  # 4.8% pérdida por temperatura\n'
+    'p_suciedad    = 0.030  # 3.0% suciedad/polvo sobre el panel\n'
+    'p_sombra      = 0.020  # 2.0% sombras lejanas (horizonte)\n'
+    'p_mismatch    = 0.015  # 1.5% desajuste entre paneles del string\n'
+    'p_cableado    = 0.015  # 1.5% resistencia del cableado DC\n'
+    'efic_inversor = 0.970  # 97.0% eficiencia del inversor\n\n'
+    'e_real = (e_ideal_kwh\n'
+    '         * (1 - p_temperatura)\n'
+    '         * (1 - p_suciedad)\n'
+    '         * (1 - p_sombra)\n'
+    '         * (1 - p_mismatch)\n'
+    '         * (1 - p_cableado)\n'
+    '         * efic_inversor)\n'
+    'print("Energía entregada a la red:", round(e_real, 2), "kWh/día")   # → 16.67 kWh')
+
+add_conversion(49,
+    'Energía real + Energía ideal', 'Performance Ratio — PR (%)',
+    'PR = Energía_real ÷ Energía_ideal × 100\n'
+    '   PR óptimo según PVsyst: 75–85 %',
+    'pr_real = (e_real / e_ideal_kwh) * 100',
+    'Calcular el PR del sistema con los datos del loss diagram anterior:',
+    'e_ideal_kwh = 20.0\n'
+    'e_real      = 16.67\n'
+    'pr_real = (e_real / e_ideal_kwh) * 100\n'
+    'print("Performance Ratio:", round(pr_real, 1), "%")   # → 83.4 %')
+
+add_conversion(50,
+    'Energía anual generada (kWh/año) + Potencia pico (kWp)', 'Rendimiento específico (kWh/kWp/año)',
+    'Rendimiento_esp = Energía_anual ÷ Potencia_pico\n'
+    '   Valor de referencia PVsyst: 1 200–1 800 kWh/kWp/año según zona',
+    'rendimiento_esp = energia_anual_kwh / potencia_kWp',
+    'Sistema de 5 kWp que genera 7 800 kWh al año:',
+    'energia_anual_kwh = 7800\n'
+    'potencia_kWp      = 5.0\n'
+    'rendimiento_esp   = energia_anual_kwh / potencia_kWp\n'
+    'print("Rendimiento específico:", rendimiento_esp, "kWh/kWp/año")   # → 1560.0')
+
+add_conversion(51,
+    'Energía real + Potencia instalada + Horas del período', 'Factor de Capacidad — CF (%)',
+    'CF = Energía_real ÷ (Potencia_instalada × Horas_período) × 100\n'
+    '   CF solar típico: 15–25 %',
+    'cf = (energia_anual_kwh / (potencia_kWp * 8760)) * 100',
+    'Sistema de 5 kWp que generó 7 800 kWh en 1 año (8 760 horas):',
+    'energia_anual_kwh = 7800\n'
+    'potencia_kWp      = 5.0\n'
+    'horas_año         = 8760\n'
+    'cf = (energia_anual_kwh / (potencia_kWp * horas_año)) * 100\n'
+    'print("Factor de Capacidad:", round(cf, 1), "%")   # → 17.8 %')
+
+add_conversion(52,
+    'Producción año 1 + Tasa de degradación anual (%)', 'Producción en año N (con degradación)',
+    'Prod_año_N = Prod_año_1 × (1 − degradacion) ^ (N − 1)\n'
+    '   Degradación típica según PVsyst: 0.5 % anual (módulos monocristalinos)',
+    'prod_n = prod_año1 * ((1 - degradacion) ** (n - 1))',
+    'Sistema genera 7 800 kWh en año 1. ¿Cuánto genera en el año 25?',
+    'prod_año1   = 7800   # kWh en el primer año\n'
+    'degradacion = 0.005  # 0.5% de pérdida por año\n'
+    'n           = 25     # año a calcular\n'
+    'prod_n = prod_año1 * ((1 - degradacion) ** (n - 1))\n'
+    'print("Producción año 25:", round(prod_n, 1), "kWh")   # → 6920.5 kWh\n\n'
+    '# Ver degradación para todos los 25 años\n'
+    'for año in range(1, 26):\n'
+    '    p = round(prod_año1 * ((1 - degradacion) ** (año - 1)), 1)\n'
+    '    print(f"Año {año:2d}: {p} kWh")')
+
+# ─────────────────────────────────────────────
+#  PARTE 6 — ANÁLISIS FINANCIERO
+# ─────────────────────────────────────────────
+add_seccion_titulo('PARTE 6 — ANÁLISIS FINANCIERO (PVsyst Economic Analysis)')
+
+p_intro6 = doc.add_paragraph(
+    'PVsyst incluye un módulo de análisis económico que calcula el retorno de la inversión. '
+    'Los indicadores clave son: Payback simple, Valor Actual Neto (VAN/NPV), Tasa Interna de '
+    'Retorno (TIR/IRR) y el LCOE (Costo Nivelado de Energía). Estos son los mismos cálculos '
+    'en Python, explicados paso a paso.'
+)
+p_intro6.runs[0].font.size = Pt(10)
+p_intro6.runs[0].italic = True
+doc.add_paragraph('')
+
+add_conversion(53,
+    'Costo total del sistema + Ahorro anual en cuenta eléctrica', 'Payback simple (años)',
+    'Payback = Costo_total ÷ Ahorro_anual',
+    'payback = costo_total / ahorro_anual',
+    'Sistema que cuesta $6 000 000 y ahorra $900 000 al año en electricidad:',
+    'costo_total  = 6000000   # pesos o dólares\n'
+    'ahorro_anual =  900000\n'
+    'payback = costo_total / ahorro_anual\n'
+    'print("Payback simple:", round(payback, 1), "años")   # → 6.7 años')
+
+add_conversion(54,
+    'Energía generada en 25 años (kWh totales) + Costo total del sistema', 'LCOE ($/kWh)',
+    'LCOE = Costo_total ÷ Energía_total_25_años\n'
+    '   Incluye degradación y costo de O&M (Operación y Mantenimiento)',
+    'lcoe = (costo_total + costo_om_total) / energia_total_25',
+    'Sistema $6 000 000, O&M $50 000/año, genera ~175 000 kWh en 25 años:',
+    'costo_total      = 6000000\n'
+    'costo_om_anual   =   50000\n'
+    'prod_año1        =    7800   # kWh/año\n'
+    'degradacion      =   0.005\n\n'
+    'energia_total_25 = sum(prod_año1 * ((1-degradacion)**(a)) for a in range(25))\n'
+    'costo_om_total   = costo_om_anual * 25\n'
+    'lcoe = (costo_total + costo_om_total) / energia_total_25\n'
+    'print("LCOE:", round(lcoe, 1), "$/kWh")   # → 44.8 $/kWh (o pesos/kWh)')
+
+add_conversion(55,
+    'Flujos de caja anuales + Tasa de descuento', 'VAN / NPV (Valor Actual Neto)',
+    'VAN = −Inversión_inicial + Σ (Flujo_año_n ÷ (1 + tasa)^n)\n'
+    '   VAN > 0 → el proyecto es rentable  |  tasa típica: 6–10 %',
+    'van = -inversion + sum(flujo / (1+tasa)**n for n, flujo in enumerate(flujos, 1))',
+    'Inversión $6 000 000, ahorro creciente 3% anual, tasa 7%, horizonte 25 años:',
+    'inversion    = 6000000\n'
+    'ahorro_año1  =  900000\n'
+    'crecimiento  =    0.03   # tarifa eléctrica sube 3% al año\n'
+    'tasa         =    0.07   # tasa de descuento (costo del dinero)\n\n'
+    'flujos = [ahorro_año1 * ((1 + crecimiento) ** (n-1)) for n in range(1, 26)]\n'
+    'van = -inversion + sum(f / (1+tasa)**n for n, f in enumerate(flujos, 1))\n'
+    'print("VAN:", round(van, 0), "$")   # VAN > 0 → proyecto rentable')
+
+add_conversion(56,
+    'Flujos de caja anuales + Inversión inicial', 'TIR / IRR (Tasa Interna de Retorno, %)',
+    'TIR = tasa que hace VAN = 0  →  se calcula por iteración (bisección)\n'
+    '   TIR > tasa de descuento → el proyecto es rentable',
+    '# Método de bisección para encontrar la TIR\n'
+    'tasa_baja, tasa_alta = 0.0, 1.0\n'
+    'for _ in range(100): ...',
+    'Calcular la TIR del mismo proyecto anterior con bisección en Python:',
+    'inversion   = 6000000\n'
+    'ahorro_año1 =  900000\n'
+    'crecimiento =   0.03\n'
+    'flujos = [-inversion] + [ahorro_año1*((1+crecimiento)**(n)) for n in range(25)]\n\n'
+    '# Bisección para TIR\n'
+    'tasa_baja, tasa_alta = 0.0, 1.0\n'
+    'for _ in range(200):\n'
+    '    tasa_mid = (tasa_baja + tasa_alta) / 2\n'
+    '    van_mid  = sum(f/(1+tasa_mid)**n for n,f in enumerate(flujos))\n'
+    '    if van_mid > 0: tasa_baja = tasa_mid\n'
+    '    else:           tasa_alta = tasa_mid\n'
+    'tir = tasa_mid * 100\n'
+    'print("TIR:", round(tir, 2), "%")   # → TIR estimada del proyecto')
+
+add_conversion(57,
+    'Energía generada anual (kWh/año)', 'CO₂ evitado (toneladas/año)',
+    'CO2_evitado = Energía_kWh × Factor_emisión\n'
+    '   Factor de emisión eléctrica chilena: ≈ 0.294 kg CO₂/kWh (SEN 2024)\n'
+    '   Factor promedio Latinoamérica: ≈ 0.36 kg CO₂/kWh',
+    'co2_kg = energia_kwh_anual * factor_emision\nco2_ton = co2_kg / 1000',
+    'Sistema que genera 7 800 kWh/año en Chile. ¿Cuánto CO₂ evita?',
+    'energia_kwh_anual = 7800\n'
+    'factor_emision    = 0.294   # kg CO2/kWh — factor SEN Chile 2024\n'
+    'co2_kg  = energia_kwh_anual * factor_emision\n'
+    'co2_ton = co2_kg / 1000\n'
+    'print("CO2 evitado:", round(co2_ton, 2), "ton CO2/año")   # → 2.29 ton CO2/año\n'
+    'print("En 25 años:", round(co2_ton * 25, 1), "ton CO2")   # → 57.3 ton CO2')
+
+# ── EJEMPLO INTEGRADOR FINAL COMPLETO ──
+add_seccion_titulo('EJEMPLO INTEGRADOR FINAL — Simulación completa tipo PVsyst en Python')
+
+p_ej3 = doc.add_paragraph()
+r_t3 = p_ej3.add_run(
+    'Caso: Análisis técnico-económico completo de un sistema solar residencial de 5 kWp'
+)
+r_t3.bold = True
+r_t3.font.size = Pt(11)
+r_t3.font.color.rgb = RGBColor(0x6E, 0x27, 0x94)
+
+codigo_final = (
+    'import math\n\n'
+    '# ══════════════════════════════════════════════\n'
+    '# DATOS DE ENTRADA DEL PROYECTO\n'
+    '# ══════════════════════════════════════════════\n'
+    'potencia_panel_w   = 400      # W por panel\n'
+    'n_paneles          = 12       # cantidad de paneles (string × paralelo)\n'
+    'hsp                = 5.2      # Horas de Sol Pico del lugar\n'
+    'temp_amb_c         = 30       # temperatura ambiente media (°C)\n'
+    'NOCT               = 45       # temperatura nominal de operación del panel\n'
+    'efic_nom           = 0.20     # eficiencia nominal del panel\n'
+    'coef_temp          = -0.0035  # coeficiente de temperatura (/°C)\n'
+    'efic_inversor      = 0.97     # eficiencia del inversor\n'
+    'degradacion_anual  = 0.005    # 0.5% de pérdida por año\n'
+    'costo_sistema      = 6000000  # costo total instalado ($)\n'
+    'tarifa_kwh         = 120      # precio del kWh en la tarifa eléctrica ($)\n'
+    'crecimiento_tarifa = 0.03     # alza anual de la tarifa eléctrica (3%)\n'
+    'tasa_descuento     = 0.07     # tasa de descuento para VAN (7%)\n'
+    'factor_co2         = 0.294    # kg CO2/kWh evitado\n\n'
+    '# ── PASO 1: Temperatura real de la celda ──\n'
+    'irradiancia   = hsp * 1000 / hsp   # simplificado: 1 000 W/m² al pico\n'
+    'T_celda = temp_amb_c + ((NOCT - 20) / 800) * 950\n'
+    'efic_real = efic_nom * (1 + coef_temp * (T_celda - 25))\n'
+    'print(f"Temperatura celda: {T_celda:.1f} °C | Efic. real: {efic_real*100:.2f} %")\n\n'
+    '# ── PASO 2: Energía ideal y real con pérdidas ──\n'
+    'potencia_dc_w = potencia_panel_w * n_paneles\n'
+    'e_ideal_wh    = potencia_dc_w * hsp\n'
+    'p_temp        = 1 - efic_real / efic_nom   # pérdida real por temperatura\n'
+    'e_real_kwh = (e_ideal_wh\n'
+    '              * (1 - p_temp)\n'
+    '              * (1 - 0.030)   # suciedad\n'
+    '              * (1 - 0.020)   # sombras\n'
+    '              * (1 - 0.015)   # mismatch\n'
+    '              * (1 - 0.015)   # cableado\n'
+    '              * efic_inversor) / 1000\n'
+    'pr = e_real_kwh / (e_ideal_wh / 1000) * 100\n'
+    'print(f"Energía real: {e_real_kwh:.2f} kWh/día | PR: {pr:.1f} %")\n\n'
+    '# ── PASO 3: Producción anual con degradación ──\n'
+    'e_año1     = e_real_kwh * 365\n'
+    'prod_25    = [round(e_año1 * ((1-degradacion_anual)**(a)), 1) for a in range(25)]\n'
+    'total_25   = round(sum(prod_25), 0)\n'
+    'print(f"Producción año 1: {e_año1:.0f} kWh | Total 25 años: {total_25:.0f} kWh")\n\n'
+    '# ── PASO 4: Análisis financiero ──\n'
+    'ahorro_año1 = e_año1 * tarifa_kwh\n'
+    'payback     = costo_sistema / ahorro_año1\n'
+    'flujos_van  = [ahorro_año1*((1+crecimiento_tarifa)**n) for n in range(25)]\n'
+    'van         = -costo_sistema + sum(f/(1+tasa_descuento)**(n+1) for n,f in enumerate(flujos_van))\n'
+    'lcoe        = (costo_sistema + 50000*25) / total_25\n'
+    'print(f"Ahorro año 1: ${ahorro_año1:,.0f}")\n'
+    'print(f"Payback: {payback:.1f} años | VAN: ${van:,.0f} | LCOE: ${lcoe:.1f}/kWh")\n\n'
+    '# ── PASO 5: CO₂ evitado ──\n'
+    'co2_25_ton = round(total_25 * factor_co2 / 1000, 1)\n'
+    'print(f"CO2 evitado en 25 años: {co2_25_ton} toneladas")\n'
+)
+
+p_c3 = doc.add_paragraph()
+cr3 = p_c3.add_run(codigo_final)
+cr3.font.name = 'Courier New'
+cr3.font.size = Pt(9)
+cr3.font.color.rgb = RGBColor(0x10, 0x10, 0x60)
+
+doc.add_paragraph('')
+
 # Pie de página
 footer = doc.add_paragraph('Elaborado para curso de Python aplicado a Energía Solar Fotovoltaica — 2026')
 footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
