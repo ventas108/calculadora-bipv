@@ -927,6 +927,354 @@ cr3.font.color.rgb = RGBColor(0x10, 0x10, 0x60)
 
 doc.add_paragraph('')
 
+# ─────────────────────────────────────────────
+#  PARTE 7 — GRÁFICOS CON MATPLOTLIB
+# ─────────────────────────────────────────────
+add_seccion_titulo('PARTE 7 — GENERACIÓN DE GRÁFICOS CON MATPLOTLIB')
+
+p_intro7 = doc.add_paragraph(
+    'Matplotlib es la librería estándar de Python para visualizar resultados. '
+    'Para usarla sin conflictos con los cálculos ya escritos, existen reglas de '
+    'orden y estructura que SIEMPRE debes respetar. Se explican primero las reglas '
+    'obligatorias y luego cada tipo de gráfico aplicado a fotovoltaica.'
+)
+p_intro7.runs[0].font.size = Pt(10)
+p_intro7.runs[0].italic = True
+doc.add_paragraph('')
+
+# ── REGLAS OBLIGATORIAS ──
+h_reglas = doc.add_heading('REGLAS OBLIGATORIAS — Cómo evitar conflictos al graficar', level=2)
+h_reglas.runs[0].font.size = Pt(11)
+h_reglas.runs[0].font.color.rgb = RGBColor(0xC0, 0x39, 0x2B)
+
+reglas_texto = [
+    ('REGLA 1 — Importar siempre al principio del archivo',
+     'El import de matplotlib debe ir en la PRIMERA línea del archivo, '
+     'antes de cualquier cálculo. Si lo pones en medio del código, puede '
+     'generar errores de estado o sobrescribir variables ya definidas.',
+     'import matplotlib\nmatplotlib.use("Agg")        # modo sin ventana emergente (ideal para scripts)\nimport matplotlib.pyplot as plt\n# A partir de aquí van tus variables y cálculos...'),
+
+    ('REGLA 2 — Abrir y cerrar cada gráfico correctamente',
+     'Cada gráfico debe abrirse con plt.figure() y cerrarse con plt.close() '
+     'al terminar. Si no cierras, el siguiente gráfico se dibuja encima del '
+     'anterior y los resultados se mezclan.',
+     'plt.figure()           # abre un lienzo nuevo\n# ... código del gráfico ...\nplt.savefig("grafico.png")  # guarda el archivo\nplt.close()            # cierra y libera memoria — OBLIGATORIO'),
+
+    ('REGLA 3 — Usar savefig() en lugar de show()',
+     'plt.show() abre una ventana emergente y CONGELA el programa hasta que '
+     'el usuario la cierre. En scripts de cálculo fotovoltaico eso interrumpe '
+     'el flujo. Usa siempre savefig() para guardar la imagen sin pausar.',
+     'plt.savefig("produccion_mensual.png", dpi=150, bbox_inches="tight")\n# dpi=150 → calidad aceptable | bbox_inches="tight" → sin recortes'),
+
+    ('REGLA 4 — Nombrar los ejes y el título siempre',
+     'Un gráfico sin etiquetas no sirve para informes ni para interpretar '
+     'resultados. PVsyst siempre etiqueta sus gráficos — sigue ese estándar.',
+     'plt.title("Producción mensual del sistema solar")\nplt.xlabel("Mes del año")\nplt.ylabel("Energía generada (kWh)")\nplt.grid(True, linestyle="--", alpha=0.5)  # grilla suave'),
+
+    ('REGLA 5 — plt.close("all") para limpiar si hay muchos gráficos',
+     'Si tu script genera varios gráficos en secuencia, usa plt.close("all") '
+     'antes de empezar el bloque de gráficos para asegurarte de que no haya '
+     'ningún lienzo residual de una ejecución anterior.',
+     'plt.close("all")   # limpia todos los gráficos abiertos\n# Ahora genera tus gráficos con seguridad'),
+]
+
+for titulo_r, desc_r, cod_r in reglas_texto:
+    p_rt = doc.add_paragraph()
+    rr = p_rt.add_run(f'▶  {titulo_r}')
+    rr.bold = True
+    rr.font.color.rgb = RGBColor(0xC0, 0x39, 0x2B)
+
+    p_rd = doc.add_paragraph(desc_r)
+    p_rd.runs[0].font.size = Pt(10)
+
+    p_rc = doc.add_paragraph()
+    cr_r = p_rc.add_run(cod_r)
+    cr_r.font.name = 'Courier New'
+    cr_r.font.size = Pt(9.5)
+    cr_r.font.color.rgb = RGBColor(0x17, 0x6B, 0x17)
+    doc.add_paragraph('')
+
+add_seccion_titulo('  F) Tipos de Gráficos Aplicados a Fotovoltaica')
+
+# Helper gráfico
+def add_grafico(numero, tipo, descripcion, cuando_usarlo, ejemplo_desc, ejemplo_codigo):
+    h = doc.add_heading(f'{numero}. Gráfico de {tipo}', level=1)
+    h.runs[0].font.size = Pt(13)
+    h.runs[0].font.color.rgb = RGBColor(0xD4, 0x7A, 0x00)
+
+    p = doc.add_paragraph()
+    r1 = p.add_run('¿Qué muestra? ')
+    r1.bold = True
+    p.add_run(descripcion)
+
+    p2 = doc.add_paragraph()
+    r2 = p2.add_run('¿Cuándo usarlo en FV? ')
+    r2.bold = True
+    p2.add_run(cuando_usarlo)
+
+    p3 = doc.add_paragraph()
+    r3 = p3.add_run('Ejemplo FV:  ')
+    r3.bold = True
+    p3.add_run(ejemplo_desc)
+
+    p4 = doc.add_paragraph()
+    cr4 = p4.add_run(ejemplo_codigo)
+    cr4.font.name = 'Courier New'
+    cr4.font.size = Pt(9.5)
+    cr4.font.color.rgb = RGBColor(0x10, 0x10, 0x60)
+    doc.add_paragraph('')
+
+
+add_grafico(58,
+    'Barras — Producción mensual',
+    'Compara cantidades entre categorías o períodos. Cada barra representa un valor.',
+    'Producción kWh por mes, comparar meses con más/menos sol, consumo vs generación.',
+    'Producción mensual de un sistema de 3 kWp con irradiación variable:',
+    'import matplotlib\nmatplotlib.use("Agg")\nimport matplotlib.pyplot as plt\n\n'
+    'meses = ["Ene","Feb","Mar","Abr","May","Jun",\n'
+    '         "Jul","Ago","Sep","Oct","Nov","Dic"]\n'
+    'produccion_kwh = [520,480,450,390,340,310,320,360,400,460,500,530]\n\n'
+    'plt.figure(figsize=(10, 5))\n'
+    'plt.bar(meses, produccion_kwh, color="orange", edgecolor="black")\n'
+    'plt.title("Producción mensual del sistema solar — 3 kWp")\n'
+    'plt.xlabel("Mes")\n'
+    'plt.ylabel("Energía generada (kWh)")\n'
+    'plt.grid(axis="y", linestyle="--", alpha=0.5)\n'
+    'plt.savefig("produccion_mensual.png", dpi=150, bbox_inches="tight")\n'
+    'plt.close()\n'
+    'print("Gráfico guardado como produccion_mensual.png")')
+
+add_grafico(59,
+    'Línea — Degradación de producción en 25 años',
+    'Muestra la evolución de un valor a lo largo del tiempo. Ideal para tendencias.',
+    'Producción año a año con degradación, evolución del ahorro acumulado, curva del VAN.',
+    'Producción anual de 7 800 kWh en año 1, degradación 0.5% anual — 25 años:',
+    'import matplotlib\nmatplotlib.use("Agg")\nimport matplotlib.pyplot as plt\n\n'
+    'prod_año1   = 7800\n'
+    'degradacion = 0.005\n'
+    'años        = list(range(1, 26))\n'
+    'produccion  = [round(prod_año1 * ((1-degradacion)**(a-1)), 1) for a in años]\n\n'
+    'plt.figure(figsize=(10, 5))\n'
+    'plt.plot(años, produccion, marker="o", color="steelblue", linewidth=2)\n'
+    'plt.fill_between(años, produccion, alpha=0.15, color="steelblue")\n'
+    'plt.title("Producción anual con degradación — 25 años de vida útil")\n'
+    'plt.xlabel("Año del sistema")\n'
+    'plt.ylabel("Energía generada (kWh/año)")\n'
+    'plt.grid(True, linestyle="--", alpha=0.5)\n'
+    'plt.savefig("degradacion_25_años.png", dpi=150, bbox_inches="tight")\n'
+    'plt.close()\n'
+    'print("Gráfico guardado como degradacion_25_años.png")')
+
+add_grafico(60,
+    'Torta (Pie) — Pérdidas del sistema (Loss Diagram)',
+    'Muestra la proporción de cada parte respecto al total. Ideal para porcentajes.',
+    'Desglose del loss diagram: qué porcentaje se pierde en temperatura, suciedad, '
+    'sombras, mismatch, cableado e inversor. Réplica visual del gráfico de PVsyst.',
+    'Loss diagram de un sistema con PR 82 % — desglose visual de pérdidas:',
+    'import matplotlib\nmatplotlib.use("Agg")\nimport matplotlib.pyplot as plt\n\n'
+    'conceptos = ["Energía útil (PR 82%)", "Pérd. temperatura",\n'
+    '             "Suciedad", "Sombras", "Mismatch",\n'
+    '             "Cableado DC", "Inversor"]\n'
+    'porcentajes = [82.0, 4.8, 3.0, 2.0, 1.5, 1.5, 3.0, 2.2]\n'
+    'porcentajes = [82.0, 4.8, 3.0, 2.0, 1.5, 1.5, 5.2]  # suma 100%\n'
+    'colores = ["#2ecc71","#e74c3c","#e67e22","#f39c12","#9b59b6","#3498db","#95a5a6"]\n'
+    'explotar = [0.05, 0, 0, 0, 0, 0, 0]  # destaca la porción útil\n\n'
+    'plt.figure(figsize=(8, 8))\n'
+    'plt.pie(porcentajes, labels=conceptos, colors=colores,\n'
+    '        autopct="%1.1f%%", explode=explotar, startangle=140)\n'
+    'plt.title("Loss Diagram — Distribución de pérdidas del sistema solar")\n'
+    'plt.savefig("loss_diagram.png", dpi=150, bbox_inches="tight")\n'
+    'plt.close()\n'
+    'print("Gráfico guardado como loss_diagram.png")')
+
+add_grafico(61,
+    'Barras dobles — Generación vs Consumo mensual',
+    'Compara dos series de datos lado a lado en el mismo gráfico.',
+    'Ver mes a mes si el sistema cubre el consumo o hay déficit/excedente. '
+    'Equivale al gráfico de balance energético de PVsyst.',
+    'Generación solar vs consumo del hogar, mes a mes:',
+    'import matplotlib\nmatplotlib.use("Agg")\nimport matplotlib.pyplot as plt\nimport numpy as np\n\n'
+    'meses      = ["Ene","Feb","Mar","Abr","May","Jun",\n'
+    '              "Jul","Ago","Sep","Oct","Nov","Dic"]\n'
+    'generacion = [520, 480, 450, 390, 340, 310, 320, 360, 400, 460, 500, 530]\n'
+    'consumo    = [400, 380, 420, 440, 460, 500, 490, 470, 430, 410, 390, 420]\n\n'
+    'x      = np.arange(len(meses))\n'
+    'ancho  = 0.35\n\n'
+    'plt.figure(figsize=(12, 5))\n'
+    'plt.bar(x - ancho/2, generacion, ancho, label="Generación FV", color="orange")\n'
+    'plt.bar(x + ancho/2, consumo,    ancho, label="Consumo hogar", color="steelblue")\n'
+    'plt.xticks(x, meses)\n'
+    'plt.title("Balance energético mensual — Generación vs Consumo")\n'
+    'plt.xlabel("Mes")\n'
+    'plt.ylabel("Energía (kWh)")\n'
+    'plt.legend()\n'
+    'plt.grid(axis="y", linestyle="--", alpha=0.5)\n'
+    'plt.savefig("balance_energetico.png", dpi=150, bbox_inches="tight")\n'
+    'plt.close()\n'
+    'print("Gráfico guardado como balance_energetico.png")')
+
+add_grafico(62,
+    'Línea doble — HSP mensual e Irradiancia',
+    'Muestra dos variables relacionadas sobre el mismo eje temporal para compararlas.',
+    'Comparar la HSP mensual con la irradiancia media, ver correlación entre temperatura '
+    'ambiente y eficiencia del panel a lo largo del año.',
+    'HSP mensual e irradiancia media mensual — recurso solar del lugar:',
+    'import matplotlib\nmatplotlib.use("Agg")\nimport matplotlib.pyplot as plt\n\n'
+    'meses       = ["Ene","Feb","Mar","Abr","May","Jun",\n'
+    '               "Jul","Ago","Sep","Oct","Nov","Dic"]\n'
+    'hsp_mensual = [6.2, 5.9, 5.5, 4.8, 4.1, 3.8, 4.0, 4.5, 5.0, 5.6, 6.0, 6.3]\n'
+    'irr_media   = [6200, 5900, 5500, 4800, 4100, 3800,\n'
+    '               4000, 4500, 5000, 5600, 6000, 6300]  # Wh/m²/día\n\n'
+    'fig, ax1 = plt.subplots(figsize=(11, 5))\n\n'
+    '# Eje izquierdo: HSP\n'
+    'ax1.plot(meses, hsp_mensual, color="orange", marker="o", linewidth=2, label="HSP (h/día)")\n'
+    'ax1.set_ylabel("HSP (h/día)", color="orange")\n'
+    'ax1.tick_params(axis="y", labelcolor="orange")\n\n'
+    '# Eje derecho: Irradiancia\n'
+    'ax2 = ax1.twinx()\n'
+    'ax2.plot(meses, irr_media, color="steelblue", marker="s",\n'
+    '         linewidth=2, linestyle="--", label="Irradiancia (Wh/m²/día)")\n'
+    'ax2.set_ylabel("Irradiancia (Wh/m²/día)", color="steelblue")\n'
+    'ax2.tick_params(axis="y", labelcolor="steelblue")\n\n'
+    'ax1.set_title("Recurso solar mensual — HSP e Irradiancia")\n'
+    'ax1.set_xlabel("Mes")\n'
+    'ax1.grid(True, linestyle="--", alpha=0.4)\n'
+    'plt.savefig("hsp_irradiancia.png", dpi=150, bbox_inches="tight")\n'
+    'plt.close()\n'
+    'print("Gráfico guardado como hsp_irradiancia.png")')
+
+add_grafico(63,
+    'Línea acumulada — Flujo de caja y Payback',
+    'Muestra cómo se acumula el ahorro año a año hasta recuperar la inversión inicial.',
+    'Visualizar el punto exacto de payback: dónde la línea cruza el eje cero. '
+    'Equivale al gráfico de flujo de caja acumulado del análisis económico de PVsyst.',
+    'Inversión $6 000 000 recuperada con ahorro anual creciente al 3%:',
+    'import matplotlib\nmatplotlib.use("Agg")\nimport matplotlib.pyplot as plt\n\n'
+    'inversion    = 6000000\n'
+    'ahorro_año1  = 900000\n'
+    'crecimiento  = 0.03\n'
+    'años         = list(range(0, 26))\n\n'
+    '# Flujo acumulado: empieza negativo (inversión) y sube con cada ahorro\n'
+    'flujo_acum = [-inversion]\n'
+    'for n in range(1, 26):\n'
+    '    ahorro_n = ahorro_año1 * ((1 + crecimiento) ** (n-1))\n'
+    '    flujo_acum.append(flujo_acum[-1] + ahorro_n)\n\n'
+    'colores_barras = ["#e74c3c" if v < 0 else "#2ecc71" for v in flujo_acum]\n\n'
+    'plt.figure(figsize=(11, 5))\n'
+    'plt.bar(años, flujo_acum, color=colores_barras, edgecolor="gray", linewidth=0.5)\n'
+    'plt.axhline(0, color="black", linewidth=1.2, linestyle="--")\n'
+    'plt.title("Flujo de caja acumulado — Punto de Payback del sistema solar")\n'
+    'plt.xlabel("Año")\n'
+    'plt.ylabel("Flujo acumulado ($)")\n'
+    'plt.grid(axis="y", linestyle="--", alpha=0.4)\n'
+    'plt.savefig("payback_flujo.png", dpi=150, bbox_inches="tight")\n'
+    'plt.close()\n'
+    'print("Gráfico guardado como payback_flujo.png")')
+
+add_grafico(64,
+    'Subplots — Múltiples gráficos en una sola imagen',
+    'Organiza varios gráficos en una cuadrícula dentro de una sola imagen. '
+    'Permite presentar un informe visual completo en un solo archivo.',
+    'Generar un panel de 4 gráficos en una imagen: producción, pérdidas, '
+    'payback y CO₂. Equivale a la hoja de resumen ejecutivo de PVsyst.',
+    'Panel de 4 resultados principales del proyecto en una sola imagen:',
+    'import matplotlib\nmatplotlib.use("Agg")\nimport matplotlib.pyplot as plt\n\n'
+    '# ── DATOS ──\n'
+    'meses       = ["E","F","M","A","M","J","J","A","S","O","N","D"]\n'
+    'produccion  = [520,480,450,390,340,310,320,360,400,460,500,530]\n'
+    'perdidas    = [82.0, 4.8, 3.0, 2.0, 1.5, 1.5, 5.2]\n'
+    'etiq_perd   = ["Útil","Temp","Suciedad","Sombra","Mismatch","Cable","Inversor"]\n'
+    'años        = list(range(1, 26))\n'
+    'prod_anual  = [7800 * (0.995**(a-1)) for a in años]\n'
+    'co2_acum    = [round(p * 0.294 / 1000, 2) for p in prod_anual]\n\n'
+    '# ── FIGURA CON 4 SUBGRÁFICOS ──\n'
+    'fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(14, 9))\n'
+    'fig.suptitle("Resumen ejecutivo — Sistema solar 3 kWp", fontsize=14, fontweight="bold")\n\n'
+    '# Gráfico 1: Producción mensual\n'
+    'ax1.bar(meses, produccion, color="orange", edgecolor="black")\n'
+    'ax1.set_title("Producción mensual (kWh)")\n'
+    'ax1.set_ylabel("kWh")\n'
+    'ax1.grid(axis="y", linestyle="--", alpha=0.5)\n\n'
+    '# Gráfico 2: Loss diagram\n'
+    'ax2.pie(perdidas, labels=etiq_perd, autopct="%1.0f%%", startangle=140,\n'
+    '        colors=["#2ecc71","#e74c3c","#e67e22","#f39c12","#9b59b6","#3498db","#95a5a6"])\n'
+    'ax2.set_title("Loss Diagram (%)")\n\n'
+    '# Gráfico 3: Degradación 25 años\n'
+    'ax3.plot(años, prod_anual, color="steelblue", marker=".", linewidth=1.8)\n'
+    'ax3.fill_between(años, prod_anual, alpha=0.12, color="steelblue")\n'
+    'ax3.set_title("Producción anual con degradación (kWh)")\n'
+    'ax3.set_xlabel("Año")\n'
+    'ax3.grid(True, linestyle="--", alpha=0.5)\n\n'
+    '# Gráfico 4: CO₂ evitado acumulado\n'
+    'ax4.plot(años, [sum(co2_acum[:i+1]) for i in range(25)],\n'
+    '         color="#27ae60", marker=".", linewidth=1.8)\n'
+    'ax4.set_title("CO₂ evitado acumulado (ton)")\n'
+    'ax4.set_xlabel("Año")\n'
+    'ax4.grid(True, linestyle="--", alpha=0.5)\n\n'
+    'plt.tight_layout()\n'
+    'plt.savefig("resumen_ejecutivo.png", dpi=150, bbox_inches="tight")\n'
+    'plt.close()\n'
+    'print("Panel de 4 gráficos guardado como resumen_ejecutivo.png")')
+
+# ── ESTRUCTURA CORRECTA DE ARCHIVO ──
+add_seccion_titulo('REGLA DE ORO — Estructura correcta de un archivo Python con cálculos Y gráficos')
+
+p_oro = doc.add_paragraph(
+    'La causa más común de errores al mezclar cálculos con gráficos es el ORDEN de '
+    'las instrucciones. La estructura correcta es siempre la misma: primero los '
+    'imports, luego los cálculos, luego los gráficos. Nunca al revés ni mezclados.'
+)
+p_oro.runs[0].font.size = Pt(10)
+p_oro.runs[0].italic = True
+doc.add_paragraph('')
+
+codigo_estructura = (
+    '# ══════════════════════════════════════════════════════════\n'
+    '# ESTRUCTURA CORRECTA — Archivo Python con cálculos y gráficos\n'
+    '# ══════════════════════════════════════════════════════════\n\n'
+    '# ── BLOQUE 1: IMPORTS (siempre al inicio, nunca en medio del código) ──\n'
+    'import math\n'
+    'import matplotlib\n'
+    'matplotlib.use("Agg")           # evita ventanas emergentes\n'
+    'import matplotlib.pyplot as plt\n'
+    'import numpy as np              # solo si usas barras dobles o arrays\n\n'
+    '# ── BLOQUE 2: CÁLCULOS (variables, fórmulas, conversiones) ──\n'
+    'potencia_w   = 400\n'
+    'n_paneles    = 12\n'
+    'hsp          = 5.2\n'
+    'energia_kwh  = potencia_w * n_paneles * hsp / 1000\n'
+    'pr           = 0.80\n'
+    'energia_real = round(energia_kwh * pr, 2)\n'
+    'print("Energía real:", energia_real, "kWh/día")\n\n'
+    '# ── BLOQUE 3: GRÁFICOS (siempre al final, después de todos los cálculos) ──\n'
+    'plt.close("all")                # limpia lienzos residuales\n\n'
+    'plt.figure(figsize=(8, 4))\n'
+    'plt.bar(["Energía ideal", "Energía real"],\n'
+    '        [energia_kwh, energia_real],\n'
+    '        color=["steelblue", "orange"])\n'
+    'plt.title("Comparación: energía ideal vs real")\n'
+    'plt.ylabel("kWh/día")\n'
+    'plt.grid(axis="y", linestyle="--", alpha=0.5)\n'
+    'plt.savefig("comparacion_energia.png", dpi=150, bbox_inches="tight")\n'
+    'plt.close()                     # cierra siempre al terminar cada gráfico\n'
+    'print("Gráfico guardado correctamente.")\n\n'
+    '# ══ RESUMEN DE REGLAS ═══════════════════════════════════════\n'
+    '# 1. import matplotlib + matplotlib.use("Agg") → primeras líneas del archivo\n'
+    '# 2. Todos los cálculos ANTES de los gráficos\n'
+    '# 3. plt.figure()  →  código del gráfico  →  plt.savefig()  →  plt.close()\n'
+    '# 4. NUNCA plt.show() en scripts — usa siempre plt.savefig()\n'
+    '# 5. plt.close("all") al inicio del bloque de gráficos para limpiar\n'
+    '# ════════════════════════════════════════════════════════════\n'
+)
+
+p_est = doc.add_paragraph()
+cr_est = p_est.add_run(codigo_estructura)
+cr_est.font.name = 'Courier New'
+cr_est.font.size = Pt(9)
+cr_est.font.color.rgb = RGBColor(0x10, 0x10, 0x60)
+
+doc.add_paragraph('')
+
 # Pie de página
 footer = doc.add_paragraph('Elaborado para curso de Python aplicado a Energía Solar Fotovoltaica — 2026')
 footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
