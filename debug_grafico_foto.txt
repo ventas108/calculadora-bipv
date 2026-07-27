@@ -1,0 +1,28 @@
+HALLAZGOS DE LA FOTO GRAFICO1:
+
+Gráfico 1: "Producción Mensual de Energía (DC y AC)"
+- Barras verdes (DC) ~7500-10000 kWh/mes
+- Barras azules (AC) muy pequeñas, casi invisibles comparadas con DC
+- Factor de Sombreado (%) línea punteada ~100%
+- Leyenda: "DC = antes de inversor", "AC = después de inversor"
+
+Gráfico 2: "Energía DC vs AC Mensual (kWh/mes)"
+- Tooltip Jun: 
+  - Energía DC (kWh/mes): 349.0 kWh/mes
+  - Energía AC (kWh/mes): -7275.2 kWh/mes  ← ¡NEGATIVO! ERROR GRAVE
+  - Pérdidas BOS (kWh/mes): -8926.2 kWh/mes ← ¡NEGATIVO! ERROR GRAVE
+- La línea AC es NEGATIVA (~-9000 kWh/mes)
+- La línea de Pérdidas BOS también es NEGATIVA
+
+DIAGNÓSTICO:
+1. La energía AC es NEGATIVA - esto es imposible físicamente
+2. Las pérdidas BOS son NEGATIVAS y mayores que la producción DC
+3. Parece que el cálculo de AC está restando las pérdidas en lugar de multiplicar por eficiencia
+4. O hay un error en el cálculo de pérdidas BOS donde se invierte el signo
+5. La producción DC parece razonable (~349 kWh/mes para Jun)
+6. Pero el gráfico 1 muestra DC ~7500-10000 que contradice el tooltip de 349
+
+POSIBLE CAUSA: 
+- El cálculo de pérdidas BOS puede estar sumando pérdidas en vez de multiplicar factores
+- O la cadena de pérdidas DC→AC tiene un error de signo
+- Necesito revisar energyProduction.ts para verificar

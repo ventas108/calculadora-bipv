@@ -1,0 +1,23 @@
+CREATE TABLE `custom_panels` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`userId` int NOT NULL,
+	`name` varchar(255) NOT NULL,
+	`powerRating` float NOT NULL,
+	`efficiency` float NOT NULL,
+	`tempCoeff` float NOT NULL,
+	`noct` float NOT NULL,
+	`area` float NOT NULL,
+	`degradationAnnual` float NOT NULL,
+	`voc` float,
+	`isc` float,
+	`vmp` float,
+	`imp` float,
+	`lengthMm` float,
+	`widthMm` float,
+	`weightKg` float,
+	`systemLoss` float,
+	`application` text,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `custom_panels_id` PRIMARY KEY(`id`)
+);

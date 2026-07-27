@@ -1,0 +1,54 @@
+## PVGIS Hourly API (seriescalc)
+- Endpoint: /api/pvgis/seriescalc
+- Params: lat, lon, pvcalculation=1, peakpower, loss, angle, aspect, startyear, endyear
+- Response JSON: outputs.hourly = array of objects:
+  - time: "20050101:0000" (UTC)
+  - P: PV power output (W) - if pvcalculation=1
+  - Gb(i): Direct in-plane irradiance (W/m²)
+  - Gd(i): Diffuse in-plane irradiance (W/m²)
+  - Gr(i): Reflected in-plane irradiance (W/m²)
+  - G(i): Global in-plane irradiance (W/m²) - if components not requested
+  - H_sun: Sun height/elevation (°)
+  - T2m: Air temperature (°C)
+  - WS10m: Wind speed at 10m (m/s)
+  - Int: Clear sky indicator (0 or 1)
+- Multi-year data (e.g., 2005-2020 = 16 years × 8760 hours = ~140,000 records)
+- For PR_T we need: T2m, G(i) or Gb(i)+Gd(i)+Gr(i), WS10m
+
+## PVWatts Hourly API
+- Same endpoint: /api/pvwatts with timeframe=hourly
+- Response: outputs contains arrays of 8760 elements:
+  - ac: AC power output (W) per hour
+  - dc: DC power output (W) per hour
+  - poa: POA irradiance (W/m²) per hour
+  - tamb: Ambient temperature (°C) per hour
+  - tcell: Cell temperature (°C) per hour
+  - wspd: Wind speed (m/s) per hour
+  - dn: Direct normal irradiance (W/m²) per hour
+  - df: Diffuse horizontal irradiance (W/m²) per hour
+
+## PR_T Hourly Calculation (IEC 61724-1:2021)
+Formula: PR_T = Σ(E_AC_h) / Σ(G_POA_h × P_nom / G_ref × (1 + γ × (T_cell_h - T_ref)))
+
+Step by step for each hour h:
+1. Get G_POA_h (irradiance on plane of array, W/m²)
+2. Get T_cell_h (cell temperature, °C)
+3. Calculate temperature correction: k_h = 1 + γ × (T_cell_h - 25)
+4. Calculate reference energy: E_ref_h = G_POA_h × P_nom / G_ref (kW)
+5. Calculate corrected reference: E_ref_T_h = E_ref_h × k_h
+6. Sum: PR_T = Σ(E_AC_h) / Σ(E_ref_T_h)
+
+This gives a temperature-independent PR that is more meaningful for comparing sites.
+
+## Strategy for Implementation:
+1. For PVGIS: Use seriescalc with 1 year of data (startyear=endyear=latest)
+   - Get T2m, total in-plane irradiance, WS10m per hour
+   - Calculate T_cell from T2m using NOCT model
+   - Calculate PR_T hourly
+
+2. For PVWatts: Use timeframe=hourly
+   - Get tamb, tcell, poa per hour (8760 values)
+   - tcell is already calculated by PVWatts!
+   - Calculate PR_T hourly
+
+3. Both produce: PR_T_hourly value + monthly PR_T breakdown for chart
