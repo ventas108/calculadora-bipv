@@ -36,3 +36,9 @@ id = "U4xMw2ImLLLLpav5yPn0u"
 uri = "file://Plan_Maestro_Completo_BIPV_Python.docx"
 type = "word_document"
 title = "Plan Maestro Completo — Calculadora BIPV Python"
+
+[[outputs]]
+id = "6e44E707Oy5ZUtqXAYIk1"
+uri = "file://Auditoria_VBA_Python_BIPV.docx"
+type = "word_document"
+title = "Auditoría VBA → Python — Calculadora BIPV"
