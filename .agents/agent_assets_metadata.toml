@@ -48,3 +48,9 @@ id = "xJvITYJERQflyK0HHygBS"
 uri = "file://Guia_Despliegue_BIPV_DigitalOcean.docx"
 type = "word_document"
 title = "Guía Despliegue — BIPV Python en Digital Ocean"
+
+[[outputs]]
+id = "0SrnPxLbaWaMA8wFMXR14"
+uri = "file://Adenda_Despliegue_BIPV_MisionCumplida.docx"
+type = "word_document"
+title = "Adenda — Despliegue BIPV Misión Cumplida"
