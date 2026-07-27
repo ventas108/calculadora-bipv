@@ -40,6 +40,10 @@ else:
     p_stc = st.number_input("Potencia instalada (kWp)", min_value=0.1, value=4.03, step=0.1)
     n_pan = st.number_input("Número de módulos", min_value=1, value=64, step=1)
 
+
+# TRM disponible desde el inicio (se actualiza en Sección 2)
+tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 1 — CAPEX
 # ═══════════════════════════════════════════════════════════════════════════════
