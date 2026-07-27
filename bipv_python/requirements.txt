@@ -1,0 +1,10 @@
+streamlit==1.36.0
+pvlib==0.11.1
+numpy==1.26.4
+pandas==2.2.2
+matplotlib==3.9.0
+scipy==1.13.1
+python-docx==1.1.2
+openpyxl==3.1.4
+requests==2.32.3
+plotly==5.22.0

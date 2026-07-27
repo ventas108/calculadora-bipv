@@ -1,0 +1,89 @@
+"""Página 4 — Dimensionamiento de strings."""
+import streamlit as st
+import pandas as pd
+from calculos.dimensionamiento import optimizar_n_serie, dimensionar_sistema
+from datos.tecnologias_bipv import MODULOS_BIPV
+from datos.catalogo_inversores import INVERSORES, seleccionar_inversor
+
+st.set_page_config(page_title="Dimensionamiento — BIPV", page_icon="📐", layout="wide")
+st.title("📐 Dimensionamiento de Strings")
+st.caption("Equivalente de Mod_OptimizarStringSizing + Mod_CalculoStringSizing (VBA)")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    panel_nombre   = st.selectbox("Panel", list(MODULOS_BIPV.keys()),
+                                   index=list(MODULOS_BIPV.keys()).index("ASP-ST1-T40"))
+    inversor_nombre = st.selectbox("Inversor", list(INVERSORES.keys()))
+
+with col2:
+    T_frio   = st.number_input("T_mín diseño (°C)", value=float(
+                                st.session_state.get("T_min_diseno", -5.0)))
+    T_real   = st.number_input("T_celda caliente realista (°C)", value=float(
+                                st.session_state.get("T_cel_realista", 36.35)))
+    T_extr   = st.number_input("T_celda caliente extremo (°C)", value=float(
+                                st.session_state.get("T_cel_extremo", 41.94)))
+    N_str_tr = st.number_input("N_strings por tracker (via combinadoras)", value=8, min_value=1)
+
+panel    = MODULOS_BIPV[panel_nombre]
+inversor = seleccionar_inversor(inversor_nombre)
+
+if st.button("▶️ Optimizar N paneles/string", type="primary"):
+    resultados = optimizar_n_serie(
+        panel, inversor,
+        T_frio=T_frio, T_real=T_real, T_extremo=T_extr,
+        N_strings_tracker=int(N_str_tr),
+        N_min=5, N_max=12,
+    )
+
+    filas = []
+    for r in resultados:
+        filas.append({
+            "N/string": r.N_serie,
+            "Voc frío (V)": r.Voc_frio,
+            "Vmp realista (V)": r.Vmp_real,
+            "Vmp extremo (V)": r.Vmp_extremo,
+            "I equiv (A)": r.I_equiv_tracker,
+            "1-Voc≤Vdc": r.v1_voc_max,
+            "2-Vmp≥Vmppt": r.v2_vmp_real,
+            "3-Vmp_ext≥Vmppt": r.v3_vmp_extr,
+            "4-I≤Imax": r.v4_i_max,
+            "Riesgos": r.riesgos,
+            "": r.semaforo_color(),
+        })
+
+    df = pd.DataFrame(filas)
+
+    def colorear(val):
+        if val == "FALLA":
+            return "background-color: #FFCCCC; color: #CC0000; font-weight: bold"
+        elif val == "ALERTA":
+            return "background-color: #FFF3CD; color: #856404; font-weight: bold"
+        elif val == "OK":
+            return "background-color: #D4EDDA; color: #155724; font-weight: bold"
+        return ""
+
+    styled = df.style.applymap(colorear,
+                                subset=["1-Voc≤Vdc", "2-Vmp≥Vmppt",
+                                        "3-Vmp_ext≥Vmppt", "4-I≤Imax"])
+    st.dataframe(styled, use_container_width=True)
+
+    # Mejor opción
+    sin_riesgos = [r for r in resultados if r.riesgos == 0]
+    if sin_riesgos:
+        mejor = sin_riesgos[0]
+        st.success(f"✅ N óptimo = **{mejor.N_serie} paneles/string** — 0 riesgos")
+        st.session_state["N_serie"] = mejor.N_serie
+
+        # Dimensionamiento del sistema
+        area = st.session_state.get("area_fachada_m2", 97.34)
+        dim  = dimensionar_sistema(panel, area, mejor.N_serie,
+                                    int(N_str_tr), inversor["N_mppt"])
+        st.markdown("### 📊 Sistema dimensionado")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("N_paneles total", dim["N_paneles"])
+        c2.metric("P_DC instalada", f"{dim['P_dc_stc_kW']:.2f} kW")
+        c3.metric("Área ocupada", f"{dim['area_ocupada_m2']} m²")
+        c4.metric("Cobertura fachada", f"{dim['cobertura_pct']}%")
+    else:
+        st.error("❌ Ningún N válido en el rango. Revisar parámetros del inversor o temperaturas.")

@@ -42,3 +42,9 @@ id = "6e44E707Oy5ZUtqXAYIk1"
 uri = "file://Auditoria_VBA_Python_BIPV.docx"
 type = "word_document"
 title = "Auditoría VBA → Python — Calculadora BIPV"
+
+[[outputs]]
+id = "xJvITYJERQflyK0HHygBS"
+uri = "file://Guia_Despliegue_BIPV_DigitalOcean.docx"
+type = "word_document"
+title = "Guía Despliegue — BIPV Python en Digital Ocean"
