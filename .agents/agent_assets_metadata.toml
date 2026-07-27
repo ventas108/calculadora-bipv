@@ -30,3 +30,9 @@ id = "UlX_aFdaOkIGBgUjuyzmQ"
 uri = "file://Visualizador_3D_BIPV_Streamlit.docx"
 type = "word_document"
 title = "Visualizador 3D de Fachadas BIPV — Integración con Streamlit"
+
+[[outputs]]
+id = "U4xMw2ImLLLLpav5yPn0u"
+uri = "file://Plan_Maestro_Completo_BIPV_Python.docx"
+type = "word_document"
+title = "Plan Maestro Completo — Calculadora BIPV Python"
