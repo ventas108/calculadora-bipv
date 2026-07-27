@@ -37,8 +37,6 @@ def obtener_tmy_pvgis(lat: float, lon: float, timeout: int = 30) -> pd.DataFrame
         "lat": round(lat, 4),
         "lon": round(lon, 4),
         "outputformat": "json",
-        "startyear": 2005,
-        "endyear": 2020,
     }
     resp = requests.get(PVGIS_TMY_URL, params=params, timeout=timeout)
     resp.raise_for_status()
