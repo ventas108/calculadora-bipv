@@ -1,3 +1,4 @@
+
 """Página 7 — Análisis financiero BIPV — Ley 1715 de 2014 (Colombia)."""
 import streamlit as st
 import plotly.graph_objects as go
