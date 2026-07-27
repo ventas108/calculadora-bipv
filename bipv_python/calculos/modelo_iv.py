@@ -103,7 +103,6 @@ def resolver_curva_iv(G, T_cel_C, panel: dict, n_puntos=100):
         resistance_series  = R_s,
         resistance_shunt   = R_sh,
         nNsVth             = nNsVth,
-        ivcurve_pnts       = n_puntos,
         method             = 'lambertw',
     )
 
@@ -112,6 +111,22 @@ def resolver_curva_iv(G, T_cel_C, panel: dict, n_puntos=100):
     Pmax = float(resultado['p_mp'])
     FF   = Pmax / (Voc * Isc) if (Voc * Isc) > 0 else 0.0
 
+    # Generar curva I-V manualmente (pvlib >=0.9 elimino ivcurve_pnts)
+    if n_puntos > 0 and Voc > 0:
+        V_arr = np.linspace(0, Voc, n_puntos)
+        I_arr = pvlib.pvsystem.i_from_v(
+            resistance_shunt   = R_sh,
+            resistance_series  = R_s,
+            nNsVth             = nNsVth,
+            voltage            = V_arr,
+            saturation_current = I_o,
+            photocurrent       = I_L,
+            method             = 'lambertw',
+        )
+    else:
+        V_arr = None
+        I_arr = None
+
     return {
         "Voc":  Voc,
         "Isc":  Isc,
@@ -119,8 +134,8 @@ def resolver_curva_iv(G, T_cel_C, panel: dict, n_puntos=100):
         "Imp":  float(resultado['i_mp']),
         "Pmax": Pmax,
         "FF":   FF,
-        "V":    resultado.get('v', None),
-        "I":    resultado.get('i', None),
+        "V":    V_arr,
+        "I":    I_arr,
     }
 
 
