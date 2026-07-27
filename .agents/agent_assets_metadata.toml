@@ -24,3 +24,9 @@ id = "6pBo7onWS6oPobCTD0wJC"
 uri = "file://Plan_Maestro_Calculadora_BIPV.docx"
 type = "word_document"
 title = "Plan Maestro — Calculadora BIPV (TypeScript + Python)"
+
+[[outputs]]
+id = "UlX_aFdaOkIGBgUjuyzmQ"
+uri = "file://Visualizador_3D_BIPV_Streamlit.docx"
+type = "word_document"
+title = "Visualizador 3D de Fachadas BIPV — Integración con Streamlit"
