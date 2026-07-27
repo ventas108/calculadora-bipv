@@ -103,14 +103,19 @@ with col_cx2:
     df_capex = pd.DataFrame.from_dict(
         items_capex, orient="index", columns=["USD"]
     )
-    df_capex["COP (M)"] = (df_capex["USD"] * st.session_state.get("tipo_cambio", 4200) / 1e6).round(1)
+    df_capex["COP (M)"] = (df_capex["USD"] * tipo_cambio / 1e6).round(1)
     st.dataframe(df_capex.style.format({"USD": "{:,.0f}", "COP (M)": "{:.1f}"}),
                  use_container_width=True)
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("CAPEX total",    f"USD {capex_total:,.0f}")
-    c2.metric("Costo por Wp",   f"USD {capex_total/p_stc/1000:.2f}/Wp" if p_stc > 0 else "—")
-    c3.metric("Costo módulo",   f"USD {capex_total/n_pan:,.0f}/módulo" if n_pan > 0 else "—")
+    c1.metric("CAPEX total",    f"USD {capex_total:,.0f}",
+              delta=f"$ {capex_total*tipo_cambio/1e6:.1f} M COP", delta_color="off")
+    c2.metric("Costo por Wp",   f"USD {capex_total/p_stc/1000:.2f}/Wp" if p_stc > 0 else "—",
+              delta=f"$ {capex_total*tipo_cambio/p_stc/1000:,.0f} COP/Wp" if p_stc > 0 else None,
+              delta_color="off")
+    c3.metric("Costo módulo",   f"USD {capex_total/n_pan:,.0f}/módulo" if n_pan > 0 else "—",
+              delta=f"$ {capex_total*tipo_cambio/n_pan:,.0f} COP/módulo" if n_pan > 0 else None,
+              delta_color="off")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 2 — TARIFA Y PARÁMETROS OPERATIVOS
@@ -131,7 +136,9 @@ with col_t1:
     tipo_cambio = st.number_input(
         "Tipo de cambio (COP/USD)",
         min_value=3000.0, max_value=6000.0,
-        value=4200.0, step=50.0,
+        value=float(st.session_state.get("tipo_cambio", 3400.0)),
+        step=50.0,
+        help="TRM actual (jul 2026): ~3.400 COP/USD. Ajusta según la tasa del día.",
     )
     st.session_state["tipo_cambio"] = tipo_cambio
 
@@ -164,6 +171,48 @@ with col_t3:
         "Horizonte de análisis (años)",
         min_value=10, max_value=30, value=25, step=5,
     )
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PANEL DE CONVERSIÓN USD → COP (en tiempo real)
+# ═══════════════════════════════════════════════════════════════════════════════
+st.markdown("---")
+with st.expander("💱 Conversor de cifras USD → COP (TRM del día)", expanded=True):
+    st.caption(f"Usando TRM: **{tipo_cambio:,.0f} COP/USD** — ajusta la tasa en la sección anterior para actualizar.")
+
+    col_cv1, col_cv2, col_cv3, col_cv4 = st.columns(4)
+    col_cv1.metric("CAPEX bruto",
+                   f"${capex_total*tipo_cambio/1e6:.2f} M COP",
+                   delta=f"USD {capex_total:,.0f}", delta_color="off")
+    col_cv2.metric("Módulos BIPV",
+                   f"${capex_modulos*tipo_cambio/1e6:.2f} M COP",
+                   delta=f"USD {capex_modulos:,.0f}", delta_color="off")
+    col_cv3.metric("Inversor",
+                   f"${capex_inversor*tipo_cambio/1e6:.2f} M COP",
+                   delta=f"USD {capex_inversor:,.0f}", delta_color="off")
+    col_cv4.metric("Estructura + Instalación",
+                   f"${(capex_estructura+capex_instalacion)*tipo_cambio/1e6:.2f} M COP",
+                   delta=f"USD {(capex_estructura+capex_instalacion):,.0f}", delta_color="off")
+
+    st.markdown("---")
+    col_cv5, col_cv6, col_cv7, col_cv8 = st.columns(4)
+    ben_lv = calcular_beneficios_ley_1715(
+        capex_usd       = capex_total,
+        fraccion_equipo = capex_equipos / capex_total if capex_total > 0 else 0.65,
+        tasa_renta      = 0.35,
+        tipo_cambio     = tipo_cambio,
+    )
+    col_cv5.metric("Beneficios Ley 1715",
+                   f"${ben_lv['total_usd']*tipo_cambio/1e6:.2f} M COP",
+                   delta=f"USD {ben_lv['total_usd']:,.0f}", delta_color="off")
+    col_cv6.metric("CAPEX neto (con Ley 1715)",
+                   f"${ben_lv['capex_neto_usd']*tipo_cambio/1e6:.2f} M COP",
+                   delta=f"USD {ben_lv['capex_neto_usd']:,.0f}", delta_color="off")
+    col_cv7.metric("Ahorro energía año 1",
+                   f"${e_ac * (tarifa_cop/1e6):.2f} M COP/año",
+                   delta=f"USD {e_ac * tarifa_cop / tipo_cambio:,.0f}/año", delta_color="off")
+    col_cv8.metric("Tarifa referencia",
+                   f"{tarifa_cop:,.0f} COP/kWh",
+                   delta=f"USD {tarifa_cop/tipo_cambio:.4f}/kWh", delta_color="off")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 3 — BENEFICIOS LEY 1715
@@ -203,20 +252,31 @@ with col_l2:
     bb1, bb2 = st.columns(2)
     bbb1, bbb2 = st.columns(2)
 
-    bb1.metric("Art. 11 — Deducción renta",  f"USD {ben['ahorro_renta_usd']:,.0f}",
+    bb1.metric("Art. 11 — Deducción renta",
+               f"USD {ben['ahorro_renta_usd']:,.0f}",
+               delta=f"$ {ben['ahorro_renta_usd']*tipo_cambio/1e6:.2f} M COP",
+               delta_color="off",
                help="50% × CAPEX × tasa_renta")
-    bb2.metric("Art. 12 — Ahorro IVA",        f"USD {ben['ahorro_iva_usd']:,.0f}",
+    bb2.metric("Art. 12 — Ahorro IVA",
+               f"USD {ben['ahorro_iva_usd']:,.0f}",
+               delta=f"$ {ben['ahorro_iva_usd']*tipo_cambio/1e6:.2f} M COP",
+               delta_color="off",
                help="19% × CAPEX_equipos")
-    bbb1.metric("Art. 14 — Dep. acelerada",   f"USD {ben['ahorro_dep_vpn_usd']:,.0f}",
+    bbb1.metric("Art. 14 — Dep. acelerada",
+                f"USD {ben['ahorro_dep_vpn_usd']:,.0f}",
+                delta=f"$ {ben['ahorro_dep_vpn_usd']*tipo_cambio/1e6:.2f} M COP",
+                delta_color="off",
                 help="VPN del ahorro por diferencial de depreciación 5 vs 10 años")
-    bbb2.metric("💚 Total beneficios",         f"USD {ben['total_usd']:,.0f}",
-                delta=f"-{ben['pct_capex']:.1f}% del CAPEX",
+    bbb2.metric("💚 Total beneficios",
+                f"USD {ben['total_usd']:,.0f}",
+                delta=f"$ {ben['total_usd']*tipo_cambio/1e6:.2f} M COP  ·  -{ben['pct_capex']:.1f}% CAPEX",
                 delta_color="off")
 
     st.info(
-        f"**CAPEX bruto:** USD {capex_total:,.0f} → "
+        f"**CAPEX bruto:** USD {capex_total:,.0f}  ($ {capex_total*tipo_cambio/1e6:.2f} M COP) → "
         f"**CAPEX neto (con Ley 1715):** USD {ben['capex_neto_usd']:,.0f}  "
-        f"({ben['pct_capex']:.1f}% de reducción efectiva)"
+        f"($ {ben['capex_neto_usd']*tipo_cambio/1e6:.2f} M COP)  "
+        f"— {ben['pct_capex']:.1f}% de reducción efectiva"
     )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -260,10 +320,11 @@ if btn_fin or st.session_state.get("financiero_ok"):
 
     df_comp = pd.DataFrame({
         "Métrica": [
-            "CAPEX efectivo (USD)",
+            "CAPEX efectivo",
+            "CAPEX efectivo (COP)",
             "TIR (%)",
             "VPN a " + str(int(tasa_desc)) + "% (USD)",
-            "VPN a " + str(int(tasa_desc)) + "% (M COP)",
+            "VPN a " + str(int(tasa_desc)) + "% (COP)",
             "Payback simple (años)",
             "Payback descontado (años)",
             "LCOE (USD/kWh)",
@@ -271,9 +332,10 @@ if btn_fin or st.session_state.get("financiero_ok"):
         ],
         "Sin Ley 1715": [
             f"USD {capex_total:,.0f}",
+            f"$ {capex_total*tipo_cambio/1e6:.2f} M",
             f"{m_sin['tir_pct']:.1f}%" if m_sin['tir_pct'] else "N/A",
             f"USD {m_sin['vpn_usd']:,.0f}",
-            f"{m_sin['vpn_cop_millon']:.1f} M",
+            f"$ {m_sin['vpn_cop_millon']:.1f} M",
             f"{m_sin['payback_simple']:.1f} años" if m_sin['payback_simple'] else "> horizonte",
             f"{m_sin['payback_desc']:.1f} años" if m_sin['payback_desc'] else "> horizonte",
             f"{m_sin['lcoe_usd_kWh']:.4f}",
@@ -281,9 +343,10 @@ if btn_fin or st.session_state.get("financiero_ok"):
         ],
         "Con Ley 1715": [
             f"USD {ben['capex_neto_usd']:,.0f}",
+            f"$ {ben['capex_neto_usd']*tipo_cambio/1e6:.2f} M",
             f"{m_con['tir_pct']:.1f}%" if m_con['tir_pct'] else "N/A",
             f"USD {m_con['vpn_usd']:,.0f}",
-            f"{m_con['vpn_cop_millon']:.1f} M",
+            f"$ {m_con['vpn_cop_millon']:.1f} M",
             f"{m_con['payback_simple']:.1f} años" if m_con['payback_simple'] else "> horizonte",
             f"{m_con['payback_desc']:.1f} años" if m_con['payback_desc'] else "> horizonte",
             f"{m_con['lcoe_usd_kWh']:.4f}",
@@ -302,11 +365,12 @@ if btn_fin or st.session_state.get("financiero_ok"):
     tir_delta = ((m_con['tir_pct'] or 0) - (m_sin['tir_pct'] or 0))
     c1.metric("TIR con Ley 1715",     f"{m_con['tir_pct']:.1f}%" if m_con['tir_pct'] else "—",
               delta=f"+{tir_delta:.1f}pp vs sin Ley 1715")
-    c2.metric("VPN con Ley 1715",     f"USD {m_con['vpn_usd']:,.0f}",
+    c2.metric("VPN con Ley 1715",
+              f"USD {m_con['vpn_usd']:,.0f}  |  $ {m_con['vpn_usd']*tipo_cambio/1e6:.1f} M COP",
               delta="✅ Positivo" if m_con['vpn_positivo'] else "❌ Negativo",
               delta_color="normal" if m_con['vpn_positivo'] else "inverse")
     c3.metric("Payback con Ley 1715", f"{m_con['payback_simple']:.1f} años" if m_con['payback_simple'] else "—")
-    c4.metric("LCOE",                 f"{m_con['lcoe_cop_kWh']:.0f} COP/kWh",
+    c4.metric("LCOE",                 f"{m_con['lcoe_cop_kWh']:.0f} COP/kWh  ·  USD {m_con['lcoe_usd_kWh']:.4f}",
               delta=f"Tarifa: {tarifa_cop:.0f} COP/kWh",
               delta_color="off")
 
@@ -387,13 +451,13 @@ if btn_fin or st.session_state.get("financiero_ok"):
     # ── Tabla de beneficios Ley 1715 ─────────────────────────────────────────
     with st.expander("📜 Detalle Ley 1715 — base de cálculo"):
         st.markdown(f"""
-| Beneficio | Base | Cálculo | Valor (USD) |
-|---|---|---|---|
-| **Art. 11** Deducción renta | 50% × CAPEX × tasa_renta | 0.50 × {capex_total:,.0f} × {tasa_renta/100:.2f} | **{ben['ahorro_renta_usd']:,.0f}** |
-| **Art. 12** Exclusión IVA | 19% × CAPEX_equipos | 0.19 × {capex_total*fraccion_equipos:,.0f} | **{ben['ahorro_iva_usd']:,.0f}** |
-| **Art. 14** Dep. acelerada | VPN diferencial 5yr vs 10yr | — | **{ben['ahorro_dep_vpn_usd']:,.0f}** |
-| **Total Ley 1715** | — | — | **{ben['total_usd']:,.0f}** |
-| **CAPEX neto** | CAPEX − Ley 1715 | {capex_total:,.0f} − {ben['total_usd']:,.0f} | **{ben['capex_neto_usd']:,.0f}** |
+| Beneficio | Base | Cálculo | USD | COP |
+|---|---|---|---|---|
+| **Art. 11** Deducción renta | 50% × CAPEX × tasa_renta | 0.50 × {capex_total:,.0f} × {tasa_renta/100:.2f} | **{ben['ahorro_renta_usd']:,.0f}** | **$ {ben['ahorro_renta_usd']*tipo_cambio/1e6:.2f} M** |
+| **Art. 12** Exclusión IVA | 19% × CAPEX_equipos | 0.19 × {capex_total*fraccion_equipos:,.0f} | **{ben['ahorro_iva_usd']:,.0f}** | **$ {ben['ahorro_iva_usd']*tipo_cambio/1e6:.2f} M** |
+| **Art. 14** Dep. acelerada | VPN diferencial 5yr vs 10yr | — | **{ben['ahorro_dep_vpn_usd']:,.0f}** | **$ {ben['ahorro_dep_vpn_usd']*tipo_cambio/1e6:.2f} M** |
+| **Total Ley 1715** | — | — | **{ben['total_usd']:,.0f}** | **$ {ben['total_usd']*tipo_cambio/1e6:.2f} M** |
+| **CAPEX neto** | CAPEX − Ley 1715 | {capex_total:,.0f} − {ben['total_usd']:,.0f} | **{ben['capex_neto_usd']:,.0f}** | **$ {ben['capex_neto_usd']*tipo_cambio/1e6:.2f} M** |
         """)
         st.caption(
             "⚠️ Los beneficios Art. 11 y 14 requieren declaración de renta con utilidades suficientes. "
@@ -405,13 +469,17 @@ if btn_fin or st.session_state.get("financiero_ok"):
         df_fc = pd.DataFrame(fc_con)
         df_fc.columns = ["Año", "Producción (kWh)", "Ingreso energía (USD)",
                           "O&M (USD)", "Flujo (USD)", "Flujo acum. (USD)"]
+        df_fc["Ingreso (M COP)"]    = (df_fc["Ingreso energía (USD)"] * tipo_cambio / 1e6).round(3)
+        df_fc["Flujo acum. (M COP)"] = (df_fc["Flujo acum. (USD)"] * tipo_cambio / 1e6).round(3)
         st.dataframe(
             df_fc.style.format({
-                "Producción (kWh)":     "{:,.0f}",
-                "Ingreso energía (USD)": "{:,.0f}",
-                "O&M (USD)":            "{:,.0f}",
-                "Flujo (USD)":          "{:+,.0f}",
-                "Flujo acum. (USD)":    "{:+,.0f}",
+                "Producción (kWh)":      "{:,.0f}",
+                "Ingreso energía (USD)":  "{:,.0f}",
+                "O&M (USD)":             "{:,.0f}",
+                "Flujo (USD)":           "{:+,.0f}",
+                "Flujo acum. (USD)":     "{:+,.0f}",
+                "Ingreso (M COP)":       "{:.3f}",
+                "Flujo acum. (M COP)":   "{:+.3f}",
             }).background_gradient(subset=["Flujo acum. (USD)"], cmap="RdYlGn"),
             use_container_width=True,
         )
@@ -420,9 +488,9 @@ if btn_fin or st.session_state.get("financiero_ok"):
     color_vpn = "✅" if m_con["vpn_positivo"] else "⚠️"
     st.success(
         f"{color_vpn} **{ciudad}** — {n_pan} módulos ASP-ST1-T40 | "
-        f"CAPEX neto: **USD {ben['capex_neto_usd']:,.0f}** | "
+        f"CAPEX neto: **USD {ben['capex_neto_usd']:,.0f}** ($ {ben['capex_neto_usd']*tipo_cambio/1e6:.2f} M COP) | "
         f"TIR: **{m_con['tir_pct']:.1f}%** | "
-        f"VPN: **USD {m_con['vpn_usd']:,.0f}** | "
+        f"VPN: **USD {m_con['vpn_usd']:,.0f}** ($ {m_con['vpn_usd']*tipo_cambio/1e6:.1f} M COP) | "
         f"Payback: **{m_con['payback_simple']:.1f} años** | "
         f"LCOE: **{m_con['lcoe_cop_kWh']:.0f} COP/kWh** "
         f"({'<' if m_con['lcoe_cop_kWh'] < tarifa_cop else '>'} tarifa {tarifa_cop:.0f} COP/kWh)"
