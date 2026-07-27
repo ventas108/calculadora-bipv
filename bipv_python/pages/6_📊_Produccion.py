@@ -232,49 +232,71 @@ if btn_sim or st.session_state.get("produccion_ok"):
     )
     st.plotly_chart(fig_hm, use_container_width=True)
 
-    # ── Desglose de pérdidas ──────────────────────────────────────────────────
-    st.subheader("📉 Desglose de pérdidas del sistema")
+    # ── Nota PR > 100% ────────────────────────────────────────────────────────
+    if res["PR"] > 1.0:
+        st.info(
+            f"ℹ️ **PR = {res['PR']*100:.1f}% > 100%** — resultado correcto para "
+            f"**{ciudad}** (altitud {st.session_state.get('alt_m', '≈2600')} m, "
+            f"T_amb media {st.session_state.get('t_media_anual', 13.9):.1f}°C). "
+            "En climas fríos de alta altitud, los módulos CdTe operan por debajo de 25°C "
+            "durante muchas horas, ganando eficiencia respecto a STC. "
+            "El PR > 100% indica **sobre-rendimiento real** (no es un error de cálculo). "
+            "IEC 61724 permite PR > 100% cuando las condiciones reales superan las STC."
+        )
 
-    poa_ref_kWh_m2 = poa_bruta_anual  # POA bruta de Recurso Solar
+    # ── Desglose de pérdidas / ganancias ─────────────────────────────────────
+    st.subheader("📉 Balance energético del sistema")
 
-    # Construir Sankey simplificado con barras horizontales
-    p_optica    = round((poa_bruta_anual - poa_ef) * P_stc_kW, 0)
-    p_temp      = res["perdida_temp_kWh"]
-    p_inv       = res["perdida_inv_kWh"]
-    e_ref       = round(poa_bruta_anual * P_stc_kW, 0)
-    e_ac        = res["E_ac_anual_kWh"]
+    e_ref    = round(poa_bruta_anual * P_stc_kW, 0)
+    e_dc     = res["E_dc_anual_kWh"]
+    p_temp   = res["perdida_temp_kWh"]
+    p_inv    = res["perdida_inv_kWh"]
+    delta_sdm = e_dc - e_ref   # positivo = ganancia
 
-    etapas_loss = ["Óptica/mismatch", "Temperatura celda", "Inversor"]
-    vals_loss   = [p_optica, p_temp, p_inv]
-    pcts_loss   = [round(v / e_ref * 100, 1) if e_ref > 0 else 0 for v in vals_loss]
+    etapas_bal  = ["Ganancia T° CdTe" if delta_sdm >= 0 else "Pérdida óptica+T°",
+                   "Pérdida T° (horas calientes)",
+                   "Pérdida inversor"]
+    vals_bal    = [delta_sdm, -p_temp, -p_inv]
+    colores_bal = [
+        "#2E7D32" if delta_sdm >= 0 else "#EF5350",
+        "#FF7043",
+        "#FFA726",
+    ]
+    pct_ref = [round(abs(v) / e_ref * 100, 1) if e_ref > 0 else 0 for v in vals_bal]
 
     fig_loss = go.Figure(go.Bar(
-        x=vals_loss,
-        y=etapas_loss,
+        x=vals_bal,
+        y=etapas_bal,
         orientation="h",
-        marker_color=["#EF5350", "#FF7043", "#FFA726"],
-        text=[f"{v:,.0f} kWh ({p}%)" for v, p in zip(vals_loss, pcts_loss)],
+        marker_color=colores_bal,
+        text=[f"{v:+,.0f} kWh ({p}%)" for v, p in zip(vals_bal, pct_ref)],
         textposition="outside",
     ))
+    fig_loss.add_vline(x=0, line_color="gray", line_width=1)
     fig_loss.update_layout(
-        xaxis_title="Pérdida (kWh/año)",
+        xaxis_title="Δ Energía respecto a E_ref (kWh/año)",
         height=260,
         plot_bgcolor="white",
         paper_bgcolor="white",
-        margin=dict(l=160, r=160),
+        margin=dict(l=200, r=180),
     )
     st.plotly_chart(fig_loss, use_container_width=True)
+    st.caption(
+        f"E ref (P_STC × POA): **{e_ref:,.0f} kWh** | "
+        f"E_dc: **{e_dc:,.0f} kWh** | "
+        f"E_ac: **{res['E_ac_anual_kWh']:,.0f} kWh**"
+    )
 
     # Tabla desglose
-    with st.expander("📋 Ver tabla detallada de pérdidas IEC 61724"):
+    with st.expander("📋 Ver tabla detallada de balance IEC 61724"):
         df_loss = perdidas_desglosadas(res, poa_bruta_anual)
         if not df_loss.empty:
             st.dataframe(
                 df_loss.style.format({
-                    "kWh": "{:,.0f}",
-                    "Pérdida (kWh)": "{:,.0f}",
+                    "kWh":        "{:,.0f}",
+                    "Δ kWh":      "{:+,.0f}",
                     "% de E_ref": "{:.2f}%",
-                }).background_gradient(subset=["Pérdida (kWh)"], cmap="Reds", low=0, high=1),
+                }),
                 use_container_width=True,
             )
 

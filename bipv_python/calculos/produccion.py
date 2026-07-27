@@ -208,23 +208,64 @@ def simular_produccion_anual(
 
 def perdidas_desglosadas(res: dict, poa_bruta_kWh_m2: float) -> pd.DataFrame:
     """
-    Tabla de pérdidas IEC 61724 — para diagrama Sankey / tabla resumen.
+    Tabla de balance energético IEC 61724.
+
+    Para climas fríos de alta altitud (Bogotá, Medellín) el SDM puede producir
+    MÁS que la referencia STC porque los módulos operan por debajo de 25°C.
+    En ese caso el 'delta SDM' es positivo (ganancia, no pérdida).
     """
     P_stc  = res["P_stc_kW"]
-    Y_r    = res["Y_r"]
-    ref_dc = P_stc * poa_bruta_kWh_m2  # energía DC teórica sin pérdidas (kWh)
+    ref_dc = P_stc * poa_bruta_kWh_m2   # kWh teóricos a STC (Pmax_nom × POA)
     if ref_dc == 0:
         return pd.DataFrame()
 
+    delta_sdm = res["E_dc_anual_kWh"] - ref_dc          # positivo = ganancia temperatura
+    delta_t   = -res["perdida_temp_kWh"]                 # horas T > 25 °C (siempre ≤ 0)
+    delta_inv = -res["perdida_inv_kWh"]                  # pérdida inversor (siempre ≤ 0)
+
+    def _signo(v):
+        return f"+{v:,.0f}" if v >= 0 else f"{v:,.0f}"
+
     filas = [
-        {"Etapa": "E ref (P_STC × POA bruta)",        "kWh": round(ref_dc, 0),              "Pérdida (kWh)": 0},
-        {"Etapa": "Pérdida óptica + mismatch",        "kWh": round(res["E_dc_anual_kWh"] + res["perdida_temp_kWh"], 0),
-                                                       "Pérdida (kWh)": round(ref_dc - res["E_dc_anual_kWh"] - res["perdida_temp_kWh"], 0)},
-        {"Etapa": "Pérdida temperatura",              "kWh": round(res["E_dc_anual_kWh"], 0), "Pérdida (kWh)": round(res["perdida_temp_kWh"], 0)},
-        {"Etapa": "E_dc (salida array)",              "kWh": round(res["E_dc_anual_kWh"], 0), "Pérdida (kWh)": 0},
-        {"Etapa": "Pérdida inversor",                 "kWh": round(res["E_ac_anual_kWh"], 0), "Pérdida (kWh)": round(res["perdida_inv_kWh"], 0)},
-        {"Etapa": "E_ac (energía entregada a la red)","kWh": round(res["E_ac_anual_kWh"], 0), "Pérdida (kWh)": 0},
+        {
+            "Etapa":     "① E ref  (P_STC × POA bruta)",
+            "kWh":       round(ref_dc, 0),
+            "Δ kWh":     0,
+            "Nota":      "Baseline a condiciones STC",
+        },
+        {
+            "Etapa":     "② Efecto SDM  (T° + baja irradiancia)",
+            "kWh":       round(res["E_dc_anual_kWh"], 0),
+            "Δ kWh":     round(delta_sdm, 0),
+            "Nota":      ("🟢 Ganancia por T_cel < 25°C (clima frío / alta altitud)"
+                          if delta_sdm >= 0
+                          else "🔴 Pérdida óptica + temperatura"),
+        },
+        {
+            "Etapa":     "③ Pérdida T° horas calientes  (T_cel > 25°C)",
+            "kWh":       round(res["E_dc_anual_kWh"] + delta_t, 0),
+            "Δ kWh":     round(delta_t, 0),
+            "Nota":      f"Tk_gamma={res.get('Tk_gamma_pct','—')}%/°C",
+        },
+        {
+            "Etapa":     "④ E_dc  (salida del array)",
+            "kWh":       round(res["E_dc_anual_kWh"], 0),
+            "Δ kWh":     0,
+            "Nota":      "",
+        },
+        {
+            "Etapa":     "⑤ Pérdida inversor",
+            "kWh":       round(res["E_ac_anual_kWh"], 0),
+            "Δ kWh":     round(delta_inv, 0),
+            "Nota":      f"η_inv = {round(-delta_inv / res['E_dc_anual_kWh'] * 100 + 100, 1) if res['E_dc_anual_kWh'] > 0 else '—'}%",
+        },
+        {
+            "Etapa":     "⑥ E_ac  (energía a la red / edificio)",
+            "kWh":       round(res["E_ac_anual_kWh"], 0),
+            "Δ kWh":     0,
+            "Nota":      "",
+        },
     ]
     df = pd.DataFrame(filas)
-    df["% de E_ref"] = (df["Pérdida (kWh)"] / ref_dc * 100).round(2)
+    df["% de E_ref"] = (df["Δ kWh"].abs() / ref_dc * 100).round(2)
     return df
