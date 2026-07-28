@@ -18,12 +18,15 @@ with col1:
 
 with col2:
     T_frio   = st.number_input("T_mín diseño (°C)", value=float(
-                                st.session_state.get("T_min_diseno", -5.0)))
+                                st.session_state.get("T_min_diseno", 5.0)),
+                key="T_min_diseno")
     T_real   = st.number_input("T_celda caliente realista (°C)", value=float(
-                                st.session_state.get("T_cel_realista", 36.35)))
+                                st.session_state.get("T_cel_realista", 36.35)),
+                key="T_cel_realista")
     T_extr   = st.number_input("T_celda caliente extremo (°C)", value=float(
-                                st.session_state.get("T_cel_extremo", 41.94)))
-    N_str_tr = st.number_input("N_strings por tracker (via combinadoras)", value=8, min_value=1)
+                                st.session_state.get("T_cel_extremo", 41.94)),
+                key="T_cel_extremo")
+    N_str_tr = st.number_input("N_strings por tracker (via combinadoras)", value=int(st.session_state.get("N_str_tr", 8)), min_value=1, key="N_str_tr")
 
 panel    = MODULOS_BIPV[panel_nombre]
 inversor = seleccionar_inversor(inversor_nombre)
