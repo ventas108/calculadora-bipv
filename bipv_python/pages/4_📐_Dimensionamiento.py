@@ -36,7 +36,7 @@ with col2:
     N_str_tr = st.number_input("N_strings por tracker (via combinadoras)", value=int(st.session_state.get("N_str_tr", 8)), min_value=1, key="N_str_tr")
 
 panel    = obtener_panel_excel(panel_nombre) if _cat_excel else MODULOS_BIPV[panel_nombre]
-inversor = seleccionar_inversor(inversor_nombre)
+inversor = obtener_inversor_excel(inversor_nombre) if _cat_inv else seleccionar_inversor(inversor_nombre)
 
 if st.button("▶️ Optimizar N paneles/string", type="primary"):
     resultados = optimizar_n_serie(
