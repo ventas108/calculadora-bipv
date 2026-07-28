@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 from calculos.dimensionamiento import optimizar_n_serie, dimensionar_sistema
 from datos.tecnologias_bipv import MODULOS_BIPV
+from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
 from datos.catalogo_inversores import INVERSORES, seleccionar_inversor
 
 st.set_page_config(page_title="Dimensionamiento — BIPV", page_icon="📐", layout="wide")
@@ -12,8 +13,10 @@ st.caption("Equivalente de Mod_OptimizarStringSizing + Mod_CalculoStringSizing (
 col1, col2 = st.columns(2)
 
 with col1:
-    panel_nombre   = st.selectbox("Panel", list(MODULOS_BIPV.keys()),
-                                   index=list(MODULOS_BIPV.keys()).index("ASP-ST1-T40"))
+    _cat_excel = cargar_catalogo_excel()
+    _lista_paneles = list(_cat_excel.keys()) if _cat_excel else list(MODULOS_BIPV.keys())
+    _idx_default = _lista_paneles.index("ASP-ST1-T40") if "ASP-ST1-T40" in _lista_paneles else 0
+    panel_nombre   = st.selectbox("Panel", _lista_paneles, index=_idx_default)
     inversor_nombre = st.selectbox("Inversor", list(INVERSORES.keys()))
 
 with col2:
@@ -28,7 +31,7 @@ with col2:
                 key="T_cel_extremo")
     N_str_tr = st.number_input("N_strings por tracker (via combinadoras)", value=int(st.session_state.get("N_str_tr", 8)), min_value=1, key="N_str_tr")
 
-panel    = MODULOS_BIPV[panel_nombre]
+panel    = obtener_panel_excel(panel_nombre) if _cat_excel else MODULOS_BIPV[panel_nombre]
 inversor = seleccionar_inversor(inversor_nombre)
 
 if st.button("▶️ Optimizar N paneles/string", type="primary"):
