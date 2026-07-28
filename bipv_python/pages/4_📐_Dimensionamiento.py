@@ -4,6 +4,7 @@ import pandas as pd
 from calculos.dimensionamiento import optimizar_n_serie, dimensionar_sistema
 from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
+from datos.catalogo_inversores_excel import cargar_catalogo_inversores, obtener_inversor_excel
 from datos.catalogo_inversores import INVERSORES, seleccionar_inversor
 
 st.set_page_config(page_title="Dimensionamiento — BIPV", page_icon="📐", layout="wide")
@@ -17,7 +18,10 @@ with col1:
     _lista_paneles = list(_cat_excel.keys()) if _cat_excel else list(MODULOS_BIPV.keys())
     _idx_default = _lista_paneles.index("ASP-ST1-T40") if "ASP-ST1-T40" in _lista_paneles else 0
     panel_nombre   = st.selectbox("Panel", _lista_paneles, index=_idx_default)
-    inversor_nombre = st.selectbox("Inversor", list(INVERSORES.keys()))
+    _cat_inv = cargar_catalogo_inversores()
+    _lista_inv = list(_cat_inv.keys()) if _cat_inv else list(INVERSORES.keys())
+    _idx_inv = next((i for i,k in enumerate(_lista_inv) if "MID15KTL3" in k or "MID 15KTL3" in k), 0)
+    inversor_nombre = st.selectbox("Inversor", _lista_inv, index=_idx_inv)
 
 with col2:
     T_frio   = st.number_input("T_mín diseño (°C)", value=float(
