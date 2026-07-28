@@ -7,7 +7,7 @@ CIUDADES = {
     "Bogotá": {
         "lat": 4.711, "lon": -74.072, "alt_m": 2600,
         "GHI_kWh_m2_dia": 4.5, "HSP": 4.5,
-        "T_amb_media": 14.0, "T_min_diseno": -5.0,
+        "T_amb_media": 14.0, "T_min_diseno": 5.0,
         "T_cel_realista": 36.35, "T_cel_extremo": 41.94,
         "region": "Andina", "CREG_zona": "Centro",
     },
