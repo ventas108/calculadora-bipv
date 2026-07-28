@@ -29,10 +29,17 @@ with col1:
                               step=1.0)
 
     # ── Inputs adicionales Modo Consumo ──────────────────────────────────────
-    consumo_mes = 0.0
-    factura_cop = 0.0
-    tarifa_kwh  = float(st.session_state.get("tarifa_cop_kwh", 850.0))
+    consumo_mes   = 0.0
+    factura_cop   = 0.0
     cobertura_pct = int(st.session_state.get("cobertura_pct", 80))
+
+    # Tarifa SIEMPRE editable — varía por ciudad y empresa prestadora
+    tarifa_kwh = st.number_input(
+        "Tarifa local (COP/kWh)",
+        min_value=100.0, max_value=2000.0,
+        value=float(st.session_state.get("tarifa_cop_kwh", 850.0)),
+        step=10.0,
+        help="Varía por ciudad y empresa prestadora. Consulta tu factura de energía.")
 
     if modo_key == "consumo":
         st.subheader("Consumo / Factura")
@@ -42,10 +49,6 @@ with col1:
                                           min_value=0.0,
                                           value=float(st.session_state.get("factura_cop", 573755.0)),
                                           step=1000.0, format="%.0f")
-            tarifa_kwh = st.number_input("Tarifa local (COP/kWh)",
-                                         min_value=100.0, max_value=2000.0,
-                                         value=float(st.session_state.get("tarifa_cop_kwh", 850.0)),
-                                         step=10.0)
             consumo_mes = factura_cop / tarifa_kwh if tarifa_kwh > 0 else 0.0
             st.info(f"Consumo estimado: **{consumo_mes:.1f} kWh/mes**")
         else:
@@ -53,10 +56,6 @@ with col1:
                                           min_value=0.0,
                                           value=float(st.session_state.get("consumo_kwh_mes", 565.0)),
                                           step=10.0)
-            tarifa_kwh = st.number_input("Tarifa local (COP/kWh)",
-                                         min_value=100.0, max_value=2000.0,
-                                         value=float(st.session_state.get("tarifa_cop_kwh", 850.0)),
-                                         step=10.0)
             factura_cop = consumo_mes * tarifa_kwh
         cobertura_pct = st.slider("% Cobertura deseada", 10, 100,
                                   value=int(st.session_state.get("cobertura_pct", 80)),
