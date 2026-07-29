@@ -54,3 +54,9 @@ id = "0SrnPxLbaWaMA8wFMXR14"
 uri = "file://Adenda_Despliegue_BIPV_MisionCumplida.docx"
 type = "word_document"
 title = "Adenda — Despliegue BIPV Misión Cumplida"
+
+[[outputs]]
+id = "2jGEGagz1fagXPgPRTwtg"
+uri = "file://MANUAL_OPERACION_BIPV_BORRADOR.pdf"
+type = "pdf"
+title = "Manual de Operación BIPV Colombia — Borrador 2026"
