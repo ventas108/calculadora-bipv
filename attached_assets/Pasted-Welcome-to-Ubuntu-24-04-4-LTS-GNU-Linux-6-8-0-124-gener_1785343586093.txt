@@ -1,0 +1,88 @@
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-124-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Wed Jul 29 16:45:37 UTC 2026
+
+  System load:  0.09               Processes:             126
+  Usage of /:   24.5% of 47.39GB   Users logged in:       0
+  Memory usage: 31%                IPv4 address for eth0: 198.199.75.160
+  Swap usage:   0%                 IPv4 address for eth0: 10.10.0.5
+
+Expanded Security Maintenance for Applications is not enabled.
+
+27 updates can be applied immediately.
+1 of these updates is a standard security update.
+To see these additional updates run: apt list --upgradable
+
+3 additional security updates can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+*** System restart required ***
+Last login: Wed Jul 29 12:19:35 2026 from 181.130.99.163
+root@bipv-colombia:~# cd ~/bipv_python
+-bash: cd: /root/bipv_python: No such file or directory
+root@bipv-colombia:~# git stash          # protege catalogo_inversores_excel.py
+fatal: not a git repository (or any of the parent directories): .git
+root@bipv-colombia:~# git pull origin main
+fatal: not a git repository (or any of the parent directories): .git
+root@bipv-colombia:~# git stash pop
+fatal: not a git repository (or any of the parent directories): .git
+root@bipv-colombia:~# pm2 restart bipv-streamlit
+0   # confirma que arranca sin erroresUse --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [bipv-streamlit](ids: [ 1 ])
+[PM2] [bipv-streamlit](1) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 1  │ bipv-streamlit     │ fork     │ 35   │ online    │ 0%       │ 5.8mb    │
+│ 0  │ calculadora-bipv   │ fork     │ 60   │ online    │ 0%       │ 183.1mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@bipv-colombia:~# pm2 logs bipv-streamlit --lines 20   # confirma que arranca sin errores
+[TAILING] Tailing last 20 lines for [bipv-streamlit] process (change the value with --lines option)
+/root/.pm2/logs/bipv-streamlit-error.log last 20 lines:
+1|bipv-str | /var/www/bipv/calculadora-bipv/bipv_python/pages/8_💼_Presupuesto.py:75: FutureWarning:
+1|bipv-str |
+1|bipv-str | The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+1|bipv-str |
+1|bipv-str | /var/www/bipv/calculadora-bipv/bipv_python/pages/8_💼_Presupuesto.py:75: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+1|bipv-str |   base = pd.concat([base, inyectar], ignore_index=True)
+1|bipv-str | /var/www/bipv/calculadora-bipv/bipv_python/pages/8_💼_Presupuesto.py:75: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+1|bipv-str |   base = pd.concat([base, inyectar], ignore_index=True)
+1|bipv-str | /var/www/bipv/calculadora-bipv/bipv_python/pages/4_📐_Dimensionamiento.py:109: FutureWarning:
+1|bipv-str |
+1|bipv-str | Styler.applymap has been deprecated. Use Styler.map instead.
+1|bipv-str |
+1|bipv-str | /var/www/bipv/calculadora-bipv/bipv_python/pages/8_💼_Presupuesto.py:75: FutureWarning:
+1|bipv-str |
+1|bipv-str | The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+1|bipv-str |
+1|bipv-str | /var/www/bipv/calculadora-bipv/bipv_python/pages/8_💼_Presupuesto.py:75: FutureWarning:
+1|bipv-str |
+1|bipv-str | The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+1|bipv-str |
+
+/root/.pm2/logs/bipv-streamlit-out.log last 20 lines:
+1|bipv-str |
+1|bipv-str |   URL: http://0.0.0.0:8501
+1|bipv-str |
+1|bipv-str |   Stopping...
+1|bipv-str |
+1|bipv-str |   You can now view your Streamlit app in your browser.
+1|bipv-str |
+1|bipv-str |   URL: http://0.0.0.0:8501
+1|bipv-str |
+1|bipv-str |
+1|bipv-str |   You can now view your Streamlit app in your browser.
+1|bipv-str |
+1|bipv-str |   URL: http://0.0.0.0:8501
+1|bipv-str |
+1|bipv-str |   Stopping...
+1|bipv-str |
+1|bipv-str |   You can now view your Streamlit app in your browser.
+1|bipv-str |
+1|bipv-str |   URL: http://0.0.0.0:8501
+1|bipv-str |
