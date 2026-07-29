@@ -58,6 +58,12 @@ def cargar_catalogo_paneles() -> dict:
             "I_mp_ref": Imp, "V_mp_ref": Vmp,
             "alpha_sc": None, "beta_oc": _f(r.get("CoefVoc_C")),
             "gamma_mp": _f(r.get("CoefT_C")),
+            # ── Aliases para dimensionamiento.py ─────────────────────────
+            "Voc_stc":  Voc,                          # = Voc_STC  del Excel
+            "Vmp_stc":  Vmp,                          # = Vmp_STC  del Excel
+            "Isc_stc":  Isc,                          # = Isc_STC  del Excel
+            "Tk_beta":  _f(r.get("CoefVoc_C")),       # coef. temp. Voc  (%/°C)
+            "Tk_gamma": _f(r.get("CoefT_C")),         # coef. temp. Pmax (%/°C)
             "I_L_ref": None, "I_o_ref": None,
             "R_s": None, "R_sh_ref": None,
         }
