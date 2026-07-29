@@ -90,3 +90,9 @@ id = "1zj1TgbdZlLtg_9DFBlOq"
 uri = "file://attached_assets/Catalogo_Baterias_BIPV_Maestro.xlsx"
 type = "table"
 title = "Catálogo Maestro de Baterías BIPV — 26 modelos"
+
+[[outputs]]
+id = "VRjTJpdD-3T09eorRVxEX"
+uri = "file://attached_assets/MANUAL_OPERACION_BIPV_v2026_FASE4.docx"
+type = "word_document"
+title = "Manual de Operación BIPV Colombia v2026 — FASE 4 Baterías"
