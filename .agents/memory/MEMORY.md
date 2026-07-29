@@ -1,0 +1,2 @@
+- [BIPV Streamlit - servidor y fixes](bipv-streamlit-server.md) — app en Digital Ocean 198.199.75.160, rama main, PM2, venv en bipv_python/venv/
+- [BIPV - git pull en servidor](bipv-server-git-pull.md) — servidor tiene cambios locales en catalogo_inversores_excel.py; usar git stash antes de pull
