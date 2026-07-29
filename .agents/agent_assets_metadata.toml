@@ -78,3 +78,9 @@ id = "ruDaljY9qYscDM0SqhGy1"
 uri = "file://attached_assets/Catalogo_Baterias_BIPV_plantilla.xlsx"
 type = "table"
 title = "Plantilla Catálogo de Baterías BIPV"
+
+[[outputs]]
+id = "jjAKuD-DBlRIrfT6Yp_JV"
+uri = "file://attached_assets/Catalogo_Baterias_BR_Series.xlsx"
+type = "table"
+title = "Catálogo Baterías BR172R / BR186R / BR200R / BR215R"
