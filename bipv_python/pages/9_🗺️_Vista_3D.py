@@ -1,6 +1,5 @@
 """Página 9 — Vista 3D del sitio: mapa geolocalizado y modelo volumétrico BIPV."""
 import math
-import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 
@@ -514,14 +513,15 @@ with tab_modelo:
         if not sol_visible:
             return None, False
 
+        # Rayo principal (línea amarilla)
         ray = go.Scatter3d(
             x=[sx, cx], y=[sy, cy], z=[sz, cz],
             mode='lines+markers',
-            line=dict(color='rgb(255,220,0)', width=5, dash='solid'),
+            line=dict(color='rgb(255,220,0)', width=5),
             marker=dict(
-                symbol=['circle', 'cone'],
-                size=[12, 6],
-                color=['rgb(255,220,0)', 'rgb(255,160,0)'],
+                symbol='circle',   # único símbolo válido para todos los puntos
+                size=[14, 6],
+                color=['rgb(255,220,0)', 'rgb(255,120,0)'],
             ),
             name=f"☀️ Sol {mes_nombre} (mediodía)",
             hovertemplate=(
@@ -648,9 +648,13 @@ with tab_modelo:
     st.divider()
     _cob_m2 = min(area_m2, ancho_m * altura_m)
 
+    _nota_paneles = "" if n_shown == N_paneles else f" (diseño: {N_paneles})"
     mc1, mc2, mc3, mc4, mc5, mc6 = st.columns(6)
-    mc1.metric("Paneles en modelo",  f"{n_shown}")
-    mc2.metric("N paneles sistema",  f"{N_paneles}")
+    mc1.metric("Paneles visualizados",
+               f"{n_shown}{_nota_paneles}",
+               help="Calculado desde las dimensiones del edificio y del panel. "
+                    "Puede diferir del número final del sistema por huecos o recortes.")
+    mc2.metric("Potencia visualizada", f"{round(n_shown * pmax_panel / 1000, 2):.2f} kWp")
     mc3.metric("Filas × Columnas",   f"{n_rows} × {n_cols}")
     mc4.metric("Potencia instalada", f"{P_instalada_kWp:.2f} kWp")
     mc5.metric(f"POA {mes_nombre}",  f"{poa_mes:.0f} kWh/m²")
