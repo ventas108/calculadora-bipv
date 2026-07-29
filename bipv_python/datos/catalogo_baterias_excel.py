@@ -111,8 +111,13 @@ _NUM_KEYS = {"capacidad_kWh", "potencia_kW", "voltaje_V",
 
 
 def _f(val, default=None):
-    try:    return float(val)
-    except: return default
+    """Convierte a float; devuelve default para None, NaN o no-numérico."""
+    try:
+        import math
+        v = float(val)
+        return default if math.isnan(v) else v
+    except Exception:
+        return default
 
 
 def _normalizar_col(nombre: str) -> str:
@@ -185,8 +190,10 @@ def cargar_catalogo_baterias() -> dict:
                     break
         if not nombre:
             continue
-        # Ignorar filas que parezcan ser encabezados repetidos
+        # Ignorar filas que parezcan ser encabezados o notas
         if nombre.lower() in _MODELO_ALIASES:
+            continue
+        if nombre.startswith("⚠") or nombre.startswith("*") or len(nombre) > 60:
             continue
 
         entry = {"nombre": nombre}

@@ -181,10 +181,15 @@ def main():
                 aplicar_estilo(c, fill_fila, FONT_NORMAL, ALIGN_WRAP)
 
     # ── Fila de advertencia final ──────────────────────────────────────────
+    # IMPORTANTE: columna A (Modelo) queda vacía para que el loader no
+    # la interprete como una batería. El texto va en columna B en adelante.
     warn_row = 4 + len(BATERIAS) + 1
     ws.row_dimensions[warn_row].height = 20
-    ws.merge_cells(f"A{warn_row}:{get_column_letter(len(COLUMNAS))}{warn_row}")
-    c = ws.cell(warn_row, 1)
+    # Dejar A vacío con estilo
+    aplicar_estilo(ws.cell(warn_row, 1), FILL_WARN, FONT_BLACK_B, ALIGN_WRAP)
+    # Texto desde columna B hasta el final
+    ws.merge_cells(f"B{warn_row}:{get_column_letter(len(COLUMNAS))}{warn_row}")
+    c = ws.cell(warn_row, 2)
     c.value = ("⚠ Pendiente para TODOS los modelos: DoD (%), Eficiencia RTE (%), "
                "Garantía (años), Temperatura operación, Costo (USD). "
                "Solicitar al proveedor para marcar 'Datos completos = Si'.")
