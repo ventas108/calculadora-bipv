@@ -122,6 +122,45 @@ with col_cx2:
               delta=f"$ {capex_total*tipo_cambio/n_pan:,.0f} COP/módulo" if n_pan > 0 else None,
               delta_color="off")
 
+# ── Puente con Presupuesto detallado ──────────────────────────────────────────
+_ppto_capex = float(st.session_state.get("presupuesto_capex_usd", 0.0))
+_ppto_frac  = float(st.session_state.get("presupuesto_fraccion_equipos", fraccion_equipos))
+_tc0        = float(st.session_state.get("tipo_cambio", 3400.0))
+
+if _ppto_capex > 0:
+    _diff_pct = abs(_ppto_capex - capex_total) / max(capex_total, 1) * 100
+    _color    = "🟢" if _diff_pct < 20 else "🟡" if _diff_pct < 60 else "🔴"
+    st.markdown("---")
+    usar_ppto = st.toggle(
+        f"{_color} Reemplazar CAPEX paramétrico con el 💼 Presupuesto detallado "
+        f"— **USD {_ppto_capex:,.0f}** ($ {_ppto_capex*_tc0/1e6:.2f} M COP)",
+        value=True,
+        help=(
+            f"Presupuesto detallado: USD {_ppto_capex:,.0f}  |  "
+            f"Modelo paramétrico: USD {capex_total:,.0f}  |  "
+            f"Diferencia: {_diff_pct:.0f}%. "
+            f"Si la diferencia supera el 50% verifica que los precios del "
+            f"Presupuesto estén en USD (no en COP)."
+        ),
+    )
+    if usar_ppto:
+        capex_total      = _ppto_capex
+        fraccion_equipos = _ppto_frac if _ppto_frac > 0 else fraccion_equipos
+        st.success(
+            f"✅ CAPEX activo: **USD {capex_total:,.0f}** "
+            f"($ {capex_total*_tc0/1e6:.2f} M COP) — desde 💼 Presupuesto detallado"
+        )
+    else:
+        st.info(
+            f"ℹ️ Usando CAPEX paramétrico: USD {capex_total:,.0f}. "
+            f"Activa el toggle para usar el Presupuesto detallado."
+        )
+else:
+    st.caption(
+        "💡 Completa la página 💼 **Presupuesto** para vincular el CAPEX real "
+        "aquí automáticamente."
+    )
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 2 — TARIFA Y PARÁMETROS OPERATIVOS
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -202,7 +241,7 @@ with st.expander("💱 Conversor de cifras USD → COP (TRM del día)", expanded
     col_cv5, col_cv6, col_cv7, col_cv8 = st.columns(4)
     ben_lv = calcular_beneficios_ley_1715(
         capex_usd       = capex_total,
-        fraccion_equipo = capex_equipos / capex_total if capex_total > 0 else 0.65,
+        fraccion_equipo = fraccion_equipos,
         tasa_renta      = 0.35,
         tipo_cambio     = tipo_cambio,
     )

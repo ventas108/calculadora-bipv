@@ -164,7 +164,33 @@ if p_stc > 0:
     st.metric("Costo por Wp", f"USD {capex_total/p_stc/1000:.2f}/Wp",
               delta=f"$ {capex_total*tc/p_stc/1000:,.0f} COP/Wp", delta_color="off")
 
-st.session_state["presupuesto_capex_usd"]   = capex_total
-st.session_state["presupuesto_sub_directo"] = sub_dir
-st.success(f"✅ CAPEX **USD {capex_total:,.0f}** ($ {capex_total*tc/1e6:.2f} M COP) "
-           f"→ 💰 Financiero lo usa automáticamente.")
+# Fracción de equipos para Ley 1715 (sub3=SistemaFV + sub4=Inversor + sub5=Catálogo)
+_frac_eq = (sub3 + sub4 + sub5) / capex_total if capex_total > 0 else 0.65
+
+st.session_state["presupuesto_capex_usd"]       = capex_total
+st.session_state["presupuesto_sub_directo"]      = sub_dir
+st.session_state["presupuesto_fraccion_equipos"] = _frac_eq
+
+# Alerta si costo/Wp es irreal (posible mezcla COP/USD en el Excel)
+if p_stc > 0:
+    costo_wp = capex_total / p_stc / 1000
+    if costo_wp > 5.0:
+        st.warning(
+            f"⚠️ **Costo/Wp elevado: USD {costo_wp:.2f}/Wp** — "
+            f"la referencia para BIPV instalado en Colombia es **USD 1.5–4.0/Wp**. "
+            f"Verifica que los precios en todas las pestañas estén en **USD**, no en COP. "
+            f"Si el Excel tiene precios en pesos, divídelos por la TRM ({tc:,.0f} COP/USD) "
+            f"antes de ingresarlos."
+        )
+    elif costo_wp > 3.0:
+        st.info(
+            f"ℹ️ Costo/Wp: USD {costo_wp:.2f}/Wp — rango alto para BIPV "
+            f"(referencia: USD 1.5–4.0/Wp). Revisa si Mano de Obra o Perfilería "
+            f"incluyen IVA o tienen precios en COP."
+        )
+
+st.success(
+    f"✅ CAPEX **USD {capex_total:,.0f}** ($ {capex_total*tc/1e6:.2f} M COP) "
+    f"→ 💰 Financiero lo usa automáticamente. "
+    f"Fracción equipos Ley 1715: **{_frac_eq*100:.0f}%**"
+)
