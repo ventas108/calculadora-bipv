@@ -5,6 +5,44 @@ import plotly.graph_objects as go
 
 from datos.ciudades_colombia import CIUDADES
 
+# ── Funciones auxiliares nivel módulo (cacheables con st.cache_data) ──────────
+
+@st.cache_data(show_spinner=False)
+def _solar_path_mensual(lat: float, lon: float, alt_m: float):
+    """Posiciones solares horarias para 12 días representativos (uno por mes)."""
+    import pvlib, pandas as pd
+    loc    = pvlib.location.Location(lat, lon, altitude=alt_m, tz="UTC")
+    dias   = pd.date_range("2001-01-15", periods=12, freq="MS") + pd.Timedelta(days=14)
+    frames = []
+    for dia in dias:
+        times = pd.date_range(dia, dia + pd.Timedelta(hours=23), freq="h", tz="UTC")
+        sp    = loc.get_solarposition(times)
+        sp["mes"] = dia.month
+        frames.append(sp[sp["apparent_elevation"] > 0.5])
+    return pd.concat(frames) if frames else pd.DataFrame()
+
+
+@st.cache_data(show_spinner=False)
+def _solar_anual_std(lat: float, lon: float, alt_m: float):
+    """Posiciones solares para año estándar 8760 h UTC (sin datos TMY)."""
+    import pvlib, pandas as pd
+    loc   = pvlib.location.Location(lat, lon, altitude=alt_m, tz="UTC")
+    times = pd.date_range("2001-01-01", periods=8760, freq="h", tz="UTC")
+    return loc.get_solarposition(times)
+
+
+def _interp_horizonte(puntos_az_el: list, az_array) -> "np.ndarray":
+    """Interpola la elevación del horizonte (0-360°, periódico)."""
+    import numpy as np
+    if not puntos_az_el:
+        return np.zeros(len(az_array))
+    datos = sorted(puntos_az_el, key=lambda p: p[0])
+    azs   = np.array([p[0] for p in datos])
+    els   = np.array([p[1] for p in datos])
+    azs_e = np.concatenate([[azs[-1] - 360], azs, [azs[0] + 360]])
+    els_e = np.concatenate([[els[-1]], els, [els[0]]])
+    return np.interp(np.asarray(az_array, dtype=float), azs_e, els_e)
+
 st.set_page_config(page_title="Vista 3D — BIPV", page_icon="🗺️", layout="wide")
 st.title("🗺️ Vista 3D del Sitio")
 st.caption(
@@ -100,9 +138,13 @@ st.session_state["n_pisos"]                = n_pisos
 st.divider()
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TABS: Mapa del Sitio (B-5A) | Modelo 3D (B-5B)
+# TABS: Mapa del Sitio (B-5A) | Modelo 3D (B-5B) | Diagrama Solar (B-5C)
 # ══════════════════════════════════════════════════════════════════════════════
-tab_mapa, tab_modelo = st.tabs(["🗺️ Mapa del Sitio", "🏗️ Modelo 3D con Paneles"])
+tab_mapa, tab_modelo, tab_solar = st.tabs([
+    "🗺️ Mapa del Sitio",
+    "🏗️ Modelo 3D con Paneles",
+    "🌞 Diagrama Solar",
+])
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TAB 1 — MAPA PYDECK (B-5A)
@@ -693,18 +735,428 @@ with tab_modelo:
               "POA estimado desde GHI de referencia IDEAM (ejecuta ☀️ Recurso Solar para datos reales)"
         st.caption(f"📌 Fuente: {src}")
 
-    # ── Nota sobre próximo módulo ─────────────────────────────────────────────
-    st.divider()
-    with st.expander("ℹ️ Próxima sección: B-5C — Diagrama solar y análisis de sombras"):
-        st.markdown("""
-        **Módulo B-5C** añadirá una tercera pestaña con:
+    # (tab_modelo cerrada)
 
-        | Elemento | Descripción |
-        |----------|-------------|
-        | **Sun path anual** | Trayectoria del sol mes a mes sobre diagrama polar |
-        | **Perfil de horizonte** | Obstáculos importados desde la página Mismatch |
-        | **Heatmap horas productivas** | 24 h × 12 meses · horas con POA > umbral vs horas sombreadas |
-        | **Ángulo de incidencia** | AOI mensual sobre la fachada con la orientación actual |
 
-        > Todo se calculará desde los datos ya presentes en sesión. No requiere recalcular nada.
-        """)
+# ─────────────────────────────────────────────────────────────────────────────
+# TAB 3 — DIAGRAMA SOLAR Y SOMBRAS (B-5C)
+# ─────────────────────────────────────────────────────────────────────────────
+with tab_solar:
+
+    # Dependencias internas
+    try:
+        import pvlib as _pv
+        import pandas as _pd
+        import numpy as _np
+        _b5c_ok = True
+    except ImportError as _e:
+        st.error(f"❌ Dependencia faltante para el diagrama solar: {_e}")
+        _b5c_ok = False
+
+    if _b5c_ok:
+
+        st.subheader("🌞 Diagrama de trayectoria solar y análisis de sombras")
+        st.caption(
+            "Trayectoria del sol por mes · Perfil de horizonte de Mismatch · "
+            "Mapa de horas productivas vs sombreadas — Fase 3 · B-5C"
+        )
+
+        # ── Leer session_state (solo lectura) ────────────────────────────────
+        tmy_df_b5c     = st.session_state.get("tmy_df")
+        poa_df_b5c     = st.session_state.get("poa_df")
+        mismatch_ok_b5c= bool(st.session_state.get("mismatch_ok", False))
+        sombra_ok_b5c  = bool(st.session_state.get("sombra_ok", False))
+        factor_sombra  = st.session_state.get("factor_sombra_anual", None)
+        res_sombra_b5c = st.session_state.get("res_sombra", {})
+        horizonte_df_b5c = st.session_state.get("horizonte_df")
+
+        # Estado de dependencias
+        cs1, cs2, cs3, cs4 = st.columns(4)
+        cs1.metric("Recurso Solar",  "✅ OK" if recurso_ok else "⚠️ Pendiente")
+        cs2.metric("Mismatch",       "✅ OK" if mismatch_ok_b5c else "⚠️ No calculado")
+        cs3.metric("Sombreado",      "✅ OK" if sombra_ok_b5c else "ℹ️ Sin obstáculos")
+        cs4.metric("TMY disponible", "✅ OK" if tmy_df_b5c is not None else "⚠️ Estimado")
+
+        if not recurso_ok:
+            st.info(
+                "ℹ️ El diagrama solar se calcula con posiciones astronómicas (pvlib). "
+                "**No necesita el TMY** para mostrarse, pero el heatmap de sombras mejora "
+                "con los datos POA reales de ☀️ Recurso Solar."
+            )
+
+        # ── Extraer perfil de horizonte ───────────────────────────────────────
+        puntos_hz = []
+        if horizonte_df_b5c is not None:
+            for _, row in horizonte_df_b5c.dropna().iterrows():
+                try:
+                    az_h = float(row.get("Azimuth (°)", 0))
+                    el_h = float(row.get("Elevación obstáculo (°)", 0))
+                    if el_h > 0:
+                        puntos_hz.append((az_h, el_h))
+                except (ValueError, TypeError):
+                    pass
+
+        hay_horizonte = len(puntos_hz) > 0
+
+        # ── Paleta de colores por mes ─────────────────────────────────────────
+        MESES_B5C   = ["Ene","Feb","Mar","Abr","May","Jun",
+                       "Jul","Ago","Sep","Oct","Nov","Dic"]
+        COLORS_MESES = [
+            "#e6194b","#f58231","#ffe119","#bfef45","#3cb44b","#42d4f4",
+            "#4363d8","#911eb4","#f032e6","#a9a9a9","#9A6324","#800000",
+        ]
+
+        # ── Calcular trayectoria solar mensual (cacheado) ─────────────────────
+        with st.spinner("Calculando trayectoria solar..."):
+            try:
+                sp_meses = _solar_path_mensual(lat, lon, alt_m)
+            except Exception as _er:
+                st.error(f"Error calculando posición solar: {_er}")
+                sp_meses = _pd.DataFrame()
+
+        # ── Calcular posiciones anuales (8760 h) ──────────────────────────────
+        with st.spinner("Calculando posiciones solares anuales..."):
+            try:
+                if tmy_df_b5c is not None:
+                    loc_b5c = _pv.location.Location(lat, lon, altitude=alt_m, tz="UTC")
+                    sp_anual = loc_b5c.get_solarposition(tmy_df_b5c.index)
+                else:
+                    sp_anual = _solar_anual_std(lat, lon, alt_m)
+                _sp_ok = True
+            except Exception as _er2:
+                st.warning(f"No se pudo calcular posición solar anual: {_er2}")
+                sp_anual = _pd.DataFrame()
+                _sp_ok = False
+
+        st.divider()
+
+        # ══════════════════════════════════════════════════════════════════════
+        # SECCIÓN 1: DIAGRAMA DE TRAYECTORIA SOLAR
+        # ══════════════════════════════════════════════════════════════════════
+        st.subheader("🌞 1. Trayectoria solar — Azimuth vs Elevación")
+
+        fig_sp = go.Figure()
+
+        # Zona azul de cielo (fondo)
+        fig_sp.add_hrect(y0=0, y1=90,
+                         fillcolor="rgba(173,216,230,0.15)",
+                         line_width=0, layer="below")
+
+        # Perfil de horizonte (zona sombreada, si hay obstáculos)
+        az_lin = _np.linspace(0, 360, 721)
+        if hay_horizonte:
+            el_hz_lin = _interp_horizonte(puntos_hz, az_lin)
+            fig_sp.add_trace(go.Scatter(
+                x=_np.concatenate([az_lin, [360, 0]]),
+                y=_np.concatenate([el_hz_lin, [el_hz_lin[-1], 0]]),
+                fill="tozeroy",
+                fillcolor="rgba(120,60,20,0.35)",
+                mode="lines",
+                line=dict(color="saddlebrown", width=2.5),
+                name="🏙️ Horizonte obstáculos",
+                showlegend=True,
+            ))
+        else:
+            fig_sp.add_trace(go.Scatter(
+                x=[0, 360], y=[0, 0],
+                mode="lines",
+                line=dict(color="saddlebrown", width=1.5, dash="dot"),
+                name="Horizonte libre (sin obstáculos)",
+                showlegend=True,
+                opacity=0.6,
+            ))
+
+        # Trayectorias solares por mes
+        if not sp_meses.empty:
+            for mes_num, grp in sp_meses.groupby("mes"):
+                if len(grp) == 0:
+                    continue
+                fig_sp.add_trace(go.Scatter(
+                    x=grp["azimuth"],
+                    y=grp["apparent_elevation"],
+                    mode="lines",
+                    name=MESES_B5C[mes_num - 1],
+                    line=dict(color=COLORS_MESES[mes_num - 1], width=2),
+                    opacity=0.85,
+                    showlegend=True,
+                    hovertemplate=(
+                        f"<b>{MESES_B5C[mes_num-1]}</b><br>"
+                        "Az: %{x:.1f}°<br>El: %{y:.1f}°<extra></extra>"
+                    ),
+                ))
+
+        # Línea vertical: azimuth de la fachada
+        fig_sp.add_vline(
+            x=azimuth,
+            line_dash="dash", line_color="orange", line_width=2,
+            annotation_text=f"◀ Fachada: {azimuth:.0f}°",
+            annotation_position="top right",
+            annotation_font=dict(color="orange", size=12),
+        )
+
+        # Marcadores especiales: solsticios + equinoccios (horas al mediodía)
+        especiales = {
+            6:  ("Solsticio Jun", "#FFD700"),    # sol más alto aprox
+            12: ("Solsticio Dic", "#87CEEB"),    # sol más bajo aprox
+            3:  ("Equinoccio Mar", "#90EE90"),
+            9:  ("Equinoccio Sep", "#FFA07A"),
+        }
+        if not sp_meses.empty:
+            for mes_e, (lbl, col) in especiales.items():
+                grp_e = sp_meses[sp_meses["mes"] == mes_e]
+                if len(grp_e) == 0:
+                    continue
+                # Punto al mediodía local aprox (elevación máxima)
+                fila_max = grp_e.loc[grp_e["apparent_elevation"].idxmax()]
+                fig_sp.add_trace(go.Scatter(
+                    x=[fila_max["azimuth"]],
+                    y=[fila_max["apparent_elevation"]],
+                    mode="markers+text",
+                    marker=dict(size=10, color=col, symbol="star",
+                                line=dict(color="white", width=1)),
+                    text=[lbl],
+                    textposition="top right",
+                    textfont=dict(size=9, color=col),
+                    showlegend=False,
+                    hovertemplate=(
+                        f"<b>{lbl}</b><br>Az: %{{x:.1f}}°<br>El: %{{y:.1f}}°"
+                        "<extra></extra>"
+                    ),
+                ))
+
+        fig_sp.update_layout(
+            height=440,
+            xaxis=dict(
+                title="Azimuth solar (°) — 0=Norte, 90=Este, 180=Sur, 270=Oeste",
+                tickvals=[0, 45, 90, 135, 180, 225, 270, 315, 360],
+                ticktext=["N (0°)", "NE", "E (90°)", "SE",
+                          "S (180°)", "SO", "O (270°)", "NO", "N (360°)"],
+                range=[0, 360],
+            ),
+            yaxis=dict(title="Elevación solar (°)", range=[0, 90]),
+            legend=dict(
+                orientation="h", y=-0.30, x=0, font_size=10,
+                bgcolor="rgba(255,255,255,0.7)",
+            ),
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+            margin=dict(b=120),
+            title=dict(
+                text=(f"<b>Trayectoria solar — {ciudad}</b>  "
+                      f"<sup>{lat:.2f}°N, {abs(lon):.2f}°W · {alt_m} m</sup>"),
+                x=0.5, xanchor="center",
+            ),
+        )
+        st.plotly_chart(fig_sp, use_container_width=True)
+
+        if hay_horizonte:
+            n_obs = len(puntos_hz)
+            max_el = max(p[1] for p in puntos_hz)
+            st.caption(
+                f"🏙️ Horizonte: **{n_obs} puntos** · Elevación máxima: **{max_el:.0f}°** · "
+                "Zona marrón = porciones del cielo bloqueadas por obstáculos. "
+                "Modifica los obstáculos en 🔀 Mismatch."
+            )
+        else:
+            st.caption(
+                "ℹ️ No hay obstáculos en el horizonte. "
+                "Configura el perfil en 🔀 Mismatch → Sección 1."
+            )
+
+        # ══════════════════════════════════════════════════════════════════════
+        # SECCIÓN 2: HEATMAP HORAS PRODUCTIVAS
+        # ══════════════════════════════════════════════════════════════════════
+        st.divider()
+        st.subheader("⏰ 2. Horas productivas vs sombreadas (24h × 12 meses)")
+        st.caption(
+            "Verde/naranja = horas con sol directo sobre la fachada (AOI < 90° y sobre el horizonte). "
+            "El valor es la irradiancia POA media (W/m²). "
+            "Gris = noche o sol detrás de la fachada."
+        )
+
+        if _sp_ok and not sp_anual.empty:
+
+            # Agregar hora y mes al DataFrame de posiciones solares
+            sp_w = sp_anual.copy()
+            sp_w["hora"] = sp_w.index.hour
+            sp_w["mes"]  = sp_w.index.month
+
+            # Calcular AOI (Ángulo de Incidencia) sobre la fachada
+            try:
+                sp_w["aoi"] = _pv.irradiance.aoi(
+                    tilt, azimuth,
+                    sp_w["apparent_zenith"],
+                    sp_w["azimuth"]
+                )
+            except Exception:
+                sp_w["aoi"] = 90.0  # fallback
+
+            # Interpolar elevación del horizonte para cada azimuth solar
+            sp_w["el_horiz"] = _interp_horizonte(
+                puntos_hz, sp_w["azimuth"].values
+            )
+
+            # Clasificación vectorizada
+            _es_dia    = sp_w["apparent_elevation"] > 0.5
+            _sombreado = _es_dia & (sp_w["apparent_elevation"] <= sp_w["el_horiz"])
+            _detras    = _es_dia & (~_sombreado) & (sp_w["aoi"] >= 90.0)
+            _productivo = _es_dia & (~_sombreado) & (~_detras)
+
+            # Valor para el heatmap: POA si productivo, 0 si no
+            if poa_df_b5c is not None and len(poa_df_b5c) == len(sp_w):
+                sp_w["poa_eff"] = poa_df_b5c["poa_global"].values * _productivo.astype(float)
+            else:
+                # Fallback: valor binario ×300 para tener escala visualizable
+                sp_w["poa_eff"] = _productivo.astype(float) * 300.0
+
+            # Agregar a heatmap 24 × 12
+            hm_prod = (
+                sp_w.groupby(["hora", "mes"])["poa_eff"]
+                .mean()
+                .unstack()
+                .reindex(index=range(24), columns=range(1, 13), fill_value=0.0)
+            )
+
+            fig_hm = go.Figure(go.Heatmap(
+                z=hm_prod.values,
+                x=MESES_B5C,
+                y=[f"{h:02d}:00" for h in range(24)],
+                colorscale="YlOrRd",
+                colorbar=dict(
+                    title="POA (W/m²)<br>horas prod.",
+                    thickness=14, len=0.8,
+                ),
+                zmin=0,
+                hovertemplate=(
+                    "<b>%{y} — %{x}</b><br>"
+                    "POA media: <b>%{z:.0f} W/m²</b><br>"
+                    "(0 = noche, sombra o sol detrás de fachada)"
+                    "<extra></extra>"
+                ),
+            ))
+            fig_hm.update_layout(
+                height=440,
+                xaxis_title="Mes",
+                yaxis_title="Hora del día (UTC)",
+                plot_bgcolor="white",
+                paper_bgcolor="white",
+                title=dict(
+                    text=(f"<b>Horas productivas — fachada {orient_label} / {tilt:.0f}°</b>"),
+                    x=0.5, xanchor="center",
+                ),
+            )
+            st.plotly_chart(fig_hm, use_container_width=True)
+
+            # ── Métricas ─────────────────────────────────────────────────────
+            st.divider()
+            st.subheader("📊 3. Métricas de sombras")
+
+            n_total_dia = int(_es_dia.sum())
+            n_prod      = int(_productivo.sum())
+            n_sombra    = int(_sombreado.sum())
+            n_detras_f  = int(_detras.sum())
+            pct_prod    = (n_prod / n_total_dia * 100) if n_total_dia > 0 else 0.0
+            pct_sombra  = (n_sombra / n_total_dia * 100) if n_total_dia > 0 else 0.0
+
+            cm1, cm2, cm3, cm4 = st.columns(4)
+            cm1.metric(
+                "Horas productivas estimadas",
+                f"{n_prod:,} h/año",
+                f"{pct_prod:.1f}% de horas con sol",
+                help="Horas con sol directo en la fachada (AOI < 90° y sobre horizonte).",
+            )
+            cm2.metric(
+                "Horas sombreadas",
+                f"{n_sombra:,} h/año",
+                f"-{pct_sombra:.1f}%",
+                delta_color="inverse",
+                help="Horas donde la elevación solar queda por debajo del horizonte configurado.",
+            )
+            cm3.metric(
+                "Horas sin vista de fachada",
+                f"{n_detras_f:,} h/año",
+                help="El sol está sobre el horizonte pero mira desde atrás de la fachada (AOI ≥ 90°).",
+            )
+            cm4.metric(
+                "Horas nocturnas",
+                f"{8760 - n_total_dia:,} h/año",
+            )
+
+            # Comparar con factor_sombra_anual de Mismatch
+            st.markdown("---")
+            if factor_sombra is not None:
+                pct_perdida_mismatch = factor_sombra * 100
+                delta_pct = pct_sombra - pct_perdida_mismatch
+
+                col_comp1, col_comp2, col_comp3 = st.columns(3)
+                col_comp1.metric(
+                    "% horas sombreadas (sun path)",
+                    f"{pct_sombra:.1f}%",
+                    help="Porcentaje de horas diurnas con sombra de horizonte — calculado desde posición astronómica.",
+                )
+                col_comp2.metric(
+                    "Factor de sombra energético (Mismatch)",
+                    f"{pct_perdida_mismatch:.1f}%",
+                    help="Pérdida energética ponderada por irradiancia — calculada en 🔀 Mismatch.",
+                )
+                col_comp3.metric(
+                    "Diferencia de métodos",
+                    f"{abs(delta_pct):.1f} pp",
+                    delta=f"{'normal' if abs(delta_pct) < 3 else 'revisar'}",
+                    delta_color="normal" if abs(delta_pct) < 3 else "inverse",
+                    help="<2 pp es normal (tiempo vs energía). >3 pp sugiere revisar el horizonte.",
+                )
+
+                if abs(delta_pct) < 3:
+                    st.success(
+                        f"✅ Consistencia entre métodos: la diferencia es **{abs(delta_pct):.1f} pp** "
+                        f"(< 3 pp es normal porque uno mide tiempo y el otro energía)."
+                    )
+                elif abs(delta_pct) < 6:
+                    st.warning(
+                        f"⚠️ Diferencia de **{abs(delta_pct):.1f} pp** entre sun path y Mismatch. "
+                        "Puede deberse a diferencias en el perfil de horizonte o el TMY. "
+                        "Verifica que el horizonte esté actualizado en 🔀 Mismatch."
+                    )
+                else:
+                    st.error(
+                        f"❌ Diferencia de **{abs(delta_pct):.1f} pp** — revisar configuración de horizonte. "
+                        "El sun path usa posición astronómica pura; Mismatch usa el TMY completo."
+                    )
+            else:
+                st.info(
+                    "ℹ️ Ejecuta la **cascada de pérdidas** en 🔀 Mismatch para comparar el factor de "
+                    "sombra energético con las horas productivas calculadas aquí."
+                )
+
+            # Nota aclaratoria sobre los dos métodos
+            with st.expander("ℹ️ ¿Por qué pueden diferir el sun path y el factor de Mismatch?"):
+                st.markdown("""
+                | Criterio | Sun path (este diagrama) | Mismatch |
+                |----------|--------------------------|----------|
+                | **Qué mide** | Fracción de **horas diurnas** con sombra | Fracción de **energía POA** perdida |
+                | **Datos base** | Posición astronómica + horizonte | TMY completo (8760 h) + horizonte |
+                | **Ponderación** | Cada hora vale igual | Cada hora ponderada por su POA |
+                | **Diferencia típica** | < 2 puntos porcentuales | — |
+
+                > En Colombia, las horas de mayor POA suelen coincidir con las de menor sombreado
+                > (sol alto), por lo que el factor energético de Mismatch suele ser **menor**
+                > que el porcentaje temporal calculado aquí.
+                """)
+
+        else:
+            st.info(
+                "⚠️ No se pudo calcular la posición solar anual. "
+                "Verifica que pvlib esté instalado y que el servidor tenga acceso a la red."
+            )
+
+        # ── Fuentes de datos ──────────────────────────────────────────────────
+        st.divider()
+        st.caption(
+            "📌 **Fuentes:** "
+            f"Posición solar: pvlib {_pv.__version__} — algoritmo Enoch/Spencer. "
+            "Horizonte: " + ("configurado en 🔀 Mismatch" if hay_horizonte else
+                             "no configurado — se asume horizonte libre") + ". "
+            "POA: " + ("TMY PVGIS real" if poa_df_b5c is not None else
+                       "estimado (ejecuta ☀️ Recurso Solar para datos reales)") + "."
+        )
