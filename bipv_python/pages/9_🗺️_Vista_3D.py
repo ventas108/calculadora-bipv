@@ -270,7 +270,7 @@ with tab_mapa:
         )
 
         with col_mapa:
-            st.pydeck_chart(deck, use_container_width=True, height=500)
+            st.pydeck_chart(deck, use_container_width=True)
 
         # Métricas
         st.divider()
