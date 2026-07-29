@@ -34,6 +34,9 @@ def cargar_catalogo_inversores() -> dict:
             "I_max_tracker":     _f(r.get("Corriente Maxima Tracker (A)")),
             "Isc_max_tracker":   _f(r.get("Corriente Cortocircuito Max Tracker (A)")),
             "P_dc_max_W":        _f(r.get("Potencia FV Max Recomendada (W)")),
+            # ── Aliases para dimensionamiento.py y Dimensionamiento.py ───
+            "Vmppt_activo_min":  _f(r.get("Tension Minima MPPT Activo (V)")),  # = V_mppt_activo
+            "N_mppt":            _f(r.get("N Trackers")),                       # = n_trackers
         }
     return inversores
 
