@@ -21,25 +21,65 @@ if not st.session_state.get("recurso_solar_ok"):
     st.warning("⚠️ Primero ejecuta ☀️ Recurso Solar para obtener el TMY del sitio.")
     st.stop()
 
-tmy      = st.session_state["tmy_df"]
-poa_base = st.session_state["poa_df"]
-ciudad   = st.session_state.get("tmy_ciudad", "—")
+tmy             = st.session_state["tmy_df"]
+ciudad          = st.session_state.get("tmy_ciudad", "—")
 poa_bruta_anual = st.session_state.get("poa_anual_kWh_m2", 0.0)
+
+# ── Selección de POA base: Motor Óptico tiene prioridad sobre Mismatch ────────
+_motor_ok       = st.session_state.get("motor_optico_ok", False)
+_mo_summary     = st.session_state.get("motor_optico_summary", {})
+_mismatch_ok    = st.session_state.get("mismatch_ok", False)
 
 # Factor de pérdidas de la página Mismatch (default 1.0 si no se ejecutó)
 factor_pr = st.session_state.get("factor_global_mismatch", 1.0)
 poa_ef    = st.session_state.get("poa_efectiva_kWh_m2", poa_bruta_anual)
 
-if st.session_state.get("mismatch_ok"):
+if _motor_ok:
+    # Motor Óptico disponible — usar POA corregida hora a hora (IAM + Soiling + Térmico)
+    poa_base          = st.session_state["poa_efectiva_df"]
+    poa_base_label    = "POA efectiva — Motor Óptico"
+    poa_display_anual = st.session_state.get("poa_efectiva_anual_kWh_m2", poa_bruta_anual)
+    _factor_global_mo = _mo_summary.get("factor_global", 1.0)
     st.success(
-        f"✅ Cascada Mismatch cargada — POA efectiva: **{poa_ef:.0f} kWh/m²/año** | "
-        f"Factor PR parcial: **{factor_pr*100:.1f}%**"
+        f"🔆 **Motor Óptico activo** — POA corregida: **{poa_display_anual:,.0f} kWh/m²/año** "
+        f"(factor global **{_factor_global_mo*100:.1f}%** = IAM + Soiling + Térmico). "
+        "La simulación usa la irradiancia real hora a hora, no un factor promedio."
     )
+    if _mismatch_ok:
+        st.info(
+            f"🔀 Mismatch también disponible (factor {factor_pr*100:.1f}%) — "
+            "se aplica además de las correcciones ópticas del Motor Óptico."
+        )
 else:
-    st.info(
-        "ℹ️ No se detecta resultado de 🔀 Mismatch — se usará POA bruta sin pérdidas "
-        f"({poa_bruta_anual:.0f} kWh/m²/año). Puedes seguir adelante."
-    )
+    poa_base          = st.session_state["poa_df"]
+    poa_base_label    = "POA bruta"
+    poa_display_anual = poa_bruta_anual
+    if _mismatch_ok:
+        st.success(
+            f"✅ Cascada Mismatch cargada — POA efectiva: **{poa_ef:.0f} kWh/m²/año** | "
+            f"Factor PR parcial: **{factor_pr*100:.1f}%**"
+        )
+    else:
+        st.info(
+            "ℹ️ No se detecta resultado de 🔀 Mismatch ni de 🔆 Motor Óptico — "
+            f"se usará POA bruta ({poa_bruta_anual:.0f} kWh/m²/año). "
+            "Puedes continuar o ejecutar primero el Motor Óptico para mayor precisión."
+        )
+
+with st.expander("ℹ️ ¿Qué POA se usa en la simulación?", expanded=False):
+    st.markdown(f"""
+    | Fuente de POA | Estado | Valor anual |
+    |---|---|---|
+    | POA bruta (PVGIS/TMY) | siempre disponible | {poa_bruta_anual:,.0f} kWh/m²/año |
+    | Motor Óptico (IAM + Soiling + Térmico) | {"✅ activo" if _motor_ok else "⬜ no ejecutado"} | {st.session_state.get("poa_efectiva_anual_kWh_m2", "—"):{",.0f" if _motor_ok else ""}} {"kWh/m²/año" if _motor_ok else ""} |
+    | Factor Mismatch | {"✅ {:.1f}%".format(factor_pr*100) if _mismatch_ok else "⬜ no ejecutado"} | — |
+
+    **Prioridad:** Motor Óptico > Mismatch > POA bruta.
+    El Motor Óptico corrige la irradiancia **hora a hora** (más preciso que un factor anual).
+    El factor Mismatch se aplica como pérdida adicional encima de la POA ya corregida.
+
+    🟢 **POA actualmente en uso:** `{poa_base_label}` — {poa_display_anual:,.0f} kWh/m²/año
+    """)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 1 — CONFIGURACIÓN DEL SISTEMA
@@ -131,8 +171,29 @@ if btn_sim or st.session_state.get("produccion_ok"):
     if not res:
         st.stop()
 
-    # ── Métricas IEC 61724 ────────────────────────────────────────────────────
+    # ── Nota sobre correcciones aplicadas ────────────────────────────────────
     st.markdown("---")
+    if _motor_ok:
+        _b0   = _mo_summary.get("b0", "—")
+        _k    = _mo_summary.get("k_bipv", "—")
+        _noct = _mo_summary.get("noct", "—")
+        _gam  = _mo_summary.get("coef_temp", 0) * 100
+        _fiam  = _mo_summary.get("f_iam_prom",  1.0)
+        _fsoil = _mo_summary.get("f_soil_prom", 1.0)
+        _fterm = _mo_summary.get("f_term_prom", 1.0)
+        st.info(
+            f"🔆 **Correcciones óptico-térmicas aplicadas** (Motor Óptico):\n\n"
+            f"• **IAM reflexión** (b₀={_b0:.3f}): factor promedio {_fiam:.3f} "
+            f"→ pérdida {(1-_fiam)*100:.1f}%\n\n"
+            f"• **Soiling estacional Colombia**: factor promedio {_fsoil:.3f} "
+            f"→ pérdida {(1-_fsoil)*100:.1f}%\n\n"
+            f"• **Térmico confinado** (k={_k}, NOCT={_noct}°C, γ={_gam:.2f}%/°C): "
+            f"factor promedio {_fterm:.3f} → pérdida {(1-_fterm)*100:.1f}%\n\n"
+            f"**Factor global aplicado: {_factor_global_mo*100:.1f}%** de la POA bruta "
+            f"({poa_bruta_anual:,.0f} → {poa_display_anual:,.0f} kWh/m²/año)."
+        )
+
+    # ── Métricas IEC 61724 ────────────────────────────────────────────────────
     st.subheader("📈 Métricas IEC 61724")
 
     m1, m2, m3, m4, m5, m6 = st.columns(6)
