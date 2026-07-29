@@ -68,3 +68,6 @@ def obtener_panel_excel(nombre: str) -> dict:
 
 def lista_paneles_excel() -> list:
     return sorted(cargar_catalogo_paneles().keys())
+
+# Alias de compatibilidad con Dimensionamiento.py
+cargar_catalogo_excel = cargar_catalogo_paneles

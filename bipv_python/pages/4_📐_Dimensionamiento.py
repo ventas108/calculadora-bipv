@@ -36,6 +36,32 @@ with col2:
     N_str_tr = st.number_input("N_strings por tracker (via combinadoras)", value=int(st.session_state.get("N_str_tr", 8)), min_value=1, key="N_str_tr")
 
 panel    = obtener_panel_excel(panel_nombre) if _cat_excel else MODULOS_BIPV[panel_nombre]
+if panel.get("costo_usd"):
+    st.session_state["costo_modulo_usd"] = panel["costo_usd"]
+_iv_params = ["Voc", "Vmp", "Isc", "Imp", "N_s", "NsA"]
+_faltantes = [k for k in _iv_params if not panel.get(k)]
+if not _faltantes:
+    st.success("🟢 Ficha completa — motor IV disponible")
+elif len(_faltantes) <= 2:
+    st.warning(f"🟡 Ficha parcial — faltan: {', '.join(_faltantes)} | solo cálculo energético")
+else:
+    st.error(f"🔴 Ficha incompleta — faltan: {', '.join(_faltantes)} | no se aplicará motor IV")
+if panel.get("notas"):
+    st.caption(f"📋 {panel['notas'][:120]}")
+    # Propagar costo al session_state para Financiero
+    if panel.get("costo_usd"):
+        st.session_state["costo_modulo_usd"] = panel["costo_usd"]
+    # ── Indicador completitud ficha técnica ───────────────────────────────────
+    _iv_params = ["Voc", "Vmp", "Isc", "Imp", "N_s", "NsA"]
+    _faltantes = [k for k in _iv_params if not panel.get(k)]
+    if not _faltantes:
+        st.success("🟢 Ficha completa — motor IV disponible")
+    elif len(_faltantes) <= 2:
+        st.warning(f"🟡 Ficha parcial — faltan: {', '.join(_faltantes)} | solo cálculo energético")
+    else:
+        st.error(f"🔴 Ficha incompleta — faltan: {', '.join(_faltantes)} | no se aplicará motor IV")
+    if panel.get("notas"):
+        st.caption(f"📋 {panel['notas'][:120]}")
 inversor = obtener_inversor_excel(inversor_nombre) if _cat_inv else seleccionar_inversor(inversor_nombre)
 
 if st.button("▶️ Optimizar N paneles/string", type="primary"):
