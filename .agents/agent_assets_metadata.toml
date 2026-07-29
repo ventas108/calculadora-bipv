@@ -72,3 +72,9 @@ id = "c3JX-_QVuLepie9s7XI65"
 uri = "file://attached_assets/MANUAL_OPERACION_BIPV_v2026_actualizado.docx"
 type = "word_document"
 title = "Manual de Operación BIPV — v2026 actualizado"
+
+[[outputs]]
+id = "ruDaljY9qYscDM0SqhGy1"
+uri = "file://attached_assets/Catalogo_Baterias_BIPV_plantilla.xlsx"
+type = "table"
+title = "Plantilla Catálogo de Baterías BIPV"
