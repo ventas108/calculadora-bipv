@@ -11,7 +11,7 @@ def _f(val, default=None):
 
 @st.cache_data(ttl=3600)
 def cargar_catalogo_inversores() -> dict:
-    df = pd.read_excel(_EXCEL, sheet_name=_SHEET, header=1)
+    df = pd.read_excel(_EXCEL, sheet_name=_SHEET, header=2)
     df.columns = [str(c).strip() for c in df.columns]
     inversores = {}
     for _, r in df.iterrows():
