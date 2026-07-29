@@ -329,6 +329,16 @@ with col_l2:
 st.markdown("---")
 st.subheader("📈 4. Análisis financiero")
 
+# Invalidar caché si el CAPEX activo cambió respecto al último cálculo
+_last_capex_calc = float(st.session_state.get("capex_total_usd", 0.0))
+if _last_capex_calc > 0 and abs(_last_capex_calc - capex_total) > 0.5:
+    st.session_state.pop("financiero_ok", None)
+    st.session_state.pop("comp_financiero", None)
+    st.warning(
+        f"⚠️ El CAPEX cambió de **USD {_last_capex_calc:,.0f}** → **USD {capex_total:,.0f}**. "
+        f"Presiona **Calcular** para actualizar TIR, VPN y Payback."
+    )
+
 btn_fin = st.button(
     "📊 Calcular TIR, VPN, Payback y LCOE", type="primary", use_container_width=True
 )
