@@ -63,6 +63,13 @@ if panel.get("notas"):
     if panel.get("notas"):
         st.caption(f"📋 {panel['notas'][:120]}")
 inversor = obtener_inversor_excel(inversor_nombre) if _cat_inv else seleccionar_inversor(inversor_nombre)
+if inversor.get("costo_usd"):
+    st.session_state["costo_inversor_usd"] = inversor["costo_usd"]
+if inversor.get("datos_completos"):
+    st.success("🟢 Inversor: ficha completa")
+else:
+    _inv_falt = [k for k in ["Vdc_max","Vmppt_min","Vmppt_max","n_trackers","n_strings_tracker","I_max_tracker","P_dc_max_W"] if not inversor.get(k)]
+    st.warning(f"🟡 Inversor incompleto — faltan: {', '.join(_inv_falt)}" if _inv_falt else "🟡 Inversor marcado como incompleto en catálogo")
 
 if st.button("▶️ Optimizar N paneles/string", type="primary"):
     resultados = optimizar_n_serie(
