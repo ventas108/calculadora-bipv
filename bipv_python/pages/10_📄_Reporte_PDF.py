@@ -49,10 +49,13 @@ with col_op1:
         key="rep_proyecto",
     )
 with col_op2:
-    incluir_motor   = st.checkbox("Incluir sección Motor Óptico",  value=motor_optico,   key="rep_inc_motor")
+    balance_ok_ui   = st.session_state.get("balance_ok", False)
+    incluir_motor   = st.checkbox("Incluir sección Motor Óptico",    value=motor_optico,   key="rep_inc_motor")
     incluir_dim     = st.checkbox("Incluir sección Dimensionamiento", value=dimensionam_ok, key="rep_inc_dim")
-    incluir_prod    = st.checkbox("Incluir sección Producción",    value=produccion_ok,  key="rep_inc_prod")
-    incluir_fin     = st.checkbox("Incluir sección Financiero",    value=financiero_ok,  key="rep_inc_fin")
+    incluir_prod    = st.checkbox("Incluir sección Producción",      value=produccion_ok,  key="rep_inc_prod")
+    incluir_fin     = st.checkbox("Incluir sección Financiero",      value=financiero_ok,  key="rep_inc_fin")
+    st.checkbox("Incluir Balance Energético + Clasificación A+/A/B/C/D",
+                value=balance_ok_ui, key="rep_inc_balance")
 
 st.markdown("---")
 
@@ -383,6 +386,74 @@ def generar_html_reporte() -> str:
              "LCOE < tarifa de red indica que generar es más barato que comprar. "
              "Los beneficios de la Ley 1715/2014 incluyen: deducción del 50% del IVA en equipos, "
              "exención de aranceles, y depreciación acelerada.")
+        html += cierre()
+
+    # ── 6. Balance Energético y Clasificación ────────────────────────────────
+    balance_ok = st.session_state.get("balance_ok", False)
+    metr_bal   = st.session_state.get("balance_metricas", {})
+    clase_e    = st.session_state.get("clasificacion_energetica", {})
+    bal_df     = st.session_state.get("balance_mensual_df")
+    incluir_bal = st.session_state.get("rep_inc_balance", balance_ok)
+
+    if balance_ok and incluir_bal and metr_bal and clase_e:
+        clase_letra = clase_e.get("clase", "—")
+        clase_desc  = clase_e.get("descripcion", "—")
+        frac        = metr_bal.get("fraccion_solar_pct", 0)
+        e_sol       = metr_bal.get("E_solar_anual_kWh", 0)
+        e_cons      = metr_bal.get("E_consumo_anual_kWh", 0)
+        e_ac_total  = metr_bal.get("E_autoconsumo_anual_kWh", 0)
+        e_exp       = metr_bal.get("E_exportacion_anual_kWh", 0)
+        e_def       = metr_bal.get("E_deficit_anual_kWh", 0)
+        e_bat       = metr_bal.get("E_bateria_total_kWh", 0)
+        ac_rate     = metr_bal.get("tasa_autoconsumo_pct", 0)
+        ratio       = metr_bal.get("ratio_solar_consumo", 0)
+        bat_nom     = st.session_state.get("bateria_nombre", "—")
+        bat_dim     = st.session_state.get("bateria_dim", {})
+
+        color_clase = clase_e.get("color_hex", "#27ae60")
+
+        html += seccion("Balance Energético y Clasificación del Edificio", "🔋")
+
+        # Insignia de clasificación
+        html += f"""
+        <div style="display:flex;align-items:center;gap:24px;margin-bottom:20px;
+                    border:2px solid {color_clase};border-radius:12px;padding:16px;
+                    background:{color_clase}15;">
+            <div style="font-size:64px;font-weight:900;color:{color_clase};
+                        min-width:80px;text-align:center;">{clase_letra}</div>
+            <div>
+                <div style="font-size:18px;font-weight:700;color:{color_clase};">
+                    Clase Energética {clase_letra} — {clase_desc}
+                </div>
+                <div style="font-size:14px;color:#555;margin-top:4px;">
+                    Fracción solar: <strong>{frac:.1f}%</strong> del consumo anual cubierto
+                    por generación fotovoltaica (autoconsumo directo{' + batería' if e_bat > 0 else ''})
+                </div>
+                <div style="font-size:12px;color:#888;margin-top:4px;">
+                    Criterio: A+ ≥ 90% · A 75–89% · B 50–74% · C 25–49% · D &lt; 25%
+                </div>
+            </div>
+        </div>"""
+
+        html += tabla_kv([
+            ("Producción solar anual (E_ac)",      _fmt(e_sol,    0), "kWh/año", "Energía AC entregada por el sistema BIPV"),
+            ("Consumo edificio anual",              _fmt(e_cons,   0), "kWh/año", "Demanda eléctrica total del edificio"),
+            ("Autoconsumo solar directo",           _fmt(e_ac_total - e_bat, 0), "kWh/año", "Solar consumida en tiempo real sin pasar por batería"),
+        ] + ([
+            ("Energía aportada por batería",        _fmt(e_bat,    0), "kWh/año", f"{bat_dim.get('N_baterias','—')} und. {bat_nom} — descarga nocturna/pico"),
+        ] if e_bat > 0 else []) + [
+            ("Autoconsumo total (directo + bat.)",  _fmt(e_ac_total, 0), "kWh/año", "kWh del sol que evitan comprar a la red"),
+            ("Excedente exportado a red",           _fmt(e_exp,    0), "kWh/año", "Solar no consumida ni almacenada → red / facturación excedentes"),
+            ("Déficit residual (de la red)",        _fmt(e_def,    0), "kWh/año", "Energía que aún debe comprarse a la distribuidora"),
+            ("Fracción solar (autosuficiencia)",    _fmt(frac,     1), "%",        "% del consumo cubierto por solar — base de la clasificación"),
+            ("Tasa de autoconsumo solar",            _fmt(ac_rate,  1), "%",        "% de la producción solar que se consume en el edificio"),
+            ("Ratio producción/consumo",             _fmt(ratio,    2), "x",        "Solar generada ÷ consumo total"),
+        ],
+        nota="La clasificación energética A+/A/B/C/D mide la autosuficiencia del edificio "
+             "frente a su demanda real. Una clase A+ significa que el sistema BIPV cubre el 90% "
+             "o más del consumo sin depender de la red. El autoconsumo directo es energía solar "
+             "usada instantáneamente; la batería captura el excedente para uso diferido (nocturno). "
+             "Los proyectos con clase B o superior tienen payback acelerado por menor dependencia tarifaria.")
         html += cierre()
 
     # ── Pie de página ─────────────────────────────────────────────────────────

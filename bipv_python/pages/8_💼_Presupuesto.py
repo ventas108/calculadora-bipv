@@ -132,6 +132,21 @@ with t5:
         cat_rows.append(["Módulos BIPV — catálogo", "MOD-CAT", float(n_pan), "un", cp])
     ci = c_inv if c_inv > 0 else st.number_input("Costo inversor (USD/un)", 0.0, 20000.0, 1850.0, 50.0, key="ci_man")
     cat_rows.append(["Inversor — catálogo", "INV-CAT", 1.0, "un", ci])
+    # ── Baterías desde Página 11 (si se dimensionaron) ────────────────────
+    _bat_dim_pres = st.session_state.get("bateria_dim")
+    _bat_nom_pres = st.session_state.get("bateria_nombre", "Batería")
+    if (_bat_dim_pres and _bat_dim_pres.get("N_baterias")
+            and _bat_dim_pres.get("costo_unitario_usd")):
+        cat_rows.append([
+            f"Baterías — {_bat_nom_pres}", "BAT-CAT",
+            float(_bat_dim_pres["N_baterias"]), "un",
+            float(_bat_dim_pres.get("costo_unitario_usd") or 0),
+        ])
+    elif _bat_dim_pres and _bat_dim_pres.get("N_baterias"):
+        st.caption(
+            f"🔋 {int(_bat_dim_pres['N_baterias'])} und. de **{_bat_nom_pres}** "
+            "dimensionadas en Pág. 11 — sin costo en catálogo, agregue manualmente si desea."
+        )
     df_cat = pd.DataFrame(cat_rows, columns=_COLS)
     sub5 = _editar_seccion("catalogo", "Catálogo", inyectar=df_cat)
 

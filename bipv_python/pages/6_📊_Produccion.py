@@ -392,4 +392,5 @@ if btn_sim or st.session_state.get("produccion_ok"):
     st.session_state["N_paneles_final"]     = N_paneles
     st.session_state["panel_nombre_final"]  = panel_nombre
     st.session_state["eta_inversor"]        = eta_inv_frac
+    st.session_state["df_mensual_produccion"] = df_m   # para Página 11 Balance
     st.session_state["produccion_ok"]       = True
