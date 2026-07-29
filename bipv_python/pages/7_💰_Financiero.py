@@ -533,10 +533,10 @@ if btn_fin or st.session_state.get("financiero_ok"):
     st.success(
         f"{color_vpn} **{ciudad}** — {n_pan} módulos ASP-ST1-T40 | "
         f"CAPEX neto: **USD {ben['capex_neto_usd']:,.0f}** ($ {ben['capex_neto_usd']*tipo_cambio/1e6:.2f} M COP) | "
-        f"TIR: **{m_con['tir_pct']:.1f}%** | "
+        f"TIR: **{m_con['tir_pct']:.1f}%** | " if m_con['tir_pct'] else "TIR: **N/A** | "
         f"VPN: **USD {m_con['vpn_usd']:,.0f}** ($ {m_con['vpn_usd']*tipo_cambio/1e6:.1f} M COP) | "
-        f"Payback: **{m_con['payback_simple']:.1f} años** | "
-        f"LCOE: **{m_con['lcoe_cop_kWh']:.0f} COP/kWh** "
+        + (f"Payback: **{m_con['payback_simple']:.1f} años** | " if m_con['payback_simple'] else "Payback: **> horizonte** | ")
+        + f"LCOE: **{m_con['lcoe_cop_kWh']:.0f} COP/kWh** "
         f"({'<' if m_con['lcoe_cop_kWh'] < tarifa_cop else '>'} tarifa {tarifa_cop:.0f} COP/kWh)"
     )
 
