@@ -66,3 +66,9 @@ id = "PnGsDY5CkqBSSVi5XGQD1"
 uri = "file://MANUAL_OPERACION_BIPV_BORRADOR.docx"
 type = "word_document"
 title = "Manual de Operación BIPV Colombia — Borrador 2026 (Word editable)"
+
+[[outputs]]
+id = "c3JX-_QVuLepie9s7XI65"
+uri = "file://attached_assets/MANUAL_OPERACION_BIPV_v2026_actualizado.docx"
+type = "word_document"
+title = "Manual de Operación BIPV — v2026 actualizado"
