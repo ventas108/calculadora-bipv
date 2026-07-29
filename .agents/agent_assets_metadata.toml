@@ -84,3 +84,9 @@ id = "jjAKuD-DBlRIrfT6Yp_JV"
 uri = "file://attached_assets/Catalogo_Baterias_BR_Series.xlsx"
 type = "table"
 title = "Catálogo Baterías BR172R / BR186R / BR200R / BR215R"
+
+[[outputs]]
+id = "1zj1TgbdZlLtg_9DFBlOq"
+uri = "file://attached_assets/Catalogo_Baterias_BIPV_Maestro.xlsx"
+type = "table"
+title = "Catálogo Maestro de Baterías BIPV — 26 modelos"
