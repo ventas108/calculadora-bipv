@@ -314,6 +314,12 @@ if btn_sim or st.session_state.get("produccion_ok"):
     p_inv    = res["perdida_inv_kWh"]
     delta_sdm = e_dc - e_ref   # positivo = ganancia
 
+    # ── Incluir pérdida bypass diodes si está disponible ─────────────────
+    _bypass_ok  = st.session_state.get("bypass_ok", False)
+    _res_bp     = st.session_state.get("bypass_result", {})
+    kwh_bypass  = _res_bp.get("kwh_bypass_anual", 0.0) if _bypass_ok else 0.0
+    kwh_bypass_ac = kwh_bypass * eta_inv_frac   # pérdida AC equivalente
+
     etapas_bal  = ["Ganancia T° CdTe" if delta_sdm >= 0 else "Pérdida óptica+T°",
                    "Pérdida T° (horas calientes)",
                    "Pérdida inversor"]
@@ -323,8 +329,15 @@ if btn_sim or st.session_state.get("produccion_ok"):
         "#FF7043",
         "#FFA726",
     ]
+
+    if _bypass_ok and kwh_bypass > 0:
+        etapas_bal.append("⚡ Bypass diodes (sombra parcial)")
+        vals_bal.append(-kwh_bypass_ac)
+        colores_bal.append("#C62828")
+
     pct_ref = [round(abs(v) / e_ref * 100, 1) if e_ref > 0 else 0 for v in vals_bal]
 
+    chart_height = 260 + (40 if _bypass_ok and kwh_bypass > 0 else 0)
     fig_loss = go.Figure(go.Bar(
         x=vals_bal,
         y=etapas_bal,
@@ -336,16 +349,33 @@ if btn_sim or st.session_state.get("produccion_ok"):
     fig_loss.add_vline(x=0, line_color="gray", line_width=1)
     fig_loss.update_layout(
         xaxis_title="Δ Energía respecto a E_ref (kWh/año)",
-        height=260,
+        height=chart_height,
         plot_bgcolor="white",
         paper_bgcolor="white",
         margin=dict(l=200, r=180),
     )
     st.plotly_chart(fig_loss, use_container_width=True)
+
+    if _bypass_ok and kwh_bypass > 0:
+        e_ac_corr = res["E_ac_anual_kWh"] - kwh_bypass_ac
+        pct_bp    = _res_bp.get("pct_bypass_anual", 0.0)
+        st.info(
+            f"⚡ **Bypass diodes incluidos** — "
+            f"Pérdida adicional: **{kwh_bypass:,.0f} kWh DC · {kwh_bypass_ac:,.0f} kWh AC/año** "
+            f"({pct_bp:.2f}% de E_dc) | "
+            f"**E_ac corregida ≈ {e_ac_corr:,.0f} kWh/año** "
+            f"(vs {res['E_ac_anual_kWh']:,.0f} sin bypass)"
+        )
+        # Actualizar E_ac con corrección bypass para páginas financieras
+        st.session_state["E_ac_anual_kWh_bypass"] = round(e_ac_corr, 0)
+        st.session_state["kwh_bypass_anual"]       = round(kwh_bypass, 1)
+
     st.caption(
         f"E ref (P_STC × POA): **{e_ref:,.0f} kWh** | "
         f"E_dc: **{e_dc:,.0f} kWh** | "
         f"E_ac: **{res['E_ac_anual_kWh']:,.0f} kWh**"
+        + (f" | E_ac con bypass: **{res['E_ac_anual_kWh'] - kwh_bypass_ac:,.0f} kWh**"
+           if _bypass_ok and kwh_bypass > 0 else "")
     )
 
     # Tabla desglose

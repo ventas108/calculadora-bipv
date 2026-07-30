@@ -12,8 +12,15 @@ from calculos.mismatch import (
     cascada_perdidas,
     factor_global_perdidas,
 )
+from calculos.mismatch_bypass import (
+    cargar_csv_fs,
+    alinear_fs_con_tmy,
+    simular_bypass_horario,
+    estadisticas_fs,
+)
 from calculos.solar import calcular_poa, ORIENTACIONES
 from datos.ciudades_colombia import CIUDADES
+from datos.tecnologias_bipv import MODULOS_BIPV
 
 st.set_page_config(page_title="Mismatch — BIPV", page_icon="🔀", layout="wide")
 st.title("🔀 Mismatch y Pérdidas de Sombreado")
@@ -476,3 +483,350 @@ if btn_cascada or st.session_state.get("cascada_ok"):
     st.session_state["factor_sombra_anual"]       = factor_sombra_anual
     st.session_state["factor_mismatch_or_pct"]    = factor_mismatch_or_pct
     st.session_state["mismatch_ok"]               = True
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECCIÓN 5 — BYPASS DIODES · Pérdida eléctrica por sombra parcial
+# ═══════════════════════════════════════════════════════════════════════════════
+st.markdown("---")
+st.subheader("⚡ 5. Bypass Diodes — Pérdida eléctrica por sombra parcial")
+
+with st.expander("ℹ️ ¿Qué son los bypass diodes y por qué importan en BIPV fachada?", expanded=False):
+    st.markdown("""
+Cuando una fracción de módulos en un **string** queda en sombra, su corriente cae
+por debajo del punto de operación del resto. Los **bypass diodes** se activan y
+cortocircuitan esos módulos → se pierde **toda su tensión V_mp**, no solo la
+potencia proporcional a la irradiancia reducida.
+
+| Método | Pérdida calculada | Error típico |
+|---|---|---|
+| Reducción escalar (método actual) | Irradiancia × factor | Subestima 3–8% en fachadas urbanas |
+| **Modelo bypass diode** | Pérdida eléctrica real por string | Exacto para sombras parciales |
+
+**Fuente de datos:** CSV exportado desde la Calculadora de Sombreado BIPV
+(`bipv.innovacionquimica.com.co`) tras ejecutar **«Cruzar Máscara + EPW»**.
+Cada «Punto de Análisis» del CSV = una fila de módulos en la fachada.
+    """)
+
+# ── Uploader CSV ─────────────────────────────────────────────────────────────
+st.markdown("#### 📂 Cargar CSV de la Calculadora de Sombreado")
+st.caption(
+    "Exporta el CSV desde bipv.innovacionquimica.com.co → Puntos de Análisis → "
+    "**Exportar CSV** (después de ejecutar «Cruzar Máscara + EPW»). "
+    "Columnas requeridas: **Mes, Dia, Hora, FS**"
+)
+
+csv_file = st.file_uploader(
+    "Archivo CSV con Factor de Sombreado horario",
+    type=["csv"],
+    key="uploader_csv_fs",
+    help="CSV exportado por la Calculadora de Factor de Sombreado BIPV",
+)
+
+# Mantener CSV cargado entre reruns
+if csv_file is not None:
+    try:
+        df_fs_raw = cargar_csv_fs(csv_file)
+        st.session_state["df_fs_raw"]  = df_fs_raw
+        st.session_state["csv_fs_ok"]  = True
+    except Exception as e:
+        st.error(f"❌ Error al leer el CSV: {e}")
+        st.session_state["csv_fs_ok"] = False
+
+csv_ok = st.session_state.get("csv_fs_ok", False)
+df_fs_raw = st.session_state.get("df_fs_raw", None)
+
+if csv_ok and df_fs_raw is not None:
+    # ── Estadísticas del CSV ──────────────────────────────────────────────
+    try:
+        stats = estadisticas_fs(df_fs_raw)
+        sc1, sc2, sc3, sc4 = st.columns(4)
+        sc1.metric("Puntos de análisis", stats["n_puntos_analisis"],
+                   help="Filas de módulos / posiciones en la fachada")
+        sc2.metric("Timestamps en CSV",  f"{stats['n_timestamps']:,}",
+                   help="Horas únicas con dato de FS")
+        sc3.metric("FS medio global",    f"{stats['fs_medio']:.3f}",
+                   help="0 = sin sombra · 1 = sombra total")
+        sc4.metric("Horas con FS > 0",   f"{stats['horas_fs_gt0']} h",
+                   help="Horas al año con algún grado de sombreado activo")
+
+        # Gráfica FS medio por mes
+        df_fs_mes = stats["df_mensual_fs"]
+        fig_fs = go.Figure(go.Bar(
+            x=df_fs_mes["Mes"],
+            y=df_fs_mes["FS medio"],
+            marker_color=[
+                "#C62828" if v > 0.3 else
+                "#F9A825" if v > 0.1 else
+                "#43A047"
+                for v in df_fs_mes["FS medio"]
+            ],
+            text=[f"{v:.3f}" for v in df_fs_mes["FS medio"]],
+            textposition="outside",
+        ))
+        fig_fs.update_layout(
+            title="Factor de Sombreado medio mensual (CSV importado)",
+            yaxis=dict(title="FS medio [0–1]", range=[0, max(df_fs_mes["FS medio"].max() * 1.3, 0.1)]),
+            xaxis_title="Mes",
+            height=320,
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+        )
+        st.plotly_chart(fig_fs, use_container_width=True)
+
+    except Exception as e:
+        st.warning(f"No se pudo calcular estadísticas del CSV: {e}")
+
+    st.markdown("---")
+
+    # ── Configuración de strings ──────────────────────────────────────────
+    st.markdown("#### ⚙️ Configuración de strings para el modelo bypass")
+
+    _n_total = st.session_state.get("N_paneles_dim", 0)
+    col_bp1, col_bp2, col_bp3 = st.columns(3)
+
+    with col_bp1:
+        panel_bp_nombre = st.selectbox(
+            "Panel fotovoltaico",
+            list(MODULOS_BIPV.keys()),
+            index=list(MODULOS_BIPV.keys()).index("ASP-ST1-T40"),
+            key="bypass_panel",
+            help="Debe coincidir con el panel de Producción",
+        )
+        panel_bp = MODULOS_BIPV[panel_bp_nombre]
+
+    with col_bp2:
+        n_series_default = 8
+        # Inferir N_series desde dimensionamiento si hay datos
+        if _n_total > 0:
+            # Módulos típicos en serie para tensión 300-600V con paneles ~80-100Voc
+            Voc_stc = panel_bp.get("Voc_stc", 100.0)
+            # Apuntar a ~400V DC → N_series ≈ 400 / Voc_stc
+            n_series_default = max(4, min(20, int(round(400 / Voc_stc))))
+
+        N_series_bp = st.number_input(
+            "Módulos en serie por string (N_series)",
+            min_value=2, max_value=30,
+            value=n_series_default,
+            step=1,
+            key="bypass_n_series",
+            help="Número de módulos conectados en serie en cada string",
+        )
+
+    with col_bp3:
+        if _n_total > 0 and N_series_bp > 0:
+            n_par_default = max(1, round(_n_total / N_series_bp))
+        else:
+            n_par_default = 4
+        N_parallel_bp = st.number_input(
+            "Strings en paralelo (N_parallel)",
+            min_value=1, max_value=200,
+            value=n_par_default,
+            step=1,
+            key="bypass_n_parallel",
+            help="Número de strings en paralelo en el array",
+        )
+        st.caption(
+            f"Total módulos: **{N_series_bp * N_parallel_bp}**"
+            + (f" (dimensionamiento: {_n_total})" if _n_total > 0 else "")
+        )
+
+    # ── POA base para el cálculo ──────────────────────────────────────────
+    _motor_ok = st.session_state.get("motor_optico_ok", False)
+    _mismatch_factor = st.session_state.get("factor_global_mismatch", 1.0)
+    if _motor_ok:
+        poa_bp = st.session_state["poa_efectiva_df"]["poa_global"].values
+        poa_src = "Motor Óptico (IAM + Soiling + Térmico)"
+    else:
+        poa_bp = st.session_state["poa_df"]["poa_global"].values * _mismatch_factor
+        poa_src = f"POA bruta × factor mismatch ({_mismatch_factor*100:.1f}%)"
+
+    T_amb_bp = tmy["T2m"].values
+    st.caption(f"📡 POA de referencia: **{poa_src}**")
+
+    # ── Botón de simulación ───────────────────────────────────────────────
+    btn_bypass = st.button(
+        "⚡ Calcular pérdida real por bypass diodes",
+        type="primary",
+        use_container_width=True,
+        key="btn_bypass",
+    )
+
+    if btn_bypass or st.session_state.get("bypass_ok"):
+        if btn_bypass:
+            with st.spinner("Alineando FS con TMY y simulando bypass diodes hora a hora..."):
+                try:
+                    # Alinear FS con el TMY
+                    tmy_idx  = st.session_state["tmy_df"].index
+                    p_shade  = alinear_fs_con_tmy(df_fs_raw, tmy_idx)
+
+                    # Simular bypass
+                    res_bp = simular_bypass_horario(
+                        G_eff      = poa_bp,
+                        T_amb      = T_amb_bp,
+                        p_shade    = p_shade.values,
+                        N_series   = int(N_series_bp),
+                        N_parallel = int(N_parallel_bp),
+                        panel      = panel_bp,
+                        NOCT       = float(panel_bp.get("NOCT", 45.0)),
+                        umbral_shade = 0.05,
+                    )
+                    st.session_state["bypass_result"]     = res_bp
+                    st.session_state["bypass_p_shade"]    = p_shade
+                    st.session_state["bypass_n_series"]   = int(N_series_bp)
+                    st.session_state["bypass_n_parallel"] = int(N_parallel_bp)
+                    st.session_state["bypass_panel"]      = panel_bp_nombre
+                    st.session_state["bypass_ok"]         = True
+                except Exception as e:
+                    st.error(f"❌ Error en simulación bypass: {e}")
+                    st.session_state["bypass_ok"] = False
+
+        res_bp = st.session_state.get("bypass_result", {})
+
+        if res_bp:
+            # ── Métricas resumen ───────────────────────────────────────────
+            bp1, bp2, bp3, bp4 = st.columns(4)
+            bp1.metric(
+                "Pérdida DC por bypass",
+                f"{res_bp['kwh_bypass_anual']:,.0f} kWh/año",
+                delta=f"-{res_bp['pct_bypass_anual']:.2f}% de E_dc",
+                delta_color="inverse",
+                help="Energía DC adicional perdida por activación de bypass diodes",
+            )
+            bp2.metric(
+                "Horas con bypass activo",
+                f"{res_bp['horas_bypass']} h/año",
+                help="Horas al año donde al menos un bypass diode se activa",
+            )
+            bp3.metric(
+                "Horas con sombra (FS > 5%)",
+                f"{res_bp['horas_sombra']} h/año",
+                help="Horas con sombra activa en el CSV cargado",
+            )
+            bp4.metric(
+                "E_dc con bypass",
+                f"{res_bp['kwh_dc_uniforme'] - res_bp['kwh_bypass_anual']:,.0f} kWh/año",
+                help="Producción DC real considerando bypass diodes",
+            )
+
+            # ── Gráfica mensual ────────────────────────────────────────────
+            df_m_bp = res_bp["df_mensual_bypass"]
+
+            fig_bp = go.Figure()
+            fig_bp.add_trace(go.Bar(
+                name="Producción DC con bypass (kWh)",
+                x=df_m_bp.index,
+                y=df_m_bp["E_dc con bypass (kWh)"].round(0),
+                marker_color="#2E7D32",
+                opacity=0.85,
+            ))
+            fig_bp.add_trace(go.Bar(
+                name="Pérdida bypass diodes (kWh)",
+                x=df_m_bp.index,
+                y=df_m_bp["Pérdida bypass (kWh)"].round(0),
+                marker_color="#C62828",
+                opacity=0.80,
+                text=df_m_bp["Pérdida bypass (kWh)"].apply(
+                    lambda v: f"{v:,.0f}" if v > 1 else ""
+                ),
+                textposition="outside",
+            ))
+            fig_bp.update_layout(
+                barmode="stack",
+                title="Producción DC mensual con bypass diodes",
+                yaxis_title="Energía (kWh)",
+                xaxis_title="Mes",
+                height=360,
+                plot_bgcolor="white",
+                paper_bgcolor="white",
+                legend=dict(orientation="h", y=-0.25),
+                margin=dict(b=80),
+            )
+            st.plotly_chart(fig_bp, use_container_width=True)
+
+            # ── Horas de bypass por mes ────────────────────────────────────
+            fig_h = go.Figure()
+            fig_h.add_trace(go.Bar(
+                name="Horas sombra activa",
+                x=df_m_bp.index,
+                y=df_m_bp["Horas con sombra"].round(0),
+                marker_color="#BDBDBD",
+                opacity=0.70,
+            ))
+            fig_h.add_trace(go.Bar(
+                name="Horas bypass activo",
+                x=df_m_bp.index,
+                y=df_m_bp["Horas bypass activo"].round(0),
+                marker_color="#E65100",
+                opacity=0.85,
+                text=df_m_bp["Horas bypass activo"].apply(
+                    lambda v: f"{v:.0f}h" if v > 0 else ""
+                ),
+                textposition="outside",
+            ))
+            fig_h.update_layout(
+                barmode="group",
+                title="Horas de sombra vs horas con bypass diode activo",
+                yaxis_title="Horas / mes",
+                xaxis_title="Mes",
+                height=300,
+                plot_bgcolor="white",
+                paper_bgcolor="white",
+                legend=dict(orientation="h", y=-0.30),
+                margin=dict(b=80),
+            )
+            st.plotly_chart(fig_h, use_container_width=True)
+
+            # ── Tabla mensual detallada ────────────────────────────────────
+            with st.expander("📋 Ver tabla mensual completa de bypass diodes"):
+                df_show = df_m_bp.copy()
+                df_show["FS medio mensual"] = df_show["FS medio mensual"].round(3)
+                st.dataframe(
+                    df_show.style.format({
+                        "E_dc con bypass (kWh)":  "{:,.0f}",
+                        "Pérdida bypass (kWh)":   "{:,.1f}",
+                        "FS medio mensual":        "{:.3f}",
+                        "Horas bypass activo":     "{:.0f}",
+                        "Horas con sombra":        "{:.0f}",
+                    }).background_gradient(subset=["Pérdida bypass (kWh)"], cmap="Reds"),
+                    use_container_width=True,
+                )
+
+            # ── Diagnóstico automático ─────────────────────────────────────
+            pct = res_bp["pct_bypass_anual"]
+            if pct > 5.0:
+                st.error(
+                    f"🔴 **Pérdida por bypass diodes: {pct:.2f}%** — "
+                    "Supera el 5% de la producción DC. La sombra parcial tiene un "
+                    "impacto significativo. Considerar:\n"
+                    "- Reorganizar strings para agrupar módulos con igual patrón de sombra\n"
+                    "- Añadir optimizadores de módulo (SolarEdge, Tigo) en las filas críticas\n"
+                    "- Verificar si el diseño de fachada puede reducir la sombra en horas pico"
+                )
+            elif pct > 2.0:
+                st.warning(
+                    f"🟡 **Pérdida por bypass diodes: {pct:.2f}%** — "
+                    "Moderada (2–5%). Revisar si los strings más afectados pueden "
+                    "separarse en ramas de MPPT independientes del inversor."
+                )
+            else:
+                st.success(
+                    f"🟢 **Pérdida por bypass diodes: {pct:.2f}%** — "
+                    "Baja (<2%). Las sombras parciales tienen impacto eléctrico controlado. "
+                    f"({res_bp['horas_bypass']} horas/año con bypass activo)"
+                )
+
+            st.success(
+                f"✅ Modelo bypass completado | "
+                f"Pérdida adicional: **{res_bp['kwh_bypass_anual']:,.0f} kWh/año** "
+                f"({res_bp['pct_bypass_anual']:.2f}% de E_dc) | "
+                f"Bypass activo **{res_bp['horas_bypass']} h/año** · "
+                f"Este resultado se suma al balance de Producción."
+            )
+
+elif not csv_ok:
+    st.info(
+        "💡 Carga el CSV exportado desde **bipv.innovacionquimica.com.co** "
+        "(Calculadora de Factor de Sombreado → Puntos de Análisis → "
+        "Cruzar Máscara + EPW → Exportar CSV) para calcular la pérdida "
+        "real por bypass diodes con tu modelo 3D del edificio."
+    )
