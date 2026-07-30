@@ -175,12 +175,32 @@ with t2: sub2 = _editar_seccion("mano_obra",  "Mano de Obra")
 with t3: sub3 = _editar_seccion("sistema_fv", "Sistema FV")
 with t4: sub4 = _editar_seccion("inversor",   "Inversor/Eléctrico")
 with t5:
-    st.markdown("**Equipos del catálogo — sincronizados con 📐 Dimensionamiento**")
-    cat_rows = []
     if n_pan > 0:
+        st.markdown(
+            f"**Equipos del catálogo** — sincronizados con 📐 Dimensionamiento "
+            f"({n_pan} módulos · {p_stc:.2f} kWp)"
+        )
+    else:
+        st.info(
+            "📐 Dimensionamiento no ejecutado en esta sesión. "
+            "Puedes ingresar los valores manualmente — la tabla se editará directamente."
+        )
+    cat_rows = []
+
+    # ── Módulos: siempre presentes ──────────────────────────────────────────
+    if n_pan > 0:
+        # Cantidad auto desde Dimensionamiento; precio manual si no viene del catálogo
         cp = c_pan if c_pan > 0 else st.number_input(
-            "Costo módulo (USD/un)", 0.0, 500.0, 65.0, 5.0, key="cp_man")
+            "Costo módulo (USD/un)", 0.0, 2000.0, 65.0, 5.0, key="cp_man")
         cat_rows.append(["Módulos BIPV — catálogo", "MOD-CAT", float(n_pan), "un", cp])
+    else:
+        # Sin Dimensionamiento: el usuario ingresa cantidad y precio manualmente
+        col_m1, col_m2 = st.columns(2)
+        n_man = col_m1.number_input("Cantidad de módulos", min_value=0, value=0, step=1, key="n_pan_man")
+        cp_man = col_m2.number_input("Costo módulo (USD/un)", min_value=0.0, value=0.0, step=5.0, key="cp_man")
+        cat_rows.append(["Módulos BIPV", "MOD-MAN", float(n_man), "un", cp_man])
+
+    # ── Inversor: siempre presente ──────────────────────────────────────────
     ci = c_inv if c_inv > 0 else st.number_input(
         "Costo inversor (USD/un)", 0.0, 20000.0, 1850.0, 50.0, key="ci_man")
     cat_rows.append(["Inversor — catálogo", "INV-CAT", 1.0, "un", ci])
