@@ -2,3 +2,4 @@
 - [BIPV - git pull en servidor](bipv-server-git-pull.md) — servidor tiene cambios locales en catalogo_inversores_excel.py; usar git stash antes de pull
 - [BIPV - jerarquía POA y Motor Óptico](bipv-poa-hierarchy.md) — poa_efectiva_df tiene prioridad sobre poa_df en Producción; session_state keys del Motor Óptico
 - [BIPV - catálogo baterías loader](bipv-catalogo-baterias-loader.md) — fixes críticos: normalizar \n en headers Excel, detección automática de fila header, defaults seguros
+- [BIPV - Calculadora de Sombreado](bipv-shading-calculator.md) — app React/TS en bipv.innovacionquimica.com.co exporta CSV con FS horario por punto de análisis → es el p_shade directo para modelo bypass diodes (Tarea #29)
