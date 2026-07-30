@@ -17,6 +17,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import numpy as np
+import datetime
 
 from datos.ciudades_colombia import FACTOR_CO2_COLOMBIA_KG_KWH
 
@@ -105,6 +106,91 @@ else:
     )
     e_ac  = st.number_input("Energía AC anual (kWh/año)", 100.0, 2e6, 50_000.0, 1000.0)
     p_stc = st.number_input("Potencia instalada (kWp)", 0.1, 5000.0, 40.0, 0.5)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SECCIÓN 0 — GESTIÓN DEL FACTOR SIN (TAREA #42)
+# ─────────────────────────────────────────────────────────────────────────────
+with st.expander("🔧 Gestión del factor de emisión SIN Colombia — actualización anual", expanded=False):
+    st.markdown("""
+    **¿Por qué es crítico mantener este factor actualizado?**
+    XM S.A. E.S.P. (operador del SIN) y la UPME publican el factor de emisión oficial
+    cada año. Si el factor que usa la calculadora tiene más de 2 años de antigüedad,
+    sus cálculos de CO₂ evitado y el valor de bonos de carbono estarán desactualizados —
+    lo que puede invalidar un reporte ante el RETC o ante un auditor VCS.
+    """)
+
+    _factor_guardado = float(st.session_state.get("co2_factor_sin_custom", FACTOR_CO2_COLOMBIA_KG_KWH))
+    _fecha_guardada  = st.session_state.get("co2_factor_fecha", "UPME Resolución 520/2019 (año 2022)")
+
+    # Calcular antigüedad
+    _anio_factor = 2022
+    try:
+        _anio_factor = int(_fecha_guardada.split("año")[-1].strip().split(")")[0].strip())
+    except Exception:
+        pass
+    _anios_antiguo = datetime.datetime.now().year - _anio_factor
+    _alerta_color  = "🔴" if _anios_antiguo >= 2 else ("🟡" if _anios_antiguo >= 1 else "🟢")
+
+    st.info(
+        f"{_alerta_color} **Factor activo:** {_factor_guardado:.4f} kg CO₂/kWh  "
+        f"({_factor_guardado*1000:.1f} gCO₂/kWh) · "
+        f"Fuente: **{_fecha_guardada}** · "
+        f"Antigüedad: **{_anios_antiguo} año(s)**"
+        + ("  ⚠️ — **Recomendado actualizar** — consulta XM o UPME." if _anios_antiguo >= 2 else "")
+    )
+
+    col_f1, col_f2 = st.columns([2, 3])
+    with col_f1:
+        nuevo_factor = st.number_input(
+            "Nuevo factor SIN (kg CO₂/kWh)",
+            min_value=0.05, max_value=1.0,
+            value=_factor_guardado, step=0.001, format="%.4f",
+            help=(
+                "Fuente oficial: XM S.A. E.S.P. → www.xm.com.co → "
+                "'Factor de Emisión de CO₂ del SIN'. "
+                "También en UPME → 'Informe de Gestión de la Demanda'. "
+                "Rango histórico Colombia: 0.100–0.185 kg/kWh (varía con hidrología). "
+                "Año seco (El Niño) → mayor factor (más térmicas). "
+                "Año húmedo → menor factor (más hidro)."
+            ),
+        )
+    with col_f2:
+        nueva_fecha = st.text_input(
+            "Fuente y año del dato",
+            value=_fecha_guardada,
+            placeholder="Ej: XM S.A. E.S.P. Informe 2025 (año 2024)",
+            help="Escribe la referencia exacta para trazabilidad en reportes ISO 14064 y RETC.",
+        )
+
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        if st.button("💾 Guardar factor actualizado", use_container_width=True):
+            st.session_state["co2_factor_sin_custom"] = nuevo_factor
+            st.session_state["co2_factor_fecha"]      = nueva_fecha
+            st.success(
+                f"✅ Factor actualizado: **{nuevo_factor:.4f} kg CO₂/kWh** · "
+                f"Fuente: {nueva_fecha}. "
+                f"Recalcula la página para aplicarlo."
+            )
+    with col_btn2:
+        if st.button("↩️ Restaurar valor oficial UPME 2022", use_container_width=True):
+            st.session_state["co2_factor_sin_custom"] = FACTOR_CO2_COLOMBIA_KG_KWH
+            st.session_state["co2_factor_fecha"]      = "UPME Resolución 520/2019 (año 2022)"
+            st.info("Factor restaurado al valor oficial UPME 2022: 0.126 kg CO₂/kWh.")
+
+    st.markdown("""
+    **📌 Guía rápida para obtener el factor actualizado:**
+    1. Ve a [www.xm.com.co](https://www.xm.com.co) → *Informes* → *Factor de Emisión del SIN*
+    2. O consulta la UPME → *Publicaciones* → *Informe de Gestión Energética Nacional*
+    3. El valor reportado es el **factor de emisión promedio anual** del SIN (gCO₂/kWh)
+    4. Divídelo entre 1000 para convertirlo a kg CO₂/kWh e ingrésalo arriba
+    5. El **factor marginal (CDM)** requiere el Margen Operativo y de Construcción de XM
+    """)
+
+# Leer factor activo (custom o default)
+FACTOR_CO2_COLOMBIA_KG_KWH = float(
+    st.session_state.get("co2_factor_sin_custom", FACTOR_CO2_COLOMBIA_KG_KWH)
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SECCIÓN 1 — SELECTOR DE METODOLOGÍA
@@ -597,9 +683,210 @@ st.info(
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SECCIÓN 9 — RASTREO CO₂ REAL VS PROYECTADO (TAREA #43)
+# ─────────────────────────────────────────────────────────────────────────────
+st.markdown("---")
+st.subheader("📡 9. Seguimiento CO₂ real vs proyectado — operación del sistema")
+st.caption(
+    "Cuando el inversor lleva meses en operación, ingresa la producción mensual real "
+    "para ver cuánto CO₂ evitaste realmente vs lo que el modelo proyectó. "
+    "Este dato es obligatorio para reportes GHG Protocol, auditorías VCS y RETC."
+)
+
+# Producción mensual proyectada desde simulación
+_meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
+
+# Si hay producción simulada por mes, la usamos; si no, distribución uniforme
+_prod_mensual_sim = st.session_state.get("produccion_mensual_kWh", None)
+if _prod_mensual_sim is not None and len(_prod_mensual_sim) == 12:
+    _proy_mes = list(_prod_mensual_sim)
+else:
+    _proy_mes = [e_ac / 12.0] * 12
+
+with st.expander("📥 Ingresar producción real del inversor (mes a mes)", expanded=False):
+    st.markdown(
+        "**¿Por qué llevar este registro?** Cada kWh real validado por el inversor tiene mayor "
+        "credibilidad ante un auditor VCS o un banco que los kWh simulados. Con estos datos "
+        "puedes generar un reporte mensual de CO₂ evitado con trazabilidad completa."
+    )
+
+    _anio_actual = datetime.datetime.now().year
+    anio_seguim = st.selectbox(
+        "Año de operación",
+        options=list(range(_anio_actual - 2, _anio_actual + 3)),
+        index=2,
+        key="co2_anio_seguim",
+    )
+
+    # Tabla editable de 12 meses
+    _defaults = {m: 0.0 for m in _meses}
+    _saved    = st.session_state.get("co2_kwh_real_dict", _defaults)
+
+    cols_mes = st.columns(4)
+    kwh_real_dict = {}
+    for i, mes in enumerate(_meses):
+        with cols_mes[i % 4]:
+            kwh_real_dict[mes] = st.number_input(
+                f"{mes} (kWh)",
+                min_value=0.0, max_value=float(e_ac),
+                value=float(_saved.get(mes, 0.0)),
+                step=10.0,
+                key=f"co2_real_{mes}",
+            )
+    st.session_state["co2_kwh_real_dict"] = kwh_real_dict
+
+# Calcular métricas reales
+kwh_real_list  = [kwh_real_dict.get(m, 0.0) for m in _meses]
+kwh_real_total = sum(kwh_real_list)
+meses_con_dato = sum(1 for v in kwh_real_list if v > 0)
+
+if meses_con_dato > 0:
+    # CO₂ real vs proyectado por mes
+    co2_real_mes  = [v * factor_activo / 1000 for v in kwh_real_list]      # tCO₂/mes real
+    co2_proy_mes  = [v * factor_activo / 1000 for v in _proy_mes]          # tCO₂/mes proyectado
+    co2_real_acum = sum(co2_real_mes[:meses_con_dato])
+    co2_proy_acum = sum(co2_proy_mes[:meses_con_dato])
+    cumpl_pct     = (co2_real_acum / co2_proy_acum * 100) if co2_proy_acum > 0 else 0
+    delta_co2     = co2_real_acum - co2_proy_acum
+    kwh_real_anual_proy = kwh_real_total / meses_con_dato * 12 if meses_con_dato > 0 else 0
+
+    # Métricas resumen
+    cr1, cr2, cr3, cr4 = st.columns(4)
+    cr1.metric(
+        f"CO₂ real ({meses_con_dato} mes{'es' if meses_con_dato>1 else ''})",
+        f"{co2_real_acum:.3f} tCO₂",
+        delta=f"{kwh_real_total:,.0f} kWh reales",
+        delta_color="off",
+    )
+    cr2.metric(
+        "CO₂ proyectado (mismo período)",
+        f"{co2_proy_acum:.3f} tCO₂",
+        delta=f"{sum(_proy_mes[:meses_con_dato]):,.0f} kWh proyectados",
+        delta_color="off",
+    )
+    _delta_label = f"+{delta_co2:.3f} t por encima" if delta_co2 >= 0 else f"{delta_co2:.3f} t por debajo"
+    cr3.metric(
+        "Cumplimiento vs proyectado",
+        f"{cumpl_pct:.1f}%",
+        delta=_delta_label,
+        delta_color="normal" if delta_co2 >= 0 else "inverse",
+        help="≥ 90% = excelente · 75–89% = aceptable · < 75% = revisar sombreado u O&M",
+    )
+    pr_real_pct = (kwh_real_total / (e_ac * meses_con_dato / 12) * 100) if e_ac > 0 else 0
+    cr4.metric(
+        "PR real vs PR simulado",
+        f"{pr_real_pct:.1f}%",
+        delta="✅ Dentro del rango" if 85 <= pr_real_pct <= 110 else "⚠️ Verificar sistema",
+        delta_color="normal" if 85 <= pr_real_pct <= 110 else "inverse",
+        help="Performance Ratio real respecto al proyectado. Rango saludable: 85–110%.",
+    )
+
+    # Interpretación persuasiva
+    if cumpl_pct >= 95:
+        st.success(
+            f"🏆 **Rendimiento sobresaliente** — El sistema está superando las expectativas "
+            f"({cumpl_pct:.1f}% del CO₂ proyectado en {meses_con_dato} mes{'es' if meses_con_dato>1 else ''}). "
+            f"Estos datos son ideales para un **reporte GHG Protocol auditado** o para solicitar "
+            f"**créditos VCS** con solidez técnica demostrada."
+        )
+    elif cumpl_pct >= 80:
+        st.info(
+            f"✅ **Rendimiento satisfactorio** — {cumpl_pct:.1f}% de cumplimiento. "
+            f"El sistema opera dentro del rango normal. "
+            f"Una pequeña diferencia puede deberse a días nublados no capturados en el TMY. "
+            f"Continúa el registro mensual para consolidar la trazabilidad ante auditores."
+        )
+    elif meses_con_dato >= 1:
+        st.warning(
+            f"⚠️ **Cumplimiento bajo ({cumpl_pct:.1f}%)** — El sistema está produciendo "
+            f"considerablemente menos CO₂ evitado del proyectado. Posibles causas: "
+            f"sombreado no modelado, suciedad acumulada en módulos, falla de inversor "
+            f"o consumo parasítico. Revisa la página 🔀 Mismatch y el O&M registrado."
+        )
+
+    # Gráfica barras agrupadas: real vs proyectado
+    _meses_con = [_meses[i] for i in range(12) if kwh_real_list[i] > 0 or _proy_mes[i] > 0]
+    _co2_r     = [co2_real_mes[i]*1000 for i in range(12) if kwh_real_list[i] > 0 or _proy_mes[i] > 0]
+    _co2_p     = [co2_proy_mes[i]*1000 for i in range(12) if kwh_real_list[i] > 0 or _proy_mes[i] > 0]
+
+    fig_real = go.Figure()
+    fig_real.add_trace(go.Bar(
+        name="Proyectado (simulación)", x=_meses_con, y=_co2_p,
+        marker_color="#90CAF9", opacity=0.8,
+        hovertemplate="%{x}: %{y:.1f} kgCO₂<extra>Proyectado</extra>",
+    ))
+    fig_real.add_trace(go.Bar(
+        name="Real (inversor)", x=_meses_con, y=_co2_r,
+        marker_color=COLOR_VERDE,
+        hovertemplate="%{x}: %{y:.1f} kgCO₂<extra>Real</extra>",
+    ))
+    fig_real.add_hline(
+        y=sum(_co2_p)/len(_co2_p) if _co2_p else 0,
+        line_dash="dot", line_color="#1565C0",
+        annotation_text="Promedio proyectado",
+        annotation_position="top right",
+    )
+    fig_real.update_layout(
+        barmode="group",
+        title=f"CO₂ evitado real vs proyectado — {anio_seguim}  ({factor_activo*1000:.0f} gCO₂/kWh)",
+        xaxis_title="Mes",
+        yaxis_title="kgCO₂ evitado",
+        height=360,
+        legend=dict(orientation="h", y=-0.22),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        hovermode="x unified",
+    )
+    st.plotly_chart(fig_real, use_container_width=True)
+
+    # Tabla exportable
+    with st.expander("📋 Tabla mensual detallada — exportable para auditoría"):
+        df_real = pd.DataFrame({
+            "Mes":                 _meses,
+            "kWh proyectado":      [round(v, 1) for v in _proy_mes],
+            "kWh real (inversor)": [round(v, 1) for v in kwh_real_list],
+            "kgCO₂ proyectado":    [round(v*factor_activo, 2) for v in _proy_mes],
+            "kgCO₂ real":          [round(v*factor_activo, 2) for v in kwh_real_list],
+            "Cumplimiento (%)":    [
+                round(kwh_real_list[i]/(_proy_mes[i] or 1)*100, 1) if _proy_mes[i] > 0 else 0
+                for i in range(12)
+            ],
+        })
+        st.dataframe(
+            df_real.style.format({
+                "kWh proyectado": "{:,.1f}",
+                "kWh real (inversor)": "{:,.1f}",
+                "kgCO₂ proyectado": "{:.2f}",
+                "kgCO₂ real": "{:.2f}",
+                "Cumplimiento (%)": "{:.1f}%",
+            }).background_gradient(subset=["Cumplimiento (%)"], cmap="RdYlGn", vmin=50, vmax=110),
+            use_container_width=True, hide_index=True,
+        )
+        st.caption(
+            f"Factor de emisión activo: {factor_activo:.4f} kg CO₂/kWh · "
+            f"Fuente: {st.session_state.get('co2_factor_fecha','UPME 2022')} · "
+            f"Metodología: {co2_metodologia} · "
+            f"Referencia: UNFCCC CDM AMS-I.D / GHG Protocol Scope 2 Location-based."
+        )
+
+    # Guardar resultados reales en session_state
+    st.session_state["co2_real_ok"]          = True
+    st.session_state["co2_real_acum_t"]      = co2_real_acum
+    st.session_state["co2_cumplimiento_pct"] = cumpl_pct
+else:
+    st.info(
+        "📌 **Aún no hay datos reales ingresados.** Cuando el sistema lleve al menos un mes "
+        "de operación, ingresa los kWh del inversor en el panel superior para activar "
+        "el seguimiento de CO₂ real. Este registro transforma tus estimaciones en "
+        "evidencia verificable para reportes corporativos y bonos de carbono."
+    )
+    st.session_state["co2_real_ok"] = False
+
+# ─────────────────────────────────────────────────────────────────────────────
 # GUARDAR EN SESSION STATE PARA REPORTE PDF
 # ─────────────────────────────────────────────────────────────────────────────
 st.session_state["co2_factor_kg_kwh"]      = factor_activo
+st.session_state["co2_factor_fecha"]       = st.session_state.get("co2_factor_fecha", "UPME Resolución 520/2019 (año 2022)")
 st.session_state["co2_metodologia"]        = "GHG Protocol" if "promedio" in metodologia.lower() else "CDM Marginal"
 st.session_state["co2_anual_t"]            = co2_anual_t
 st.session_state["co2_total_t"]            = co2_total_t

@@ -20,14 +20,16 @@ motor_optico   = st.session_state.get("motor_optico_ok", False)
 dimensionam_ok = bool(st.session_state.get("N_serie"))
 produccion_ok  = st.session_state.get("produccion_ok", False)
 financiero_ok  = st.session_state.get("financiero_ok", False)
+co2_ok         = st.session_state.get("impacto_co2_ok", False)
 
 st.markdown("### Estado del proyecto")
-c1, c2, c3, c4, c5 = st.columns(5)
+c1, c2, c3, c4, c5, c6 = st.columns(6)
 c1.metric("🏠 Proyecto",       "✅" if proyecto_ok  else "⬜")
 c2.metric("☀️ Recurso Solar",  "✅" if recurso_ok   else "⬜")
 c3.metric("🔆 Motor Óptico",   "✅" if motor_optico else "⬜")
 c4.metric("📊 Producción",     "✅" if produccion_ok else "⬜")
 c5.metric("💰 Financiero",     "✅" if financiero_ok else "⬜")
+c6.metric("🌿 Huella CO₂",     "✅" if co2_ok       else "⬜")
 
 if not recurso_ok:
     st.warning("⚠️ Ejecuta al menos ☀️ Recurso Solar para generar un reporte útil.")
@@ -58,6 +60,11 @@ with col_op2:
     incluir_fin     = st.checkbox("Incluir sección Financiero",      value=financiero_ok,  key="rep_inc_fin")
     st.checkbox("Incluir Balance Energético + Clasificación A+/A/B/C/D",
                 value=balance_ok_ui, key="rep_inc_balance")
+    st.checkbox("🌿 Incluir Huella de Carbono Evitada",
+                value=co2_ok, key="rep_inc_co2",
+                help="Incluye emisiones CO₂ evitadas, equivalencias IDEAM (árboles, hogares), "
+                     "valor en bonos de carbono y contribución al NDC Colombia 2030. "
+                     "Ejecuta 🌿 Huella CO₂ primero para activar.")
 
 st.markdown("---")
 
@@ -99,9 +106,29 @@ def generar_html_reporte() -> str:
 
     # Financiero
     fin          = st.session_state.get("metricas_financiero", {})
+    fin_p90      = st.session_state.get("metricas_financiero_p90", {})
     ben          = st.session_state.get("ben_1715", {})
     capex        = st.session_state.get("capex_total_usd", "—")
     tarifa       = st.session_state.get("tarifa_cop_kWh", st.session_state.get("tarifa_cop_kwh", 850))
+
+    # CO₂ — Huella de Carbono Evitada (Página 12)
+    co2_anual_t       = float(st.session_state.get("co2_anual_t", 0.0))
+    co2_total_t       = float(st.session_state.get("co2_total_t", 0.0))
+    co2_prom_t        = float(st.session_state.get("co2_total_prom_t", 0.0))
+    co2_marg_t        = float(st.session_state.get("co2_total_marg_t", 0.0))
+    co2_arboles       = float(st.session_state.get("co2_arboles_equiv", 0.0))
+    co2_hogares       = float(st.session_state.get("co2_hogares_equiv", 0.0))
+    co2_km            = float(st.session_state.get("co2_km_vehiculo_equiv", 0.0))
+    co2_bonos_usd     = float(st.session_state.get("co2_valor_bonos_usd", 0.0))
+    co2_precio_bono   = float(st.session_state.get("co2_precio_bono_usd", 12.0))
+    co2_factor_usado  = float(st.session_state.get("co2_factor_kg_kwh", 0.126))
+    co2_metodologia   = str(st.session_state.get("co2_metodologia", "GHG Protocol"))
+    co2_factor_fecha  = str(st.session_state.get("co2_factor_fecha", "UPME Resolución 520/2019"))
+    co2_real_ok       = bool(st.session_state.get("co2_real_ok", False))
+    co2_real_t        = float(st.session_state.get("co2_real_acum_t", 0.0))
+    co2_cumpl_pct     = float(st.session_state.get("co2_cumplimiento_pct", 0.0))
+    factor_p90_pct    = float(st.session_state.get("factor_p90_pct", 10.0))
+    tipo_cambio_rep   = float(st.session_state.get("tipo_cambio", 3400.0))
 
     # ── Paleta de colores ─────────────────────────────────────────────────────
     COLOR_PRIMARIO  = "#1a5276"
@@ -637,6 +664,130 @@ def generar_html_reporte() -> str:
              "o más del consumo sin depender de la red. El autoconsumo directo es energía solar "
              "usada instantáneamente; la batería captura el excedente para uso diferido (nocturno). "
              "Los proyectos con clase B o superior tienen payback acelerado por menor dependencia tarifaria.")
+        html += cierre()
+
+    # ── 7. Huella de Carbono Evitada ─────────────────────────────────────────
+    incluir_co2_rep = st.session_state.get("rep_inc_co2", False)
+    if co2_ok and incluir_co2_rep and co2_total_t > 0:
+        COLOR_VERDE_CO2  = "#1e8449"
+        COLOR_AZUL_CO2   = "#1a5276"
+        COLOR_TIERRA     = "#784212"
+
+        html += seccion("Huella de Carbono Evitada — Impacto Ambiental Real", "🌿", COLOR_VERDE_CO2)
+
+        # Banner de impacto persuasivo
+        html += f"""
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;
+                    margin-bottom:20px;">
+            <div style="background:linear-gradient(135deg,{COLOR_VERDE_CO2},{COLOR_VERDE_CO2}cc);
+                        color:white;border-radius:10px;padding:16px;text-align:center;">
+                <div style="font-size:2.2em;font-weight:900;">{co2_anual_t:.1f}</div>
+                <div style="font-size:0.85em;opacity:0.9;">tCO₂ evitadas / año</div>
+                <div style="font-size:0.72em;opacity:0.75;margin-top:4px;">año 1 de operación</div>
+            </div>
+            <div style="background:linear-gradient(135deg,#145a32,{COLOR_VERDE_CO2});
+                        color:white;border-radius:10px;padding:16px;text-align:center;">
+                <div style="font-size:2.2em;font-weight:900;">{co2_total_t:,.0f}</div>
+                <div style="font-size:0.85em;opacity:0.9;">tCO₂ totales en 25 años</div>
+                <div style="font-size:0.72em;opacity:0.75;margin-top:4px;">vida útil del sistema</div>
+            </div>
+            <div style="background:linear-gradient(135deg,#1a5276,#2e86c1);
+                        color:white;border-radius:10px;padding:16px;text-align:center;">
+                <div style="font-size:2.2em;font-weight:900;">{co2_arboles:,.0f}</div>
+                <div style="font-size:0.85em;opacity:0.9;">árboles equivalentes</div>
+                <div style="font-size:0.72em;opacity:0.75;margin-top:4px;">IDEAM 22 kg CO₂/árbol/año</div>
+            </div>
+            <div style="background:linear-gradient(135deg,#784212,#b7770d);
+                        color:white;border-radius:10px;padding:16px;text-align:center;">
+                <div style="font-size:2.2em;font-weight:900;">USD {co2_bonos_usd:,.0f}</div>
+                <div style="font-size:0.85em;opacity:0.9;">valor en bonos carbono</div>
+                <div style="font-size:0.72em;opacity:0.75;margin-top:4px;">a USD {co2_precio_bono:.0f}/tCO₂ · VCS</div>
+            </div>
+        </div>"""
+
+        html += tabla_kv([
+            ("Metodología",
+             co2_metodologia,
+             "",
+             "GHG Protocol Scope 2 (inventario corporativo) · CDM AMS-I.D (bonos de carbono)"),
+            ("Factor de emisión SIN Colombia",
+             f"{co2_factor_usado*1000:.1f} gCO₂/kWh  ({co2_factor_usado:.3f} kg/kWh)",
+             "",
+             f"Fuente: {co2_factor_fecha} — Sistema Interconectado Nacional"),
+            ("CO₂ evitado — año 1",
+             f"{co2_anual_t:.2f} tCO₂/año",
+             "",
+             "Equivale a sacar un vehículo de circulación durante 1 año completo"),
+            ("CO₂ evitado — 25 años (factor promedio SIN)",
+             f"{co2_prom_t:,.1f} tCO₂",
+             "",
+             f"Factor 0.126 kg/kWh — GHG Protocol · Ley 1931/2018 · RETC"),
+            ("CO₂ evitado — 25 años (factor marginal CDM)",
+             f"{co2_marg_t:,.1f} tCO₂",
+             "",
+             "Factor 0.300 kg/kWh — UNFCCC Tool 07 — base para créditos VCS/Gold Standard"),
+            ("Árboles nativos colombianos equivalentes",
+             f"{co2_arboles:,.0f} árboles",
+             "permanentes",
+             "Bosque Húmedo Tropical · IDEAM 2010 · 22 kgCO₂/árbol/año"),
+            ("Hogares colombianos abastecidos",
+             f"{co2_hogares:,.1f} hogares",
+             "× 1 año",
+             f"o {co2_hogares/25:.1f} hogares durante 25 años · UPME 2022 · 130 kWh/mes"),
+            ("Km en vehículo a gasolina",
+             f"{co2_km:,.0f} mil km",
+             "no recorridos",
+             "IDEAM FECOC 2022 · 0.162 kgCO₂/km · equivale a múltiples vueltas al país"),
+            ("Valor en bonos de carbono (VCS)",
+             f"USD {co2_bonos_usd:,.0f}",
+             f"({co2_total_t:,.1f} t × USD {co2_precio_bono:.0f}/t)",
+             "Mercado voluntario Verra VCS · referencia 2024 · sujeto a verificación"),
+        ])
+
+        # P90 financial note
+        if fin_p90 and factor_p90_pct > 0:
+            tir_p90 = fin_p90.get("tir_pct")
+            vpn_p90 = fin_p90.get("vpn_usd", 0)
+            html += caja_nota(
+                f"<strong>🏦 Sensibilidad P90 confirmada:</strong> incluso con producción "
+                f"{factor_p90_pct:.0f}% menor al P50 (escenario conservador exigido por bancos), "
+                f"el proyecto evita <strong>{co2_total_t*(1-factor_p90_pct/100):,.1f} tCO₂</strong> en 25 años "
+                + (f"· TIR P90 = <strong>{tir_p90:.1f}%</strong> · VPN P90 = USD <strong>{vpn_p90:,.0f}</strong>"
+                   if tir_p90 else ""),
+                color="#e8f5e9", borde=COLOR_VERDE_CO2, icono="🏦"
+            )
+
+        # CO₂ real vs proyectado (si existe)
+        if co2_real_ok and co2_real_t > 0:
+            html += caja_nota(
+                f"<strong>📡 Seguimiento en tiempo real:</strong> producción mensual ingresada → "
+                f"CO₂ real acumulado = <strong>{co2_real_t:.2f} tCO₂</strong> · "
+                f"Cumplimiento vs proyectado: <strong>{co2_cumpl_pct:.1f}%</strong>.",
+                color="#e3f2fd", borde="#1565c0", icono="📡"
+            )
+
+        # Marco regulatorio compacto
+        html += f"""
+        <div style="margin-top:14px;padding:12px 16px;background:#f0f9f4;
+                    border:1px solid #a9dfbf;border-radius:6px;font-size:0.86em;">
+            <strong>📜 Marco regulatorio aplicado:</strong>
+            <span style="color:#555;">
+            GHG Protocol Corporate Standard (Scope 2 · Location-based) ·
+            ISO 14064-1:2018 · UNFCCC CDM AMS-I.D · IPCC AR6 WG III ·
+            Ley 1931/2018 (gestión cambio climático Colombia) ·
+            NDC Colombia 2030 (meta 51% reducción GEI) ·
+            UPME Resolución 520/2019 (factor SIN oficial).
+            </span>
+        </div>"""
+
+        html += caja_nota(
+            "<strong>Este proyecto no es solo una inversión financiera — es una declaración de liderazgo climático.</strong> "
+            "Cada kWh generado por la fachada BIPV desplaza energía de una red que aún depende de combustibles fósiles "
+            "en épocas de sequía. Al instalar este sistema, la organización puede reportar emisiones evitadas ante el "
+            "RETC, acreditar ante la ANLA y posicionarse como empresa carbono-comprometida frente a clientes, "
+            "inversionistas y entidades financiadoras.",
+            color="#fef9e7", borde="#f39c12", icono="💡"
+        )
         html += cierre()
 
     # ── Pie de página ─────────────────────────────────────────────────────────
