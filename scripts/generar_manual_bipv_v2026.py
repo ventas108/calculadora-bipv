@@ -300,6 +300,50 @@ def build_manual():
         col_widths=[5, 9, 4]
     )
 
+    # ── Coordenadas exactas del predio ───────────────────────────────────
+    doc.add_paragraph()
+    add_heading(doc, "📍 Coordenadas exactas del predio (opcional — para mayor precisión)", level=3, color=C_AZUL)
+    add_body(doc,
+        "Dentro de la columna 'Datos del sitio' aparece un expander "
+        "\"📍 Coordenadas exactas del predio\". Ábralo si el predio tiene una "
+        "ubicación GPS diferente al centro de la ciudad seleccionada. "
+        "PVGIS descargará el TMY para ese punto exacto, y Vista 3D centrará el "
+        "mapa y calculará el diagrama solar para esa latitud/longitud.",
+        sz=9, indent=0.3)
+
+    simple_table(doc,
+        ["Campo", "Descripción", "Ejemplo proyecto Cra. 16 No. 33A-21, Bogotá"],
+        [
+            ("Latitud (°N)",
+             "Positivo = Norte del Ecuador. Colombia: 4° a 13°N.",
+             "4.62288"),
+            ("Longitud (°E)",
+             "Colombia: siempre negativo, entre -67° y -82°.",
+             "-74.07146"),
+            ("Altitud (m.s.n.m.)",
+             "Altura del predio sobre el nivel del mar.",
+             "2600"),
+        ],
+        col_widths=[3.5, 7, 7.7]
+    )
+
+    add_note_box(doc, "✔", "Cómo confirmar que las coordenadas quedaron activas:",
+        " Al hacer clic en Guardar configuración con coordenadas personalizadas, "
+        "el mensaje de éxito mostrará: 'Predio: X.XXXXX°, Y.YYYYY°, ZZZ m.s.n.m.' "
+        "En Página 2 (Recurso Solar) aparecerá un banner verde con el texto "
+        "'Usando coordenadas exactas del predio' y los valores ingresados. "
+        "Las métricas de Latitud/Longitud en esa página mostrarán 5 decimales.",
+        C_VERDE_CLR, C_VERDE_OSC)
+
+    add_note_box(doc, "🔄", "Propagación automática a otras páginas:",
+        " Una vez guardadas en Página 1, las coordenadas exactas del predio se "
+        "propagan automáticamente a:\n"
+        "  • Página 2 (Recurso Solar) — PVGIS descarga el TMY del punto exacto.\n"
+        "  • Motor Óptico (Pág. 5b) — hereda el TMY de Página 2, no necesita ajuste.\n"
+        "  • Vista 3D (Pág. 9) — el mapa Mapbox y el diagrama solar pvlib usan "
+        "las coordenadas del predio, no el centro de la ciudad.",
+        C_AZUL_CLR, C_AZUL)
+
     add_body(doc, "Hacer clic en  Guardar configuración.", bold=True, indent=0.5)
 
     add_success(doc, "",
@@ -341,6 +385,13 @@ def build_manual():
         col_widths=[4.5, 9, 4.7]
     )
     add_body(doc, "Hacer clic en  Calcular Recurso Solar.  Esperar 30-90 segundos.", bold=True, indent=0.5)
+
+    add_info(doc,
+        "Si ingresó coordenadas exactas en Página 1, esta página mostrará un banner "
+        "verde con el texto 'Usando coordenadas exactas del predio' y los valores "
+        "precisos de latitud/longitud. Si el banner NO aparece y las métricas muestran "
+        "los valores genéricos de la ciudad, regresar a Página 1, abrir el expander de "
+        "coordenadas, ingresar los valores y hacer clic en Guardar configuración.")
 
     add_success(doc, "",
         "[OK]  Aparece 'Recurso solar calculado' con: gráfica POA mensual, "
@@ -914,6 +965,17 @@ def build_manual():
             ("Factor global del Motor Óptico < 70%",
              "Parámetros incorrectos: b0 o k_BIPV demasiado altos",
              "Verificar tipo de vidrio (b0) y tipo de montaje (k_BIPV). Fachada típica Colombia: factor 78-88%."),
+            # ── NUEVOS: Coordenadas del predio ─────────────────────────
+            ("Página 2 muestra coordenadas genéricas de la ciudad aunque se ingresaron coordenadas del predio",
+             "Las coordenadas se ingresaron en el expander pero no se hizo clic en Guardar configuración, "
+             "o la sesión se reinició",
+             "Regresar a Página 1 → abrir expander '📍 Coordenadas exactas del predio' → "
+             "verificar los valores → hacer clic en Guardar configuración. "
+             "El banner verde en Página 2 confirma que las coordenadas del predio están activas."),
+            ("Vista 3D centra el mapa en el centro de la ciudad, no en el predio",
+             "Misma causa: coordenadas del predio no guardadas en sesión",
+             "Mismo procedimiento: Página 1 → expander coordenadas → Guardar configuración. "
+             "Vista 3D tomará las coordenadas del predio automáticamente en la siguiente carga."),
             # ── NUEVOS: FASE 4 ─────────────────────────────────────────
             ("🔋 Página 11 — 'Catálogo no encontrado' o dropdown vacío",
              "La hoja 'Catalogo_Baterias' no existe en el Excel del servidor o el loader no detectó la fila de encabezados",
@@ -947,9 +1009,15 @@ def build_manual():
 
     checks = [
         ("Pág. 1",
-         "Ciudad correcta, tarifa eléctrica real, área o consumo correctamente ingresado y guardado."),
+         "Ciudad correcta, tarifa eléctrica real, área o consumo correctamente ingresado y guardado. "
+         "Si el predio tiene coordenadas GPS distintas al centro de la ciudad: abrir el expander "
+         "'📍 Coordenadas exactas del predio', ingresar Latitud, Longitud y Altitud, "
+         "y hacer clic en Guardar configuración. Verificar que el mensaje de éxito "
+         "muestre 'Predio: X.XXXXX°, Y.YYYYY°'."),
         ("Pág. 2",
-         "Azimuth y tilt verificados para la orientación real. Recurso Solar calculado sin errores de PVGIS."),
+         "Azimuth y tilt verificados para la orientación real. Recurso Solar calculado sin errores de PVGIS. "
+         "Si se ingresaron coordenadas del predio: verificar que el banner verde "
+         "'Usando coordenadas exactas del predio' aparece antes de hacer clic en Descargar TMY."),
         ("Pág. 4",
          "Panel con ficha técnica completa (semáforo verde), inversor compatible seleccionado, "
          "todas las verificaciones de tensión en verde."),
