@@ -25,13 +25,30 @@ if ciudad not in CIUDADES:
     st.stop()
 
 c = CIUDADES[ciudad]
-lat, lon, alt_m = c["lat"], c["lon"], c["alt_m"]
+
+# ── Coordenadas: predio exacto tiene prioridad sobre centro de ciudad ─────────
+lat   = float(st.session_state.get("lat_proyecto", c["lat"]))
+lon   = float(st.session_state.get("lon_proyecto", c["lon"]))
+alt_m = int(st.session_state.get("alt_proyecto",   c["alt_m"]))
+
+_coord_personalizada = (
+    abs(lat - c["lat"]) > 0.0001 or abs(lon - c["lon"]) > 0.0001
+)
 
 # ── Panel de configuración ───────────────────────────────────────────────────
-st.subheader(f"📍 Sitio: {ciudad}")
+if _coord_personalizada:
+    st.subheader(f"📍 Sitio: {ciudad}  ·  📌 Predio personalizado")
+    st.success(
+        f"✅ Usando coordenadas exactas del predio: "
+        f"**{lat:.5f}°**, **{lon:.5f}°**, **{alt_m} m.s.n.m.**  "
+        f"(Centro de {ciudad}: {c['lat']}°, {c['lon']}°)"
+    )
+else:
+    st.subheader(f"📍 Sitio: {ciudad}")
+
 col_info1, col_info2, col_info3, col_info4 = st.columns(4)
-col_info1.metric("Latitud", f"{lat}°")
-col_info2.metric("Longitud", f"{lon}°")
+col_info1.metric("Latitud", f"{lat:.5f}°")
+col_info2.metric("Longitud", f"{lon:.5f}°")
 col_info3.metric("Altitud", f"{alt_m} m.s.n.m.")
 col_info4.metric("GHI referencia", f"{c['GHI_kWh_m2_dia']} kWh/m²·día")
 
@@ -76,7 +93,11 @@ def cargar_tmy(lat, lon):
 # ── Botón de simulación ──────────────────────────────────────────────────────
 if st.button("🌐 Descargar TMY de PVGIS y calcular POA", type="primary", use_container_width=True):
 
-    with st.spinner(f"Conectando a PVGIS para {ciudad} ({lat}°, {lon}°)..."):
+    _sitio_label = (
+        f"predio en {ciudad} ({lat:.5f}°, {lon:.5f}°)"
+        if _coord_personalizada else f"{ciudad} ({lat}°, {lon}°)"
+    )
+    with st.spinner(f"Conectando a PVGIS para {_sitio_label}..."):
         try:
             tmy = cargar_tmy(lat, lon)
         except Exception as e:

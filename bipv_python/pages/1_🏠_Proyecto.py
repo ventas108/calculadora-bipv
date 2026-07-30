@@ -74,6 +74,64 @@ with col2:
             f"**Región:** {c['region']}  |  **Zona CREG:** {c['CREG_zona']}"
         )
 
+        # ── Coordenadas exactas del predio (opcional) ─────────────────────
+        with st.expander("📍 Coordenadas exactas del predio (opcional — para mayor precisión)"):
+            st.caption(
+                "Por defecto se usan las coordenadas del centro de la ciudad. "
+                "Si conoces las coordenadas GPS exactas del predio, ingrésalas aquí. "
+                "PVGIS descargará el TMY para ese punto específico."
+            )
+            _lat_def = float(st.session_state.get("lat_proyecto", c["lat"]))
+            _lon_def = float(st.session_state.get("lon_proyecto", c["lon"]))
+            _alt_def = int(st.session_state.get("alt_proyecto",   c["alt_m"]))
+
+            cx1, cx2, cx3 = st.columns(3)
+            lat_custom = cx1.number_input(
+                "Latitud (°N)",
+                min_value=-5.0, max_value=15.0,
+                value=_lat_def,
+                step=0.00001, format="%.5f",
+                help="Positivo = Norte del Ecuador. Colombia: 4° a 13°N aprox."
+            )
+            lon_custom = cx2.number_input(
+                "Longitud (°E)",
+                min_value=-82.0, max_value=-66.0,
+                value=_lon_def,
+                step=0.00001, format="%.5f",
+                help="Colombia: entre -67° y -82°. Siempre negativo."
+            )
+            alt_custom = cx3.number_input(
+                "Altitud (m.s.n.m.)",
+                min_value=0, max_value=4500,
+                value=_alt_def,
+                step=10,
+                help="Altitud del predio en metros sobre el nivel del mar."
+            )
+
+            # Verificar si el usuario cambió respecto a la ciudad
+            _coords_personalizadas = (
+                abs(lat_custom - c["lat"]) > 0.0001 or
+                abs(lon_custom - c["lon"]) > 0.0001 or
+                alt_custom != c["alt_m"]
+            )
+            if _coords_personalizadas:
+                st.success(
+                    f"✅ Coordenadas del predio: **{lat_custom:.5f}°**, "
+                    f"**{lon_custom:.5f}°**, **{alt_custom} m.s.n.m.**  "
+                    f"— Se usarán estas coordenadas en Recurso Solar."
+                )
+            else:
+                st.info(
+                    f"Usando coordenadas de referencia de {ciudad}: "
+                    f"{c['lat']}°, {c['lon']}°. "
+                    "Modifica los valores para usar las del predio específico."
+                )
+
+            # Guardar en variables accesibles fuera del expander
+            st.session_state["_lat_custom_temp"] = lat_custom
+            st.session_state["_lon_custom_temp"] = lon_custom
+            st.session_state["_alt_custom_temp"] = alt_custom
+
         GHI_anual = c["GHI_kWh_m2_dia"] * 365   # kWh/m²/año
 
         # Densidad de potencia — desde panel seleccionado o entrada manual
@@ -154,4 +212,19 @@ if st.button("💾 Guardar configuración", type="primary"):
         st.session_state["T_cel_realista"] = c["T_cel_realista"]
         st.session_state["T_cel_extremo"]  = c["T_cel_extremo"]
         st.session_state["GHI_kWh_m2_dia"] = c["GHI_kWh_m2_dia"]
-    st.success("✅ Configuración guardada. Continúa en ☀️ Recurso Solar.")
+        # Guardar coordenadas del predio (pueden ser las del expander o las de la ciudad)
+        st.session_state["lat_proyecto"] = st.session_state.get("_lat_custom_temp", c["lat"])
+        st.session_state["lon_proyecto"] = st.session_state.get("_lon_custom_temp", c["lon"])
+        st.session_state["alt_proyecto"] = st.session_state.get("_alt_custom_temp", c["alt_m"])
+    # Forzar recálculo de Recurso Solar si cambiaron las coordenadas
+    st.session_state["recurso_solar_ok"] = False
+    _lat = st.session_state["lat_proyecto"]
+    _lon = st.session_state["lon_proyecto"]
+    _alt = st.session_state["alt_proyecto"]
+    _coord_msg = (
+        f"Predio: **{_lat:.5f}°**, **{_lon:.5f}°**, **{_alt} m.s.n.m.**"
+        if (abs(_lat - CIUDADES[ciudad]["lat"]) > 0.0001 or
+            abs(_lon - CIUDADES[ciudad]["lon"]) > 0.0001)
+        else f"Coordenadas de referencia de {ciudad}"
+    )
+    st.success(f"✅ Configuración guardada. {_coord_msg}. Continúa en ☀️ Recurso Solar.")
