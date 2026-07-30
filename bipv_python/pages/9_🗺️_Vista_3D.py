@@ -1073,12 +1073,12 @@ with tab_solar:
                     _nv = _sv["nombre"]
                     _pdf_v = _poa_viz.get(_nv)
                     if _modo_c == "POA mensual":
-                        _pm_v = poa_mensual_superficie(_pdf_v) if _pdf_v else None
+                        _pm_v = poa_mensual_superficie(_pdf_v) if _pdf_v is not None else None
                         _val_v = _pm_v[_mes_viz-1] if _pm_v else (
                             float(st.session_state.get("GHI_kWh_m2_dia", 5.0))
                             * (0.5 + 0.5 * _np.cos(_np.radians(float(_sv["tilt_deg"])))) * 30.0
                         )
-                        _pa_v = poa_anual_superficie(_pdf_v) if _pdf_v else 0.0
+                        _pa_v = poa_anual_superficie(_pdf_v) if _pdf_v is not None else 0.0
                         _sup_hovs[_nv] = (
                             f"<b>{_nv}</b><br>Tipo: {_sv['tipo']}<br>"
                             f"Tilt {_sv['tilt_deg']:.0f}° · Az {_sv['azimuth_deg']:.0f}°<br>"
@@ -1200,7 +1200,7 @@ with tab_solar:
                 for _sv in _sups_viz:
                     _nv = _sv["nombre"]
                     _pdf_vm = _poa_viz.get(_nv)
-                    _pm_vm  = poa_mensual_superficie(_pdf_vm) if _pdf_vm else [0.0]*12
+                    _pm_vm  = poa_mensual_superficie(_pdf_vm) if _pdf_vm is not None else [0.0]*12
                     _pv_vm  = _pm_vm[_mes_viz-1]
                     _e_vm   = _pv_vm * _sv["area_m2"] * float(st.session_state.get("eta_panel",0.16)) * float(st.session_state.get("pr_sistema",0.78))
                     _row_mv = {
@@ -1244,7 +1244,7 @@ with tab_solar:
                 _tot_m = [0.0]*12
                 for _sp in _sups_p:
                     _pdf_p = _poa_p.get(_sp["nombre"])
-                    if not _pdf_p or _pdf_p.empty: continue
+                    if _pdf_p is None or _pdf_p.empty: continue
                     _prod_p = produccion_superficie(_pdf_p, _sp["area_m2"], _eta_p, _pr_p)
                     for _mi in range(12): _tot_m[_mi] += _prod_p["e_ac_mensual"][_mi]
                     _fig_stk.add_trace(go.Bar(
@@ -1274,7 +1274,7 @@ with tab_solar:
                 _pa_list, _et_list, _co_list = [], [], []
                 for _sp in _sups_p:
                     _pdf_p = _poa_p.get(_sp["nombre"])
-                    _pa_v2 = poa_anual_superficie(_pdf_p) if _pdf_p else 0.0
+                    _pa_v2 = poa_anual_superficie(_pdf_p) if _pdf_p is not None else 0.0
                     _pa_list.append(_pa_v2)
                     _et_list.append(
                         f"{TIPOS_SUPERFICIE.get(_sp['tipo'],{}).get('icon','')} "
@@ -1300,7 +1300,7 @@ with tab_solar:
                 _rows_a, _tot_ar, _tot_ea = [], 0.0, 0.0
                 for _sp in _sups_p:
                     _pdf_p = _poa_p.get(_sp["nombre"])
-                    _pa_a  = poa_anual_superficie(_pdf_p) if _pdf_p else 0.0
+                    _pa_a  = poa_anual_superficie(_pdf_p) if _pdf_p is not None else 0.0
                     _pr_a  = produccion_superficie(_pdf_p, _sp["area_m2"], _eta_p, _pr_p)
                     _tot_ar += _sp["area_m2"]; _tot_ea += _pr_a["e_ac_anual_kWh"]
                     _fs_str = "—"
