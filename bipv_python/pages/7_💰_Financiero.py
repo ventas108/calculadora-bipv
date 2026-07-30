@@ -227,11 +227,33 @@ with col_t2:
     )
 
 with col_t3:
-    opex_pct = st.slider(
-        "O&M anual (%CAPEX)",
-        min_value=0.5, max_value=3.0, value=1.0, step=0.25,
-        help="BIPV fachada: 0.5–1.5%/año. Incluye limpieza, revisión y seguros.",
-    )
+    # ── OPEX: desde Presupuesto detallado o slider paramétrico ───────────────
+    _ppto_opex_anual = float(st.session_state.get("presupuesto_opex_anual_usd", 0.0))
+    _capex_para_opex = float(st.session_state.get("presupuesto_capex_usd", capex_total))
+    if _ppto_opex_anual > 0 and _capex_para_opex > 0:
+        _opex_pct_ppto = _ppto_opex_anual / _capex_para_opex * 100
+        usar_opex_ppto = st.toggle(
+            f"Usar OPEX del 💼 Presupuesto — **USD {_ppto_opex_anual:,.0f}/año** ({_opex_pct_ppto:.2f}% CAPEX)",
+            value=True, key="usar_opex_ppto",
+            help=f"OPEX detallado ingresado en pestaña 📅 OPEX Anual del Presupuesto. "
+                 f"Desactiva para usar el slider paramétrico."
+        )
+        if usar_opex_ppto:
+            opex_pct = _opex_pct_ppto
+            st.caption(f"✅ OPEX activo: USD {_ppto_opex_anual:,.0f}/año ({_opex_pct_ppto:.2f}% CAPEX) — desde 💼 Presupuesto")
+        else:
+            opex_pct = st.slider(
+                "O&M anual (%CAPEX) — paramétrico",
+                min_value=0.5, max_value=3.0, value=1.0, step=0.25,
+                help="BIPV fachada: 0.5–1.5%/año.",
+            )
+    else:
+        opex_pct = st.slider(
+            "O&M anual (%CAPEX)",
+            min_value=0.5, max_value=3.0, value=1.0, step=0.25,
+            help="BIPV fachada: 0.5–1.5%/año. Incluye limpieza, revisión y seguros. "
+                 "Completa 📅 OPEX Anual en Presupuesto para usar valores reales.",
+        )
     tasa_desc = st.slider(
         "Tasa de descuento WACC (%)",
         min_value=5.0, max_value=20.0, value=10.0, step=0.5,
