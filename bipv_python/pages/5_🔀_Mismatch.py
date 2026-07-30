@@ -525,17 +525,28 @@ csv_file = st.file_uploader(
 # Mantener CSV cargado entre reruns
 if csv_file is not None:
     try:
-        df_fs_raw = cargar_csv_fs(csv_file)
+        df_fs_raw, _meta_fs = cargar_csv_fs(csv_file)
         st.session_state["df_fs_raw"]  = df_fs_raw
+        st.session_state["meta_fs"]    = _meta_fs
         st.session_state["csv_fs_ok"]  = True
     except Exception as e:
         st.error(f"❌ Error al leer el CSV: {e}")
         st.session_state["csv_fs_ok"] = False
 
-csv_ok = st.session_state.get("csv_fs_ok", False)
+csv_ok   = st.session_state.get("csv_fs_ok", False)
 df_fs_raw = st.session_state.get("df_fs_raw", None)
+meta_fs   = st.session_state.get("meta_fs", {})
 
 if csv_ok and df_fs_raw is not None:
+    # ── Banner fuente del FS ───────────────────────────────────────────────
+    tipo_fs = meta_fs.get("tipo", "combinado")
+    if tipo_fs == "geometrico":
+        st.success(meta_fs.get("descripcion", ""))
+    else:
+        st.warning(meta_fs.get("descripcion", ""))
+    for adv in meta_fs.get("advertencias", []):
+        st.warning(f"⚠️ {adv}")
+
     # ── Estadísticas del CSV ──────────────────────────────────────────────
     try:
         stats = estadisticas_fs(df_fs_raw)
@@ -544,8 +555,12 @@ if csv_ok and df_fs_raw is not None:
                    help="Filas de módulos / posiciones en la fachada")
         sc2.metric("Timestamps en CSV",  f"{stats['n_timestamps']:,}",
                    help="Horas únicas con dato de FS")
-        sc3.metric("FS medio global",    f"{stats['fs_medio']:.3f}",
-                   help="0 = sin sombra · 1 = sombra total")
+        sc3.metric(
+            f"{'FS_geom' if tipo_fs == 'geometrico' else 'FS'} medio",
+            f"{stats['fs_medio']:.3f}",
+            help="0 = sin sombra · 1 = sombra total — "
+                 + ("solo obstáculos físicos" if tipo_fs == "geometrico" else "sombra geom. + nubes"),
+        )
         sc4.metric("Horas con FS > 0",   f"{stats['horas_fs_gt0']} h",
                    help="Horas al año con algún grado de sombreado activo")
 
@@ -815,12 +830,19 @@ if csv_ok and df_fs_raw is not None:
                     f"({res_bp['horas_bypass']} horas/año con bypass activo)"
                 )
 
+            _tipo_fs_res = meta_fs.get("tipo", "combinado")
+            _col_fs_res  = meta_fs.get("col_original", "FS")
+            _fs_badge    = (
+                "🟩 FS geométrico (solo obstáculos físicos)"
+                if _tipo_fs_res == "geometrico"
+                else "🟨 FS combinado (geom + nubes) — puede sobreestimar bypass"
+            )
             st.success(
                 f"✅ Modelo bypass completado | "
                 f"Pérdida adicional: **{res_bp['kwh_bypass_anual']:,.0f} kWh/año** "
                 f"({res_bp['pct_bypass_anual']:.2f}% de E_dc) | "
                 f"Bypass activo **{res_bp['horas_bypass']} h/año** · "
-                f"Este resultado se suma al balance de Producción."
+                f"Fuente FS: **{_col_fs_res}** — {_fs_badge}"
             )
 
 elif not csv_ok:

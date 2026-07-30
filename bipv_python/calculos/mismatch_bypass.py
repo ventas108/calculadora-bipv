@@ -257,7 +257,7 @@ def simular_bypass_horario(
 # 3. Parser CSV de la Calculadora de Sombreado
 # ══════════════════════════════════════════════════════════════════════════════
 
-def cargar_csv_fs(archivo) -> pd.DataFrame:
+def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
     """
     Parsea el CSV exportado por la Calculadora de Sombreado
     (bipv.innovacionquimica.com.co / botón «Cruzar Máscara + EPW»).
@@ -269,8 +269,23 @@ def cargar_csv_fs(archivo) -> pd.DataFrame:
         Evento, Mes, Dia, Hora, Altura Solar (deg), Acimut Solar (deg),
         Obstaculo, FS_geometrico, FS_climatico, FS, Situacion
 
-    Retorna DataFrame limpio con columnas: mes, dia, hora, FS
-    Donde FS ∈ [0, 1] · 0 = sin sombra · 1 = totalmente sombreado
+    Retorna
+    -------
+    (df, meta) donde:
+    · df  : DataFrame con columnas [mes, dia, hora, FS] · FS ∈ [0,1] · 0=sin sombra
+    · meta: dict con información sobre la fuente del FS usado:
+        - "col_original"  : nombre de columna del CSV que se usó
+        - "tipo"          : "geometrico" | "combinado" | "basico"
+        - "descripcion"   : texto explicativo para mostrar en la UI
+        - "advertencias"  : lista de strings con advertencias (puede ser vacía)
+
+    PRIORIDAD DE COLUMNAS (razón física):
+        FS_geometrico > FS (combinado) > cualquier columna FS disponible
+
+    Los bypass diodes solo se activan por obstáculos físicos (sombra geométrica).
+    Las nubes (FS_climatico) reducen la irradiancia uniformemente en todo el array
+    → nunca activan bypass diodes. Usar el FS combinado (max(geom, clim)) sobreestima
+    las pérdidas en días nublados. Ref: Deline et al. 2013, Eq. 3.
     """
     if hasattr(archivo, "read"):
         raw = archivo.read()
@@ -283,58 +298,97 @@ def cargar_csv_fs(archivo) -> pd.DataFrame:
     # Normalizar nombres
     df_raw.columns = [str(c).strip() for c in df_raw.columns]
 
-    # Mapear columnas con tolerancia a variaciones de nombre
-    col_map: dict[str, str] = {}
+    # ── Mapear todas las columnas FS por separado ──────────────────────────────
+    col_mes: str | None  = None
+    col_dia: str | None  = None
+    col_hora: str | None = None
+    col_fs_geom: str | None     = None   # FS_geometrico — obstáculos físicos
+    col_fs_clim: str | None     = None   # FS_climatico  — nubes (NO para bypass)
+    col_fs_combined: str | None = None   # FS            — max(geom, clim) o básico
+
     for c in df_raw.columns:
-        cl = c.lower().replace(" ", "_").replace("á", "a").replace("í", "i")
-        if cl in ("mes", "month"):
-            col_map.setdefault("mes", c)
-        elif cl in ("dia", "día", "day"):
-            col_map.setdefault("dia", c)
-        elif cl in ("hora", "hour", "hora_utc"):
-            col_map.setdefault("hora", c)
-        elif cl in ("fs", "factor_sombreado", "shading_factor", "fs_combined"):
-            col_map.setdefault("FS", c)
-        elif "fs_climatico" in cl or "fs_climático" in cl:
-            col_map.setdefault("FS", c)
-        elif "fs_geometrico" in cl or "fs_geométrico" in cl:
-            col_map.setdefault("FS", c)
+        cl = c.lower().replace(" ", "_").replace("á", "a").replace("í", "i").replace("é", "e")
+        if col_mes  is None and cl in ("mes", "month"):
+            col_mes = c
+        elif col_dia  is None and cl in ("dia", "day"):
+            col_dia = c
+        elif col_hora is None and cl in ("hora", "hour", "hora_utc"):
+            col_hora = c
+        elif col_fs_geom is None and ("fs_geometrico" in cl or "fs_geometrica" in cl):
+            col_fs_geom = c
+        elif col_fs_clim is None and ("fs_climatico" in cl or "fs_climatica" in cl):
+            col_fs_clim = c
+        elif col_fs_combined is None and cl in ("fs", "factor_sombreado", "shading_factor", "fs_combined"):
+            col_fs_combined = c
 
-    faltan = [r for r in ("mes", "dia", "hora", "FS") if r not in col_map]
-    if faltan:
-        raise ValueError(
-            f"CSV de sombreado: columnas requeridas no encontradas → {faltan}.\n"
-            f"Columnas presentes: {list(df_raw.columns)}"
-        )
-
-    # Extraer columna de fachada si existe (para diagnóstico multi-fachada)
-    fachada_col = None
+    # Extraer columna de fachada si existe
+    col_fachada: str | None = None
     for c in df_raw.columns:
         cl = c.lower().replace(" ", "_")
         if cl in ("fachada", "facade", "obstaculo", "obstacle"):
-            fachada_col = c
+            col_fachada = c
             break
 
-    cols_to_read = [col_map["mes"], col_map["dia"], col_map["hora"], col_map["FS"]]
-    if fachada_col and fachada_col not in cols_to_read:
-        cols_to_read.append(fachada_col)
+    # ── Elegir columna FS con prioridad explícita ──────────────────────────────
+    advertencias: list[str] = []
 
-    df = df_raw[cols_to_read].copy()
-    rename_map: dict[str, str] = {
-        col_map["mes"]:  "mes",
-        col_map["dia"]:  "dia",
-        col_map["hora"]: "hora",
-        col_map["FS"]:   "FS",
+    if col_fs_geom is not None:
+        # ✅ MEJOR OPCIÓN: solo sombra geométrica por obstáculos físicos
+        col_fs_elegida = col_fs_geom
+        tipo_fs        = "geometrico"
+        descripcion_fs = (
+            f"✅ Usando **{col_fs_geom}** — sombra por obstáculos físicos únicamente. "
+            "Las nubes (FS_climático) se excluyen porque no activan bypass diodes."
+        )
+    elif col_fs_combined is not None:
+        # ⚠️ SEGUNDA OPCIÓN: FS combinado (max(geom, clim))
+        col_fs_elegida = col_fs_combined
+        tipo_fs        = "combinado"
+        descripcion_fs = (
+            f"⚠️ Usando **{col_fs_combined}** (FS combinado = max(geom, clim)). "
+            "El resultado puede sobreestimar bypass en días nublados porque incluye FS_climático. "
+            "Para mayor precisión, usa el CSV del flujo «Cruzar Máscara + EPW» que incluye FS_geometrico."
+        )
+        advertencias.append(
+            "CSV sin columna FS_geometrico — se usa el FS combinado. "
+            "Los días nublados pueden aparecer con bypass activo de forma artificial."
+        )
+    else:
+        # ❌ Sin ninguna columna FS válida
+        raise ValueError(
+            "CSV de sombreado: no se encontró ninguna columna de Factor de Sombreado.\n"
+            f"Columnas presentes: {list(df_raw.columns)}\n"
+            "Se esperan columnas como: FS_geometrico, FS, factor_sombreado"
+        )
+
+    # Verificar columnas obligatorias de tiempo
+    faltan_tiempo = [n for n, v in [("mes", col_mes), ("dia", col_dia), ("hora", col_hora)] if v is None]
+    if faltan_tiempo:
+        raise ValueError(
+            f"CSV de sombreado: columnas de tiempo no encontradas → {faltan_tiempo}.\n"
+            f"Columnas presentes: {list(df_raw.columns)}"
+        )
+
+    # ── Construir DataFrame limpio ─────────────────────────────────────────────
+    cols_leer = [col_mes, col_dia, col_hora, col_fs_elegida]
+    if col_fachada and col_fachada not in cols_leer:
+        cols_leer.append(col_fachada)
+
+    df = df_raw[cols_leer].copy()
+    rename: dict[str, str] = {
+        col_mes:         "mes",
+        col_dia:         "dia",
+        col_hora:        "hora",
+        col_fs_elegida:  "FS",
     }
-    if fachada_col and fachada_col not in rename_map:
-        rename_map[fachada_col] = "fachada"
-    df = df.rename(columns=rename_map)
+    if col_fachada and col_fachada not in rename:
+        rename[col_fachada] = "fachada"
+    df = df.rename(columns=rename)
 
     df = df.dropna(subset=["mes", "dia", "hora"])
     df["mes"] = df["mes"].astype(int)
     df["dia"] = df["dia"].astype(int)
 
-    # Hora puede venir como entero (8) o como "HH:MM" (08:30) → extraer la parte entera
     def _parse_hora(v: object) -> int:
         s = str(v).strip()
         if ":" in s:
@@ -347,22 +401,28 @@ def cargar_csv_fs(archivo) -> pd.DataFrame:
     df["hora"] = df["hora"].apply(_parse_hora)
     df["FS"]   = pd.to_numeric(df["FS"], errors="coerce").fillna(0.0).clip(0.0, 1.0)
 
-    # Advertencia si hay múltiples fachadas mezcladas — el bypass model necesita una sola fachada
+    # ── Advertencia multi-fachada ──────────────────────────────────────────────
     if "fachada" in df.columns:
         fachadas_unicas = df["fachada"].dropna().unique()
         if len(fachadas_unicas) > 1:
-            import warnings
-            warnings.warn(
+            msg = (
                 f"El CSV contiene {len(fachadas_unicas)} fachadas/obstáculos distintos: "
                 f"{list(fachadas_unicas[:5])}{'...' if len(fachadas_unicas) > 5 else ''}. "
-                "El modelo bypass promediará el FS de todas. Si tienes un array en una sola "
-                "fachada, filtra el CSV para esa fachada antes de importar.",
-                UserWarning,
-                stacklevel=2,
+                "Se promediarán todas. Filtra el CSV por tu fachada activa para resultados exactos."
             )
+            advertencias.append(msg)
 
-    # Retornar solo columnas estándar
-    return df[["mes", "dia", "hora", "FS"]].copy()
+    meta: dict = {
+        "col_original":  col_fs_elegida,
+        "tipo":          tipo_fs,
+        "descripcion":   descripcion_fs,
+        "advertencias":  advertencias,
+        "col_fs_geom":   col_fs_geom,
+        "col_fs_clim":   col_fs_clim,
+        "col_fs_combined": col_fs_combined,
+    }
+
+    return df[["mes", "dia", "hora", "FS"]].copy(), meta
 
 
 # ══════════════════════════════════════════════════════════════════════════════
