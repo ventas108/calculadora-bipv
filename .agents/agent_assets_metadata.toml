@@ -96,3 +96,9 @@ id = "VRjTJpdD-3T09eorRVxEX"
 uri = "file://attached_assets/MANUAL_OPERACION_BIPV_v2026_FASE4.docx"
 type = "word_document"
 title = "Manual de Operación BIPV Colombia v2026 — FASE 4 + Coordenadas del Predio"
+
+[[outputs]]
+id = "SPl5k0bi-3VUL8mrS6sKK"
+uri = "file://attached_assets/INFORME_CAPACIDAD_BIPV_2026-07-30.docx"
+type = "word_document"
+title = "Informe de Capacidad — GitHub + Digital Ocean · 30 julio 2026"
