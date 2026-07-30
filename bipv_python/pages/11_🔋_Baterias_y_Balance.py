@@ -40,7 +40,14 @@ st.caption(
 # ── Pre-requisitos ────────────────────────────────────────────────────────────
 prod_ok   = st.session_state.get("produccion_ok", False)
 df_m_prod = st.session_state.get("df_mensual_produccion", None)
-e_ac_anual = float(st.session_state.get("E_ac_anual_kWh", 0.0))
+
+# Usar E_ac corregida por bypass si está disponible (#37)
+_e_ac_base_bat   = float(st.session_state.get("E_ac_anual_kWh", 0.0))
+_e_ac_bypass_bat = float(st.session_state.get("E_ac_anual_kWh_bypass", 0.0))
+_bypass_ok_bat   = st.session_state.get("bypass_ok", False)
+_kwh_bp_bat      = float(st.session_state.get("kwh_bypass_anual", 0.0))
+
+e_ac_anual = _e_ac_bypass_bat if (_bypass_ok_bat and _e_ac_bypass_bat > 0) else _e_ac_base_bat
 
 if not prod_ok or df_m_prod is None or e_ac_anual <= 0:
     st.warning(
@@ -51,6 +58,22 @@ if not prod_ok or df_m_prod is None or e_ac_anual <= 0:
     st.info(
         "💡 Puede continuar configurando baterías, pero el balance energético "
         "requiere los resultados de producción."
+    )
+
+# Banner bypass (#37)
+if prod_ok and _bypass_ok_bat and _e_ac_bypass_bat > 0:
+    st.info(
+        f"⚡ **Corrección bypass activa:** "
+        f"E_ac base = {_e_ac_base_bat:,.0f} kWh/año → "
+        f"pérdida bypass = {_kwh_bp_bat:,.0f} kWh/año → "
+        f"**E_ac usada en el balance = {e_ac_anual:,.0f} kWh/año** "
+        f"({(_e_ac_base_bat - e_ac_anual) / _e_ac_base_bat * 100:.1f}% menos). "
+        "La autogeneración y el dimensionamiento de la batería se calculan con la producción real."
+    )
+elif prod_ok and e_ac_anual > 0:
+    st.caption(
+        "💡 Ejecuta el modelo Bypass Diodes en Página 5 para usar la E_ac corregida "
+        "por sombra parcial en este balance energético."
     )
 
 # ══════════════════════════════════════════════════════════════════════════════

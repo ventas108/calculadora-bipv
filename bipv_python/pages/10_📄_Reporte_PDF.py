@@ -535,11 +535,30 @@ def generar_html_reporte() -> str:
         capex_n    = ben.get("capex_neto_usd", capex) if ben else capex
         des_1715   = ben.get("descuento_ica_pct", 0) if ben else 0
 
+        # Trazabilidad E_ac (#38): base vs bypass-corregida
+        _e_ac_base_pdf   = res_prod.get("E_ac_anual_kWh", 0)
+        _e_ac_bypass_pdf = st.session_state.get("E_ac_anual_kWh_bypass", 0)
+        _kwh_bp_pdf      = bypass_res_r.get("kwh_bypass_anual", 0) if bypass_ok_r else 0
+        _e_ac_fin_label  = (
+            f"{_e_ac_bypass_pdf:,.0f} kWh/año (corregida por bypass)"
+            if (bypass_ok_r and _e_ac_bypass_pdf > 0)
+            else f"{_e_ac_base_pdf:,.0f} kWh/año (simulación estándar)"
+        )
+
         html += seccion("Análisis Financiero — Ley 1715 / 2014", "💰")
         html += tabla_kv([
             ("CAPEX total (bruto)",   _fmt(capex,    0),  "USD",      "Costo total del sistema instalado"),
             ("CAPEX neto (Ley 1715)", _fmt(capex_n,  0),  "USD",      "Después de beneficios tributarios"),
             ("Descuento ICA / IVA",   _fmt(des_1715, 1),  "%",        "Beneficio Ley 1715 de 2014 Colombia"),
+            ("E_ac usada en el análisis", _e_ac_fin_label, "",
+             "La E_ac corregida por bypass ya descuenta las pérdidas por sombra parcial en strings — "
+             "estimación conservadora y realista para proyectos BIPV urbanos"),
+            *([(
+                "Pérdida bypass descontada",
+                f"{_kwh_bp_pdf:,.0f} kWh/año  ({_kwh_bp_pdf / _e_ac_base_pdf * 100:.1f}% de E_ac base)",
+                "",
+                "Energía DC perdida por activación de bypass diodes × η_inversor"
+            )] if (bypass_ok_r and _e_ac_bypass_pdf > 0 and _e_ac_base_pdf > 0) else []),
             ("Tarifa de referencia",  _fmt(tarifa,   0),  "COP/kWh",  "Precio de energía del contrato o tarifa pública"),
             ("VPN (20 años)",         _fmt(vpn,      0),  "USD",      "Valor Presente Neto del proyecto"),
             ("TIR",                   _fmt(tir,      1) if tir else "N/A",   "%", "Tasa Interna de Retorno"),
