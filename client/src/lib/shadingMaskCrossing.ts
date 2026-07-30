@@ -484,8 +484,12 @@ export function executeCrossing(
         // Clasificar situación
         const situacion = classifyCombinedSituation(fsGeom, fsClim);
 
-        // Formatear hora
-        const hourStr = `${String(Math.floor(hourDecimal)).padStart(2, '0')}:${String(Math.round((hourDecimal % 1) * 60)).padStart(2, '0')}`;
+        // Formatear hora — normalizar minutos para evitar overflow (ej: 0.9999*60 → 60)
+        const _rawMinutes = Math.round((hourDecimal % 1) * 60);
+        const _overflowHour = _rawMinutes >= 60 ? 1 : 0;
+        const _hourInt   = Math.floor(hourDecimal) + _overflowHour;
+        const _minuteInt = _rawMinutes >= 60 ? 0 : _rawMinutes;
+        const hourStr = `${String(_hourInt).padStart(2, '0')}:${String(_minuteInt).padStart(2, '0')}`;
 
         results.push({
           evento: criticalDay.name,

@@ -484,23 +484,32 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
     // Detectar si hay datos extendidos (formato días críticos)
     const hasExtended = points.some(p => p.evento || p.fsClimatico !== undefined);
 
+    // Escapa un valor para CSV: envuelve en comillas si contiene coma, comilla o salto de línea
+    const escapeCSV = (v: string | number | undefined | null): string => {
+      const s = String(v ?? '');
+      if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
+
     const headers = hasExtended
       ? ['Evento', 'Mes', 'Dia', 'Hora', 'Altura Solar (deg)', 'Acimut Solar (deg)', 'Obstaculo', 'FS_geometrico', 'FS_climatico', 'FS', 'Situacion']
       : ['Mes', 'Dia', 'Hora', 'Altura Solar', 'Acimut Solar', 'Obstaculo', 'Area Sombreada', 'FS'];
 
     const rows = hasExtended
       ? points.map(p => [
-          p.evento || '',
+          escapeCSV(p.evento || ''),
           p.month,
           p.day,
-          p.hourStr || `${p.hour}:00`,
+          Math.floor(p.hour),          // entero para alineación con TMY hora a hora
           p.heightSolar.toFixed(2),
           p.azimuthSolar.toFixed(2),
-          p.obstacle,
+          escapeCSV(p.obstacle),       // puede tener comas si hay múltiples obstáculos
           (p.fsGeometrico ?? 0).toFixed(3),
           (p.fsClimatico ?? 0).toFixed(3),
           p.fs.toFixed(3),
-          p.situacion || '',
+          escapeCSV(p.situacion || ''),
         ])
       : points.map(p => [
           p.month,
@@ -508,7 +517,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
           p.hour,
           p.heightSolar,
           p.azimuthSolar,
-          p.obstacle,
+          escapeCSV(p.obstacle),
           p.shadowedArea,
           p.fs.toFixed(3),
         ]);

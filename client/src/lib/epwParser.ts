@@ -79,7 +79,8 @@ export const parseEPW = (content: string): EPWData => {
     const parts = line.split(',');
     
     // Verificar que la línea tiene suficientes campos y empieza con un año válido
-    if (parts.length < 22) continue;
+    // EPW accede hasta índice 22 (cloudCover) → necesita al menos 23 campos
+    if (parts.length < 23) continue;
     const year = parseInt(parts[0]);
     if (isNaN(year) || year < 1900 || year > 2100) continue;
     
@@ -105,9 +106,9 @@ export const parseEPW = (content: string): EPWData => {
         day: parseInt(parts[2]) || 1,
         hour: parseInt(parts[3]) || 0,
         minute: parseInt(parts[4]) || 0,
-        temperature: parseFloat(parts[6]) || 0,
-        dewPoint: parseFloat(parts[7]) || 0,
-        relativeHumidity: parseFloat(parts[8]) || 0,
+        temperature: parseFloat(parts[6]) ?? 0,          // usar ?? para preservar 0°C y valores negativos
+        dewPoint: parseFloat(parts[7]) ?? 0,
+        relativeHumidity: parseFloat(parts[8]) ?? 0,
         atmosphericPressure: parseFloat(parts[9]) || 101325,
         globalHorizontalIrradiance: parseFloat(parts[13]) || 0,
         directNormalIrradiance: parseFloat(parts[14]) || 0,

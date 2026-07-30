@@ -307,15 +307,62 @@ def cargar_csv_fs(archivo) -> pd.DataFrame:
             f"Columnas presentes: {list(df_raw.columns)}"
         )
 
-    df = df_raw[[col_map["mes"], col_map["dia"], col_map["hora"], col_map["FS"]]].copy()
-    df.columns = ["mes", "dia", "hora", "FS"]
+    # Extraer columna de fachada si existe (para diagnóstico multi-fachada)
+    fachada_col = None
+    for c in df_raw.columns:
+        cl = c.lower().replace(" ", "_")
+        if cl in ("fachada", "facade", "obstaculo", "obstacle"):
+            fachada_col = c
+            break
+
+    cols_to_read = [col_map["mes"], col_map["dia"], col_map["hora"], col_map["FS"]]
+    if fachada_col and fachada_col not in cols_to_read:
+        cols_to_read.append(fachada_col)
+
+    df = df_raw[cols_to_read].copy()
+    rename_map: dict[str, str] = {
+        col_map["mes"]:  "mes",
+        col_map["dia"]:  "dia",
+        col_map["hora"]: "hora",
+        col_map["FS"]:   "FS",
+    }
+    if fachada_col and fachada_col not in rename_map:
+        rename_map[fachada_col] = "fachada"
+    df = df.rename(columns=rename_map)
+
     df = df.dropna(subset=["mes", "dia", "hora"])
-    df["mes"]  = df["mes"].astype(int)
-    df["dia"]  = df["dia"].astype(int)
-    df["hora"] = df["hora"].astype(int)
+    df["mes"] = df["mes"].astype(int)
+    df["dia"] = df["dia"].astype(int)
+
+    # Hora puede venir como entero (8) o como "HH:MM" (08:30) → extraer la parte entera
+    def _parse_hora(v: object) -> int:
+        s = str(v).strip()
+        if ":" in s:
+            return int(s.split(":")[0])
+        try:
+            return int(float(s))
+        except (ValueError, TypeError):
+            return 0
+
+    df["hora"] = df["hora"].apply(_parse_hora)
     df["FS"]   = pd.to_numeric(df["FS"], errors="coerce").fillna(0.0).clip(0.0, 1.0)
 
-    return df
+    # Advertencia si hay múltiples fachadas mezcladas — el bypass model necesita una sola fachada
+    if "fachada" in df.columns:
+        fachadas_unicas = df["fachada"].dropna().unique()
+        if len(fachadas_unicas) > 1:
+            import warnings
+            warnings.warn(
+                f"El CSV contiene {len(fachadas_unicas)} fachadas/obstáculos distintos: "
+                f"{list(fachadas_unicas[:5])}{'...' if len(fachadas_unicas) > 5 else ''}. "
+                "El modelo bypass promediará el FS de todas. Si tienes un array en una sola "
+                "fachada, filtra el CSV para esa fachada antes de importar.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+    # Retornar solo columnas estándar
+    return df[["mes", "dia", "hora", "FS"]].copy()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
