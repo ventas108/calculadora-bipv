@@ -370,61 +370,78 @@ def generar_html_reporte() -> str:
     total_sim_d  = st.session_state.get("diag_total_sim_kwh", 0)
 
     if df_diag_real is not None and total_real_d > 0:
-        html += seccion("Diagnóstico: PR Real vs PR Esperado (Inversor)", "🔍")
+        pr_conv_g_d  = st.session_state.get("diag_pr_conv_global",  0.0)
+        pr_corr_g_d  = st.session_state.get("diag_pr_corr_global",  0.0)
+        perd_t_pct_d = st.session_state.get("diag_perdida_t_pct",   0.0)
+        perd_t_kwh_d = st.session_state.get("diag_perdida_t_kwh",   0.0)
+        total_stc_d  = st.session_state.get("diag_total_stc_kwh",   0.0)
+        gamma_d      = st.session_state.get("diag_gamma_pct",       -0.45)
 
-        # Tabla comparativa
+        html += seccion("Diagnóstico BIPV: PR convencional · PR corregido T° · Pérdidas temperatura", "🔍")
+
+        # Métricas globales
+        html += tabla_kv([
+            ("PR convencional global",
+             _fmt(pr_conv_g_d*100, 1), "%",
+             "E_real ÷ (P_STC × HSP) — incluye todas las pérdidas incluida temperatura"),
+            ("PR corregido por temperatura",
+             _fmt(pr_corr_g_d*100, 1), "%",
+             "PR_conv ÷ factor_T — elimina efecto térmico → muestra pérdidas reales no-térmicas"),
+            ("% Pérdidas por temperatura (promedio)",
+             _fmt(perd_t_pct_d, 1), "%",
+             f"γ × (T_cell_media − 25°C) · γ = {gamma_d:+.3f}%/°C · Normal en BIPV fachada: 8–15%"),
+            ("Energía perdida por temperatura",
+             _fmt(perd_t_kwh_d, 0), "kWh",
+             "kWh que la temperatura 'consumió' en los meses con dato"),
+            ("E_real acumulada (inversor)",
+             _fmt(total_real_d, 0), "kWh", "Suma kWh reales ingresados"),
+            ("E_simulada con T° real",
+             _fmt(total_sim_d,  0), "kWh", "Lo que el modelo predijo con temperatura real del TMY"),
+            ("E_STC (T=25°C, sin pérd. T°)",
+             _fmt(total_stc_d,  0), "kWh", "Producción si T_cell fuera siempre 25°C — límite térmico"),
+            ("Diferencia real vs simulado",
+             f"{total_real_d - total_sim_d:+,.0f}", "kWh",
+             f"{(total_real_d-total_sim_d)/total_sim_d*100:+.1f}% · positivo = supera la simulación"),
+            ("Meses PR_corr < 80% (problema)",
+             ", ".join(meses_rojo_d) if meses_rojo_d else "Ninguno", "",
+             "Pérdidas no-térmicas significativas — inspección urgente"),
+            ("Meses PR_corr 80–90% (revisar)",
+             ", ".join(meses_amar_d) if meses_amar_d else "Ninguno", "",
+             "Suciedad, sombreado leve o degradación moderada"),
+        ],
+        nota="PR convencional = E_real ÷ (P_STC × HSP) — estándar IEC 61724, incluye pérdidas temperatura. "
+             "PR corregido = PR_conv ÷ (1 + γ×ΔT) — elimina efecto térmico; revela pérdidas reales "
+             "(suciedad, sombras, degradación, cableado). "
+             "🟢 PR_corr ≥ 90%: excelente (pérdidas son principalmente térmicas, normales en BIPV). "
+             "🟡 80–90%: revisar limpieza y strings. "
+             "🔴 < 80%: problema real no térmico — inspección de campo urgente.")
+
+        # Tabla mes a mes
+        cols_pdf = ["Mes","HSP (h)","T_cell (°C)","% Pérd. T°",
+                    "E_sim (kWh)","E_real (kWh)",
+                    "PR_conv (%)","PR_corr_T (%)","Δ kWh","Estado"]
         filas_diag = df_diag_real[df_diag_real["E_real (kWh)"] != "—"]
         if not filas_diag.empty:
             html += """
-            <table style="width:100%;border-collapse:collapse;font-size:0.88em;margin-bottom:14px;">
-            <thead><tr style="background:#1A569A;color:#fff;">
-                <th style="padding:6px 8px;text-align:left;">Mes</th>
-                <th style="padding:6px 8px;text-align:right;">HSP (h)</th>
-                <th style="padding:6px 8px;text-align:right;">E_sim (kWh)</th>
-                <th style="padding:6px 8px;text-align:right;">E_real (kWh)</th>
-                <th style="padding:6px 8px;text-align:right;">PR_esp (%)</th>
-                <th style="padding:6px 8px;text-align:right;">PR_real (%)</th>
-                <th style="padding:6px 8px;text-align:right;">Δ kWh</th>
-                <th style="padding:6px 8px;text-align:center;">Estado</th>
-            </tr></thead><tbody>"""
-            for _, row in filas_diag.iterrows():
-                bg = "#fff" if filas_diag.index.get_loc(_) % 2 == 0 else "#f4f7fb"
-                estado_str = str(row["Estado"])
-                if "🔴" in estado_str:
-                    color_est = "#c62828"
-                elif "🟡" in estado_str:
-                    color_est = "#f9a825"
-                else:
-                    color_est = "#2e7d32"
-                html += f"""
-                <tr style="background:{bg};">
-                    <td style="padding:5px 8px;font-weight:600;">{row['Mes']}</td>
-                    <td style="padding:5px 8px;text-align:right;">{row['HSP (h)']}</td>
-                    <td style="padding:5px 8px;text-align:right;">{row['E_sim (kWh)']:,}</td>
-                    <td style="padding:5px 8px;text-align:right;font-weight:600;">{row['E_real (kWh)']:,}</td>
-                    <td style="padding:5px 8px;text-align:right;">{row['PR_esp (%)']}</td>
-                    <td style="padding:5px 8px;text-align:right;font-weight:600;">{row['PR_real (%)']}</td>
-                    <td style="padding:5px 8px;text-align:right;">{row['Δ kWh']:+,}</td>
-                    <td style="padding:5px 8px;text-align:center;color:{color_est};font-weight:700;">{estado_str}</td>
-                </tr>"""
+            <table style="width:100%;border-collapse:collapse;font-size:0.82em;margin-bottom:14px;">
+            <thead><tr style="background:#1A569A;color:#fff;">"""
+            for col in cols_pdf:
+                align = "left" if col == "Mes" else "right" if col not in ["Estado"] else "center"
+                html += f'<th style="padding:5px 6px;text-align:{align};">{col}</th>'
+            html += "</tr></thead><tbody>"
+            for ri, (_, row) in enumerate(filas_diag.iterrows()):
+                bg = "#fff" if ri % 2 == 0 else "#f4f7fb"
+                estado_str = str(row.get("Estado","—"))
+                color_est = "#c62828" if "🔴" in estado_str else "#f9a825" if "🟡" in estado_str else "#2e7d32"
+                html += f'<tr style="background:{bg};">'
+                for col in cols_pdf:
+                    val = row.get(col,"—")
+                    align = "left" if col == "Mes" else "center" if col == "Estado" else "right"
+                    weight = "700" if col in ["E_real (kWh)","PR_conv (%)","PR_corr_T (%)"] else "400"
+                    color  = color_est if col == "Estado" else "inherit"
+                    html += f'<td style="padding:4px 6px;text-align:{align};font-weight:{weight};color:{color};">{val}</td>'
+                html += "</tr>"
             html += "</tbody></table>"
-
-        # Resumen diagnóstico
-        delta_d = total_real_d - total_sim_d
-        delta_pct_d = (delta_d / total_sim_d * 100) if total_sim_d > 0 else 0
-        html += tabla_kv([
-            ("E_real acumulada (inversor)",   _fmt(total_real_d, 0), "kWh", "Suma de kWh reales ingresados"),
-            ("E_simulada acumulada",          _fmt(total_sim_d,  0), "kWh", "Suma de kWh simulados para los mismos meses"),
-            ("Diferencia acumulada",          f"{delta_d:+,.0f}",    "kWh", f"{delta_pct_d:+.1f}% vs simulado"),
-            ("Meses con problema (PR < 80%)", ", ".join(meses_rojo_d) if meses_rojo_d else "Ninguno",
-             "", "Requieren inspección de campo urgente"),
-            ("Meses a revisar (PR 80–90%)",   ", ".join(meses_amar_d) if meses_amar_d else "Ninguno",
-             "", "Verificar limpieza y strings"),
-        ],
-        nota="PR real = E_AC_real ÷ (P_STC × HSP_mes). "
-             "🟢 PR_real ≥ 90% del esperado: sistema normal. "
-             "🟡 80–90%: suciedad o sombreado leve. "
-             "🔴 < 80%: problema que requiere inspección urgente (strings, degradación, inversor).")
         html += cierre()
 
     # ── 5. Financiero ─────────────────────────────────────────────────────────

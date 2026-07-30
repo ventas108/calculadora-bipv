@@ -396,216 +396,370 @@ if btn_sim or st.session_state.get("produccion_ok"):
     st.session_state["produccion_ok"]       = True
 
     # ══════════════════════════════════════════════════════════════════════════
-    # SECCIÓN — DIAGNÓSTICO: PRODUCCIÓN REAL DEL INVERSOR
+    # SECCIÓN — DIAGNÓSTICO IEC 61724: PR CONVENCIONAL Y PR CORREGIDO POR T°
     # ══════════════════════════════════════════════════════════════════════════
     st.markdown("---")
-    st.subheader("🔍 Diagnóstico: PR real vs PR esperado")
-    st.caption(
-        "Ingresa los kWh reales registrados por el inversor (o por la factura EPM) "
-        "mes a mes para calcular el PR real y compararlo contra el PR simulado."
-    )
+    st.subheader("🔍 Diagnóstico BIPV: PR convencional · PR corregido · Pérdidas T°")
+    with st.expander("ℹ️ ¿Qué mide cada PR?", expanded=False):
+        st.markdown("""
+| Indicador | Fórmula | Qué muestra |
+|---|---|---|
+| **PR convencional** | E_real ÷ (P_STC × HSP) | PR estándar IEC 61724 — incluye **todas** las pérdidas (temperatura + eléctricas + ópticas) |
+| **% Pérdidas T°** | (1 − factor_T) × 100 | Cuánto pierde el sistema **solo por calor** = γ × (T_cell − 25°C) |
+| **PR corregido T°** | PR_conv ÷ factor_T | PR sin efecto temperatura — revela las **pérdidas reales** (suciedad, sombras, degradación, cableado) |
 
-    # ── HSP mensual desde POA base ────────────────────────────────────────────
+*factor_T = 1 + γ × (T_cell_media − 25°C)   ·   γ = coeficiente de temperatura de Pmax del panel*
+
+**Regla de diagnóstico:**
+- Si PR_corr ≈ PR_conv → temperatura no es el problema principal; buscar fallas mecánicas/eléctricas
+- Si PR_corr >> PR_conv → temperatura está consumiendo una fracción importante de la producción (común en BIPV fachada)
+- Si PR_corr < 0.85 → existen pérdidas no térmicas significativas (suciedad, sombras, degradación, strings)
+        """)
+
+    # ── Pre-cómputos desde la simulación ─────────────────────────────────────
     _poa_hsp = poa_base.copy()
     _poa_hsp["_mes"] = _poa_hsp.index.month
-    _hsp_mes = _poa_hsp.groupby("_mes")["poa_global"].sum() / 1000.0  # kWh/m² → HSP
+    _hsp_mes = _poa_hsp.groupby("_mes")["poa_global"].sum() / 1000.0   # kWh/m² = HSP
+
+    # T_cell media mensual desde df_horario (ya calculado por la simulación)
+    _df_h_diag = res["df_horario"].copy()
+    _df_h_diag["_mes"] = _df_h_diag.index.month
+    # Solo horas con irradiancia > 10 W/m² para promediar T_cell operativa real
+    _df_h_diag_sol = _df_h_diag[_df_h_diag["G_eff_Wm2"] > 10]
+    _t_cell_mes = _df_h_diag_sol.groupby("_mes")["T_cel_C"].mean()
+
+    # E_ac_STC mensual = (E_dc + pérdida_T) × eta_inv  → producción si T_cell = 25°C siempre
+    # = "Producción a irradiancia real pero temperatura constante 25°C"
+    _e_dc_mes      = df_m["E_dc (kWh)"]
+    _perdida_t_mes = df_m["Pérdida T° (kWh)"]
+    _e_ac_stc_mes  = (_e_dc_mes + _perdida_t_mes) * eta_inv_frac  # kWh, T=25°C
+
+    # Coeficiente de temperatura de Pmax del panel (%/°C → fracción/°C)
+    gamma_pct = panel.get("Tk_gamma", -0.45)          # %/°C  (negativo)
+    gamma_frac = gamma_pct / 100.0                     # fracción/°C
 
     meses_etiq = ["Ene","Feb","Mar","Abr","May","Jun",
                   "Jul","Ago","Sep","Oct","Nov","Dic"]
 
+    # ── Info del coeficiente de temperatura ──────────────────────────────────
+    st.info(
+        f"Panel seleccionado: **{panel_nombre}** · "
+        f"γ (Tk_gamma) = **{gamma_pct:+.3f} %/°C** · "
+        f"NOCT = **{panel.get('NOCT', 45):.0f}°C**  |  "
+        f"A mayor temperatura → mayor pérdida de potencia (monocristalino típico: −0.35 a −0.45 %/°C)"
+    )
+
     # ── Tabla de ingreso de datos reales ─────────────────────────────────────
-    st.markdown("#### 📥 Ingresar producción real del inversor (kWh/mes)")
+    st.markdown("#### 📥 Producción real del inversor (kWh/mes)")
+    st.caption("Tomar de: display del inversor · app de monitoreo · factura EPM · medidor bidireccional")
 
     _prev = st.session_state.get("diag_real_kwh", {})
-
     cols_inp = st.columns(6)
     kwh_real = {}
     for i, mes in enumerate(meses_etiq):
         col = cols_inp[i % 6]
         kwh_real[mes] = col.number_input(
             mes,
-            min_value=0.0,
-            max_value=500_000.0,
+            min_value=0.0, max_value=500_000.0,
             value=float(_prev.get(mes, 0.0)),
-            step=10.0,
-            format="%.1f",
+            step=10.0, format="%.1f",
             key=f"diag_real_{mes}",
             help=f"kWh AC reales medidos por el inversor en {mes}",
         )
-
-    # Guardar valores ingresados
     st.session_state["diag_real_kwh"] = kwh_real
-
     meses_con_dato = [m for m in meses_etiq if kwh_real[m] > 0]
 
     if not meses_con_dato:
         st.info(
-            "💡 Ingresa los kWh reales de al menos un mes para ver el diagnóstico. "
-            "Puedes obtenerlos del display del inversor, su app de monitoreo o de la factura EPM."
+            "💡 Ingresa los kWh reales de al menos un mes para activar el diagnóstico. "
+            "Con dos o más meses obtienes la tendencia de degradación y las pérdidas por temperatura."
         )
     else:
-        # ── Calcular comparativa ──────────────────────────────────────────────
+        # ── Calcular comparativa completa ─────────────────────────────────────
         filas = []
         for i, mes in enumerate(meses_etiq):
-            num_mes   = i + 1
-            e_sim     = df_m.loc[df_m.index == mes, "E_ac (kWh)"].values
-            e_sim_val = float(e_sim[0]) if len(e_sim) > 0 else 0.0
-            hsp_val   = float(_hsp_mes.get(num_mes, 0.0))
-            e_real    = kwh_real[mes]
+            num_mes      = i + 1
+            e_sim_arr    = df_m.loc[df_m.index == mes, "E_ac (kWh)"].values
+            e_sim_val    = float(e_sim_arr[0]) if len(e_sim_arr) > 0 else 0.0
+            e_stc_arr    = _e_ac_stc_mes[_e_ac_stc_mes.index == mes].values
+            e_stc_val    = float(e_stc_arr[0]) if len(e_stc_arr) > 0 else e_sim_val
+            hsp_val      = float(_hsp_mes.get(num_mes, 0.0))
+            t_cell_val   = float(_t_cell_mes.get(num_mes, 25.0))
+            e_real       = kwh_real[mes]
 
-            # PR esperado del mes = E_sim / (P_stc × HSP_mes)
+            # Factor temperatura mensual: < 1 cuando T_cell > 25°C (pérdida)
+            factor_T     = 1.0 + gamma_frac * (t_cell_val - 25.0)
+            perdida_T_pct= (1.0 - factor_T) * 100.0   # % de producción perdida por calor
+
+            # PR simulado esperado (referencia)
             pr_esp = (e_sim_val / (P_stc_kW * hsp_val)) if (P_stc_kW > 0 and hsp_val > 0) else 0.0
-            # PR real del mes
-            pr_real = (e_real / (P_stc_kW * hsp_val)) if (e_real > 0 and P_stc_kW > 0 and hsp_val > 0) else None
+            # PR convencional real = E_real / (P_STC × HSP)  — incluye pérdidas temperatura
+            pr_conv = (e_real / (P_stc_kW * hsp_val)) if (e_real > 0 and P_stc_kW > 0 and hsp_val > 0) else None
+            # PR corregido por temperatura = PR_conv / factor_T  — elimina efecto térmico
+            pr_corr = (pr_conv / factor_T) if (pr_conv is not None and factor_T > 0.5) else None
 
-            if pr_real is not None:
-                ratio = pr_real / pr_esp if pr_esp > 0 else 0.0
-                if ratio >= 0.90:
-                    semaforo = "🟢"
-                    estado   = "Normal"
-                elif ratio >= 0.80:
-                    semaforo = "🟡"
-                    estado   = "Revisar"
+            if pr_conv is not None:
+                ratio_conv = pr_conv / pr_esp if pr_esp > 0 else 0.0
+                # Semáforo sobre PR_corregido (pérdidas NO térmicas)
+                if pr_corr is not None:
+                    if pr_corr >= 0.90:
+                        sem_corr = "🟢"; est_corr = "Bueno"
+                    elif pr_corr >= 0.80:
+                        sem_corr = "🟡"; est_corr = "Revisar"
+                    else:
+                        sem_corr = "🔴"; est_corr = "Problema"
                 else:
-                    semaforo = "🔴"
-                    estado   = "Problema"
+                    sem_corr = "⬜"; est_corr = "—"
                 delta_kwh  = e_real - e_sim_val
                 delta_pct  = (delta_kwh / e_sim_val * 100) if e_sim_val > 0 else 0.0
             else:
-                semaforo = "⬜"; estado = "Sin dato"
-                delta_kwh = None; delta_pct = None; ratio = None
+                ratio_conv = None; delta_kwh = None; delta_pct = None
+                sem_corr = "⬜"; est_corr = "Sin dato"
 
             filas.append({
-                "Mes":           mes,
-                "HSP (h)":       round(hsp_val, 1),
-                "E_sim (kWh)":   round(e_sim_val, 0),
-                "E_real (kWh)":  round(e_real, 0) if e_real > 0 else "—",
-                "PR_esp (%)":    round(pr_esp * 100, 1) if pr_esp > 0 else "—",
-                "PR_real (%)":   round(pr_real * 100, 1) if pr_real is not None else "—",
-                "Δ kWh":         round(delta_kwh, 0) if delta_kwh is not None else "—",
-                "Δ %":           round(delta_pct, 1) if delta_pct is not None else "—",
-                "Estado":        f"{semaforo} {estado}",
+                "Mes":              mes,
+                "HSP (h)":          round(hsp_val, 1),
+                "T_cell (°C)":      round(t_cell_val, 1),
+                "factor_T":         round(factor_T, 4),
+                "% Pérd. T°":       round(perdida_T_pct, 1),
+                "E_STC_sim (kWh)":  round(e_stc_val, 0),     # "producción baja irradiancia"
+                "E_sim (kWh)":      round(e_sim_val, 0),      # simulada con temperatura real
+                "E_real (kWh)":     round(e_real, 0) if e_real > 0 else "—",
+                "PR_esp (%)":       round(pr_esp * 100, 1)   if pr_esp > 0      else "—",
+                "PR_conv (%)":      round(pr_conv * 100, 1)  if pr_conv is not None else "—",
+                "PR_corr_T (%)":    round(pr_corr * 100, 1)  if pr_corr is not None else "—",
+                "Δ kWh":            round(delta_kwh, 0)       if delta_kwh is not None else "—",
+                "Δ %":              round(delta_pct, 1)        if delta_pct is not None else "—",
+                "Estado":           f"{sem_corr} {est_corr}",
             })
 
         df_diag = pd.DataFrame(filas)
 
-        # ── Gráfica PR real vs esperado ───────────────────────────────────────
-        meses_grafica  = [f["Mes"] for f in filas if f["PR_real (%)"] != "—"]
-        pr_esp_grafica = [f["PR_esp (%)"] for f in filas if f["PR_real (%)"] != "—"]
-        pr_real_grafica= [f["PR_real (%)"] for f in filas if f["PR_real (%)"] != "—"]
-        e_sim_graf     = [f["E_sim (kWh)"] for f in filas if f["E_real (kWh)"] != "—"]
-        e_real_graf    = [f["E_real (kWh)"] for f in filas if f["E_real (kWh)"] != "—"]
+        # Filtrar filas con datos reales para gráficas
+        filas_r     = [f for f in filas if f["E_real (kWh)"] != "—"]
+        meses_g     = [f["Mes"]             for f in filas_r]
+        pr_esp_g    = [f["PR_esp (%)"]      for f in filas_r]
+        pr_conv_g   = [f["PR_conv (%)"]     for f in filas_r]
+        pr_corr_g   = [f["PR_corr_T (%)"]   for f in filas_r]
+        perdida_t_g = [f["% Pérd. T°"]      for f in filas_r]
+        t_cell_g    = [f["T_cell (°C)"]     for f in filas_r]
+        e_stc_g     = [f["E_STC_sim (kWh)"] for f in filas_r]
+        e_sim_g     = [f["E_sim (kWh)"]     for f in filas_r]
+        e_real_g    = [f["E_real (kWh)"]    for f in filas_r]
 
-        tab1, tab2 = st.tabs(["📊 PR real vs esperado", "📅 kWh real vs simulado"])
+        # ── TABS de gráficas ──────────────────────────────────────────────────
+        tab1, tab2, tab3 = st.tabs([
+            "📊 PR convencional vs PR corregido T°",
+            "🌡️ Pérdidas por temperatura",
+            "📅 kWh: STC vs simulado vs real",
+        ])
 
         with tab1:
+            st.caption(
+                "**Azul**: PR esperado (simulado con temperatura real) · "
+                "**Naranja**: PR convencional real (E_real/P_STC/HSP, incluye pérdidas T°) · "
+                "**Verde/Rojo**: PR corregido (sin efecto temperatura) → pérdidas reales no térmicas"
+            )
             fig_pr = go.Figure()
             fig_pr.add_trace(go.Bar(
-                name="PR esperado (simulado)",
-                x=meses_grafica, y=pr_esp_grafica,
-                marker_color="#1565C0", opacity=0.75,
+                name="PR esperado (sim)",
+                x=meses_g, y=pr_esp_g,
+                marker_color="#1565C0", opacity=0.60,
             ))
             fig_pr.add_trace(go.Bar(
-                name="PR real (inversor)",
-                x=meses_grafica, y=pr_real_grafica,
-                marker_color=[
-                    "#2E7D32" if (r >= e * 0.90) else
-                    "#F9A825" if (r >= e * 0.80) else
-                    "#C62828"
-                    for r, e in zip(pr_real_grafica, pr_esp_grafica)
-                ],
-                opacity=0.90,
-                text=[f"{r:.1f}%" for r in pr_real_grafica],
+                name="PR convencional real",
+                x=meses_g, y=pr_conv_g,
+                marker_color="#E65100", opacity=0.80,
+                text=[f"{v:.1f}%" for v in pr_conv_g],
                 textposition="outside",
             ))
+            fig_pr.add_trace(go.Bar(
+                name="PR corregido T° (real no-térmico)",
+                x=meses_g, y=pr_corr_g,
+                marker_color=[
+                    "#2E7D32" if v >= 90 else
+                    "#F9A825" if v >= 80 else
+                    "#C62828"
+                    for v in pr_corr_g
+                ],
+                opacity=0.90,
+                text=[f"{v:.1f}%" for v in pr_corr_g],
+                textposition="inside",
+            ))
             fig_pr.add_hline(
-                y=float(res["PR"]) * 100 * 0.90,
-                line_dash="dash", line_color="#EF5350",
-                annotation_text="Umbral 90% PR", annotation_position="top right",
+                y=85, line_dash="dot", line_color="#C62828",
+                annotation_text="Umbral PR_corr 85%", annotation_position="top left",
             )
             fig_pr.update_layout(
                 barmode="group", yaxis_title="Performance Ratio (%)",
-                height=380, plot_bgcolor="white", paper_bgcolor="white",
-                legend=dict(orientation="h", y=-0.25), margin=dict(b=80),
-                yaxis=dict(range=[0, max(max(pr_esp_grafica), max(pr_real_grafica)) * 1.15]),
+                height=400, plot_bgcolor="white", paper_bgcolor="white",
+                legend=dict(orientation="h", y=-0.28), margin=dict(b=90),
+                yaxis=dict(range=[0, max(max(pr_corr_g + [0]), max(pr_esp_g + [0])) * 1.18]),
             )
             st.plotly_chart(fig_pr, use_container_width=True)
 
         with tab2:
+            st.caption(
+                "Barras rojas: % de producción perdida por temperatura cada mes. "
+                "Línea: T_cell media operativa del panel. "
+                "Para BIPV en fachada confinada, T_cell puede llegar a 50–65°C → pérdidas del 10–18%."
+            )
+            fig_t = go.Figure()
+            fig_t.add_trace(go.Bar(
+                name="% Pérdida por T° (respecto a STC)",
+                x=meses_g, y=perdida_t_g,
+                marker_color=[
+                    "#C62828" if v > 10 else
+                    "#F9A825" if v > 6  else
+                    "#43A047"
+                    for v in perdida_t_g
+                ],
+                opacity=0.85,
+                text=[f"{v:.1f}%" for v in perdida_t_g],
+                textposition="outside",
+                yaxis="y1",
+            ))
+            fig_t.add_trace(go.Scatter(
+                name="T_cell media operativa (°C)",
+                x=meses_g, y=t_cell_g,
+                mode="lines+markers+text",
+                text=[f"{v:.0f}°C" for v in t_cell_g],
+                textposition="top center",
+                line=dict(color="#1565C0", width=2),
+                marker=dict(size=7),
+                yaxis="y2",
+            ))
+            fig_t.update_layout(
+                yaxis=dict(title="Pérdida T° (%)", range=[0, max(perdida_t_g) * 1.4]),
+                yaxis2=dict(title="T_cell (°C)", overlaying="y", side="right",
+                            range=[0, max(t_cell_g) * 1.3]),
+                height=380, plot_bgcolor="white", paper_bgcolor="white",
+                legend=dict(orientation="h", y=-0.28), margin=dict(b=90),
+            )
+            st.plotly_chart(fig_t, use_container_width=True)
+
+        with tab3:
+            st.caption(
+                "**Gris**: E_ac_STC — producción si T_cell = 25°C siempre (baja irradiancia, T constante). "
+                "**Azul**: E_ac simulada con temperatura real. "
+                "**Verde**: E_real del inversor. "
+                "La brecha Gris−Azul = pérdidas por temperatura. La brecha Azul−Verde = otras pérdidas reales."
+            )
             fig_kwh = go.Figure()
             fig_kwh.add_trace(go.Bar(
-                name="E_ac simulada (kWh)",
-                x=meses_grafica, y=e_sim_graf,
-                marker_color="#1565C0", opacity=0.70,
+                name="E_STC (T=25°C, sin pérd. temp.)",
+                x=meses_g, y=e_stc_g,
+                marker_color="#9E9E9E", opacity=0.70,
             ))
             fig_kwh.add_trace(go.Bar(
-                name="E_ac real inversor (kWh)",
-                x=meses_grafica, y=e_real_graf,
-                marker_color="#2E7D32", opacity=0.85,
-                text=[f"{v:,.0f}" for v in e_real_graf],
+                name="E_sim (temperatura real)",
+                x=meses_g, y=e_sim_g,
+                marker_color="#1565C0", opacity=0.75,
+            ))
+            fig_kwh.add_trace(go.Bar(
+                name="E_real (inversor)",
+                x=meses_g, y=e_real_g,
+                marker_color="#2E7D32", opacity=0.88,
+                text=[f"{v:,.0f}" for v in e_real_g],
                 textposition="outside",
             ))
             fig_kwh.update_layout(
                 barmode="group", yaxis_title="Energía (kWh)",
-                height=380, plot_bgcolor="white", paper_bgcolor="white",
-                legend=dict(orientation="h", y=-0.25), margin=dict(b=80),
+                height=400, plot_bgcolor="white", paper_bgcolor="white",
+                legend=dict(orientation="h", y=-0.28), margin=dict(b=90),
             )
             st.plotly_chart(fig_kwh, use_container_width=True)
 
-        # ── Tabla comparativa ─────────────────────────────────────────────────
-        st.markdown("#### 📋 Tabla comparativa mes a mes")
-        st.dataframe(df_diag, use_container_width=True, hide_index=True)
+        # ── Tabla completa ────────────────────────────────────────────────────
+        st.markdown("#### 📋 Tabla completa de diagnóstico mes a mes")
+        cols_show = ["Mes","HSP (h)","T_cell (°C)","% Pérd. T°",
+                     "E_STC_sim (kWh)","E_sim (kWh)","E_real (kWh)",
+                     "PR_esp (%)","PR_conv (%)","PR_corr_T (%)","Δ kWh","Estado"]
+        st.dataframe(df_diag[cols_show], use_container_width=True, hide_index=True)
 
         # ── Diagnóstico automático ────────────────────────────────────────────
-        meses_rojo    = [f["Mes"] for f in filas if f["Estado"].startswith("🔴")]
-        meses_amarillo= [f["Mes"] for f in filas if f["Estado"].startswith("🟡")]
-        meses_verde   = [f["Mes"] for f in filas if f["Estado"].startswith("🟢")]
+        meses_rojo     = [f["Mes"] for f in filas_r if f["Estado"].startswith("🔴")]
+        meses_amarillo = [f["Mes"] for f in filas_r if f["Estado"].startswith("🟡")]
+        meses_verde    = [f["Mes"] for f in filas_r if f["Estado"].startswith("🟢")]
 
-        # Totales reales ingresados
         total_real = sum(kwh_real[m] for m in meses_etiq if kwh_real[m] > 0)
         total_sim  = sum(
             float(df_m.loc[df_m.index == m, "E_ac (kWh)"].values[0])
-            for m in meses_con_dato
-            if len(df_m.loc[df_m.index == m]) > 0
+            for m in meses_con_dato if len(df_m.loc[df_m.index == m]) > 0
         )
-        tarifa_ref = st.session_state.get("tarifa_kwh", 650)
-        perdida_cop= max(0.0, (total_sim - total_real) * tarifa_ref)
+        total_stc  = sum(
+            float(_e_ac_stc_mes[_e_ac_stc_mes.index == m].values[0])
+            for m in meses_con_dato if len(_e_ac_stc_mes[_e_ac_stc_mes.index == m]) > 0
+        )
+        perdida_t_kwh_total = max(0.0, total_stc - total_sim)
+        tarifa_ref  = st.session_state.get("tarifa_kwh", 650)
+        perdida_cop = max(0.0, (total_sim - total_real) * tarifa_ref)
+
+        # PR globales acumulados (meses con dato)
+        _hsp_total_diag = sum(float(_hsp_mes.get(meses_etiq.index(m)+1, 0.0)) for m in meses_con_dato)
+        _factor_T_pond  = (1.0 + gamma_frac * (
+            np.mean([float(_t_cell_mes.get(meses_etiq.index(m)+1, 25.0)) for m in meses_con_dato]) - 25.0
+        )) if meses_con_dato else 1.0
+        pr_conv_global  = (total_real / (P_stc_kW * _hsp_total_diag)) if (_hsp_total_diag > 0 and P_stc_kW > 0) else 0.0
+        pr_corr_global  = (pr_conv_global / _factor_T_pond) if _factor_T_pond > 0.5 else 0.0
+        perdida_t_pct_global = (1.0 - _factor_T_pond) * 100.0
 
         st.markdown("#### 🩺 Diagnóstico automático")
 
+        # Métricas resumen
+        mc1, mc2, mc3, mc4 = st.columns(4)
+        mc1.metric("PR convencional global", f"{pr_conv_global*100:.1f}%",
+                   help="E_real / (P_STC × HSP) — incluye pérdidas temperatura")
+        mc2.metric("PR corregido T° global", f"{pr_corr_global*100:.1f}%",
+                   help="Pérdidas NO térmicas: suciedad, sombras, degradación, cableado")
+        mc3.metric("% Pérd. temperatura (prom.)", f"{perdida_t_pct_global:.1f}%",
+                   help=f"γ × (T_cell_media − 25°C) · γ = {gamma_pct:+.3f}%/°C")
+        mc4.metric("Pérdida T° acumulada", f"{perdida_t_kwh_total:,.0f} kWh",
+                   help="kWh perdidos solo por temperatura en los meses ingresados")
+
+        # Alertas
         if meses_rojo:
             st.error(
-                f"🔴 **Problema detectado en: {', '.join(meses_rojo)}** — "
-                f"PR real < 80% del esperado. "
-                "Causas probables: paneles degradados, suciedad severa, sombras, "
-                "falla en strings o en el inversor. Requiere inspección de campo urgente."
+                f"🔴 **PR_corregido < 80% en: {', '.join(meses_rojo)}** — "
+                "Existen pérdidas NO térmicas significativas. "
+                "Causas probables: suciedad severa, sombras, degradación de paneles, "
+                "falla en strings o conector MC4 quemado. Inspección de campo urgente."
             )
         if meses_amarillo:
             st.warning(
-                f"🟡 **Atención en: {', '.join(meses_amarillo)}** — "
-                f"PR real entre 80% y 90% del esperado. "
-                "Posible suciedad acumulada, sombreado parcial o degradación leve. "
-                "Verificar limpieza y revisar strings individuales."
+                f"🟡 **PR_corregido 80–90% en: {', '.join(meses_amarillo)}** — "
+                "Pérdidas no térmicas moderadas. "
+                "Verificar limpieza, sombreado parcial y revisar strings individuales."
             )
         if meses_verde and not meses_rojo and not meses_amarillo:
             st.success(
-                f"🟢 **Sistema operando correctamente** en todos los meses ingresados "
-                f"({', '.join(meses_verde)}). PR real ≥ 90% del esperado."
+                f"🟢 **Sistema en buen estado** en todos los meses con dato ({', '.join(meses_verde)}). "
+                f"PR_corregido ≥ 90% — las pérdidas observadas son principalmente por temperatura, "
+                f"que es normal en BIPV (γ = {gamma_pct:+.3f}%/°C)."
             )
         if total_sim > 0:
-            delta_total = total_real - total_sim
+            delta_total     = total_real - total_sim
             delta_pct_total = delta_total / total_sim * 100
             st.info(
-                f"📊 **Resumen acumulado ({len(meses_con_dato)} meses con dato):** "
-                f"E_real = **{total_real:,.0f} kWh** | "
-                f"E_simulada = **{total_sim:,.0f} kWh** | "
-                f"Diferencia = **{delta_total:+,.0f} kWh ({delta_pct_total:+.1f}%)**"
-                + (f" | Pérdida estimada ≈ **${perdida_cop:,.0f} COP**" if perdida_cop > 0 else "")
+                f"📊 **Resumen ({len(meses_con_dato)} meses):** "
+                f"E_real = **{total_real:,.0f} kWh** · "
+                f"E_sim = **{total_sim:,.0f} kWh** · "
+                f"E_STC (T=25°C) = **{total_stc:,.0f} kWh** | "
+                f"Diferencia real vs sim = **{delta_total:+,.0f} kWh ({delta_pct_total:+.1f}%)** · "
+                f"Pérdida temperatura acumulada ≈ **{perdida_t_kwh_total:,.0f} kWh** "
+                f"({perdida_t_kwh_total/total_stc*100:.1f}% de E_STC)"
+                + (f" · Pérdida no-térmica ≈ **${perdida_cop:,.0f} COP**" if perdida_cop > 0 else "")
             )
 
-        # Guardar para Reporte PDF
-        st.session_state["df_diagnostico_real"] = df_diag
-        st.session_state["diag_meses_rojo"]     = meses_rojo
-        st.session_state["diag_meses_amarillo"] = meses_amarillo
-        st.session_state["diag_total_real_kwh"] = total_real
-        st.session_state["diag_total_sim_kwh"]  = total_sim
+        # ── Guardar para Reporte PDF ──────────────────────────────────────────
+        st.session_state["df_diagnostico_real"]  = df_diag
+        st.session_state["diag_meses_rojo"]      = meses_rojo
+        st.session_state["diag_meses_amarillo"]  = meses_amarillo
+        st.session_state["diag_total_real_kwh"]  = total_real
+        st.session_state["diag_total_sim_kwh"]   = total_sim
+        st.session_state["diag_total_stc_kwh"]   = total_stc
+        st.session_state["diag_pr_conv_global"]  = pr_conv_global
+        st.session_state["diag_pr_corr_global"]  = pr_corr_global
+        st.session_state["diag_perdida_t_pct"]   = perdida_t_pct_global
+        st.session_state["diag_perdida_t_kwh"]   = perdida_t_kwh_total
+        st.session_state["diag_gamma_pct"]       = gamma_pct
