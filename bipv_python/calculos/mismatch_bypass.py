@@ -321,13 +321,17 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
         elif col_fs_combined is None and cl in ("fs", "factor_sombreado", "shading_factor", "fs_combined"):
             col_fs_combined = c
 
-    # Extraer columna de fachada si existe
+    # Extraer columna de fachada — priorizar columna 'Fachada' limpia sobre 'Obstaculo'
     col_fachada: str | None = None
+    col_fachada_clean: str | None = None   # columna dedicada "Fachada"
+    col_obstaculo: str | None = None       # columna "Obstaculo" (fachada embebida)
     for c in df_raw.columns:
         cl = c.lower().replace(" ", "_")
-        if cl in ("fachada", "facade", "obstaculo", "obstacle"):
-            col_fachada = c
-            break
+        if cl in ("fachada", "facade"):
+            col_fachada_clean = c
+        elif cl in ("obstaculo", "obstacle"):
+            col_obstaculo = c
+    col_fachada = col_fachada_clean or col_obstaculo  # Fachada limpia tiene prioridad
 
     # ── Elegir columna FS con prioridad explícita ──────────────────────────────
     advertencias: list[str] = []
@@ -401,28 +405,61 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
     df["hora"] = df["hora"].apply(_parse_hora)
     df["FS"]   = pd.to_numeric(df["FS"], errors="coerce").fillna(0.0).clip(0.0, 1.0)
 
-    # ── Advertencia multi-fachada ──────────────────────────────────────────────
-    if "fachada" in df.columns:
-        fachadas_unicas = df["fachada"].dropna().unique()
-        if len(fachadas_unicas) > 1:
-            msg = (
-                f"El CSV contiene {len(fachadas_unicas)} fachadas/obstáculos distintos: "
-                f"{list(fachadas_unicas[:5])}{'...' if len(fachadas_unicas) > 5 else ''}. "
-                "Se promediarán todas. Filtra el CSV por tu fachada activa para resultados exactos."
+    # ── #32 Detección de convención FS (transmitancia vs p_shade) ─────────────
+    # Solo aplica cuando NO tenemos FS_geometrico (que siempre es p_shade)
+    convencion_probable = "p_shade"
+    inversion_detectada = False
+    if tipo_fs != "geometrico" and len(df) > 20:
+        pct_near_1 = float((df["FS"] > 0.90).mean())
+        pct_near_0 = float((df["FS"] < 0.10).mean())
+        # Señal de transmitancia: la mayoría de horas sin sombra tendrán FS ≈ 1.0
+        # Señal de p_shade:       la mayoría de horas sin sombra tendrán FS ≈ 0.0
+        if pct_near_1 > 0.55 and pct_near_1 > pct_near_0 * 3:
+            convencion_probable = "transmitancia"
+            inversion_detectada = True
+            advertencias.append(
+                f"🔴 FORMATO POSIBLEMENTE INVERTIDO: el {pct_near_1*100:.0f}% de los valores FS "
+                "son > 0.90. El CSV parece estar en **formato transmitancia** "
+                "(1 = sin sombra, 0 = sombra total), pero el modelo bypass necesita "
+                "**formato p_shade** (0 = sin sombra, 1 = sombra total). "
+                "Este CSV probablemente fue exportado desde los 'Puntos manuales' de la "
+                "calculadora, no desde 'Cruzar Máscara + EPW'. "
+                "Activa la opción **'Invertir FS (1 − FS)'** para corregirlo."
             )
-            advertencias.append(msg)
+
+    # ── #33 Fachadas disponibles ───────────────────────────────────────────────
+    fachadas_disponibles: list[str] = []
+    if "fachada" in df.columns:
+        fachadas_unicas = [str(f) for f in df["fachada"].dropna().unique()]
+        fachadas_disponibles = sorted(fachadas_unicas)
+        if len(fachadas_unicas) > 1:
+            advertencias.append(
+                f"El CSV contiene **{len(fachadas_unicas)} fachadas/obstáculos** distintos: "
+                f"{', '.join(fachadas_unicas[:4])}{'…' if len(fachadas_unicas) > 4 else ''}. "
+                "Selecciona la fachada de tu array en el selector de abajo."
+            )
 
     meta: dict = {
-        "col_original":  col_fs_elegida,
-        "tipo":          tipo_fs,
-        "descripcion":   descripcion_fs,
-        "advertencias":  advertencias,
-        "col_fs_geom":   col_fs_geom,
-        "col_fs_clim":   col_fs_clim,
-        "col_fs_combined": col_fs_combined,
+        "col_original":        col_fs_elegida,
+        "tipo":                tipo_fs,
+        "descripcion":         descripcion_fs,
+        "advertencias":        advertencias,
+        "col_fs_geom":         col_fs_geom,
+        "col_fs_clim":         col_fs_clim,
+        "col_fs_combined":     col_fs_combined,
+        # #32
+        "convencion_probable": convencion_probable,
+        "inversion_detectada": inversion_detectada,
+        # #33
+        "fachadas_disponibles": fachadas_disponibles,
+        "tiene_fachada_col":    "fachada" in df.columns,
     }
 
-    return df[["mes", "dia", "hora", "FS"]].copy(), meta
+    # Retornar df con fachada cuando esté disponible (para filtrado en UI)
+    cols_out = ["mes", "dia", "hora", "FS"]
+    if "fachada" in df.columns:
+        cols_out.append("fachada")
+    return df[cols_out].copy(), meta
 
 
 # ══════════════════════════════════════════════════════════════════════════════

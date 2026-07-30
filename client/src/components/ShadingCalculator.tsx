@@ -60,6 +60,7 @@ interface AnalysisPoint {
   fsClimatico?: number; // FS climático (sombra por nubosidad)
   situacion?: string; // Muy nublado, Parcialmente nublado, Cielo despejado, etc.
   hourStr?: string; // Hora en formato string original (ej: "07:30")
+  facade?: string; // Nombre de la fachada (columna Fachada en CSV extendido)
 }
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -494,7 +495,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
     };
 
     const headers = hasExtended
-      ? ['Evento', 'Mes', 'Dia', 'Hora', 'Altura Solar (deg)', 'Acimut Solar (deg)', 'Obstaculo', 'FS_geometrico', 'FS_climatico', 'FS', 'Situacion']
+      ? ['Evento', 'Mes', 'Dia', 'Hora', 'Altura Solar (deg)', 'Acimut Solar (deg)', 'Obstaculo', 'FS_geometrico', 'FS_climatico', 'FS', 'Situacion', 'Fachada']
       : ['Mes', 'Dia', 'Hora', 'Altura Solar', 'Acimut Solar', 'Obstaculo', 'Area Sombreada', 'FS'];
 
     const rows = hasExtended
@@ -510,6 +511,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
           (p.fsClimatico ?? 0).toFixed(3),
           p.fs.toFixed(3),
           escapeCSV(p.situacion || ''),
+          escapeCSV(p.facade || ''),   // columna Fachada para filtrado por fachada activa
         ])
       : points.map(p => [
           p.month,

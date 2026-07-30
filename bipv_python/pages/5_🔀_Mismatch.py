@@ -544,12 +544,80 @@ if csv_ok and df_fs_raw is not None:
         st.success(meta_fs.get("descripcion", ""))
     else:
         st.warning(meta_fs.get("descripcion", ""))
-    for adv in meta_fs.get("advertencias", []):
+
+    # ── #32 · Detección de convención invertida ────────────────────────────
+    inversion_detectada = meta_fs.get("inversion_detectada", False)
+    _adv_list = meta_fs.get("advertencias", [])
+
+    # Separar advertencias críticas (inversión) de las informativas (multi-fachada)
+    _adv_criticas = [a for a in _adv_list if "INVERTIDO" in a or "FORMATO" in a]
+    _adv_info     = [a for a in _adv_list if a not in _adv_criticas]
+
+    for adv in _adv_criticas:
+        st.error(adv)
+    for adv in _adv_info:
         st.warning(f"⚠️ {adv}")
+
+    if inversion_detectada:
+        st.warning(
+            "💡 **Solución recomendada:** vuelve a la Calculadora de Sombreado, "
+            "ejecuta **«Cruzar Máscara + EPW»** y exporta ese CSV (columna FS_geometrico incluida). "
+            "Si prefieres usar este CSV de todas formas, activa la opción abajo."
+        )
+
+    # Checkbox para invertir FS (solo visible si se detectó posible inversión o el usuario lo activa)
+    with st.expander("🔧 Opciones avanzadas del CSV", expanded=inversion_detectada):
+        invertir_fs = st.checkbox(
+            "Invertir FS (usar 1 − FS) — activa si el CSV está en formato transmitancia",
+            value=inversion_detectada,
+            key="bypass_invertir_fs",
+            help="El CSV de 'Puntos manuales' usa FS = transmitancia (1=sin sombra). "
+                 "El modelo bypass necesita FS = p_shade (0=sin sombra). "
+                 "Marca esta opción para convertir automáticamente.",
+        )
+    st.session_state["bypass_invertir_fs_flag"] = invertir_fs
+
+    # ── #33 · Selector de fachada ──────────────────────────────────────────
+    fachadas_disp  = meta_fs.get("fachadas_disponibles", [])
+    tiene_fachadas = meta_fs.get("tiene_fachada_col", False) and len(fachadas_disp) > 1
+
+    if tiene_fachadas:
+        st.markdown("#### 🏗️ Seleccionar fachada del array")
+        st.caption(
+            f"El CSV tiene {len(fachadas_disp)} fachadas/obstáculos distintos. "
+            "Selecciona la fachada donde está instalado tu array solar para que el modelo "
+            "use solo el FS de esa fachada (no el promedio de todas)."
+        )
+        fachada_sel = st.selectbox(
+            "Fachada activa del array",
+            options=["— Todas (promedio) —"] + fachadas_disp,
+            index=0,
+            key="bypass_fachada_sel",
+            help="Usa la fachada que coincide con la orientación del array en tu proyecto",
+        )
+        st.session_state["bypass_fachada_sel_val"] = (
+            None if fachada_sel == "— Todas (promedio) —" else fachada_sel
+        )
+    else:
+        st.session_state["bypass_fachada_sel_val"] = None
+
+    # ── Aplicar filtros al df antes de estadísticas y simulación ──────────
+    _invertir  = st.session_state.get("bypass_invertir_fs_flag", False)
+    _fachada_f = st.session_state.get("bypass_fachada_sel_val", None)
+
+    df_fs_work = df_fs_raw.copy()
+    if _fachada_f and "fachada" in df_fs_work.columns:
+        df_fs_work = df_fs_work[df_fs_work["fachada"] == _fachada_f].copy()
+        if df_fs_work.empty:
+            st.error(f"No se encontraron filas para la fachada seleccionada: '{_fachada_f}'")
+            df_fs_work = df_fs_raw.copy()  # fallback
+    if _invertir:
+        df_fs_work = df_fs_work.copy()
+        df_fs_work["FS"] = (1.0 - df_fs_work["FS"]).clip(0.0, 1.0)
 
     # ── Estadísticas del CSV ──────────────────────────────────────────────
     try:
-        stats = estadisticas_fs(df_fs_raw)
+        stats = estadisticas_fs(df_fs_work)
         sc1, sc2, sc3, sc4 = st.columns(4)
         sc1.metric("Puntos de análisis", stats["n_puntos_analisis"],
                    help="Filas de módulos / posiciones en la fachada")
@@ -670,9 +738,9 @@ if csv_ok and df_fs_raw is not None:
         if btn_bypass:
             with st.spinner("Alineando FS con TMY y simulando bypass diodes hora a hora..."):
                 try:
-                    # Alinear FS con el TMY
+                    # Alinear FS con el TMY (usa df_fs_work: ya filtrado por fachada e invertido si aplica)
                     tmy_idx  = st.session_state["tmy_df"].index
-                    p_shade  = alinear_fs_con_tmy(df_fs_raw, tmy_idx)
+                    p_shade  = alinear_fs_con_tmy(df_fs_work, tmy_idx)
 
                     # Simular bypass
                     res_bp = simular_bypass_horario(

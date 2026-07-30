@@ -584,6 +584,7 @@ export function crossingResultsToAnalysisPoints(results: CrossingResult[]): Arra
   fsClimatico: number;
   situacion: string;
   hourStr: string;
+  facade: string;
 }> {
   return results.map((r, i) => ({
     id: `crossing_${Date.now()}_${i}`,
@@ -601,6 +602,7 @@ export function crossingResultsToAnalysisPoints(results: CrossingResult[]): Arra
     fsClimatico: r.fsClimatico,
     situacion: r.situacion,
     hourStr: r.hourStr,
+    facade: r.facade,               // campo limpio para columna Fachada en CSV
   }));
 }
 
