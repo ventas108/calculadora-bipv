@@ -53,6 +53,8 @@ with col_op2:
     incluir_motor   = st.checkbox("Incluir sección Motor Óptico",    value=motor_optico,   key="rep_inc_motor")
     incluir_dim     = st.checkbox("Incluir sección Dimensionamiento", value=dimensionam_ok, key="rep_inc_dim")
     incluir_prod    = st.checkbox("Incluir sección Producción",      value=produccion_ok,  key="rep_inc_prod")
+    _bypass_ok_rep  = st.session_state.get("bypass_ok", False)
+    incluir_bypass  = st.checkbox("Incluir pérdidas bypass diodes",  value=_bypass_ok_rep, key="rep_inc_bypass")
     incluir_fin     = st.checkbox("Incluir sección Financiero",      value=financiero_ok,  key="rep_inc_fin")
     st.checkbox("Incluir Balance Energético + Clasificación A+/A/B/C/D",
                 value=balance_ok_ui, key="rep_inc_balance")
@@ -88,6 +90,12 @@ def generar_html_reporte() -> str:
     n_paneles    = st.session_state.get("N_paneles_final", st.session_state.get("N_paneles_dim", "—"))
     panel_nombre = st.session_state.get("panel_nombre_final", "ASP-ST1-T40")
     p_stc_kw     = st.session_state.get("P_stc_kW_sistema", "—")
+
+    # Bypass diodes
+    bypass_ok_r   = st.session_state.get("bypass_ok", False)
+    bypass_res_r  = st.session_state.get("bypass_result", {})
+    meta_fs_r     = st.session_state.get("meta_fs", {})
+    incluir_bypass_r = st.session_state.get("rep_inc_bypass", bypass_ok_r)
 
     # Financiero
     fin          = st.session_state.get("metricas_financiero", {})
@@ -442,6 +450,80 @@ def generar_html_reporte() -> str:
                     html += f'<td style="padding:4px 6px;text-align:{align};font-weight:{weight};color:{color};">{val}</td>'
                 html += "</tr>"
             html += "</tbody></table>"
+        html += cierre()
+
+    # ── 4c. Pérdidas por bypass diodes ────────────────────────────────────────
+    if bypass_ok_r and incluir_bypass_r and bypass_res_r:
+        kwh_bp   = bypass_res_r.get("kwh_bypass_anual", 0)
+        pct_bp   = bypass_res_r.get("pct_bypass_anual", 0)
+        h_bp     = bypass_res_r.get("horas_bypass", 0)
+        h_somb   = bypass_res_r.get("horas_sombra", 0)
+        e_dc_uni = bypass_res_r.get("kwh_dc_uniforme", 0)
+        e_ac_bp  = st.session_state.get("E_ac_anual_kWh_bypass", 0)
+        col_fs_r = meta_fs_r.get("col_original", "FS")
+        tipo_fsr = meta_fs_r.get("tipo", "combinado")
+        modo_uso = st.session_state.get("bypass_modo_usado", "mensual")
+        df_m_bp  = bypass_res_r.get("df_mensual_bypass")
+
+        html += seccion("Pérdidas por Bypass Diodes — Sombra Parcial en Strings", "⚡")
+        html += tabla_kv([
+            ("Pérdida anual por bypass diodes",
+             _fmt(kwh_bp, 0), "kWh DC/año",
+             "Energía DC adicional perdida cuando los bypass diodes se activan por sombra de obstáculos"),
+            ("% sobre producción DC",
+             _fmt(pct_bp, 2), "%",
+             "Fracción de la producción DC base perdida por activación de bypass diodes"),
+            ("Horas con bypass activo",
+             f"{h_bp:,}", "h/año",
+             "Horas al año donde al menos un bypass diode en el array se activa"),
+            ("Horas con sombra geométrica",
+             f"{h_somb:,}", "h/año",
+             "Horas con Factor de Sombreado > 5% según el modelo 3D"),
+            ("E_ac corregida (con bypass)",
+             _fmt(e_ac_bp, 0) if e_ac_bp else "—", "kWh AC/año",
+             "Producción AC real = E_ac simulada − pérdida_bypass × η_inversor"),
+            ("Fuente de datos FS",
+             col_fs_r, "",
+             "Geometrico = solo obstáculos físicos · Combinado = geom + nubes (sobreestima)"),
+            ("Modo cobertura temporal",
+             "Patrón mensual" if modo_uso == "mensual" else "Días críticos exactos", "",
+             "Mensual replica el patrón del día crítico a todos los días del mes"),
+        ],
+        nota=(
+            "Los bypass diodes se activan cuando un obstáculo físico (edificio vecino, voladizo) "
+            "sombrea parte de un string, reduciendo Isc por debajo del punto de operación del "
+            "resto de módulos. A diferencia de la reducción escalar de irradiancia, el bypass "
+            "elimina toda la tensión de los módulos sombreados → pérdida mayor. "
+            f"{'🟢 Bajo impacto (<2%)' if pct_bp < 2 else '🟡 Impacto moderado (2–5%)' if pct_bp < 5 else '🔴 Impacto alto (>5%)'}"
+            " — Ref: Deline et al. 2013."
+        ))
+
+        # Tabla mensual de bypass
+        if df_m_bp is not None:
+            try:
+                html += """
+                <table style="width:100%;border-collapse:collapse;font-size:0.82em;margin-bottom:14px;">
+                <thead><tr style="background:#B71C1C;color:#fff;">
+                <th style="padding:5px 8px;text-align:left;">Mes</th>
+                <th style="padding:5px 8px;text-align:right;">E_dc con bypass (kWh)</th>
+                <th style="padding:5px 8px;text-align:right;">Pérdida bypass (kWh)</th>
+                <th style="padding:5px 8px;text-align:right;">FS medio</th>
+                <th style="padding:5px 8px;text-align:right;">Horas bypass</th>
+                </tr></thead><tbody>"""
+                for ri, (mes, row) in enumerate(df_m_bp.iterrows()):
+                    bg = "#fff" if ri % 2 == 0 else "#fdf2f2"
+                    p_loss = float(row.get("Pérdida bypass (kWh)", 0))
+                    color_p = "#c62828" if p_loss > 50 else "#e53935" if p_loss > 20 else "inherit"
+                    html += f"""<tr style="background:{bg};">
+                    <td style="padding:4px 8px;font-weight:600;">{mes}</td>
+                    <td style="padding:4px 8px;text-align:right;">{float(row.get('E_dc con bypass (kWh)',0)):,.0f}</td>
+                    <td style="padding:4px 8px;text-align:right;color:{color_p};font-weight:700;">{p_loss:,.1f}</td>
+                    <td style="padding:4px 8px;text-align:right;">{float(row.get('FS medio mensual',0)):.3f}</td>
+                    <td style="padding:4px 8px;text-align:right;">{float(row.get('Horas bypass activo',0)):.0f}</td>
+                    </tr>"""
+                html += "</tbody></table>"
+            except Exception:
+                pass
         html += cierre()
 
     # ── 5. Financiero ─────────────────────────────────────────────────────────

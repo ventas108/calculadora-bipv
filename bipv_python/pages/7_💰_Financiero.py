@@ -22,16 +22,42 @@ st.caption(
 
 # ── Prerequisitos ─────────────────────────────────────────────────────────────
 prod_ok = st.session_state.get("produccion_ok", False)
-e_ac    = st.session_state.get("E_ac_anual_kWh", 0.0)
 p_stc   = st.session_state.get("P_stc_kW_sistema", 0.0)
 n_pan   = st.session_state.get("N_paneles_final", 64)
 ciudad  = st.session_state.get("tmy_ciudad", "Bogotá")
 
+# Usar E_ac corregida por bypass si está disponible (Tarea #35)
+_e_ac_base   = st.session_state.get("E_ac_anual_kWh", 0.0)
+_e_ac_bypass = st.session_state.get("E_ac_anual_kWh_bypass", 0.0)
+_bypass_ok   = st.session_state.get("bypass_ok", False)
+_kwh_bypass  = st.session_state.get("kwh_bypass_anual", 0.0)
+
+e_ac = _e_ac_bypass if (_bypass_ok and _e_ac_bypass > 0) else _e_ac_base
+
 if prod_ok and e_ac > 0:
-    st.success(
-        f"✅ Producción cargada — **{e_ac:,.0f} kWh/año** | "
-        f"Sistema: **{p_stc:.2f} kWp** ({n_pan} módulos) | Ciudad: **{ciudad}**"
-    )
+    if _bypass_ok and _e_ac_bypass > 0:
+        st.success(
+            f"✅ Producción con corrección bypass — **{e_ac:,.0f} kWh/año** | "
+            f"Sistema: **{p_stc:.2f} kWp** ({n_pan} módulos) | Ciudad: **{ciudad}**"
+        )
+        st.info(
+            f"⚡ **Corrección bypass diodes aplicada:** "
+            f"E_ac base = {_e_ac_base:,.0f} kWh/año → "
+            f"pérdida bypass = {_kwh_bypass:,.0f} kWh/año → "
+            f"**E_ac neta = {e_ac:,.0f} kWh/año** "
+            f"({(_e_ac_base - e_ac) / _e_ac_base * 100:.1f}% menos). "
+            "TIR y Payback calculados con la producción real corregida."
+        )
+    else:
+        st.success(
+            f"✅ Producción cargada — **{e_ac:,.0f} kWh/año** | "
+            f"Sistema: **{p_stc:.2f} kWp** ({n_pan} módulos) | Ciudad: **{ciudad}**"
+        )
+        if prod_ok:
+            st.caption(
+                "💡 Ejecuta el modelo Bypass Diodes en Página 5 (Sección 5) para usar "
+                "la E_ac corregida por sombra parcial en este análisis financiero."
+            )
 else:
     st.warning("⚠️ Primero ejecuta 📊 Producción para calcular la energía anual del sistema.")
     e_ac = st.number_input(
