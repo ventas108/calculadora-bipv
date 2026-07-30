@@ -469,35 +469,110 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
 def alinear_fs_con_tmy(
     df_fs: pd.DataFrame,
     tmy_index: pd.DatetimeIndex,
+    modo: str = "mensual",
 ) -> pd.Series:
     """
-    Convierte el DataFrame de FS (mes/dia/hora, posiblemente múltiples puntos
-    de análisis por timestamp) en una Serie horaria alineada con el TMY.
+    Convierte el DataFrame de FS (mes/dia/hora) en una Serie horaria alineada
+    con el TMY (8760 horas).
 
-    · Múltiples puntos de análisis para el mismo timestamp → promedia el FS.
-    · Timestamps del TMY sin dato en el CSV → FS = 0.0 (sin sombra).
-    · El join usa solo (mes, dia, hora) — ignora el año del TMY y del CSV.
+    Parámetros
+    ----------
+    df_fs     : DataFrame con columnas [mes, dia, hora, FS]
+    tmy_index : DatetimeIndex del TMY (8760 timestamps)
+    modo      : "mensual" (recomendado) | "exacto"
 
-    Retorna pd.Series (índice = tmy_index, valores FS ∈ [0, 1])
+        "exacto"  — join por (mes, dia, hora). Solo los días críticos del CSV
+                    tienen FS > 0. El resto del año queda FS = 0.
+                    Cobertura típica: ~60–150 horas/año (< 2% del TMY).
+
+        "mensual" — join por (mes, hora). El patrón horario del día crítico
+                    se replica a todos los días del mismo mes.
+                    Razonamiento: la geometría solar cambia poco dentro de
+                    un mes; el día crítico (ej. 21 de marzo) es representativo
+                    de todo el mes de marzo.
+                    Cobertura típica: ~2 000–3 500 horas/año.
+
+    Retorna pd.Series (índice = tmy_index, valores FS ∈ [0, 1], nombre="p_shade")
     """
-    # Promediar FS por (mes, dia, hora) — colapsa múltiples puntos de análisis
-    df_agg = (df_fs.groupby(["mes", "dia", "hora"])["FS"]
-              .mean()
-              .reset_index()
-              .rename(columns={"FS": "FS_mean"}))
+    if modo == "mensual":
+        # Promediar FS por (mes, hora) — replica el patrón a todos los días del mes
+        df_agg = (df_fs.groupby(["mes", "hora"])["FS"]
+                  .mean()
+                  .reset_index()
+                  .rename(columns={"FS": "FS_mean"}))
 
-    # Construir tabla de lookup para el TMY
-    tmy_df = pd.DataFrame({
-        "mes":  tmy_index.month,
-        "dia":  tmy_index.day,
-        "hora": tmy_index.hour,
-    }, index=tmy_index)
+        tmy_df = pd.DataFrame({
+            "mes":  tmy_index.month,
+            "hora": tmy_index.hour,
+        }, index=tmy_index)
 
-    merged = tmy_df.merge(df_agg, on=["mes", "dia", "hora"], how="left")
+        merged = tmy_df.merge(df_agg, on=["mes", "hora"], how="left")
+    else:
+        # "exacto": solo los timestamps que aparecen en el CSV
+        df_agg = (df_fs.groupby(["mes", "dia", "hora"])["FS"]
+                  .mean()
+                  .reset_index()
+                  .rename(columns={"FS": "FS_mean"}))
+
+        tmy_df = pd.DataFrame({
+            "mes":  tmy_index.month,
+            "dia":  tmy_index.day,
+            "hora": tmy_index.hour,
+        }, index=tmy_index)
+
+        merged = tmy_df.merge(df_agg, on=["mes", "dia", "hora"], how="left")
+
     merged.index = tmy_index
     merged["FS_mean"] = merged["FS_mean"].fillna(0.0)
 
     return pd.Series(merged["FS_mean"].values, index=tmy_index, name="p_shade")
+
+
+def cobertura_csv(
+    df_fs: pd.DataFrame,
+    tmy_index: pd.DatetimeIndex,
+) -> dict:
+    """
+    Calcula estadísticas de cobertura del CSV para ambos modos de alineación.
+
+    Retorna dict con:
+        n_exacto     : horas TMY con match exacto (mes, dia, hora)
+        pct_exacto   : porcentaje de cobertura exacta
+        n_mensual    : horas TMY con match mensual (mes, hora)
+        pct_mensual  : porcentaje de cobertura mensual
+        n_tmy        : total horas en TMY
+        dias_criticos: lista de días únicos en el CSV [(mes, dia), ...]
+        meses_cubiertos: lista de meses con al menos un día crítico
+    """
+    n_tmy = len(tmy_index)
+
+    # ── Cobertura exacta ────────────────────────────────────────────────────
+    df_ex = df_fs.groupby(["mes", "dia", "hora"])["FS"].mean().reset_index()
+    tmy_ex = pd.DataFrame({
+        "mes": tmy_index.month, "dia": tmy_index.day, "hora": tmy_index.hour,
+    }, index=tmy_index)
+    n_exacto = int(tmy_ex.merge(df_ex, on=["mes", "dia", "hora"], how="left")["FS"].notna().sum())
+
+    # ── Cobertura mensual ───────────────────────────────────────────────────
+    df_men = df_fs.groupby(["mes", "hora"])["FS"].mean().reset_index()
+    tmy_men = pd.DataFrame({"mes": tmy_index.month, "hora": tmy_index.hour}, index=tmy_index)
+    n_mensual = int(tmy_men.merge(df_men, on=["mes", "hora"], how="left")["FS"].notna().sum())
+
+    # ── Días y meses cubiertos ──────────────────────────────────────────────
+    dias_criticos = sorted(
+        df_fs[["mes", "dia"]].drop_duplicates().apply(tuple, axis=1).tolist()
+    )
+    meses_cubiertos = sorted(df_fs["mes"].unique().tolist())
+
+    return {
+        "n_exacto":        n_exacto,
+        "pct_exacto":      round(n_exacto / n_tmy * 100, 1),
+        "n_mensual":       n_mensual,
+        "pct_mensual":     round(n_mensual / n_tmy * 100, 1),
+        "n_tmy":           n_tmy,
+        "dias_criticos":   dias_criticos,
+        "meses_cubiertos": meses_cubiertos,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════

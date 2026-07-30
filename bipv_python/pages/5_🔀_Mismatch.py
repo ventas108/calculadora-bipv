@@ -15,6 +15,7 @@ from calculos.mismatch import (
 from calculos.mismatch_bypass import (
     cargar_csv_fs,
     alinear_fs_con_tmy,
+    cobertura_csv,
     simular_bypass_horario,
     estadisticas_fs,
 )
@@ -726,6 +727,83 @@ if csv_ok and df_fs_raw is not None:
     T_amb_bp = tmy["T2m"].values
     st.caption(f"📡 POA de referencia: **{poa_src}**")
 
+    # ── #36 · Cobertura temporal y modo de alineación ─────────────────────
+    st.markdown("#### 📅 Cobertura temporal del CSV")
+    try:
+        _tmy_idx = st.session_state["tmy_df"].index
+        cob = cobertura_csv(df_fs_work, _tmy_idx)
+
+        cc1, cc2, cc3 = st.columns(3)
+        cc1.metric(
+            "Días críticos en CSV",
+            f"{len(cob['dias_criticos'])}",
+            help="Días del año con datos de FS en el CSV (solsticios, equinoccios, etc.)",
+        )
+        cc2.metric(
+            "Cobertura modo exacto",
+            f"{cob['n_exacto']:,} h ({cob['pct_exacto']}%)",
+            help="Horas del TMY que tienen coincidencia exacta (mes, día, hora) con el CSV",
+        )
+        cc3.metric(
+            "Cobertura modo mensual",
+            f"{cob['n_mensual']:,} h ({cob['pct_mensual']}%)",
+            help="Horas cubiertas al replicar el patrón horario del día crítico a todo el mes",
+        )
+
+        # Semáforo visual
+        if cob["pct_exacto"] < 2.0:
+            st.warning(
+                f"⚠️ **Cobertura exacta baja: {cob['pct_exacto']}% del año** — "
+                f"solo {len(cob['dias_criticos'])} días críticos cubiertos. "
+                "El **modo mensual** (recomendado) extiende el patrón de cada día crítico "
+                f"a todos los días de su mes, elevando la cobertura al **{cob['pct_mensual']}%**."
+            )
+        elif cob["pct_mensual"] > 80:
+            st.success(
+                f"✅ **Cobertura mensual: {cob['pct_mensual']}%** — "
+                "el CSV cubre todos (o casi todos) los meses del año."
+            )
+
+        # Meses sin día crítico
+        meses_sin = [m for m in range(1, 13) if m not in cob["meses_cubiertos"]]
+        if meses_sin:
+            meses_nombres = ["Ene","Feb","Mar","Abr","May","Jun",
+                             "Jul","Ago","Sep","Oct","Nov","Dic"]
+            nombres_sin = [meses_nombres[m-1] for m in meses_sin]
+            st.caption(
+                f"🔸 Meses sin día crítico en el CSV → FS = 0 asumido: "
+                f"**{', '.join(nombres_sin)}**. "
+                "Para máxima precisión, incluye al menos un día de cada mes en "
+                "la Calculadora de Sombreado."
+            )
+    except KeyError:
+        st.info("ℹ️ Ejecuta Datos Meteorológicos primero para ver estadísticas de cobertura.")
+    except Exception as _e:
+        st.caption(f"(No se pudo calcular cobertura: {_e})")
+
+    # ── Modo de alineación ────────────────────────────────────────────────
+    modo_alineacion = st.radio(
+        "🗓️ Modo de cobertura temporal",
+        options=["mensual", "exacto"],
+        format_func=lambda m: (
+            "📅 Mensual (recomendado) — replica el patrón del día crítico a todo el mes"
+            if m == "mensual"
+            else "📌 Exacto — solo los días críticos del CSV (cobertura baja)"
+        ),
+        index=0,
+        key="bypass_modo_alineacion",
+        horizontal=True,
+        help=(
+            "**Mensual**: el FS horario del día crítico (ej. 21 de marzo) se aplica a "
+            "todos los días de ese mes a la misma hora. La geometría solar varía poco "
+            "dentro de un mes, así que el día crítico es representativo. "
+            "Resultado: estimación anual de bypass mucho más realista.\n\n"
+            "**Exacto**: el FS solo se usa para las horas exactas del CSV. "
+            "El resto del año se asume FS=0 (sin bypass). Útil para verificación."
+        ),
+    )
+    st.session_state["bypass_modo_alineacion"] = modo_alineacion
+
     # ── Botón de simulación ───────────────────────────────────────────────
     btn_bypass = st.button(
         "⚡ Calcular pérdida real por bypass diodes",
@@ -738,9 +816,11 @@ if csv_ok and df_fs_raw is not None:
         if btn_bypass:
             with st.spinner("Alineando FS con TMY y simulando bypass diodes hora a hora..."):
                 try:
-                    # Alinear FS con el TMY (usa df_fs_work: ya filtrado por fachada e invertido si aplica)
+                    # Alinear FS con el TMY (df_fs_work: filtrado por fachada e invertido si aplica)
                     tmy_idx  = st.session_state["tmy_df"].index
-                    p_shade  = alinear_fs_con_tmy(df_fs_work, tmy_idx)
+                    _modo    = st.session_state.get("bypass_modo_alineacion", "mensual")
+                    p_shade  = alinear_fs_con_tmy(df_fs_work, tmy_idx, modo=_modo)
+                    st.session_state["bypass_modo_usado"] = _modo
 
                     # Simular bypass
                     res_bp = simular_bypass_horario(
@@ -905,12 +985,19 @@ if csv_ok and df_fs_raw is not None:
                 if _tipo_fs_res == "geometrico"
                 else "🟨 FS combinado (geom + nubes) — puede sobreestimar bypass"
             )
+            _modo_usado = st.session_state.get("bypass_modo_usado", "mensual")
+            _modo_badge = (
+                "📅 patrón mensual"
+                if _modo_usado == "mensual"
+                else "📌 días críticos exactos"
+            )
             st.success(
                 f"✅ Modelo bypass completado | "
                 f"Pérdida adicional: **{res_bp['kwh_bypass_anual']:,.0f} kWh/año** "
                 f"({res_bp['pct_bypass_anual']:.2f}% de E_dc) | "
                 f"Bypass activo **{res_bp['horas_bypass']} h/año** · "
-                f"Fuente FS: **{_col_fs_res}** — {_fs_badge}"
+                f"Fuente FS: **{_col_fs_res}** ({_fs_badge}) · "
+                f"Cobertura: **{_modo_badge}**"
             )
 
 elif not csv_ok:
