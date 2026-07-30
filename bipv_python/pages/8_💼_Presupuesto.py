@@ -4,7 +4,11 @@ import pandas as pd
 
 st.set_page_config(page_title="Presupuesto BIPV", page_icon="💼", layout="wide")
 st.title("💼 Presupuesto Detallado — Costos Reales del Proyecto")
-st.caption("Plantilla editable por sección. Ajusta cantidades y precios USD según el proyecto.")
+st.caption(
+    "Marca o desmarca ítems con la columna **Activo** para incluirlos o excluirlos del total. "
+    "Agrega filas con ➕ en la esquina inferior del editor. Elimina filas seleccionando la fila y "
+    "presionando **Suprimir**. Los cambios se mantienen mientras la sesión esté abierta."
+)
 
 tc = st.number_input("💱 TRM (COP/USD)", min_value=1000.0, max_value=10000.0,
     value=float(st.session_state.get("tipo_cambio", 3600.0)), step=50.0)
@@ -21,18 +25,22 @@ if n_pan > 0:
 else:
     st.warning("⚠️ Ejecuta 📐 Dimensionamiento primero para vincular equipos automáticamente.")
 
+# ── Constantes ──────────────────────────────────────────────────────────────
 _EXCEL = "/var/www/bipv/calculadora-bipv/bipv_python/datos/insumos_template.xlsx"
-_COLS  = ["Descripcion", "Ref", "Cantidad", "Unidad", "USD_un"]
+_COLS  = ["Activo", "Descripcion", "Ref", "Cantidad", "Unidad", "USD_un"]
 
+# ── Carga plantilla desde Excel ─────────────────────────────────────────────
 @st.cache_data(ttl=3600)
-def _cargar_secciones():
-    df = pd.read_excel(_EXCEL, sheet_name="Hoja1", header=None, dtype=str)
+def _cargar_secciones_raw():
+    """Lee el Excel y devuelve dict {key: DataFrame sin columna Activo}."""
+    _BASE_COLS = ["Descripcion", "Ref", "Cantidad", "Unidad", "USD_un"]
     sec_map = [
         ("1. MATERIALES",           "perfileria"),
         ("2. MANO DE OBRA",         "mano_obra"),
         ("3. SISTEMA FOTOVOLTAICO", "sistema_fv"),
         ("4. INVERSOR",             "inversor"),
     ]
+    df = pd.read_excel(_EXCEL, sheet_name="Hoja1", header=None, dtype=str)
     secciones = {}
     current = None; hdr = False; rows = []
     for _, row in df.iterrows():
@@ -41,7 +49,7 @@ def _cargar_secciones():
         for prefix, key in sec_map:
             if first.upper().startswith(prefix.upper()):
                 if current and rows:
-                    secciones[current] = pd.DataFrame(rows, columns=_COLS)
+                    secciones[current] = pd.DataFrame(rows, columns=_BASE_COLS)
                 current = key; hdr = False; rows = []; hit = True; break
         if hit: continue
         if not current: continue
@@ -49,7 +57,7 @@ def _cargar_secciones():
             if first == "Descripcion": hdr = True
             continue
         if "SUBTOTAL" in first.upper():
-            secciones[current] = pd.DataFrame(rows, columns=_COLS)
+            secciones[current] = pd.DataFrame(rows, columns=_BASE_COLS)
             current = None; rows = []; hdr = False; continue
         if first and first not in ("None", "nan", ""):
             try:    usd  = float(str(row.iloc[4]).replace(",",".")) if len(row) > 4 else 0.0
@@ -58,31 +66,58 @@ def _cargar_secciones():
             except: cant = 1.0
             rows.append([first, str(row.iloc[1] or ""), cant, str(row.iloc[3] or "un"), usd])
     if current and rows:
-        secciones[current] = pd.DataFrame(rows, columns=_COLS)
+        secciones[current] = pd.DataFrame(rows, columns=_BASE_COLS)
     for df2 in secciones.values():
         df2["Cantidad"] = pd.to_numeric(df2["Cantidad"], errors="coerce").fillna(1.0)
         df2["USD_un"]   = pd.to_numeric(df2["USD_un"],   errors="coerce").fillna(0.0)
     return secciones
 
-try:
-    _plantilla = _cargar_secciones()
-except Exception as e:
-    st.error(f"No se pudo leer insumos_template.xlsx: {e}"); _plantilla = {}
 
-def _editar_seccion(key, label, inyectar=None):
-    base = _plantilla.get(key, pd.DataFrame(columns=_COLS)).copy()
+def _plantilla_con_activo(key, inyectar=None):
+    """Devuelve DataFrame base con columna Activo=True, más inyección opcional."""
+    raw = _secciones_raw.get(key, pd.DataFrame(columns=["Descripcion","Ref","Cantidad","Unidad","USD_un"])).copy()
     if inyectar is not None and not inyectar.empty:
-        base = pd.concat([base, inyectar], ignore_index=True)
-    extras = st.session_state.get(f"extra_{key}", [])
-    if extras:
-        base = pd.concat([base, pd.DataFrame(extras, columns=_COLS)], ignore_index=True)
-    base["Cantidad"] = pd.to_numeric(base["Cantidad"], errors="coerce").fillna(0)
-    base["USD_un"]   = pd.to_numeric(base["USD_un"],   errors="coerce").fillna(0)
-    base["Total USD"]= (base["Cantidad"] * base["USD_un"]).round(2)
+        raw = pd.concat([raw, inyectar], ignore_index=True)
+    raw.insert(0, "Activo", True)
+    raw["Cantidad"] = pd.to_numeric(raw["Cantidad"], errors="coerce").fillna(0.0)
+    raw["USD_un"]   = pd.to_numeric(raw["USD_un"],   errors="coerce").fillna(0.0)
+    return raw
+
+
+try:
+    _secciones_raw = _cargar_secciones_raw()
+except Exception as e:
+    st.error(f"No se pudo leer insumos_template.xlsx: {e}")
+    _secciones_raw = {}
+
+# ── Editor de sección con persistencia en session_state ─────────────────────
+def _editar_seccion(key, label, inyectar=None):
+    ss_key = f"df_sec_{key}"
+
+    col_reset, _ = st.columns([1, 5])
+    if col_reset.button(f"↺ Resetear '{label}' a plantilla", key=f"reset_{key}"):
+        if ss_key in st.session_state:
+            del st.session_state[ss_key]
+        st.rerun()
+
+    # Inicializar desde plantilla si es la primera vez o fue reseteado
+    if ss_key not in st.session_state:
+        st.session_state[ss_key] = _plantilla_con_activo(key, inyectar)
+
+    df_actual = st.session_state[ss_key].copy()
+
+    # Asegurar columnas correctas (por si el df persistido no tiene Activo)
+    if "Activo" not in df_actual.columns:
+        df_actual.insert(0, "Activo", True)
+    df_actual["Cantidad"] = pd.to_numeric(df_actual["Cantidad"], errors="coerce").fillna(0.0)
+    df_actual["USD_un"]   = pd.to_numeric(df_actual["USD_un"],   errors="coerce").fillna(0.0)
+    df_actual["Total USD"] = (df_actual["Cantidad"] * df_actual["USD_un"]).round(2)
 
     edited = st.data_editor(
-        base,
+        df_actual,
         column_config={
+            "Activo":    st.column_config.CheckboxColumn("✔ Activo", width="small",
+                            help="Desmarca para excluir este ítem del total sin borrarlo"),
             "Descripcion": st.column_config.TextColumn("Descripción", width="large"),
             "Ref":         st.column_config.TextColumn("Ref.", width="small"),
             "Cantidad":    st.column_config.NumberColumn("Cantidad", format="%.2f"),
@@ -90,29 +125,44 @@ def _editar_seccion(key, label, inyectar=None):
             "USD_un":      st.column_config.NumberColumn("USD/un", format="%.2f"),
             "Total USD":   st.column_config.NumberColumn("Total USD", disabled=True, format="%.2f"),
         },
-        use_container_width=True, num_rows="dynamic", key=f"ed_{key}",
+        use_container_width=True,
+        num_rows="dynamic",   # ← el usuario puede agregar filas con ➕ y eliminar con Supr
+        key=f"ed_{key}",
     )
-    cant   = pd.to_numeric(edited["Cantidad"], errors="coerce").fillna(0)
-    precio = pd.to_numeric(edited["USD_un"],   errors="coerce").fillna(0)
-    total  = float((cant * precio).sum())
-    c1, _ = st.columns(2)
-    c1.metric(f"Subtotal {label}", f"USD {total:,.0f}", f"$ {total*tc/1e6:.2f} M COP", delta_color="off")
 
-    with st.expander("➕ Agregar ítem nuevo"):
-        a1,a2,a3,a4,a5 = st.columns([3,1,1,1,1])
-        nd  = a1.text_input("Descripción", key=f"nd_{key}")
-        nr  = a2.text_input("Ref.",        key=f"nr_{key}")
-        nq  = a3.number_input("Cantidad",  min_value=0.0, value=1.0, key=f"nq_{key}")
-        nu  = a4.text_input("Unidad",      value="un",   key=f"nu_{key}")
-        np_ = a5.number_input("USD/un",    min_value=0.0, value=0.0, key=f"np_{key}")
-        if st.button("Agregar", key=f"btn_{key}"):
-            if nd:
-                lst = st.session_state.get(f"extra_{key}", [])
-                lst.append([nd, nr, nq, nu, np_])
-                st.session_state[f"extra_{key}"] = lst
-                st.rerun()
+    # Recalcular totales y persistir
+    edited["Cantidad"] = pd.to_numeric(edited["Cantidad"], errors="coerce").fillna(0.0)
+    edited["USD_un"]   = pd.to_numeric(edited["USD_un"],   errors="coerce").fillna(0.0)
+    edited["Total USD"] = (edited["Cantidad"] * edited["USD_un"]).round(2)
+    # Solo guardar si hubo cambio real (evitar ciclos de rerun)
+    if not edited.equals(st.session_state[ss_key]):
+        st.session_state[ss_key] = edited
+
+    # Total solo de filas activas
+    activos = edited["Activo"].fillna(False).astype(bool)
+    cant    = edited.loc[activos, "Cantidad"]
+    precio  = edited.loc[activos, "USD_un"]
+    total   = float((cant * precio).sum())
+    total_inactivo = float((edited.loc[~activos, "Cantidad"] * edited.loc[~activos, "USD_un"]).sum())
+
+    c1, c2, _ = st.columns([2, 2, 3])
+    c1.metric(f"Subtotal {label} (activos)",
+              f"USD {total:,.0f}", f"$ {total*tc/1e6:.2f} M COP", delta_color="off")
+    if total_inactivo > 0:
+        c2.metric("Ítems desactivados (excluidos)",
+                  f"USD {total_inactivo:,.0f}", "no suma al total", delta_color="off")
+
+    n_activos   = int(activos.sum())
+    n_inactivos = int((~activos).sum())
+    st.caption(
+        f"📋 **{len(edited)} ítems** — {n_activos} activos, {n_inactivos} desactivados. "
+        "Agrega filas nuevas con el botón ➕ al pie de la tabla. "
+        "Elimina una fila seleccionándola y pulsando la tecla **Supr / Delete**."
+    )
+
     return total
 
+# ── Tabs ────────────────────────────────────────────────────────────────────
 t1,t2,t3,t4,t5 = st.tabs([
     "🔩 Perfilería y Estructura",
     "👷 Mano de Obra",
@@ -128,11 +178,13 @@ with t5:
     st.markdown("**Equipos del catálogo — sincronizados con 📐 Dimensionamiento**")
     cat_rows = []
     if n_pan > 0:
-        cp = c_pan if c_pan > 0 else st.number_input("Costo módulo (USD/un)", 0.0, 500.0, 65.0, 5.0, key="cp_man")
+        cp = c_pan if c_pan > 0 else st.number_input(
+            "Costo módulo (USD/un)", 0.0, 500.0, 65.0, 5.0, key="cp_man")
         cat_rows.append(["Módulos BIPV — catálogo", "MOD-CAT", float(n_pan), "un", cp])
-    ci = c_inv if c_inv > 0 else st.number_input("Costo inversor (USD/un)", 0.0, 20000.0, 1850.0, 50.0, key="ci_man")
+    ci = c_inv if c_inv > 0 else st.number_input(
+        "Costo inversor (USD/un)", 0.0, 20000.0, 1850.0, 50.0, key="ci_man")
     cat_rows.append(["Inversor — catálogo", "INV-CAT", 1.0, "un", ci])
-    # ── Baterías desde Página 11 (si se dimensionaron) ────────────────────
+
     _bat_dim_pres = st.session_state.get("bateria_dim")
     _bat_nom_pres = st.session_state.get("bateria_nombre", "Batería")
     if (_bat_dim_pres and _bat_dim_pres.get("N_baterias")
@@ -147,9 +199,17 @@ with t5:
             f"🔋 {int(_bat_dim_pres['N_baterias'])} und. de **{_bat_nom_pres}** "
             "dimensionadas en Pág. 11 — sin costo en catálogo, agregue manualmente si desea."
         )
-    df_cat = pd.DataFrame(cat_rows, columns=_COLS)
-    sub5 = _editar_seccion("catalogo", "Catálogo", inyectar=df_cat)
 
+    df_iny = pd.DataFrame(cat_rows, columns=["Descripcion","Ref","Cantidad","Unidad","USD_un"])
+
+    # El catálogo re-inyecta equipos del Dimensionamiento al resetear
+    ss_cat = "df_sec_catalogo"
+    if ss_cat not in st.session_state or st.button("↺ Resetear 'Catálogo' a plantilla", key="reset_catalogo"):
+        if ss_cat in st.session_state:
+            del st.session_state[ss_cat]
+    sub5 = _editar_seccion("catalogo", "Catálogo", inyectar=df_iny)
+
+# ── Resumen CAPEX ────────────────────────────────────────────────────────────
 st.markdown("---")
 st.subheader("📊 Resumen CAPEX Total del Proyecto")
 df_res = pd.DataFrame([
@@ -179,14 +239,12 @@ if p_stc > 0:
     st.metric("Costo por Wp", f"USD {capex_total/p_stc/1000:.2f}/Wp",
               delta=f"$ {capex_total*tc/p_stc/1000:,.0f} COP/Wp", delta_color="off")
 
-# Fracción de equipos para Ley 1715 (sub3=SistemaFV + sub4=Inversor + sub5=Catálogo)
 _frac_eq = (sub3 + sub4 + sub5) / capex_total if capex_total > 0 else 0.65
 
 st.session_state["presupuesto_capex_usd"]       = capex_total
 st.session_state["presupuesto_sub_directo"]      = sub_dir
 st.session_state["presupuesto_fraccion_equipos"] = _frac_eq
 
-# Alerta si costo/Wp es irreal (posible mezcla COP/USD en el Excel)
 if p_stc > 0:
     costo_wp = capex_total / p_stc / 1000
     if costo_wp > 5.0:
