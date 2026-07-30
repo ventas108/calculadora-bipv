@@ -16,7 +16,7 @@
 8. [Página 5 — Mismatch y Bypass Diodes ★ NUEVO](#8-página-5--mismatch-y-bypass-diodes-)
 9. [Página 6 — Producción Anual](#9-página-6--producción-anual)
 10. [Página 7 — Análisis Financiero ★ ACTUALIZADO](#10-página-7--análisis-financiero-)
-11. [Página 8 — Presupuesto](#11-página-8--presupuesto)
+11. [Página 8 — Presupuesto ★ ACTUALIZADO](#11-página-8--presupuesto-)
 12. [Página 11 — Baterías y Balance ★ ACTUALIZADO](#12-página-11--baterías-y-balance-)
 13. [Página 10 — Reporte PDF ★ ACTUALIZADO](#13-página-10--reporte-pdf-)
 14. [Calculadora de Sombreado 3D](#14-calculadora-de-sombreado-3d)
@@ -392,15 +392,127 @@ un análisis más realista.
 
 ---
 
-## 11. Página 8 — Presupuesto
+## 11. Página 8 — Presupuesto ★
 
-**Propósito:** Generar una cotización detallada del sistema con costos de equipos y mano de obra.
+**Propósito:** Construir la cotización detallada del proyecto con control total sobre
+qué materiales e insumos aplican, a qué precio y en qué cantidad.
 
-Los precios se leen automáticamente desde el archivo Excel del servidor
-(`inversores_catalogo.xlsx`). Si ves `$0` en alguna línea, verifica que la
-hoja `Presupuesto` del Excel tenga los datos correctos.
+> ★ **Actualización:** La tabla de materiales ya no es una lista fija. Ahora puedes
+> activar o desactivar ítems por proyecto, agregar insumos nuevos y eliminar los que
+> no aplican — todo directamente en la tabla, sin tocar el Excel.
 
-El presupuesto se puede exportar como PDF imprimible desde Página 10.
+---
+
+### Estructura de pestañas
+
+| Pestaña | Contenido |
+|---|---|
+| 🔩 Perfilería y Estructura | Rieles, tornillería, soportes, perfiles |
+| 👷 Mano de Obra | Instalación, certificaciones, transporte |
+| ⚡ Sistema FV | Cables, protecciones, cajas, puesta a tierra |
+| 🔌 Inversor y Equipos Eléctricos | Tableros, breakers, comunicaciones |
+| 📦 Equipos del Catálogo | Módulos + inversor + baterías (auto desde Dimensionamiento) |
+
+---
+
+### Columna "✔ Activo" — incluir o excluir ítems
+
+Cada fila tiene un **checkbox en la primera columna**:
+
+- ✅ **Marcado (Activo):** el ítem suma al subtotal y al CAPEX total.
+- ☐ **Desmarcado:** el ítem queda visible en la tabla como referencia pero
+  **no suma al total**. Útil para materiales opcionales o que ya están
+  cubiertos por otra partida.
+
+Debajo de cada tabla verás dos métricas:
+- **Subtotal (activos):** suma solo de los ítems con checkbox marcado.
+- **Ítems desactivados (excluidos):** suma de los ítems desmarcados, para
+  que veas cuánto estás dejando fuera.
+
+---
+
+### Agregar un ítem nuevo
+
+1. Desplázate hasta el final de la tabla de la pestaña correspondiente.
+2. Haz clic en el botón **➕** que aparece en la esquina inferior izquierda
+   del editor.
+3. Se agrega una fila en blanco — completa Descripción, Ref., Cantidad,
+   Unidad y USD/un directamente en la celda.
+4. El checkbox "Activo" se marca automáticamente en la fila nueva.
+
+---
+
+### Eliminar un ítem
+
+1. Haz clic en la fila que quieres eliminar (queda resaltada).
+2. Presiona la tecla **Supr** o **Delete** del teclado.
+
+> 💡 Si prefieres no eliminar un ítem sino solo excluirlo del total,
+> desmarca el checkbox — así puedes volver a activarlo más adelante.
+
+---
+
+### Persistencia durante la sesión
+
+Los cambios que hagas (activar/desactivar, editar precios, agregar filas)
+**se conservan mientras el navegador esté abierto** y navegues entre páginas.
+Si cierras el navegador o la sesión expira, el presupuesto vuelve a cargar
+desde la plantilla base del Excel.
+
+---
+
+### Botón "↺ Resetear sección"
+
+Cada pestaña tiene este botón en la parte superior. Úsalo para:
+- Empezar un proyecto nuevo desde cero en esa sección.
+- Deshacer todos los cambios de la sesión actual y volver a la plantilla del Excel.
+
+---
+
+### TRM y conversión COP
+
+El campo **💱 TRM (COP/USD)** en la parte superior aplica a toda la página.
+Todos los precios se ingresan en **USD**; la conversión a millones de COP
+se muestra automáticamente en cada subtotal.
+
+> ⚠️ Si el Excel base tiene precios en COP, divídelos por la TRM antes de
+> ingresarlos. La calculadora trabaja siempre en USD internamente.
+
+---
+
+### Resumen CAPEX y conexión con Financiero
+
+Al pie de la página, el **Resumen CAPEX Total** agrega las cinco secciones
+(solo ítems activos) y aplica:
+
+- **Costos indirectos (%):** gastos de administración, AUI, utilidad.
+- **Imprevistos y contingencia (%):** reserva para riesgos.
+
+El **CAPEX TOTAL** resultante se envía automáticamente a:
+- 💰 **Página 7 — Financiero** (VPN, TIR, payback).
+- 📄 **Página 10 — Reporte PDF** (sección de costos y Ley 1715).
+
+La fracción de equipos (Sistema FV + Inversor + Catálogo / CAPEX total)
+se calcula automáticamente para los beneficios tributarios de la **Ley 1715**.
+
+---
+
+### Alerta de costo/Wp
+
+Si el CAPEX supera **USD 5.0/Wp** aparece una advertencia en naranja.
+La referencia para BIPV instalado en Colombia es **USD 1.5–4.0/Wp**.
+Causas comunes de valores fuera de rango:
+- Precios ingresados en COP en lugar de USD.
+- IVA incluido en precios sin descontar.
+- Mano de obra o perfilería duplicada entre secciones.
+
+---
+
+### Exportar el presupuesto
+
+El presupuesto detallado se incluye en el **Reporte PDF (Página 10)**
+como una sección de costos. Para una cotización formal en PDF o Excel
+independiente, consulta la tarea pendiente de exportación.
 
 ---
 

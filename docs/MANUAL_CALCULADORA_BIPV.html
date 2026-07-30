@@ -2,570 +2,708 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Manual Calculadora BIPV — Julio 2026</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual Calculadora BIPV — Innovación Química / SolTech Energy</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;font-size:11pt;line-height:1.65;color:#1a1a2e;max-width:900px;margin:0 auto;padding:40px 48px}
-h1{font-size:22pt;font-weight:700;color:#1a3a6b;border-bottom:3px solid #1a3a6b;padding-bottom:10px;margin:32px 0 6px}
-h2{font-size:14pt;font-weight:700;color:#1a5276;margin:28px 0 8px;padding:6px 12px;border-left:4px solid #f39c12;background:#fef9f0}
-h3{font-size:12pt;font-weight:600;color:#1a5276;margin:18px 0 6px}
-h4{font-size:11pt;font-weight:600;color:#555;margin:14px 0 4px;text-transform:uppercase;letter-spacing:.04em}
-p{margin:8px 0}
-ul,ol{margin:6px 0 6px 22px}
-li{margin:3px 0;display:list-item;list-style:disc}
-code{font-family:monospace;font-size:9.5pt;background:#f0f4f8;padding:1px 5px;border-radius:3px;color:#c0392b}
-pre{background:#1e2a3a;color:#e8edf2;border-radius:6px;padding:14px 18px;font-family:monospace;font-size:9pt;line-height:1.55;overflow-x:auto;margin:10px 0;white-space:pre-wrap}
-pre code{background:none;color:inherit;padding:0}
-table{width:100%;border-collapse:collapse;margin:12px 0;font-size:10pt}
-td{padding:6px 10px;border-bottom:1px solid #e0e7ef;vertical-align:top}
-tr:first-child td{background:#1a5276;color:#fff;font-weight:600}
-tr:nth-child(even) td{background:#f4f8fb}
-blockquote{border-left:4px solid #f39c12;background:#fffbf0;padding:8px 14px;margin:10px 0;font-style:italic;color:#555;border-radius:0 4px 4px 0}
-hr{border:none;border-top:2px solid #d5e8f5;margin:24px 0}
-strong{color:#1a3a6b}
-.cover{text-align:center;padding:32px 0 24px;border-bottom:3px solid #1a3a6b;margin-bottom:28px}
-@media print{body{max-width:100%;padding:20px 24px;font-size:10pt}h2{break-inside:avoid}pre,table,blockquote{break-inside:avoid}@page{margin:1.5cm 2cm}}
+  body { font-family: Arial, sans-serif; max-width: 960px; margin: 40px auto; padding: 0 24px; color: #222; line-height: 1.65; }
+  h1,h2 { color: #1a5276; border-bottom: 2px solid #1a5276; padding-bottom: 6px; }
+  h3 { color: #2e86c1; }
+  h4 { color: #555; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th { background: #1a5276; color: #fff; padding: 8px 12px; text-align: left; }
+  td { border: 1px solid #ccc; padding: 7px 12px; }
+  tr:nth-child(even) td { background: #f4f8fb; }
+  code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: 0.92em; }
+  pre { background: #f0f0f0; padding: 14px; border-radius: 6px; overflow-x: auto; }
+  blockquote { border-left: 4px solid #1a5276; margin: 0; padding: 8px 16px; background: #eaf2f8; color: #444; }
+  ul, ol { padding-left: 24px; }
+  li { margin-bottom: 4px; }
+  a { color: #1a5276; }
+  hr { border: none; border-top: 1px solid #ccc; margin: 32px 0; }
+  .toc { background: #f4f8fb; border: 1px solid #ccc; padding: 16px 24px; border-radius: 6px; margin-bottom: 32px; }
 </style>
 </head>
 <body>
-<div class="cover">
-  <div style="font-size:40pt;margin-bottom:8px">☀️</div>
-  <h1 style="border:none;font-size:26pt">Manual de Usuario</h1>
-  <div style="font-size:18pt;font-weight:700;color:#f39c12;margin-top:4px">Calculadora BIPV</div>
-  <div style="font-size:13pt;color:#555;margin-top:6px">Innovación Química / SolTech Energy</div>
-  <div style="font-size:10pt;color:#888;margin-top:8px">Versión: Julio 2026 &nbsp;·&nbsp; calc.innovacionquimica.com.co</div>
-</div>
-<h1>Manual de Usuario — Calculadora BIPV</h1>
-<h3>Innovación Química / SolTech Energy</h3>
-<strong>Versión:</strong> Julio 2026 | <strong>URL:</strong> calc.innovacionquimica.com.co
-
-<hr>
-
-<h2>Tabla de contenido</h2>
-
-<li>[Descripción general](#1-descripción-general)</li>
-<li>[Flujo de trabajo recomendado](#2-flujo-de-trabajo-recomendado)</li>
-<li>[Página 1 — Proyecto](#3-página-1--proyecto)</li>
-<li>[Página 2 — Recurso Solar](#4-página-2--recurso-solar)</li>
-<li>[Página 3 — Motor IV](#5-página-3--motor-iv)</li>
-<li>[Página 4 — Dimensionamiento](#6-página-4--dimensionamiento)</li>
-<li>[Página 5b — Motor Óptico](#7-página-5b--motor-óptico)</li>
-<li>[Página 5 — Mismatch y Bypass Diodes ★ NUEVO](#8-página-5--mismatch-y-bypass-diodes-)</li>
-<li>[Página 6 — Producción Anual](#9-página-6--producción-anual)</li>
-<li>[Página 7 — Análisis Financiero ★ ACTUALIZADO](#10-página-7--análisis-financiero-)</li>
-<li>[Página 8 — Presupuesto](#11-página-8--presupuesto)</li>
-<li>[Página 11 — Baterías y Balance ★ ACTUALIZADO](#12-página-11--baterías-y-balance-)</li>
-<li>[Página 10 — Reporte PDF ★ ACTUALIZADO](#13-página-10--reporte-pdf-)</li>
-<li>[Calculadora de Sombreado 3D](#14-calculadora-de-sombreado-3d)</li>
-<li>[Cadena completa de bypass diodes](#15-cadena-completa-de-bypass-diodes)</li>
-<li>[Interpretación de resultados clave](#16-interpretación-de-resultados-clave)</li>
-<li>[Preguntas frecuentes](#17-preguntas-frecuentes)</li>
-
-<hr>
-
-<h2>1. Descripción general</h2>
-
-La Calculadora BIPV es una herramienta de simulación fotovoltaica especializada en sistemas integrados en edificios (Building-Integrated Photovoltaics). Está diseñada para proyectos en Colombia con paneles SolTech (ASP-ST1-T40) e inversores Growatt.
-
-<strong>Tecnologías simuladas:</strong>
-<li>Paneles monocristalinos BIPV de fachada (ASP-ST1-T40, 200 Wp)</li>
-<li>Inversores Growatt (catálogo desde Excel con motor de emparejamiento automático)</li>
-<li>Baterías de litio (catálogo configurable)</li>
-<li>Modelo óptico completo: IAM, soiling, efecto térmico confinado BIPV</li>
-<li>Modelo eléctrico completo: bypass diodes bajo sombra parcial</li>
-
-<strong>Datos de entrada requeridos:</strong>
-<li>Archivo TMY (EPW) de la ubicación del proyecto</li>
-<li>Área y orientación de la fachada</li>
-<li>Perfil de consumo energético del edificio (para balance con batería)</li>
-
-<hr>
-
-<h2>2. Flujo de trabajo recomendado</h2>
-
-``<code>
-1 Proyecto → 2 Recurso Solar → (3 Motor IV) → 4 Dimensionamiento
+<h1 id="manual-de-usuario-calculadora-bipv">Manual de Usuario — Calculadora BIPV</h1>
+<h3 id="innovacion-quimica-soltech-energy">Innovación Química / SolTech Energy</h3>
+<p><strong>Versión:</strong> Julio 2026 | <strong>URL:</strong> calc.innovacionquimica.com.co</p>
+<hr />
+<h2 id="tabla-de-contenido">Tabla de contenido</h2>
+<ol>
+<li><a href="#1-descripción-general">Descripción general</a></li>
+<li><a href="#2-flujo-de-trabajo-recomendado">Flujo de trabajo recomendado</a></li>
+<li><a href="#3-página-1--proyecto">Página 1 — Proyecto</a></li>
+<li><a href="#4-página-2--recurso-solar">Página 2 — Recurso Solar</a></li>
+<li><a href="#5-página-3--motor-iv">Página 3 — Motor IV</a></li>
+<li><a href="#6-página-4--dimensionamiento">Página 4 — Dimensionamiento</a></li>
+<li><a href="#7-página-5b--motor-óptico">Página 5b — Motor Óptico</a></li>
+<li><a href="#8-página-5--mismatch-y-bypass-diodes-">Página 5 — Mismatch y Bypass Diodes ★ NUEVO</a></li>
+<li><a href="#9-página-6--producción-anual">Página 6 — Producción Anual</a></li>
+<li><a href="#10-página-7--análisis-financiero-">Página 7 — Análisis Financiero ★ ACTUALIZADO</a></li>
+<li><a href="#11-página-8--presupuesto-">Página 8 — Presupuesto ★ ACTUALIZADO</a></li>
+<li><a href="#12-página-11--baterías-y-balance-">Página 11 — Baterías y Balance ★ ACTUALIZADO</a></li>
+<li><a href="#13-página-10--reporte-pdf-">Página 10 — Reporte PDF ★ ACTUALIZADO</a></li>
+<li><a href="#14-calculadora-de-sombreado-3d">Calculadora de Sombreado 3D</a></li>
+<li><a href="#15-cadena-completa-de-bypass-diodes">Cadena completa de bypass diodes</a></li>
+<li><a href="#16-interpretación-de-resultados-clave">Interpretación de resultados clave</a></li>
+<li><a href="#17-preguntas-frecuentes">Preguntas frecuentes</a></li>
+</ol>
+<hr />
+<h2 id="1-descripcion-general">1. Descripción general</h2>
+<p>La Calculadora BIPV es una herramienta de simulación fotovoltaica especializada en sistemas integrados en edificios (Building-Integrated Photovoltaics). Está diseñada para proyectos en Colombia con paneles SolTech (ASP-ST1-T40) e inversores Growatt.</p>
+<p><strong>Tecnologías simuladas:</strong>
+- Paneles monocristalinos BIPV de fachada (ASP-ST1-T40, 200 Wp)
+- Inversores Growatt (catálogo desde Excel con motor de emparejamiento automático)
+- Baterías de litio (catálogo configurable)
+- Modelo óptico completo: IAM, soiling, efecto térmico confinado BIPV
+- Modelo eléctrico completo: bypass diodes bajo sombra parcial</p>
+<p><strong>Datos de entrada requeridos:</strong>
+- Archivo TMY (EPW) de la ubicación del proyecto
+- Área y orientación de la fachada
+- Perfil de consumo energético del edificio (para balance con batería)</p>
+<hr />
+<h2 id="2-flujo-de-trabajo-recomendado">2. Flujo de trabajo recomendado</h2>
+<pre><code>1 Proyecto → 2 Recurso Solar → (3 Motor IV) → 4 Dimensionamiento
     → (5b Motor Óptico) → 5 Mismatch/Bypass → 6 Producción
     → 7 Financiero → 8 Presupuesto → 11 Baterías → 10 Reporte PDF
-</code>`<code>
-
-<strong>Páginas obligatorias:</strong> 1, 2, 4, 6, 7, 10
-<strong>Páginas opcionales pero recomendadas para BIPV urbano:</strong> 3, 5b, 5, 11
-
-<blockquote>⚠️ <strong>Regla de datos:</strong> Cada página guarda sus resultados en memoria de sesión</blockquote>
-<blockquote>(</code>session_state<code>). Si recargas el navegador, todos los datos se pierden y</blockquote>
-<blockquote>debes ejecutar el flujo desde el principio.</blockquote>
-
-<hr>
-
-<h2>3. Página 1 — Proyecto</h2>
-
-<strong>Propósito:</strong> Registrar los datos básicos del proyecto.
-
-<strong>Campos obligatorios:</strong>
-<li>Nombre del proyecto y empresa cliente</li>
-<li>Ciudad (selección desde lista; define el TMY por defecto)</li>
-<li>Tipo de edificación y uso</li>
-
-<strong>Campos opcionales:</strong>
-<li>Descripción del sistema BIPV</li>
-<li>Datos del contacto</li>
-
-<strong>Resultado:</strong> Los datos del proyecto aparecen en el encabezado del Reporte PDF.
-
-<hr>
-
-<h2>4. Página 2 — Recurso Solar</h2>
-
-<strong>Propósito:</strong> Cargar el archivo climático TMY y calcular la irradiancia sobre la fachada (POA).
-
-<h3>Pasos</h3>
-
+</code></pre>
+<p><strong>Páginas obligatorias:</strong> 1, 2, 4, 6, 7, 10
+<strong>Páginas opcionales pero recomendadas para BIPV urbano:</strong> 3, 5b, 5, 11</p>
+<blockquote>
+<p>⚠️ <strong>Regla de datos:</strong> Cada página guarda sus resultados en memoria de sesión
+(<code>session_state</code>). Si recargas el navegador, todos los datos se pierden y
+debes ejecutar el flujo desde el principio.</p>
+</blockquote>
+<hr />
+<h2 id="3-pagina-1-proyecto">3. Página 1 — Proyecto</h2>
+<p><strong>Propósito:</strong> Registrar los datos básicos del proyecto.</p>
+<p><strong>Campos obligatorios:</strong>
+- Nombre del proyecto y empresa cliente
+- Ciudad (selección desde lista; define el TMY por defecto)
+- Tipo de edificación y uso</p>
+<p><strong>Campos opcionales:</strong>
+- Descripción del sistema BIPV
+- Datos del contacto</p>
+<p><strong>Resultado:</strong> Los datos del proyecto aparecen en el encabezado del Reporte PDF.</p>
+<hr />
+<h2 id="4-pagina-2-recurso-solar">4. Página 2 — Recurso Solar</h2>
+<p><strong>Propósito:</strong> Cargar el archivo climático TMY y calcular la irradiancia sobre la fachada (POA).</p>
+<h3 id="pasos">Pasos</h3>
+<ol>
 <li><strong>Cargar archivo EPW:</strong></li>
-   - Descarga el EPW de [https://energyplus.net/weather](https://energyplus.net/weather)
-   - Busca la ciudad más cercana al proyecto
-   - Arrastra el archivo </code>.epw<code> al uploader
-
-<li><strong>Configurar la fachada:</strong></li>
-   - <strong>Orientación (azimuth):</strong> 0° = Norte, 90° = Este, 180° = Sur, 270° = Oeste
-   - <strong>Inclinación (tilt):</strong> 90° = fachada vertical (caso típico BIPV), 0° = horizontal
-   - <strong>Área de la fachada (m²):</strong> área total de la fachada donde van los paneles
-
-<li><strong>Ejecutar cálculo:</strong></li>
-   - Clic en <strong>"Calcular POA"</strong>
-   - La app calcula la irradiancia en el plano de la fachada hora a hora (8 760 horas)
-
-<strong>Resultados:</strong>
-<li>POA bruta anual (kWh/m²/año)</li>
-<li>Heatmap de irradiancia horaria (meses × horas del día)</li>
-<li>Diagrama solar con la trayectoria del sol sobre la fachada</li>
-
-<blockquote><strong>Nota timezone:</strong> El diagrama solar usa UTC. Para Colombia (UTC-5), la hora solar</blockquote>
-<blockquote>de mediodía aparece a las 17:00 UTC en el diagrama.</blockquote>
-
-<hr>
-
-<h2>5. Página 3 — Motor IV</h2>
-
-<strong>Propósito:</strong> Modelar la curva corriente-voltaje (I-V) del panel usando el modelo de 5 parámetros (SDM).
-
-<strong>¿Cuándo usar?</strong>
-<li>Cuando tienes la ficha técnica completa del panel (Voc, Isc, Vmpp, Impp, α, β, γ)</li>
-<li>Para verificar que los parámetros del catálogo son coherentes</li>
-
-<strong>¿Cuándo no es necesario?</strong>
-<li>Si usas los paneles ASP-ST1-T40 del catálogo estándar (ya tienen SDM calibrado)</li>
-<li>Para una estimación rápida sin análisis eléctrico detallado</li>
-
-<strong>El Motor IV se activa automáticamente</strong> cuando el panel tiene ficha técnica completa
-en el catálogo. No requiere intervención manual.
-
-<hr>
-
-<h2>6. Página 4 — Dimensionamiento</h2>
-
-<strong>Propósito:</strong> Calcular cuántos paneles caben en la fachada y seleccionar el inversor óptimo.
-
-<h3>Pasos</h3>
-
+<li>Descarga el EPW de <a href="https://energyplus.net/weather">https://energyplus.net/weather</a></li>
+<li>Busca la ciudad más cercana al proyecto</li>
+<li>
+<p>Arrastra el archivo <code>.epw</code> al uploader</p>
+</li>
+<li>
+<p><strong>Configurar la fachada:</strong></p>
+</li>
+<li><strong>Orientación (azimuth):</strong> 0° = Norte, 90° = Este, 180° = Sur, 270° = Oeste</li>
+<li><strong>Inclinación (tilt):</strong> 90° = fachada vertical (caso típico BIPV), 0° = horizontal</li>
+<li>
+<p><strong>Área de la fachada (m²):</strong> área total de la fachada donde van los paneles</p>
+</li>
+<li>
+<p><strong>Ejecutar cálculo:</strong></p>
+</li>
+<li>Clic en <strong>"Calcular POA"</strong></li>
+<li>La app calcula la irradiancia en el plano de la fachada hora a hora (8 760 horas)</li>
+</ol>
+<p><strong>Resultados:</strong>
+- POA bruta anual (kWh/m²/año)
+- Heatmap de irradiancia horaria (meses × horas del día)
+- Diagrama solar con la trayectoria del sol sobre la fachada</p>
+<blockquote>
+<p><strong>Nota timezone:</strong> El diagrama solar usa UTC. Para Colombia (UTC-5), la hora solar
+de mediodía aparece a las 17:00 UTC en el diagrama.</p>
+</blockquote>
+<hr />
+<h2 id="5-pagina-3-motor-iv">5. Página 3 — Motor IV</h2>
+<p><strong>Propósito:</strong> Modelar la curva corriente-voltaje (I-V) del panel usando el modelo de 5 parámetros (SDM).</p>
+<p><strong>¿Cuándo usar?</strong>
+- Cuando tienes la ficha técnica completa del panel (Voc, Isc, Vmpp, Impp, α, β, γ)
+- Para verificar que los parámetros del catálogo son coherentes</p>
+<p><strong>¿Cuándo no es necesario?</strong>
+- Si usas los paneles ASP-ST1-T40 del catálogo estándar (ya tienen SDM calibrado)
+- Para una estimación rápida sin análisis eléctrico detallado</p>
+<p><strong>El Motor IV se activa automáticamente</strong> cuando el panel tiene ficha técnica completa
+en el catálogo. No requiere intervención manual.</p>
+<hr />
+<h2 id="6-pagina-4-dimensionamiento">6. Página 4 — Dimensionamiento</h2>
+<p><strong>Propósito:</strong> Calcular cuántos paneles caben en la fachada y seleccionar el inversor óptimo.</p>
+<h3 id="pasos_1">Pasos</h3>
+<ol>
 <li><strong>Revisar los datos de la fachada:</strong></li>
-   - Área disponible (viene de Página 2)
-   - Dimensiones del panel (0.98 m × 1.76 m para ASP-ST1-T40)
-
-<li><strong>Configurar el layout:</strong></li>
-   - Orientación de los módulos (portrait / landscape)
-   - Espaciado entre paneles (si aplica)
-
-<li><strong>Selección de inversor:</strong></li>
-   - La app propone el inversor más adecuado del catálogo Growatt
-   - Verifica que Vdc_máx del string ≤ Vdc_máx del inversor
-   - Verifica que P_pico_array ≤ 1.3 × P_nominal_inversor
-
-<strong>Resultados:</strong>
-<li>N° de paneles instalables</li>
-<li>Potencia instalada (kWp)</li>
-<li>Inversor recomendado con alertas de compatibilidad</li>
-
-<hr>
-
-<h2>7. Página 5b — Motor Óptico</h2>
-
-<strong>Propósito:</strong> Aplicar las correcciones ópticas específicas de BIPV sobre la POA bruta.
-
-<strong>Cascada de correcciones:</strong>
-</code>`<code>
-POA bruta
+<li>Área disponible (viene de Página 2)</li>
+<li>
+<p>Dimensiones del panel (0.98 m × 1.76 m para ASP-ST1-T40)</p>
+</li>
+<li>
+<p><strong>Configurar el layout:</strong></p>
+</li>
+<li>Orientación de los módulos (portrait / landscape)</li>
+<li>
+<p>Espaciado entre paneles (si aplica)</p>
+</li>
+<li>
+<p><strong>Selección de inversor:</strong></p>
+</li>
+<li>La app propone el inversor más adecuado del catálogo Growatt</li>
+<li>Verifica que Vdc_máx del string ≤ Vdc_máx del inversor</li>
+<li>Verifica que P_pico_array ≤ 1.3 × P_nominal_inversor</li>
+</ol>
+<p><strong>Resultados:</strong>
+- N° de paneles instalables
+- Potencia instalada (kWp)
+- Inversor recomendado con alertas de compatibilidad</p>
+<hr />
+<h2 id="7-pagina-5b-motor-optico">7. Página 5b — Motor Óptico</h2>
+<p><strong>Propósito:</strong> Aplicar las correcciones ópticas específicas de BIPV sobre la POA bruta.</p>
+<p><strong>Cascada de correcciones:</strong></p>
+<pre><code>POA bruta
   × IAM (Incidence Angle Modifier)    → pérdida por reflexión a ángulos oblicuos
   × Soiling                           → pérdida por suciedad acumulada en vidrio
   × Factor térmico BIPV (k_BIPV)      → penalización por cámara trasera confinada
   = POA efectiva
-</code>`<code>
-
-<strong>¿Cuándo usar?</strong>
-<li>Siempre en proyectos BIPV de fachada para un cálculo más preciso</li>
-<li>El k_BIPV para fachada ventilada es ~0.93–0.97; para fachada sellada es ~0.88–0.92</li>
-
-<strong>¿Cuándo omitir?</strong>
-<li>En estudios de prefactibilidad donde una estimación ±10% es suficiente</li>
-
-<strong>Resultado:</strong> </code>POA efectiva<code> (kWh/m²/año) que la Página 6 usa en lugar de la POA bruta.
-
-<hr>
-
-<h2>8. Página 5 — Mismatch y Bypass Diodes ★</h2>
-
-<blockquote><strong>Esta página es nueva y clave para proyectos BIPV en entornos urbanos con obstáculos.</strong></blockquote>
-
-<strong>Propósito:</strong> Calcular las pérdidas eléctricas reales por sombra parcial en strings,
-modelando la activación de los bypass diodes integrados en cada panel.
-
-<h3>¿Por qué importa?</h3>
-
-Cuando un obstáculo (edificio vecino, voladizo, antena) sombrea <em>parte</em> de un string,
+</code></pre>
+<p><strong>¿Cuándo usar?</strong>
+- Siempre en proyectos BIPV de fachada para un cálculo más preciso
+- El k_BIPV para fachada ventilada es ~0.93–0.97; para fachada sellada es ~0.88–0.92</p>
+<p><strong>¿Cuándo omitir?</strong>
+- En estudios de prefactibilidad donde una estimación ±10% es suficiente</p>
+<p><strong>Resultado:</strong> <code>POA efectiva</code> (kWh/m²/año) que la Página 6 usa en lugar de la POA bruta.</p>
+<hr />
+<h2 id="8-pagina-5-mismatch-y-bypass-diodes">8. Página 5 — Mismatch y Bypass Diodes ★</h2>
+<blockquote>
+<p><strong>Esta página es nueva y clave para proyectos BIPV en entornos urbanos con obstáculos.</strong></p>
+</blockquote>
+<p><strong>Propósito:</strong> Calcular las pérdidas eléctricas reales por sombra parcial en strings,
+modelando la activación de los bypass diodes integrados en cada panel.</p>
+<h3 id="por-que-importa">¿Por qué importa?</h3>
+<p>Cuando un obstáculo (edificio vecino, voladizo, antena) sombrea <em>parte</em> de un string,
 los módulos sombreados reducen su Isc. Los bypass diodes se activan para proteger el
 circuito, pero al hacerlo <strong>eliminan toda la tensión</strong> de esos módulos. La pérdida real
-es mucho mayor que la reducción proporcional de irradiancia.
-
-Ejemplo: sombra en 2 de 8 módulos en serie → pérdida NO es 25%, sino puede ser 40-60%
-de la producción de ese string en esas horas.
-
-<hr>
-
-<h3>Sección 1 — Cargar el CSV de Factor de Sombreado</h3>
-
-El CSV debe provenir de la <strong>Calculadora de Sombreado 3D</strong> (bipv.innovacionquimica.com.co).
-
-<strong>Formato del CSV esperado:</strong>
-</code>`<code>
-Hora,Mes,Dia,FS_geometrico,FS_climatico,FS_combinado,Fachada,...
+es mucho mayor que la reducción proporcional de irradiancia.</p>
+<p>Ejemplo: sombra en 2 de 8 módulos en serie → pérdida NO es 25%, sino puede ser 40-60%
+de la producción de ese string en esas horas.</p>
+<hr />
+<h3 id="seccion-1-cargar-el-csv-de-factor-de-sombreado">Sección 1 — Cargar el CSV de Factor de Sombreado</h3>
+<p>El CSV debe provenir de la <strong>Calculadora de Sombreado 3D</strong> (bipv.innovacionquimica.com.co).</p>
+<p><strong>Formato del CSV esperado:</strong></p>
+<pre><code>Hora,Mes,Dia,FS_geometrico,FS_climatico,FS_combinado,Fachada,...
 8,3,21,0.00,0.05,0.04,Fachada_Sur,...
 9,3,21,0.12,0.15,0.24,Fachada_Sur,...
-</code>`<code>
-
+</code></pre>
+<ul>
 <li><strong>FS_geometrico:</strong> factor de sombreado solo por obstáculos físicos (recomendado)</li>
 <li><strong>FS_climatico:</strong> incluye nubes → sobreestima el bypass</li>
 <li><strong>FS_combinado:</strong> combinación de ambos</li>
 <li><strong>Convención:</strong> 0 = sin sombra, 1 = sombra total (p_shade directo)</li>
 <li><strong>Fachada:</strong> nombre de la fachada del análisis</li>
-
-<strong>Pasos:</strong>
-<li>Arrastra el CSV al uploader</li>
-<li>La app detecta automáticamente qué columna de FS usar (prioridad: FS_geometrico)</li>
-<li>Revisa el banner de color:</li>
+</ul>
+<p><strong>Pasos:</strong>
+1. Arrastra el CSV al uploader
+2. La app detecta automáticamente qué columna de FS usar (prioridad: FS_geometrico)
+3. Revisa el banner de color:
    - 🟩 <strong>Verde:</strong> FS_geometrico detectado — resultados más precisos
-   - 🟨 <strong>Amarillo:</strong> solo FS combinado disponible — puede sobreestimar bypass
-
-<hr>
-
-<h3>★ Detección automática de CSV con FS invertido</h3>
-
-<blockquote><strong>Importante para CSVs generados por herramientas externas</strong></blockquote>
-
-Algunas herramientas exportan el Factor de Sombreado con la <strong>convención invertida</strong>:
-<li>Convención estándar (calculadora BIPV): <strong>0 = sin sombra, 1 = sombra total</strong></li>
-<li>Convención invertida (puntos manuales): <strong>1 = sin sombra, 0 = sombra total</strong> (transmitancia)</li>
-
-La app detecta automáticamente si el CSV parece estar invertido (>55% de valores > 0.90
-y sin columna FS_geometrico explícita) y muestra:
-
-</code>`<code>
-🔴 POSIBLE CSV INVERTIDO: el 87% de los valores FS están entre 0.90 y 1.00,
+   - 🟨 <strong>Amarillo:</strong> solo FS combinado disponible — puede sobreestimar bypass</p>
+<hr />
+<h3 id="deteccion-automatica-de-csv-con-fs-invertido">★ Detección automática de CSV con FS invertido</h3>
+<blockquote>
+<p><strong>Importante para CSVs generados por herramientas externas</strong></p>
+</blockquote>
+<p>Algunas herramientas exportan el Factor de Sombreado con la <strong>convención invertida</strong>:
+- Convención estándar (calculadora BIPV): <strong>0 = sin sombra, 1 = sombra total</strong>
+- Convención invertida (puntos manuales): <strong>1 = sin sombra, 0 = sombra total</strong> (transmitancia)</p>
+<p>La app detecta automáticamente si el CSV parece estar invertido (&gt;55% de valores &gt; 0.90
+y sin columna FS_geometrico explícita) y muestra:</p>
+<pre><code>🔴 POSIBLE CSV INVERTIDO: el 87% de los valores FS están entre 0.90 y 1.00,
 lo que sugiere transmitancia (1=sin sombra), no Factor de Sombreado (1=sombra total).
-</code>`<code>
-
-<strong>Acción:</strong> Abre "Opciones avanzadas" y activa <strong>"Invertir FS (1 − FS)"</strong>.
-
-<hr>
-
-<h3>★ Selector de Fachada</h3>
-
-Si el CSV contiene datos de múltiples fachadas o fachadas con múltiples orientaciones,
-aparece un selector <strong>"🏗️ Seleccionar fachada del array"</strong> con las fachadas detectadas.
-
-Selecciona solo la fachada donde está instalado el array antes de simular.
-Esto evita que obstáculos de otras fachadas contaminen el cálculo de bypass.
-
-<hr>
-
-<h3>Sección 5 — Configuración de strings y cobertura temporal</h3>
-
-<h4>Configuración de strings</h4>
-
-<tr><td>Parámetro</td><td>Descripción</td><td>Ejemplo Ruta N</td></tr>
-
-<tr><td>Panel fotovoltaico</td><td>Debe coincidir con el de Producción</td><td>ASP-ST1-T40</td></tr>
-<tr><td>Módulos en serie (N_series)</td><td>Módulos en un string</td><td>8</td></tr>
-<tr><td>Strings en paralelo (N_parallel)</td><td>Número de strings</td><td>55</td></tr>
-
-La app infiere N_series automáticamente buscando que Voc_array ≈ 400 V DC.
-
-<h4>★ Cobertura temporal del CSV</h4>
-
-El CSV de días críticos típicamente cubre solo 4–6 días del año (~60 horas).
-La app muestra:
-
-<tr><td>Métrica</td><td>Descripción</td></tr>
-
-<tr><td>Días críticos</td><td>Cuántos días con datos hay en el CSV</td></tr>
-<tr><td>Cobertura modo exacto</td><td>Horas TMY con coincidencia exacta (mes/día/hora)</td></tr>
-<tr><td>Cobertura modo mensual</td><td>Horas cubiertas al replicar el patrón a todo el mes</td></tr>
-
-<strong>Modos de cobertura:</strong>
-
-<li><strong>📅 Modo mensual (recomendado):</strong> El patrón horario de cada día crítico</li>
+</code></pre>
+<p><strong>Acción:</strong> Abre "Opciones avanzadas" y activa <strong>"Invertir FS (1 − FS)"</strong>.</p>
+<hr />
+<h3 id="selector-de-fachada">★ Selector de Fachada</h3>
+<p>Si el CSV contiene datos de múltiples fachadas o fachadas con múltiples orientaciones,
+aparece un selector <strong>"🏗️ Seleccionar fachada del array"</strong> con las fachadas detectadas.</p>
+<p>Selecciona solo la fachada donde está instalado el array antes de simular.
+Esto evita que obstáculos de otras fachadas contaminen el cálculo de bypass.</p>
+<hr />
+<h3 id="seccion-5-configuracion-de-strings-y-cobertura-temporal">Sección 5 — Configuración de strings y cobertura temporal</h3>
+<h4 id="configuracion-de-strings">Configuración de strings</h4>
+<table>
+<thead>
+<tr>
+<th>Parámetro</th>
+<th>Descripción</th>
+<th>Ejemplo Ruta N</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Panel fotovoltaico</td>
+<td>Debe coincidir con el de Producción</td>
+<td>ASP-ST1-T40</td>
+</tr>
+<tr>
+<td>Módulos en serie (N_series)</td>
+<td>Módulos en un string</td>
+<td>8</td>
+</tr>
+<tr>
+<td>Strings en paralelo (N_parallel)</td>
+<td>Número de strings</td>
+<td>55</td>
+</tr>
+</tbody>
+</table>
+<p>La app infiere N_series automáticamente buscando que Voc_array ≈ 400 V DC.</p>
+<h4 id="cobertura-temporal-del-csv">★ Cobertura temporal del CSV</h4>
+<p>El CSV de días críticos típicamente cubre solo 4–6 días del año (~60 horas).
+La app muestra:</p>
+<table>
+<thead>
+<tr>
+<th>Métrica</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Días críticos</td>
+<td>Cuántos días con datos hay en el CSV</td>
+</tr>
+<tr>
+<td>Cobertura modo exacto</td>
+<td>Horas TMY con coincidencia exacta (mes/día/hora)</td>
+</tr>
+<tr>
+<td>Cobertura modo mensual</td>
+<td>Horas cubiertas al replicar el patrón a todo el mes</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Modos de cobertura:</strong></p>
+<ul>
+<li>
+<p><strong>📅 Modo mensual (recomendado):</strong> El patrón horario de cada día crítico
   (ej. 21 de marzo) se replica a todos los días de ese mes. La geometría solar
-  varía <3° dentro de un mes, así que el día crítico es representativo del mes.
-  <strong>Cobertura típica: 25–40% del año.</strong>
-
-<li><strong>📌 Modo exacto:</strong> Solo usa los días del CSV. El 98%+ del año tiene FS=0.</li>
-  Útil para verificación pero subestima enormemente las pérdidas anuales.
-
-<blockquote><strong>Recomendación:</strong> Usa el modo mensual siempre para el diseño. Usa el modo exacto</blockquote>
-<blockquote>para comparar con mediciones puntuales o para auditorías.</blockquote>
-
-<hr>
-
-<h3>Sección 5 — Ejecutar la simulación</h3>
-
-Clic en <strong>"⚡ Calcular pérdida real por bypass diodes"</strong>.
-
-La simulación:
-<li>Alinea el CSV con el TMY según el modo seleccionado</li>
-<li>Para cada hora del año (8 760 iteraciones): si FS > 5%, resuelve el circuito IV</li>
+  varía &lt;3° dentro de un mes, así que el día crítico es representativo del mes.
+  <strong>Cobertura típica: 25–40% del año.</strong></p>
+</li>
+<li>
+<p><strong>📌 Modo exacto:</strong> Solo usa los días del CSV. El 98%+ del año tiene FS=0.
+  Útil para verificación pero subestima enormemente las pérdidas anuales.</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>Recomendación:</strong> Usa el modo mensual siempre para el diseño. Usa el modo exacto
+para comparar con mediciones puntuales o para auditorías.</p>
+</blockquote>
+<hr />
+<h3 id="seccion-5-ejecutar-la-simulacion">Sección 5 — Ejecutar la simulación</h3>
+<p>Clic en <strong>"⚡ Calcular pérdida real por bypass diodes"</strong>.</p>
+<p>La simulación:
+1. Alinea el CSV con el TMY según el modo seleccionado
+2. Para cada hora del año (8 760 iteraciones): si FS &gt; 5%, resuelve el circuito IV
    con los módulos sombreados activos y calcula la potencia real del array
-<li>Compara con la producción sin sombra (baseline) → calcula pérdida horaria</li>
-
-<strong>Resultados mostrados:</strong>
-<li><strong>Pérdida bypass (kWh DC/año):</strong> energía DC perdida por la activación de bypass</li>
-<li><strong>% sobre E_dc:</strong> fracción de la producción DC base</li>
-<li><strong>Horas con bypass activo / año:</strong> magnitud del problema</li>
-<li><strong>E_dc_base vs E_dc_bypass:</strong> curva mensual comparativa</li>
-<li><strong>Tabla mensual:</strong> desglose de pérdidas mes a mes</li>
-
-<strong>Interpretación del % de pérdida bypass:</strong>
-<li>< 2%: Bajo — sombras leves, bypass no es un problema crítico</li>
-<li>2–5%: Moderado — considerar redibujo de layout o modificar strings</li>
-<li>5–10%: Alto — evaluar cambio de orientación o supresores de sombra</li>
-<li>> 10%: Muy alto — el sistema BIPV tiene un problema de sombreado serio</li>
-
-<hr>
-
-<h2>9. Página 6 — Producción Anual</h2>
-
-<strong>Propósito:</strong> Calcular la producción AC anual del sistema completo.
-
-<h3>Pasos</h3>
-
+3. Compara con la producción sin sombra (baseline) → calcula pérdida horaria</p>
+<p><strong>Resultados mostrados:</strong>
+- <strong>Pérdida bypass (kWh DC/año):</strong> energía DC perdida por la activación de bypass
+- <strong>% sobre E_dc:</strong> fracción de la producción DC base
+- <strong>Horas con bypass activo / año:</strong> magnitud del problema
+- <strong>E_dc_base vs E_dc_bypass:</strong> curva mensual comparativa
+- <strong>Tabla mensual:</strong> desglose de pérdidas mes a mes</p>
+<p><strong>Interpretación del % de pérdida bypass:</strong>
+- &lt; 2%: Bajo — sombras leves, bypass no es un problema crítico
+- 2–5%: Moderado — considerar redibujo de layout o modificar strings
+- 5–10%: Alto — evaluar cambio de orientación o supresores de sombra
+- &gt; 10%: Muy alto — el sistema BIPV tiene un problema de sombreado serio</p>
+<hr />
+<h2 id="9-pagina-6-produccion-anual">9. Página 6 — Producción Anual</h2>
+<p><strong>Propósito:</strong> Calcular la producción AC anual del sistema completo.</p>
+<h3 id="pasos_2">Pasos</h3>
+<ol>
 <li>Revisa los datos de entrada (tomados automáticamente de páginas anteriores)</li>
 <li>Verifica que el inversor esté correctamente seleccionado</li>
 <li>Si ejecutaste el Motor Óptico (5b), la POA efectiva se usa automáticamente</li>
 <li>Clic en <strong>"Calcular producción"</strong></li>
-
-<strong>Balance energético mostrado:</strong>
-
-</code>`<code>
-POA bruta → Motor Óptico (IAM + Soiling + Térmico) → POA efectiva
+</ol>
+<p><strong>Balance energético mostrado:</strong></p>
+<pre><code>POA bruta → Motor Óptico (IAM + Soiling + Térmico) → POA efectiva
   → Pérdida mismatch → E_dc → Pérdida bypass ← (si Página 5 fue ejecutada)
   → Pérdida inversor → E_ac anual
-</code>`<code>
-
-Si ejecutaste el modelo de bypass en Página 5, el balance incluye automáticamente
-una barra <strong>"Bypass diodes"</strong> mostrando los kWh DC perdidos.
-
-<strong>La E_ac guardada en memoria:</strong>
-<li></code>E_ac_anual_kWh<code> — producción base (sin corrección bypass)</li>
-<li></code>E_ac_anual_kWh_bypass<code> — producción real (con corrección bypass) ← usada por Páginas 7, 11</li>
-
-<hr>
-
-<h2>10. Página 7 — Análisis Financiero ★</h2>
-
-<strong>Propósito:</strong> Calcular TIR, VPN, Payback y LCOE del proyecto bajo la Ley 1715/2014.
-
-<h3>★ E_ac corregida por bypass (nuevo)</h3>
-
-Si ejecutaste el modelo de bypass en Página 5, la app usa <strong>automáticamente</strong>
-la E_ac corregida como base del análisis. Verás el banner:
-
-</code>`<code>
-⚡ Corrección bypass diodes aplicada:
+</code></pre>
+<p>Si ejecutaste el modelo de bypass en Página 5, el balance incluye automáticamente
+una barra <strong>"Bypass diodes"</strong> mostrando los kWh DC perdidos.</p>
+<p><strong>La E_ac guardada en memoria:</strong>
+- <code>E_ac_anual_kWh</code> — producción base (sin corrección bypass)
+- <code>E_ac_anual_kWh_bypass</code> — producción real (con corrección bypass) ← usada por Páginas 7, 11</p>
+<hr />
+<h2 id="10-pagina-7-analisis-financiero">10. Página 7 — Análisis Financiero ★</h2>
+<p><strong>Propósito:</strong> Calcular TIR, VPN, Payback y LCOE del proyecto bajo la Ley 1715/2014.</p>
+<h3 id="e_ac-corregida-por-bypass-nuevo">★ E_ac corregida por bypass (nuevo)</h3>
+<p>Si ejecutaste el modelo de bypass en Página 5, la app usa <strong>automáticamente</strong>
+la E_ac corregida como base del análisis. Verás el banner:</p>
+<pre><code>⚡ Corrección bypass diodes aplicada:
 E_ac base = 91.000 kWh/año → pérdida bypass = 2.850 kWh/año → E_ac neta = 88.150 kWh/año (3.1% menos)
 TIR y Payback calculados con la producción real corregida.
-</code>`<code>
-
-Si bypass NO fue ejecutado, aparece una nota sugiriendo ejecutar Página 5 para
-un análisis más realista.
-
-<h3>Pasos</h3>
-
+</code></pre>
+<p>Si bypass NO fue ejecutado, aparece una nota sugiriendo ejecutar Página 5 para
+un análisis más realista.</p>
+<h3 id="pasos_3">Pasos</h3>
+<ol>
 <li><strong>Sección 1 — CAPEX:</strong> Ingresa costos de módulos, inversor, estructura, instalación</li>
 <li><strong>Sección 2 — Parámetros financieros:</strong></li>
-   - Tarifa energía (COP/kWh)
-   - TRM (COP/USD)
-   - Tasa de descuento (%)
-   - Horizonte de análisis (años)
-   - Degradación anual del sistema (%)
+<li>Tarifa energía (COP/kWh)</li>
+<li>TRM (COP/USD)</li>
+<li>Tasa de descuento (%)</li>
+<li>Horizonte de análisis (años)</li>
+<li>Degradación anual del sistema (%)</li>
 <li><strong>Sección 3 — Beneficios Ley 1715:</strong> Revisa los ahorros tributarios calculados</li>
 <li><strong>Clic "📊 Calcular TIR, VPN, Payback y LCOE"</strong></li>
-
-<h3>Beneficios Ley 1715/2014</h3>
-
-<tr><td>Artículo</td><td>Beneficio</td><td>Cálculo</td></tr>
-
-<tr><td>Art. 11</td><td>Deducción renta</td><td>50% × CAPEX × tasa_renta (35%)</td></tr>
-<tr><td>Art. 12</td><td>Exclusión IVA equipos</td><td>19% × CAPEX_equipos</td></tr>
-<tr><td>Art. 14</td><td>Depreciación acelerada</td><td>VPN del diferencial 5yr vs 10yr</td></tr>
-
-<blockquote>Requiere certificación UPME previa al inicio del proyecto.</blockquote>
-
-<h3>Indicadores de viabilidad</h3>
-
-<tr><td>Indicador</td><td>Proyecto viable</td><td>Proyecto marginal</td><td>Proyecto no viable</td></tr>
-
-<tr><td>TIR</td><td>> 12%</td><td>8–12%</td><td>< 8%</td></tr>
-<tr><td>VPN</td><td>> 0 USD</td><td>Cercano a 0</td><td>< 0 USD</td></tr>
-<tr><td>Payback simple</td><td>< 10 años</td><td>10–15 años</td><td>> 15 años</td></tr>
-<tr><td>LCOE</td><td>< tarifa red</td><td>≈ tarifa red</td><td>> tarifa red</td></tr>
-
-<hr>
-
-<h2>11. Página 8 — Presupuesto</h2>
-
-<strong>Propósito:</strong> Generar una cotización detallada del sistema con costos de equipos y mano de obra.
-
-Los precios se leen automáticamente desde el archivo Excel del servidor
-(</code>inversores_catalogo.xlsx<code>). Si ves </code>$0<code> en alguna línea, verifica que la
-hoja </code>Presupuesto<code> del Excel tenga los datos correctos.
-
-El presupuesto se puede exportar como PDF imprimible desde Página 10.
-
-<hr>
-
-<h2>12. Página 11 — Baterías y Balance ★</h2>
-
-<strong>Propósito:</strong> Dimensionar el sistema de almacenamiento y calcular el balance energético
-(autogeneración, autosuficiencia, excedentes a red).
-
-<h3>★ E_ac corregida por bypass (nuevo)</h3>
-
-Si bypass fue ejecutado en Página 5, la E_ac usada para el balance es la corregida.
-Verás el banner:
-
-</code>`<code>
-⚡ Corrección bypass activa:
+</ol>
+<h3 id="beneficios-ley-17152014">Beneficios Ley 1715/2014</h3>
+<table>
+<thead>
+<tr>
+<th>Artículo</th>
+<th>Beneficio</th>
+<th>Cálculo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Art. 11</td>
+<td>Deducción renta</td>
+<td>50% × CAPEX × tasa_renta (35%)</td>
+</tr>
+<tr>
+<td>Art. 12</td>
+<td>Exclusión IVA equipos</td>
+<td>19% × CAPEX_equipos</td>
+</tr>
+<tr>
+<td>Art. 14</td>
+<td>Depreciación acelerada</td>
+<td>VPN del diferencial 5yr vs 10yr</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Requiere certificación UPME previa al inicio del proyecto.</p>
+</blockquote>
+<h3 id="indicadores-de-viabilidad">Indicadores de viabilidad</h3>
+<table>
+<thead>
+<tr>
+<th>Indicador</th>
+<th>Proyecto viable</th>
+<th>Proyecto marginal</th>
+<th>Proyecto no viable</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TIR</td>
+<td>&gt; 12%</td>
+<td>8–12%</td>
+<td>&lt; 8%</td>
+</tr>
+<tr>
+<td>VPN</td>
+<td>&gt; 0 USD</td>
+<td>Cercano a 0</td>
+<td>&lt; 0 USD</td>
+</tr>
+<tr>
+<td>Payback simple</td>
+<td>&lt; 10 años</td>
+<td>10–15 años</td>
+<td>&gt; 15 años</td>
+</tr>
+<tr>
+<td>LCOE</td>
+<td>&lt; tarifa red</td>
+<td>≈ tarifa red</td>
+<td>&gt; tarifa red</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="11-pagina-8-presupuesto">11. Página 8 — Presupuesto ★</h2>
+<p><strong>Propósito:</strong> Construir la cotización detallada del proyecto con control total sobre
+qué materiales e insumos aplican, a qué precio y en qué cantidad.</p>
+<blockquote>
+<p>★ <strong>Actualización:</strong> La tabla de materiales ya no es una lista fija. Ahora puedes
+activar o desactivar ítems por proyecto, agregar insumos nuevos y eliminar los que
+no aplican — todo directamente en la tabla, sin tocar el Excel.</p>
+</blockquote>
+<hr />
+<h3 id="estructura-de-pestanas">Estructura de pestañas</h3>
+<table>
+<thead>
+<tr>
+<th>Pestaña</th>
+<th>Contenido</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🔩 Perfilería y Estructura</td>
+<td>Rieles, tornillería, soportes, perfiles</td>
+</tr>
+<tr>
+<td>👷 Mano de Obra</td>
+<td>Instalación, certificaciones, transporte</td>
+</tr>
+<tr>
+<td>⚡ Sistema FV</td>
+<td>Cables, protecciones, cajas, puesta a tierra</td>
+</tr>
+<tr>
+<td>🔌 Inversor y Equipos Eléctricos</td>
+<td>Tableros, breakers, comunicaciones</td>
+</tr>
+<tr>
+<td>📦 Equipos del Catálogo</td>
+<td>Módulos + inversor + baterías (auto desde Dimensionamiento)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="columna-activo-incluir-o-excluir-items">Columna "✔ Activo" — incluir o excluir ítems</h3>
+<p>Cada fila tiene un <strong>checkbox en la primera columna</strong>:</p>
+<ul>
+<li>✅ <strong>Marcado (Activo):</strong> el ítem suma al subtotal y al CAPEX total.</li>
+<li>☐ <strong>Desmarcado:</strong> el ítem queda visible en la tabla como referencia pero
+  <strong>no suma al total</strong>. Útil para materiales opcionales o que ya están
+  cubiertos por otra partida.</li>
+</ul>
+<p>Debajo de cada tabla verás dos métricas:
+- <strong>Subtotal (activos):</strong> suma solo de los ítems con checkbox marcado.
+- <strong>Ítems desactivados (excluidos):</strong> suma de los ítems desmarcados, para
+  que veas cuánto estás dejando fuera.</p>
+<hr />
+<h3 id="agregar-un-item-nuevo">Agregar un ítem nuevo</h3>
+<ol>
+<li>Desplázate hasta el final de la tabla de la pestaña correspondiente.</li>
+<li>Haz clic en el botón <strong>➕</strong> que aparece en la esquina inferior izquierda
+   del editor.</li>
+<li>Se agrega una fila en blanco — completa Descripción, Ref., Cantidad,
+   Unidad y USD/un directamente en la celda.</li>
+<li>El checkbox "Activo" se marca automáticamente en la fila nueva.</li>
+</ol>
+<hr />
+<h3 id="eliminar-un-item">Eliminar un ítem</h3>
+<ol>
+<li>Haz clic en la fila que quieres eliminar (queda resaltada).</li>
+<li>Presiona la tecla <strong>Supr</strong> o <strong>Delete</strong> del teclado.</li>
+</ol>
+<blockquote>
+<p>💡 Si prefieres no eliminar un ítem sino solo excluirlo del total,
+desmarca el checkbox — así puedes volver a activarlo más adelante.</p>
+</blockquote>
+<hr />
+<h3 id="persistencia-durante-la-sesion">Persistencia durante la sesión</h3>
+<p>Los cambios que hagas (activar/desactivar, editar precios, agregar filas)
+<strong>se conservan mientras el navegador esté abierto</strong> y navegues entre páginas.
+Si cierras el navegador o la sesión expira, el presupuesto vuelve a cargar
+desde la plantilla base del Excel.</p>
+<hr />
+<h3 id="boton-resetear-seccion">Botón "↺ Resetear sección"</h3>
+<p>Cada pestaña tiene este botón en la parte superior. Úsalo para:
+- Empezar un proyecto nuevo desde cero en esa sección.
+- Deshacer todos los cambios de la sesión actual y volver a la plantilla del Excel.</p>
+<hr />
+<h3 id="trm-y-conversion-cop">TRM y conversión COP</h3>
+<p>El campo <strong>💱 TRM (COP/USD)</strong> en la parte superior aplica a toda la página.
+Todos los precios se ingresan en <strong>USD</strong>; la conversión a millones de COP
+se muestra automáticamente en cada subtotal.</p>
+<blockquote>
+<p>⚠️ Si el Excel base tiene precios en COP, divídelos por la TRM antes de
+ingresarlos. La calculadora trabaja siempre en USD internamente.</p>
+</blockquote>
+<hr />
+<h3 id="resumen-capex-y-conexion-con-financiero">Resumen CAPEX y conexión con Financiero</h3>
+<p>Al pie de la página, el <strong>Resumen CAPEX Total</strong> agrega las cinco secciones
+(solo ítems activos) y aplica:</p>
+<ul>
+<li><strong>Costos indirectos (%):</strong> gastos de administración, AUI, utilidad.</li>
+<li><strong>Imprevistos y contingencia (%):</strong> reserva para riesgos.</li>
+</ul>
+<p>El <strong>CAPEX TOTAL</strong> resultante se envía automáticamente a:
+- 💰 <strong>Página 7 — Financiero</strong> (VPN, TIR, payback).
+- 📄 <strong>Página 10 — Reporte PDF</strong> (sección de costos y Ley 1715).</p>
+<p>La fracción de equipos (Sistema FV + Inversor + Catálogo / CAPEX total)
+se calcula automáticamente para los beneficios tributarios de la <strong>Ley 1715</strong>.</p>
+<hr />
+<h3 id="alerta-de-costowp">Alerta de costo/Wp</h3>
+<p>Si el CAPEX supera <strong>USD 5.0/Wp</strong> aparece una advertencia en naranja.
+La referencia para BIPV instalado en Colombia es <strong>USD 1.5–4.0/Wp</strong>.
+Causas comunes de valores fuera de rango:
+- Precios ingresados en COP en lugar de USD.
+- IVA incluido en precios sin descontar.
+- Mano de obra o perfilería duplicada entre secciones.</p>
+<hr />
+<h3 id="exportar-el-presupuesto">Exportar el presupuesto</h3>
+<p>El presupuesto detallado se incluye en el <strong>Reporte PDF (Página 10)</strong>
+como una sección de costos. Para una cotización formal en PDF o Excel
+independiente, consulta la tarea pendiente de exportación.</p>
+<hr />
+<h2 id="12-pagina-11-baterias-y-balance">12. Página 11 — Baterías y Balance ★</h2>
+<p><strong>Propósito:</strong> Dimensionar el sistema de almacenamiento y calcular el balance energético
+(autogeneración, autosuficiencia, excedentes a red).</p>
+<h3 id="e_ac-corregida-por-bypass-nuevo_1">★ E_ac corregida por bypass (nuevo)</h3>
+<p>Si bypass fue ejecutado en Página 5, la E_ac usada para el balance es la corregida.
+Verás el banner:</p>
+<pre><code>⚡ Corrección bypass activa:
 E_ac base = 91.000 kWh/año → pérdida bypass = 2.850 kWh/año → E_ac usada en el balance = 88.150 kWh/año (3.1% menos)
 La autogeneración y el dimensionamiento de la batería se calculan con la producción real.
-</code>`<code>
-
-Esto evita <strong>sobredimensionar la batería</strong> basándose en una producción solar inexistente.
-
-<h3>Pasos</h3>
-
+</code></pre>
+<p>Esto evita <strong>sobredimensionar la batería</strong> basándose en una producción solar inexistente.</p>
+<h3 id="pasos_4">Pasos</h3>
+<ol>
 <li><strong>Seleccionar la batería</strong> del catálogo (o ingresar manualmente)</li>
 <li><strong>Ingresar el perfil de consumo</strong> del edificio (kWh/día o perfil horario)</li>
 <li><strong>Ejecutar el balance energético</strong></li>
-
-<strong>Resultados:</strong>
-<li>Tasa de autogeneración (%) — fracción del consumo cubierta por solar</li>
-<li>Tasa de autosuficiencia (%) — fracción de la producción solar autoconsumida</li>
-<li>Excedentes a red (kWh/año)</li>
-<li>Dimensionamiento recomendado de la batería (kWh y ciclos/año)</li>
-
-<hr>
-
-<h2>13. Página 10 — Reporte PDF ★</h2>
-
-<strong>Propósito:</strong> Generar el reporte técnico descargable del proyecto.
-
-<h3>Secciones del reporte</h3>
-
-<tr><td>Sección</td><td>Contenido</td><td>Disponible si</td></tr>
-
-<tr><td>1. Proyecto</td><td>Datos generales, ubicación, sistema</td><td>Siempre</td></tr>
-<tr><td>2. Recurso Solar</td><td>POA anual, heatmap</td><td>Página 2 ejecutada</td></tr>
-<tr><td>3. Motor Óptico</td><td>Cascada IAM + Soiling + Térmico</td><td>Página 5b ejecutada</td></tr>
-<tr><td>4. Producción</td><td>E_ac, PR, Factor de Planta</td><td>Página 6 ejecutada</td></tr>
-<tr><td>4b. Diagnóstico</td><td>PR real vs esperado mes a mes</td><td>Datos reales ingresados</td></tr>
-<tr><td>★ 4c. Bypass Diodes</td><td>Pérdidas bypass, tabla mensual</td><td>Página 5 ejecutada</td></tr>
-<tr><td>★ 5. Financiero</td><td>TIR, VPN, Payback + fuente E_ac</td><td>Página 7 ejecutada</td></tr>
-<tr><td>6. Balance</td><td>Autogeneración, batería</td><td>Página 11 ejecutada</td></tr>
-
-<h3>★ Sección 4c — Bypass Diodes (nueva)</h3>
-
-Cuando el modelo de bypass fue ejecutado, el reporte incluye:
-<li>Tabla con pérdida anual, % E_dc, horas bypass, E_ac corregida</li>
-<li>Fuente del FS (geométrico o combinado) y modo de cobertura temporal</li>
-<li>Semáforo de impacto: 🟢 < 2% · 🟡 2–5% · 🔴 > 5%</li>
-<li>Tabla mensual con pérdidas coloreadas (rojo si > 20 kWh ese mes)</li>
-<li>Referencia técnica: Deline et al. 2013</li>
-
-<h3>★ Sección 5 — Trazabilidad de E_ac (nuevo)</h3>
-
-La sección Financiero del reporte ahora muestra explícitamente qué E_ac se usó:
-
-</code>`<code>
-E_ac usada en el análisis:  88.150 kWh/año (corregida por bypass)
+</ol>
+<p><strong>Resultados:</strong>
+- Tasa de autogeneración (%) — fracción del consumo cubierta por solar
+- Tasa de autosuficiencia (%) — fracción de la producción solar autoconsumida
+- Excedentes a red (kWh/año)
+- Dimensionamiento recomendado de la batería (kWh y ciclos/año)</p>
+<hr />
+<h2 id="13-pagina-10-reporte-pdf">13. Página 10 — Reporte PDF ★</h2>
+<p><strong>Propósito:</strong> Generar el reporte técnico descargable del proyecto.</p>
+<h3 id="secciones-del-reporte">Secciones del reporte</h3>
+<table>
+<thead>
+<tr>
+<th>Sección</th>
+<th>Contenido</th>
+<th>Disponible si</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Proyecto</td>
+<td>Datos generales, ubicación, sistema</td>
+<td>Siempre</td>
+</tr>
+<tr>
+<td>2. Recurso Solar</td>
+<td>POA anual, heatmap</td>
+<td>Página 2 ejecutada</td>
+</tr>
+<tr>
+<td>3. Motor Óptico</td>
+<td>Cascada IAM + Soiling + Térmico</td>
+<td>Página 5b ejecutada</td>
+</tr>
+<tr>
+<td>4. Producción</td>
+<td>E_ac, PR, Factor de Planta</td>
+<td>Página 6 ejecutada</td>
+</tr>
+<tr>
+<td>4b. Diagnóstico</td>
+<td>PR real vs esperado mes a mes</td>
+<td>Datos reales ingresados</td>
+</tr>
+<tr>
+<td>★ 4c. Bypass Diodes</td>
+<td>Pérdidas bypass, tabla mensual</td>
+<td>Página 5 ejecutada</td>
+</tr>
+<tr>
+<td>★ 5. Financiero</td>
+<td>TIR, VPN, Payback + fuente E_ac</td>
+<td>Página 7 ejecutada</td>
+</tr>
+<tr>
+<td>6. Balance</td>
+<td>Autogeneración, batería</td>
+<td>Página 11 ejecutada</td>
+</tr>
+</tbody>
+</table>
+<h3 id="seccion-4c-bypass-diodes-nueva">★ Sección 4c — Bypass Diodes (nueva)</h3>
+<p>Cuando el modelo de bypass fue ejecutado, el reporte incluye:
+- Tabla con pérdida anual, % E_dc, horas bypass, E_ac corregida
+- Fuente del FS (geométrico o combinado) y modo de cobertura temporal
+- Semáforo de impacto: 🟢 &lt; 2% · 🟡 2–5% · 🔴 &gt; 5%
+- Tabla mensual con pérdidas coloreadas (rojo si &gt; 20 kWh ese mes)
+- Referencia técnica: Deline et al. 2013</p>
+<h3 id="seccion-5-trazabilidad-de-e_ac-nuevo">★ Sección 5 — Trazabilidad de E_ac (nuevo)</h3>
+<p>La sección Financiero del reporte ahora muestra explícitamente qué E_ac se usó:</p>
+<pre><code>E_ac usada en el análisis:  88.150 kWh/año (corregida por bypass)
 Pérdida bypass descontada:  2.850 kWh/año (3.1% de E_ac base)
-</code>`<code>
-
-Esto permite al cliente o a la UPME verificar que los números de TIR y Payback
-son <strong>conservadores y realistas</strong> (no optimistas).
-
-<h3>Cómo generar el PDF</h3>
-
+</code></pre>
+<p>Esto permite al cliente o a la UPME verificar que los números de TIR y Payback
+son <strong>conservadores y realistas</strong> (no optimistas).</p>
+<h3 id="como-generar-el-pdf">Cómo generar el PDF</h3>
+<ol>
 <li>Completa los campos "Nombre de la empresa" y "Nombre del proyecto"</li>
 <li>Selecciona qué secciones incluir (checkboxes)</li>
 <li>Clic en <strong>"⬇️ Descargar reporte (.html → imprimir como PDF)"</strong></li>
-<li>El archivo </code>.html<code> se abre en el navegador</li>
+<li>El archivo <code>.html</code> se abre en el navegador</li>
 <li>Usa <strong>Ctrl+P → Guardar como PDF</strong> (escala recomendada: 85%, márgenes: mínimos)</li>
-
-<hr>
-
-<h2>14. Calculadora de Sombreado 3D</h2>
-
-<strong>URL:</strong> bipv.innovacionquimica.com.co
-
-<strong>Propósito:</strong> Generar el CSV de Factor de Sombreado para usar en Página 5 de la calculadora BIPV.
-
-<h3>Pasos en la Calculadora de Sombreado 3D</h3>
-
+</ol>
+<hr />
+<h2 id="14-calculadora-de-sombreado-3d">14. Calculadora de Sombreado 3D</h2>
+<p><strong>URL:</strong> bipv.innovacionquimica.com.co</p>
+<p><strong>Propósito:</strong> Generar el CSV de Factor de Sombreado para usar en Página 5 de la calculadora BIPV.</p>
+<h3 id="pasos-en-la-calculadora-de-sombreado-3d">Pasos en la Calculadora de Sombreado 3D</h3>
+<ol>
 <li><strong>Cargar el archivo EPW</strong> del proyecto (el mismo que en Página 2)</li>
 <li><strong>Dibujar los obstáculos</strong> en el mapa 3D:</li>
-   - Edificios vecinos (altura, distancia, ancho)
-   - Voladizos, antenas, tanques
+<li>Edificios vecinos (altura, distancia, ancho)</li>
+<li>Voladizos, antenas, tanques</li>
 <li><strong>Configurar los puntos de análisis:</strong></li>
-   - Ubicar puntos sobre la fachada fotovoltaica
-   - Asignar nombre de fachada (campo "Fachada")
+<li>Ubicar puntos sobre la fachada fotovoltaica</li>
+<li>Asignar nombre de fachada (campo "Fachada")</li>
 <li><strong>Seleccionar días críticos:</strong></li>
-   - Mínimo recomendado: solsticios (21 jun, 21 dic) + equinoccios (21 mar, 21 sep)
-   - Para mayor precisión: un día representativo por mes (12 días)
+<li>Mínimo recomendado: solsticios (21 jun, 21 dic) + equinoccios (21 mar, 21 sep)</li>
+<li>Para mayor precisión: un día representativo por mes (12 días)</li>
 <li><strong>Cruzar máscara de sombras con el EPW:</strong></li>
-   - Botón "Cruzar Máscara + EPW"
-   - Genera: FS_geometrico (obstáculos), FS_climatico (nubes), FS_combinado
+<li>Botón "Cruzar Máscara + EPW"</li>
+<li>Genera: FS_geometrico (obstáculos), FS_climatico (nubes), FS_combinado</li>
 <li><strong>Exportar CSV:</strong></li>
-   - Botón "Exportar CSV"
-   - El CSV incluye columnas: Hora, Mes, Dia, FS_geometrico, FS_climatico, FS_combinado, <strong>Fachada</strong> ← columna nueva
-
-<h3>Convención del CSV exportado</h3>
-
-<tr><td>Valor FS</td><td>Significado</td></tr>
-
-<tr><td>0.00</td><td>Sin sombra en esa hora</td></tr>
-<tr><td>0.50</td><td>50% de la fachada sombreada</td></tr>
-<tr><td>1.00</td><td>Sombra total (100%)</td></tr>
-
-<blockquote>Esta es la convención <strong>p_shade</strong>: 0 = libre, 1 = sombreado.</blockquote>
-<blockquote>Es la convención correcta para cargar en Página 5.</blockquote>
-
-<hr>
-
-<h2>15. Cadena completa de bypass diodes</h2>
-
-Este es el flujo completo cuando se usa el modelo de bypass:
-
-</code>`<code>
-bipv.innovacionquimica.com.co (Calculadora Sombreado 3D)
+<li>Botón "Exportar CSV"</li>
+<li>El CSV incluye columnas: Hora, Mes, Dia, FS_geometrico, FS_climatico, FS_combinado, <strong>Fachada</strong> ← columna nueva</li>
+</ol>
+<h3 id="convencion-del-csv-exportado">Convención del CSV exportado</h3>
+<table>
+<thead>
+<tr>
+<th>Valor FS</th>
+<th>Significado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.00</td>
+<td>Sin sombra en esa hora</td>
+</tr>
+<tr>
+<td>0.50</td>
+<td>50% de la fachada sombreada</td>
+</tr>
+<tr>
+<td>1.00</td>
+<td>Sombra total (100%)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Esta es la convención <strong>p_shade</strong>: 0 = libre, 1 = sombreado.
+Es la convención correcta para cargar en Página 5.</p>
+</blockquote>
+<hr />
+<h2 id="15-cadena-completa-de-bypass-diodes">15. Cadena completa de bypass diodes</h2>
+<p>Este es el flujo completo cuando se usa el modelo de bypass:</p>
+<pre><code>bipv.innovacionquimica.com.co (Calculadora Sombreado 3D)
   │
   ├── Dibujar obstáculos 3D
   ├── Cruzar con EPW (días críticos)
@@ -583,7 +721,7 @@ Calculadora BIPV — Página 5 (Mismatch)
            │
            ↓
 Página 6 — Producción
-  └── Balance energético con barra "Bypass diodes"
+  └── Balance energético con barra &quot;Bypass diodes&quot;
       Guarda: E_ac_anual_kWh_bypass en memoria
            │
     ┌──────┴──────┐
@@ -596,81 +734,85 @@ E_ac_bypass     E_ac_bypass
            ↓
 Página 10 — Reporte PDF
   ├── Sección 4c: Pérdidas bypass (tabla mensual)
-  └── Sección 5: "E_ac usada: X kWh/año (corregida por bypass)"
-</code>`<code>
-
-<hr>
-
-<h2>16. Interpretación de resultados clave</h2>
-
-<h3>Performance Ratio (PR)</h3>
-
-</code>`<code>
-PR = Y_f / Y_r = (E_ac / P_STC) / (H_POA / G_STC)
-</code>``
-
-<li><strong>PR > 100%:</strong> Posible en Bogotá/Medellín (altitud, temperatura baja) — físicamente correcto</li>
+  └── Sección 5: &quot;E_ac usada: X kWh/año (corregida por bypass)&quot;
+</code></pre>
+<hr />
+<h2 id="16-interpretacion-de-resultados-clave">16. Interpretación de resultados clave</h2>
+<h3 id="performance-ratio-pr">Performance Ratio (PR)</h3>
+<pre><code>PR = Y_f / Y_r = (E_ac / P_STC) / (H_POA / G_STC)
+</code></pre>
+<ul>
+<li><strong>PR &gt; 100%:</strong> Posible en Bogotá/Medellín (altitud, temperatura baja) — físicamente correcto</li>
 <li><strong>PR 80–100%:</strong> Rango normal para fachadas BIPV bien diseñadas</li>
 <li><strong>PR 60–80%:</strong> Revisar pérdidas ópticas, mismatch o sombreado</li>
-<li><strong>PR < 60%:</strong> Problema real — inspección de campo recomendada</li>
-
-<h3>E_ac vs E_ac_bypass</h3>
-
-<tr><td>Escenario</td><td>E_ac usada</td><td>Para qué</td></tr>
-
-<tr><td>Sin sombras significativas</td><td>E_ac base</td><td>Proyectos con obstrucción < 5%</td></tr>
-<tr><td>Con sombras urbanas</td><td>E_ac_bypass</td><td>Fachadas en centros urbanos</td></tr>
-<tr><td>Certificación UPME</td><td>E_ac_bypass</td><td>Estimación conservadora requerida</td></tr>
-
-<h3>Horas con bypass activo</h3>
-
-<li><strong>< 200 h/año:</strong> Sombra estacional leve (ej. solo invierno solar)</li>
+<li><strong>PR &lt; 60%:</strong> Problema real — inspección de campo recomendada</li>
+</ul>
+<h3 id="e_ac-vs-e_ac_bypass">E_ac vs E_ac_bypass</h3>
+<table>
+<thead>
+<tr>
+<th>Escenario</th>
+<th>E_ac usada</th>
+<th>Para qué</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sin sombras significativas</td>
+<td>E_ac base</td>
+<td>Proyectos con obstrucción &lt; 5%</td>
+</tr>
+<tr>
+<td>Con sombras urbanas</td>
+<td>E_ac_bypass</td>
+<td>Fachadas en centros urbanos</td>
+</tr>
+<tr>
+<td>Certificación UPME</td>
+<td>E_ac_bypass</td>
+<td>Estimación conservadora requerida</td>
+</tr>
+</tbody>
+</table>
+<h3 id="horas-con-bypass-activo">Horas con bypass activo</h3>
+<ul>
+<li><strong>&lt; 200 h/año:</strong> Sombra estacional leve (ej. solo invierno solar)</li>
 <li><strong>200–500 h/año:</strong> Sombra moderada — bypass tiene impacto real</li>
-<li><strong>> 500 h/año:</strong> Sombra severa — reconsiderar el layout del array</li>
-
-<hr>
-
-<h2>17. Preguntas frecuentes</h2>
-
-<strong>P: ¿El CSV de la Calculadora de Sombreado cubre las 8 760 horas del año?</strong>
+<li><strong>&gt; 500 h/año:</strong> Sombra severa — reconsiderar el layout del array</li>
+</ul>
+<hr />
+<h2 id="17-preguntas-frecuentes">17. Preguntas frecuentes</h2>
+<p><strong>P: ¿El CSV de la Calculadora de Sombreado cubre las 8 760 horas del año?</strong>
 R: No. El CSV cubre solo los días críticos seleccionados (~60–150 horas). El modo
 "mensual" replica el patrón de cada día crítico a todos los días del mismo mes,
 elevando la cobertura al 25–40% del año. Los meses sin día crítico asumen FS=0.
-Para máxima precisión, incluye un día representativo por cada mes del año.
-
-<strong>P: ¿Por qué mi TIR es diferente antes y después de ejecutar bypass?</strong>
+Para máxima precisión, incluye un día representativo por cada mes del año.</p>
+<p><strong>P: ¿Por qué mi TIR es diferente antes y después de ejecutar bypass?</strong>
 R: Con bypass activo, la Página 7 usa E_ac_bypass (menor que E_ac base). Menos
 energía generada = menos ahorro = TIR levemente menor. La diferencia es proporcional
-al % de pérdida bypass. Para proyectos con < 2% de pérdida, el impacto en TIR
-es < 0.3 puntos porcentuales.
-
-<strong>P: El banner de "FS invertido" apareció. ¿Qué hago?</strong>
+al % de pérdida bypass. Para proyectos con &lt; 2% de pérdida, el impacto en TIR
+es &lt; 0.3 puntos porcentuales.</p>
+<p><strong>P: El banner de "FS invertido" apareció. ¿Qué hago?</strong>
 R: Si el CSV viene de la Calculadora de Sombreado 3D de esta suite, NO está invertido
 — el banner puede ser un falso positivo si el FS promedio real es muy alto (fachada
 muy poco sombreada). Si el CSV viene de otra herramienta, activa el checkbox
-"Invertir FS (1 − FS)" y verifica que la gráfica mensual tenga sentido.
-
-<strong>P: ¿Por qué hay meses sin dato de bypass?</strong>
+"Invertir FS (1 − FS)" y verifica que la gráfica mensual tenga sentido.</p>
+<p><strong>P: ¿Por qué hay meses sin dato de bypass?</strong>
 R: Si el CSV no tiene ningún día crítico de ese mes, la app asume FS=0 en todo el mes.
 Solución: en la Calculadora de Sombreado, agrega al menos un día representativo
-de los meses faltantes antes de exportar el CSV.
-
-<strong>P: ¿El PR puede ser mayor de 100%?</strong>
+de los meses faltantes antes de exportar el CSV.</p>
+<p><strong>P: ¿El PR puede ser mayor de 100%?</strong>
 R: Sí. En ciudades de alta altitud como Bogotá (2 600 m) o Medellín (1 500 m), la
 temperatura ambiente baja hace que los módulos operen por debajo de 25°C muchas horas,
-ganando eficiencia. Esto es físicamente correcto según IEC 61724.
-
-<strong>P: ¿Qué es el modo "Motor Óptico vs sin Motor Óptico"?</strong>
+ganando eficiencia. Esto es físicamente correcto según IEC 61724.</p>
+<p><strong>P: ¿Qué es el modo "Motor Óptico vs sin Motor Óptico"?</strong>
 R: El Motor Óptico aplica correcciones de IAM (reflexión angular), soiling (suciedad)
 y temperatura confinada BIPV. Sin él, la app usa la POA bruta × factor de mismatch
 global. El Motor Óptico da resultados más precisos para fachadas BIPV (diferencia
-típica: 5–12% en la producción final).
-
-<hr>
-
-<em>Manual generado el 30 de julio de 2026</em>
+típica: 5–12% en la producción final).</p>
+<hr />
+<p><em>Manual generado el 30 de julio de 2026</em>
 <em>Calculadora BIPV — Innovación Química / SolTech Energy</em>
-<em>Repositorio: github.com/ventas108/calculadora-bipv</em>
-
+<em>Repositorio: github.com/ventas108/calculadora-bipv</em></p>
 </body>
 </html>
