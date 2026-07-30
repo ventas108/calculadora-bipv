@@ -362,6 +362,71 @@ def generar_html_reporte() -> str:
              "respecto a las condiciones STC. IEC 61724 permite PR > 100% — es un resultado físicamente correcto.")
         html += cierre()
 
+    # ── 4b. Diagnóstico PR real vs esperado ──────────────────────────────────
+    df_diag_real = st.session_state.get("df_diagnostico_real")
+    meses_rojo_d = st.session_state.get("diag_meses_rojo", [])
+    meses_amar_d = st.session_state.get("diag_meses_amarillo", [])
+    total_real_d = st.session_state.get("diag_total_real_kwh", 0)
+    total_sim_d  = st.session_state.get("diag_total_sim_kwh", 0)
+
+    if df_diag_real is not None and total_real_d > 0:
+        html += seccion("Diagnóstico: PR Real vs PR Esperado (Inversor)", "🔍")
+
+        # Tabla comparativa
+        filas_diag = df_diag_real[df_diag_real["E_real (kWh)"] != "—"]
+        if not filas_diag.empty:
+            html += """
+            <table style="width:100%;border-collapse:collapse;font-size:0.88em;margin-bottom:14px;">
+            <thead><tr style="background:#1A569A;color:#fff;">
+                <th style="padding:6px 8px;text-align:left;">Mes</th>
+                <th style="padding:6px 8px;text-align:right;">HSP (h)</th>
+                <th style="padding:6px 8px;text-align:right;">E_sim (kWh)</th>
+                <th style="padding:6px 8px;text-align:right;">E_real (kWh)</th>
+                <th style="padding:6px 8px;text-align:right;">PR_esp (%)</th>
+                <th style="padding:6px 8px;text-align:right;">PR_real (%)</th>
+                <th style="padding:6px 8px;text-align:right;">Δ kWh</th>
+                <th style="padding:6px 8px;text-align:center;">Estado</th>
+            </tr></thead><tbody>"""
+            for _, row in filas_diag.iterrows():
+                bg = "#fff" if filas_diag.index.get_loc(_) % 2 == 0 else "#f4f7fb"
+                estado_str = str(row["Estado"])
+                if "🔴" in estado_str:
+                    color_est = "#c62828"
+                elif "🟡" in estado_str:
+                    color_est = "#f9a825"
+                else:
+                    color_est = "#2e7d32"
+                html += f"""
+                <tr style="background:{bg};">
+                    <td style="padding:5px 8px;font-weight:600;">{row['Mes']}</td>
+                    <td style="padding:5px 8px;text-align:right;">{row['HSP (h)']}</td>
+                    <td style="padding:5px 8px;text-align:right;">{row['E_sim (kWh)']:,}</td>
+                    <td style="padding:5px 8px;text-align:right;font-weight:600;">{row['E_real (kWh)']:,}</td>
+                    <td style="padding:5px 8px;text-align:right;">{row['PR_esp (%)']}</td>
+                    <td style="padding:5px 8px;text-align:right;font-weight:600;">{row['PR_real (%)']}</td>
+                    <td style="padding:5px 8px;text-align:right;">{row['Δ kWh']:+,}</td>
+                    <td style="padding:5px 8px;text-align:center;color:{color_est};font-weight:700;">{estado_str}</td>
+                </tr>"""
+            html += "</tbody></table>"
+
+        # Resumen diagnóstico
+        delta_d = total_real_d - total_sim_d
+        delta_pct_d = (delta_d / total_sim_d * 100) if total_sim_d > 0 else 0
+        html += tabla_kv([
+            ("E_real acumulada (inversor)",   _fmt(total_real_d, 0), "kWh", "Suma de kWh reales ingresados"),
+            ("E_simulada acumulada",          _fmt(total_sim_d,  0), "kWh", "Suma de kWh simulados para los mismos meses"),
+            ("Diferencia acumulada",          f"{delta_d:+,.0f}",    "kWh", f"{delta_pct_d:+.1f}% vs simulado"),
+            ("Meses con problema (PR < 80%)", ", ".join(meses_rojo_d) if meses_rojo_d else "Ninguno",
+             "", "Requieren inspección de campo urgente"),
+            ("Meses a revisar (PR 80–90%)",   ", ".join(meses_amar_d) if meses_amar_d else "Ninguno",
+             "", "Verificar limpieza y strings"),
+        ],
+        nota="PR real = E_AC_real ÷ (P_STC × HSP_mes). "
+             "🟢 PR_real ≥ 90% del esperado: sistema normal. "
+             "🟡 80–90%: suciedad o sombreado leve. "
+             "🔴 < 80%: problema que requiere inspección urgente (strings, degradación, inversor).")
+        html += cierre()
+
     # ── 5. Financiero ─────────────────────────────────────────────────────────
     if financiero_ok and incluir_fin and fin:
         vpn        = fin.get("vpn_usd", 0)

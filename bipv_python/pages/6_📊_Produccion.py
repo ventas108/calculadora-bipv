@@ -394,3 +394,218 @@ if btn_sim or st.session_state.get("produccion_ok"):
     st.session_state["eta_inversor"]        = eta_inv_frac
     st.session_state["df_mensual_produccion"] = df_m   # para Página 11 Balance
     st.session_state["produccion_ok"]       = True
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # SECCIÓN — DIAGNÓSTICO: PRODUCCIÓN REAL DEL INVERSOR
+    # ══════════════════════════════════════════════════════════════════════════
+    st.markdown("---")
+    st.subheader("🔍 Diagnóstico: PR real vs PR esperado")
+    st.caption(
+        "Ingresa los kWh reales registrados por el inversor (o por la factura EPM) "
+        "mes a mes para calcular el PR real y compararlo contra el PR simulado."
+    )
+
+    # ── HSP mensual desde POA base ────────────────────────────────────────────
+    _poa_hsp = poa_base.copy()
+    _poa_hsp["_mes"] = _poa_hsp.index.month
+    _hsp_mes = _poa_hsp.groupby("_mes")["poa_global"].sum() / 1000.0  # kWh/m² → HSP
+
+    meses_etiq = ["Ene","Feb","Mar","Abr","May","Jun",
+                  "Jul","Ago","Sep","Oct","Nov","Dic"]
+
+    # ── Tabla de ingreso de datos reales ─────────────────────────────────────
+    st.markdown("#### 📥 Ingresar producción real del inversor (kWh/mes)")
+
+    _prev = st.session_state.get("diag_real_kwh", {})
+
+    cols_inp = st.columns(6)
+    kwh_real = {}
+    for i, mes in enumerate(meses_etiq):
+        col = cols_inp[i % 6]
+        kwh_real[mes] = col.number_input(
+            mes,
+            min_value=0.0,
+            max_value=500_000.0,
+            value=float(_prev.get(mes, 0.0)),
+            step=10.0,
+            format="%.1f",
+            key=f"diag_real_{mes}",
+            help=f"kWh AC reales medidos por el inversor en {mes}",
+        )
+
+    # Guardar valores ingresados
+    st.session_state["diag_real_kwh"] = kwh_real
+
+    meses_con_dato = [m for m in meses_etiq if kwh_real[m] > 0]
+
+    if not meses_con_dato:
+        st.info(
+            "💡 Ingresa los kWh reales de al menos un mes para ver el diagnóstico. "
+            "Puedes obtenerlos del display del inversor, su app de monitoreo o de la factura EPM."
+        )
+    else:
+        # ── Calcular comparativa ──────────────────────────────────────────────
+        filas = []
+        for i, mes in enumerate(meses_etiq):
+            num_mes   = i + 1
+            e_sim     = df_m.loc[df_m.index == mes, "E_ac (kWh)"].values
+            e_sim_val = float(e_sim[0]) if len(e_sim) > 0 else 0.0
+            hsp_val   = float(_hsp_mes.get(num_mes, 0.0))
+            e_real    = kwh_real[mes]
+
+            # PR esperado del mes = E_sim / (P_stc × HSP_mes)
+            pr_esp = (e_sim_val / (P_stc_kW * hsp_val)) if (P_stc_kW > 0 and hsp_val > 0) else 0.0
+            # PR real del mes
+            pr_real = (e_real / (P_stc_kW * hsp_val)) if (e_real > 0 and P_stc_kW > 0 and hsp_val > 0) else None
+
+            if pr_real is not None:
+                ratio = pr_real / pr_esp if pr_esp > 0 else 0.0
+                if ratio >= 0.90:
+                    semaforo = "🟢"
+                    estado   = "Normal"
+                elif ratio >= 0.80:
+                    semaforo = "🟡"
+                    estado   = "Revisar"
+                else:
+                    semaforo = "🔴"
+                    estado   = "Problema"
+                delta_kwh  = e_real - e_sim_val
+                delta_pct  = (delta_kwh / e_sim_val * 100) if e_sim_val > 0 else 0.0
+            else:
+                semaforo = "⬜"; estado = "Sin dato"
+                delta_kwh = None; delta_pct = None; ratio = None
+
+            filas.append({
+                "Mes":           mes,
+                "HSP (h)":       round(hsp_val, 1),
+                "E_sim (kWh)":   round(e_sim_val, 0),
+                "E_real (kWh)":  round(e_real, 0) if e_real > 0 else "—",
+                "PR_esp (%)":    round(pr_esp * 100, 1) if pr_esp > 0 else "—",
+                "PR_real (%)":   round(pr_real * 100, 1) if pr_real is not None else "—",
+                "Δ kWh":         round(delta_kwh, 0) if delta_kwh is not None else "—",
+                "Δ %":           round(delta_pct, 1) if delta_pct is not None else "—",
+                "Estado":        f"{semaforo} {estado}",
+            })
+
+        df_diag = pd.DataFrame(filas)
+
+        # ── Gráfica PR real vs esperado ───────────────────────────────────────
+        meses_grafica  = [f["Mes"] for f in filas if f["PR_real (%)"] != "—"]
+        pr_esp_grafica = [f["PR_esp (%)"] for f in filas if f["PR_real (%)"] != "—"]
+        pr_real_grafica= [f["PR_real (%)"] for f in filas if f["PR_real (%)"] != "—"]
+        e_sim_graf     = [f["E_sim (kWh)"] for f in filas if f["E_real (kWh)"] != "—"]
+        e_real_graf    = [f["E_real (kWh)"] for f in filas if f["E_real (kWh)"] != "—"]
+
+        tab1, tab2 = st.tabs(["📊 PR real vs esperado", "📅 kWh real vs simulado"])
+
+        with tab1:
+            fig_pr = go.Figure()
+            fig_pr.add_trace(go.Bar(
+                name="PR esperado (simulado)",
+                x=meses_grafica, y=pr_esp_grafica,
+                marker_color="#1565C0", opacity=0.75,
+            ))
+            fig_pr.add_trace(go.Bar(
+                name="PR real (inversor)",
+                x=meses_grafica, y=pr_real_grafica,
+                marker_color=[
+                    "#2E7D32" if (r >= e * 0.90) else
+                    "#F9A825" if (r >= e * 0.80) else
+                    "#C62828"
+                    for r, e in zip(pr_real_grafica, pr_esp_grafica)
+                ],
+                opacity=0.90,
+                text=[f"{r:.1f}%" for r in pr_real_grafica],
+                textposition="outside",
+            ))
+            fig_pr.add_hline(
+                y=float(res["PR"]) * 100 * 0.90,
+                line_dash="dash", line_color="#EF5350",
+                annotation_text="Umbral 90% PR", annotation_position="top right",
+            )
+            fig_pr.update_layout(
+                barmode="group", yaxis_title="Performance Ratio (%)",
+                height=380, plot_bgcolor="white", paper_bgcolor="white",
+                legend=dict(orientation="h", y=-0.25), margin=dict(b=80),
+                yaxis=dict(range=[0, max(max(pr_esp_grafica), max(pr_real_grafica)) * 1.15]),
+            )
+            st.plotly_chart(fig_pr, use_container_width=True)
+
+        with tab2:
+            fig_kwh = go.Figure()
+            fig_kwh.add_trace(go.Bar(
+                name="E_ac simulada (kWh)",
+                x=meses_grafica, y=e_sim_graf,
+                marker_color="#1565C0", opacity=0.70,
+            ))
+            fig_kwh.add_trace(go.Bar(
+                name="E_ac real inversor (kWh)",
+                x=meses_grafica, y=e_real_graf,
+                marker_color="#2E7D32", opacity=0.85,
+                text=[f"{v:,.0f}" for v in e_real_graf],
+                textposition="outside",
+            ))
+            fig_kwh.update_layout(
+                barmode="group", yaxis_title="Energía (kWh)",
+                height=380, plot_bgcolor="white", paper_bgcolor="white",
+                legend=dict(orientation="h", y=-0.25), margin=dict(b=80),
+            )
+            st.plotly_chart(fig_kwh, use_container_width=True)
+
+        # ── Tabla comparativa ─────────────────────────────────────────────────
+        st.markdown("#### 📋 Tabla comparativa mes a mes")
+        st.dataframe(df_diag, use_container_width=True, hide_index=True)
+
+        # ── Diagnóstico automático ────────────────────────────────────────────
+        meses_rojo    = [f["Mes"] for f in filas if f["Estado"].startswith("🔴")]
+        meses_amarillo= [f["Mes"] for f in filas if f["Estado"].startswith("🟡")]
+        meses_verde   = [f["Mes"] for f in filas if f["Estado"].startswith("🟢")]
+
+        # Totales reales ingresados
+        total_real = sum(kwh_real[m] for m in meses_etiq if kwh_real[m] > 0)
+        total_sim  = sum(
+            float(df_m.loc[df_m.index == m, "E_ac (kWh)"].values[0])
+            for m in meses_con_dato
+            if len(df_m.loc[df_m.index == m]) > 0
+        )
+        tarifa_ref = st.session_state.get("tarifa_kwh", 650)
+        perdida_cop= max(0.0, (total_sim - total_real) * tarifa_ref)
+
+        st.markdown("#### 🩺 Diagnóstico automático")
+
+        if meses_rojo:
+            st.error(
+                f"🔴 **Problema detectado en: {', '.join(meses_rojo)}** — "
+                f"PR real < 80% del esperado. "
+                "Causas probables: paneles degradados, suciedad severa, sombras, "
+                "falla en strings o en el inversor. Requiere inspección de campo urgente."
+            )
+        if meses_amarillo:
+            st.warning(
+                f"🟡 **Atención en: {', '.join(meses_amarillo)}** — "
+                f"PR real entre 80% y 90% del esperado. "
+                "Posible suciedad acumulada, sombreado parcial o degradación leve. "
+                "Verificar limpieza y revisar strings individuales."
+            )
+        if meses_verde and not meses_rojo and not meses_amarillo:
+            st.success(
+                f"🟢 **Sistema operando correctamente** en todos los meses ingresados "
+                f"({', '.join(meses_verde)}). PR real ≥ 90% del esperado."
+            )
+        if total_sim > 0:
+            delta_total = total_real - total_sim
+            delta_pct_total = delta_total / total_sim * 100
+            st.info(
+                f"📊 **Resumen acumulado ({len(meses_con_dato)} meses con dato):** "
+                f"E_real = **{total_real:,.0f} kWh** | "
+                f"E_simulada = **{total_sim:,.0f} kWh** | "
+                f"Diferencia = **{delta_total:+,.0f} kWh ({delta_pct_total:+.1f}%)**"
+                + (f" | Pérdida estimada ≈ **${perdida_cop:,.0f} COP**" if perdida_cop > 0 else "")
+            )
+
+        # Guardar para Reporte PDF
+        st.session_state["df_diagnostico_real"] = df_diag
+        st.session_state["diag_meses_rojo"]     = meses_rojo
+        st.session_state["diag_meses_amarillo"] = meses_amarillo
+        st.session_state["diag_total_real_kwh"] = total_real
+        st.session_state["diag_total_sim_kwh"]  = total_sim
