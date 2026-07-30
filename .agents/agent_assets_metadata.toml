@@ -102,3 +102,9 @@ id = "SPl5k0bi-3VUL8mrS6sKK"
 uri = "file://attached_assets/INFORME_CAPACIDAD_BIPV_2026-07-30.docx"
 type = "word_document"
 title = "Informe de Capacidad — GitHub + Digital Ocean · 30 julio 2026"
+
+[[outputs]]
+id = "kZsJ1yQ3v84-zkiRJCgUG"
+uri = "file://attached_assets/PREDIAGNOSTICO_FV_RutaN_88kWp_2026-07-30.docx"
+type = "word_document"
+title = "Pre-Diagnóstico Fotovoltaico — Ruta N 88 kWp · 30 julio 2026"
