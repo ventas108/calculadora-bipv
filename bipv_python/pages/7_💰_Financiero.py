@@ -225,6 +225,18 @@ with col_t2:
         help="CdTe SolTech: 0.5%/año (mejor que c-Si ~0.7%). "
              "Fuente: Jordan & Kurtz 2013.",
     )
+    factor_p90 = st.slider(
+        "Incertidumbre P90 (%)",
+        min_value=0.0, max_value=25.0, value=10.0, step=0.5,
+        help=(
+            "Reducción de E_ac para estimar el escenario P90 "
+            "(hay 90% de probabilidad de superar esta producción). "
+            "pvlib entrega P50 por defecto. El P90 típicamente es "
+            "8–15% menor que el P50 en proyectos BIPV fachada "
+            "(incertidumbre de irradiación + modelo + sombreado). "
+            "Los bancos colombianos exigen presentar P90."
+        ),
+    )
 
 with col_t3:
     # ── OPEX: desde Presupuesto detallado o slider paramétrico ───────────────
@@ -393,7 +405,11 @@ btn_fin = st.button(
 
 if btn_fin or st.session_state.get("financiero_ok"):
 
+    # ── E_ac P90 ──────────────────────────────────────────────────────────────
+    e_ac_p90 = e_ac * (1.0 - factor_p90 / 100.0)
+
     if btn_fin:
+        # Escenario P50 (base)
         comp = comparativo_ley_1715(
             capex_usd         = capex_total,
             e_ac_kWh_anual    = e_ac,
@@ -406,33 +422,75 @@ if btn_fin or st.session_state.get("financiero_ok"):
             n_anos            = n_anos,
             beneficios_1715   = ben,
         )
-        st.session_state["comp_financiero"] = comp
-        st.session_state["financiero_ok"]   = True
+        # Escenario P90 (conservador — mismo CAPEX, menos producción)
+        comp_p90 = comparativo_ley_1715(
+            capex_usd         = capex_total,
+            e_ac_kWh_anual    = e_ac_p90,
+            tarifa_cop_kWh    = tarifa_cop,
+            tipo_cambio       = tipo_cambio,
+            tasa_descuento    = tasa_desc / 100,
+            tasa_escalacion   = esc_tarifa,
+            tasa_degradacion  = tasa_deg,
+            opex_pct          = opex_pct,
+            n_anos            = n_anos,
+            beneficios_1715   = ben,
+        )
+        st.session_state["comp_financiero"]    = comp
+        st.session_state["comp_financiero_p90"] = comp_p90
+        st.session_state["financiero_ok"]      = True
+        st.session_state["factor_p90_guardado"] = factor_p90
     else:
-        comp = st.session_state.get("comp_financiero", {})
+        comp     = st.session_state.get("comp_financiero", {})
+        comp_p90 = st.session_state.get("comp_financiero_p90", {})
         if not comp:
             st.warning("Presiona el botón para calcular.")
             st.stop()
+        # Si el factor P90 cambió desde el último cálculo, avisar
+        _factor_guardado = st.session_state.get("factor_p90_guardado", factor_p90)
+        if abs(_factor_guardado - factor_p90) > 0.1:
+            st.info(
+                f"ℹ️ El factor P90 cambió ({_factor_guardado:.1f}% → {factor_p90:.1f}%). "
+                f"Presiona **Calcular** para actualizar el escenario P90."
+            )
 
-    m_sin = comp["sin"]["metricas"]
-    m_con = comp["con"]["metricas"]
+    m_sin  = comp["sin"]["metricas"]
+    m_con  = comp["con"]["metricas"]
+    m_p90  = comp_p90["con"]["metricas"] if comp_p90 else None
 
-    # ── Tabla comparativa SIN / CON Ley 1715 ─────────────────────────────────
-    st.subheader("⚖️ Comparativo sin / con Ley 1715")
+    # ── Tabla comparativa: Sin Ley 1715 | Con Ley 1715 (P50) | Con Ley 1715 (P90) ──
+    st.subheader("⚖️ Comparativo sin / con Ley 1715  ·  P50 vs P90")
+    st.caption(
+        f"**P50** = producción esperada ({e_ac:,.0f} kWh/año) · "
+        f"**P90** = escenario conservador banco ({e_ac_p90:,.0f} kWh/año, "
+        f"−{factor_p90:.1f}%) · "
+        f"CAPEX igual en ambos escenarios"
+    )
+
+    _col_p90 = [
+        f"USD {ben['capex_neto_usd']:,.0f}",
+        f"$ {ben['capex_neto_usd']*tipo_cambio/1e6:.2f} M",
+        f"{m_p90['tir_pct']:.1f}%" if (m_p90 and m_p90['tir_pct']) else "N/A",
+        f"USD {m_p90['vpn_usd']:,.0f}" if m_p90 else "—",
+        f"$ {m_p90['vpn_cop_millon']:.1f} M" if m_p90 else "—",
+        f"{m_p90['payback_simple']:.1f} años" if (m_p90 and m_p90['payback_simple']) else "> horizonte",
+        f"{m_p90['payback_desc']:.1f} años" if (m_p90 and m_p90['payback_desc']) else "> horizonte",
+        f"{m_p90['lcoe_usd_kWh']:.4f}" if m_p90 else "—",
+        f"{m_p90['lcoe_cop_kWh']:.0f}" if m_p90 else "—",
+    ] if m_p90 else ["—"] * 9
 
     df_comp = pd.DataFrame({
         "Métrica": [
             "CAPEX efectivo",
             "CAPEX efectivo (COP)",
             "TIR (%)",
-            "VPN a " + str(int(tasa_desc)) + "% (USD)",
-            "VPN a " + str(int(tasa_desc)) + "% (COP)",
+            f"VPN a {int(tasa_desc)}% (USD)",
+            f"VPN a {int(tasa_desc)}% (COP)",
             "Payback simple (años)",
             "Payback descontado (años)",
             "LCOE (USD/kWh)",
             "LCOE (COP/kWh)",
         ],
-        "Sin Ley 1715": [
+        "Sin Ley 1715 · P50": [
             f"USD {capex_total:,.0f}",
             f"$ {capex_total*tipo_cambio/1e6:.2f} M",
             f"{m_sin['tir_pct']:.1f}%" if m_sin['tir_pct'] else "N/A",
@@ -443,7 +501,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
             f"{m_sin['lcoe_usd_kWh']:.4f}",
             f"{m_sin['lcoe_cop_kWh']:.0f}",
         ],
-        "Con Ley 1715": [
+        "Con Ley 1715 · P50 ✅": [
             f"USD {ben['capex_neto_usd']:,.0f}",
             f"$ {ben['capex_neto_usd']*tipo_cambio/1e6:.2f} M",
             f"{m_con['tir_pct']:.1f}%" if m_con['tir_pct'] else "N/A",
@@ -454,78 +512,156 @@ if btn_fin or st.session_state.get("financiero_ok"):
             f"{m_con['lcoe_usd_kWh']:.4f}",
             f"{m_con['lcoe_cop_kWh']:.0f}",
         ],
+        f"Con Ley 1715 · P90 🏦 (−{factor_p90:.0f}%)": _col_p90,
     })
 
     def _color_comp(row):
-        """Verde para Con Ley 1715 si mejora el indicador."""
-        return ["", "", "background-color: #E8F5E9; font-weight: bold"]
+        n = len(row)
+        styles = [""] * n
+        for i in range(1, n):
+            try:
+                val_str = str(row.iloc[i])
+                # TIR row — verde P50, amarillo P90
+                if "%" in val_str and i == 1:
+                    styles[i] = "background-color: #E8F5E9; font-weight: bold"
+                elif "%" in val_str and i == 2:
+                    styles[i] = "background-color: #FFF9C4; font-weight: bold"
+            except Exception:
+                pass
+        return styles
 
     st.dataframe(df_comp.style.apply(_color_comp, axis=1), use_container_width=True, hide_index=True)
 
-    # ── Métricas clave ─────────────────────────────────────────────────────────
-    c1, c2, c3, c4 = st.columns(4)
+    # ── Métricas clave: 3 columnas P50 / P90 / Delta ──────────────────────────
+    c1, c2, c3 = st.columns(3)
     tir_delta = ((m_con['tir_pct'] or 0) - (m_sin['tir_pct'] or 0))
-    c1.metric("TIR con Ley 1715",     f"{m_con['tir_pct']:.1f}%" if m_con['tir_pct'] else "—",
-              delta=f"+{tir_delta:.1f}pp vs sin Ley 1715")
-    c2.metric("VPN con Ley 1715",
+    c1.metric(
+        "TIR P50 con Ley 1715",
+        f"{m_con['tir_pct']:.1f}%" if m_con['tir_pct'] else "—",
+        delta=f"+{tir_delta:.1f}pp vs sin Ley 1715",
+    )
+    if m_p90:
+        tir_caida = (m_con['tir_pct'] or 0) - (m_p90['tir_pct'] or 0)
+        c2.metric(
+            f"TIR P90 con Ley 1715 (−{factor_p90:.0f}%)",
+            f"{m_p90['tir_pct']:.1f}%" if m_p90['tir_pct'] else "—",
+            delta=f"−{tir_caida:.1f}pp vs P50",
+            delta_color="inverse",
+        )
+        vpn_p90_ok = m_p90.get("vpn_positivo", False)
+        c3.metric(
+            "VPN P90 con Ley 1715",
+            f"USD {m_p90['vpn_usd']:,.0f}",
+            delta="✅ Positivo — bancable" if vpn_p90_ok else "⚠️ Negativo — revisar",
+            delta_color="normal" if vpn_p90_ok else "inverse",
+        )
+    else:
+        c2.metric("TIR P90", "Recalcula →", delta="")
+        c3.metric("VPN P90", "Recalcula →", delta="")
+
+    c4, c5, c6 = st.columns(3)
+    c4.metric("VPN P50 con Ley 1715",
               f"USD {m_con['vpn_usd']:,.0f}  |  $ {m_con['vpn_usd']*tipo_cambio/1e6:.1f} M COP",
               delta="✅ Positivo" if m_con['vpn_positivo'] else "❌ Negativo",
               delta_color="normal" if m_con['vpn_positivo'] else "inverse")
-    c3.metric("Payback con Ley 1715", f"{m_con['payback_simple']:.1f} años" if m_con['payback_simple'] else "—")
-    c4.metric("LCOE",                 f"{m_con['lcoe_cop_kWh']:.0f} COP/kWh  ·  USD {m_con['lcoe_usd_kWh']:.4f}",
-              delta=f"Tarifa: {tarifa_cop:.0f} COP/kWh",
-              delta_color="off")
+    c5.metric("Payback P50", f"{m_con['payback_simple']:.1f} años" if m_con['payback_simple'] else "—")
+    if m_p90:
+        c6.metric("Payback P90",
+                  f"{m_p90['payback_simple']:.1f} años" if m_p90['payback_simple'] else "> horizonte",
+                  delta=f"+{(m_p90['payback_simple'] or n_anos)-(m_con['payback_simple'] or 0):.1f} años vs P50"
+                        if m_p90['payback_simple'] and m_con['payback_simple'] else "",
+                  delta_color="inverse")
+    else:
+        c6.metric("LCOE P50", f"{m_con['lcoe_cop_kWh']:.0f} COP/kWh  ·  USD {m_con['lcoe_usd_kWh']:.4f}",
+                  delta=f"Tarifa: {tarifa_cop:.0f} COP/kWh", delta_color="off")
 
-    # ── Gráfica flujo de caja acumulado ──────────────────────────────────────
-    st.subheader("💵 Flujo de caja acumulado (USD)")
+    # ── Gráfica flujo de caja acumulado con banda P50–P90 ────────────────────
+    st.subheader("💵 Flujo de caja acumulado (USD)  —  banda P50 / P90")
 
-    fc_sin = comp["sin"]["flujos"]
-    fc_con = comp["con"]["flujos"]
-    anos   = [f["año"] for f in fc_sin]
+    fc_sin  = comp["sin"]["flujos"]
+    fc_con  = comp["con"]["flujos"]
+    fc_p90  = comp_p90["con"]["flujos"] if comp_p90 else None
+    anos    = [f["año"] for f in fc_sin]
 
     fig_fc = go.Figure()
+
+    # Banda entre P50 y P90 (relleno semitransparente)
+    if fc_p90:
+        fig_fc.add_trace(go.Scatter(
+            x=anos,
+            y=[f["flujo_acum_usd"] for f in fc_p90],
+            name=f"Con Ley 1715 · P90 (−{factor_p90:.0f}%)",
+            line=dict(color="#F57F17", width=1.5, dash="dot"),
+            mode="lines",
+            fill=None,
+        ))
+        fig_fc.add_trace(go.Scatter(
+            x=anos,
+            y=[f["flujo_acum_usd"] for f in fc_con],
+            name="Con Ley 1715 · P50",
+            line=dict(color="#2E7D32", width=2.5),
+            fill="tonexty",
+            fillcolor="rgba(255,179,0,0.12)",   # banda P50–P90 en ámbar suave
+            mode="lines",
+        ))
+    else:
+        fig_fc.add_trace(go.Scatter(
+            x=anos,
+            y=[f["flujo_acum_usd"] for f in fc_con],
+            name="Con Ley 1715 · P50",
+            line=dict(color="#2E7D32", width=2.5),
+            mode="lines",
+        ))
+
     fig_fc.add_trace(go.Scatter(
         x=anos, y=[f["flujo_acum_usd"] for f in fc_sin],
-        name="Sin Ley 1715",
+        name="Sin Ley 1715 · P50",
         line=dict(color="#EF5350", width=2, dash="dash"),
-        mode="lines",
-    ))
-    fig_fc.add_trace(go.Scatter(
-        x=anos, y=[f["flujo_acum_usd"] for f in fc_con],
-        name="Con Ley 1715",
-        line=dict(color="#2E7D32", width=2.5),
-        fill="tonexty",
-        fillcolor="rgba(46,125,50,0.08)",
         mode="lines",
     ))
     fig_fc.add_hline(y=0, line_color="gray", line_dash="dot", line_width=1)
 
-    # Marcar payback
+    # Payback P50
     if m_con.get("payback_simple"):
         fig_fc.add_vline(
             x=m_con["payback_simple"],
             line_color="#2E7D32", line_dash="dot",
-            annotation_text=f"Payback: {m_con['payback_simple']:.1f} años",
+            annotation_text=f"Payback P50: {m_con['payback_simple']:.1f} a",
             annotation_position="top right",
+        )
+    # Payback P90
+    if m_p90 and m_p90.get("payback_simple"):
+        fig_fc.add_vline(
+            x=m_p90["payback_simple"],
+            line_color="#F57F17", line_dash="dot",
+            annotation_text=f"Payback P90: {m_p90['payback_simple']:.1f} a",
+            annotation_position="bottom right",
         )
     if m_sin.get("payback_simple"):
         fig_fc.add_vline(
             x=m_sin["payback_simple"],
             line_color="#EF5350", line_dash="dot",
-            annotation_text=f"Payback sin: {m_sin['payback_simple']:.1f} años",
-            annotation_position="bottom right",
+            annotation_text=f"Payback sin 1715: {m_sin['payback_simple']:.1f} a",
+            annotation_position="top left",
         )
 
     fig_fc.update_layout(
         xaxis_title="Año",
         yaxis_title="Flujo acumulado (USD)",
-        height=420,
-        legend=dict(orientation="h", y=-0.2),
+        height=440,
+        legend=dict(orientation="h", y=-0.22),
         plot_bgcolor="white",
         paper_bgcolor="white",
         hovermode="x unified",
     )
     st.plotly_chart(fig_fc, use_container_width=True)
+    if fc_p90:
+        st.caption(
+            "🟡 La banda **ámbar** muestra la incertidumbre P50–P90: "
+            "el proyecto debería ser rentable incluso en el escenario conservador "
+            f"(producción {factor_p90:.0f}% menor). "
+            "Un banco típicamente financia si el VPN P90 ≥ 0."
+        )
 
     # ── Gráfica ingresos anuales vs OPEX ──────────────────────────────────────
     with st.expander("📊 Ver ingresos anuales vs O&M"):
@@ -599,8 +735,11 @@ if btn_fin or st.session_state.get("financiero_ok"):
     )
 
     # Guardar para Reporte
-    st.session_state["capex_total_usd"]     = capex_total
-    st.session_state["ben_1715"]            = ben
-    st.session_state["metricas_financiero"] = m_con
-    st.session_state["tarifa_cop_kWh"]      = tarifa_cop
-    st.session_state["financiero_ok"]       = True
+    st.session_state["capex_total_usd"]        = capex_total
+    st.session_state["ben_1715"]               = ben
+    st.session_state["metricas_financiero"]    = m_con
+    st.session_state["metricas_financiero_p90"] = m_p90   # para Reporte PDF
+    st.session_state["e_ac_p90_kWh"]           = e_ac_p90
+    st.session_state["factor_p90_pct"]         = factor_p90
+    st.session_state["tarifa_cop_kWh"]         = tarifa_cop
+    st.session_state["financiero_ok"]          = True
