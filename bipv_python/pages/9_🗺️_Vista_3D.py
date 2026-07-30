@@ -69,10 +69,16 @@ if not ciudad or ciudad not in CIUDADES:
         pass
     st.stop()
 
-c      = CIUDADES[ciudad]
-lat    = c["lat"]
-lon    = c["lon"]
-alt_m  = c["alt_m"]
+c     = CIUDADES[ciudad]
+
+# Coordenadas: predio exacto tiene prioridad sobre centro de ciudad
+lat   = float(st.session_state.get("lat_proyecto", c["lat"]))
+lon   = float(st.session_state.get("lon_proyecto", c["lon"]))
+alt_m = int(st.session_state.get("alt_proyecto",   c["alt_m"]))
+
+_coord_personalizada = (
+    abs(lat - c["lat"]) > 0.0001 or abs(lon - c["lon"]) > 0.0001
+)
 
 # ── Panel de estado ───────────────────────────────────────────────────────────
 recurso_ok   = st.session_state.get("recurso_solar_ok", False)
@@ -83,8 +89,9 @@ nombre_proy  = st.session_state.get("nombre_proyecto", "Proyecto BIPV")
 orient_label = st.session_state.get("orientacion_label", f"Azimuth {azimuth:.0f}°")
 
 col_s1, col_s2, col_s3, col_s4 = st.columns(4)
-col_s1.metric("Ciudad",       ciudad)
-col_s2.metric("Coordenadas",  f"{lat}°N, {lon}°W")
+col_s1.metric("Ciudad",      ciudad)
+_coord_label = f"{lat:.5f}°N, {lon:.5f}°E" if _coord_personalizada else f"{lat}°N, {lon}°E"
+col_s2.metric("Coordenadas", _coord_label)
 col_s3.metric("Orientación",  orient_label)
 col_s4.metric("Recurso Solar", "✅ Calculado" if recurso_ok else "⚠️ Pendiente")
 
