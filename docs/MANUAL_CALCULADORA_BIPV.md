@@ -16,7 +16,7 @@
 8. [Página 5 — Mismatch y Bypass Diodes ★ NUEVO](#8-página-5--mismatch-y-bypass-diodes-)
 9. [Página 6 — Producción Anual](#9-página-6--producción-anual)
 10. [Página 7 — Análisis Financiero ★ ACTUALIZADO](#10-página-7--análisis-financiero-)
-11. [Página 8 — Presupuesto ★ ACTUALIZADO](#11-página-8--presupuesto-)
+11. [Página 8 — Presupuesto Bancable ★★ ACTUALIZADO](#11-página-8--presupuesto-bancable-)
 12. [Página 11 — Baterías y Balance ★ ACTUALIZADO](#12-página-11--baterías-y-balance-)
 13. [Página 10 — Reporte PDF ★ ACTUALIZADO](#13-página-10--reporte-pdf-)
 14. [Calculadora de Sombreado 3D](#14-calculadora-de-sombreado-3d)
@@ -392,127 +392,244 @@ un análisis más realista.
 
 ---
 
-## 11. Página 8 — Presupuesto ★
+## 11. Página 8 — Presupuesto Bancable ★★
 
-**Propósito:** Construir la cotización detallada del proyecto con control total sobre
-qué materiales e insumos aplican, a qué precio y en qué cantidad.
+**Propósito:** Construir el presupuesto completo del proyecto con estructura
+financiera exigida para bancabilidad: CAPEX directo, costos blandos, contingencias
+diferenciadas y OPEX anual proyectado a 25 años.
 
-> ★ **Actualización:** La tabla de materiales ya no es una lista fija. Ahora puedes
-> activar o desactivar ítems por proyecto, agregar insumos nuevos y eliminar los que
-> no aplican — todo directamente en la tabla, sin tocar el Excel.
+> **¿Por qué "bancable"?** Un banco o fondo de inversión no financia proyectos
+> con un estimado de obra simple. Exige un presupuesto que demuestre que todos
+> los costos están identificados, cuantificados y respaldados por fuentes.
+> Esta estructura cumple ese estándar.
 
 ---
 
-### Estructura de pestañas
+### Encabezado del presupuesto
 
-| Pestaña | Contenido |
-|---|---|
-| 🔩 Perfilería y Estructura | Rieles, tornillería, soportes, perfiles |
-| 👷 Mano de Obra | Instalación, certificaciones, transporte |
-| ⚡ Sistema FV | Cables, protecciones, cajas, puesta a tierra |
-| 🔌 Inversor y Equipos Eléctricos | Tableros, breakers, comunicaciones |
-| 📦 Equipos del Catálogo | Módulos + inversor + baterías (auto desde Dimensionamiento) |
+Antes de comenzar, completa el bloque superior (expandible):
+
+| Campo | Qué es | Por qué importa |
+|---|---|---|
+| **Nombre del proyecto** | Identificador único | Traza el presupuesto a un proyecto específico |
+| **Vigencia** | Fecha hasta la que los precios son válidos | Los bancos exigen presupuestos vigentes; precios de hace >90 días se consideran desactualizados |
+| **Elaboró** | Nombre de la empresa o profesional | Da trazabilidad y responsabilidad técnica al documento |
+
+---
+
+### Estructura de 7 pestañas
+
+| Pestaña | Contenido | Categoría financiera |
+|---|---|---|
+| 🔩 Perfilería y Estructura | Rieles, soportes, fijaciones BIPV | CAPEX Directo |
+| 👷 Mano de Obra | Instalación, certificación RETIE, transporte | CAPEX Directo |
+| ⚡ Sistema FV | Cables, protecciones, cajas, puesta a tierra, monitoreo | CAPEX Directo |
+| 🔌 Inversor y Equipos Eléctricos | Tableros, breakers, comunicaciones | CAPEX Directo |
+| 📦 Equipos del Catálogo | Módulos + inversor + baterías (auto desde Dimensionamiento) | CAPEX Directo |
+| 🧾 **Costos Blandos** | Ingeniería, trámites, legal, PM, ITA, póliza CAR | CAPEX Blando (soft costs) |
+| 📅 **OPEX Anual** | O&M, limpieza, seguro operativo, monitoreo, fondos reposición | Gasto operativo anual |
 
 ---
 
 ### Columna "✔ Activo" — incluir o excluir ítems
 
-Cada fila tiene un **checkbox en la primera columna**:
+Cada fila tiene un **checkbox** al inicio:
 
-- ✅ **Marcado (Activo):** el ítem suma al subtotal y al CAPEX total.
-- ☐ **Desmarcado:** el ítem queda visible en la tabla como referencia pero
-  **no suma al total**. Útil para materiales opcionales o que ya están
-  cubiertos por otra partida.
+- ✅ **Marcado:** el ítem suma al subtotal y al CAPEX total.
+- ☐ **Desmarcado:** queda visible como referencia pero **no suma**. Útil
+  para ítems opcionales o que cubre otra partida del contrato.
 
-Debajo de cada tabla verás dos métricas:
-- **Subtotal (activos):** suma solo de los ítems con checkbox marcado.
-- **Ítems desactivados (excluidos):** suma de los ítems desmarcados, para
-  que veas cuánto estás dejando fuera.
+**Agregar una fila nueva:** botón **➕** al pie de la tabla → fila en blanco → escribe directamente.
+**Eliminar una fila:** selecciona la fila → tecla **Supr / Delete**.
+**Resetear:** botón **↺** en la parte superior de cada pestaña vuelve a la plantilla base del Excel.
 
 ---
 
-### Agregar un ítem nuevo
+### Fuente de precios — campo de trazabilidad
 
-1. Desplázate hasta el final de la tabla de la pestaña correspondiente.
-2. Haz clic en el botón **➕** que aparece en la esquina inferior izquierda
-   del editor.
-3. Se agrega una fila en blanco — completa Descripción, Ref., Cantidad,
-   Unidad y USD/un directamente en la celda.
-4. El checkbox "Activo" se marca automáticamente en la fila nueva.
+Cada pestaña tiene un campo de texto **"Fuente / cotización"**. Escribe aquí el
+origen de los precios ingresados (ej.: *"Cotización Acesco julio 2026"*,
+*"Lista de precios Schneider distribuidora Medellín"*).
 
----
-
-### Eliminar un ítem
-
-1. Haz clic en la fila que quieres eliminar (queda resaltada).
-2. Presiona la tecla **Supr** o **Delete** del teclado.
-
-> 💡 Si prefieres no eliminar un ítem sino solo excluirlo del total,
-> desmarca el checkbox — así puedes volver a activarlo más adelante.
+> **Impacto bancario:** El auditor técnico independiente (ITA) y el banco
+> verifican que los precios sean de mercado y tengan respaldo documental.
+> Sin fuente, los precios se consideran estimados, no cotizaciones.
 
 ---
 
-### Persistencia durante la sesión
+### 🧾 Pestaña Costos Blandos — soft costs
 
-Los cambios que hagas (activar/desactivar, editar precios, agregar filas)
-**se conservan mientras el navegador esté abierto** y navegues entre páginas.
-Si cierras el navegador o la sesión expira, el presupuesto vuelve a cargar
-desde la plantilla base del Excel.
+Los **costos blandos** son todos los gastos del proyecto que no son materiales
+ni mano de obra de instalación física. Representan entre el **8–18% del CAPEX
+directo** en proyectos BIPV en Colombia.
 
----
+| Ítem | Qué incluye | Referencia Colombia |
+|---|---|---|
+| **Ingeniería, diseño y memorias** | Planos eléctricos y mecánicos, cálculos estructurales, estudio de producción | 1.5–3% CAPEX directo |
+| **Estudio de sombreado y simulación BIPV** | Modelo 3D, análisis horario, curvas IV, informe técnico | USD 800–2.500 (proyecto pequeño) |
+| **Registro UPME y trámites Ley 1715** | Solicitud calificación UPME, resolución de calificación | USD 500–1.200 (incluye honorarios gestor) |
+| **Concepto de conexión — operador de red** | Solicitud al operador local (EPM, ENEL, etc.) para conexión en paralelo | USD 200–800 |
+| **Certificación RETIE / RITEL** | Inspección por organismo certificador acreditado. Obligatorio en Colombia | USD 300–900 según potencia |
+| **Gestión del proyecto (PM)** | Director de proyecto, coordinación, informes de avance, actas de entrega | 3–5% CAPEX directo |
+| **Asesoría legal y estructuración financiera** | Contratos EPC, contrato O&M, asesoría financiera, estructuración crédito | USD 1.500–5.000 |
+| **Auditoría técnica independiente (ITA)** | Revisión por firma especializada externa. **Obligatorio para financiamiento > USD 200k** | USD 2.000–8.000 |
+| **Póliza CAR — construcción todo riesgo** | Seguro durante la ejecución del proyecto (daños, robo, responsabilidad civil) | 0.4–0.6% CAPEX directo |
+| **Gastos notariales, registros y licencias** | Escrituras de servidumbre, permisos municipales, otros | USD 300–1.000 |
 
-### Botón "↺ Resetear sección"
-
-Cada pestaña tiene este botón en la parte superior. Úsalo para:
-- Empezar un proyecto nuevo desde cero en esa sección.
-- Deshacer todos los cambios de la sesión actual y volver a la plantilla del Excel.
-
----
-
-### TRM y conversión COP
-
-El campo **💱 TRM (COP/USD)** en la parte superior aplica a toda la página.
-Todos los precios se ingresan en **USD**; la conversión a millones de COP
-se muestra automáticamente en cada subtotal.
-
-> ⚠️ Si el Excel base tiene precios en COP, divídelos por la TRM antes de
-> ingresarlos. La calculadora trabaja siempre en USD internamente.
+> **Impacto:** Si omites los costos blandos, el CAPEX está subvalorado en
+> un 8–18%. Esto hace que la TIR calculada sea artificialmente alta y el
+> VPN sobreestimado — el proyecto parecerá más rentable de lo que es.
+> Un banco detecta esto inmediatamente y lo considera una señal de riesgo.
 
 ---
 
-### Resumen CAPEX y conexión con Financiero
+### 📅 Pestaña OPEX Anual — costos de operación
 
-Al pie de la página, el **Resumen CAPEX Total** agrega las cinco secciones
-(solo ítems activos) y aplica:
+El **OPEX** (Operating Expenditure) es el costo anual de mantener el sistema
+funcionando durante su vida útil (25–30 años). Es la diferencia entre los
+ingresos brutos por energía y el flujo de caja neto que recibe el inversionista.
 
-- **Costos indirectos (%):** gastos de administración, AUI, utilidad.
-- **Imprevistos y contingencia (%):** reserva para riesgos.
+> **Los valores en esta pestaña representan USD por año** (no por unidad física).
+> El total anual se envía automáticamente a 💰 **Financiero** para construir el
+> flujo de caja a 25 años.
 
-El **CAPEX TOTAL** resultante se envía automáticamente a:
-- 💰 **Página 7 — Financiero** (VPN, TIR, payback).
-- 📄 **Página 10 — Reporte PDF** (sección de costos y Ley 1715).
+| Ítem | Qué incluye | Referencia Colombia |
+|---|---|---|
+| **O&M preventivo — visitas técnicas** | Revisión anual de módulos, strings, inversor, cableado, torqueo de conexiones | USD 5–10/kWp·año |
+| **Limpieza de módulos** | Lavado manual o con agua a presión. En Urabá: alta frecuencia por humedad y vegetación | USD 1–3/kWp·año (4 veces/año aprox.) |
+| **Seguro operativo — todo riesgo** | Cubre daños por granizo, viento, cortocircuito, robo de módulos o inversor | 0.3–0.5% CAPEX/año |
+| **Monitoreo remoto (Growatt/SCADA)** | Plataforma de telemetría en tiempo real, alertas de falla, informes de producción | USD 200–600/año |
+| **Revisión anual inversor** | Actualización firmware, limpieza ventiladores, verificación protecciones | USD 150–400/año |
+| **Fondo de reposición inversor** | Provisión anual para reemplazar el inversor al año 12–15 de vida | Costo inversor ÷ 12 años |
+| **Fondo de reposición módulos** | Provisión para módulos dañados fuera de garantía, degradación acelerada | 0.1–0.2% CAPEX/año |
+| **Administración y costos fijos** | Contabilidad, reportes a UPME, administración de contratos O&M | USD 300–800/año |
 
-La fracción de equipos (Sistema FV + Inversor + Catálogo / CAPEX total)
-se calcula automáticamente para los beneficios tributarios de la **Ley 1715**.
+**Referencia consolidada Colombia BIPV:**
+
+| KPI OPEX | Valor de referencia |
+|---|---|
+| OPEX total / kWp · año | USD 8–15 |
+| OPEX / CAPEX anual | 1.0–2.5% |
+| Fondo reposición inversor | ~0.8–1.2% CAPEX/año |
+
+> **Impacto financiero:** Si el OPEX es USD 0 en el modelo, la TIR y el VPN
+> están sobreestimados. Un modelo sin OPEX no es financieramente evaluable.
+> El banco proyecta el OPEX incluso si el solicitante no lo incluye, y usa
+> sus propios estimados (conservadores) si no hay datos del proyecto.
 
 ---
 
-### Alerta de costo/Wp
+### Cálculo del CAPEX Total — tres niveles de contingencia
 
-Si el CAPEX supera **USD 5.0/Wp** aparece una advertencia en naranja.
-La referencia para BIPV instalado en Colombia es **USD 1.5–4.0/Wp**.
-Causas comunes de valores fuera de rango:
-- Precios ingresados en COP en lugar de USD.
-- IVA incluido en precios sin descontar.
-- Mano de obra o perfilería duplicada entre secciones.
+El CAPEX total se construye en cascada:
+
+```
+CAPEX Directo     = Perfilería + Mano de Obra + Sistema FV + Inversor + Catálogo
+CAPEX Base        = CAPEX Directo + Costos Blandos
+─────────────────────────────────────────────────────────
++ Costos indirectos (%)   → AUI: Administración, Imprevistos, Utilidad del contratista
++ Contingencia técnica (%) → Reserva por riesgo específico de instalación BIPV en fachada
++ Contingencia de precios (%) → Reserva por volatilidad de TRM y materiales importados
+═════════════════════════════════════════════════════════
+= CAPEX TOTAL     → va a Financiero, Ley 1715 y Reporte PDF
+```
+
+#### Significado de cada contingencia
+
+**Costos indirectos — AUI (Administración, Imprevistos, Utilidad)**
+
+El AUI es el porcentaje que aplica el **contratista EPC** sobre el costo
+directo para cubrir sus propios gastos de administración, los imprevistos
+de ejecución y su utilidad neta.
+
+- Referencia Colombia: **10–18%** del CAPEX directo.
+- En proyectos BIPV con acceso difícil o trabajo en altura: extremo alto del rango.
+- *No confundir con la utilidad del inversionista (dueño del proyecto).*
+
+**Contingencia técnica**
+
+Reserva específica para riesgos de ejecución que son más altos en BIPV
+que en una instalación convencional en suelo:
+
+- Integración con la fachada existente (interferencias no previstas en planos)
+- Trabajos en altura con andamios o grúas
+- Adaptaciones estructurales del edificio
+- Pruebas de compatibilidad electromagnética con la fachada
+
+- Referencia: **8–15%** para BIPV de fachada. Instalación en suelo: 4–8%.
+
+**Contingencia de precios**
+
+Reserva para absorber el impacto de variaciones en el tipo de cambio
+(TRM) y en los precios de materiales importados (módulos, inversor,
+cables de cobre) entre la fecha del presupuesto y la ejecución.
+
+- Referencia: **3–7%** según horizonte de ejecución.
+- Para proyectos con ejecución > 6 meses desde la cotización: usar extremo alto.
 
 ---
 
-### Exportar el presupuesto
+### KPIs de bancabilidad — semáforo automático
 
-El presupuesto detallado se incluye en el **Reporte PDF (Página 10)**
-como una sección de costos. Para una cotización formal en PDF o Excel
-independiente, consulta la tarea pendiente de exportación.
+La calculadora evalúa cuatro indicadores y muestra alertas si están
+fuera del rango de referencia para proyectos BIPV en Colombia:
+
+| KPI | Cálculo | Rango sano | Alerta si... |
+|---|---|---|---|
+| **USD / Wp** | CAPEX total ÷ potencia instalada (W) | USD 1.8–4.0/Wp | > 5.0/Wp (precio en COP?) · > 3.5/Wp (rango alto) |
+| **USD / m²** | CAPEX total ÷ área de fachada (m²) | USD 180–350/m² | > 400/m² |
+| **OPEX / CAPEX** | OPEX anual ÷ CAPEX total | 1.0–2.5%/año | > 3.0% |
+| **OPEX / kWp·año** | OPEX anual ÷ potencia instalada | USD 8–15/kWp | indicativo |
+
+> **USD/Wp** es el indicador más universal. Un banco lo compara contra
+> proyectos financiados en la región. Si está fuera de rango, el banco
+> pide justificación técnica o rechaza el presupuesto.
+
+> **USD/m²** es clave para BIPV porque relaciona el costo con el área
+> de fachada aprovechada, no solo con la potencia. Un edificio en zona
+> de alto costo de construcción puede tener un USD/m² alto pero un
+> USD/Wp razonable — es importante mostrar ambos.
+
+---
+
+### Fracción de equipos — base para Ley 1715
+
+La calculadora determina automáticamente qué proporción del CAPEX total
+corresponde a **equipos calificables** (módulos, inversor, sistema FV):
+
+```
+Fracción equipos = (Sistema FV + Inversor + Catálogo) ÷ CAPEX total
+```
+
+Esta fracción es la base del **Art. 12 — Exclusión IVA** y del
+**Art. 11 — Deducción renta** de la Ley 1715. Si es incorrecta, los
+beneficios tributarios en Financiero quedan mal calculados.
+
+---
+
+### Conexión automática con otras páginas
+
+| Dato exportado | Lo usa | Para qué |
+|---|---|---|
+| **CAPEX TOTAL** | 💰 Financiero | TIR, VPN, Payback, LCOE, Ley 1715 |
+| **OPEX Anual** | 💰 Financiero | Flujo de caja anual a 25 años (reemplaza el slider paramétrico) |
+| **Fracción equipos** | 💰 Financiero | Art. 11 y Art. 12 Ley 1715 |
+| **CAPEX TOTAL** | 📄 Reporte PDF | Sección de costos y resumen ejecutivo |
+
+En 💰 Financiero aparece un **toggle** que permite elegir entre:
+- OPEX del presupuesto detallado (recomendado, valores reales ingresados aquí)
+- OPEX paramétrico (slider % del CAPEX, para estimaciones rápidas)
+
+---
+
+### TRM y precios en USD
+
+Todos los precios se ingresan en **USD**. La conversión a pesos colombianos
+(millones de COP) se muestra automáticamente usando la TRM del campo superior.
+
+> ⚠️ Error frecuente: ingresar precios en COP en lugar de USD. La alerta
+> de USD/Wp > 5.0 es el primer síntoma. Si ocurre, divide todos los
+> precios de esa sección por la TRM vigente.
 
 ---
 
