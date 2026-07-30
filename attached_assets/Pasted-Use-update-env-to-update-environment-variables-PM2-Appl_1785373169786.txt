@@ -1,0 +1,70 @@
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [bipv-streamlit](ids: [ 1 ])
+[PM2] [bipv-streamlit](1) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 1  │ bipv-streamlit     │ fork     │ 46   │ online    │ 0%       │ 6.1mb    │
+│ 0  │ calculadora-bipv   │ fork     │ 61   │ online    │ 0%       │ 130.7mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# df -h /
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda1        48G   12G   36G  25% /
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# du -sh /var/www/bipv/calculadora-bipv/*
+44K     /var/www/bipv/calculadora-bipv/Adenda_Despliegue_BIPV_MisionCumplida.docx
+56K     /var/www/bipv/calculadora-bipv/Adenda_Python_Fotovoltaico.docx
+48K     /var/www/bipv/calculadora-bipv/Algoritmo_paso_a_paso_BIPV.docx
+56K     /var/www/bipv/calculadora-bipv/Auditoria_VBA_Python_BIPV.docx
+4.0K    /var/www/bipv/calculadora-bipv/DEPLOY_README.md
+4.0K    /var/www/bipv/calculadora-bipv/DIAGNOSTICO_OPTIMIZADOR_SIMULADOR.md
+4.0K    /var/www/bipv/calculadora-bipv/DIAGNOSTICO_POA_SIMULADOR.md
+4.0K    /var/www/bipv/calculadora-bipv/DIAGNOSTICO_PR.md
+48K     /var/www/bipv/calculadora-bipv/Diagnostico_Mejoras_Calculadora_BIPV.docx
+20K     /var/www/bipv/calculadora-bipv/Ecuaciones_Simulador_Energia_IEC61724.md
+44K     /var/www/bipv/calculadora-bipv/Guia_Despliegue_BIPV_DigitalOcean.docx
+48K     /var/www/bipv/calculadora-bipv/MANUAL_OPERACION_BIPV_BORRADOR.docx
+32K     /var/www/bipv/calculadora-bipv/MANUAL_OPERACION_BIPV_BORRADOR.pdf
+20K     /var/www/bipv/calculadora-bipv/MANUAL_OPERACION_CALCULADORA_BIPV.md
+52K     /var/www/bipv/calculadora-bipv/Plan_Maestro_Calculadora_BIPV.docx
+60K     /var/www/bipv/calculadora-bipv/Plan_Maestro_Completo_BIPV_Python.docx
+52K     /var/www/bipv/calculadora-bipv/Visualizador_3D_BIPV_Streamlit.docx
+476K    /var/www/bipv/calculadora-bipv/artifacts
+42M     /var/www/bipv/calculadora-bipv/attached_assets
+946M    /var/www/bipv/calculadora-bipv/bipv_python
+2.4M    /var/www/bipv/calculadora-bipv/calculadora.zip
+2.5M    /var/www/bipv/calculadora-bipv/client
+4.0K    /var/www/bipv/calculadora-bipv/components.json
+4.0K    /var/www/bipv/calculadora-bipv/debug_grafico_foto.txt
+88K     /var/www/bipv/calculadora-bipv/drizzle
+4.0K    /var/www/bipv/calculadora-bipv/drizzle.config.ts
+20K     /var/www/bipv/calculadora-bipv/fix.patch
+8.0K    /var/www/bipv/calculadora-bipv/ideas.md
+136K    /var/www/bipv/calculadora-bipv/lib
+4.0K    /var/www/bipv/calculadora-bipv/main.py
+4.0K    /var/www/bipv/calculadora-bipv/notes_csv_import.md
+4.0K    /var/www/bipv/calculadora-bipv/notes_navigation.md
+4.0K    /var/www/bipv/calculadora-bipv/notes_pvwatts_irradiance.md
+4.0K    /var/www/bipv/calculadora-bipv/notes_table_fix.md
+492K    /var/www/bipv/calculadora-bipv/package-lock.json
+8.0K    /var/www/bipv/calculadora-bipv/package.json
+8.0K    /var/www/bipv/calculadora-bipv/patches
+344K    /var/www/bipv/calculadora-bipv/pnpm-lock.yaml
+8.0K    /var/www/bipv/calculadora-bipv/pnpm-workspace.yaml
+4.0K    /var/www/bipv/calculadora-bipv/pyproject.toml
+16K     /var/www/bipv/calculadora-bipv/references
+4.0K    /var/www/bipv/calculadora-bipv/replit.md
+4.0K    /var/www/bipv/calculadora-bipv/research_hourly_apis.txt
+4.0K    /var/www/bipv/calculadora-bipv/research_iec61724.txt
+556K    /var/www/bipv/calculadora-bipv/scripts
+600K    /var/www/bipv/calculadora-bipv/server
+76K     /var/www/bipv/calculadora-bipv/shared
+4.0K    /var/www/bipv/calculadora-bipv/test_crossing_debug.mjs
+4.0K    /var/www/bipv/calculadora-bipv/test_crossing_debug2.mjs
+88K     /var/www/bipv/calculadora-bipv/todo.md
+4.0K    /var/www/bipv/calculadora-bipv/tsconfig.base.json
+4.0K    /var/www/bipv/calculadora-bipv/tsconfig.json
+4.0K    /var/www/bipv/calculadora-bipv/tsconfig.node.json
+104K    /var/www/bipv/calculadora-bipv/uv.lock
+8.0K    /var/www/bipv/calculadora-bipv/vite.config.ts
+4.0K    /var/www/bipv/calculadora-bipv/vitest.config.ts
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
