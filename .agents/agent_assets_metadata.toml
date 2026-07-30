@@ -108,3 +108,9 @@ id = "kZsJ1yQ3v84-zkiRJCgUG"
 uri = "file://attached_assets/PREDIAGNOSTICO_FV_RutaN_88kWp_2026-07-30.docx"
 type = "word_document"
 title = "Pre-Diagnóstico Fotovoltaico — Ruta N 88 kWp · 30 julio 2026"
+
+[[outputs]]
+id = "H-LxIIEd920lNbloM9stN"
+uri = "file://docs/MANUAL_CALCULADORA_BIPV.html"
+type = "unspecified"
+title = "Manual Calculadora BIPV — Julio 2026"
