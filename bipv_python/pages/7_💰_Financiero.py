@@ -123,6 +123,15 @@ with col_cx2:
     capex_total       = capex_sub_total + capex_imprev
     fraccion_equipos  = capex_equipos / capex_total if capex_total > 0 else 0.65
 
+    # Override: CAPEX real desde Presupuesto Detallado
+    _ppto = float(st.session_state.get("presupuesto_capex_usd", 0.0))
+    if _ppto > 0:
+        capex_total      = _ppto
+        _sub             = float(st.session_state.get("presupuesto_sub_directo", _ppto*0.65))
+        fraccion_equipos = _sub / capex_total if capex_total > 0 else 0.65
+        st.info(f"💼 CAPEX real desde Presupuesto Detallado: **USD {capex_total:,.0f}** "
+                f"| $ {capex_total*tipo_cambio/1e6:.2f} M COP")
+
     st.markdown("**Desglose CAPEX**")
     items_capex = {
         "Módulos BIPV":        capex_modulos,
