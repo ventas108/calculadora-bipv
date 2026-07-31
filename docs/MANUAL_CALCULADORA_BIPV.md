@@ -8,8 +8,8 @@
 
 1. [Descripción general](#1-descripción-general)
 2. [Flujo de trabajo recomendado](#2-flujo-de-trabajo-recomendado)
-3. [Página 1 — Proyecto](#3-página-1--proyecto)
-4. [Página 2 — Recurso Solar](#4-página-2--recurso-solar)
+3. [Página 1 — Proyecto ★★ ACTUALIZADO](#3-página-1--proyecto)
+4. [Página 2 — Recurso Solar ★ ACTUALIZADO](#4-página-2--recurso-solar)
 5. [Página 3 — Motor IV](#5-página-3--motor-iv)
 6. [Página 4 — Dimensionamiento](#6-página-4--dimensionamiento)
 7. [Página 5b — Motor Óptico](#7-página-5b--motor-óptico)
@@ -63,24 +63,83 @@ La Calculadora BIPV es una herramienta de simulación fotovoltaica especializada
 
 ## 3. Página 1 — Proyecto
 
-**Propósito:** Registrar los datos básicos del proyecto.
+**Propósito:** Registrar los datos básicos del proyecto y configurar el tipo de instalación que determina los parámetros por defecto del sistema.
 
-**Campos obligatorios:**
+### Campos obligatorios
 - Nombre del proyecto y empresa cliente
-- Ciudad (selección desde lista; define el TMY por defecto)
-- Tipo de edificación y uso
+- Ciudad (selección desde lista; define las coordenadas y el TMY por defecto)
+- **Tipo de instalación** ← nuevo selector clave (ver tabla más abajo)
 
-**Campos opcionales:**
+### Campos opcionales
 - Descripción del sistema BIPV
 - Datos del contacto
 
-**Resultado:** Los datos del proyecto aparecen en el encabezado del Reporte PDF.
+---
+
+### ★ Selector de Tipo de instalación (nuevo)
+
+El selector **"Tipo de instalación"** reemplaza al anterior campo genérico de área. Su función principal es configurar automáticamente los parámetros físicos correctos para cada tecnología de integración fotovoltaica.
+
+#### Tipos disponibles y parámetros por defecto
+
+| Tipo | Densidad recomendada (W/m²) | PR típico | Tilt por defecto | ¿Por qué ese tilt? |
+|---|---|---|---|---|
+| 🏢 Fachada BIPV | 80 – 180 W/m² | 0.65 | **90°** | Panel vertical integrado en muro |
+| 🏠 Techo inclinado BIPV | 100 – 200 W/m² | 0.75 | **15°** | Inclinación mínima típica en Colombia |
+| ⛱️ Pérgola BIPV | 60 – 150 W/m² | 0.70 | **10°** | Estructura casi horizontal para generar sombra |
+| 🏗️ Marquesina BIPV | 70 – 160 W/m² | 0.68 | **30°** | Ángulo de voladizo estándar |
+| 🏚️ Techo plano | 120 – 220 W/m² | 0.78 | **10°** | Mínimo para garantizar escorrentía |
+| 🌿 Granja FV | 130 – 250 W/m² | 0.80 | **15°** | Ángulo óptimo para latitud Colombia (≈5°N) |
+
+#### ¿Qué ocurre al cambiar el tipo?
+
+Cuando seleccionas un tipo de instalación, la app actualiza en cascada tres parámetros:
+
+1. **Densidad de potencia (W/m²):** el slider en esta misma página se mueve al valor central del rango recomendado para ese tipo.
+2. **Performance Ratio (PR):** el campo PR se actualiza al valor típico de la tecnología.
+3. **Inclinación (tilt):** el slider de tilt en Página 2 — Recurso Solar se inicializa al ángulo físicamente correcto para ese tipo de instalación.
+
+> **Importante:** Si el usuario ajusta manualmente cualquiera de estos valores después de elegir el tipo, sus ajustes se respetan. El reseteo automático ocurre solo cuando cambias el tipo de instalación.
+
+---
+
+### ★ Alertas reactivas de densidad y PR (nuevo)
+
+La app valida en tiempo real que la densidad y el PR ingresados sean coherentes con el tipo de instalación seleccionado. Si algún valor está fuera del rango recomendado, aparece una alerta **inmediatamente al mover el slider**, sin necesidad de hacer clic en Guardar:
+
+```
+⚠️ La densidad ingresada (50 W/m²) está fuera del rango recomendado
+   para Fachada BIPV (80–180 W/m²).
+   Un valor por debajo del mínimo puede subestimar la producción del sistema.
+```
+
+```
+⚠️ El PR ingresado (0.90) está por encima del valor típico para
+   Fachada BIPV (PR típico: 0.65). Verifica que incluya todas las pérdidas
+   reales: ópticas, térmicas, cableado y mismatch.
+```
+
+**¿Puedo ignorar la alerta?** Sí. Las alertas son informativas y no bloquean el cálculo. Son útiles para detectar errores de entrada (por ejemplo, ingresar la densidad en W en lugar de W/m², o un PR optimista que no incluye pérdidas BIPV).
+
+**¿Cuándo no aparece la alerta?** Si densidad y PR están dentro del rango del tipo seleccionado, la interfaz está limpia sin ningún mensaje.
+
+---
+
+### Panel "Datos del sitio" (actualización en tiempo real)
+
+El panel inferior de la página muestra las coordenadas y altitud del proyecto. Este panel se actualiza **en tiempo real** cada vez que:
+- Cambias la ciudad en el selector
+- Modificas manualmente las coordenadas en el expander de ajuste fino
+
+Cuando las coordenadas mostradas corresponden al centroide de la ciudad (no al predio exacto), aparece un indicador `⚠️ Coordenadas del centroide de la ciudad` para recordar que se deben ajustar al predio real antes de ejecutar la simulación solar.
+
+**Resultado:** Al guardar, la app persiste el tipo de instalación, el área, la densidad, el PR y el tilt por defecto en memoria de sesión. Estos valores se usan en Página 2, Página 4, Página 6 y el Reporte PDF.
 
 ---
 
 ## 4. Página 2 — Recurso Solar
 
-**Propósito:** Cargar el archivo climático TMY y calcular la irradiancia sobre la fachada (POA).
+**Propósito:** Cargar el archivo climático TMY y calcular la irradiancia sobre el plano de instalación (POA).
 
 ### Pasos
 
@@ -89,22 +148,51 @@ La Calculadora BIPV es una herramienta de simulación fotovoltaica especializada
    - Busca la ciudad más cercana al proyecto
    - Arrastra el archivo `.epw` al uploader
 
-2. **Configurar la fachada:**
+2. **Configurar la geometría de instalación:**
    - **Orientación (azimuth):** 0° = Norte, 90° = Este, 180° = Sur, 270° = Oeste
-   - **Inclinación (tilt):** 90° = fachada vertical (caso típico BIPV), 0° = horizontal
-   - **Área de la fachada (m²):** área total de la fachada donde van los paneles
+   - **Inclinación (tilt):** ver sección "Tilt por defecto según tipo" más abajo
+   - **Área de instalación (m²):** área total donde van los paneles
 
 3. **Ejecutar cálculo:**
    - Clic en **"Calcular POA"**
-   - La app calcula la irradiancia en el plano de la fachada hora a hora (8 760 horas)
+   - La app calcula la irradiancia en el plano de instalación hora a hora (8 760 horas)
 
 **Resultados:**
 - POA bruta anual (kWh/m²/año)
 - Heatmap de irradiancia horaria (meses × horas del día)
-- Diagrama solar con la trayectoria del sol sobre la fachada
+- Diagrama solar con la trayectoria del sol sobre el plano
 
 > **Nota timezone:** El diagrama solar usa UTC. Para Colombia (UTC-5), la hora solar
 > de mediodía aparece a las 17:00 UTC en el diagrama.
+
+---
+
+### ★ Tilt por defecto según tipo de instalación (nuevo)
+
+Cuando llegas a esta página después de configurar el tipo de instalación en Página 1, el slider de **inclinación (tilt)** ya está pre-cargado con el ángulo físicamente correcto para tu tipo:
+
+| Tipo de instalación | Tilt pre-cargado | Referencia física |
+|---|---|---|
+| 🏢 Fachada BIPV | **90°** | Panel integrado verticalmente en muro |
+| 🏠 Techo inclinado BIPV | **15°** | Inclinación mínima típica en edificios Colombia |
+| ⛱️ Pérgola BIPV | **10°** | Estructura de cobertura casi horizontal |
+| 🏗️ Marquesina BIPV | **30°** | Voladizo en ángulo estándar de marquesina |
+| 🏚️ Techo plano | **10°** | Mínimo para escorrentía en techos planos |
+| 🌿 Granja FV | **15°** | Óptimo para latitud Colombia (~5° N) |
+
+Un **banner informativo** en la parte superior de la página muestra el tipo activo y el ángulo sugerido, por ejemplo:
+
+```
+ℹ️ Tipo de instalación: Fachada BIPV
+   Tilt sugerido: 90° (panel vertical integrado en muro).
+   Puedes ajustar el slider si el diseño específico requiere otro ángulo.
+```
+
+**¿Puedo cambiar el tilt manualmente?** Sí. El valor pre-cargado es una sugerencia. Si tu diseño requiere un ángulo diferente (por ejemplo, una fachada inclinada a 75°), mueve el slider libremente. La app guardará tu selección manual para esa sesión.
+
+**¿Qué pasa si vuelvo a cambiar el tipo en Página 1?** El tilt se resetea al valor correspondiente al nuevo tipo. Esto evita que el ángulo de una fachada quede accidentalmente en un proyecto de granja FV.
+
+> **Impacto en el cálculo:** El tilt es el parámetro geométrico más sensible en el cálculo de POA. Una fachada vertical (90°) capta principalmente irradiancia difusa y directa de bajo ángulo solar; un techo plano (10°) capta mucho más irradiancia directa anual. Usar el tilt incorrecto puede llevar a errores de ±20–30% en la POA anual.
 
 ---
 
@@ -857,8 +945,34 @@ y temperatura confinada BIPV. Sin él, la app usa la POA bruta × factor de mism
 global. El Motor Óptico da resultados más precisos para fachadas BIPV (diferencia
 típica: 5–12% en la producción final).
 
+**P: Cambié el tipo de instalación a "Granja FV" pero el tilt sigue en 90°. ¿Por qué?**
+R: El tilt se resetea al valor del nuevo tipo solo si aún no has ajustado manualmente
+el slider en Página 2 en esta sesión. Si ya lo moviste antes del cambio de tipo, la
+app respeta tu selección manual para no sobreescribir trabajo hecho. Solución: ve a
+Página 2 y ajusta el slider manualmente al valor deseado (15° para Granja FV).
+
+**P: Aparece la alerta de densidad fuera de rango pero estoy seguro de que mi valor es correcto. ¿Puedo continuar?**
+R: Sí, la alerta es informativa y no bloquea ningún cálculo. En instalaciones especiales
+(fachadas con módulos de alta densidad > 200 W/m² o pérgolas de baja densidad < 60 W/m²)
+los rangos pueden diferir de los típicos. La alerta te pide verificar — si el valor
+es intencional, simplemente ignórala y continúa.
+
+**P: ¿Qué pasa si selecciono "Fachada BIPV" pero mi edificio tiene la fachada inclinada a 75°?**
+R: El tilt pre-cargado es 90° (fachada vertical estándar), pero puedes moverlo a 75°
+libremente en Página 2. El slider acepta cualquier valor entre 0° y 90°. La app
+calculará la POA correctamente para el ángulo que ingreses, independientemente del
+tipo de instalación seleccionado.
+
+**P: ¿La alerta de PR considera las pérdidas del Motor Óptico?**
+R: No. La alerta de PR en Página 1 compara tu entrada con el rango típico global del
+tipo de instalación, que ya incorpora las pérdidas ópticas promedio (IAM, soiling,
+temperatura confinada). El PR que ingresas en Página 1 es el PR total del sistema
+(incluyendo todas las pérdidas). Si ejecutas el Motor Óptico en Página 5b, las
+correcciones ópticas se aplican sobre la POA y el PR resultante se recalcula en
+Página 6 con mayor precisión.
+
 ---
 
-*Manual generado el 30 de julio de 2026*
+*Manual generado el 31 de julio de 2026*
 *Calculadora BIPV — Innovación Química / SolTech Energy*
 *Repositorio: github.com/ventas108/calculadora-bipv*
