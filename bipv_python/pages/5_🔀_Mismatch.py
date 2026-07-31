@@ -21,6 +21,7 @@ from calculos.mismatch_bypass import (
 )
 from calculos.solar import calcular_poa, ORIENTACIONES
 from datos.ciudades_colombia import CIUDADES
+from calculos.tz_utils import utc_offset_latam, tz_label
 from datos.tecnologias_bipv import MODULOS_BIPV
 
 st.set_page_config(page_title="Mismatch — BIPV", page_icon="🔀", layout="wide")
@@ -39,6 +40,8 @@ tmy       = st.session_state["tmy_df"]
 ciudad    = st.session_state.get("tmy_ciudad", "—")
 c         = CIUDADES[ciudad]
 lat, lon, alt_m = c["lat"], c["lon"], c["alt_m"]
+_tz_off_mm = utc_offset_latam(lat, lon)
+_tz_lbl_mm = tz_label(_tz_off_mm)
 tilt_def  = st.session_state.get("tilt_fachada", 90)
 az_def    = st.session_state.get("azimuth_fachada", 0)
 or_label  = st.session_state.get("orientacion_label", "Norte (0°)")
@@ -161,6 +164,7 @@ fig_sp = go.Figure()
 
 # Trayectorias solares por mes
 for mes, grp in solar_path.groupby("mes"):
+    _h_loc_mm = [f"{(h + _tz_off_mm) % 24:02d}:00" for h in grp.index.hour]
     fig_sp.add_trace(go.Scatter(
         x=grp["azimuth"],
         y=grp["apparent_elevation"],
@@ -169,6 +173,12 @@ for mes, grp in solar_path.groupby("mes"):
         line=dict(color=colores_meses[mes - 1], width=1.5),
         opacity=0.75,
         showlegend=True,
+        customdata=_h_loc_mm,
+        hovertemplate=(
+            f"<b>{nombres_meses[mes]}</b><br>"
+            "Az: %{x:.1f}° El: %{y:.1f}°<br>"
+            f"🕐 %{{customdata}} ({_tz_lbl_mm})<extra></extra>"
+        ),
     ))
 
 # Perfil de horizonte

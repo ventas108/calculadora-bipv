@@ -127,14 +127,20 @@ def resumen_mensual(tmy: pd.DataFrame, poa: pd.DataFrame) -> pd.DataFrame:
     return monthly
 
 
-def heatmap_poa_horario(poa: pd.DataFrame) -> pd.DataFrame:
+def heatmap_poa_horario(poa: pd.DataFrame, utc_offset: int = 0) -> pd.DataFrame:
     """
     Matriz 24h × 12 meses para heatmap — promedio POA por hora y mes.
+
+    utc_offset : offset UTC en horas enteras para mostrar hora local.
+                 Por ejemplo, -5 para Colombia (UTC-5).
+                 Los datos de irradiancia no se modifican; solo cambia
+                 la agrupación horaria para que el eje Y refleje hora local.
     """
     df = poa[["poa_global"]].copy()
-    df["hora"] = df.index.hour
+    df["hora"] = (df.index.hour + utc_offset) % 24   # hora local 0-23
     df["mes"]  = df.index.month
     pivot = df.groupby(["hora", "mes"])["poa_global"].mean().unstack()
     meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
     pivot.columns = meses
+    pivot = pivot.sort_index()          # asegura orden 00-23 h
     return pivot

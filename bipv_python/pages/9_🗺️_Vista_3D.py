@@ -4,6 +4,7 @@ import streamlit as st
 import plotly.graph_objects as go
 
 from datos.ciudades_colombia import CIUDADES
+from calculos.tz_utils import utc_offset_latam, tz_label
 
 # ── Funciones auxiliares nivel módulo (cacheables con st.cache_data) ──────────
 
@@ -1598,6 +1599,10 @@ with tab_solar:
             _COLS_SOL  = ["#e6194b","#f58231","#ffe119","#bfef45","#3cb44b","#42d4f4",
                           "#4363d8","#911eb4","#f032e6","#a9a9a9","#9A6324","#800000"]
 
+            # ── Zona horaria local estimada por coordenadas ──────────────────
+            _utc_off = utc_offset_latam(lat, lon)
+            _tz_lbl  = tz_label(_utc_off)
+
             with st.spinner("Calculando trayectoria solar..."):
                 try:    _sp_m = _solar_path_mensual(lat, lon, alt_m)
                 except Exception as _er_s: st.error(f"Error: {_er_s}"); _sp_m = _pd.DataFrame()
@@ -1640,11 +1645,17 @@ with tab_solar:
             if not _sp_m.empty:
                 for _mn, _grp in _sp_m.groupby("mes"):
                     if not len(_grp): continue
+                    _h_loc = [f"{(h + _utc_off) % 24:02d}:00" for h in _grp.index.hour]
                     _fig_sp.add_trace(go.Scatter(
                         x=_grp["azimuth"],y=_grp["apparent_elevation"],
                         mode="lines",name=_MESES_SOL[_mn-1],
                         line=dict(color=_COLS_SOL[_mn-1],width=2),opacity=0.85,
-                        hovertemplate=f"<b>{_MESES_SOL[_mn-1]}</b><br>Az:%{{x:.1f}}° El:%{{y:.1f}}°<extra></extra>",
+                        customdata=_h_loc,
+                        hovertemplate=(
+                            f"<b>{_MESES_SOL[_mn-1]}</b><br>"
+                            "Az:%{x:.1f}° El:%{y:.1f}°<br>"
+                            "🕐 %{customdata} (hora local)<extra></extra>"
+                        ),
                     ))
 
             # Línea vertical para cada superficie activa
@@ -1724,7 +1735,7 @@ with tab_solar:
             if _sp_a_ok and not _sp_a.empty:
                 import pvlib as _pv_hm
                 _spw = _sp_a.copy()
-                _spw["hora"] = _spw.index.hour; _spw["mes"] = _spw.index.month
+                _spw["hora"] = (_spw.index.hour + _utc_off) % 24; _spw["mes"] = _spw.index.month
                 _spw["aoi"]  = _pv_hm.irradiance.aoi(
                     surface_tilt=_tilt_hm, surface_azimuth=_az_hm,
                     solar_zenith=_spw["apparent_zenith"], solar_azimuth=_spw["azimuth"],
@@ -1757,7 +1768,7 @@ with tab_solar:
                     hovertemplate="<b>%{y} — %{x}</b><br>POA: <b>%{z:.0f} W/m²</b><extra></extra>",
                 ))
                 _fig_hm.update_layout(
-                    height=440, xaxis_title="Mes", yaxis_title="Hora del día (UTC)",
+                    height=440, xaxis_title="Mes", yaxis_title=f"Hora local ({_tz_lbl})",
                     plot_bgcolor="white", paper_bgcolor="white",
                     title=dict(
                         text=(

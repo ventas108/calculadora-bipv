@@ -11,6 +11,7 @@ from calculos.solar import (
     heatmap_poa_horario,
     ORIENTACIONES,
 )
+from calculos.tz_utils import utc_offset_latam, tz_label
 
 st.set_page_config(page_title="Recurso Solar — BIPV", page_icon="☀️", layout="wide")
 st.title("☀️ Recurso Solar")
@@ -129,7 +130,6 @@ if st.button("🌐 Descargar TMY de PVGIS y calcular POA", type="primary", use_c
     with st.spinner(f"Calculando irradiancia POA para {icono_tipo} {tipo_instalacion} ({tilt}°)..."):
         poa = calcular_poa(tmy, lat, lon, alt_m, tilt, azimuth)
         monthly = resumen_mensual(tmy, poa)
-        heatmap = heatmap_poa_horario(poa)
 
     # ── Métricas anuales ─────────────────────────────────────────────────────
     ghi_anual  = tmy["G_h"].sum() / 1000.0
@@ -180,6 +180,10 @@ if st.button("🌐 Descargar TMY de PVGIS y calcular POA", type="primary", use_c
     # ── Heatmap POA horario ──────────────────────────────────────────────────
     st.subheader("🌡️ Mapa de calor — POA promedio por hora y mes (W/m²)")
 
+    _tz_off  = utc_offset_latam(lat, lon)
+    _tz_lbl  = tz_label(_tz_off)
+    heatmap  = heatmap_poa_horario(poa, utc_offset=_tz_off)
+
     fig_heat = go.Figure(go.Heatmap(
         z=heatmap.values,
         x=heatmap.columns,
@@ -190,11 +194,12 @@ if st.button("🌐 Descargar TMY de PVGIS y calcular POA", type="primary", use_c
     ))
     fig_heat.update_layout(
         xaxis_title="Mes",
-        yaxis_title="Hora del día (UTC)",
+        yaxis_title=f"Hora local ({_tz_lbl})",
         height=400,
         plot_bgcolor="white",
     )
     st.plotly_chart(fig_heat, use_container_width=True)
+    st.caption(f"🕐 Horas en hora local ({_tz_lbl}). Datos TMY en UTC convertidos para visualización.")
 
     # ── Tabla resumen mensual ────────────────────────────────────────────────
     with st.expander("📋 Ver tabla de irradiancia mensual"):
