@@ -319,7 +319,7 @@ def cascada_optica(
         "poa_optica_anual_kWh_m2":     round(optica_a, 1),   # tras IAM dir+dif
         "poa_post_soil_anual_kWh_m2":  round(post_s_a, 1),
         "poa_post_term_anual_kWh_m2":  round(post_t_a, 1),
-        "poa_efectiva_anual_kWh_m2":   round(efectiva_a, 1), # tras transparencia
+        "poa_efectiva_anual_kWh_m2":   round(efectiva_a, 1), # = poa_post_term; τ NO se aplica (ya en Isc_stc)
         # Pérdidas anuales por corrección
         "perdida_iam_kWh_m2":          round(p_iam_a, 1),
         "perdida_soil_kWh_m2":         round(p_soil_a, 1),
