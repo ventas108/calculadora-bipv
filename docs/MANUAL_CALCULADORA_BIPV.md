@@ -14,13 +14,14 @@
 6. [Página 4 — Dimensionamiento](#6-página-4--dimensionamiento)
 7. [Página 5b — Motor Óptico](#7-página-5b--motor-óptico)
 8. [Página 5 — Mismatch y Bypass Diodes ★ NUEVO](#8-página-5--mismatch-y-bypass-diodes-)
-9. [Página 6 — Producción Anual](#9-página-6--producción-anual)
-10. [Página 7 — Análisis Financiero ★ ACTUALIZADO](#10-página-7--análisis-financiero-)
+8b. [Página 9 — Vista 3D y Multi-Superficie ★★ NUEVO](#8b-página-9--vista-3d-y-multi-superficie-)
+9. [Página 6 — Producción Anual ★ ACTUALIZADO](#9-página-6--producción-anual-)
+10. [Página 7 — Análisis Financiero ★★ ACTUALIZADO](#10-página-7--análisis-financiero-)
 11. [Página 8 — Presupuesto Bancable ★★ ACTUALIZADO](#11-página-8--presupuesto-bancable-)
 12. [Página 11 — Baterías y Balance ★ ACTUALIZADO](#12-página-11--baterías-y-balance-)
-13. [Página 10 — Reporte PDF ★ ACTUALIZADO](#13-página-10--reporte-pdf-)
+13. [Página 10 — Reporte PDF ★★ ACTUALIZADO](#13-página-10--reporte-pdf-)
 14. [Calculadora de Sombreado 3D](#14-calculadora-de-sombreado-3d)
-15. [Cadena completa de bypass diodes](#15-cadena-completa-de-bypass-diodes)
+15. [Cadena completa — bypass y multi-superficie](#15-cadena-completa--bypass-y-multi-superficie)
 16. [Interpretación de resultados clave](#16-interpretación-de-resultados-clave)
 17. [Preguntas frecuentes](#17-preguntas-frecuentes)
 
@@ -49,11 +50,16 @@ La Calculadora BIPV es una herramienta de simulación fotovoltaica especializada
 ```
 1 Proyecto → 2 Recurso Solar → (3 Motor IV) → 4 Dimensionamiento
     → (5b Motor Óptico) → 5 Mismatch/Bypass → 6 Producción
+    → [9 Vista 3D Multi-Sup ← opcional]
     → 7 Financiero → 8 Presupuesto → 11 Baterías → 10 Reporte PDF
 ```
 
 **Páginas obligatorias:** 1, 2, 4, 6, 7, 10
-**Páginas opcionales pero recomendadas para BIPV urbano:** 3, 5b, 5, 11
+**Páginas opcionales pero recomendadas para BIPV urbano:** 3, 5b, 5, 9 (multi-sup), 11
+
+> **Cuándo usar Página 9 — Vista 3D:** Si el proyecto tiene más de una superficie
+> (ej. fachada sur + techo plano + pérgola), ejecuta la Página 9 para combinar las
+> producciones y alimentar Financiero con la E_ac total del sistema.
 
 > ⚠️ **Regla de datos:** Cada página guarda sus resultados en memoria de sesión
 > (`session_state`). Si recargas el navegador, todos los datos se pierden y
@@ -401,7 +407,95 @@ La simulación:
 
 ---
 
-## 9. Página 6 — Producción Anual
+## 8b. Página 9 — Vista 3D y Multi-Superficie ★★ NUEVO
+
+**Propósito:** Modelar proyectos BIPV con **más de una superficie** (fachada + techo + pérgola + marquesina), combinando sus POA y producciones en un único valor de E_ac total que alimenta Financiero, Baterías y CO₂.
+
+> **Cuándo usarla:** Solo si el proyecto tiene múltiples superficies con distintas orientaciones. Para una sola superficie (techo plano, fachada única), Página 9 no es necesaria.
+
+### Sub-tabs de la Página 9
+
+| Sub-tab | Función |
+|---|---|
+| ⚙️ Superficies BIPV | Crear y configurar cada superficie (tilt, azimuth, área, tipo) |
+| 🗺️ Vista 3D | Visualización 3D del edificio con mapa de POA o FS por mes |
+| 📊 Producción por Superficie | Barras apiladas, recurso solar, tabla resumen, bypass por superficie |
+| ☀️ Diagrama Solar | Trayectoria solar con perfil de obstáculos (sin cambios) |
+
+### ⚙️ Sub-tab 1 — Superficies BIPV
+
+**Tipos de superficie disponibles:**
+
+| Tipo | Tilt por defecto | Azimuth sugerido | Corrección T° |
+|---|---|---|---|
+| Fachada BIPV | 90° | 0° / 90° / 180° / 270° | Confinada (k=1.3) |
+| Techo plano | 10° | 0° | Ventilada (k=1.0) |
+| Techo inclinado | 30° | 180° (sur) | Ventilada (k=1.0) |
+| Pérgola BIPV | 15° | 180° (sur) | Semi-ventilada (k=1.1) |
+| Marquesina | 20° | 180° (sur) | Semi-ventilada (k=1.1) |
+
+**Pasos:**
+1. Pulsar **"➕ Agregar superficie"** para cada plano activo del edificio
+2. Configurar nombre, tipo, área, tilt y azimuth para cada superficie
+3. Pulsar **"☀️ Calcular POA para todas las superficies"**
+4. La app calcula el perfil TMY para cada orientación
+
+### 📊 Sub-tab 3 — Producción y Bypass Multi-Superficie
+
+#### Secciones 1–4 (producción base)
+- **1.** Barras apiladas de E_ac mensual por superficie
+- **2.** POA anual por orientación (gráfica horizontal)
+- **3.** Tabla resumen con área, POA, E_ac y % del total
+- **4.** FS mensual por superficie desde el CSV (requiere columna `Fachada`)
+
+#### ★ Sección 5 — Bypass diodes por superficie (#46)
+
+Ejecuta el modelo de bypass **individualmente** para cada superficie usando su propio perfil POA y su propio perfil FS del CSV:
+
+1. Seleccionar el panel fotovoltaico y N_series (compartido para todas las superficies)
+2. El N_parallel de cada superficie se calcula automáticamente: `N_parallel = área_m² / área_panel / N_series`
+3. Pulsar **"⚡ Calcular bypass por superficie"**
+
+**Resultado — tabla por superficie:**
+
+| Columna | Significado |
+|---|---|
+| Fachada CSV | Qué filas del CSV se usaron para esta superficie |
+| E_ac base (kWh/año) | E_ac sin corrección bypass |
+| Pérdida bypass (%) | % de la E_ac perdida por activación de bypass diodes |
+| Horas bypass/año | Horas al año con bypass activo en esa superficie |
+| E_ac bypass (kWh/año) | E_ac real corregida por bypass |
+
+> **Clave:** `E_ac_anual_kWh_multisup` se actualiza con la suma de E_ac_bypass de todas las superficies. Esta clave tiene **prioridad máxima** en Financiero, Baterías y CO₂.
+
+### 🔗 Botón "Integrar al Financiero"
+
+Después de calcular la POA (o el bypass), el botón **"🔗 Integrar al Financiero"** escribe las claves exclusivas del sistema multi-superficie en la sesión:
+
+| Clave | Contenido | Nunca sobreescribe |
+|---|---|---|
+| `E_ac_anual_kWh_multisup` | E_ac total del sistema | `E_ac_anual_kWh` (superficie única) |
+| `poa_df_multisup` | POA combinada ponderada por área | `poa_df` (POA bruta original) |
+| `area_total_multisup` | Suma de áreas activas | `area_fachada_m2` |
+| `multisup_desglose` | Lista con detalle por superficie | — |
+| `multisup_activo` | Flag booleano | — |
+
+### Prioridad en las páginas aguas abajo
+
+Cuando `multisup_activo = True`, Financiero, Baterías y CO₂ usan la E_ac multi-superficie:
+
+```
+💰 Financiero / 🔋 Baterías / 🌿 CO₂ leen en este orden:
+  1. E_ac_anual_kWh_multisup  ← si multi-superficie activo  ★ prioridad máxima
+  2. E_ac_anual_kWh_bypass    ← si bypass (superficie única) ejecutado
+  3. E_ac_anual_kWh           ← simulación estándar base
+```
+
+Un banner en cada página indica qué modo está activo.
+
+---
+
+## 9. Página 6 — Producción Anual ★ ACTUALIZADO
 
 **Propósito:** Calcular la producción AC anual del sistema completo.
 
@@ -427,25 +521,53 @@ una barra **"Bypass diodes"** mostrando los kWh DC perdidos.
 - `E_ac_anual_kWh` — producción base (sin corrección bypass)
 - `E_ac_anual_kWh_bypass` — producción real (con corrección bypass) ← usada por Páginas 7, 11
 
+### ★ Tasa de degradación anual desde historial PR (#28)
+
+Al final de la Página 6 hay una nueva sección **"📉 Tasa de degradación anual del sistema"**. Permite calcular la degradación real de los módulos a partir del PR corregido por temperatura de varios años operativos.
+
+**Pasos:**
+1. Ingresar el número de años con datos (mínimo 2)
+2. Para cada año: el año calendario y el PR_corr_T promedio anual (tomado de la tabla de diagnóstico)
+3. La app ajusta una **regresión lineal** sobre los puntos e informa:
+
+| Métrica | Descripción |
+|---|---|
+| Pendiente PR (pp/año) | Cambio absoluto en puntos porcentuales por año |
+| Tasa de degradación | % de pérdida relativa al PR inicial por año |
+| Vida útil (PR > 70%) | Años estimados hasta degradación severa |
+
+El resultado se guarda como `tasa_degradacion_calculada` y queda disponible en Página 7 como alternativa al slider paramétrico.
+
+> **Ejemplo:** Si PR_corr_T fue 82% en 2022, 81.3% en 2023 y 80.6% en 2024, la regresión da −0.7 pp/año → tasa = 0.70%/año (ligeramente superior al 0.5% de catálogo CdTe).
+
 ---
 
-## 10. Página 7 — Análisis Financiero ★
+## 10. Página 7 — Análisis Financiero ★★ ACTUALIZADO
 
 **Propósito:** Calcular TIR, VPN, Payback y LCOE del proyecto bajo la Ley 1715/2014.
 
-### ★ E_ac corregida por bypass (nuevo)
+### ★ Prioridad de E_ac: multi-superficie > bypass > base
 
-Si ejecutaste el modelo de bypass en Página 5, la app usa **automáticamente**
-la E_ac corregida como base del análisis. Verás el banner:
+La Página 7 selecciona automáticamente la estimación de producción más precisa disponible:
 
 ```
-⚡ Corrección bypass diodes aplicada:
-E_ac base = 91.000 kWh/año → pérdida bypass = 2.850 kWh/año → E_ac neta = 88.150 kWh/año (3.1% menos)
-TIR y Payback calculados con la producción real corregida.
+Prioridad alta    → E_ac_anual_kWh_multisup   (Página 9 integrada)
+Prioridad media   → E_ac_anual_kWh_bypass     (Página 5 bypass ejecutado)
+Prioridad baja    → E_ac_anual_kWh            (simulación estándar)
 ```
 
-Si bypass NO fue ejecutado, aparece una nota sugiriendo ejecutar Página 5 para
-un análisis más realista.
+Un banner muestra qué fuente está activa y permite desactivar el modo multi-superficie con un botón "Desactivar".
+
+### ★ Toggle de degradación desde historial real (#28)
+
+Si ejecutaste la sección **"📉 Degradación anual"** de Página 6 con al menos 2 años de PR histórico, aparece un interruptor junto al slider de degradación:
+
+```
+🔘 Usar degradación del historial real — 0.62%/año
+   (calculada en 📊 Producción › Degradación anual)
+```
+
+Al activarlo, el slider paramétrico se reemplaza por la tasa calculada por regresión lineal. La TIR y el VPN quedan calculados con la degradación **real medida** del sistema, no el valor genérico de catálogo.
 
 ### Pasos
 
@@ -455,7 +577,7 @@ un análisis más realista.
    - TRM (COP/USD)
    - Tasa de descuento (%)
    - Horizonte de análisis (años)
-   - Degradación anual del sistema (%)
+   - Degradación anual del sistema (% — o usar historial real con toggle)
 3. **Sección 3 — Beneficios Ley 1715:** Revisa los ahorros tributarios calculados
 4. **Clic "📊 Calcular TIR, VPN, Payback y LCOE"**
 
@@ -759,37 +881,64 @@ Esto evita **sobredimensionar la batería** basándose en una producción solar 
 
 ### Secciones del reporte
 
-| Sección | Contenido | Disponible si |
-|---|---|---|
-| 1. Proyecto | Datos generales, ubicación, sistema | Siempre |
-| 2. Recurso Solar | POA anual, heatmap | Página 2 ejecutada |
-| 3. Motor Óptico | Cascada IAM + Soiling + Térmico | Página 5b ejecutada |
-| 4. Producción | E_ac, PR, Factor de Planta | Página 6 ejecutada |
-| 4b. Diagnóstico | PR real vs esperado mes a mes | Datos reales ingresados |
-| ★ 4c. Bypass Diodes | Pérdidas bypass, tabla mensual | Página 5 ejecutada |
-| ★ 5. Financiero | TIR, VPN, Payback + fuente E_ac | Página 7 ejecutada |
-| 6. Balance | Autogeneración, batería | Página 11 ejecutada |
+| Sección | Contenido | Disponible si | Checkbox |
+|---|---|---|---|
+| 1. Proyecto | Datos generales, ubicación, sistema | Siempre | — |
+| 2. Recurso Solar | POA anual, GHI, temperatura | Página 2 ejecutada | — |
+| 3. Motor Óptico | Cascada IAM + Soiling + Térmico | Página 5b ejecutada | ✅ Motor Óptico |
+| 4. Producción | E_ac, PR, Factor de Planta | Página 6 ejecutada | ✅ Producción |
+| 4b. Diagnóstico | PR real vs esperado mes a mes | Datos reales ingresados | — |
+| ★ 4c. Bypass Diodes | Pérdidas bypass, tabla mensual | Página 5 ejecutada | ✅ Bypass Diodes |
+| ★★ 4d. Multi-Superficie | Desglose E_ac + bypass por superficie | Página 9 integrada | ✅ Multi-Superficie |
+| ★ 5. Financiero | TIR, VPN, Payback + fuente E_ac | Página 7 ejecutada | ✅ Financiero |
+| ★★ 5b. Costos Presupuesto | CAPEX, OPEX, KPIs de bancabilidad | Página 8 completada | ✅ Costos Presupuesto |
+| 6. Balance | Autogeneración, batería | Página 11 ejecutada | ✅ Balance |
+| 7. CO₂ | Emisiones evitadas, equivalencias | Página 12 ejecutada | ✅ CO₂ |
 
-### ★ Sección 4c — Bypass Diodes (nueva)
+### ★ Sección 4c — Bypass Diodes (superficie única)
 
-Cuando el modelo de bypass fue ejecutado, el reporte incluye:
+Cuando el modelo de bypass fue ejecutado en Página 5, el reporte incluye:
 - Tabla con pérdida anual, % E_dc, horas bypass, E_ac corregida
 - Fuente del FS (geométrico o combinado) y modo de cobertura temporal
 - Semáforo de impacto: 🟢 < 2% · 🟡 2–5% · 🔴 > 5%
 - Tabla mensual con pérdidas coloreadas (rojo si > 20 kWh ese mes)
 - Referencia técnica: Deline et al. 2013
 
-### ★ Sección 5 — Trazabilidad de E_ac (nuevo)
+### ★★ Sección 4d — Multi-Superficie (nueva, #45)
 
-La sección Financiero del reporte ahora muestra explícitamente qué E_ac se usó:
+Cuando Página 9 fue integrada, el reporte incluye una tabla por superficie con:
+- E_ac base, pérdida bypass (%), horas bypass/año, E_ac con bypass
+- Fila TOTAL SISTEMA con área total y E_ac total
+- Nota con densidad del sistema (kWh/m²·año)
+
+> Activar con checkbox **"🏗️ Incluir desglose Multi-Superficie"** en opciones del reporte.
+
+### ★★ Sección 5b — Costos del Presupuesto (nueva, #8)
+
+Cuando Página 8 fue completada, el reporte incluye:
+- CAPEX directo (equipos + obra) y costos blandos en USD y M COP
+- CAPEX total y KPIs: USD/m², USD/kWp, OPEX/CAPEX
+- Fracción de equipos (base para beneficios Ley 1715)
+
+> Activar con checkbox **"💼 Incluir Resumen de Costos del Presupuesto"**.
+
+### ★ Sección 5 — Trazabilidad de E_ac (actualizado, #38)
+
+La sección Financiero del reporte muestra qué fuente de E_ac se usó (en orden de prioridad):
 
 ```
-E_ac usada en el análisis:  88.150 kWh/año (corregida por bypass)
-Pérdida bypass descontada:  2.850 kWh/año (3.1% de E_ac base)
+# Caso 1: Sistema multi-superficie con bypass
+E_ac usada: 33.929 kWh/año (multi-superficie — 2 superficies + bypass)
+
+# Caso 2: Superficie única con bypass
+E_ac usada: 88.150 kWh/año (corregida por bypass diodes)
+Pérdida bypass descontada: 2.850 kWh/año (3.1% de E_ac base)
+
+# Caso 3: Simulación estándar
+E_ac usada: 91.000 kWh/año (simulación estándar superficie única)
 ```
 
-Esto permite al cliente o a la UPME verificar que los números de TIR y Payback
-son **conservadores y realistas** (no optimistas).
+Esto permite al cliente o a la UPME verificar que los números de TIR y Payback son **conservadores y realistas** (no optimistas).
 
 ### Cómo generar el PDF
 
@@ -839,43 +988,69 @@ son **conservadores y realistas** (no optimistas).
 
 ---
 
-## 15. Cadena completa de bypass diodes
+## 15. Cadena completa — bypass y multi-superficie
 
-Este es el flujo completo cuando se usa el modelo de bypass:
+### Flujo A — Superficie única con bypass diodes
 
 ```
 bipv.innovacionquimica.com.co (Calculadora Sombreado 3D)
-  │
-  ├── Dibujar obstáculos 3D
-  ├── Cruzar con EPW (días críticos)
   └── Exportar CSV (con columna Fachada)
            │
            ↓
-Calculadora BIPV — Página 5 (Mismatch)
-  │
-  ├── Cargar CSV
-  ├── Detectar: FS_geometrico ✓ | FS invertido ✓ | Multi-fachada ✓
+Página 5 — Mismatch
+  ├── Cargar CSV · Detectar FS_geometrico / invertido / multi-fachada
   ├── [Si multi-fachada] → Seleccionar fachada del array
   ├── Cobertura temporal: Modo mensual (recomendado) o exacto
   ├── Configurar strings (N_series, N_parallel)
-  └── Ejecutar simulación → kWh_bypass_anual, pct_bypass, horas_bypass
+  └── ⚡ Calcular → kWh_bypass_anual, pct_bypass, horas_bypass
            │
            ↓
 Página 6 — Producción
-  └── Balance energético con barra "Bypass diodes"
-      Guarda: E_ac_anual_kWh_bypass en memoria
+  └── Guarda: E_ac_anual_kWh_bypass ← usada aguas abajo
            │
-    ┌──────┴──────┐
-    ↓             ↓
-Página 7        Página 11
-Financiero      Baterías
-TIR/VPN con     Dimensionamiento con
-E_ac_bypass     E_ac_bypass
+    ┌──────┼──────┬──────────┐
+    ↓      ↓      ↓          ↓
+Pág.7   Pág.11  Pág.12     Pág.10
+Financ. Baterías CO₂        PDF
+TIR/VPN  Balance  Emisiones  §4c bypass
+                             §5 E_ac label
+```
+
+### Flujo B — Multi-superficie (Página 9)
+
+```
+Página 9 — Vista 3D
+  ├── ⚙️ Superficies BIPV: crear fachada, techo, pérgola, marquesina
+  ├── ☀️ Calcular POA para cada superficie
+  ├── [Opcional] Cargar CSV → FS por fachada en sub-tab FS
+  ├── [Opcional] ⚡ Bypass por superficie (Sección 5)
+  │      Para cada superficie:
+  │        · POA propia × FS propio del CSV (filtrado por Fachada)
+  │        · N_parallel = área / área_panel / N_series
+  │        · simular_bypass_horario() → pérdida% por superficie
+  │        · E_ac_bypass_i = E_ac_base_i × (1 - pérdida%)
+  └── 🔗 Integrar al Financiero
+       Escribe claves exclusivas (nunca sobreescriben las de Pág. 1):
+         E_ac_anual_kWh_multisup ← suma E_ac por superficie
+         poa_df_multisup         ← POA combinada ponderada
+         area_total_multisup     ← suma de áreas
+         multisup_desglose       ← lista por superficie
+         multisup_activo = True
            │
-           ↓
-Página 10 — Reporte PDF
-  ├── Sección 4c: Pérdidas bypass (tabla mensual)
-  └── Sección 5: "E_ac usada: X kWh/año (corregida por bypass)"
+    ┌──────┼──────┬──────────┐
+    ↓      ↓      ↓          ↓
+Pág.7   Pág.11  Pág.12     Pág.10
+Financ. Baterías CO₂        PDF §4d
+★ prioridad máxima en todas     multi-sup
+```
+
+### Prioridad global de E_ac
+
+```
+Página 7 / 11 / 12 / 10 leen:
+  1. E_ac_anual_kWh_multisup  ← Página 9 integrada  ★ MÁX
+  2. E_ac_anual_kWh_bypass    ← Página 5 ejecutada
+  3. E_ac_anual_kWh           ← Página 6 base
 ```
 
 ---
@@ -893,13 +1068,15 @@ PR = Y_f / Y_r = (E_ac / P_STC) / (H_POA / G_STC)
 - **PR 60–80%:** Revisar pérdidas ópticas, mismatch o sombreado
 - **PR < 60%:** Problema real — inspección de campo recomendada
 
-### E_ac vs E_ac_bypass
+### E_ac según escenario del proyecto
 
 | Escenario | E_ac usada | Para qué |
 |---|---|---|
-| Sin sombras significativas | E_ac base | Proyectos con obstrucción < 5% |
-| Con sombras urbanas | E_ac_bypass | Fachadas en centros urbanos |
-| Certificación UPME | E_ac_bypass | Estimación conservadora requerida |
+| Superficie única, sin sombras significativas | E_ac base | Proyectos con obstrucción < 5% |
+| Superficie única, con sombras urbanas | E_ac_bypass | Fachadas en centros urbanos |
+| Multi-superficie (techo + fachada + pérgola) | E_ac_multisup | Proyectos con orientaciones mixtas |
+| Multi-superficie + bypass por superficie | E_ac_multisup (corregida) | Máxima precisión — BIPV urbano complejo |
+| Certificación UPME / bancos | E_ac más conservadora disponible | Exigencia de estimación realista |
 
 ### Horas con bypass activo
 
@@ -971,8 +1148,40 @@ temperatura confinada). El PR que ingresas en Página 1 es el PR total del siste
 correcciones ópticas se aplican sobre la POA y el PR resultante se recalcula en
 Página 6 con mayor precisión.
 
+**P: ¿Cómo funciona la Página 9 (Vista 3D) con un proyecto de una sola superficie?**
+R: Para proyectos de una sola superficie (ej. solo fachada sur), la Página 9 no es
+necesaria. El flujo normal (Páginas 1→2→4→5→6→7) es suficiente. La Página 9 agrega
+valor cuando hay 2 o más superficies con distintas orientaciones que deben combinarse
+en un solo sistema.
+
+**P: Si activo multi-superficie en Página 9, ¿se pierden los resultados de la Página 6?**
+R: No. Las claves de multi-superficie (`E_ac_anual_kWh_multisup`, `poa_df_multisup`)
+son **exclusivas** y nunca sobreescriben `E_ac_anual_kWh` ni `poa_df`. Al desactivar
+el modo multi-superficie con el botón "Desactivar", Financiero vuelve a usar la E_ac
+de Página 6 automáticamente.
+
+**P: ¿Cómo calcula el N_parallel para cada superficie en el bypass por superficie?**
+R: La app divide el número estimado de módulos de cada superficie
+(`N_panels = área_m² / área_panel`) por el N_series configurado:
+`N_parallel = max(1, round(N_panels / N_series))`. El N_series es el mismo
+para todas las superficies (se asume un único tipo de string); el N_parallel
+varía proporcionalmente al área de cada superficie.
+
+**P: Tengo datos de PR de 3 años. ¿Por qué la degradación calculada es negativa (mejora)?**
+R: Una pendiente positiva (PR creciente) puede reflejar mejora real en limpieza o
+mantenimiento entre años, no que los módulos "mejoren". Si ves PR_corr_T subiendo,
+revisa si cambió el protocolo de limpieza. La app indica "PR estable o en mejora" y
+no actualiza la tasa de degradación en Financiero si la pendiente es positiva.
+
+**P: ¿Puedo usar el bypass por superficie si el CSV no tiene columna "Fachada"?**
+R: Sí. Si el CSV no tiene columna `Fachada`, la app usa el promedio de todos los
+puntos del CSV como FS para cada superficie. Esto es menos preciso que tener una
+columna `Fachada`, pero es funcional. Para mayor precisión, asigna un nombre de
+fachada a cada punto de análisis en la Calculadora de Sombreado 3D antes de exportar.
+
 ---
 
-*Manual generado el 31 de julio de 2026*
+*Manual actualizado el 31 de julio de 2026*
+*Novedades de esta versión: Vista 3D Multi-Superficie (Pág. 9) completa · Bypass por superficie (#46) · Degradación desde historial PR (#28) · Reporte PDF con desglose multi-sup (#45), costos presupuesto (#8) y E_ac multi-sup (#38)*
 *Calculadora BIPV — Innovación Química / SolTech Energy*
 *Repositorio: github.com/ventas108/calculadora-bipv*
