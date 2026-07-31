@@ -266,8 +266,8 @@ with t5:
         st.caption(f"🔋 {int(_bat['N_baterias'])} und. {_bat_nom} — agrega precio manualmente")
 
     df_iny = pd.DataFrame(cat_rows, columns=_BASE_COLS)
-    if "df_sec_catalogo" not in st.session_state or \
-       st.button("↺ Resetear 'Catálogo'", key="reset_catalogo"):
+    # Inicializar sección si aún no existe (el reset lo maneja _editar_seccion internamente)
+    if "df_sec_catalogo" not in st.session_state:
         st.session_state.pop("df_sec_catalogo", None)
     sub5 = _editar_seccion("catalogo", "Catálogo", inyectar=df_iny,
         referencia_mercado="Ej.: Cotización JA Solar / Growatt distribuidor, julio 2026")
