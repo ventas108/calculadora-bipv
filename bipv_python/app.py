@@ -53,7 +53,9 @@ with col1:
     st.metric("🏙️ Ciudad", st.session_state["ciudad"])
 
 with col2:
-    st.metric("📐 Área fachada", f"{st.session_state['area_fachada_m2']} m²")
+    _tipo_inst = st.session_state.get("tipo_instalacion", "Fachada BIPV")
+    st.metric("📐 Área instalación", f"{st.session_state['area_fachada_m2']} m²",
+              delta=_tipo_inst, delta_color="off")
 
 with col3:
     energia = st.session_state.get("energia_anual_kWh")

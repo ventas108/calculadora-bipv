@@ -5,6 +5,17 @@ from datos.ciudades_colombia import CIUDADES, LISTA_CIUDADES
 st.set_page_config(page_title="Proyecto — BIPV", page_icon="🏠", layout="wide")
 st.title("🏠 Datos del Proyecto")
 
+# ── Tipos de instalación con defaults técnicos ────────────────────────────────
+TIPOS_INSTALACION = {
+    "Fachada BIPV":             {"icono": "🏢", "dens_min": 70,  "dens_max": 90,  "dens_def": 75,  "pr_def": 0.70, "pr_hint": "0.65–0.75"},
+    "Techo inclinado (BIPV)":   {"icono": "🏠", "dens_min": 100, "dens_max": 200, "dens_def": 150, "pr_def": 0.78, "pr_hint": "0.75–0.85"},
+    "Techo plano (con soporte)":{"icono": "🏭", "dens_min": 130, "dens_max": 200, "dens_def": 160, "pr_def": 0.80, "pr_hint": "0.75–0.85"},
+    "Pérgola / sombreadero":    {"icono": "⛱️", "dens_min": 80,  "dens_max": 130, "dens_def": 100, "pr_def": 0.73, "pr_hint": "0.68–0.78"},
+    "Marquesina / voladizo":    {"icono": "🏗️", "dens_min": 70,  "dens_max": 100, "dens_def": 80,  "pr_def": 0.70, "pr_hint": "0.65–0.75"},
+    "Granja fotovoltaica":      {"icono": "☀️", "dens_min": 150, "dens_max": 240, "dens_def": 190, "pr_def": 0.82, "pr_hint": "0.78–0.88"},
+}
+LISTA_TIPOS = list(TIPOS_INSTALACION.keys())
+
 # ── Selector de modo ─────────────────────────────────────────────────────────
 modo = st.radio(
     "¿Cuál es tu punto de partida?",
@@ -32,19 +43,39 @@ with col1:
         for _k in ("lat_proyecto", "lon_proyecto", "alt_proyecto",
                    "_lat_custom_temp", "_lon_custom_temp", "_alt_custom_temp"):
             st.session_state.pop(_k, None)
-        st.session_state["ciudad"] = ciudad   # actualizar inmediatamente
+        st.session_state["ciudad"] = ciudad
 
-    area   = st.number_input("Área de fachada disponible (m²)",
-                              min_value=10.0, max_value=5000.0,
-                              value=float(st.session_state.get("area_fachada_m2", 97.34)),
-                              step=1.0)
+    # ── Tipo de instalación ───────────────────────────────────────────────────
+    tipo_anterior = st.session_state.get("tipo_instalacion", "Fachada BIPV")
+    if tipo_anterior not in LISTA_TIPOS:
+        tipo_anterior = "Fachada BIPV"
+    tipo_instalacion = st.selectbox(
+        "Tipo de instalación",
+        LISTA_TIPOS,
+        index=LISTA_TIPOS.index(tipo_anterior),
+        help="Define el contexto físico del sistema solar. Ajusta los rangos recomendados de densidad y PR.",
+        format_func=lambda t: f"{TIPOS_INSTALACION[t]['icono']}  {t}",
+    )
+    cfg = TIPOS_INSTALACION[tipo_instalacion]
+
+    # Si cambió el tipo → resetear densidad y PR a los defaults del nuevo tipo
+    if tipo_instalacion != tipo_anterior:
+        st.session_state.pop("densidad_Wm2", None)
+        st.session_state.pop("PR", None)
+
+    area = st.number_input(
+        "Área de instalación disponible (m²)",
+        min_value=10.0, max_value=500_000.0,
+        value=float(st.session_state.get("area_fachada_m2", 97.34)),
+        step=1.0,
+        help=f"{cfg['icono']} {tipo_instalacion} — ingresa la superficie neta de paneles."
+    )
 
     # ── Inputs adicionales Modo Consumo ──────────────────────────────────────
     consumo_mes   = 0.0
     factura_cop   = 0.0
     cobertura_pct = int(st.session_state.get("cobertura_pct", 80))
 
-    # Tarifa SIEMPRE editable — varía por ciudad y empresa prestadora
     tarifa_kwh = st.number_input(
         "Tarifa local (COP/kWh)",
         min_value=100.0, max_value=2000.0,
@@ -84,35 +115,27 @@ with col2:
                 "Si conoces las coordenadas GPS exactas del predio, ingrésalas aquí. "
                 "PVGIS descargará el TMY para ese punto específico."
             )
-            # Siempre parte de la ciudad actual (ya limpiadas si hubo cambio de ciudad)
             _lat_def = float(st.session_state.get("lat_proyecto", c["lat"]))
             _lon_def = float(st.session_state.get("lon_proyecto", c["lon"]))
             _alt_def = int(st.session_state.get("alt_proyecto",   c["alt_m"]))
 
             cx1, cx2, cx3 = st.columns(3)
             lat_custom = cx1.number_input(
-                "Latitud (°N)",
-                min_value=-5.0, max_value=15.0,
-                value=_lat_def,
-                step=0.00001, format="%.5f",
+                "Latitud (°N)", min_value=-5.0, max_value=15.0,
+                value=_lat_def, step=0.00001, format="%.5f",
                 help="Positivo = Norte del Ecuador. Colombia: 4° a 13°N aprox."
             )
             lon_custom = cx2.number_input(
-                "Longitud (°E)",
-                min_value=-82.0, max_value=-66.0,
-                value=_lon_def,
-                step=0.00001, format="%.5f",
+                "Longitud (°E)", min_value=-82.0, max_value=-66.0,
+                value=_lon_def, step=0.00001, format="%.5f",
                 help="Colombia: entre -67° y -82°. Siempre negativo."
             )
             alt_custom = cx3.number_input(
-                "Altitud (m.s.n.m.)",
-                min_value=0, max_value=4500,
-                value=_alt_def,
-                step=10,
+                "Altitud (m.s.n.m.)", min_value=0, max_value=4500,
+                value=_alt_def, step=10,
                 help="Altitud del predio en metros sobre el nivel del mar."
             )
 
-            # Verificar si el usuario cambió respecto a la ciudad
             _coords_personalizadas = (
                 abs(lat_custom - c["lat"]) > 0.0001 or
                 abs(lon_custom - c["lon"]) > 0.0001 or
@@ -131,13 +154,11 @@ with col2:
                     "Modifica los valores para usar las del predio específico."
                 )
 
-            # Guardar en variables accesibles fuera del expander
             st.session_state["_lat_custom_temp"] = lat_custom
             st.session_state["_lon_custom_temp"] = lon_custom
             st.session_state["_alt_custom_temp"] = alt_custom
 
         # ── Panel "Datos del sitio" — refleja ciudad + coordenadas activas ──
-        # Coordenadas activas = las del expander (en vivo, sin necesidad de Guardar)
         _lat_activa = st.session_state.get("_lat_custom_temp", c["lat"])
         _lon_activa = st.session_state.get("_lon_custom_temp", c["lon"])
         _alt_activa = st.session_state.get("_alt_custom_temp", c["alt_m"])
@@ -146,7 +167,6 @@ with col2:
             abs(_lon_activa - c["lon"]) > 0.0001 or
             _alt_activa != c["alt_m"]
         )
-
         _coord_label = (
             f"**Latitud:** {_lat_activa:.5f}°  |  **Longitud:** {_lon_activa:.5f}°  |  "
             f"**Altitud:** {_alt_activa} m  ⚠️ *coordenadas del predio*"
@@ -154,7 +174,6 @@ with col2:
             f"**Latitud:** {c['lat']}°  |  **Longitud:** {c['lon']}°  |  "
             f"**Altitud:** {c['alt_m']} m"
         )
-
         st.info(
             f"{_coord_label}\n\n"
             f"**GHI:** {c['GHI_kWh_m2_dia']} kWh/m²·día  |  **HSP:** {c['HSP']} h/día\n\n"
@@ -163,9 +182,9 @@ with col2:
             f"**Región:** {c['region']}  |  **Zona CREG:** {c['CREG_zona']}"
         )
 
-        GHI_anual = c["GHI_kWh_m2_dia"] * 365   # kWh/m²/año
+        GHI_anual = c["GHI_kWh_m2_dia"] * 365
 
-        # Densidad de potencia — desde panel seleccionado o entrada manual
+        # ── Densidad de potencia — desde panel seleccionado o entrada manual ─
         panel_ss = st.session_state.get("panel_dict")
         if panel_ss and panel_ss.get("area_m2") and panel_ss.get("Pmax_stc"):
             dens_Wm2 = panel_ss["Pmax_stc"] / panel_ss["area_m2"]
@@ -173,23 +192,38 @@ with col2:
         else:
             dens_Wm2 = st.number_input(
                 "Densidad de potencia del panel (W/m²)",
-                min_value=30.0, max_value=200.0,
-                value=float(st.session_state.get("densidad_Wm2", 75.0)),
+                min_value=30.0, max_value=300.0,
+                value=float(st.session_state.get("densidad_Wm2", float(cfg["dens_def"]))),
                 step=5.0,
-                help="Pmax / Área panel. CdTe BIPV fachada: 70–90 W/m². Mono-Si techo: 150–200 W/m²")
+                help=(
+                    f"{cfg['icono']} {tipo_instalacion}: "
+                    f"{cfg['dens_min']}–{cfg['dens_max']} W/m²  |  "
+                    "CdTe BIPV fachada: 70–90 · Mono-Si techo/campo: 150–220 W/m²"
+                )
+            )
 
         PR = st.number_input(
             "Performance Ratio (PR)",
-            min_value=0.50, max_value=0.95,
-            value=float(st.session_state.get("PR", 0.75)),
+            min_value=0.40, max_value=0.98,
+            value=float(st.session_state.get("PR", cfg["pr_def"])),
             step=0.01,
-            help="BIPV fachada: 0.65–0.75  |  Convencional techo: 0.75–0.85")
+            help=(
+                f"{cfg['icono']} {tipo_instalacion}: {cfg['pr_hint']}  |  "
+                "BIPV fachada: 0.65–0.75 · Techo conv.: 0.75–0.85 · Granja FV: 0.78–0.88"
+            )
+        )
 
-        eta = dens_Wm2 / 1000.0   # kW/m²
+        eta = dens_Wm2 / 1000.0
+
+        # ── Banner de tipo de instalación ─────────────────────────────────────
+        st.info(
+            f"{cfg['icono']} **{tipo_instalacion}** — "
+            f"Densidad recomendada: {cfg['dens_min']}–{cfg['dens_max']} W/m²  |  "
+            f"PR recomendado: {cfg['pr_hint']}"
+        )
 
         st.divider()
         if modo_key == "area":
-            # ── MODO B: Área → Energía proyectada ────────────────────────────
             E_anual = area * eta * GHI_anual * PR
             ahorro_mes = E_anual / 12.0 * tarifa_kwh
             st.subheader("📊 Estimación de producción")
@@ -199,7 +233,6 @@ with col2:
             st.session_state["energia_anual_estimada"] = E_anual
 
         else:
-            # ── MODO A: Consumo → Área necesaria ─────────────────────────────
             E_objetivo  = consumo_mes * (cobertura_pct / 100.0) * 12.0
             denominador = eta * GHI_anual * PR
             area_nec    = E_objetivo / denominador if denominador > 0 else 0.0
@@ -228,10 +261,11 @@ with col2:
 if st.button("💾 Guardar configuración", type="primary"):
     st.session_state["nombre_proyecto"]    = nombre
     st.session_state["ciudad"]             = ciudad
-    st.session_state["area_fachada_m2"]    = area
+    st.session_state["tipo_instalacion"]   = tipo_instalacion
+    st.session_state["area_fachada_m2"]    = area   # clave histórica — no renombrar
     st.session_state["modo_calculo"]       = modo_key
     st.session_state["PR"]                 = PR
-    st.session_state["densidad_Wm2"]       = dens_Wm2 if "dens_Wm2" in dir() else 75.0
+    st.session_state["densidad_Wm2"]       = dens_Wm2 if "dens_Wm2" in dir() else cfg["dens_def"]
     st.session_state["tarifa_cop_kwh"]     = tarifa_kwh
     if modo_key == "consumo":
         st.session_state["factura_cop"]    = factura_cop
@@ -243,11 +277,9 @@ if st.button("💾 Guardar configuración", type="primary"):
         st.session_state["T_cel_realista"] = c["T_cel_realista"]
         st.session_state["T_cel_extremo"]  = c["T_cel_extremo"]
         st.session_state["GHI_kWh_m2_dia"] = c["GHI_kWh_m2_dia"]
-        # Guardar coordenadas del predio (pueden ser las del expander o las de la ciudad)
         st.session_state["lat_proyecto"] = st.session_state.get("_lat_custom_temp", c["lat"])
         st.session_state["lon_proyecto"] = st.session_state.get("_lon_custom_temp", c["lon"])
         st.session_state["alt_proyecto"] = st.session_state.get("_alt_custom_temp", c["alt_m"])
-    # Forzar recálculo de Recurso Solar si cambiaron las coordenadas
     st.session_state["recurso_solar_ok"] = False
     _lat = st.session_state["lat_proyecto"]
     _lon = st.session_state["lon_proyecto"]
@@ -258,4 +290,7 @@ if st.button("💾 Guardar configuración", type="primary"):
             abs(_lon - CIUDADES[ciudad]["lon"]) > 0.0001)
         else f"Coordenadas de referencia de {ciudad}"
     )
-    st.success(f"✅ Configuración guardada. {_coord_msg}. Continúa en ☀️ Recurso Solar.")
+    st.success(
+        f"✅ Configuración guardada — {cfg['icono']} **{tipo_instalacion}** · "
+        f"{_coord_msg}. Continúa en ☀️ Recurso Solar."
+    )
