@@ -1435,6 +1435,129 @@ with tab_solar:
                         with _col_g:
                             st.plotly_chart(_fig_fsm, use_container_width=True)
 
+                # ── ⚡ 5. Bypass diodes por superficie (#46) ──────────────
+                st.divider()
+                st.markdown("#### ⚡ 5. Bypass diodes por superficie")
+                st.caption(
+                    "Modelo de bypass diodes ejecutado **individualmente** por superficie "
+                    "usando su propio perfil POA y su propio FS del CSV. "
+                    "Actualiza la E_ac del sistema multi-superficie en Financiero, Baterías y CO₂."
+                )
+
+                if not (_csv_p and _df_fsp is not None):
+                    st.info(
+                        "ℹ️ Carga el CSV de sombreado en 🔀 Mismatch › Sección 5 "
+                        "para habilitar el bypass por superficie."
+                    )
+                else:
+                    from calculos.mismatch_bypass import simular_bypass_horario as _sbh
+                    from calculos.mismatch_bypass import alinear_fs_con_tmy as _afs
+
+                    from datos.tecnologias_bipv import MODULOS_BIPV as _MBPV
+                    _bpc1, _bpc2, _bpc3 = st.columns(3)
+                    _bp_panel_sel = _bpc1.selectbox(
+                        "Panel fotovoltaico",
+                        list(_MBPV.keys()),
+                        index=list(_MBPV.keys()).index("ASP-ST1-T40"),
+                        key="ms_bp_panel",
+                    )
+                    _bp_panel_data = _MBPV[_bp_panel_sel]
+                    _bp_n_series = _bpc2.number_input(
+                        "Módulos en serie (N_series)", 2, 30, 8, step=1,
+                        key="ms_bp_nseries",
+                        help="Mismo valor para todas las superficies. N_parallel se ajusta por área.",
+                    )
+                    _bp_modo = _bpc3.radio(
+                        "Modo cobertura", ["mensual", "exacto"],
+                        key="ms_bp_modo", horizontal=True,
+                        format_func=lambda m: "📅 Mensual" if m == "mensual" else "📌 Exacto",
+                    )
+
+                    _btn_bp_ms = st.button(
+                        "⚡ Calcular bypass por superficie",
+                        type="primary", key="btn_bypass_multisup",
+                    )
+
+                    if _btn_bp_ms:
+                        _tmy_ms    = st.session_state.get("tmy_df")
+                        _t_amb_ms  = _tmy_ms["T2m"].values
+                        _tmy_idx_ms = _tmy_ms.index
+                        _mapa_fach = mapear_fachadas_csv(_df_fsp, _sups_p)
+                        _bp_rows, _e_bp_total = [], 0.0
+
+                        with st.spinner("Simulando bypass diodes por superficie..."):
+                            for _sp_bp in _sups_p:
+                                _poa_sp_bp = _poa_p.get(_sp_bp["nombre"])
+                                if _poa_sp_bp is None or _poa_sp_bp.empty:
+                                    continue
+                                _g_eff_sp   = _poa_sp_bp["poa_global"].values
+                                _fach_csv_sp = _mapa_fach.get(_sp_bp["nombre"])
+                                _df_fs_sp   = _df_fsp.copy()
+                                if _fach_csv_sp and "fachada" in _df_fs_sp.columns:
+                                    _df_fs_sp = _df_fs_sp[
+                                        _df_fs_sp["fachada"] == _fach_csv_sp
+                                    ].copy()
+                                _p_shade_sp = _afs(_df_fs_sp, _tmy_idx_ms, modo=_bp_modo)
+                                _n_pan_sp   = max(1, int(_sp_bp["area_m2"] /
+                                                         _bp_panel_data["area_m2"]))
+                                _n_par_sp   = max(1, round(_n_pan_sp / _bp_n_series))
+                                try:
+                                    _res_sp_bp = _sbh(
+                                        G_eff=_g_eff_sp, T_amb=_t_amb_ms,
+                                        p_shade=_p_shade_sp.values,
+                                        N_series=int(_bp_n_series),
+                                        N_parallel=int(_n_par_sp),
+                                        panel=_bp_panel_data,
+                                        NOCT=float(_bp_panel_data.get("NOCT", 45.0)),
+                                    )
+                                    _prod_sp_bp = produccion_superficie(
+                                        _poa_sp_bp, _sp_bp["area_m2"], _eta_p, _pr_p
+                                    )
+                                    _f_bp_sp  = 1.0 - (_res_sp_bp["pct_bypass_anual"] / 100.0)
+                                    _eac_sp_bp = _prod_sp_bp["e_ac_anual_kWh"] * _f_bp_sp
+                                    _e_bp_total += _eac_sp_bp
+                                    _bp_rows.append({
+                                        "Superficie": (
+                                            f"{TIPOS_SUPERFICIE.get(_sp_bp['tipo'],{}).get('icon','')} "
+                                            f"{_sp_bp['nombre']}"
+                                        ),
+                                        "Tipo":               _sp_bp["tipo"],
+                                        "Área (m²)":          f"{_sp_bp['area_m2']:.1f}",
+                                        "Fachada CSV":        _fach_csv_sp or "— promedio —",
+                                        "E_ac base (kWh/año)": f"{_prod_sp_bp['e_ac_anual_kWh']:,.0f}",
+                                        "Pérdida bypass (%)": f"{_res_sp_bp['pct_bypass_anual']:.2f}%",
+                                        "Horas bypass/año":   str(_res_sp_bp["horas_bypass"]),
+                                        "E_ac bypass (kWh/año)": f"{_eac_sp_bp:,.0f}",
+                                    })
+                                except Exception as _esp_bp:
+                                    st.warning(
+                                        f"⚠️ Error bypass {_sp_bp['nombre']}: {_esp_bp}"
+                                    )
+
+                        # Actualizar clave exclusiva — no toca E_ac_anual_kWh
+                        st.session_state["E_ac_anual_kWh_multisup"]    = round(_e_bp_total, 1)
+                        st.session_state["bypass_multisup_resultados"] = _bp_rows
+                        st.session_state["bypass_multisup_ok"]         = True
+                        st.session_state["multisup_activo"]            = True
+                        st.rerun()
+
+                    if st.session_state.get("bypass_multisup_ok"):
+                        _saved_bp = st.session_state.get("bypass_multisup_resultados", [])
+                        if _saved_bp:
+                            st.dataframe(
+                                _pd.DataFrame(_saved_bp),
+                                use_container_width=True, hide_index=True,
+                            )
+                            _e_ms_f = st.session_state.get("E_ac_anual_kWh_multisup", 0)
+                            _bc1b, _bc2b = st.columns(2)
+                            _bc1b.metric(
+                                "⚡ E_ac sistema con bypass",
+                                f"{_e_ms_f:,.0f} kWh/año",
+                            )
+                            _bc2b.success(
+                                "✅ Activo en Financiero · Baterías · CO₂"
+                            )
+
         # ════════════════════════════════════════════════════════════════════
         # SUB-TAB 4 — TRAYECTORIA SOLAR (contenido original conservado)
         # ════════════════════════════════════════════════════════════════════
