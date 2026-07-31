@@ -1,7 +1,36 @@
 """Página 1 — Configuración del proyecto."""
+import json
+import os
 import streamlit as st
 from datos.ciudades_colombia import CIUDADES, LISTA_CIUDADES
 from calculos.tz_utils import utc_offset_latam, tz_label
+
+# ── Ruta del archivo de proyecto (persiste entre recargas) ───────────────────
+_DIR_DATOS = os.path.join(os.path.dirname(__file__), "..", "datos")
+PROJECT_FILE = os.path.join(_DIR_DATOS, "proyecto_actual.json")
+
+def _cargar_proyecto():
+    """Lee proyecto_actual.json y vuelca en session_state (solo si existe)."""
+    if not os.path.exists(PROJECT_FILE):
+        return
+    try:
+        with open(PROJECT_FILE, "r", encoding="utf-8") as f:
+            saved = json.load(f)
+        for k, v in saved.items():
+            st.session_state.setdefault(k, v)
+    except Exception:
+        pass
+
+def _guardar_proyecto(datos: dict):
+    """Persiste datos del proyecto en JSON a disco."""
+    os.makedirs(_DIR_DATOS, exist_ok=True)
+    with open(PROJECT_FILE, "w", encoding="utf-8") as f:
+        json.dump(datos, f, ensure_ascii=False, indent=2)
+
+# ── Cargar al inicio de cada sesión (solo la primera vez) ───────────────────
+if "proyecto_cargado_desde_disco" not in st.session_state:
+    _cargar_proyecto()
+    st.session_state["proyecto_cargado_desde_disco"] = True
 
 st.set_page_config(page_title="Proyecto — BIPV", page_icon="🏠", layout="wide")
 st.title("🏠 Datos del Proyecto")
@@ -313,14 +342,16 @@ with col2:
 
 # ── Guardar ──────────────────────────────────────────────────────────────────
 if st.button("💾 Guardar configuración", type="primary"):
+    _dens_val = dens_Wm2 if "dens_Wm2" in dir() else cfg["dens_def"]
+
     st.session_state["nombre_proyecto"]    = nombre
     st.session_state["ciudad"]             = ciudad
     st.session_state["tipo_instalacion"]   = tipo_instalacion
     st.session_state["area_fachada_m2"]    = area   # clave histórica — no renombrar
     st.session_state["modo_calculo"]       = modo_key
     st.session_state["PR"]                 = PR
-    st.session_state["densidad_Wm2"]       = dens_Wm2 if "dens_Wm2" in dir() else cfg["dens_def"]
-    st.session_state["tilt_default"]       = cfg["tilt_def"]   # #47 — usado como default en Recurso Solar
+    st.session_state["densidad_Wm2"]       = _dens_val
+    st.session_state["tilt_default"]       = cfg["tilt_def"]
     st.session_state["tarifa_cop_kwh"]     = tarifa_kwh
     if modo_key == "consumo":
         st.session_state["factura_cop"]    = factura_cop
@@ -339,6 +370,33 @@ if st.button("💾 Guardar configuración", type="primary"):
             st.session_state["lat_proyecto"], st.session_state["lon_proyecto"]
         )
     st.session_state["recurso_solar_ok"] = False
+
+    # ── Persistir a disco — sobrevive recargas y reinicios de PM2 ────────────
+    _datos_json = {
+        "nombre_proyecto":  nombre,
+        "ciudad":           ciudad,
+        "tipo_instalacion": tipo_instalacion,
+        "area_fachada_m2":  area,
+        "modo_calculo":     modo_key,
+        "PR":               PR,
+        "densidad_Wm2":     _dens_val,
+        "tilt_default":     cfg["tilt_def"],
+        "tarifa_cop_kwh":   tarifa_kwh,
+        "lat_proyecto":     st.session_state["lat_proyecto"],
+        "lon_proyecto":     st.session_state["lon_proyecto"],
+        "alt_proyecto":     st.session_state["alt_proyecto"],
+    }
+    if modo_key == "consumo":
+        _datos_json.update({
+            "factura_cop":     factura_cop,
+            "consumo_kwh_mes": consumo_mes,
+            "cobertura_pct":   cobertura_pct,
+        })
+    try:
+        _guardar_proyecto(_datos_json)
+    except Exception as _e:
+        st.warning(f"⚠️ No se pudo guardar en disco: {_e}")
+
     _lat = st.session_state["lat_proyecto"]
     _lon = st.session_state["lon_proyecto"]
     _alt = st.session_state["alt_proyecto"]
