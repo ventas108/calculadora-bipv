@@ -250,34 +250,37 @@ def cascada_optica(
     poa_post_term = np.maximum(poa_post_soil * f_term, 0.0)
     perd_term     = np.maximum(poa_post_soil - poa_post_term, 0.0)
 
-    # ── 4. Corrección por transparencia del vidrio BIPV ───────────────────────
-    # Solo la fracción opaca (1−τ) genera electricidad.
-    # Ej. CdTe 40% transparente → τ=0.40 → solo 60% del área es activa.
-    # Esto es una corrección geométrica/óptica, no eléctrica, porque determina
-    # cuánta irradiancia intercepta las celdas por m² de fachada total.
+    # ── 4. Transparencia τ — INFORMACIONAL, NO se aplica a poa_efectiva ─────────
+    # La transparencia NO reduce G_raw aquí porque el modelo de producción usa
+    # SDM (I_L ∝ Isc_stc) donde Isc_stc ya fue medido en el panel real con τ:
+    #   Isc_real = Isc_celda × (1−τ) → ya está en los parámetros calibrados
+    # Aplicar (1−τ) a G_raw daría doble conteo en _calcular_pmax_vectorizado.
+    # Se calcula solo para mostrar la pérdida potencial en el Motor Óptico.
     tau = float(np.clip(transparencia, 0.0, 0.95))
-    f_tau        = 1.0 - tau
-    poa_efectiva = np.maximum(poa_post_term * f_tau, 0.0)
-    perd_tau     = np.maximum(poa_post_term - poa_efectiva, 0.0)
+    f_tau             = 1.0 - tau
+    poa_efectiva      = np.maximum(poa_post_term, 0.0)     # ← sin (1-τ): va a Producción
+    poa_efectiva_celda = poa_post_term * f_tau             # informacional: irrad. en celdas
+    perd_tau          = poa_post_term - poa_efectiva_celda  # pérdida τ informacional
 
     # ── DataFrame resultado horario ───────────────────────────────────────────
     result_df = pd.DataFrame({
-        "poa_bruta":      poa_bruta,
-        "poa_optica":     poa_optica,       # tras IAM dir + dif
-        "poa_post_soil":  poa_post_soil,
-        "poa_post_term":  poa_post_term,
-        "poa_efectiva":   poa_efectiva,     # ← usar como poa_global en downstream
-        "f_iam":          f_iam,
-        "f_iam_dif":      f_iam_dif_arr,
-        "aoi_deg":        aoi_deg,
-        "f_soil":         f_soil,
-        "f_term":         f_term,
-        "perdida_iam":    np.maximum(perd_iam, 0.0),
-        "perdida_iam_dir": np.maximum(perd_iam_dir, 0.0),
-        "perdida_iam_dif": np.maximum(perd_iam_dif, 0.0),
-        "perdida_soil":   np.maximum(perd_soil, 0.0),
-        "perdida_term":   perd_term,
-        "perdida_tau":    np.maximum(perd_tau, 0.0),
+        "poa_bruta":           poa_bruta,
+        "poa_optica":          poa_optica,          # tras IAM dir + dif
+        "poa_post_soil":       poa_post_soil,
+        "poa_post_term":       poa_post_term,
+        "poa_efectiva":        poa_efectiva,         # = poa_post_term → va a Producción
+        "poa_efectiva_celda":  poa_efectiva_celda,  # informacional: irrad. en celdas con τ
+        "f_iam":               f_iam,
+        "f_iam_dif":           f_iam_dif_arr,
+        "aoi_deg":             aoi_deg,
+        "f_soil":              f_soil,
+        "f_term":              f_term,
+        "perdida_iam":         np.maximum(perd_iam, 0.0),
+        "perdida_iam_dir":     np.maximum(perd_iam_dir, 0.0),
+        "perdida_iam_dif":     np.maximum(perd_iam_dif, 0.0),
+        "perdida_soil":        np.maximum(perd_soil, 0.0),
+        "perdida_term":        perd_term,
+        "perdida_tau":         np.maximum(perd_tau, 0.0),  # informacional
     }, index=idx)
 
     # ── Resumen anual ─────────────────────────────────────────────────────────
@@ -321,8 +324,10 @@ def cascada_optica(
         "perdida_iam_kWh_m2":          round(p_iam_a, 1),
         "perdida_soil_kWh_m2":         round(p_soil_a, 1),
         "perdida_term_kWh_m2":         round(p_term_a, 1),
-        "perdida_tau_kWh_m2":          round(p_tau_a, 1),
-        "perdida_total_kWh_m2":        round(p_iam_a + p_soil_a + p_term_a + p_tau_a, 1),
+        # τ es informacional — NO se aplica a poa_efectiva (ya está en Isc_stc del panel)
+        "perdida_tau_kWh_m2_info":     round(p_tau_a, 1),
+        "perdida_total_kWh_m2":        round(p_iam_a + p_soil_a + p_term_a, 1),
+        "_tau_solo_informacional":     True,
         # Factores promedio (horas con sol)
         "f_iam_prom":                  round(f_iam_mean, 4),
         "f_iam_dif":                   round(float(f_iam_dif), 4),

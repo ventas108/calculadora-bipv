@@ -395,19 +395,24 @@ cm4.metric(
     help=f"Caída de eficiencia por temperatura > 25°C (k_BIPV={summary['k_bipv']}).",
 )
 _tau_pct = summary.get("transparencia", 0.0) * 100
+_tau_loss = summary.get("perdida_tau_kWh_m2_info", 0)
 cm5.metric(
-    "Pérdida transparencia",
-    f"−{summary.get('perdida_tau_kWh_m2', 0):,.0f} kWh/m²/año",
-    f"−{_tau_pct:.0f}% área",
+    "Transparencia τ (info)",
+    f"−{_tau_loss:,.0f} kWh/m²/año",
+    f"τ={_tau_pct:.0f}% — solo referencia",
     delta_color="inverse",
-    help=f"Fracción de vidrio sin celda activa (τ={_tau_pct:.0f}%). Solo (1−τ) genera.",
+    help=(
+        "Pérdida INFORMACIONAL. El modelo de producción usa SDM donde "
+        "Isc_stc ya incluye τ (se calibró en el panel real). "
+        "No se resta del POA que va a Producción para evitar doble conteo."
+    ),
 )
 cm6.metric(
-    "POA efectiva neta",
+    "POA efectiva → Producción",
     f"{summary['poa_efectiva_anual_kWh_m2']:,.0f} kWh/m²/año",
     f"{summary['factor_global']*100:.1f}% de la bruta",
     delta_color="normal",
-    help="Irradiancia efectiva tras IAM (dir+dif) + Soiling + Térmico + Transparencia.",
+    help="Irradiancia efectiva tras IAM (dir+dif) + Soiling + Térmico. Es la que usa Producción.",
 )
 
 # ── 2B. Gráfica Waterfall ──────────────────────────────────────────────────────
@@ -417,27 +422,20 @@ bruta  = summary["poa_bruta_anual_kWh_m2"]
 p_iam  = summary["perdida_iam_kWh_m2"]
 p_soil = summary["perdida_soil_kWh_m2"]
 p_term = summary["perdida_term_kWh_m2"]
-p_tau  = summary.get("perdida_tau_kWh_m2", 0.0)
+p_tau  = summary.get("perdida_tau_kWh_m2_info", 0.0)   # informacional
 efect  = summary["poa_efectiva_anual_kWh_m2"]
 
-_tau_label = f"Transparencia\n(τ={summary.get('transparencia', 0)*100:.0f}%)" if p_tau > 0.5 else "Transparencia\n(τ=0)"
-
+# ── Cascada principal (4 pasos → lo que va a Producción) ──────────────────────
 fig_wf = go.Figure(go.Waterfall(
     orientation="v",
-    measure=["absolute", "relative", "relative", "relative", "relative", "total"],
-    x=["POA bruta",
-       "IAM\n(dir+dif)",
-       "Soiling\n(suciedad)",
-       "Térmico\n(BIPV)",
-       _tau_label,
-       "POA efectiva"],
-    y=[bruta, -p_iam, -p_soil, -p_term, -p_tau, 0],
+    measure=["absolute", "relative", "relative", "relative", "total"],
+    x=["POA bruta", "IAM\n(dir+dif)", "Soiling\n(suciedad)", "Térmico\n(BIPV)", "POA efectiva\n→ Producción"],
+    y=[bruta, -p_iam, -p_soil, -p_term, 0],
     text=[
         f"{bruta:,.0f}",
         f"−{p_iam:,.0f}",
         f"−{p_soil:,.0f}",
         f"−{p_term:,.1f}",
-        f"−{p_tau:,.1f}",
         f"{efect:,.0f}",
     ],
     textposition="outside",
@@ -447,7 +445,7 @@ fig_wf = go.Figure(go.Waterfall(
     connector=dict(line=dict(color="gray", width=1, dash="dot")),
 ))
 fig_wf.update_layout(
-    height=400,
+    height=380,
     yaxis_title="kWh/m²/año",
     plot_bgcolor="white",
     paper_bgcolor="white",
@@ -457,12 +455,22 @@ fig_wf.update_layout(
             f"<b>Cascada óptico-térmica BIPV</b>  "
             f"<sup>b₀={summary['b0']:.3f} · f_dif={summary.get('f_iam_dif', 0.95):.2f} · "
             f"k={summary['k_bipv']} · NOCT={summary['noct']}°C · "
-            f"γ={summary['coef_temp']*100:.2f}%/°C · τ={summary.get('transparencia', 0)*100:.0f}%</sup>"
+            f"γ={summary['coef_temp']*100:.2f}%/°C</sup>"
         ),
         x=0.5, xanchor="center",
     ),
 )
 st.plotly_chart(fig_wf, use_container_width=True)
+
+# ── Nota de transparencia (informacional separada) ────────────────────────────
+_tau_pct_wf = summary.get("transparencia", 0.0) * 100
+if _tau_pct_wf > 0:
+    st.info(
+        f"ℹ️ **Transparencia τ={_tau_pct_wf:.0f}% — referencia:**  "
+        f"Pérdida potencial si Isc_stc fuera de celda pura: **{p_tau:,.0f} kWh/m²/año**. "
+        "Esta pérdida NO se resta del POA porque el catálogo usa Isc_stc del panel real "
+        "(donde τ ya redujo la corriente). Restarla daría doble conteo en el modelo SDM."
+    )
 
 # ── 2C. Comparación mensual ────────────────────────────────────────────────────
 st.markdown("#### 2.2. Comparación mensual: POA bruta vs POA efectiva")

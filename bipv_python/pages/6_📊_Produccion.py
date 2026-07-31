@@ -71,7 +71,7 @@ with st.expander("ℹ️ ¿Qué POA se usa en la simulación?", expanded=False):
     | Fuente de POA | Estado | Valor anual |
     |---|---|---|
     | POA bruta (PVGIS/TMY) | siempre disponible | {poa_bruta_anual:,.0f} kWh/m²/año |
-    | Motor Óptico (IAM + Soiling + Térmico) | {"✅ activo" if _motor_ok else "⬜ no ejecutado"} | {st.session_state.get("poa_efectiva_anual_kWh_m2", "—"):{",.0f" if _motor_ok else ""}} {"kWh/m²/año" if _motor_ok else ""} |
+    | Motor Óptico (IAM dir+dif · Soiling · Térmico BIPV) | {"✅ activo" if _motor_ok else "⬜ no ejecutado"} | {st.session_state.get("poa_efectiva_anual_kWh_m2", "—"):{",.0f" if _motor_ok else ""}} {"kWh/m²/año" if _motor_ok else ""} |
     | Factor Mismatch | {"✅ {:.1f}%".format(factor_pr*100) if _mismatch_ok else "⬜ no ejecutado"} | — |
 
     **Prioridad:** Motor Óptico > Mismatch > POA bruta.
