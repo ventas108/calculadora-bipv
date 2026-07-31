@@ -53,32 +53,34 @@ with col1:
             st.session_state.pop(_k, None)
         st.rerun()  # Re-render limpio para evitar DOM error al cambiar ciudad
 
-    # ── Tipo de instalación ───────────────────────────────────────────────────
-    tipo_anterior = st.session_state.get("tipo_instalacion", "Fachada BIPV")
-    if tipo_anterior not in LISTA_TIPOS:
-        tipo_anterior = "Fachada BIPV"
+    # ── Tipo de instalación — key= para que Streamlit maneje el estado ────────
+    # Inicializar desde valor guardado si es la primera vez
+    if "tipo_inst_key" not in st.session_state:
+        _saved = st.session_state.get("tipo_instalacion", LISTA_TIPOS[0])
+        st.session_state["tipo_inst_key"] = _saved if _saved in LISTA_TIPOS else LISTA_TIPOS[0]
+
+    _tipo_prev = st.session_state["tipo_inst_key"]   # valor ANTES de este render
+
     tipo_instalacion = st.selectbox(
         "Tipo de instalación",
         LISTA_TIPOS,
-        index=LISTA_TIPOS.index(tipo_anterior),
+        key="tipo_inst_key",   # Streamlit gestiona el estado — sin index=
         help="Define el contexto físico del sistema solar. Ajusta los rangos recomendados de densidad y PR.",
         format_func=lambda t: f"{TIPOS_INSTALACION[t]['icono']}  {t}",
     )
     cfg = TIPOS_INSTALACION[tipo_instalacion]
-    # Persistir inmediatamente — sobrevive a st.rerun() por cambio de ciudad
-    st.session_state["tipo_instalacion"] = tipo_instalacion
+    st.session_state["tipo_instalacion"] = tipo_instalacion  # compatibilidad con Save
 
-    # ── Banner de tipo — en col1, lookup directa, nunca se desincroniza ──────
-    _c = TIPOS_INSTALACION[tipo_instalacion]   # lookup independiente de cfg
+    # ── Banner de tipo — siempre coherente con el selectbox ──────────────────
     st.info(
-        f"{_c['icono']} **{tipo_instalacion}** — "
-        f"Densidad: {_c['dens_min']}–{_c['dens_max']} W/m²  |  "
-        f"PR: {_c['pr_hint']}  |  "
-        f"Inclinación sugerida: **{_c['tilt_def']}°**"
+        f"{cfg['icono']} **{tipo_instalacion}** — "
+        f"Densidad: {cfg['dens_min']}–{cfg['dens_max']} W/m²  |  "
+        f"PR: {cfg['pr_hint']}  |  "
+        f"Inclinación sugerida: **{cfg['tilt_def']}°**"
     )
 
     # Si cambió el tipo → resetear densidad, PR y tilt a los defaults del nuevo tipo
-    if tipo_instalacion != tipo_anterior:
+    if tipo_instalacion != _tipo_prev:
         st.session_state.pop("densidad_Wm2", None)
         st.session_state.pop("PR", None)
         st.session_state.pop("tilt_default", None)
