@@ -68,6 +68,15 @@ with col1:
     # Persistir inmediatamente — sobrevive a st.rerun() por cambio de ciudad
     st.session_state["tipo_instalacion"] = tipo_instalacion
 
+    # ── Banner de tipo — en col1, lookup directa, nunca se desincroniza ──────
+    _c = TIPOS_INSTALACION[tipo_instalacion]   # lookup independiente de cfg
+    st.info(
+        f"{_c['icono']} **{tipo_instalacion}** — "
+        f"Densidad: {_c['dens_min']}–{_c['dens_max']} W/m²  |  "
+        f"PR: {_c['pr_hint']}  |  "
+        f"Inclinación sugerida: **{_c['tilt_def']}°**"
+    )
+
     # Si cambió el tipo → resetear densidad, PR y tilt a los defaults del nuevo tipo
     if tipo_instalacion != tipo_anterior:
         st.session_state.pop("densidad_Wm2", None)
@@ -264,15 +273,6 @@ with col2:
             )
 
         eta = dens_Wm2 / 1000.0
-
-        # ── Banner de tipo de instalación ─────────────────────────────────────
-        tilt_recom = cfg["tilt_def"]
-        st.info(
-            f"{cfg['icono']} **{tipo_instalacion}** — "
-            f"Densidad: {cfg['dens_min']}–{cfg['dens_max']} W/m²  |  "
-            f"PR: {cfg['pr_hint']}  |  "
-            f"Inclinación sugerida: **{tilt_recom}°** (configurable en ☀️ Recurso Solar)"
-        )
 
         st.divider()
         if modo_key == "area":
