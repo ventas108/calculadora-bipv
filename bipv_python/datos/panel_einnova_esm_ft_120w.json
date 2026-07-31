@@ -1,0 +1,22 @@
+{
+    "TipoPanel":            "EINNOVA ESM-FT 120W Flat Tile Color",
+    "Marca":                "EINNOVA Solarline",
+    "Tecnologia":           "N-Type TOPCon Double Glass BIPV Tile",
+    "PmaxWp":               120,
+    "DimensionesMM":        "1600x460x6",
+    "CostoUSD":             null,
+    "NOCT_C":               null,
+    "CoefT_C":              -0.300,
+    "CoefVoc_C":            -0.250,
+    "TransparenciaPct":     0,
+    "Voc_STC":              10.99,
+    "Vmp_STC":              9.59,
+    "Isc_STC":              13.26,
+    "Imp_STC":              12.50,
+    "Ns (Celdas Serie)":    15,
+    "n (Factor Idealidad)": 1.3,
+    "NsA = n × Ns":         19.5,
+    "Fuente NsA":           "N_s ESTIMADO: 10.99V / 0.73V célula TOPCon ≈ 15. Confirmar con EINNOVA",
+    "Confianza":            "Media",
+    "Notas":                "EINNOVA ESM-FT 120W — Teja solar plana doble vidrio BIPV. Colores: negro, gris, rojo/terracota. OPACA (τ=0%). Dims CONFIRMADAS: 1600×460×6mm. Peso 13.5kg. Vmax=1000Vdc. Fusible 20A. Efic. 21.8% = eficiencia de celda (módulo=16.3% sobre área total). Ficha STC indica 20°C celda (no estándar — asumido 25°C). CoefT_C y CoefVoc_C ESTIMADOS para N-Type TOPCon. N_s ESTIMADO. Nota: módulo pequeño (120W) — requiere más unidades en serie por string. Precio pendiente."
+}
