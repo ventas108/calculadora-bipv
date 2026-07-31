@@ -13,6 +13,7 @@ from datos.catalogo_baterias_excel import (
     cargar_catalogo_baterias,
     obtener_bateria,
     lista_baterias,
+    diagnostico_catalogo,
 )
 from calculos.baterias_balance import (
     dimensionar_bateria,
@@ -91,19 +92,73 @@ st.header("⚡ B-6 — Dimensionado de Baterías")
 cat_bat = cargar_catalogo_baterias()
 tiene_catalogo = len(cat_bat) > 0
 
-col_b1, col_b2 = st.columns([1, 1])
+# ── #26 — Banner de estado de carga del catálogo ─────────────────────────────
+_diag = diagnostico_catalogo()
+_hojas_disp = _diag.get("hojas_disponibles", [])
+_hoja_usada = _diag.get("hoja_usada")
 
-with col_b1:
-    st.subheader("Selección de batería")
-
-    if not tiene_catalogo:
+if not tiene_catalogo:
+    if "error" in _diag:
+        st.error(f"🔴 **Excel no accesible:** {_diag['error']}")
+    elif not _hoja_usada:
         st.error(
-            "🔴 **Catálogo de baterías no encontrado.** "
-            "Agregue una hoja `Catalogo_Baterias` en el archivo "
-            "`inversores_catalogo.xlsx` del servidor."
+            f"🔴 **Hoja `Catalogo_Baterias` no encontrada** en el archivo Excel del servidor. "
+            f"Hojas disponibles: `{'`, `'.join(_hojas_disp) if _hojas_disp else 'ninguna'}`"
         )
-        with st.expander("📋 Columnas esperadas en la hoja Catalogo_Baterias"):
-            st.markdown("""
+    else:
+        st.warning("🟡 **Catálogo vacío** — la hoja existe pero no se cargaron modelos. "
+                   "Verifique que las columnas del Excel coincidan con el formato esperado.")
+else:
+    _n_modelos    = _diag.get("modelos_cargados", len(cat_bat))
+    _incompletos  = _diag.get("modelos_incompletos", [])
+    _no_mapeadas  = _diag.get("columnas_no_mapeadas", [])
+
+    if _incompletos or _no_mapeadas:
+        st.warning(
+            f"🟡 **Catálogo parcial** — hoja `{_hoja_usada}` · "
+            f"**{_n_modelos} modelos** cargados · "
+            f"{len(_incompletos)} modelos con datos incompletos"
+            + (f" · {len(_no_mapeadas)} columnas no reconocidas" if _no_mapeadas else "")
+        )
+    else:
+        st.success(
+            f"✅ **Catálogo OK** — hoja `{_hoja_usada}` · **{_n_modelos} modelos** · todos los campos reconocidos"
+        )
+
+# ── #24 — Expander de diagnóstico detallado ───────────────────────────────────
+if tiene_catalogo:
+    _incompletos = _diag.get("modelos_incompletos", [])
+    _no_mapeadas = _diag.get("columnas_no_mapeadas", [])
+    if _incompletos or _no_mapeadas:
+        with st.expander("🔍 Diagnóstico detallado del catálogo"):
+            if _no_mapeadas:
+                st.markdown("**Columnas del Excel NO reconocidas por el loader:**")
+                st.code(", ".join(_no_mapeadas))
+                st.caption(
+                    "Estas columnas están en el Excel pero no tienen un alias en el loader. "
+                    "Si contienen datos importantes (voltaje, DoD, ciclos…), agrega el nombre exacto "
+                    "al `_COL_MAP` en `datos/catalogo_baterias_excel.py`."
+                )
+            if _incompletos:
+                st.markdown("**Modelos con campos críticos faltantes:**")
+                rows = []
+                for m in _incompletos:
+                    rows.append({
+                        "Modelo": m["modelo"],
+                        "Campos faltantes": ", ".join(m["campos_faltantes"]) if m["campos_faltantes"] else "—",
+                        "Ficha marcada": "✅ Sí" if m.get("datos_completos") else "🟡 No",
+                    })
+                st.dataframe(
+                    pd.DataFrame(rows), use_container_width=True, hide_index=True
+                )
+                st.caption(
+                    "Modelos sin `capacidad_kWh` no pueden dimensionarse. "
+                    "Modelos sin `dod_pct`, `eta_rte_pct` o `ciclos_vida` usan valores por defecto "
+                    "(80% DoD · 95% RTE · 3000 ciclos)."
+                )
+elif not tiene_catalogo:
+    with st.expander("📋 Columnas esperadas en la hoja Catalogo_Baterias"):
+        st.markdown("""
 | Columna | Descripción | Ejemplo |
 |---|---|---|
 | Modelo | Nombre del modelo | BYD Battery-Box HVM |
@@ -117,14 +172,23 @@ with col_b1:
 | Tecnología | Química | LFP |
 | Costo (USD) | Precio unitario sin IVA | 4200 |
 | Garantía (años) | Años de garantía | 10 |
-            """)
+        """)
+
+col_b1, col_b2 = st.columns([1, 1])
+
+with col_b1:
+    st.subheader("Selección de batería")
+
+    if not tiene_catalogo:
+        # El banner de error ya fue mostrado arriba — solo bloquear la selección
+        st.info("👆 Ver instrucciones arriba para agregar la hoja al Excel del servidor.")
         usa_bateria = False
     else:
         lista = lista_baterias()
         bat_sel = st.selectbox("Batería del catálogo", lista, key="bat_nombre_sel")
         bat = obtener_bateria(bat_sel)
 
-        # Indicador completitud
+        # Indicador completitud ficha
         if bat.get("datos_completos"):
             st.success("🟢 Ficha completa")
         else:
@@ -132,6 +196,82 @@ with col_b1:
                      if not bat.get(k)]
             st.warning(f"🟡 Datos incompletos — faltan: {', '.join(_falt)}" if _falt
                        else "🟡 Ficha marcada como incompleta en catálogo")
+
+        # ── #25 — Compatibilidad batería ↔ inversor ───────────────────────────
+        _inv_dim    = st.session_state.get("inversor_dict_dim", {})
+        _inv_nombre = st.session_state.get("inversor_nombre_dim", "")
+        _bat_v      = bat.get("voltaje_V")
+
+        def _check_compatibilidad(bat_d: dict, inv_d: dict, inv_nom: str) -> tuple:
+            """(estado, msg) — estado: 'ok' | 'warning' | 'error'"""
+            if not inv_d and not inv_nom:
+                return "warning", (
+                    "⚠️ **Inversor no seleccionado:** ve a Página 4 › Dimensionamiento "
+                    "para seleccionar el inversor antes de verificar la compatibilidad."
+                )
+            bat_v       = bat_d.get("voltaje_V")
+            es_hibrido  = inv_d.get("es_hibrido", False)
+            bat_v_min   = inv_d.get("bat_voltaje_min")
+            bat_v_max   = inv_d.get("bat_voltaje_max")
+            inv_lower   = inv_nom.lower()
+
+            # Heurística por nombre si no hay flag explícito
+            es_string   = any(x in inv_lower for x in ["mid", "max", "mtlp", "string"])
+            es_hibrido_h = any(x in inv_lower for x in ["sph", "spa", "hybrid", "storage",
+                                                          "min tl-x", "min-tl-x", "bcs"])
+            tipo_inv = es_hibrido or es_hibrido_h
+
+            motivos = []
+
+            # 1. Verificar si es inversor de string (no acepta baterías)
+            if not tipo_inv and es_string:
+                motivos.append(
+                    f"**`{inv_nom}`** es un inversor de **string** (sin puerto DC para batería). "
+                    "Las baterías requieren un inversor **híbrido** (ej. Growatt SPH/SPA, Huawei SUN2000)."
+                )
+
+            # 2. Verificar rango de voltaje si el inversor es híbrido y tiene rango
+            if tipo_inv and bat_v and bat_v_min and bat_v_max:
+                if not (bat_v_min <= bat_v <= bat_v_max):
+                    motivos.append(
+                        f"Voltaje de batería **{bat_v:.0f} V** fuera del rango del inversor "
+                        f"({bat_v_min:.0f}–{bat_v_max:.0f} V)."
+                    )
+
+            # 3. HV check: si no hay info de rango pero la batería es HV y el inversor no parece híbrido
+            if not tipo_inv and not es_string and bat_v and bat_v > 150:
+                motivos.append(
+                    f"La batería es **alta tensión ({bat_v:.0f} V)**. "
+                    "Confirme que el inversor seleccionado es híbrido y soporta ese rango de voltaje."
+                )
+
+            if motivos:
+                return "error", "🔴 **Incompatibilidad detectada:**\n" + "\n".join(f"- {m}" for m in motivos)
+            elif tipo_inv and bat_v:
+                if bat_v_min and bat_v_max:
+                    return "ok", (
+                        f"✅ Inversor híbrido · Voltaje batería {bat_v:.0f} V ✓ "
+                        f"dentro del rango {bat_v_min:.0f}–{bat_v_max:.0f} V"
+                    )
+                return "ok", f"✅ Inversor híbrido compatible con baterías ({inv_nom})"
+            elif not _inv_dim and not inv_nom:
+                return "warning", (
+                    "ℹ️ Selecciona el inversor en Página 4 para verificar la compatibilidad."
+                )
+            else:
+                return "warning", (
+                    f"⚠️ No se puede verificar la compatibilidad automáticamente para **{inv_nom}**. "
+                    + (f"Voltaje de batería: **{bat_v:.0f} V**. " if bat_v else "")
+                    + "Confirme con el fabricante del inversor que acepta batería externa."
+                )
+
+        _compat_estado, _compat_msg = _check_compatibilidad(bat, _inv_dim, _inv_nombre)
+        if _compat_estado == "error":
+            st.error(_compat_msg)
+        elif _compat_estado == "warning":
+            st.warning(_compat_msg)
+        else:
+            st.success(_compat_msg)
 
         # Ficha técnica
         with st.expander("📋 Ficha técnica del modelo seleccionado"):
@@ -146,6 +286,8 @@ with col_b1:
                 "Costo unitario (USD)": f"${bat.get('costo_usd', 0):,.0f}" if bat.get("costo_usd") else "—",
                 "Garantía (años)":      bat.get("garantia_anos", "—"),
             }
+            if _inv_nombre:
+                ficha["Inversor del proyecto"] = _inv_nombre
             st.table(pd.DataFrame(ficha.items(), columns=["Parámetro", "Valor"]))
 
         usa_bateria = st.checkbox("✅ Incluir batería en el balance energético", value=True)

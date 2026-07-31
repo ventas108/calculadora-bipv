@@ -65,6 +65,9 @@ if panel.get("notas"):
 inversor = obtener_inversor_excel(inversor_nombre) if _cat_inv else seleccionar_inversor(inversor_nombre)
 if inversor.get("costo_usd"):
     st.session_state["costo_inversor_usd"] = inversor["costo_usd"]
+# Propagar inversor a session_state para compatibilidad baterías (#25)
+st.session_state["inversor_nombre_dim"] = inversor_nombre
+st.session_state["inversor_dict_dim"]   = inversor
 if inversor.get("datos_completos"):
     st.success("🟢 Inversor: ficha completa")
 else:

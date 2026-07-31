@@ -37,6 +37,10 @@ def cargar_catalogo_inversores() -> dict:
             # ── Aliases para dimensionamiento.py y Dimensionamiento.py ───
             "Vmppt_activo_min":  _f(r.get("Tension Minima MPPT Activo (V)")),  # = V_mppt_activo
             "N_mppt":            _f(r.get("N Trackers")),                       # = n_trackers
+            # ── Compatibilidad con baterías (#25) — columnas opcionales ──────
+            "es_hibrido":       str(r.get("Inversor Híbrido (Si/No)", "")).strip().lower() == "si",
+            "bat_voltaje_min":  _f(r.get("Voltaje Batería Min (V)")),
+            "bat_voltaje_max":  _f(r.get("Voltaje Batería Max (V)")),
         }
     return inversores
 
