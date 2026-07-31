@@ -1,9 +1,7 @@
-"""Página 2 — Recurso Solar: TMY desde PVGIS + POA para fachada BIPV."""
+"""Página 2 — Recurso Solar: TMY desde PVGIS + POA para sistemas solares."""
 import streamlit as st
 import plotly.graph_objects as go
-import plotly.express as px
 import pandas as pd
-import numpy as np
 
 from datos.ciudades_colombia import CIUDADES
 from calculos.solar import (
@@ -18,13 +16,26 @@ st.set_page_config(page_title="Recurso Solar — BIPV", page_icon="☀️", layo
 st.title("☀️ Recurso Solar")
 st.caption("Datos TMY (Typical Meteorological Year) desde PVGIS v5.2 — JRC European Commission")
 
-# ── Leer ciudad desde session_state ─────────────────────────────────────────
+# ── Leer ciudad y tipo de instalación desde session_state ────────────────────
 ciudad = st.session_state.get("ciudad", "Bogotá")
 if ciudad not in CIUDADES:
     st.warning("⚠️ Primero configura el proyecto en 🏠 Proyecto.")
     st.stop()
 
 c = CIUDADES[ciudad]
+
+# ── Tipo de instalación activo (para etiquetas y tilt default) ───────────────
+tipo_instalacion = st.session_state.get("tipo_instalacion", "Fachada BIPV")
+TIPOS_INFO = {
+    "Fachada BIPV":              {"icono": "🏢", "tilt_def": 90,  "tilt_hint": "90° = vertical (fachada). BIPV integrado en vidrio."},
+    "Techo inclinado (BIPV)":    {"icono": "🏠", "tilt_def": 25,  "tilt_hint": "15°–35° típico en Colombia. Ajusta al ángulo real de tu cubierta."},
+    "Techo plano (con soporte)": {"icono": "🏭", "tilt_def": 15,  "tilt_hint": "10°–20° con estructura metálica. Permite autolimpieza."},
+    "Pérgola / sombreadero":     {"icono": "⛱️", "tilt_def": 10,  "tilt_hint": "5°–15°. Casi horizontal para maximizar sombra."},
+    "Marquesina / voladizo":     {"icono": "🏗️", "tilt_def": 20,  "tilt_hint": "15°–30°. Inclinación del voladizo estructural."},
+    "Granja fotovoltaica":       {"icono": "☀️", "tilt_def": 20,  "tilt_hint": "15°–25° óptimo para Colombia (lat. 4°–8°N). Maximiza producción anual."},
+}
+tipo_cfg = TIPOS_INFO.get(tipo_instalacion, TIPOS_INFO["Fachada BIPV"])
+icono_tipo = tipo_cfg["icono"]
 
 # ── Coordenadas: predio exacto tiene prioridad sobre centro de ciudad ─────────
 lat   = float(st.session_state.get("lat_proyecto", c["lat"]))
@@ -37,14 +48,14 @@ _coord_personalizada = (
 
 # ── Panel de configuración ───────────────────────────────────────────────────
 if _coord_personalizada:
-    st.subheader(f"📍 Sitio: {ciudad}  ·  📌 Predio personalizado")
+    st.subheader(f"📍 Sitio: {ciudad}  ·  📌 Predio personalizado  ·  {icono_tipo} {tipo_instalacion}")
     st.success(
         f"✅ Usando coordenadas exactas del predio: "
         f"**{lat:.5f}°**, **{lon:.5f}°**, **{alt_m} m.s.n.m.**  "
         f"(Centro de {ciudad}: {c['lat']}°, {c['lon']}°)"
     )
 else:
-    st.subheader(f"📍 Sitio: {ciudad}")
+    st.subheader(f"📍 Sitio: {ciudad}  ·  {icono_tipo} {tipo_instalacion}")
 
 col_info1, col_info2, col_info3, col_info4 = st.columns(4)
 col_info1.metric("Latitud", f"{lat:.5f}°")
@@ -54,26 +65,36 @@ col_info4.metric("GHI referencia", f"{c['GHI_kWh_m2_dia']} kWh/m²·día")
 
 st.markdown("---")
 
-# ── Orientación de la fachada ────────────────────────────────────────────────
-st.subheader("🧭 Orientación de la fachada BIPV")
+# ── Orientación e inclinación del sistema ────────────────────────────────────
+st.subheader(f"🧭 Orientación e inclinación — {icono_tipo} {tipo_instalacion}")
 
 col_or1, col_or2, col_or3 = st.columns(3)
 
 with col_or1:
     orientacion_label = st.selectbox(
-        "Azimuth (dirección que mira la fachada)",
+        "Azimuth (dirección que mira el sistema)",
         list(ORIENTACIONES.keys()),
-        index=list(ORIENTACIONES.keys()).index("Norte (0°)"),
-        help="En Colombia las fachadas Norte y Oriente reciben buen recurso solar.",
+        index=list(ORIENTACIONES.keys()).index(
+            st.session_state.get("orientacion_label", "Norte (0°)")
+            if st.session_state.get("orientacion_label") in ORIENTACIONES
+            else "Norte (0°)"
+        ),
+        help="En Colombia las orientaciones Norte y Oriente reciben buen recurso solar.",
     )
     azimuth = ORIENTACIONES[orientacion_label]
 
 with col_or2:
+    # Tilt default: session_state (guardado) > default del tipo > 90
+    _tilt_guardado = st.session_state.get("tilt_default", tipo_cfg["tilt_def"])
+    # Si el tilt guardado corresponde a otro tipo (ej. venía de fachada=90 y ahora es granja=20),
+    # usar el default del tipo actual si el usuario aún no guardó con el nuevo tipo.
+    _tilt_tipo_activo = int(st.session_state.get("tilt_default", tipo_cfg["tilt_def"]))
+
     tilt = st.slider(
         "Inclinación del plano (°)",
-        min_value=0, max_value=90, value=90,
-        help="90° = fachada vertical. 0° = horizontal (techo plano). "
-             "BIPV fachada = 90°.",
+        min_value=0, max_value=90,
+        value=_tilt_tipo_activo,
+        help=tipo_cfg["tilt_hint"],
     )
 
 with col_or3:
@@ -105,25 +126,25 @@ if st.button("🌐 Descargar TMY de PVGIS y calcular POA", type="primary", use_c
             st.info("Verifica la conexión a internet del servidor. PVGIS requiere acceso a re.jrc.ec.europa.eu")
             st.stop()
 
-    with st.spinner("Calculando irradiancia POA en el plano de la fachada..."):
+    with st.spinner(f"Calculando irradiancia POA para {icono_tipo} {tipo_instalacion} ({tilt}°)..."):
         poa = calcular_poa(tmy, lat, lon, alt_m, tilt, azimuth)
         monthly = resumen_mensual(tmy, poa)
         heatmap = heatmap_poa_horario(poa)
 
     # ── Métricas anuales ─────────────────────────────────────────────────────
-    ghi_anual  = tmy["G_h"].sum() / 1000.0   # kWh/m²/año
-    poa_anual  = poa["poa_global"].sum() / 1000.0  # kWh/m²/año
+    ghi_anual  = tmy["G_h"].sum() / 1000.0
+    poa_anual  = poa["poa_global"].sum() / 1000.0
     ratio_poa  = poa_anual / ghi_anual if ghi_anual > 0 else 0
     t_media    = tmy["T2m"].mean()
-    dias_sol   = poa_anual / 1.0  # horas sol pico equivalentes
 
     st.markdown("---")
     st.subheader("📊 Resultados del recurso solar")
 
     mc1, mc2, mc3, mc4, mc5 = st.columns(5)
     mc1.metric("GHI anual", f"{ghi_anual:,.0f} kWh/m²", help="Irradiancia Global Horizontal")
-    mc2.metric("POA anual", f"{poa_anual:,.0f} kWh/m²", help="Irradiancia en el plano de la fachada")
-    mc3.metric("Factor POA/GHI", f"{ratio_poa:.2f}", help="Relación entre POA y GHI — <1 es normal para fachadas")
+    mc2.metric("POA anual", f"{poa_anual:,.0f} kWh/m²", help=f"Irradiancia en el plano del sistema ({tilt}°)")
+    mc3.metric("Factor POA/GHI", f"{ratio_poa:.2f}",
+               help="<1 es normal para fachadas verticales. ~1 en techos optimizados. >1 posible con tracking.")
     mc4.metric("T° media anual", f"{t_media:.1f} °C", help="Temperatura media ambiente del TMY")
     mc5.metric("HSP equivalentes", f"{poa_anual:.0f} h/año", help="Horas Sol Pico — energía base para cálculo")
 
@@ -139,7 +160,7 @@ if st.button("🌐 Descargar TMY de PVGIS y calcular POA", type="primary", use_c
         opacity=0.85,
     ))
     fig_monthly.add_trace(go.Bar(
-        name=f"POA fachada {orientacion_label} / {tilt}° (kWh/m²)",
+        name=f"POA {icono_tipo} {tipo_instalacion} — {orientacion_label} / {tilt}° (kWh/m²)",
         x=monthly.index,
         y=monthly["POA (kWh/m²)"],
         marker_color="#FF8C00",
@@ -188,6 +209,7 @@ if st.button("🌐 Descargar TMY de PVGIS y calcular POA", type="primary", use_c
     st.session_state["poa_df"]            = poa
     st.session_state["tmy_ciudad"]        = ciudad
     st.session_state["tilt_fachada"]      = tilt
+    st.session_state["tilt_default"]      = tilt   # persiste la selección del usuario
     st.session_state["azimuth_fachada"]   = azimuth
     st.session_state["orientacion_label"] = orientacion_label
     st.session_state["poa_anual_kWh_m2"]  = round(poa_anual, 1)
@@ -196,33 +218,34 @@ if st.button("🌐 Descargar TMY de PVGIS y calcular POA", type="primary", use_c
     st.session_state["recurso_solar_ok"]  = True
 
     st.success(
-        f"✅ Recurso solar calculado para {ciudad}  |  "
-        f"POA anual: **{poa_anual:,.0f} kWh/m²**  |  "
-        f"GHI anual: **{ghi_anual:,.0f} kWh/m²**\n\n"
+        f"✅ Recurso solar calculado para **{ciudad}**  |  "
+        f"{icono_tipo} **{tipo_instalacion}** — {orientacion_label} / {tilt}°  |  "
+        f"POA: **{poa_anual:,.0f} kWh/m²/año**  |  "
+        f"GHI: **{ghi_anual:,.0f} kWh/m²/año**\n\n"
         f"Continúa en 📊 Producción para simular la energía generada."
     )
 
 # ── Mostrar resultado previo si ya se calculó ────────────────────────────────
 elif st.session_state.get("recurso_solar_ok") and st.session_state.get("tmy_ciudad") == ciudad:
-    poa_prev = st.session_state.get("poa_anual_kWh_m2", 0)
-    ghi_prev = st.session_state.get("ghi_anual_kWh_m2", 0)
-    tilt_prev = st.session_state.get("tilt_fachada", 90)
+    poa_prev  = st.session_state.get("poa_anual_kWh_m2", 0)
+    ghi_prev  = st.session_state.get("ghi_anual_kWh_m2", 0)
+    tilt_prev = st.session_state.get("tilt_fachada", tipo_cfg["tilt_def"])
     az_prev   = st.session_state.get("orientacion_label", "—")
 
     st.success(
         f"✅ TMY cargado para **{ciudad}**  |  "
-        f"Fachada: **{az_prev} / {tilt_prev}°**  |  "
+        f"{icono_tipo} **{tipo_instalacion}** — {az_prev} / {tilt_prev}°  |  "
         f"POA: **{poa_prev:,.0f} kWh/m²/año**  |  "
         f"GHI: **{ghi_prev:,.0f} kWh/m²/año**"
     )
-    st.info("Cambia la orientación y presiona el botón para recalcular.")
+    st.info("Cambia la orientación o inclinación y presiona el botón para recalcular.")
 
 else:
     st.info(
-        "👆 Presiona el botón para descargar el TMY de PVGIS y calcular la irradiancia "
-        "en el plano de tu fachada BIPV."
+        f"👆 Presiona el botón para descargar el TMY de PVGIS y calcular la irradiancia "
+        f"para tu {icono_tipo} **{tipo_instalacion}**."
     )
-    st.markdown("""
+    st.markdown(f"""
     **¿Qué descarga PVGIS?**
     - **8.760 horas** de datos climáticos típicos (promedio 2005–2020)
     - Variables: GHI, DNI, DHI, temperatura, viento, presión
@@ -231,6 +254,8 @@ else:
 
     **¿Qué calcula pvlib?**
     - Posición solar hora a hora para la latitud/longitud del proyecto
-    - Irradiancia en el plano inclinado (modelo Hay-Davies)
+    - Irradiancia en el plano del sistema a **{tilt}°** de inclinación (modelo Hay-Davies)
     - Resultado: **POA (W/m²)** — entrada directa al motor de producción
+
+    > {icono_tipo} **{tipo_instalacion}**: inclinación recomendada {tipo_cfg['tilt_hint']}
     """)

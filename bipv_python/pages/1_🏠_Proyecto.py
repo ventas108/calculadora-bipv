@@ -7,12 +7,13 @@ st.title("🏠 Datos del Proyecto")
 
 # ── Tipos de instalación con defaults técnicos ────────────────────────────────
 TIPOS_INSTALACION = {
-    "Fachada BIPV":             {"icono": "🏢", "dens_min": 70,  "dens_max": 90,  "dens_def": 75,  "pr_def": 0.70, "pr_hint": "0.65–0.75"},
-    "Techo inclinado (BIPV)":   {"icono": "🏠", "dens_min": 100, "dens_max": 200, "dens_def": 150, "pr_def": 0.78, "pr_hint": "0.75–0.85"},
-    "Techo plano (con soporte)":{"icono": "🏭", "dens_min": 130, "dens_max": 200, "dens_def": 160, "pr_def": 0.80, "pr_hint": "0.75–0.85"},
-    "Pérgola / sombreadero":    {"icono": "⛱️", "dens_min": 80,  "dens_max": 130, "dens_def": 100, "pr_def": 0.73, "pr_hint": "0.68–0.78"},
-    "Marquesina / voladizo":    {"icono": "🏗️", "dens_min": 70,  "dens_max": 100, "dens_def": 80,  "pr_def": 0.70, "pr_hint": "0.65–0.75"},
-    "Granja fotovoltaica":      {"icono": "☀️", "dens_min": 150, "dens_max": 240, "dens_def": 190, "pr_def": 0.82, "pr_hint": "0.78–0.88"},
+    #  icono  dens W/m²              PR              tilt °
+    "Fachada BIPV":             {"icono": "🏢", "dens_min": 70,  "dens_max": 90,  "dens_def": 75,  "pr_def": 0.70, "pr_hint": "0.65–0.75", "tilt_def": 90},
+    "Techo inclinado (BIPV)":   {"icono": "🏠", "dens_min": 100, "dens_max": 200, "dens_def": 150, "pr_def": 0.78, "pr_hint": "0.75–0.85", "tilt_def": 25},
+    "Techo plano (con soporte)":{"icono": "🏭", "dens_min": 130, "dens_max": 200, "dens_def": 160, "pr_def": 0.80, "pr_hint": "0.75–0.85", "tilt_def": 15},
+    "Pérgola / sombreadero":    {"icono": "⛱️", "dens_min": 80,  "dens_max": 130, "dens_def": 100, "pr_def": 0.73, "pr_hint": "0.68–0.78", "tilt_def": 10},
+    "Marquesina / voladizo":    {"icono": "🏗️", "dens_min": 70,  "dens_max": 100, "dens_def": 80,  "pr_def": 0.70, "pr_hint": "0.65–0.75", "tilt_def": 20},
+    "Granja fotovoltaica":      {"icono": "☀️", "dens_min": 150, "dens_max": 240, "dens_def": 190, "pr_def": 0.82, "pr_hint": "0.78–0.88", "tilt_def": 20},
 }
 LISTA_TIPOS = list(TIPOS_INSTALACION.keys())
 
@@ -58,10 +59,11 @@ with col1:
     )
     cfg = TIPOS_INSTALACION[tipo_instalacion]
 
-    # Si cambió el tipo → resetear densidad y PR a los defaults del nuevo tipo
+    # Si cambió el tipo → resetear densidad, PR y tilt a los defaults del nuevo tipo
     if tipo_instalacion != tipo_anterior:
         st.session_state.pop("densidad_Wm2", None)
         st.session_state.pop("PR", None)
+        st.session_state.pop("tilt_default", None)
 
     area = st.number_input(
         "Área de instalación disponible (m²)",
@@ -202,6 +204,23 @@ with col2:
                 )
             )
 
+        # ── Alerta densidad fuera de rango (#48) ─────────────────────────────
+        if not (panel_ss and panel_ss.get("area_m2")):   # solo cuando es entrada manual
+            if dens_Wm2 < cfg["dens_min"]:
+                st.warning(
+                    f"⚠️ **Densidad baja** para {cfg['icono']} {tipo_instalacion}: "
+                    f"ingresaste **{dens_Wm2:.0f} W/m²**, rango recomendado "
+                    f"**{cfg['dens_min']}–{cfg['dens_max']} W/m²**. "
+                    f"¿Usas un módulo de baja eficiencia o película delgada?"
+                )
+            elif dens_Wm2 > cfg["dens_max"]:
+                st.warning(
+                    f"⚠️ **Densidad alta** para {cfg['icono']} {tipo_instalacion}: "
+                    f"ingresaste **{dens_Wm2:.0f} W/m²**, rango recomendado "
+                    f"**{cfg['dens_min']}–{cfg['dens_max']} W/m²**. "
+                    f"Verifica la ficha técnica del panel."
+                )
+
         PR = st.number_input(
             "Performance Ratio (PR)",
             min_value=0.40, max_value=0.98,
@@ -213,13 +232,30 @@ with col2:
             )
         )
 
+        # ── Alerta PR fuera de rango (#48) ───────────────────────────────────
+        _pr_min, _pr_max = (float(x) for x in cfg["pr_hint"].split("–"))
+        if PR < _pr_min:
+            st.warning(
+                f"⚠️ **PR bajo** para {cfg['icono']} {tipo_instalacion}: "
+                f"ingresaste **{PR:.2f}**, rango recomendado **{cfg['pr_hint']}**. "
+                f"Un PR muy bajo sobreestima las pérdidas del sistema."
+            )
+        elif PR > _pr_max:
+            st.warning(
+                f"⚠️ **PR alto** para {cfg['icono']} {tipo_instalacion}: "
+                f"ingresaste **{PR:.2f}**, rango recomendado **{cfg['pr_hint']}**. "
+                f"Valores >0.85 son poco frecuentes sin monitoreo activo de pérdidas."
+            )
+
         eta = dens_Wm2 / 1000.0
 
         # ── Banner de tipo de instalación ─────────────────────────────────────
+        tilt_recom = cfg["tilt_def"]
         st.info(
             f"{cfg['icono']} **{tipo_instalacion}** — "
-            f"Densidad recomendada: {cfg['dens_min']}–{cfg['dens_max']} W/m²  |  "
-            f"PR recomendado: {cfg['pr_hint']}"
+            f"Densidad: {cfg['dens_min']}–{cfg['dens_max']} W/m²  |  "
+            f"PR: {cfg['pr_hint']}  |  "
+            f"Inclinación sugerida: **{tilt_recom}°** (configurable en ☀️ Recurso Solar)"
         )
 
         st.divider()
@@ -266,6 +302,7 @@ if st.button("💾 Guardar configuración", type="primary"):
     st.session_state["modo_calculo"]       = modo_key
     st.session_state["PR"]                 = PR
     st.session_state["densidad_Wm2"]       = dens_Wm2 if "dens_Wm2" in dir() else cfg["dens_def"]
+    st.session_state["tilt_default"]       = cfg["tilt_def"]   # #47 — usado como default en Recurso Solar
     st.session_state["tarifa_cop_kwh"]     = tarifa_kwh
     if modo_key == "consumo":
         st.session_state["factura_cop"]    = factura_cop

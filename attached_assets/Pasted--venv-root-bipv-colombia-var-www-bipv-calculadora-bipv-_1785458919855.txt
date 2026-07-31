@@ -1,0 +1,38 @@
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# cd /root/bipv_python && git pull origin main && pm2 restart bipv-streamlit
+-bash: cd: /root/bipv_python: No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# cd /var/www/bipv/calculadora-bipv && git pull origin main && pm2 restart bipv-streamlit
+remote: Enumerating objects: 48, done.
+remote: Counting objects: 100% (48/48), done.
+remote: Compressing objects: 100% (21/21), done.
+remote: Total 39 (delta 23), reused 34 (delta 18), pack-reused 0 (from 0)
+Unpacking objects: 100% (39/39), 1.32 MiB | 11.03 MiB/s, done.
+From https://github.com/ventas108/calculadora-bipv
+ * branch              main       -> FETCH_HEAD
+   7415058f..0eefcb5a  main       -> origin/main
+Updating 7415058f..0eefcb5a
+Fast-forward
+ .agents/agent_assets_metadata.toml                 |   2 +-
+ MANUAL_CALCULADORA_BIPV_v2_julio2026.docx          | Bin 53560 -> 57209 bytes
+ attached_assets/image_1785453711807.png            | Bin 0 -> 229248 bytes
+ attached_assets/image_1785453839784.png            | Bin 0 -> 333431 bytes
+ attached_assets/image_1785454693648.png            | Bin 0 -> 236875 bytes
+ attached_assets/image_1785456908391.png            | Bin 0 -> 216508 bytes
+ attached_assets/image_1785457462143.png            | Bin 0 -> 373082 bytes
+ bipv_python/app.py                                 |   4 +-
+ "bipv_python/pages/1_\360\237\217\240_Proyecto.py" | 154 +++++++++++++++++++++++++++++++++++++++++++------------------
+ 9 files changed, 114 insertions(+), 46 deletions(-)
+ create mode 100644 attached_assets/image_1785453711807.png
+ create mode 100644 attached_assets/image_1785453839784.png
+ create mode 100644 attached_assets/image_1785454693648.png
+ create mode 100644 attached_assets/image_1785456908391.png
+ create mode 100644 attached_assets/image_1785457462143.png
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [bipv-streamlit](ids: [ 1 ])
+[PM2] [bipv-streamlit](1) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 1  │ bipv-streamlit     │ fork     │ 71   │ online    │ 0%       │ 7.6mb    │
+│ 0  │ calculadora-bipv   │ fork     │ 61   │ online    │ 0%       │ 135.7mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
