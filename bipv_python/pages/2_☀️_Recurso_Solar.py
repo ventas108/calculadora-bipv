@@ -180,7 +180,7 @@ if st.button("🌐 Descargar TMY de PVGIS y calcular POA", type="primary", use_c
     # ── Heatmap POA horario ──────────────────────────────────────────────────
     st.subheader("🌡️ Mapa de calor — POA promedio por hora y mes (W/m²)")
 
-    _tz_off  = utc_offset_latam(lat, lon)
+    _tz_off  = st.session_state.get("utc_offset_local", utc_offset_latam(lat, lon))
     _tz_lbl  = tz_label(_tz_off)
     heatmap  = heatmap_poa_horario(poa, utc_offset=_tz_off)
 

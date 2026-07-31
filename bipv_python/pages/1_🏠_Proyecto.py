@@ -1,6 +1,7 @@
 """Página 1 — Configuración del proyecto."""
 import streamlit as st
 from datos.ciudades_colombia import CIUDADES, LISTA_CIUDADES
+from calculos.tz_utils import utc_offset_latam, tz_label
 
 st.set_page_config(page_title="Proyecto — BIPV", page_icon="🏠", layout="wide")
 st.title("🏠 Datos del Proyecto")
@@ -183,6 +184,13 @@ with col2:
             f"**T_mín diseño:** {c['T_min_diseno']}°C\n\n"
             f"**Región:** {c['region']}  |  **Zona CREG:** {c['CREG_zona']}"
         )
+        _tz_off_p = utc_offset_latam(_lat_activa, _lon_activa)
+        _tz_lbl_p = tz_label(_tz_off_p)
+        st.caption(
+            f"🕐 Zona horaria estimada para este sitio: **{_tz_lbl_p}** "
+            f"— los heatmaps y diagramas solares se mostrarán en hora local. "
+            f"Guarda el proyecto para aplicarla."
+        )
 
         GHI_anual = c["GHI_kWh_m2_dia"] * 365
 
@@ -317,6 +325,9 @@ if st.button("💾 Guardar configuración", type="primary"):
         st.session_state["lat_proyecto"] = st.session_state.get("_lat_custom_temp", c["lat"])
         st.session_state["lon_proyecto"] = st.session_state.get("_lon_custom_temp", c["lon"])
         st.session_state["alt_proyecto"] = st.session_state.get("_alt_custom_temp", c["alt_m"])
+        st.session_state["utc_offset_local"] = utc_offset_latam(
+            st.session_state["lat_proyecto"], st.session_state["lon_proyecto"]
+        )
     st.session_state["recurso_solar_ok"] = False
     _lat = st.session_state["lat_proyecto"]
     _lon = st.session_state["lon_proyecto"]
