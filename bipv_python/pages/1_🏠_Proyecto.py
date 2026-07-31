@@ -65,6 +65,8 @@ with col1:
         format_func=lambda t: f"{TIPOS_INSTALACION[t]['icono']}  {t}",
     )
     cfg = TIPOS_INSTALACION[tipo_instalacion]
+    # Persistir inmediatamente — sobrevive a st.rerun() por cambio de ciudad
+    st.session_state["tipo_instalacion"] = tipo_instalacion
 
     # Si cambió el tipo → resetear densidad, PR y tilt a los defaults del nuevo tipo
     if tipo_instalacion != tipo_anterior:
