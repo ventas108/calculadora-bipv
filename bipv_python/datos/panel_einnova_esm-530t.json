@@ -8,8 +8,8 @@
     "CoefVoc_C": -0.26,
     "TransparenciaPct": 0,
     "n (Factor Idealidad)": 1.3,
-    "Fuente NsA": "Ficha oficial EINNOVA ESM-T series — Ns estimado (confirmar dims)",
-    "Confianza": "Media",
+    "Fuente NsA": "Ficha oficial EINNOVA ESM-T — 132 piezas (6×22) confirmadas",
+    "Confianza": "Alta",
     "TipoPanel": "EINNOVA ESM-530T TopCon Bifacial",
     "PmaxWp": 530,
     "Voc_STC": 46.3,
@@ -18,5 +18,5 @@
     "Imp_STC": 13.59,
     "Ns (Celdas Serie)": 132,
     "NsA = n × Ns": 171.6,
-    "Notas": "Ficha oficial EINNOVA ESM-530T TopCon Bifacial. Efic=22.32%. CoefIsc=+0.04%/°C. Vmax=1500Vdc. Dims ESTIMADAS — confirmar con EINNOVA."
+    "Notas": "Ficha oficial EINNOVA ESM-530T TopCon Bifacial. Efic=22.32%. CoefIsc=+0.04%/°C. Vmax=1500Vdc. Dims CONFIRMADAS: 2094×1134×30mm. 132 semicélulas 6×22."
 }
