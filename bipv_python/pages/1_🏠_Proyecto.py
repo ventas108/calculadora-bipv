@@ -21,8 +21,19 @@ with col1:
     st.subheader("Identificación")
     nombre = st.text_input("Nombre del proyecto",
                            value=st.session_state.get("nombre_proyecto", "Proyecto BIPV"))
+
+    # ── Detectar cambio de ciudad ANTES de mostrar el expander ───────────────
+    ciudad_anterior = st.session_state.get("ciudad", "Bogotá")
     ciudad = st.selectbox("Ciudad", LISTA_CIUDADES,
-                          index=LISTA_CIUDADES.index(st.session_state.get("ciudad", "Bogotá")))
+                          index=LISTA_CIUDADES.index(ciudad_anterior))
+
+    # Si la ciudad cambió → resetear coordenadas a las de la nueva ciudad
+    if ciudad != ciudad_anterior:
+        for _k in ("lat_proyecto", "lon_proyecto", "alt_proyecto",
+                   "_lat_custom_temp", "_lon_custom_temp", "_alt_custom_temp"):
+            st.session_state.pop(_k, None)
+        st.session_state["ciudad"] = ciudad   # actualizar inmediatamente
+
     area   = st.number_input("Área de fachada disponible (m²)",
                               min_value=10.0, max_value=5000.0,
                               value=float(st.session_state.get("area_fachada_m2", 97.34)),
@@ -65,14 +76,6 @@ with col2:
     st.subheader("Datos del sitio")
     if ciudad in CIUDADES:
         c = CIUDADES[ciudad]
-        st.info(
-            f"**Latitud:** {c['lat']}°  |  **Longitud:** {c['lon']}°  |  "
-            f"**Altitud:** {c['alt_m']} m\n\n"
-            f"**GHI:** {c['GHI_kWh_m2_dia']} kWh/m²·día  |  **HSP:** {c['HSP']} h/día\n\n"
-            f"**T_amb media:** {c['T_amb_media']}°C  |  "
-            f"**T_mín diseño:** {c['T_min_diseno']}°C\n\n"
-            f"**Región:** {c['region']}  |  **Zona CREG:** {c['CREG_zona']}"
-        )
 
         # ── Coordenadas exactas del predio (opcional) ─────────────────────
         with st.expander("📍 Coordenadas exactas del predio (opcional — para mayor precisión)"):
@@ -81,6 +84,7 @@ with col2:
                 "Si conoces las coordenadas GPS exactas del predio, ingrésalas aquí. "
                 "PVGIS descargará el TMY para ese punto específico."
             )
+            # Siempre parte de la ciudad actual (ya limpiadas si hubo cambio de ciudad)
             _lat_def = float(st.session_state.get("lat_proyecto", c["lat"]))
             _lon_def = float(st.session_state.get("lon_proyecto", c["lon"]))
             _alt_def = int(st.session_state.get("alt_proyecto",   c["alt_m"]))
@@ -131,6 +135,33 @@ with col2:
             st.session_state["_lat_custom_temp"] = lat_custom
             st.session_state["_lon_custom_temp"] = lon_custom
             st.session_state["_alt_custom_temp"] = alt_custom
+
+        # ── Panel "Datos del sitio" — refleja ciudad + coordenadas activas ──
+        # Coordenadas activas = las del expander (en vivo, sin necesidad de Guardar)
+        _lat_activa = st.session_state.get("_lat_custom_temp", c["lat"])
+        _lon_activa = st.session_state.get("_lon_custom_temp", c["lon"])
+        _alt_activa = st.session_state.get("_alt_custom_temp", c["alt_m"])
+        _coords_mod = (
+            abs(_lat_activa - c["lat"]) > 0.0001 or
+            abs(_lon_activa - c["lon"]) > 0.0001 or
+            _alt_activa != c["alt_m"]
+        )
+
+        _coord_label = (
+            f"**Latitud:** {_lat_activa:.5f}°  |  **Longitud:** {_lon_activa:.5f}°  |  "
+            f"**Altitud:** {_alt_activa} m  ⚠️ *coordenadas del predio*"
+            if _coords_mod else
+            f"**Latitud:** {c['lat']}°  |  **Longitud:** {c['lon']}°  |  "
+            f"**Altitud:** {c['alt_m']} m"
+        )
+
+        st.info(
+            f"{_coord_label}\n\n"
+            f"**GHI:** {c['GHI_kWh_m2_dia']} kWh/m²·día  |  **HSP:** {c['HSP']} h/día\n\n"
+            f"**T_amb media:** {c['T_amb_media']}°C  |  "
+            f"**T_mín diseño:** {c['T_min_diseno']}°C\n\n"
+            f"**Región:** {c['region']}  |  **Zona CREG:** {c['CREG_zona']}"
+        )
 
         GHI_anual = c["GHI_kWh_m2_dia"] * 365   # kWh/m²/año
 
