@@ -30,7 +30,7 @@ def cargar_catalogo_paneles() -> dict:
         if Voc is not None and Voc < 10:   continue
         if Isc is not None and Isc > 100:  continue
         nombre = str(r.get("TipoPanel", "")).strip()
-        if not nombre: continue
+        if not nombre or len(nombre) < 5: continue  # filtra entradas basura/prueba (ej. "yaya")
         Vmp = _f(r.get("Vmp_STC"))
         Imp = _f(r.get("Imp_STC"))
         costo = _f(r.get("CostoUSD"))
