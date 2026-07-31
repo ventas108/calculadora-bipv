@@ -152,6 +152,136 @@ def simular_iv_hora_a_hora(G_array, T_cel_array, panel: dict):
     return pd.DataFrame(registros)
 
 
+# ── Parámetros mínimos requeridos para el Motor SDM ───────────────────────────
+_SDM_KEYS = ("I_L_ref", "I_o_ref", "R_s", "R_sh_ref", "a_ref", "Tk_alfa", "tecnologia")
+
+
+def tiene_sdm_completo(panel: dict) -> bool:
+    """True si el panel tiene todos los parámetros SDM calibrados y válidos."""
+    return all(panel.get(k) not in (None, 0, "", "nan") for k in _SDM_KEYS)
+
+
+def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
+    """
+    Estima parámetros SDM (De Soto 2006) a partir de datos básicos de ficha técnica.
+
+    Requiere: Voc_stc, Isc_stc, Vmp_stc, Imp_stc, N_s o NsA, tecnologia.
+    Opcional: Tk_beta (coef. Voc %/°C), Tk_gamma (coef. Pmax %/°C).
+
+    Retorna dict compatible con resolver_curva_iv() o None si faltan datos.
+    El dict incluye '_estimado': True para advertir al usuario.
+    """
+    from datos.tecnologias_bipv import CONSTANTES_TECNOLOGIA
+
+    Voc = float(panel.get("Voc_stc") or panel.get("Voc") or 0)
+    Isc = float(panel.get("Isc_stc") or panel.get("Isc") or 0)
+    Vmp = float(panel.get("Vmp_stc") or panel.get("Vmp") or 0)
+    Imp = float(panel.get("Imp_stc") or panel.get("Imp") or 0)
+    N_s = panel.get("N_s")
+    NsA = panel.get("NsA")
+
+    if not all([Voc > 0, Isc > 0, Vmp > 0, Imp > 0]):
+        return None
+
+    # ── Normalizar tecnología ──────────────────────────────────────────────────
+    tec_raw = str(panel.get("tecnologia", "")).strip().lower()
+    _MAP = {
+        "mono-si": "Mono-Si", "mono si": "Mono-Si", "monocrystalline": "Mono-Si",
+        "monocristalino": "Mono-Si", "mono": "Mono-Si",
+        "poli-si": "Poli-Si", "poly-si": "Poli-Si", "poly": "Poli-Si",
+        "policristalino": "Poli-Si", "polycrystalline": "Poli-Si",
+        "multicrystalline": "Poli-Si",
+        "cdte": "CdTe", "cd te": "CdTe", "cadmium telluride": "CdTe",
+    }
+    tec_norm = _MAP.get(tec_raw, "Mono-Si")
+    if tec_norm not in CONSTANTES_TECNOLOGIA:
+        tec_norm = "Mono-Si"
+
+    const  = CONSTANTES_TECNOLOGIA[tec_norm]
+    EgRef  = const["Eg_ref"]
+    dEgdT  = const["dEgdT"]
+    Vt_ref = K_BOLTZMANN * T_REF_K / Q_ELECTRON    # 0.025693 V @ 25°C
+
+    # ── a_ref = n × Ns × Vt ───────────────────────────────────────────────────
+    if NsA:
+        a_ref = float(NsA) * Vt_ref
+        N_s_est = N_s or int(round(float(NsA) / const.get("n_mediana", 1.05)))
+    elif N_s:
+        n_typ = {"CdTe": 1.09, "Mono-Si": 1.05, "Poli-Si": 1.10}.get(tec_norm, 1.05)
+        a_ref = n_typ * float(N_s) * Vt_ref
+        N_s_est = int(N_s)
+    else:
+        N_s_est = max(int(round(Voc / 0.65)), 36)  # ≈ 0.65 V/cell c-Si
+        n_typ = 1.05
+        a_ref = n_typ * N_s_est * Vt_ref
+
+    # ── Coeficientes de temperatura ────────────────────────────────────────────
+    Tk_beta  = panel.get("Tk_beta")  or panel.get("CoefVoc_C") or panel.get("beta_oc")
+    Tk_gamma = panel.get("Tk_gamma") or panel.get("gamma_mp")   or panel.get("beta_mp")
+    Tk_alfa  = panel.get("Tk_alfa")  or panel.get("alpha_sc")
+
+    # beta_voc en V/°C (pvlib necesita V/°C, no %/°C)
+    if Tk_beta:
+        beta_voc_V = float(Tk_beta) / 100.0 * Voc
+    else:
+        beta_pct = {"CdTe": -0.30, "Mono-Si": -0.37, "Poli-Si": -0.40}.get(tec_norm, -0.37)
+        beta_voc_V = beta_pct / 100.0 * Voc
+
+    # alpha_sc en A/°C
+    if Tk_alfa:
+        alpha_sc_A = float(Tk_alfa) / 100.0 * Isc
+    else:
+        alpha_pct = {"CdTe": 0.02, "Mono-Si": 0.05, "Poli-Si": 0.05}.get(tec_norm, 0.05)
+        alpha_sc_A = alpha_pct / 100.0 * Isc
+
+    # ── Estimación SDM con pvlib fit_desoto ────────────────────────────────────
+    try:
+        fit = pvlib.ivtools.sdm.fit_desoto(
+            v_mp            = Vmp,
+            i_mp            = Imp,
+            v_oc            = Voc,
+            i_sc            = Isc,
+            alpha_sc        = alpha_sc_A,
+            beta_voc        = beta_voc_V,
+            cells_in_series = N_s_est,
+            EgRef           = EgRef,
+            dEgdT           = dEgdT,
+            irrad_ref       = 1000.0,
+            temp_ref        = 25.0,
+        )
+        I_L  = float(fit["I_L_ref"])
+        I_o  = float(fit["I_o_ref"])
+        R_s  = float(fit["R_s"])
+        R_sh = float(fit["R_sh_ref"])
+        _metodo = "fit_desoto"
+    except Exception:
+        # Fallback heurístico si la optimización falla
+        I_L  = Isc * 1.001
+        I_o  = Isc * np.exp(-Voc / a_ref) * 1e-3
+        R_s  = (Voc - Vmp) / Imp * 0.20
+        R_sh = Vmp / max(Isc - Imp, 1e-6) * 5.0
+        _metodo = "heurístico"
+
+    return {
+        "nombre":     panel.get("nombre", "Panel"),
+        "tecnologia": tec_norm,
+        "I_L_ref":    I_L,
+        "I_o_ref":    I_o,
+        "R_s":        R_s,
+        "R_sh_ref":   R_sh,
+        "a_ref":      a_ref,
+        "Tk_alfa":    float(Tk_alfa) if Tk_alfa else alpha_pct if "alpha_pct" in dir() else 0.05,
+        "Tk_gamma":   float(Tk_gamma) if Tk_gamma else -0.40,
+        "Voc_stc":    Voc,
+        "Isc_stc":    Isc,
+        "Pmax_stc":   Vmp * Imp,
+        "R_sh_base":  0.0,
+        "_estimado":  True,
+        "_metodo":    _metodo,
+        "_tec_norm":  tec_norm,
+    }
+
+
 def validar_sdm_vs_ficha(panel: dict, tolerancia_pct=5.0) -> dict:
     """
     Compara el SDM calibrado contra los valores STC de la ficha.

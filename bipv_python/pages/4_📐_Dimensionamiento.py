@@ -38,30 +38,22 @@ with col2:
 panel    = obtener_panel_excel(panel_nombre) if _cat_excel else MODULOS_BIPV[panel_nombre]
 if panel.get("costo_usd"):
     st.session_state["costo_modulo_usd"] = panel["costo_usd"]
-_iv_params = ["Voc", "Vmp", "Isc", "Imp", "N_s", "NsA"]
-_faltantes = [k for k in _iv_params if not panel.get(k)]
+
+# ── Indicador completitud ficha técnica ───────────────────────────────────────
+_iv_params  = ["Voc", "Vmp", "Isc", "Imp", "N_s", "NsA"]
+_faltantes  = [k for k in _iv_params if not panel.get(k)]
 if not _faltantes:
-    st.success("🟢 Ficha completa — motor IV disponible")
+    st.success("🟢 Ficha completa — Motor IV se activará automáticamente")
 elif len(_faltantes) <= 2:
-    st.warning(f"🟡 Ficha parcial — faltan: {', '.join(_faltantes)} | solo cálculo energético")
+    st.warning(f"🟡 Ficha parcial — faltan: {', '.join(_faltantes)} | Motor IV usará estimación")
 else:
-    st.error(f"🔴 Ficha incompleta — faltan: {', '.join(_faltantes)} | no se aplicará motor IV")
+    st.error(f"🔴 Ficha incompleta — faltan: {', '.join(_faltantes)} | solo cálculo energético")
 if panel.get("notas"):
     st.caption(f"📋 {panel['notas'][:120]}")
-    # Propagar costo al session_state para Financiero
-    if panel.get("costo_usd"):
-        st.session_state["costo_modulo_usd"] = panel["costo_usd"]
-    # ── Indicador completitud ficha técnica ───────────────────────────────────
-    _iv_params = ["Voc", "Vmp", "Isc", "Imp", "N_s", "NsA"]
-    _faltantes = [k for k in _iv_params if not panel.get(k)]
-    if not _faltantes:
-        st.success("🟢 Ficha completa — motor IV disponible")
-    elif len(_faltantes) <= 2:
-        st.warning(f"🟡 Ficha parcial — faltan: {', '.join(_faltantes)} | solo cálculo energético")
-    else:
-        st.error(f"🔴 Ficha incompleta — faltan: {', '.join(_faltantes)} | no se aplicará motor IV")
-    if panel.get("notas"):
-        st.caption(f"📋 {panel['notas'][:120]}")
+
+# ── Guardar panel en session_state para Motor IV automático (#7) ─────────────
+st.session_state["panel_dict"]        = panel
+st.session_state["panel_nombre_dim"]  = panel_nombre
 inversor = obtener_inversor_excel(inversor_nombre) if _cat_inv else seleccionar_inversor(inversor_nombre)
 if inversor.get("costo_usd"):
     st.session_state["costo_inversor_usd"] = inversor["costo_usd"]
