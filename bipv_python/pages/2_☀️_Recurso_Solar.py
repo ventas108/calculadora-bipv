@@ -112,8 +112,16 @@ st.markdown("---")
 def cargar_tmy(lat, lon):
     return obtener_tmy_pvgis(lat, lon)
 
-# ── Botón de simulación ──────────────────────────────────────────────────────
-if st.button("🌐 Descargar TMY de PVGIS y calcular POA", type="primary", use_container_width=True):
+# ── Botones de acción ────────────────────────────────────────────────────────
+_btn_col1, _btn_col2 = st.columns([4, 1])
+_descarga_btn = _btn_col1.button("🌐 Descargar TMY de PVGIS y calcular POA", type="primary", use_container_width=True)
+_recalc_btn   = _btn_col2.button("🔄 Limpiar caché", use_container_width=True,
+                                  help="Fuerza nueva descarga desde PVGIS, descartando datos anteriores.")
+if _recalc_btn:
+    cargar_tmy.clear()
+    st.success("✅ Caché limpiada — presiona **Descargar TMY** para obtener datos frescos.")
+
+if _descarga_btn:
 
     _sitio_label = (
         f"predio en {ciudad} ({lat:.5f}°, {lon:.5f}°)"
