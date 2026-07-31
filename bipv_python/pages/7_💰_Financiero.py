@@ -266,6 +266,21 @@ with col_t2:
         help="CdTe SolTech: 0.5%/año (mejor que c-Si ~0.7%). "
              "Fuente: Jordan & Kurtz 2013.",
     )
+    # ── #28 · Usar tasa calculada desde historial PR real ────────────────────
+    _tasa_calc = st.session_state.get("tasa_degradacion_calculada", None)
+    if _tasa_calc is not None and _tasa_calc > 0:
+        _usar_deg_real = st.toggle(
+            f"Usar degradación del historial real — **{_tasa_calc:.2f}%/año** "
+            f"(calculada en 📊 Producción › Degradación anual)",
+            value=True, key="usar_deg_historico",
+            help="Tasa calculada por regresión lineal sobre PR_corr_T histórico. "
+                 "Desactiva para usar el slider paramétrico.",
+        )
+        if _usar_deg_real:
+            tasa_deg = _tasa_calc
+            st.caption(
+                f"✅ Degradación activa: **{_tasa_calc:.2f}%/año** — desde historial PR real"
+            )
     factor_p90 = st.slider(
         "Incertidumbre P90 (%)",
         min_value=0.0, max_value=25.0, value=10.0, step=0.5,

@@ -793,3 +793,127 @@ if btn_sim or st.session_state.get("produccion_ok"):
         st.session_state["diag_perdida_t_pct"]   = perdida_t_pct_global
         st.session_state["diag_perdida_t_kwh"]   = perdida_t_kwh_total
         st.session_state["diag_gamma_pct"]       = gamma_pct
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECCIÓN — #28 TASA DE DEGRADACIÓN ANUAL DESDE HISTORIAL DE PR
+# ═══════════════════════════════════════════════════════════════════════════════
+st.markdown("---")
+st.subheader("📉 Tasa de degradación anual del sistema")
+st.caption(
+    "Ingresa el **PR corregido por temperatura** de cada año operativo para detectar "
+    "la degradación real de los módulos mediante regresión lineal. "
+    "Requiere al menos **2 años** de datos."
+)
+
+n_anos_hist = st.number_input(
+    "Número de años con datos",
+    min_value=2, max_value=15, value=3, step=1,
+    key="deg_n_anos_hist",
+    help="Cada año → un valor de PR_corr_T promedio anual.",
+)
+
+# Tabla de entrada: año | PR_corr_T (%)
+_hist_data = []
+_deg_cols  = st.columns(min(int(n_anos_hist), 6))
+for _i in range(int(n_anos_hist)):
+    _col_i = _deg_cols[_i % len(_deg_cols)]
+    _yr_v  = _col_i.number_input(
+        f"Año {_i + 1}",
+        min_value=2015, max_value=2040,
+        value=int(st.session_state.get(f"deg_ano_{_i}", 2023 - int(n_anos_hist) + 1 + _i)),
+        step=1, key=f"deg_ano_{_i}",
+    )
+    _pr_v  = _col_i.number_input(
+        f"PR_corr_T {_yr_v} (%)",
+        min_value=40.0, max_value=100.0,
+        value=float(st.session_state.get(f"deg_pr_{_i}", 80.0)),
+        step=0.5, format="%.1f",
+        key=f"deg_pr_{_i}",
+        help="PR corregido por temperatura de la tabla de diagnóstico. Promedio anual.",
+    )
+    _hist_data.append({"año": float(_yr_v), "pr": float(_pr_v)})
+
+if len(_hist_data) >= 2:
+    import numpy as _np_deg
+    _años_arr = _np_deg.array([d["año"] for d in _hist_data])
+    _prs_arr  = _np_deg.array([d["pr"]  for d in _hist_data])
+    _slope, _intercept = _np_deg.polyfit(_años_arr, _prs_arr, 1)
+    # Tasa relativa: % de pérdida por año respecto al PR del primer año
+    _pr_inicial      = float(_prs_arr[0]) if _prs_arr[0] > 0 else 80.0
+    _tasa_deg_calc   = max(0.0, -_slope / _pr_inicial * 100.0)
+    _tasa_deg_abs_pp = -_slope  # puntos porcentuales por año
+
+    # Guardar para Financiero
+    st.session_state["tasa_degradacion_calculada"] = round(_tasa_deg_calc, 2)
+
+    # Métricas
+    _dm1, _dm2, _dm3 = st.columns(3)
+    _dm1.metric(
+        "Pendiente PR",
+        f"{_slope:+.3f} pp/año",
+        help="Cambio absoluto en PR por año (puntos porcentuales)",
+    )
+    _dm2.metric(
+        "Tasa de degradación calculada",
+        f"{_tasa_deg_calc:.2f}%/año",
+        delta="→ disponible en 💰 Financiero",
+        delta_color="off",
+        help="Relativa al PR inicial. Se usa en el cálculo de TIR/VPN.",
+    )
+    _años_hasta_70 = (
+        int((_pr_inicial - 70.0) / max(0.001, -_slope))
+        if _slope < 0 else None
+    )
+    _dm3.metric(
+        "Vida útil (PR > 70%)",
+        f"{_años_hasta_70} años" if _años_hasta_70 is not None else "PR estable",
+        help="Años hasta que el sistema alcance un PR_corr_T del 70%.",
+    )
+
+    # Gráfica de tendencia
+    _x_fit = _np_deg.linspace(_años_arr.min(), _años_arr.max(), 80)
+    _y_fit = _slope * _x_fit + _intercept
+    _fig_deg = go.Figure()
+    _fig_deg.add_trace(go.Scatter(
+        x=_años_arr.tolist(), y=_prs_arr.tolist(),
+        mode="markers", name="PR_corr_T real",
+        marker=dict(size=12, color="#1565C0",
+                    line=dict(width=2, color="white")),
+        hovertemplate="Año %{x:.0f}: <b>%{y:.1f}%</b><extra></extra>",
+    ))
+    _fig_deg.add_trace(go.Scatter(
+        x=_x_fit.tolist(), y=_y_fit.tolist(),
+        mode="lines",
+        name=f"Tendencia lineal ({_slope:+.3f} pp/año)",
+        line=dict(color="#C62828", dash="dash", width=2.5),
+    ))
+    _fig_deg.update_layout(
+        height=320,
+        xaxis=dict(title="Año", tickformat="d"),
+        yaxis=dict(
+            title="PR corregido T° (%)",
+            range=[max(50.0, float(_prs_arr.min()) - 5.0),
+                   min(105.0, float(_prs_arr.max()) + 5.0)],
+        ),
+        plot_bgcolor="white", paper_bgcolor="white",
+        legend=dict(orientation="h", y=-0.30),
+        title=dict(
+            text="<b>Tendencia de degradación del sistema BIPV</b>",
+            x=0.5, xanchor="center",
+        ),
+        margin=dict(b=80),
+    )
+    st.plotly_chart(_fig_deg, use_container_width=True)
+
+    if _slope < -0.001:
+        st.info(
+            f"📉 **Degradación detectada: {_tasa_deg_calc:.2f}%/año** "
+            f"({_tasa_deg_abs_pp:+.3f} pp/año absolutos). "
+            "La tasa calculada está disponible en 💰 Financiero — "
+            "activa el interruptor 'Usar degradación del historial real'."
+        )
+    else:
+        st.success(
+            "✅ **No se detecta degradación significativa** — PR estable o en mejora. "
+            "Posible causa: mejora en limpieza/mantenimiento entre años."
+        )
