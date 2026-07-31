@@ -912,10 +912,10 @@ PR = Y_f / Y_r = (E_ac / P_STC) / (H_POA / G_STC)
 ## 17. Preguntas frecuentes
 
 **P: ¿El CSV de la Calculadora de Sombreado cubre las 8 760 horas del año?**
-R: No. El CSV cubre solo los días críticos seleccionados (~60–150 horas). El modo
-"mensual" replica el patrón de cada día crítico a todos los días del mismo mes,
-elevando la cobertura al 25–40% del año. Los meses sin día crítico asumen FS=0.
-Para máxima precisión, incluye un día representativo por cada mes del año.
+R: No. El CSV cubre solo los días críticos (~60–150 horas). El modo "mensual" replica
+el patrón de cada día a todo el mes (cobertura ~25–40%). Para máxima precisión,
+incluye un día representativo por cada mes (12 días en total), de modo que cada mes
+tenga su propio perfil de sombra real.
 
 **P: ¿Por qué mi TIR es diferente antes y después de ejecutar bypass?**
 R: Con bypass activo, la Página 7 usa E_ac_bypass (menor que E_ac base). Menos
