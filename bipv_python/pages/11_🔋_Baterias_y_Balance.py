@@ -41,13 +41,20 @@ st.caption(
 prod_ok   = st.session_state.get("produccion_ok", False)
 df_m_prod = st.session_state.get("df_mensual_produccion", None)
 
-# Usar E_ac corregida por bypass si está disponible (#37)
-_e_ac_base_bat   = float(st.session_state.get("E_ac_anual_kWh", 0.0))
-_e_ac_bypass_bat = float(st.session_state.get("E_ac_anual_kWh_bypass", 0.0))
-_bypass_ok_bat   = st.session_state.get("bypass_ok", False)
-_kwh_bp_bat      = float(st.session_state.get("kwh_bypass_anual", 0.0))
+# Prioridad E_ac: multi-superficie > bypass > base (claves exclusivas)
+_e_ac_base_bat     = float(st.session_state.get("E_ac_anual_kWh", 0.0))
+_e_ac_bypass_bat   = float(st.session_state.get("E_ac_anual_kWh_bypass", 0.0))
+_e_ac_multisup_bat = float(st.session_state.get("E_ac_anual_kWh_multisup", 0.0))
+_bypass_ok_bat     = st.session_state.get("bypass_ok", False)
+_multisup_ok_bat   = st.session_state.get("multisup_activo", False)
+_kwh_bp_bat        = float(st.session_state.get("kwh_bypass_anual", 0.0))
 
-e_ac_anual = _e_ac_bypass_bat if (_bypass_ok_bat and _e_ac_bypass_bat > 0) else _e_ac_base_bat
+if _multisup_ok_bat and _e_ac_multisup_bat > 0:
+    e_ac_anual = _e_ac_multisup_bat
+elif _bypass_ok_bat and _e_ac_bypass_bat > 0:
+    e_ac_anual = _e_ac_bypass_bat
+else:
+    e_ac_anual = _e_ac_base_bat
 
 if not prod_ok or df_m_prod is None or e_ac_anual <= 0:
     st.warning(

@@ -83,10 +83,20 @@ COLOR_AZUL    = "#1565C0"
 # ─────────────────────────────────────────────────────────────────────────────
 # PREREQUISITO — Producción anual
 # ─────────────────────────────────────────────────────────────────────────────
-_e_ac_base   = st.session_state.get("E_ac_anual_kWh", 0.0)
-_e_ac_bypass = st.session_state.get("E_ac_anual_kWh_bypass", 0.0)
-_bypass_ok   = st.session_state.get("bypass_ok", False)
-e_ac         = _e_ac_bypass if (_bypass_ok and _e_ac_bypass > 0) else _e_ac_base
+# Prioridad E_ac: multi-superficie > bypass > base (claves exclusivas)
+_e_ac_base     = st.session_state.get("E_ac_anual_kWh", 0.0)
+_e_ac_bypass   = st.session_state.get("E_ac_anual_kWh_bypass", 0.0)
+_e_ac_multisup = st.session_state.get("E_ac_anual_kWh_multisup", 0.0)
+_bypass_ok     = st.session_state.get("bypass_ok", False)
+_multisup_ok   = st.session_state.get("multisup_activo", False)
+_area_ms       = st.session_state.get("area_total_multisup", 0.0)
+
+if _multisup_ok and _e_ac_multisup > 0:
+    e_ac = _e_ac_multisup
+elif _bypass_ok and _e_ac_bypass > 0:
+    e_ac = _e_ac_bypass
+else:
+    e_ac = _e_ac_base
 
 p_stc   = st.session_state.get("P_stc_kW_sistema", 0.0)
 n_pan   = st.session_state.get("N_paneles_final", 0)
@@ -94,10 +104,15 @@ ciudad  = st.session_state.get("tmy_ciudad", "—")
 n_anos  = 25     # vida útil estándar BIPV — IEC 61730
 
 if e_ac > 0:
+    _sufijo = (
+        f" | 🏗️ Sistema multi-superficie ({_area_ms:.1f} m²)" if (_multisup_ok and _e_ac_multisup > 0)
+        else " | ⚡ Corrección bypass aplicada"                 if (_bypass_ok and _e_ac_bypass > 0)
+        else ""
+    )
     st.success(
         f"✅ Producción: **{e_ac:,.0f} kWh/año** | "
         f"Sistema: **{p_stc:.2f} kWp** ({n_pan} módulos) | Ciudad: **{ciudad}**"
-        + (" | ⚡ Corrección bypass aplicada" if (_bypass_ok and _e_ac_bypass > 0) else "")
+        + _sufijo
     )
 else:
     st.warning(
