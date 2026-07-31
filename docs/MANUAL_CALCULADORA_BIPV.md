@@ -653,6 +653,13 @@ Cada fila tiene un **checkbox** al inicio:
 **Eliminar una fila:** selecciona la fila → tecla **Supr / Delete**.
 **Resetear:** botón **↺** en la parte superior de cada pestaña vuelve a la plantilla base del Excel.
 
+> **¿Por qué "Suprimir eliminar" aparece en gris?**
+> El botón se activa **solo cuando hay al menos una fila desmarcada** (desactivada).
+> Su función es eliminar permanentemente todas las filas que estén sin marcar.
+> Si todas las filas están activas (0 desactivados), no hay nada que suprimir y Streamlit
+> lo muestra deshabilitado automáticamente. Para activarlo: desactiva cualquier fila
+> quitando su ✅, y el botón quedará disponible.
+
 ---
 
 ### Fuente de precios — campo de trazabilidad
