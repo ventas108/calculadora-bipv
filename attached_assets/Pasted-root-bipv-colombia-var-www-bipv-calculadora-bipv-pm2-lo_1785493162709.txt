@@ -1,0 +1,45 @@
+root@bipv-colombia:/var/www/bipv/calculadora-bipv# pm2 logs bipv-streamlit --lines 20
+[TAILING] Tailing last 20 lines for [bipv-streamlit] process (change the value with --lines option)
+/root/.pm2/logs/bipv-streamlit-error.log last 20 lines:
+1|bipv-str | /var/www/bipv/calculadora-bipv/bipv_python/pages/8_💼_Presupuesto.py:138: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+1|bipv-str |   raw = pd.concat([raw, inyectar], ignore_index=True)
+1|bipv-str | /var/www/bipv/calculadora-bipv/bipv_python/pages/8_💼_Presupuesto.py:138: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+1|bipv-str |   raw = pd.concat([raw, inyectar], ignore_index=True)
+1|bipv-str | /var/www/bipv/calculadora-bipv/bipv_python/pages/8_💼_Presupuesto.py:138: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+1|bipv-str |   raw = pd.concat([raw, inyectar], ignore_index=True)
+1|bipv-str | /var/www/bipv/calculadora-bipv/bipv_python/pages/8_💼_Presupuesto.py:138: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+1|bipv-str |   raw = pd.concat([raw, inyectar], ignore_index=True)
+1|bipv-str | /var/www/bipv/calculadora-bipv/bipv_python/pages/8_💼_Presupuesto.py:138: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+1|bipv-str |   raw = pd.concat([raw, inyectar], ignore_index=True)
+1|bipv-str | 2026-07-30 23:21:16.128 Uncaught app exception
+1|bipv-str | Traceback (most recent call last):
+1|bipv-str |   File "/var/www/bipv/calculadora-bipv/bipv_python/venv/lib/python3.12/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 589, in _run_script
+1|bipv-str |     exec(code, module.__dict__)
+1|bipv-str |   File "/var/www/bipv/calculadora-bipv/bipv_python/pages/9_🗺️_Vista_3D.py", line 1076, in <module>
+1|bipv-str |     _pm_v = poa_mensual_superficie(_pdf_v) if _pdf_v else None
+1|bipv-str |                                               ^^^^^^
+1|bipv-str |   File "/var/www/bipv/calculadora-bipv/bipv_python/venv/lib/python3.12/site-packages/pandas/core/generic.py", line 1577, in __nonzero__
+1|bipv-str |     raise ValueError(
+1|bipv-str | ValueError: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().
+
+/root/.pm2/logs/bipv-streamlit-out.log last 20 lines:
+1|bipv-str |   URL: http://0.0.0.0:8501
+1|bipv-str |
+1|bipv-str |   Stopping...
+1|bipv-str |
+1|bipv-str |   You can now view your Streamlit app in your browser.
+1|bipv-str |
+1|bipv-str |   URL: http://0.0.0.0:8501
+1|bipv-str |
+1|bipv-str |   Stopping...
+1|bipv-str |
+1|bipv-str |   You can now view your Streamlit app in your browser.
+1|bipv-str |
+1|bipv-str |   URL: http://0.0.0.0:8501
+1|bipv-str |
+1|bipv-str |   Stopping...
+1|bipv-str |
+1|bipv-str |   You can now view your Streamlit app in your browser.
+1|bipv-str |
+1|bipv-str |   URL: http://0.0.0.0:8501
+1|bipv-str |
