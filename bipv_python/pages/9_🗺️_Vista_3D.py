@@ -931,6 +931,60 @@ with tab_solar:
                     st.metric("⚡ Producción total del sistema", f"{_tot_r:,.0f} kWh/año")
                     st.caption(f"η={_eta_g*100:.0f}% · PR={_pr_g*100:.0f}%")
 
+            # ── Integrar al análisis financiero ──────────────────────────────
+            if _poa_ss:
+                st.divider()
+                st.markdown("##### 🔗 Integrar al análisis financiero")
+                st.caption(
+                    "Envía la producción combinada de todas las superficies al "
+                    "Financiero, Baterías y CO₂ usando **claves exclusivas** — "
+                    "nunca sobreescribe `poa_df` ni `E_ac_anual_kWh` de superficie simple."
+                )
+
+                _multisup_activo = st.session_state.get("multisup_activo", False)
+                _ci1, _ci2 = st.columns([2, 3])
+
+                _btn_integrar = _ci1.button(
+                    "🔗 Usar sistema multi-superficie en Financiero",
+                    type="primary",
+                    key="btn_integrar_multisup",
+                )
+
+                if _multisup_activo:
+                    _ci2.success(
+                        f"✅ Modo multi-superficie **activo** — "
+                        f"E_ac total: **{st.session_state.get('E_ac_anual_kWh_multisup', 0):,.0f} kWh/año** "
+                        f"· Área: **{st.session_state.get('area_total_multisup', 0):.1f} m²**"
+                    )
+                    if _ci2.button("✖ Desactivar modo multi-superficie", key="btn_desactivar_multisup"):
+                        for _k in ("multisup_activo", "poa_df_multisup",
+                                   "E_ac_anual_kWh_multisup", "area_total_multisup",
+                                   "multisup_desglose"):
+                            st.session_state.pop(_k, None)
+                        st.rerun()
+
+                if _btn_integrar:
+                    from calculos.multi_superficie import (
+                        agregar_poa_ponderada, e_ac_total_multisup,
+                    )
+                    _sups_act_int = [s for s in _sups_actualizado if s.get("activa", True)]
+                    _eta_int = float(st.session_state.get("eta_panel", 0.16))
+                    _pr_int  = float(st.session_state.get("pr_sistema", 0.78))
+
+                    # POA combinada ponderada (clave exclusiva — no toca poa_df)
+                    _poa_comb = agregar_poa_ponderada(_poa_ss, _sups_act_int)
+
+                    # E_ac y desglose
+                    _res_int = e_ac_total_multisup(_poa_ss, _sups_act_int, _eta_int, _pr_int)
+
+                    # Escribir SOLO claves exclusivas
+                    st.session_state["poa_df_multisup"]         = _poa_comb          # no toca poa_df
+                    st.session_state["E_ac_anual_kWh_multisup"] = _res_int["e_ac_total_kWh"]
+                    st.session_state["area_total_multisup"]      = _res_int["area_total_m2"]
+                    st.session_state["multisup_desglose"]        = _res_int["desglose"]
+                    st.session_state["multisup_activo"]          = True
+                    st.rerun()
+
 
         # ════════════════════════════════════════════════════════════════════
         # SUB-TAB 2 — VISTA 3D MULTI-SUPERFICIE

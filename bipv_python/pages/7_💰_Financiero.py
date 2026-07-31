@@ -26,16 +26,48 @@ p_stc   = st.session_state.get("P_stc_kW_sistema", 0.0)
 n_pan   = st.session_state.get("N_paneles_final", 64)
 ciudad  = st.session_state.get("tmy_ciudad", "Bogotá")
 
-# Usar E_ac corregida por bypass si está disponible (Tarea #35)
-_e_ac_base   = st.session_state.get("E_ac_anual_kWh", 0.0)
-_e_ac_bypass = st.session_state.get("E_ac_anual_kWh_bypass", 0.0)
-_bypass_ok   = st.session_state.get("bypass_ok", False)
-_kwh_bypass  = st.session_state.get("kwh_bypass_anual", 0.0)
+# ── Prioridad E_ac: multi-superficie > bypass > base ─────────────────────────
+# Claves exclusivas — nunca se sobreescriben entre sí
+_e_ac_base     = st.session_state.get("E_ac_anual_kWh", 0.0)
+_e_ac_bypass   = st.session_state.get("E_ac_anual_kWh_bypass", 0.0)
+_e_ac_multisup = st.session_state.get("E_ac_anual_kWh_multisup", 0.0)
+_bypass_ok     = st.session_state.get("bypass_ok", False)
+_kwh_bypass    = st.session_state.get("kwh_bypass_anual", 0.0)
+_multisup_ok   = st.session_state.get("multisup_activo", False)
+_area_multisup = st.session_state.get("area_total_multisup", 0.0)
+_desglose_ms   = st.session_state.get("multisup_desglose", [])
+_n_sups        = len(_desglose_ms)
 
-e_ac = _e_ac_bypass if (_bypass_ok and _e_ac_bypass > 0) else _e_ac_base
+if _multisup_ok and _e_ac_multisup > 0:
+    e_ac = _e_ac_multisup
+elif _bypass_ok and _e_ac_bypass > 0:
+    e_ac = _e_ac_bypass
+else:
+    e_ac = _e_ac_base
 
 if prod_ok and e_ac > 0:
-    if _bypass_ok and _e_ac_bypass > 0:
+    if _multisup_ok and _e_ac_multisup > 0:
+        st.success(
+            f"✅ Sistema multi-superficie — **{e_ac:,.0f} kWh/año** | "
+            f"{_n_sups} superficie(s) · Área total: **{_area_multisup:.1f} m²** | Ciudad: **{ciudad}**"
+        )
+        st.info(
+            f"🏗️ **Modo multi-superficie activo:** TIR y Payback calculados con la suma "
+            f"de todas las superficies BIPV definidas en 🗺️ Vista 3D. "
+            f"Producción superficie principal: {_e_ac_base:,.0f} kWh/año."
+        )
+        if _desglose_ms:
+            import pandas as _pd_fin
+            _df_des = _pd_fin.DataFrame([
+                {"Superficie": d["nombre"], "Tipo": d["tipo"],
+                 "Área (m²)": f"{d['area_m2']:.1f}",
+                 "POA (kWh/m²/año)": f"{d['poa_kWh_m2']:.0f}",
+                 "E_ac (kWh/año)": f"{d['e_ac_kWh']:,.0f}"}
+                for d in _desglose_ms
+            ])
+            with st.expander("📋 Desglose por superficie"):
+                st.dataframe(_df_des, use_container_width=True, hide_index=True)
+    elif _bypass_ok and _e_ac_bypass > 0:
         st.success(
             f"✅ Producción con corrección bypass — **{e_ac:,.0f} kWh/año** | "
             f"Sistema: **{p_stc:.2f} kWp** ({n_pan} módulos) | Ciudad: **{ciudad}**"

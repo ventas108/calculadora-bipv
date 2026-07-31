@@ -289,3 +289,76 @@ def color_fs(fs: float) -> str:
     if fs < 0.35:
         return "rgb(237, 137, 54)"    # naranja
     return "rgb(229, 62, 62)"         # rojo
+
+
+# ── Integración multi-superficie → sistema principal ──────────────────────────
+
+def agregar_poa_ponderada(
+    poa_superficies: dict,
+    superficies: list[dict],
+) -> "pd.DataFrame":
+    """
+    Combina los perfiles POA horarios de múltiples superficies en un único
+    DataFrame ponderado por área activa.
+
+    No sobreescribe 'poa_df' (superficie simple de Pág. 2).
+    Se guarda en session_state['poa_df_multisup'].
+
+    Retorna DataFrame con columna 'poa_global' (W/m²) representando
+    la irradiancia media ponderada del sistema completo.
+    """
+    frames, pesos = [], []
+    for sup in superficies:
+        if not sup.get("activa", True):
+            continue
+        poa = poa_superficies.get(sup["nombre"])
+        if poa is None or poa.empty or "poa_global" not in poa.columns:
+            continue
+        frames.append(poa["poa_global"])
+        pesos.append(float(sup["area_m2"]))
+
+    if not frames:
+        return pd.DataFrame()
+
+    area_total = sum(pesos)
+    if area_total <= 0:
+        return pd.DataFrame()
+
+    combinado = sum(f * (w / area_total) for f, w in zip(frames, pesos))
+    return pd.DataFrame({"poa_global": combinado})
+
+
+def e_ac_total_multisup(
+    poa_superficies: dict,
+    superficies: list[dict],
+    eta_panel: float = 0.16,
+    pr: float = 0.78,
+) -> dict:
+    """
+    Calcula E_ac anual total y por superficie para el sistema multi-superficie.
+
+    Retorna:
+        e_ac_total_kWh  : float — suma de todas las superficies activas
+        area_total_m2   : float — suma de áreas activas
+        desglose        : list[dict] — {nombre, tipo, area_m2, e_ac_kWh, poa_kWh_m2}
+    """
+    desglose, e_total, area_total = [], 0.0, 0.0
+    for sup in superficies:
+        if not sup.get("activa", True):
+            continue
+        poa = poa_superficies.get(sup["nombre"])
+        prod = produccion_superficie(poa, sup["area_m2"], eta_panel, pr)
+        e_total    += prod["e_ac_anual_kWh"]
+        area_total += sup["area_m2"]
+        desglose.append({
+            "nombre":       sup["nombre"],
+            "tipo":         sup["tipo"],
+            "area_m2":      sup["area_m2"],
+            "e_ac_kWh":     prod["e_ac_anual_kWh"],
+            "poa_kWh_m2":   prod["poa_anual_kWh_m2"],
+        })
+    return {
+        "e_ac_total_kWh": round(e_total, 1),
+        "area_total_m2":  round(area_total, 1),
+        "desglose":        desglose,
+    }
