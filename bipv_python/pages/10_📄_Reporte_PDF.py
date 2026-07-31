@@ -65,6 +65,16 @@ with col_op2:
                 help="Incluye emisiones CO₂ evitadas, equivalencias IDEAM (árboles, hogares), "
                      "valor en bonos de carbono y contribución al NDC Colombia 2030. "
                      "Ejecuta 🌿 Huella CO₂ primero para activar.")
+    _multisup_ui = bool(st.session_state.get("multisup_activo", False))
+    st.checkbox("🏗️ Incluir desglose Multi-Superficie",
+                value=_multisup_ui, key="rep_inc_multisup",
+                help="Tabla de producción y bypass por superficie. "
+                     "Activa en 🗺️ Vista 3D › ⚙️ Superficies BIPV primero.")
+    _ppto_ui = float(st.session_state.get("presupuesto_capex_usd", 0)) > 0
+    st.checkbox("💼 Incluir Resumen de Costos del Presupuesto",
+                value=_ppto_ui, key="rep_inc_presupuesto",
+                help="CAPEX, OPEX y desglose del Presupuesto. "
+                     "Completa 💼 Presupuesto primero.")
 
 st.markdown("---")
 
@@ -553,6 +563,99 @@ def generar_html_reporte() -> str:
                 pass
         html += cierre()
 
+    # ── 4d. Desglose Multi-Superficie (#45) ──────────────────────────────────
+    _inc_ms = st.session_state.get("rep_inc_multisup", False)
+    _ms_activo    = bool(st.session_state.get("multisup_activo", False))
+    _ms_desglose  = st.session_state.get("multisup_desglose", [])
+    _ms_e_ac      = float(st.session_state.get("E_ac_anual_kWh_multisup", 0.0))
+    _ms_area      = float(st.session_state.get("area_total_multisup", 0.0))
+    _ms_bp_ok     = bool(st.session_state.get("bypass_multisup_ok", False))
+    _ms_bp_rows   = st.session_state.get("bypass_multisup_resultados", [])
+
+    if _inc_ms and _ms_activo and _ms_desglose and _ms_e_ac > 0:
+        html += seccion("Producción Multi-Superficie — Desglose por Superficie BIPV", "🏗️", "#6c3483")
+
+        # Tabla de desglose
+        html += """
+        <table style="width:100%;border-collapse:collapse;font-size:0.88em;margin-bottom:14px;">
+        <thead><tr style="background:#6c3483;color:#fff;">
+          <th style="padding:6px 10px;text-align:left;">Superficie</th>
+          <th style="padding:6px 10px;text-align:left;">Tipo</th>
+          <th style="padding:6px 10px;text-align:right;">Área (m²)</th>
+          <th style="padding:6px 10px;text-align:right;">% área</th>
+          <th style="padding:6px 10px;text-align:right;">POA (kWh/m²/año)</th>
+          <th style="padding:6px 10px;text-align:right;">E_ac (kWh/año)</th>
+          <th style="padding:6px 10px;text-align:right;">% E_ac</th>
+        </tr></thead><tbody>"""
+        for _ri, _s in enumerate(_ms_desglose):
+            _bg = "#f4f6f7" if _ri % 2 == 0 else "white"
+            _pct_a = _s.get("area_m2", 0) / max(1.0, _ms_area) * 100
+            _pct_e = _s.get("e_ac_kWh", 0) / max(1.0, _ms_e_ac) * 100
+            html += f"""
+            <tr style="background:{_bg};">
+              <td style="padding:5px 10px;font-weight:600;">{_s.get('nombre','—')}</td>
+              <td style="padding:5px 10px;color:#666;">{_s.get('tipo','—')}</td>
+              <td style="padding:5px 10px;text-align:right;">{_s.get('area_m2',0):.1f}</td>
+              <td style="padding:5px 10px;text-align:right;color:#888;">{_pct_a:.1f}%</td>
+              <td style="padding:5px 10px;text-align:right;">{_s.get('poa_kWh_m2',0):,.0f}</td>
+              <td style="padding:5px 10px;text-align:right;font-weight:700;">{_s.get('e_ac_kWh',0):,.0f}</td>
+              <td style="padding:5px 10px;text-align:right;color:#6c3483;">{_pct_e:.1f}%</td>
+            </tr>"""
+        html += f"""
+            <tr style="background:#6c3483;color:white;font-weight:bold;">
+              <td style="padding:6px 10px;" colspan="2">TOTAL SISTEMA</td>
+              <td style="padding:6px 10px;text-align:right;">{_ms_area:.1f}</td>
+              <td style="padding:6px 10px;text-align:right;">100%</td>
+              <td style="padding:6px 10px;text-align:right;">—</td>
+              <td style="padding:6px 10px;text-align:right;">{_ms_e_ac:,.0f}</td>
+              <td style="padding:6px 10px;text-align:right;">100%</td>
+            </tr>
+        </tbody></table>"""
+
+        # Tabla bypass por superficie (si está disponible)
+        if _ms_bp_ok and _ms_bp_rows:
+            html += """
+            <p style="margin:16px 0 8px;font-weight:600;color:#6c3483;">
+              ⚡ Pérdidas por bypass diodes — por superficie
+            </p>
+            <table style="width:100%;border-collapse:collapse;font-size:0.85em;margin-bottom:14px;">
+            <thead><tr style="background:#922b21;color:#fff;">
+              <th style="padding:5px 8px;text-align:left;">Superficie</th>
+              <th style="padding:5px 8px;text-align:left;">Fachada CSV</th>
+              <th style="padding:5px 8px;text-align:right;">E_ac base (kWh/año)</th>
+              <th style="padding:5px 8px;text-align:right;">Pérdida bypass (%)</th>
+              <th style="padding:5px 8px;text-align:right;">Horas bypass/año</th>
+              <th style="padding:5px 8px;text-align:right;">E_ac con bypass (kWh/año)</th>
+            </tr></thead><tbody>"""
+            for _bi, _br in enumerate(_ms_bp_rows):
+                _bg = "#fff" if _bi % 2 == 0 else "#fdf2f2"
+                html += f"""
+                <tr style="background:{_bg};">
+                  <td style="padding:4px 8px;font-weight:600;">{_br.get('Superficie','—')}</td>
+                  <td style="padding:4px 8px;color:#888;">{_br.get('Fachada CSV','—')}</td>
+                  <td style="padding:4px 8px;text-align:right;">{_br.get('E_ac base (kWh/año)','—')}</td>
+                  <td style="padding:4px 8px;text-align:right;color:#c62828;font-weight:700;">{_br.get('Pérdida bypass (%)','—')}</td>
+                  <td style="padding:4px 8px;text-align:right;">{_br.get('Horas bypass/año','—')}</td>
+                  <td style="padding:4px 8px;text-align:right;font-weight:700;">{_br.get('E_ac bypass (kWh/año)','—')}</td>
+                </tr>"""
+            html += f"""
+                <tr style="background:#922b21;color:white;font-weight:bold;">
+                  <td colspan="5" style="padding:5px 8px;">E_ac TOTAL CON BYPASS</td>
+                  <td style="padding:5px 8px;text-align:right;">{_ms_e_ac:,.0f} kWh/año</td>
+                </tr>
+            </tbody></table>"""
+
+        html += caja_nota(
+            f"Sistema con <strong>{len(_ms_desglose)} superficies activas</strong> — "
+            f"área total <strong>{_ms_area:.1f} m²</strong> · "
+            f"E_ac total <strong>{_ms_e_ac:,.0f} kWh/año</strong> · "
+            f"densidad <strong>{_ms_e_ac / max(1.0, _ms_area):.0f} kWh/m²·año</strong>."
+            + (" Los valores de E_ac ya incluyen la corrección por bypass diodes."
+               if _ms_bp_ok else ""),
+            color="#f5eef8", borde="#6c3483", icono="🏗️"
+        )
+        html += cierre()
+
     # ── 5. Financiero ─────────────────────────────────────────────────────────
     if financiero_ok and incluir_fin and fin:
         vpn        = fin.get("vpn_usd", 0)
@@ -562,14 +665,22 @@ def generar_html_reporte() -> str:
         capex_n    = ben.get("capex_neto_usd", capex) if ben else capex
         des_1715   = ben.get("descuento_ica_pct", 0) if ben else 0
 
-        # Trazabilidad E_ac (#38): base vs bypass-corregida
-        _e_ac_base_pdf   = res_prod.get("E_ac_anual_kWh", 0)
-        _e_ac_bypass_pdf = st.session_state.get("E_ac_anual_kWh_bypass", 0)
-        _kwh_bp_pdf      = bypass_res_r.get("kwh_bypass_anual", 0) if bypass_ok_r else 0
-        _e_ac_fin_label  = (
-            f"{_e_ac_bypass_pdf:,.0f} kWh/año (corregida por bypass)"
-            if (bypass_ok_r and _e_ac_bypass_pdf > 0)
-            else f"{_e_ac_base_pdf:,.0f} kWh/año (simulación estándar)"
+        # Trazabilidad E_ac (#38): multi-sup > bypass > base
+        _e_ac_base_pdf     = res_prod.get("E_ac_anual_kWh", 0)
+        _e_ac_bypass_pdf   = st.session_state.get("E_ac_anual_kWh_bypass", 0)
+        _e_ac_multisup_pdf = float(st.session_state.get("E_ac_anual_kWh_multisup", 0.0))
+        _multisup_ok_pdf   = bool(st.session_state.get("multisup_activo", False))
+        _n_sups_pdf        = len(st.session_state.get("multisup_desglose", []))
+        _kwh_bp_pdf        = bypass_res_r.get("kwh_bypass_anual", 0) if bypass_ok_r else 0
+        _e_ac_fin_label    = (
+            f"{_e_ac_multisup_pdf:,.0f} kWh/año "
+            f"(multi-superficie — {_n_sups_pdf} superficies{'  + bypass' if st.session_state.get('bypass_multisup_ok') else ''})"
+            if (_multisup_ok_pdf and _e_ac_multisup_pdf > 0)
+            else (
+                f"{_e_ac_bypass_pdf:,.0f} kWh/año (corregida por bypass diodes)"
+                if (bypass_ok_r and _e_ac_bypass_pdf > 0)
+                else f"{_e_ac_base_pdf:,.0f} kWh/año (simulación estándar superficie única)"
+            )
         )
 
         html += seccion("Análisis Financiero — Ley 1715 / 2014", "💰")
@@ -596,6 +707,71 @@ def generar_html_reporte() -> str:
              "LCOE < tarifa de red indica que generar es más barato que comprar. "
              "Los beneficios de la Ley 1715/2014 incluyen: deducción del 50% del IVA en equipos, "
              "exención de aranceles, y depreciación acelerada.")
+        html += cierre()
+
+    # ── 5b. Resumen de Costos del Presupuesto (#8) ────────────────────────────
+    _inc_ppto     = st.session_state.get("rep_inc_presupuesto", False)
+    _capex_ppto   = float(st.session_state.get("presupuesto_capex_usd", 0.0))
+    _directo_ppto = float(st.session_state.get("presupuesto_capex_directo", 0.0))
+    _blando_ppto  = float(st.session_state.get("presupuesto_capex_blando", 0.0))
+    _opex_ppto    = float(st.session_state.get("presupuesto_opex_anual_usd", 0.0))
+    _frac_eq_ppto = float(st.session_state.get("presupuesto_fraccion_equipos", 0.65))
+
+    if _inc_ppto and _capex_ppto > 0:
+        _area_pp   = float(st.session_state.get("area_fachada_m2", 0) or 0)
+        _potencia_pp = float(st.session_state.get("P_stc_kW_sistema", 0) or 0)
+        _tc_pp     = tipo_cambio_rep
+        _otros_ppto = _capex_ppto - _directo_ppto - _blando_ppto
+
+        html += seccion("Resumen de Costos — Presupuesto del Proyecto", "💼", "#1a5276")
+        html += tabla_kv([
+            ("CAPEX directo (equipos + obra)",
+             f"USD {_directo_ppto:,.0f}",
+             f"$ {_directo_ppto*_tc_pp/1e6:.2f} M COP",
+             f"{_directo_ppto/_capex_ppto*100:.1f}% del CAPEX total — módulos, inversor, estructura, instalación"),
+            ("Costos blandos (ingeniería + permisos)",
+             f"USD {_blando_ppto:,.0f}",
+             f"$ {_blando_ppto*_tc_pp/1e6:.2f} M COP",
+             f"{_blando_ppto/_capex_ppto*100:.1f}% del CAPEX — diseño, licencias, interventoría"),
+            *([(
+                "Otros (contingencias + imprevistos)",
+                f"USD {_otros_ppto:,.0f}",
+                f"$ {_otros_ppto*_tc_pp/1e6:.2f} M COP",
+                f"{_otros_ppto/_capex_ppto*100:.1f}% del CAPEX"
+            )] if _otros_ppto > 50 else []),
+            ("CAPEX TOTAL",
+             f"USD {_capex_ppto:,.0f}",
+             f"$ {_capex_ppto*_tc_pp/1e6:.2f} M COP",
+             "Inversión inicial total del proyecto"),
+            *([(
+                "Costo unitario por m²",
+                f"USD {_capex_ppto/_area_pp:,.0f}/m²",
+                f"$ {_capex_ppto*_tc_pp/_area_pp/1e3:.1f} k COP/m²",
+                "Referencia BIPV Colombia: USD 180–350/m²"
+            )] if _area_pp > 0 else []),
+            *([(
+                "Costo por kWp instalado",
+                f"USD {_capex_ppto/_potencia_pp:,.0f}/kWp",
+                f"$ {_capex_ppto*_tc_pp/_potencia_pp/1e6:.2f} M COP/kWp",
+                "Referencia BIPV Colombia: USD 900–1.800/kWp"
+            )] if _potencia_pp > 0 else []),
+            ("Fracción equipos (para Ley 1715)",
+             f"{_frac_eq_ppto*100:.1f}%",
+             "del CAPEX",
+             "Base para calcular beneficios tributarios Art. 11–14 Ley 1715/2014"),
+            *([(
+                "OPEX anual (O&M)",
+                f"USD {_opex_ppto:,.0f}/año",
+                f"$ {_opex_ppto*_tc_pp/1e6:.2f} M COP/año",
+                f"{_opex_ppto/_capex_ppto*100:.2f}% del CAPEX — limpieza, revisión, seguros"
+            )] if _opex_ppto > 0 else []),
+        ],
+        nota=(
+            "CAPEX directo = módulos BIPV + inversor + estructura + instalación. "
+            "Costos blandos = diseño técnico, trámites, interventoría, gastos bancables. "
+            "La fracción de equipos determina el monto sobre el que aplican los beneficios tributarios "
+            "de la Ley 1715/2014 (IVA, renta, depreciación acelerada)."
+        ))
         html += cierre()
 
     # ── 6. Balance Energético y Clasificación ────────────────────────────────
