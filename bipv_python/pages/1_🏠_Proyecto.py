@@ -40,12 +40,18 @@ with col1:
     ciudad = st.selectbox("Ciudad", LISTA_CIUDADES,
                           index=LISTA_CIUDADES.index(ciudad_anterior))
 
-    # Si la ciudad cambió → resetear coordenadas a las de la nueva ciudad
+    # Si la ciudad cambió → pre-cargar coords de la nueva ciudad y rerenderizar limpio
     if ciudad != ciudad_anterior:
-        for _k in ("lat_proyecto", "lon_proyecto", "alt_proyecto",
-                   "_lat_custom_temp", "_lon_custom_temp", "_alt_custom_temp"):
-            st.session_state.pop(_k, None)
+        c_nueva = CIUDADES.get(ciudad, {})
         st.session_state["ciudad"] = ciudad
+        # Establecer coords nuevas ANTES de renderizar el expander (evita DOM error)
+        st.session_state["_lat_custom_temp"] = c_nueva.get("lat", 4.711)
+        st.session_state["_lon_custom_temp"] = c_nueva.get("lon", -74.072)
+        st.session_state["_alt_custom_temp"] = c_nueva.get("alt_m", 0)
+        for _k in ("lat_proyecto", "lon_proyecto", "alt_proyecto",
+                   "densidad_Wm2", "PR", "tilt_default"):
+            st.session_state.pop(_k, None)
+        st.rerun()  # Re-render limpio para evitar DOM error al cambiar ciudad
 
     # ── Tipo de instalación ───────────────────────────────────────────────────
     tipo_anterior = st.session_state.get("tipo_instalacion", "Fachada BIPV")
