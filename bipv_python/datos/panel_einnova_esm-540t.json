@@ -1,0 +1,22 @@
+{
+    "Marca": "EINNOVA Solarline",
+    "Tecnologia": "N-Type TopCon Bifacial Mono",
+    "DimensionesMM": "2094x1134x30",
+    "CostoUSD": null,
+    "NOCT_C": 45,
+    "CoefT_C": -0.36,
+    "CoefVoc_C": -0.26,
+    "TransparenciaPct": 0,
+    "n (Factor Idealidad)": 1.3,
+    "Fuente NsA": "Ficha oficial EINNOVA ESM-T series — Ns estimado (confirmar dims)",
+    "Confianza": "Media",
+    "TipoPanel": "EINNOVA ESM-540T TopCon Bifacial",
+    "PmaxWp": 540,
+    "Voc_STC": 46.7,
+    "Isc_STC": 14.35,
+    "Vmp_STC": 39.4,
+    "Imp_STC": 13.7,
+    "Ns (Celdas Serie)": 132,
+    "NsA = n × Ns": 171.6,
+    "Notas": "Ficha oficial EINNOVA ESM-540T TopCon Bifacial. Efic=22.74%. CoefIsc=+0.04%/°C. Vmax=1500Vdc. Dims ESTIMADAS — confirmar con EINNOVA."
+}
