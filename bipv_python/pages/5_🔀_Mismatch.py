@@ -36,19 +36,36 @@ if not st.session_state.get("recurso_solar_ok"):
     st.stop()
 
 tmy       = st.session_state["tmy_df"]
-poa_base  = st.session_state["poa_df"]
 ciudad    = st.session_state.get("tmy_ciudad", "—")
 c         = CIUDADES[ciudad]
 lat, lon, alt_m = c["lat"], c["lon"], c["alt_m"]
-poa_anual = st.session_state.get("poa_anual_kWh_m2", 0.0)
 tilt_def  = st.session_state.get("tilt_fachada", 90)
 az_def    = st.session_state.get("azimuth_fachada", 0)
 or_label  = st.session_state.get("orientacion_label", "Norte (0°)")
 
-st.info(
-    f"📍 **{ciudad}** — POA fachada {or_label} / {tilt_def}°: "
-    f"**{poa_anual:,.0f} kWh/m²/año**"
-)
+# ── Prioridad POA: multi-superficie > superficie simple ───────────────────────
+_multisup_ok  = st.session_state.get("multisup_activo", False)
+_poa_multisup = st.session_state.get("poa_df_multisup")
+_ms_area      = st.session_state.get("area_total_multisup", 0.0)
+_ms_desglose  = st.session_state.get("multisup_desglose", [])
+_ms_nsups     = len(_ms_desglose)
+
+if _multisup_ok and _poa_multisup is not None and not _poa_multisup.empty:
+    poa_base  = _poa_multisup                                    # clave exclusiva — no toca poa_df
+    poa_anual = float(poa_base["poa_global"].sum() / 1000.0)
+    st.info(
+        f"🏗️ **Modo multi-superficie activo** — POA combinada ponderada por área: "
+        f"**{poa_anual:,.0f} kWh/m²/año** | {_ms_nsups} superficie(s) · "
+        f"Área total: **{_ms_area:.1f} m²**. "
+        "La cascada de pérdidas se aplica al sistema completo."
+    )
+else:
+    poa_base  = st.session_state["poa_df"]
+    poa_anual = st.session_state.get("poa_anual_kWh_m2", 0.0)
+    st.info(
+        f"📍 **{ciudad}** — POA fachada {or_label} / {tilt_def}°: "
+        f"**{poa_anual:,.0f} kWh/m²/año**"
+    )
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 1 — SOMBREADO DE HORIZONTE
@@ -484,6 +501,14 @@ if btn_cascada or st.session_state.get("cascada_ok"):
     st.session_state["factor_sombra_anual"]       = factor_sombra_anual
     st.session_state["factor_mismatch_or_pct"]    = factor_mismatch_or_pct
     st.session_state["mismatch_ok"]               = True
+
+    # ── Clave exclusiva multi-superficie (no sobreescribe poa_efectiva_kWh_m2) ─
+    if _multisup_ok and _poa_multisup is not None:
+        st.session_state["poa_efectiva_kWh_m2_multisup"] = round(poa_efectiva, 1)
+        st.session_state["factor_global_mismatch_multisup"] = fg
+        # Nota: E_ac_anual_kWh_multisup NO se recalcula aquí para evitar
+        # doble conteo con el PR ya aplicado en Vista 3D. El factor_global_mismatch
+        # queda disponible para que Producción lo aplique si el usuario lo decide.
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 5 — BYPASS DIODES · Pérdida eléctrica por sombra parcial
