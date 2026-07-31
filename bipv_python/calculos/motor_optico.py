@@ -148,23 +148,38 @@ def cascada_optica(
     coef_temp: float = -0.0045,
     k_bipv: float = 1.3,
     soiling_config: dict | None = None,
+    f_iam_dif: float = 0.95,
+    transparencia: float = 0.0,
+    k_soiling_vert: float = 1.0,
 ) -> tuple[pd.DataFrame, dict]:
     """
-    Aplica la cascada completa IAM → Soiling → Térmico al TMY de 8760 h.
+    Aplica la cascada completa de correcciones reales de vidrio BIPV:
+    IAM (directa + difusa) → Soiling → Térmico → Transparencia
 
-    La corrección por transparencia (η_adj = η_base × (1-τ)) NO se aplica
-    aquí porque pertenece al modelo eléctrico (Dimensionamiento); la τ solo
-    afecta la eficiencia STC, no la irradiancia.
+    Correcciones implementadas
+    --------------------------
+    1. IAM directa   : ASHRAE  f_iam = 1 − b0×(1/cosAOI − 1)
+    2. IAM difusa    : factor constante f_iam_dif (IEC 61853-3: 0.95 para vidrio plano)
+    3. Soiling       : factores mensuales Colombia × k_soiling_vert (auto-limpieza vertical)
+    4. Térmico BIPV  : NOCT + k_BIPV confinamiento (IEA-PVPS T15)
+    5. Transparencia : solo fracción opaca (1−τ) contribuye a generación eléctrica
 
     Parameters
     ----------
-    tmy_df  : DataFrame 8760h con columnas G_h, Gb_n, Gd_h, T2m, WS10m
-    poa_df  : DataFrame 8760h de calcular_poa() — columnas poa_global, poa_direct, …
-    b0      : coeficiente ASHRAE del vidrio
-    noct    : temperatura nominal de operación (°C)
-    coef_temp: coeficiente térmico en decimal/°C (ej. -0.0045)
-    k_bipv  : factor de confinamiento térmico
-    soiling_config: dict mes→fracción opcional; si None usa SOILING_COLOMBIA
+    tmy_df         : DataFrame 8760h con columnas G_h, Gb_n, Gd_h, T2m, WS10m
+    poa_df         : DataFrame 8760h de calcular_poa() — columnas poa_global, poa_direct, …
+    b0             : coeficiente ASHRAE del vidrio (0.05 estándar, 0.12 CdTe)
+    noct           : temperatura nominal de operación (°C)
+    coef_temp      : coeficiente térmico en decimal/°C (ej. -0.0045)
+    k_bipv         : factor de confinamiento térmico (1.0 ventilado, 1.3 fachada, 1.5 sellado)
+    soiling_config : dict mes→fracción; si None usa SOILING_COLOMBIA
+    f_iam_dif      : factor IAM para componente difusa (0–1). Defecto 0.95 per IEC 61853-3.
+                     La difusa llega desde todos los ángulos → valor promedio esférico.
+    transparencia  : fracción de área transparente del vidrio BIPV (0–1).
+                     Ej. τ=0.40 → 40% del área es vidrio sin celda; solo (1−τ) genera.
+    k_soiling_vert : factor de auto-limpieza para fachadas verticales (0–1).
+                     Verticales se ensucian ~35% menos que inclinadas (k≈0.65).
+                     Defecto 1.0 = sin ajuste.
 
     Returns
     -------
@@ -201,16 +216,30 @@ def cascada_optica(
     aoi_deg = np.degrees(np.arccos(cos_aoi))
     aoi_deg = np.where(dni <= 2.0, 90.0, aoi_deg)   # noche/nuboso → reflexión total
 
-    # ── 1. IAM ASHRAE ─────────────────────────────────────────────────────────
+    # ── 1. IAM ASHRAE — componente DIRECTA ────────────────────────────────────
     f_iam        = iam_ashrae(aoi_deg, b0)
     poa_dir_neta = poa_dir * f_iam
-    poa_optica   = poa_dir_neta + poa_dif            # POA después de reflexión geométrica
-    perd_iam     = poa_dir - poa_dir_neta             # pérdida por reflexión (W/m²)
+    perd_iam_dir = poa_dir - poa_dir_neta
+
+    # ── 1b. IAM difusa — factor constante por tipo de vidrio (IEC 61853-3) ───
+    # La difusa llega desde todos los ángulos sólidos del hemisferio → factor
+    # promedio esférico ≈ 0.95 para vidrio plano; se aplica sobre toda la difusa.
+    f_iam_dif_arr = float(np.clip(f_iam_dif, 0.80, 1.0))
+    poa_dif_neta  = poa_dif * f_iam_dif_arr
+    perd_iam_dif  = poa_dif - poa_dif_neta
+
+    poa_optica = poa_dir_neta + poa_dif_neta          # POA después de toda reflexión
+    perd_iam   = perd_iam_dir + perd_iam_dif          # pérdida total IAM (W/m²)
 
     # ── 2. Soiling estacional Colombia ────────────────────────────────────────
-    f_soil       = soiling_series(idx, tmy_df, soiling_config)
+    # k_soiling_vert < 1.0 reduce la suciedad en fachadas verticales que
+    # se auto-limpian con la lluvia más eficientemente que superficies inclinadas.
+    f_soil_base  = soiling_series(idx, tmy_df, soiling_config)
+    k_vert       = float(np.clip(k_soiling_vert, 0.3, 1.0))
+    f_soil       = f_soil_base * k_vert
+
     poa_post_soil = poa_optica * (1.0 - f_soil)
-    perd_soil    = poa_optica * f_soil
+    perd_soil     = poa_optica * f_soil
 
     # ── 3. Modelo térmico BIPV confinado ──────────────────────────────────────
     T_amb = (tmy_df["T2m"].values
@@ -218,35 +247,50 @@ def cascada_optica(
              else np.full(len(idx), 22.0))
     f_term = factor_termico_bipv(poa_optica, T_amb, noct, coef_temp, k_bipv)
 
-    # La corrección térmica actúa como factor sobre la eficiencia de conversión,
-    # lo que equivale a escalar la POA efectiva (energia aprovechable).
-    poa_efectiva = np.maximum(poa_post_soil * f_term, 0.0)
-    perd_term    = np.maximum(poa_post_soil - poa_post_soil * f_term, 0.0)
+    poa_post_term = np.maximum(poa_post_soil * f_term, 0.0)
+    perd_term     = np.maximum(poa_post_soil - poa_post_term, 0.0)
+
+    # ── 4. Corrección por transparencia del vidrio BIPV ───────────────────────
+    # Solo la fracción opaca (1−τ) genera electricidad.
+    # Ej. CdTe 40% transparente → τ=0.40 → solo 60% del área es activa.
+    # Esto es una corrección geométrica/óptica, no eléctrica, porque determina
+    # cuánta irradiancia intercepta las celdas por m² de fachada total.
+    tau = float(np.clip(transparencia, 0.0, 0.95))
+    f_tau        = 1.0 - tau
+    poa_efectiva = np.maximum(poa_post_term * f_tau, 0.0)
+    perd_tau     = np.maximum(poa_post_term - poa_efectiva, 0.0)
 
     # ── DataFrame resultado horario ───────────────────────────────────────────
     result_df = pd.DataFrame({
         "poa_bruta":      poa_bruta,
-        "poa_optica":     poa_optica,
+        "poa_optica":     poa_optica,       # tras IAM dir + dif
         "poa_post_soil":  poa_post_soil,
-        "poa_efectiva":   poa_efectiva,   # ← usar como poa_global en downstream
+        "poa_post_term":  poa_post_term,
+        "poa_efectiva":   poa_efectiva,     # ← usar como poa_global en downstream
         "f_iam":          f_iam,
+        "f_iam_dif":      f_iam_dif_arr,
         "aoi_deg":        aoi_deg,
         "f_soil":         f_soil,
         "f_term":         f_term,
         "perdida_iam":    np.maximum(perd_iam, 0.0),
+        "perdida_iam_dir": np.maximum(perd_iam_dir, 0.0),
+        "perdida_iam_dif": np.maximum(perd_iam_dif, 0.0),
         "perdida_soil":   np.maximum(perd_soil, 0.0),
         "perdida_term":   perd_term,
+        "perdida_tau":    np.maximum(perd_tau, 0.0),
     }, index=idx)
 
     # ── Resumen anual ─────────────────────────────────────────────────────────
     escala = 1 / 1000.0  # W/m² × h → kWh/m²
-    bruta_a   = float(result_df["poa_bruta"].sum()     * escala)
-    optica_a  = float(result_df["poa_optica"].sum()    * escala)
-    post_s_a  = float(result_df["poa_post_soil"].sum() * escala)
-    efectiva_a = float(result_df["poa_efectiva"].sum() * escala)
-    p_iam_a   = float(result_df["perdida_iam"].sum()   * escala)
-    p_soil_a  = float(result_df["perdida_soil"].sum()  * escala)
-    p_term_a  = float(result_df["perdida_term"].sum()  * escala)
+    bruta_a    = float(result_df["poa_bruta"].sum()      * escala)
+    optica_a   = float(result_df["poa_optica"].sum()     * escala)
+    post_s_a   = float(result_df["poa_post_soil"].sum()  * escala)
+    post_t_a   = float(result_df["poa_post_term"].sum()  * escala)
+    efectiva_a = float(result_df["poa_efectiva"].sum()   * escala)
+    p_iam_a    = float(result_df["perdida_iam"].sum()    * escala)
+    p_soil_a   = float(result_df["perdida_soil"].sum()   * escala)
+    p_term_a   = float(result_df["perdida_term"].sum()   * escala)
+    p_tau_a    = float(result_df["perdida_tau"].sum()    * escala)
 
     # Factores medios (solo horas con sol)
     mask_sol = poa_bruta > 10
@@ -254,40 +298,47 @@ def cascada_optica(
     f_soil_mean = float(f_soil.mean())
     f_term_mean = float(f_term[mask_sol].mean())  if mask_sol.any() else 1.0
 
-    # Factor global de degradación
+    # Factor global de degradación (bruta → efectiva neta)
     factor_global = efectiva_a / bruta_a if bruta_a > 0 else 0.0
 
     # Resumen mensual (kWh/m²/mes)
     meses_es = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
                 "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
     monthly_raw = result_df[["poa_bruta", "poa_efectiva",
-                              "perdida_iam", "perdida_soil", "perdida_term"]
+                              "perdida_iam", "perdida_soil",
+                              "perdida_term", "perdida_tau"]
                             ].resample("ME").sum() * escala
     monthly_raw.index = meses_es
 
     summary: dict = {
-        # Energías anuales
-        "poa_bruta_anual_kWh_m2":     round(bruta_a, 1),
-        "poa_optica_anual_kWh_m2":    round(optica_a, 1),
-        "poa_post_soil_anual_kWh_m2": round(post_s_a, 1),
-        "poa_efectiva_anual_kWh_m2":  round(efectiva_a, 1),
-        # Pérdidas anuales
-        "perdida_iam_kWh_m2":         round(p_iam_a, 1),
-        "perdida_soil_kWh_m2":        round(p_soil_a, 1),
-        "perdida_term_kWh_m2":        round(p_term_a, 1),
-        "perdida_total_kWh_m2":       round(p_iam_a + p_soil_a + p_term_a, 1),
+        # Energías anuales en cada etapa de la cascada
+        "poa_bruta_anual_kWh_m2":      round(bruta_a, 1),
+        "poa_optica_anual_kWh_m2":     round(optica_a, 1),   # tras IAM dir+dif
+        "poa_post_soil_anual_kWh_m2":  round(post_s_a, 1),
+        "poa_post_term_anual_kWh_m2":  round(post_t_a, 1),
+        "poa_efectiva_anual_kWh_m2":   round(efectiva_a, 1), # tras transparencia
+        # Pérdidas anuales por corrección
+        "perdida_iam_kWh_m2":          round(p_iam_a, 1),
+        "perdida_soil_kWh_m2":         round(p_soil_a, 1),
+        "perdida_term_kWh_m2":         round(p_term_a, 1),
+        "perdida_tau_kWh_m2":          round(p_tau_a, 1),
+        "perdida_total_kWh_m2":        round(p_iam_a + p_soil_a + p_term_a + p_tau_a, 1),
         # Factores promedio (horas con sol)
-        "f_iam_prom":                 round(f_iam_mean, 4),
-        "f_soil_prom":                round(1.0 - f_soil_mean, 4),
-        "f_term_prom":                round(f_term_mean, 4),
-        "factor_global":              round(factor_global, 4),
+        "f_iam_prom":                  round(f_iam_mean, 4),
+        "f_iam_dif":                   round(float(f_iam_dif), 4),
+        "f_soil_prom":                 round(1.0 - f_soil_mean, 4),
+        "f_term_prom":                 round(f_term_mean, 4),
+        "f_tau":                       round(1.0 - tau, 4),
+        "factor_global":               round(factor_global, 4),
         # Parámetros usados
-        "b0":       b0,
-        "noct":     noct,
-        "coef_temp": coef_temp,
-        "k_bipv":   k_bipv,
+        "b0":            b0,
+        "noct":          noct,
+        "coef_temp":     coef_temp,
+        "k_bipv":        k_bipv,
+        "k_soiling_vert": k_vert,
+        "transparencia": tau,
         # Tablas mensuales
-        "monthly":  monthly_raw,
+        "monthly":       monthly_raw,
     }
 
     return result_df, summary

@@ -241,10 +241,41 @@ with col3:
     coef_temp = coef_pct / 100.0  # convertir a decimal/°C
     st.metric("γ (decimal/°C)", f"{coef_temp:.4f}")
 
-    st.markdown("**Soiling**")
+    st.markdown("**Soiling y auto-limpieza**")
     usar_soiling_custom = st.checkbox(
         "Usar factores de soiling personalizados",
         value=False, key="mo_soiling_custom",
+    )
+    _tilt_actual = st.session_state.get("tilt_fachada", 90)
+    _es_vertical = _tilt_actual >= 75
+    _k_vert_default = 0.65 if _es_vertical else 1.0
+    k_soiling_vert = st.slider(
+        "Factor auto-limpieza vertical",
+        min_value=0.30, max_value=1.00, step=0.05,
+        value=float(st.session_state.get("mo_k_soiling_vert", _k_vert_default)),
+        format="%.2f",
+        key="mo_k_soiling_vert",
+        help=(
+            "Fachadas verticales se ensucian ~35% menos que superficies inclinadas "
+            "(lluvia los limpia con mayor eficacia). "
+            "k=0.65 → 35% menos soiling. k=1.0 → sin ajuste."
+        ),
+    )
+    if _es_vertical and k_soiling_vert < 0.9:
+        st.caption(f"🧹 Auto-limpieza vertical activa (k={k_soiling_vert:.2f})")
+
+    st.markdown("**IAM difusa**")
+    f_iam_dif = st.slider(
+        "Factor IAM difusa (f_iam_dif)",
+        min_value=0.80, max_value=1.00, step=0.01,
+        value=float(st.session_state.get("mo_f_iam_dif", 0.95)),
+        format="%.2f",
+        key="mo_f_iam_dif",
+        help=(
+            "Factor IAM para la componente difusa (llega de todos los ángulos). "
+            "IEC 61853-3 recomienda 0.95 para vidrio plano. "
+            "CdTe laminado o vidrio texturado: 0.90–0.93."
+        ),
     )
 
 # Soiling config
@@ -277,7 +308,7 @@ run_btn = st.button(
 )
 
 if run_btn:
-    with st.spinner("Aplicando cascada IAM → Soiling → Térmico (8 760 horas)…"):
+    with st.spinner("Aplicando cascada IAM (dir+dif) → Soiling → Térmico → Transparencia (8 760 h)…"):
         try:
             result_df, summary = cascada_optica(
                 tmy_df=tmy_df,
@@ -287,6 +318,9 @@ if run_btn:
                 coef_temp=coef_temp,
                 k_bipv=k_bipv,
                 soiling_config=soiling_config,
+                f_iam_dif=f_iam_dif,
+                transparencia=transparencia,
+                k_soiling_vert=k_soiling_vert,
             )
             # ── Guardar en session_state ──────────────────────────────────────
             poa_ef_df = poa_df.copy()
@@ -302,6 +336,8 @@ if run_btn:
             st.session_state["motor_optico_k_bipv"]        = k_bipv
             st.session_state["motor_optico_noct"]          = noct
             st.session_state["motor_optico_coef_temp"]     = coef_temp
+            st.session_state["motor_optico_f_iam_dif"]     = f_iam_dif
+            st.session_state["motor_optico_k_soil_vert"]   = k_soiling_vert
 
             st.success(
                 f"✅ Cascada calculada. "
@@ -327,39 +363,51 @@ st.markdown("---")
 st.subheader("📊 2. Resultados de la cascada óptico-térmica")
 
 # ── 2A. Métricas de pérdidas ──────────────────────────────────────────────────
-cm1, cm2, cm3, cm4, cm5 = st.columns(5)
+_bruta = summary["poa_bruta_anual_kWh_m2"]
+cm1, cm2, cm3, cm4, cm5, cm6 = st.columns(6)
 cm1.metric(
     "POA bruta",
-    f"{summary['poa_bruta_anual_kWh_m2']:,.0f} kWh/m²/año",
+    f"{_bruta:,.0f} kWh/m²/año",
     help="Irradiancia plano de array sin correcciones.",
 )
 cm2.metric(
-    "Pérdida IAM (reflexión)",
+    "Pérdida IAM total",
     f"−{summary['perdida_iam_kWh_m2']:,.0f} kWh/m²/año",
-    f"−{summary['perdida_iam_kWh_m2']/summary['poa_bruta_anual_kWh_m2']*100:.1f}%",
+    f"−{summary['perdida_iam_kWh_m2']/_bruta*100:.1f}%",
     delta_color="inverse",
-    help="Energía perdida por reflexión geométrica del vidrio según ángulo de incidencia.",
+    help=(
+        "Reflexión sobre la componente directa (ASHRAE b₀) "
+        f"+ difusa (f_iam_dif={summary.get('f_iam_dif', 0.95):.2f}, IEC 61853-3)."
+    ),
 )
 cm3.metric(
     "Pérdida soiling",
     f"−{summary['perdida_soil_kWh_m2']:,.0f} kWh/m²/año",
-    f"−{summary['perdida_soil_kWh_m2']/summary['poa_bruta_anual_kWh_m2']*100:.1f}%",
+    f"−{summary['perdida_soil_kWh_m2']/_bruta*100:.1f}%",
     delta_color="inverse",
-    help="Pérdida por suciedad estacional (polvo, smog). Incluye autolavado por lluvia.",
+    help=f"Suciedad estacional Colombia × k_vert={summary.get('k_soiling_vert', 1.0):.2f} (auto-limpieza fachada).",
 )
 cm4.metric(
     "Pérdida térmica",
     f"−{summary['perdida_term_kWh_m2']:,.0f} kWh/m²/año",
-    f"−{summary['perdida_term_kWh_m2']/summary['poa_bruta_anual_kWh_m2']*100:.1f}%",
+    f"−{summary['perdida_term_kWh_m2']/_bruta*100:.1f}%",
     delta_color="inverse",
-    help=f"Caída de eficiencia por temperatura de celda > 25°C (k_BIPV={summary['k_bipv']}).",
+    help=f"Caída de eficiencia por temperatura > 25°C (k_BIPV={summary['k_bipv']}).",
 )
+_tau_pct = summary.get("transparencia", 0.0) * 100
 cm5.metric(
+    "Pérdida transparencia",
+    f"−{summary.get('perdida_tau_kWh_m2', 0):,.0f} kWh/m²/año",
+    f"−{_tau_pct:.0f}% área",
+    delta_color="inverse",
+    help=f"Fracción de vidrio sin celda activa (τ={_tau_pct:.0f}%). Solo (1−τ) genera.",
+)
+cm6.metric(
     "POA efectiva neta",
     f"{summary['poa_efectiva_anual_kWh_m2']:,.0f} kWh/m²/año",
     f"{summary['factor_global']*100:.1f}% de la bruta",
     delta_color="normal",
-    help="Irradiancia efectiva aprovechable después de las 3 correcciones.",
+    help="Irradiancia efectiva tras IAM (dir+dif) + Soiling + Térmico + Transparencia.",
 )
 
 # ── 2B. Gráfica Waterfall ──────────────────────────────────────────────────────
@@ -369,18 +417,27 @@ bruta  = summary["poa_bruta_anual_kWh_m2"]
 p_iam  = summary["perdida_iam_kWh_m2"]
 p_soil = summary["perdida_soil_kWh_m2"]
 p_term = summary["perdida_term_kWh_m2"]
+p_tau  = summary.get("perdida_tau_kWh_m2", 0.0)
 efect  = summary["poa_efectiva_anual_kWh_m2"]
+
+_tau_label = f"Transparencia\n(τ={summary.get('transparencia', 0)*100:.0f}%)" if p_tau > 0.5 else "Transparencia\n(τ=0)"
 
 fig_wf = go.Figure(go.Waterfall(
     orientation="v",
-    measure=["absolute", "relative", "relative", "relative", "total"],
-    x=["POA bruta", "IAM\n(reflexión)", "Soiling\n(suciedad)", "Térmico\n(temperatura)", "POA efectiva"],
-    y=[bruta, -p_iam, -p_soil, -p_term, 0],
+    measure=["absolute", "relative", "relative", "relative", "relative", "total"],
+    x=["POA bruta",
+       "IAM\n(dir+dif)",
+       "Soiling\n(suciedad)",
+       "Térmico\n(BIPV)",
+       _tau_label,
+       "POA efectiva"],
+    y=[bruta, -p_iam, -p_soil, -p_term, -p_tau, 0],
     text=[
         f"{bruta:,.0f}",
         f"−{p_iam:,.0f}",
         f"−{p_soil:,.0f}",
         f"−{p_term:,.1f}",
+        f"−{p_tau:,.1f}",
         f"{efect:,.0f}",
     ],
     textposition="outside",
@@ -390,16 +447,17 @@ fig_wf = go.Figure(go.Waterfall(
     connector=dict(line=dict(color="gray", width=1, dash="dot")),
 ))
 fig_wf.update_layout(
-    height=380,
+    height=400,
     yaxis_title="kWh/m²/año",
     plot_bgcolor="white",
     paper_bgcolor="white",
     showlegend=False,
     title=dict(
         text=(
-            f"<b>Cascada óptico-térmica</b>  "
-            f"<sup>b₀={summary['b0']:.3f} · k={summary['k_bipv']} · "
-            f"NOCT={summary['noct']}°C · γ={summary['coef_temp']*100:.2f}%/°C</sup>"
+            f"<b>Cascada óptico-térmica BIPV</b>  "
+            f"<sup>b₀={summary['b0']:.3f} · f_dif={summary.get('f_iam_dif', 0.95):.2f} · "
+            f"k={summary['k_bipv']} · NOCT={summary['noct']}°C · "
+            f"γ={summary['coef_temp']*100:.2f}%/°C · τ={summary.get('transparencia', 0)*100:.0f}%</sup>"
         ),
         x=0.5, xanchor="center",
     ),
@@ -421,7 +479,7 @@ fig_bar.add_trace(go.Bar(
     textposition="outside",
 ))
 fig_bar.add_trace(go.Bar(
-    name="POA efectiva (IAM+Soil+Térm)",
+    name="POA efectiva (IAM dir+dif · Soiling · Térm · τ)",
     x=meses_es, y=monthly["poa_efectiva"].round(1),
     marker_color="#e67e22", opacity=0.90,
     text=monthly["poa_efectiva"].round(0).astype(int),
@@ -443,9 +501,10 @@ st.markdown("#### 2.3. Desglose de pérdidas por mes")
 
 fig_stack = go.Figure()
 for col_s, lbl, color in [
-    ("perdida_iam",  "IAM (reflexión)",    "#e74c3c"),
-    ("perdida_soil", "Soiling (suciedad)", "#f39c12"),
-    ("perdida_term", "Térmica",            "#8e44ad"),
+    ("perdida_iam",  "IAM dir+dif (reflexión)", "#e74c3c"),
+    ("perdida_soil", "Soiling (suciedad)",       "#f39c12"),
+    ("perdida_term", "Térmica (BIPV)",           "#8e44ad"),
+    ("perdida_tau",  "Transparencia (τ)",        "#95a5a6"),
 ]:
     fig_stack.add_trace(go.Bar(
         name=lbl,
@@ -574,7 +633,7 @@ else:
 st.markdown("---")
 st.caption(
     "📌 **Integración con otras páginas:** La POA efectiva calculada aquí se guarda en sesión "
-    "como `poa_efectiva_df`. En una próxima actualización, 📐 Dimensionamiento y 📊 Producción "
-    "podrán usarla automáticamente. Por ahora, usa el **factor global** "
-    f"(**{summary['factor_global']*100:.1f}%**) para ajustar manualmente las estimaciones de energía."
+    f"como `poa_efectiva_df` con factor global **{summary['factor_global']*100:.1f}%**. "
+    "📊 **Producción** la usa automáticamente en cuanto ejecutas esta cascada — "
+    "no necesitas ajustar nada manualmente."
 )
