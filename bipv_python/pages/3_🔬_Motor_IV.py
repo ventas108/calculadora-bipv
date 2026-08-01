@@ -76,8 +76,8 @@ _opciones_sdm   = list(MODULOS_BIPV.keys())            # SDM calibrado completo
 _opciones_excel = [k for k in _cat_excel if k not in MODULOS_BIPV]  # catálogo Excel
 
 # Lista combinada con separadores de grupo
-_GROUP_SDM   = "── Paneles BIPV (SDM calibrado) ──"
-_GROUP_EXCEL = "── Catálogo FV (estimación SDM) ──"
+_GROUP_SDM   = "── BIPV ASP-ST1 (SDM calibrado) ──"
+_GROUP_EXCEL = "── Catálogo Excel: CdTe / CIGS / Mono-Si / Poli-Si (SDM estimado) ──"
 _opciones_all = [_GROUP_SDM] + _opciones_sdm + [_GROUP_EXCEL] + _opciones_excel
 
 st.markdown("---")
