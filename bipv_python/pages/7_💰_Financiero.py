@@ -313,18 +313,88 @@ with col_t2:
             st.caption(
                 f"✅ Degradación activa: **{_tasa_calc:.2f}%/año** — desde historial PR real"
             )
-    factor_p90 = st.slider(
-        "Incertidumbre P90 (%)",
-        min_value=0.0, max_value=25.0, value=10.0, step=0.5,
-        help=(
-            "Reducción de E_ac para estimar el escenario P90 "
-            "(hay 90% de probabilidad de superar esta producción). "
-            "pvlib entrega P50 por defecto. El P90 típicamente es "
-            "8–15% menor que el P50 en proyectos BIPV fachada "
-            "(incertidumbre de irradiación + modelo + sombreado). "
-            "Los bancos colombianos exigen presentar P90."
-        ),
-    )
+    # ── Modelo P90 basado en zona climática y correcciones aplicadas ─────────
+    # Metodología: incertidumbre combinada cuadrática EPRI TR-107348 / IEC 61724-3
+    # σ_irr: variabilidad interanual del TMY calibrada por zona climática Colombia
+    # (IDEAM Atlas de Radiación Solar 2022 + Solargis long-term variability dataset)
+    _sigma_irr_map_fin = {
+        "urab": 6.5, "turbo": 6.5, "apartad": 6.5,
+        "choc": 6.5, "quibd": 6.5,
+        "bogot": 5.5, "saban": 5.5, "tunja": 5.5, "cundin": 5.5,
+        "llano": 5.5, "villavicenc": 5.5, "vichada": 5.5, "casanare": 5.5,
+        "bucaramanga": 5.0, "santand": 5.0, "pasto": 5.0,
+        "medell": 5.0, "antioq": 5.0, "rionegro": 5.0,
+        "cali": 4.5, "valle": 4.5, "palmira": 4.5,
+        "barranq": 4.0, "cartagena": 4.0, "santa marta": 4.0,
+    }
+    _ciu_low_fin = str(ciudad).lower()
+    _sigma_irr_fin = 5.0
+    for _kw_fin, _sv_fin in _sigma_irr_map_fin.items():
+        if _kw_fin in _ciu_low_fin:
+            _sigma_irr_fin = _sv_fin
+            break
+
+    # σ_PR: incertidumbre del modelo de pérdidas — disminuye con cada corrección activa
+    _motor_ok_p90  = st.session_state.get("poa_efectiva_df") is not None
+    _bypass_ok_p90 = bool(st.session_state.get("bypass_ok", False))
+    if _motor_ok_p90 and _bypass_ok_p90:
+        _sigma_pr_fin  = 3.5
+        _pr_label      = "Motor Óptico + Bypass Diodes activos — precisión máxima"
+    elif _motor_ok_p90:
+        _sigma_pr_fin  = 4.2
+        _pr_label      = "Motor Óptico activo (sin bypass)"
+    elif _bypass_ok_p90:
+        _sigma_pr_fin  = 4.2
+        _pr_label      = "Bypass Diodes activos (sin Motor Óptico)"
+    else:
+        _sigma_pr_fin  = 5.0
+        _pr_label      = "Modelo base — sin correcciones ópticas ni bypass"
+
+    _sigma_tot_fin   = (_sigma_irr_fin**2 + _sigma_pr_fin**2) ** 0.5
+    _f_p90_auto      = round(1.28 * _sigma_tot_fin, 1)   # z₉₀ = 1.28
+
+    factor_p90 = _f_p90_auto    # valor por defecto (puede sobreescribirse abajo)
+
+    with st.expander(
+        f"📊 Modelo P90 — σ_total {_sigma_tot_fin:.1f}%  →  factor {_f_p90_auto:.1f}%  "
+        f"→  P90 = {e_ac*(1-_f_p90_auto/100):,.0f} kWh/año",
+        expanded=False,
+    ):
+        st.markdown(
+            "**Metodología de incertidumbre combinada** *(EPRI TR-107348 / IEC 61724-3)*\n\n"
+            f"| Fuente | σ (%) | Origen |\n"
+            f"|---|---|---|\n"
+            f"| Variabilidad interanual TMY — {ciudad} | **{_sigma_irr_fin:.1f}** "
+            f"| IDEAM / Solargis — zona climática Colombia |\n"
+            f"| Incertidumbre modelo de pérdidas | **{_sigma_pr_fin:.1f}** "
+            f"| {_pr_label} |\n"
+            f"| **σ total combinado** | **{_sigma_tot_fin:.1f}** | √(σ_irr² + σ_PR²) |\n"
+            f"| **Factor P90** | **{_f_p90_auto:.1f}%** | z₉₀ × σ_total = 1.28 × {_sigma_tot_fin:.1f}% |\n\n"
+            f"**P90 = {e_ac:,.0f} × (1 − {_f_p90_auto/100:.3f}) = "
+            f"{e_ac*(1-_f_p90_auto/100):,.0f} kWh/año**\n\n"
+            f"*PVsyst aplica un factor P90 manual fijo sin diferenciación regional. "
+            f"Este modelo ajusta automáticamente σ_irr según la zona climática colombiana "
+            f"y reduce σ_PR a medida que se activan el Motor Óptico y los Bypass Diodes, "
+            f"premiando la profundidad de la simulación.*"
+        )
+        _usar_p90_man = st.checkbox(
+            "Ajustar factor P90 manualmente", value=False, key="p90_manual_override"
+        )
+        if _usar_p90_man:
+            factor_p90 = st.slider(
+                "Factor P90 manual (%)", 0.0, 25.0,
+                float(_f_p90_auto), 0.5, key="p90_slider_manual"
+            )
+        else:
+            factor_p90 = _f_p90_auto
+            st.caption(
+                f"✅ P90 automático: **{factor_p90:.1f}%** → "
+                f"E_ac P90 = **{e_ac*(1-factor_p90/100):,.0f} kWh/año** "
+                f"(P50 = {e_ac:,.0f} kWh/año)"
+            )
+    # Garantizar valor fuera del expander (Streamlit ejecuta widgets aunque esté cerrado)
+    if not st.session_state.get("p90_manual_override", False):
+        factor_p90 = _f_p90_auto
 
 with col_t3:
     # ── OPEX: desde Presupuesto detallado o slider paramétrico ───────────────

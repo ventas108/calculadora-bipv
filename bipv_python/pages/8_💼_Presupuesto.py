@@ -405,6 +405,35 @@ with t0:
         )
         st.caption("💡 Ejecuta 📐 Dimensionamiento para que este valor se vincule automáticamente.")
 
+    # ── Auto-actualización silenciosa cuando el kWp del sistema cambió ────────
+    # Si la estimación ya fue aplicada y el sistema cambió >5% de potencia,
+    # recalcula y re-aplica automáticamente con el mismo tipo/escenario/zona.
+    _er_cfg_prev = st.session_state.get("est_rapida_config", {})
+    if st.session_state.get("est_rapida_aplicada") and _er_cfg_prev and p_stc > 0:
+        _kwp_prev_er = float(_er_cfg_prev.get("kwp", 0))
+        if _kwp_prev_er > 0 and abs(p_stc - _kwp_prev_er) / _kwp_prev_er > 0.05:
+            _tipo_auto = _er_cfg_prev.get("tipo", list(_BENCH.keys())[0])
+            _esc_auto  = _er_cfg_prev.get("escenario", "Base")
+            _zona_auto = _er_cfg_prev.get("zona", list(_ZONA_FACTOR.keys())[0])
+            _r_auto    = _calc_parametrico(p_stc, _tipo_auto, _esc_auto, _zona_auto)
+            st.session_state["presupuesto_capex_usd"]        = _r_auto["capex_total"]
+            st.session_state["presupuesto_opex_anual_usd"]   = _r_auto["opex_total"]
+            st.session_state["presupuesto_fraccion_equipos"] = (
+                _r_auto["equip_total"] / _r_auto["capex_total"]
+                if _r_auto["capex_total"] > 0 else 0.65
+            )
+            st.session_state["presupuesto_capex_directo"] = _r_auto["directo"]
+            st.session_state["presupuesto_sub_directo"]   = _r_auto["directo"]
+            st.session_state["presupuesto_capex_blando"]  = _r_auto["soft_total"]
+            st.session_state["est_rapida_config"] = {**_er_cfg_prev, "kwp": p_stc}
+            st.info(
+                f"🔄 **Estimación Rápida auto-actualizada** — el sistema cambió de "
+                f"**{_kwp_prev_er:.1f} → {p_stc:.1f} kWp**. "
+                f"CAPEX actualizado a **USD {_r_auto['capex_total']:,.0f}** "
+                f"({_tipo_auto} · {_esc_auto} · {_zona_auto}). "
+                f"💰 Financiero refleja el nuevo valor automáticamente."
+            )
+
     # ── Selectores: tipo, escenario, zona ────────────────────────────────────
     col_s1, col_s2, col_s3 = st.columns(3)
 

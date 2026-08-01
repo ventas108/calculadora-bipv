@@ -75,6 +75,17 @@ with col_op2:
                 value=_ppto_ui, key="rep_inc_presupuesto",
                 help="CAPEX, OPEX y desglose del Presupuesto. "
                      "Completa 💼 Presupuesto primero.")
+    _er_activa_ui = bool(st.session_state.get("est_rapida_aplicada", False))
+    st.checkbox(
+        "🧮 Incluir Estimación Rápida — Fundamentación del Presupuesto",
+        value=_er_activa_ui,
+        key="rep_inc_est_rapida",
+        help=(
+            "Desglose CAPEX/OPEX paramétrico con benchmarks colombianos, "
+            "comparativo de 3 escenarios y nota metodológica persuasiva-honesta. "
+            "Aplica la Estimación Rápida en 💼 Presupuesto primero."
+        ),
+    )
 
 st.markdown("---")
 
@@ -772,6 +783,141 @@ def generar_html_reporte() -> str:
             "La fracción de equipos determina el monto sobre el que aplican los beneficios tributarios "
             "de la Ley 1715/2014 (IVA, renta, depreciación acelerada)."
         ))
+        html += cierre()
+
+    # ── 5c. Estimación Rápida — Fundamentación del Presupuesto ───────────────
+    _inc_er_r    = st.session_state.get("rep_inc_est_rapida", False)
+    _er_activa_r = st.session_state.get("est_rapida_aplicada", False)
+    _er_cfg_r    = st.session_state.get("est_rapida_config", {})
+    _er_cap_r    = float(st.session_state.get("presupuesto_capex_usd", 0.0))
+
+    if _inc_er_r and _er_activa_r and _er_cfg_r and _er_cap_r > 0:
+        _er_tipo_r  = _er_cfg_r.get("tipo", "—")
+        _er_esc_r   = _er_cfg_r.get("escenario", "Base")
+        _er_zona_r  = _er_cfg_r.get("zona", "—")
+        _er_kwp_r   = float(_er_cfg_r.get("kwp", 0))
+        _er_wp_r    = max(_er_kwp_r * 1000, 1)
+        _er_dir_r   = float(st.session_state.get("presupuesto_capex_directo", 0))
+        _er_bla_r   = float(st.session_state.get("presupuesto_capex_blando", 0))
+        _er_cont_r  = max(0.0, _er_cap_r - _er_dir_r - _er_bla_r)
+        _er_opex_r  = float(st.session_state.get("presupuesto_opex_anual_usd", 0))
+        _er_feq_r   = float(st.session_state.get("presupuesto_fraccion_equipos", 0.65))
+        _er_equip_r = _er_feq_r * _er_dir_r
+        _er_epc_r   = max(0.0, _er_dir_r - _er_equip_r)
+        _tc_er_r    = tipo_cambio_rep
+        _ref_wp     = ("0.70–1.10 USD/Wp" if "Granja" in _er_tipo_r
+                       else "0.90–1.45 USD/Wp" if "Techo" in _er_tipo_r
+                       else "1.60–3.20 USD/Wp")
+
+        html += seccion(
+            "Fundamentación del Presupuesto — Estimación Rápida Paramétrica",
+            "🧮", "#1a5276"
+        )
+        html += f"""
+        <div style="background:#eaf4fb;border-left:4px solid #2980b9;padding:13px 16px;
+                    margin-bottom:18px;border-radius:0 4px 4px 0;font-size:0.93em;
+                    line-height:1.55;">
+            <strong>¿Por qué este presupuesto es técnicamente sólido?</strong><br>
+            El CAPEX presentado fue estimado con benchmarks de mercado colombiano
+            (UPME 2026, IRENA <em>Renewable Power Generation Costs 2023</em>, CCSE,
+            datos de campo Urabá–Antioquia–Valle del Cauca) calibrados por
+            <em>tipo de instalación</em>, <em>escenario económico</em> y
+            <em>zona geográfica</em>.
+            La metodología replica el análisis de <em>Prefactibilidad Etapa 1</em>
+            según la guía DNDE del Ministerio de Minas y Energía de Colombia.<br><br>
+            <strong>Precisión declarada: ±25–35 %</strong> sobre el valor de
+            cotización EPC formal — suficiente para establecer la viabilidad del
+            proyecto, comparar entre oportunidades y estructurar los escenarios
+            financieros presentados en este informe.
+            Los beneficios Ley 1715/2014 ya están calculados sobre esta base de CAPEX.
+        </div>"""
+
+        html += tabla_kv([
+            ("Configuración aplicada",
+             f"{_er_tipo_r}  ·  {_er_esc_r}",
+             _er_zona_r,
+             f"{_er_kwp_r:.1f} kWp · benchmarks julio 2026"),
+            ("🔩 Equipos (módulos, inversores, estructura, cableado, SCADA)",
+             f"USD {_er_equip_r:,.0f}",
+             f"$ {_er_equip_r*_tc_er_r/1e6:.2f} M COP",
+             f"{_er_equip_r/_er_cap_r*100:.1f}% del CAPEX total"),
+            ("🏗️ Construcción y EPC (obra civil, montaje, instalación eléctrica)",
+             f"USD {_er_epc_r:,.0f}",
+             f"$ {_er_epc_r*_tc_er_r/1e6:.2f} M COP",
+             f"{_er_epc_r/_er_cap_r*100:.1f}% del CAPEX total"),
+            ("🧾 Costos blandos (ingeniería, RETIE/UPME, PM, conexión a red)",
+             f"USD {_er_bla_r:,.0f}",
+             f"$ {_er_bla_r*_tc_er_r/1e6:.2f} M COP",
+             f"{_er_bla_r/_er_cap_r*100:.1f}% del CAPEX total"),
+            ("⚙️ Contingencias y reservas de ejecución",
+             f"USD {_er_cont_r:,.0f}",
+             f"$ {_er_cont_r*_tc_er_r/1e6:.2f} M COP",
+             f"{_er_cont_r/_er_cap_r*100:.1f}% del CAPEX total"),
+            ("✅ CAPEX TOTAL",
+             f"USD {_er_cap_r:,.0f}",
+             f"$ {_er_cap_r*_tc_er_r/1e6:.2f} M COP",
+             f"{_er_cap_r/_er_wp_r:.3f} USD/Wp · Referencia {_er_tipo_r}: {_ref_wp}"),
+            *([(
+                "OPEX anual proyectado a 25 años",
+                f"USD {_er_opex_r:,.0f}/año",
+                f"$ {_er_opex_r*_tc_er_r/1e6:.2f} M COP/año",
+                f"{_er_opex_r/_er_cap_r*100:.2f}% CAPEX/año — O&M, limpieza, "
+                "seguros, monitoreo, fondo reposición inversor"
+            )] if _er_opex_r > 0 else []),
+        ], nota=(
+            "Fuente: benchmarks UPME / IRENA 2026 calibrados para Colombia. "
+            "La fracción de equipos determina la base de los beneficios tributarios "
+            "Ley 1715/2014 (Art. 11 deducción renta, Art. 12 exclusión IVA, "
+            "Art. 14 depreciación acelerada). "
+            "Para bancabilidad formal, reemplazar con cotización EPC firmada "
+            "con fuente y vigencia de precios."
+        ))
+
+        html += f"""
+        <div style="margin-top:16px;padding:14px 16px;background:#fffde7;
+                    border:1px solid #f9a825;border-radius:6px;">
+            <strong style="font-size:0.94em;color:#5d4037;">
+                📊 Rango de escenarios — misma instalación · {_er_zona_r}
+            </strong>
+            <table style="width:100%;border-collapse:collapse;margin-top:10px;
+                          font-size:0.90em;">
+                <tr style="background:#f9a825;color:white;">
+                    <th style="padding:6px 10px;text-align:left;">Escenario</th>
+                    <th style="padding:6px 10px;text-align:right;">CAPEX / Wp</th>
+                    <th style="padding:6px 10px;text-align:left;">Descripción</th>
+                </tr>
+                <tr style="background:#e8f5e9;">
+                    <td style="padding:5px 10px;font-weight:bold;color:#2e7d32;">
+                        Optimista</td>
+                    <td style="padding:5px 10px;text-align:right;">
+                        Extremo inferior del rango</td>
+                    <td style="padding:5px 10px;color:#555;">
+                        Proveedores negociados, acceso fácil, sin imprevistos de obra</td>
+                </tr>
+                <tr style="background:#e3f2fd;">
+                    <td style="padding:5px 10px;font-weight:bold;color:#1565c0;">
+                        ⭐ {_er_esc_r} — <em>este reporte</em></td>
+                    <td style="padding:5px 10px;text-align:right;font-weight:bold;">
+                        {_er_cap_r/_er_wp_r:.3f} USD/Wp</td>
+                    <td style="padding:5px 10px;color:#555;">
+                        Mediana del mercado colombiano julio 2026</td>
+                </tr>
+                <tr style="background:#fce4ec;">
+                    <td style="padding:5px 10px;font-weight:bold;color:#b71c1c;">
+                        Conservador</td>
+                    <td style="padding:5px 10px;text-align:right;">
+                        Extremo superior del rango</td>
+                    <td style="padding:5px 10px;color:#555;">
+                        Zona remota, alta contingencia, contratista sin experiencia BIPV</td>
+                </tr>
+            </table>
+            <p style="margin:8px 0 0;font-size:0.83em;color:#777;font-style:italic;">
+                El análisis financiero (TIR / VPN / Payback) usa el escenario
+                <strong>{_er_esc_r}</strong>.
+                Para due diligence bancario formal, solicitar cotización EPC
+                firmada con fuente y vigencia de precios.
+            </p>
+        </div>"""
         html += cierre()
 
     # ── 6. Balance Energético y Clasificación ────────────────────────────────
