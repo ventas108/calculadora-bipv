@@ -200,9 +200,176 @@ def _editar_seccion(key, label, inyectar=None, referencia_mercado=""):
     return total
 
 # ══════════════════════════════════════════════════════════════════════════════
+# BENCHMARKS PARAMÉTRICOS — Colombia 2025-2026
+# Fuente: Guía de Costos BIPV / IRENA / datos de mercado colombiano
+# ══════════════════════════════════════════════════════════════════════════════
+_BENCH = {
+    # ── tipo_instalacion → escenario → { ítem: USD/Wp o USD fijo }
+    # ── Formato: (opt, base, cons)
+    "Granja FV campo": {
+        "modulos_wp":       (0.180, 0.200, 0.220),
+        "inversores_wp":    (0.060, 0.075, 0.090),
+        "estructura_wp":    (0.080, 0.100, 0.120),
+        "cableado_wp":      (0.040, 0.050, 0.060),
+        "protecciones_wp":  (0.015, 0.020, 0.025),
+        "trafo_fijo":       (15000, 22000, 35000),   # USD fijo (>100 kWp)
+        "scada_fijo":       ( 8000, 11000, 15000),   # USD fijo
+        "obra_civil_wp":    (0.050, 0.070, 0.090),
+        "montaje_wp":       (0.040, 0.055, 0.070),
+        "elect_wp":         (0.030, 0.040, 0.050),
+        "puesta_marcha_wp": (0.010, 0.015, 0.020),
+        "logistica_pct":    (0.030, 0.050, 0.070),  # % de equipos (módulos+inv)
+        "ingenieria_pct":   (0.015, 0.022, 0.030),  # % CAPEX directo
+        "pm_pct":           (0.030, 0.040, 0.050),  # % CAPEX directo
+        "permisos_fijo":    ( 5000,  8000, 14000),  # USD fijo
+        "conexion_fijo":    ( 8000, 16000, 32000),  # USD fijo
+        "contingencia_pct": (0.080, 0.100, 0.120),  # % CAPEX total
+        "opex_om_kw":       (  8.0,  10.0,  12.0),  # USD/kWp/año
+        "opex_limpieza_kw": (  2.0,   3.0,   4.0),
+        "opex_reposicion_kw":(  2.0,   2.5,   3.0),
+        "opex_monitoreo_kw":(  3.0,   4.0,   5.0),
+        "opex_seguro_pct":  (0.003, 0.004, 0.005),  # % CAPEX/año
+    },
+    "Techo industrial": {
+        "modulos_wp":       (0.180, 0.205, 0.230),
+        "inversores_wp":    (0.065, 0.080, 0.095),
+        "estructura_wp":    (0.060, 0.080, 0.100),
+        "cableado_wp":      (0.035, 0.045, 0.055),
+        "protecciones_wp":  (0.012, 0.018, 0.022),
+        "trafo_fijo":       (    0,     0,     0),   # no aplica típicamente
+        "scada_fijo":       ( 5000,  8000, 12000),
+        "obra_civil_wp":    (0.020, 0.030, 0.040),
+        "montaje_wp":       (0.035, 0.050, 0.065),
+        "elect_wp":         (0.025, 0.035, 0.045),
+        "puesta_marcha_wp": (0.008, 0.012, 0.018),
+        "logistica_pct":    (0.020, 0.035, 0.050),
+        "ingenieria_pct":   (0.015, 0.022, 0.030),
+        "pm_pct":           (0.025, 0.035, 0.045),
+        "permisos_fijo":    ( 3000,  6000, 10000),
+        "conexion_fijo":    ( 5000, 10000, 20000),
+        "contingencia_pct": (0.070, 0.090, 0.110),
+        "opex_om_kw":       (  6.0,   9.0,  12.0),
+        "opex_limpieza_kw": (  1.5,   2.5,   3.5),
+        "opex_reposicion_kw":(  2.0,   2.5,   3.0),
+        "opex_monitoreo_kw":(  2.0,   3.0,   4.0),
+        "opex_seguro_pct":  (0.003, 0.004, 0.005),
+    },
+    "BIPV fachada/pérgola": {
+        "modulos_wp":       (0.250, 0.320, 0.400),
+        "inversores_wp":    (0.070, 0.090, 0.110),
+        "estructura_wp":    (0.200, 0.280, 0.380),
+        "cableado_wp":      (0.050, 0.065, 0.080),
+        "protecciones_wp":  (0.015, 0.022, 0.030),
+        "trafo_fijo":       (    0,     0,     0),
+        "scada_fijo":       ( 6000,  9000, 14000),
+        "obra_civil_wp":    (0.040, 0.060, 0.090),
+        "montaje_wp":       (0.080, 0.120, 0.180),
+        "elect_wp":         (0.040, 0.055, 0.070),
+        "puesta_marcha_wp": (0.015, 0.022, 0.030),
+        "logistica_pct":    (0.025, 0.040, 0.060),
+        "ingenieria_pct":   (0.020, 0.030, 0.040),
+        "pm_pct":           (0.035, 0.045, 0.060),
+        "permisos_fijo":    ( 4000,  8000, 15000),
+        "conexion_fijo":    ( 5000, 10000, 20000),
+        "contingencia_pct": (0.100, 0.130, 0.160),
+        "opex_om_kw":       ( 10.0,  13.0,  16.0),
+        "opex_limpieza_kw": (  2.0,   3.0,   4.5),
+        "opex_reposicion_kw":(  2.5,   3.0,   4.0),
+        "opex_monitoreo_kw":(  3.0,   4.0,   5.0),
+        "opex_seguro_pct":  (0.004, 0.005, 0.006),
+    },
+}
+
+# Factor de zona geográfica (afecta obra civil + logística)
+_ZONA_FACTOR = {
+    "Bogotá / Sabana":          1.00,
+    "Medellín / Antioquia":     1.05,
+    "Cali / Valle":             1.07,
+    "Barranquilla / Costa":     1.08,
+    "Urabá / Chocó (tropical)": 1.17,
+    "Llanos Orientales":        1.12,
+    "Otra zona remota":         1.15,
+}
+
+def _calc_parametrico(kwp, tipo, escenario, zona):
+    """Devuelve dict con desglose y totales en USD."""
+    idx = {"Optimista": 0, "Base": 1, "Conservador": 2}[escenario]
+    b = _BENCH[tipo]
+    zf = _ZONA_FACTOR[zona]
+    wp = kwp * 1000
+
+    def g(key): return b[key][idx]
+
+    # ── Equipos / duros ────────────────────────────────────────────────
+    mod     = g("modulos_wp")    * wp
+    inv     = g("inversores_wp") * wp
+    est     = g("estructura_wp") * wp * zf
+    cable   = g("cableado_wp")   * wp
+    prot    = g("protecciones_wp") * wp
+    trafo   = g("trafo_fijo")   if kwp >= 100 else 0
+    scada   = g("scada_fijo")
+    log_eq  = (mod + inv) * g("logistica_pct") * zf
+    equip_total = mod + inv + est + cable + prot + trafo + scada + log_eq
+
+    # ── Construcción / EPC ─────────────────────────────────────────────
+    civil   = g("obra_civil_wp")    * wp * zf
+    montaje = g("montaje_wp")       * wp
+    elect   = g("elect_wp")         * wp
+    pm_obra = g("puesta_marcha_wp") * wp
+    epc_total = civil + montaje + elect + pm_obra
+
+    # ── Costos directos ────────────────────────────────────────────────
+    directo = equip_total + epc_total
+
+    # ── Costos blandos ─────────────────────────────────────────────────
+    ing     = directo * g("ingenieria_pct")
+    pm      = directo * g("pm_pct")
+    perm    = g("permisos_fijo")
+    conex   = g("conexion_fijo")
+    soft_total = ing + pm + perm + conex
+
+    capex_base = directo + soft_total
+
+    # ── Contingencias ──────────────────────────────────────────────────
+    cont    = capex_base * g("contingencia_pct")
+    capex_total = capex_base + cont
+
+    # ── OPEX anual ─────────────────────────────────────────────────────
+    opex_om     = g("opex_om_kw")        * kwp
+    opex_limp   = g("opex_limpieza_kw")  * kwp
+    opex_repos  = g("opex_reposicion_kw") * kwp
+    opex_mon    = g("opex_monitoreo_kw") * kwp
+    opex_seg    = capex_total * g("opex_seguro_pct")
+    opex_total  = opex_om + opex_limp + opex_repos + opex_mon + opex_seg
+
+    return {
+        "kwp": kwp, "wp": wp,
+        # Equipos
+        "mod": mod, "inv": inv, "est": est, "cable": cable,
+        "prot": prot, "trafo": trafo, "scada": scada, "log_eq": log_eq,
+        "equip_total": equip_total,
+        # EPC
+        "civil": civil, "montaje": montaje, "elect": elect, "pm_obra": pm_obra,
+        "epc_total": epc_total,
+        # Soft
+        "ing": ing, "pm": pm, "perm": perm, "conex": conex,
+        "soft_total": soft_total,
+        # Totales
+        "directo": directo,
+        "capex_base": capex_base,
+        "cont": cont,
+        "capex_total": capex_total,
+        # OPEX
+        "opex_om": opex_om, "opex_limp": opex_limp,
+        "opex_repos": opex_repos, "opex_mon": opex_mon, "opex_seg": opex_seg,
+        "opex_total": opex_total,
+    }
+
+# ══════════════════════════════════════════════════════════════════════════════
 # TABS
 # ══════════════════════════════════════════════════════════════════════════════
 tabs = st.tabs([
+    "🧮 Estimación Rápida",
     "🔩 Perfilería y Estructura",
     "👷 Mano de Obra",
     "⚡ Sistema FV",
@@ -211,7 +378,262 @@ tabs = st.tabs([
     "🧾 Costos Blandos",
     "📅 OPEX Anual",
 ])
-t1,t2,t3,t4,t5,t6,t7 = tabs
+t0,t1,t2,t3,t4,t5,t6,t7 = tabs
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 0 — ESTIMACIÓN RÁPIDA PARAMÉTRICA
+# ══════════════════════════════════════════════════════════════════════════════
+with t0:
+    st.markdown(
+        "> 🧮 **Estimación paramétrica** — Benchmarks de mercado colombiano 2025-2026 "
+        "(IRENA, UPME, CCSE, datos propios).  \n"
+        "> No reemplaza cotización real. Cuando completes los tabs de cotización, "
+        "desactívala con el botón '🔄 Limpiar' para que el Resumen use los valores reales."
+    )
+
+    # ── kWp del sistema: auto desde Dimensionamiento o entrada manual ─────────
+    if p_stc > 0:
+        kwp_est = p_stc
+        st.success(
+            f"⚡ Sistema detectado desde Dimensionamiento: **{kwp_est:.2f} kWp** · "
+            f"{n_pan} módulos · TRM **{tc:,.0f} COP/USD**"
+        )
+    else:
+        kwp_est = st.number_input(
+            "Potencia instalada (kWp) — completa 📐 Dimensionamiento para auto-completar",
+            min_value=1.0, max_value=100000.0, value=100.0, step=10.0, key="kwp_est_manual"
+        )
+        st.caption("💡 Ejecuta 📐 Dimensionamiento para que este valor se vincule automáticamente.")
+
+    # ── Selectores: tipo, escenario, zona ────────────────────────────────────
+    col_s1, col_s2, col_s3 = st.columns(3)
+
+    # Auto-detectar tipo de instalación
+    _tipo_opts = list(_BENCH.keys())
+    _tipo_idx  = 0   # Granja FV por defecto
+    if area_m2 > 0 and kwp_est > 0:
+        _densidad = area_m2 / (kwp_est * 1000) * 1000  # m²/kWp
+        if _densidad > 6.0:            # módulos de fachada ocupan más m²/kWp
+            _tipo_idx = 2              # BIPV fachada/pérgola
+        elif kwp_est < 200:
+            _tipo_idx = 1              # Techo industrial
+    elif kwp_est < 100:
+        _tipo_idx = 1
+
+    tipo_est = col_s1.selectbox(
+        "Tipo de instalación", _tipo_opts, index=_tipo_idx, key="est_tipo",
+        help="Se auto-detecta según la densidad de paneles del Dimensionamiento."
+    )
+    escenario_est = col_s2.selectbox(
+        "Escenario de costo", ["Optimista", "Base", "Conservador"], index=1, key="est_esc",
+        help="Base = mediana de mercado. Optimista = compra directa + negociación. Conservador = + contingencias."
+    )
+
+    # Auto-detectar zona desde ciudad del recurso solar
+    _ciudad_ss  = str(st.session_state.get("tmy_ciudad", "")).lower()
+    _zona_opts  = list(_ZONA_FACTOR.keys())
+    _zona_map   = {
+        "bogot": 0, "saban": 0, "tunja": 0,
+        "medell": 1, "antioq": 1, "rionegro": 1,
+        "cali": 2, "valle": 2, "palmira": 2,
+        "barranq": 3, "santa marta": 3, "cartagena": 3, "costa": 3,
+        "urab": 4, "apartad": 4, "turbo": 4, "choc": 4,
+        "villavicencio": 5, "llano": 5, "vichada": 5,
+    }
+    _zona_idx = 0
+    for kw, idx in _zona_map.items():
+        if kw in _ciudad_ss:
+            _zona_idx = idx
+            break
+
+    zona_est = col_s3.selectbox(
+        "Zona geográfica", _zona_opts, index=_zona_idx, key="est_zona",
+        help="Se auto-detecta desde la ciudad del Recurso Solar. Factor logístico y climático."
+    )
+    if _ciudad_ss:
+        st.caption(f"📍 Ciudad detectada del Recurso Solar: **{st.session_state.get('tmy_ciudad', '—')}** "
+                   f"→ zona asignada: **{zona_est}** (factor ×{_ZONA_FACTOR[zona_est]:.2f})")
+
+    st.markdown("---")
+
+    # ── Calcular los tres escenarios en paralelo ──────────────────────────────
+    r_opt  = _calc_parametrico(kwp_est, tipo_est, "Optimista",   zona_est)
+    r_base = _calc_parametrico(kwp_est, tipo_est, "Base",        zona_est)
+    r_cons = _calc_parametrico(kwp_est, tipo_est, "Conservador", zona_est)
+    r      = {"Optimista": r_opt, "Base": r_base, "Conservador": r_cons}[escenario_est]
+
+    # ── Métricas principales del escenario activo ─────────────────────────────
+    st.markdown(f"#### 📊 Desglose — Escenario **{escenario_est}** · {tipo_est} · {zona_est}")
+    mc1, mc2, mc3, mc4 = st.columns(4)
+    mc1.metric("CAPEX Total",    f"USD {r['capex_total']:,.0f}",
+               f"$ {r['capex_total']*tc/1e6:.2f} M COP", delta_color="off")
+    mc2.metric("USD / Wp",       f"USD {r['capex_total']/r['wp']:.3f}/Wp",
+               f"Ref: {tipo_est[:5]}", delta_color="off")
+    mc3.metric("OPEX Anual",     f"USD {r['opex_total']:,.0f}/año",
+               f"USD {r['opex_total']/kwp_est:.1f}/kWp·año", delta_color="off")
+    mc4.metric("Frac. equipos (Ley 1715)",
+               f"{r['equip_total']/r['capex_total']*100:.1f}%",
+               "Base Art. 12 IVA + Art. 11 renta", delta_color="off")
+
+    # ── Tabla de desglose por categoría ──────────────────────────────────────
+    _pct = lambda v: f"{v/r['capex_total']*100:.1f}%"
+    desglose_rows = [
+        ("🔩 EQUIPOS / DUROS",            None,           None),
+        ("  · Módulos FV",                r["mod"],       _pct(r["mod"])),
+        ("  · Inversores",                r["inv"],       _pct(r["inv"])),
+        ("  · Estructura de montaje",     r["est"],       _pct(r["est"])),
+        ("  · Cableado DC + AC",          r["cable"],     _pct(r["cable"])),
+        ("  · Protecciones DC/AC",        r["prot"],      _pct(r["prot"])),
+        ("  · Transformador MT",          r["trafo"],     _pct(r["trafo"])) if r["trafo"] > 0 else None,
+        ("  · SCADA / Medición",          r["scada"],     _pct(r["scada"])),
+        ("  · Logística / Transporte",    r["log_eq"],    _pct(r["log_eq"])),
+        ("  Subtotal Equipos",            r["equip_total"], _pct(r["equip_total"])),
+        ("🏗️ CONSTRUCCIÓN / EPC",         None,           None),
+        ("  · Obra civil + cimentación",  r["civil"],     _pct(r["civil"])),
+        ("  · Montaje estructural",        r["montaje"],   _pct(r["montaje"])),
+        ("  · Instalación eléctrica",     r["elect"],     _pct(r["elect"])),
+        ("  · Puesta en marcha / Tests",  r["pm_obra"],   _pct(r["pm_obra"])),
+        ("  Subtotal EPC",                r["epc_total"], _pct(r["epc_total"])),
+        ("🧾 COSTOS BLANDOS",             None,           None),
+        ("  · Ingeniería + diseño",       r["ing"],       _pct(r["ing"])),
+        ("  · Gestión de proyecto (PM)",  r["pm"],        _pct(r["pm"])),
+        ("  · Permisos / RETIE / UPME",   r["perm"],      _pct(r["perm"])),
+        ("  · Conexión a la red",         r["conex"],     _pct(r["conex"])),
+        ("  Subtotal Costos Blandos",     r["soft_total"],_pct(r["soft_total"])),
+        ("⚙️ CONTINGENCIAS",              r["cont"],      _pct(r["cont"])),
+        ("✅ CAPEX TOTAL",                r["capex_total"], "100.0%"),
+    ]
+    desglose_rows = [x for x in desglose_rows if x is not None]
+
+    df_des = pd.DataFrame(
+        [(d[0], d[1], d[2]) for d in desglose_rows],
+        columns=["Categoría", "USD", "% CAPEX"]
+    )
+    df_des["COP (M)"] = df_des["USD"].apply(
+        lambda v: round(v * tc / 1e6, 2) if v is not None else None
+    )
+
+    def _style_desglose(row):
+        cat = str(row["Categoría"])
+        if cat.startswith("✅") or cat.startswith("  Subtotal"):
+            return ["font-weight:bold; background:#EAF4FB"] * len(row)
+        if row["USD"] is None:
+            return ["font-weight:bold; color:#1a3c5e; background:#f0f4f8"] * len(row)
+        return [""] * len(row)
+
+    st.dataframe(
+        df_des.style
+            .apply(_style_desglose, axis=1)
+            .format({"USD": lambda v: f"{v:,.0f}" if v else "—",
+                     "COP (M)": lambda v: f"{v:.2f}" if v else "—",
+                     "% CAPEX": lambda v: v if v else "—"}),
+        use_container_width=True, hide_index=True, height=560
+    )
+
+    # ── Comparativo 3 escenarios ──────────────────────────────────────────────
+    with st.expander("📊 Comparativo Optimista / Base / Conservador", expanded=False):
+        comp_data = []
+        for esc, rv in [("Optimista", r_opt), ("Base", r_base), ("Conservador", r_cons)]:
+            comp_data.append({
+                "Escenario":      esc,
+                "CAPEX (USD)":    rv["capex_total"],
+                "USD/Wp":         rv["capex_total"] / rv["wp"],
+                "CAPEX (M COP)":  rv["capex_total"] * tc / 1e6,
+                "OPEX (USD/año)": rv["opex_total"],
+                "OPEX (USD/kWp)": rv["opex_total"] / kwp_est,
+                "Equipos (%)":    rv["equip_total"] / rv["capex_total"] * 100,
+            })
+        df_comp = pd.DataFrame(comp_data)
+        st.dataframe(
+            df_comp.style.format({
+                "CAPEX (USD)": "{:,.0f}",
+                "USD/Wp":      "{:.3f}",
+                "CAPEX (M COP)": "{:.2f}",
+                "OPEX (USD/año)": "{:,.0f}",
+                "OPEX (USD/kWp)": "{:.1f}",
+                "Equipos (%)":    "{:.1f}%",
+            }).apply(lambda row: ["background:#e8f5e9"]*len(row) if row["Escenario"] == escenario_est
+                     else [""]*len(row), axis=1),
+            use_container_width=True, hide_index=True
+        )
+
+    # ── OPEX anual desglose ───────────────────────────────────────────────────
+    with st.expander("📅 Desglose OPEX anual estimado", expanded=False):
+        opex_rows = [
+            ("O&M preventivo + correctivo",     r["opex_om"]),
+            ("Limpieza de módulos",              r["opex_limp"]),
+            ("Seguro operativo",                 r["opex_seg"]),
+            ("Fondo reposición inversores",      r["opex_repos"]),
+            ("Monitoreo remoto + administración",r["opex_mon"]),
+            ("TOTAL OPEX anual",                 r["opex_total"]),
+        ]
+        df_opex_e = pd.DataFrame(opex_rows, columns=["Ítem", "USD/año"])
+        df_opex_e["COP (M)/año"] = (df_opex_e["USD/año"] * tc / 1e6).round(3)
+        df_opex_e["USD/kWp·año"] = (df_opex_e["USD/año"] / kwp_est).round(2)
+        st.dataframe(
+            df_opex_e.style
+                .format({"USD/año": "{:,.0f}", "COP (M)/año": "{:.3f}", "USD/kWp·año": "{:.2f}"})
+                .apply(lambda r: ["font-weight:bold; background:#EAF4FB"]*len(r)
+                       if "TOTAL" in str(r["Ítem"]) else [""]*len(r), axis=1),
+            use_container_width=True, hide_index=True
+        )
+        st.caption(f"Ref. Colombia {tipo_est}: USD 15–25/kWp·año. "
+                   f"Este proyecto: **USD {r['opex_total']/kwp_est:.1f}/kWp·año**")
+
+    # ── Nota de coherencia con valores ya corridos ────────────────────────────
+    st.markdown("---")
+    _ppto_real = float(st.session_state.get("presupuesto_capex_usd", 0.0))
+    _opex_real = float(st.session_state.get("presupuesto_opex_anual_usd", 0.0))
+    _est_activa = st.session_state.get("est_rapida_aplicada", False)
+
+    if _ppto_real > 0 and not _est_activa:
+        st.info(
+            f"ℹ️ El Resumen ya tiene un CAPEX real desde los tabs de cotización: "
+            f"**USD {_ppto_real:,.0f}**. "
+            f"Para usar la estimación paramétrica, presiona '✅ Aplicar' abajo. "
+            f"Para volver al cotizado, presiona '🔄 Limpiar'."
+        )
+
+    col_ap1, col_ap2, col_ap3 = st.columns([2, 2, 4])
+    if col_ap1.button("✅ Aplicar a 💰 Financiero", type="primary", key="btn_aplicar_est"):
+        st.session_state["presupuesto_capex_usd"]       = r["capex_total"]
+        st.session_state["presupuesto_opex_anual_usd"]  = r["opex_total"]
+        st.session_state["presupuesto_fraccion_equipos"] = (
+            r["equip_total"] / r["capex_total"] if r["capex_total"] > 0 else 0.65
+        )
+        st.session_state["presupuesto_capex_directo"]   = r["directo"]
+        st.session_state["presupuesto_sub_directo"]     = r["directo"]
+        st.session_state["presupuesto_capex_blando"]    = r["soft_total"]
+        st.session_state["est_rapida_aplicada"]         = True
+        st.session_state["est_rapida_config"]           = {
+            "tipo": tipo_est, "escenario": escenario_est,
+            "zona": zona_est, "kwp": kwp_est,
+        }
+        st.rerun()
+
+    if col_ap2.button("🔄 Limpiar (usar cotización real)", key="btn_limpiar_est"):
+        for _k in ["est_rapida_aplicada", "est_rapida_config",
+                   "presupuesto_capex_usd", "presupuesto_opex_anual_usd",
+                   "presupuesto_fraccion_equipos", "presupuesto_capex_directo",
+                   "presupuesto_sub_directo", "presupuesto_capex_blando"]:
+            st.session_state.pop(_k, None)
+        st.rerun()
+
+    if _est_activa:
+        cfg = st.session_state.get("est_rapida_config", {})
+        st.success(
+            f"✅ **Estimación paramétrica ACTIVA** → 💰 Financiero usa:  \n"
+            f"CAPEX **USD {_ppto_real:,.0f}** (${_ppto_real*tc/1e6:.2f} M COP) · "
+            f"OPEX **USD {_opex_real:,.0f}/año**  \n"
+            f"Configuración: {cfg.get('tipo','—')} · {cfg.get('escenario','—')} · "
+            f"{cfg.get('zona','—')} · {cfg.get('kwp',0):.1f} kWp  \n"
+            f"🔄 Presiona 'Limpiar' cuando tengas cotizaciones reales."
+        )
+    else:
+        st.caption(
+            "⬆️ Presiona **✅ Aplicar** para enviar esta estimación a 💰 Financiero. "
+            "El Resumen al final de la página seguirá mostrando los tabs de cotización real."
+        )
 
 with t1:
     st.markdown("##### Perfilería, estructura BIPV, soportes, fijaciones")
@@ -398,108 +820,135 @@ with t7:
 st.markdown("---")
 st.subheader("📊 Resumen CAPEX Total del Proyecto")
 
-capex_directo = sub1 + sub2 + sub3 + sub4 + sub5
-capex_base    = capex_directo + sub6  # directo + costos blandos
+# ── Detectar modo activo: paramétrico vs cotización real ─────────────────────
+_est_activa  = st.session_state.get("est_rapida_aplicada", False)
+_cotizacion_real = (sub1 + sub2 + sub3 + sub4 + sub5 + sub6) > 0
 
-df_res = pd.DataFrame([
-    {"Categoría": "🔩 Perfilería y Estructura",              "USD": sub1, "COP (M)": round(sub1*tc/1e6,2), "% CAPEX base": 0.0},
-    {"Categoría": "👷 Mano de Obra y Servicios",             "USD": sub2, "COP (M)": round(sub2*tc/1e6,2), "% CAPEX base": 0.0},
-    {"Categoría": "⚡ Sistema FV (cables, protecciones)",    "USD": sub3, "COP (M)": round(sub3*tc/1e6,2), "% CAPEX base": 0.0},
-    {"Categoría": "🔌 Inversor y Equipos Eléctricos",        "USD": sub4, "COP (M)": round(sub4*tc/1e6,2), "% CAPEX base": 0.0},
-    {"Categoría": "📦 Módulos + Inversor + Baterías",        "USD": sub5, "COP (M)": round(sub5*tc/1e6,2), "% CAPEX base": 0.0},
-    {"Categoría": "🧾 Costos Blandos (soft costs)",          "USD": sub6, "COP (M)": round(sub6*tc/1e6,2), "% CAPEX base": 0.0},
-])
-if capex_base > 0:
-    df_res["% CAPEX base"] = (df_res["USD"] / capex_base * 100).round(1)
+if _est_activa and not _cotizacion_real:
+    # ── MODO PARAMÉTRICO: usar los valores ya guardados en session_state ──────
+    cfg = st.session_state.get("est_rapida_config", {})
+    st.info(
+        f"🧮 **Modo estimación paramétrica activa** — "
+        f"{cfg.get('tipo','—')} · {cfg.get('escenario','—')} · "
+        f"{cfg.get('zona','—')} · {cfg.get('kwp',0):.1f} kWp  \n"
+        f"Los tabs de cotización están vacíos. Completa al menos uno para activar el modo cotización real, "
+        f"o ve al tab **🧮 Estimación Rápida** para cambiar parámetros."
+    )
+    capex_total  = float(st.session_state.get("presupuesto_capex_usd", 0.0))
+    opex_pub     = float(st.session_state.get("presupuesto_opex_anual_usd", 0.0))
+    _frac_eq     = float(st.session_state.get("presupuesto_fraccion_equipos", 0.65))
+    capex_directo= float(st.session_state.get("presupuesto_capex_directo", capex_total * 0.75))
+    capex_base   = capex_directo + float(st.session_state.get("presupuesto_capex_blando", 0.0))
 
-# Fila subtotal
-df_res.loc[len(df_res)] = {"Categoría": "🔵 CAPEX Base (directo + blandos)",
-    "USD": capex_base, "COP (M)": round(capex_base*tc/1e6,2),
-    "% CAPEX base": 100.0}
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("CAPEX Paramétrico", f"USD {capex_total:,.0f}",
+              f"$ {capex_total*tc/1e6:.2f} M COP", delta_color="off")
+    m2.metric("USD / Wp", f"USD {capex_total/p_stc/1000:.3f}" if p_stc > 0 else "—",
+              "Estimado paramétrico", delta_color="off")
+    m3.metric("OPEX Anual", f"USD {opex_pub:,.0f}/año",
+              f"USD {opex_pub/p_stc:.1f}/kWp·año" if p_stc > 0 else "—", delta_color="off")
+    m4.metric("Frac. equipos (Ley 1715)", f"{_frac_eq*100:.1f}%",
+              "Para Art. 12 + Art. 11", delta_color="off")
 
-st.dataframe(
-    df_res.style
-        .format({"USD":"{:,.0f}","COP (M)":"{:.2f}","% CAPEX base":"{:.1f}%"})
-        .apply(lambda r: ["font-weight:bold; background:#EAF4FB"]*len(r) if "CAPEX Base" in str(r["Categoría"]) else [""]*len(r), axis=1),
-    use_container_width=True, hide_index=True,
-)
-
-st.markdown("##### ⚙️ Contingencias")
-cc1, cc2, cc3 = st.columns(3)
-ind_pct   = cc1.slider("Costos indirectos — AUI, administración, utilidad (%)",
-                        2, 25, 12, 1, help="Típico Colombia: 10–18%") / 100
-c_tec_pct = cc2.slider("Contingencia técnica — riesgo instalación BIPV fachada (%)",
-                        0, 20, 10, 1, help="BIPV de fachada: 8–15%. Suelo convencional: 5–8%") / 100
-c_pre_pct = cc3.slider("Contingencia de precios — volatilidad materiales (%)",
-                        0, 10,  5, 1, help="Recomendado: 3–7% para proyectos con TRM expuesta") / 100
-
-indirectos   = capex_base * ind_pct
-c_tec        = capex_base * c_tec_pct
-c_pre        = capex_base * c_pre_pct
-capex_total  = capex_base + indirectos + c_tec + c_pre
-
-m1,m2,m3,m4 = st.columns(4)
-m1.metric("CAPEX Base",        f"USD {capex_base:,.0f}",    f"$ {capex_base*tc/1e6:.2f} M COP",    delta_color="off")
-m2.metric("Indirectos",        f"USD {indirectos:,.0f}",    f"{ind_pct*100:.0f}% CAPEX base",      delta_color="off")
-m3.metric("Contingencias",     f"USD {c_tec+c_pre:,.0f}",   f"Téc {c_tec_pct*100:.0f}% + Pre {c_pre_pct*100:.0f}%", delta_color="off")
-m4.metric("✅ CAPEX TOTAL",    f"USD {capex_total:,.0f}",    f"$ {capex_total*tc/1e6:.2f} M COP",   delta_color="off")
-
-# ── KPIs de bancabilidad ──────────────────────────────────────────────────────
-st.markdown("##### 📐 KPIs de bancabilidad")
-k1, k2, k3, k4 = st.columns(4)
-
-if p_stc > 0:
-    costo_wp = capex_total / p_stc / 1000
-    k1.metric("Costo / Wp", f"USD {costo_wp:.2f}/Wp",
-              f"$ {costo_wp*tc*1000:,.0f} COP/Wp", delta_color="off")
-    if costo_wp > 5.0:
-        st.warning(f"⚠️ USD {costo_wp:.2f}/Wp — muy alto. Ref. BIPV fachada Colombia: USD 1.8–4.0/Wp. "
-                   f"Verifica que todos los precios estén en USD (no COP).")
-    elif costo_wp > 3.5:
-        st.info(f"ℹ️ USD {costo_wp:.2f}/Wp — rango alto. Ref.: USD 1.8–3.5/Wp para BIPV fachada.")
-
-if area_m2 > 0:
-    costo_m2 = capex_total / area_m2
-    k2.metric("Costo / m²", f"USD {costo_m2:.0f}/m²",
-              f"$ {costo_m2*tc/1e3:.1f} k COP/m²", delta_color="off")
-    if costo_m2 > 400:
-        st.info(f"ℹ️ USD {costo_m2:.0f}/m² — revisa si la subestructura o los módulos tienen precios altos. "
-                f"Ref. BIPV: USD 180–350/m².")
-
-if sub7 > 0 and capex_total > 0:
-    opex_ratio = sub7 / capex_total * 100
-    k3.metric("OPEX / CAPEX anual", f"{opex_ratio:.2f}%",
-              "Ref.: 1.0–2.5%/año", delta_color="off")
-    if opex_ratio > 3.0:
-        st.warning(f"⚠️ OPEX/CAPEX = {opex_ratio:.1f}% — alto. Revisa los fondos de reposición o seguros.")
-
-if p_stc > 0 and sub7 > 0:
-    k4.metric("OPEX / kWp·año", f"USD {sub7/p_stc:.0f}",
-              "Ref.: USD 8–15/kWp·año", delta_color="off")
-
-# ── Costos blandos como % del directo ────────────────────────────────────────
-if sub6 > 0 and capex_directo > 0:
-    soft_pct = sub6 / capex_directo * 100
-    st.caption(
-        f"🧾 Costos blandos = **{soft_pct:.1f}% del CAPEX directo** "
-        f"(referencia Colombia: 8–18%)"
+    st.success(
+        f"✅ **CAPEX TOTAL USD {capex_total:,.0f}** ($ {capex_total*tc/1e6:.2f} M COP) "
+        f"→ 💰 Financiero lo usa automáticamente. "
+        f"Ley 1715 frac. equipos: **{_frac_eq*100:.0f}%** "
+        f"· **OPEX USD {opex_pub:,.0f}/año** enviado al flujo de caja."
     )
 
-# ── Fracción de equipos para Ley 1715 ────────────────────────────────────────
-_frac_eq = (sub3 + sub4 + sub5) / capex_total if capex_total > 0 else 0.65
+else:
+    # ── MODO COTIZACIÓN REAL: calcular desde tabs ─────────────────────────────
+    if _est_activa and _cotizacion_real:
+        st.success("✅ Cotización real detectada en tabs — usando esos valores (estimación paramétrica ignorada).")
+        # Desactivar flag para no confundir en futuras recargas
+        st.session_state.pop("est_rapida_aplicada", None)
+        st.session_state.pop("est_rapida_config", None)
 
-# ── Publicar en session_state ─────────────────────────────────────────────────
-st.session_state["presupuesto_capex_usd"]         = capex_total
-st.session_state["presupuesto_capex_directo"]      = capex_directo
-st.session_state["presupuesto_capex_blando"]       = sub6
-st.session_state["presupuesto_sub_directo"]        = capex_directo   # compat.
-st.session_state["presupuesto_fraccion_equipos"]   = _frac_eq
-st.session_state["presupuesto_opex_anual_usd"]     = sub7            # ← nuevo → Financiero
+    capex_directo = sub1 + sub2 + sub3 + sub4 + sub5
+    capex_base    = capex_directo + sub6
 
-st.success(
-    f"✅ **CAPEX TOTAL USD {capex_total:,.0f}** ($ {capex_total*tc/1e6:.2f} M COP) "
-    f"→ 💰 Financiero lo usa automáticamente. "
-    f"Ley 1715 frac. equipos: **{_frac_eq*100:.0f}%**"
-    + (f" · **OPEX USD {sub7:,.0f}/año** enviado al flujo de caja." if sub7 > 0 else
-       " · ⚠️ OPEX = USD 0 — completa la pestaña 📅 OPEX Anual.")
-)
+    df_res = pd.DataFrame([
+        {"Categoría": "🔩 Perfilería y Estructura",           "USD": sub1, "COP (M)": round(sub1*tc/1e6,2), "% CAPEX base": 0.0},
+        {"Categoría": "👷 Mano de Obra y Servicios",          "USD": sub2, "COP (M)": round(sub2*tc/1e6,2), "% CAPEX base": 0.0},
+        {"Categoría": "⚡ Sistema FV (cables, protecciones)", "USD": sub3, "COP (M)": round(sub3*tc/1e6,2), "% CAPEX base": 0.0},
+        {"Categoría": "🔌 Inversor y Equipos Eléctricos",     "USD": sub4, "COP (M)": round(sub4*tc/1e6,2), "% CAPEX base": 0.0},
+        {"Categoría": "📦 Módulos + Inversor + Baterías",     "USD": sub5, "COP (M)": round(sub5*tc/1e6,2), "% CAPEX base": 0.0},
+        {"Categoría": "🧾 Costos Blandos (soft costs)",       "USD": sub6, "COP (M)": round(sub6*tc/1e6,2), "% CAPEX base": 0.0},
+    ])
+    if capex_base > 0:
+        df_res["% CAPEX base"] = (df_res["USD"] / capex_base * 100).round(1)
+    df_res.loc[len(df_res)] = {"Categoría": "🔵 CAPEX Base (directo + blandos)",
+        "USD": capex_base, "COP (M)": round(capex_base*tc/1e6,2), "% CAPEX base": 100.0}
+    st.dataframe(
+        df_res.style
+            .format({"USD":"{:,.0f}","COP (M)":"{:.2f}","% CAPEX base":"{:.1f}%"})
+            .apply(lambda r: ["font-weight:bold; background:#EAF4FB"]*len(r)
+                   if "CAPEX Base" in str(r["Categoría"]) else [""]*len(r), axis=1),
+        use_container_width=True, hide_index=True,
+    )
+
+    st.markdown("##### ⚙️ Contingencias")
+    cc1, cc2, cc3 = st.columns(3)
+    ind_pct   = cc1.slider("Costos indirectos — AUI, administración, utilidad (%)",
+                            2, 25, 12, 1, help="Típico Colombia: 10–18%") / 100
+    c_tec_pct = cc2.slider("Contingencia técnica (%)", 0, 20, 10, 1,
+                            help="BIPV fachada: 8–15%. Suelo convencional: 5–8%") / 100
+    c_pre_pct = cc3.slider("Contingencia de precios (%)", 0, 10, 5, 1,
+                            help="Recomendado: 3–7% para proyectos con TRM expuesta") / 100
+
+    indirectos  = capex_base * ind_pct
+    c_tec       = capex_base * c_tec_pct
+    c_pre       = capex_base * c_pre_pct
+    capex_total = capex_base + indirectos + c_tec + c_pre
+
+    m1,m2,m3,m4 = st.columns(4)
+    m1.metric("CAPEX Base",    f"USD {capex_base:,.0f}",   f"$ {capex_base*tc/1e6:.2f} M COP", delta_color="off")
+    m2.metric("Indirectos",    f"USD {indirectos:,.0f}",   f"{ind_pct*100:.0f}% CAPEX base",   delta_color="off")
+    m3.metric("Contingencias", f"USD {c_tec+c_pre:,.0f}",  f"Téc {c_tec_pct*100:.0f}% + Pre {c_pre_pct*100:.0f}%", delta_color="off")
+    m4.metric("✅ CAPEX TOTAL",f"USD {capex_total:,.0f}",   f"$ {capex_total*tc/1e6:.2f} M COP",delta_color="off")
+
+    # ── KPIs de bancabilidad ──────────────────────────────────────────────────
+    st.markdown("##### 📐 KPIs de bancabilidad")
+    k1, k2, k3, k4 = st.columns(4)
+    if p_stc > 0 and capex_total > 0:
+        costo_wp = capex_total / p_stc / 1000
+        k1.metric("Costo / Wp", f"USD {costo_wp:.2f}/Wp", f"$ {costo_wp*tc*1000:,.0f} COP/Wp", delta_color="off")
+        if costo_wp > 5.0:
+            st.warning(f"⚠️ USD {costo_wp:.2f}/Wp — muy alto. Ref. BIPV fachada: USD 1.8–4.0/Wp. "
+                       f"Verifica que todos los precios estén en USD (no COP).")
+        elif costo_wp > 3.5:
+            st.info(f"ℹ️ USD {costo_wp:.2f}/Wp — rango alto. Ref.: USD 1.8–3.5/Wp para BIPV fachada.")
+    if area_m2 > 0 and capex_total > 0:
+        costo_m2 = capex_total / area_m2
+        k2.metric("Costo / m²", f"USD {costo_m2:.0f}/m²", f"$ {costo_m2*tc/1e3:.1f} k COP/m²", delta_color="off")
+        if costo_m2 > 400:
+            st.info(f"ℹ️ USD {costo_m2:.0f}/m² — Ref. BIPV: USD 180–350/m².")
+    if sub7 > 0 and capex_total > 0:
+        opex_ratio = sub7 / capex_total * 100
+        k3.metric("OPEX / CAPEX anual", f"{opex_ratio:.2f}%", "Ref.: 1.0–2.5%/año", delta_color="off")
+        if opex_ratio > 3.0:
+            st.warning(f"⚠️ OPEX/CAPEX = {opex_ratio:.1f}% — revisa fondos de reposición o seguros.")
+    if p_stc > 0 and sub7 > 0:
+        k4.metric("OPEX / kWp·año", f"USD {sub7/p_stc:.0f}", "Ref.: USD 8–15/kWp·año", delta_color="off")
+    if sub6 > 0 and capex_directo > 0:
+        st.caption(f"🧾 Costos blandos = **{sub6/capex_directo*100:.1f}% del CAPEX directo** (ref. Colombia: 8–18%)")
+
+    opex_pub  = sub7
+    _frac_eq  = (sub3 + sub4 + sub5) / capex_total if capex_total > 0 else 0.65
+
+    # ── Publicar en session_state ─────────────────────────────────────────────
+    st.session_state["presupuesto_capex_usd"]       = capex_total
+    st.session_state["presupuesto_capex_directo"]   = capex_directo
+    st.session_state["presupuesto_capex_blando"]    = sub6
+    st.session_state["presupuesto_sub_directo"]     = capex_directo
+    st.session_state["presupuesto_fraccion_equipos"]= _frac_eq
+    st.session_state["presupuesto_opex_anual_usd"]  = sub7
+
+    st.success(
+        f"✅ **CAPEX TOTAL USD {capex_total:,.0f}** ($ {capex_total*tc/1e6:.2f} M COP) "
+        f"→ 💰 Financiero lo usa automáticamente. "
+        f"Ley 1715 frac. equipos: **{_frac_eq*100:.0f}%**"
+        + (f" · **OPEX USD {sub7:,.0f}/año** enviado al flujo de caja." if sub7 > 0 else
+           " · ⚠️ OPEX = USD 0 — completa la pestaña 📅 OPEX Anual.")
+    )
