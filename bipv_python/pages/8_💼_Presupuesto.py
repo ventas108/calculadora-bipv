@@ -275,8 +275,8 @@ _BENCH = {
         "opex_om_kw":       ( 10.0,  13.0,  16.0),
         "opex_limpieza_kw": (  2.0,   3.0,   4.5),
         "opex_reposicion_kw":(  2.5,   3.0,   4.0),
-        "opex_monitoreo_kw":(  3.0,   4.0,   5.0),
-        "opex_seguro_pct":  (0.004, 0.005, 0.006),
+        "opex_monitoreo_kw":(  1.0,   2.0,   3.0),   # Growatt cloud + soporte; SCADA ya en CAPEX
+        "opex_seguro_pct":  (0.002, 0.003, 0.004),   # 0.2–0.4 %/año; sector solar Colombia
     },
 }
 
@@ -629,7 +629,10 @@ with t0:
                        if "TOTAL" in str(r["Ítem"]) else [""]*len(r), axis=1),
             use_container_width=True, hide_index=True
         )
-        st.caption(f"Ref. Colombia {tipo_est}: USD 15–25/kWp·año. "
+        _ref_opex = {"Granja FV campo": "8–14", "Techo industrial": "9–16",
+                     "BIPV fachada/pérgola": "18–32"}.get(tipo_est, "10–25")
+        st.caption(f"Ref. Colombia {tipo_est}: **USD {_ref_opex}/kWp·año** "
+                   f"(incluye O&M, limpieza, reposición inversores, monitoreo, seguro todo riesgo).  "
                    f"Este proyecto: **USD {r['opex_total']/kwp_est:.1f}/kWp·año**")
 
     # ── Nota de coherencia con valores ya corridos ────────────────────────────
@@ -681,6 +684,19 @@ with t0:
             f"{cfg.get('zona','—')} · {cfg.get('kwp',0):.1f} kWp  \n"
             f"🔄 Presiona 'Limpiar' cuando tengas cotizaciones reales."
         )
+        # ── Alerta si el cálculo live difiere >10% del valor guardado ────────
+        _live_capex = r.get("capex_total", 0)
+        if _ppto_real > 0 and _live_capex > 0:
+            _diff_pct = abs(_live_capex - _ppto_real) / _ppto_real * 100
+            if _diff_pct > 10:
+                st.warning(
+                    f"⚠️ **Los parámetros cambiaron desde la última aplicación.** "
+                    f"El cálculo actual arroja **USD {_live_capex:,.0f}** "
+                    f"({_diff_pct:.0f}% {'más' if _live_capex>_ppto_real else 'menos'} "
+                    f"que el valor guardado USD {_ppto_real:,.0f}).  \n"
+                    f"💡 Presiona **✅ Aplicar** para actualizar Financiero con los nuevos parámetros, "
+                    f"o los resultados de TIR/VPN reflejarán la configuración anterior."
+                )
     else:
         st.caption(
             "⬆️ Presiona **✅ Aplicar** para enviar esta estimación a 💰 Financiero. "
@@ -866,7 +882,8 @@ with t6:
 with t7:
     st.markdown("""
     ##### OPEX anual — costos de operación y mantenimiento durante la vida útil del sistema
-    > 💡 Referencia Colombia BIPV: **USD 8–15/kWp/año** (O&M + limpieza + seguro).
+    > 💡 Referencia Colombia: Granja FV **8–14 USD/kWp·año** · Techo industrial **9–16** · BIPV fachada **18–32**.
+    > El OPEX BIPV es mayor porque incluye O&M especializado + seguro sobre CAPEX alto + reposición inversores.
     > El OPEX total anual se envía automáticamente a 💰 Financiero para el flujo de caja a 25 años.
     > **USD/un en esta pestaña = costo anual del ítem** (no unitario).
     """)
@@ -920,8 +937,9 @@ with t7:
     co1.metric("OPEX Total Anual", f"USD {sub7:,.0f}/año",
                f"$ {sub7*tc/1e6:.3f} M COP/año", delta_color="off")
     if p_stc > 0:
+        _ref_opex_t7 = "18–32" if "BIPV" in str(st.session_state.get("tipo_instalacion","")) else "8–16"
         co2.metric("OPEX / kWp", f"USD {sub7/p_stc:.0f}/kWp·año",
-                   "Ref: USD 8–15/kWp·año", delta_color="off")
+                   f"Ref BIPV: 18–32 · Techo: 9–16 USD/kWp·año", delta_color="off")
     if excl_o > 0:
         co3.metric("Excluidos", f"USD {excl_o:,.0f}/año", "no suma al total", delta_color="off")
     st.caption(f"📋 {len(ed_opex)} ítems — {int(act_o.sum())} activos. → Este valor reemplaza el slider O&M en 💰 Financiero.")
@@ -1005,7 +1023,7 @@ else:
     ind_pct   = cc1.slider("Costos indirectos — AUI, administración, utilidad (%)",
                             2, 25, 12, 1, help="Típico Colombia: 10–18%") / 100
     c_tec_pct = cc2.slider("Contingencia técnica (%)", 0, 20, 10, 1,
-                            help="BIPV fachada: 8–15%. Suelo convencional: 5–8%") / 100
+                            help="BIPV fachada: 10–15%. Techo industrial: 7–12%. Suelo convencional: 5–8%") / 100
     c_pre_pct = cc3.slider("Contingencia de precios (%)", 0, 10, 5, 1,
                             help="Recomendado: 3–7% para proyectos con TRM expuesta") / 100
 
@@ -1042,7 +1060,7 @@ else:
         if opex_ratio > 3.0:
             st.warning(f"⚠️ OPEX/CAPEX = {opex_ratio:.1f}% — revisa fondos de reposición o seguros.")
     if p_stc > 0 and sub7 > 0:
-        k4.metric("OPEX / kWp·año", f"USD {sub7/p_stc:.0f}", "Ref.: USD 8–15/kWp·año", delta_color="off")
+        k4.metric("OPEX / kWp·año", f"USD {sub7/p_stc:.0f}", "BIPV: 18–32 · Techo: 9–16 · Granja: 8–14 USD/kWp·año", delta_color="off")
     if sub6 > 0 and capex_directo > 0:
         st.caption(f"🧾 Costos blandos = **{sub6/capex_directo*100:.1f}% del CAPEX directo** (ref. Colombia: 8–18%)")
 
