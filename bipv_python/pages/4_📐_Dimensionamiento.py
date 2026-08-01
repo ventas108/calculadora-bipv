@@ -34,6 +34,11 @@ with col2:
                                 st.session_state.get("T_cel_extremo", 41.94)),
                 key="T_cel_extremo")
     N_str_tr = st.number_input("N_strings por tracker (via combinadoras)", value=int(st.session_state.get("N_str_tr", 8)), min_value=1, key="N_str_tr")
+    col_nm1, col_nm2 = st.columns(2)
+    with col_nm1:
+        N_min_scan = st.number_input("N mínimo a explorar", value=int(st.session_state.get("N_min_scan", 5)),  min_value=1, max_value=40, key="N_min_scan")
+    with col_nm2:
+        N_max_scan = st.number_input("N máximo a explorar", value=int(st.session_state.get("N_max_scan", 20)), min_value=2, max_value=40, key="N_max_scan")
 
 panel    = obtener_panel_excel(panel_nombre) if _cat_excel else MODULOS_BIPV[panel_nombre]
 if panel.get("costo_usd"):
@@ -71,7 +76,7 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
         panel, inversor,
         T_frio=T_frio, T_real=T_real, T_extremo=T_extr,
         N_strings_tracker=int(N_str_tr),
-        N_min=5, N_max=12,
+        N_min=int(N_min_scan), N_max=int(N_max_scan),
     )
 
     filas = []
