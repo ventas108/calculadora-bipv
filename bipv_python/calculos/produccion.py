@@ -251,25 +251,27 @@ def perdidas_desglosadas(res: dict, poa_bruta_kWh_m2: float) -> pd.DataFrame:
                           else "🔴 Pérdida óptica + temperatura"),
         },
         {
-            "Etapa":     "③ Pérdida T° horas calientes  (T_cel > 25°C)",
-            "kWh":       round(res["E_dc_anual_kWh"] + delta_t, 0),
+            # Fila informativa: desglosa la componente térmica pura del efecto SDM de fila ②
+            # NO es un paso acumulado — la kWh muestra E_dc (mismo que fila ②)
+            "Etapa":     "   ↳ Componente T° horas calientes  (T_cel > 25°C)",
+            "kWh":       round(res["E_dc_anual_kWh"], 0),
             "Δ kWh":     round(delta_t, 0),
-            "Nota":      f"Tk_gamma={res.get('Tk_gamma_pct','—')}%/°C",
+            "Nota":      f"Sub-componente de ②  ·  Tk_gamma={res.get('Tk_gamma_pct','—')}%/°C",
         },
         {
-            "Etapa":     "④ E_dc  (salida del array)",
+            "Etapa":     "③ E_dc  (salida del array)",
             "kWh":       round(res["E_dc_anual_kWh"], 0),
             "Δ kWh":     0,
             "Nota":      "",
         },
         {
-            "Etapa":     "⑤ Pérdida inversor",
+            "Etapa":     "④ Pérdida inversor",
             "kWh":       round(res["E_ac_anual_kWh"], 0),
             "Δ kWh":     round(delta_inv, 0),
-            "Nota":      f"η_inv = {round(-delta_inv / res['E_dc_anual_kWh'] * 100 + 100, 1) if res['E_dc_anual_kWh'] > 0 else '—'}%",
+            "Nota":      f"η_inv = {round(res['E_ac_anual_kWh'] / res['E_dc_anual_kWh'] * 100, 1) if res['E_dc_anual_kWh'] > 0 else '—'}%",
         },
         {
-            "Etapa":     "⑥ E_ac  (energía a la red / edificio)",
+            "Etapa":     "⑤ E_ac  (energía a la red / edificio)",
             "kWh":       round(res["E_ac_anual_kWh"], 0),
             "Δ kWh":     0,
             "Nota":      "",
