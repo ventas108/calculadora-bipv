@@ -49,11 +49,16 @@ _coord_personalizada = (
 
 # ── Panel de configuración ───────────────────────────────────────────────────
 if _coord_personalizada:
-    st.subheader(f"📍 Sitio: {ciudad}  ·  📌 Predio personalizado  ·  {icono_tipo} {tipo_instalacion}")
+    # Mostrar nombre del proyecto si existe, de lo contrario las coordenadas
+    _nombre_proy = st.session_state.get("nombre_proyecto", "").strip()
+    _label_sitio = _nombre_proy if _nombre_proy else f"{lat:.4f}°N, {abs(lon):.4f}°O"
+    st.subheader(f"📍 Sitio: {_label_sitio}  ·  📌 Predio personalizado  ·  {icono_tipo} {tipo_instalacion}")
     st.success(
-        f"✅ Usando coordenadas exactas del predio: "
-        f"**{lat:.5f}°**, **{lon:.5f}°**, **{alt_m} m.s.n.m.**  "
-        f"(Centro de {ciudad}: {c['lat']}°, {c['lon']}°)"
+        f"✅ **Coordenadas exactas del predio:** "
+        f"**{lat:.5f}°** lat, **{lon:.5f}°** lon, **{alt_m} m.s.n.m.**  \n"
+        f"🌡️ *Ciudad de referencia climática TMY: **{ciudad}** "
+        f"({c['lat']}°, {c['lon']}°) — seleccionada por similitud térmica y costera. "
+        f"Los datos meteorológicos se descargan de PVGIS para las coordenadas exactas del predio, no para {ciudad}.*"
     )
 else:
     st.subheader(f"📍 Sitio: {ciudad}  ·  {icono_tipo} {tipo_instalacion}")
