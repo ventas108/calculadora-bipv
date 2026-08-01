@@ -66,8 +66,19 @@ with col1:
 
     # ── Detectar cambio de ciudad ANTES de mostrar el expander ───────────────
     ciudad_anterior = st.session_state.get("ciudad", "Bogotá")
-    ciudad = st.selectbox("Ciudad", LISTA_CIUDADES,
-                          index=LISTA_CIUDADES.index(ciudad_anterior))
+    ciudad = st.selectbox(
+        "Ciudad de referencia climática",
+        LISTA_CIUDADES,
+        index=LISTA_CIUDADES.index(ciudad_anterior),
+        help=(
+            "Selecciona la ciudad cuyo clima se asemeja más al sitio del proyecto. "
+            "Si el predio está en una ubicación no listada (ej. Urabá, Catatumbo, "
+            "Llanos Orientales), elige la ciudad más cercana en temperatura y régimen "
+            "de lluvia. Las coordenadas exactas del predio se ingresan abajo — PVGIS "
+            "descargará los datos TMY para esas coordenadas, no para el centro de "
+            "esta ciudad."
+        ),
+    )
 
     # Si la ciudad cambió → pre-cargar coords de la nueva ciudad y rerenderizar limpio
     if ciudad != ciudad_anterior:
