@@ -1,4 +1,5 @@
 """Página 4 — Dimensionamiento de strings."""
+import math
 import streamlit as st
 import pandas as pd
 from calculos.dimensionamiento import optimizar_n_serie, dimensionar_sistema
@@ -122,11 +123,30 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
         area = st.session_state.get("area_fachada_m2", 97.34)
         dim  = dimensionar_sistema(panel, area, mejor.N_serie,
                                     int(N_str_tr), inversor["N_mppt"])
-        st.markdown("### 📊 Sistema dimensionado")
+
+        st.markdown("### 📊 Por inversor (1 unidad)")
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("N_paneles total", dim["N_paneles"])
-        c2.metric("P_DC instalada", f"{dim['P_dc_stc_kW']:.2f} kW")
-        c3.metric("Área ocupada", f"{dim['area_ocupada_m2']} m²")
-        c4.metric("Cobertura fachada", f"{dim['cobertura_pct']}%")
+        c1.metric("Paneles / inversor", dim["N_paneles"])
+        c2.metric("P_DC / inversor",    f"{dim['P_dc_stc_kW']:.2f} kW")
+        c3.metric("Área / inversor",    f"{dim['area_ocupada_m2']} m²")
+        c4.metric("Cobertura unitaria", f"{dim['cobertura_pct']}%")
+
+        # ── Escalado a la granja completa ─────────────────────────────────────
+        if dim["area_ocupada_m2"] > 0:
+            N_inv        = math.ceil(area / dim["area_ocupada_m2"])
+            total_panels = N_inv * dim["N_paneles"]
+            total_kWp    = N_inv * dim["P_dc_stc_kW"]
+            total_area   = N_inv * dim["area_ocupada_m2"]
+            cobert_total = min(round(total_area / area * 100, 1), 100.0) if area > 0 else 0
+            P_ac_inv_kW  = (inversor.get("P_ac_nom_W") or inversor.get("P_dc_max_W") or 0) / 1000
+            st.markdown("### 🏭 Proyecto completo (toda el área)")
+            g1, g2, g3, g4, g5 = st.columns(5)
+            g1.metric("Inversores",       N_inv)
+            g2.metric("Paneles totales",  f"{total_panels:,}")
+            g3.metric("kWp instalados",   f"{total_kWp:,.1f} kWp")
+            g4.metric("Área cubierta",    f"{total_area:,.0f} m²")
+            g5.metric("Cobertura total",  f"{cobert_total} %")
+            st.session_state["N_inv_total"]    = N_inv
+            st.session_state["P_dc_total_kWp"] = round(total_kWp, 2)
     else:
         st.error("❌ Ningún N válido en el rango. Revisar parámetros del inversor o temperaturas.")
