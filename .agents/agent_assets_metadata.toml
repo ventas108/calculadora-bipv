@@ -141,3 +141,10 @@ uri = "file://attached_assets/MANUAL_CALCULADORA_BIPV_v3_agosto2026.docx"
 type = "word_document"
 title = "Manual Calculadora BIPV v3 — agosto 2026"
 description = "Manual de usuario actualizado con la sección completa de Estimación Rápida paramétrica integrada en la Página 8 — Presupuesto Bancable."
+
+[[outputs]]
+id = "2KmiE12XeIwIxsw748tiq"
+uri = "file://attached_assets/comparacion_BIPV_vs_PVsyst_agosto2026.docx"
+type = "word_document"
+title = "Calculadora BIPV vs. PVsyst — Evaluación actualizada agosto 2026"
+description = "Comparación completa con puntajes actualizados, estado de cada brecha y hoja de ruta para el único gap que aún bloquea financiación bancaria formal."
