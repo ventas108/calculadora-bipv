@@ -91,7 +91,10 @@ def optimizar_n_serie(panel: dict, inversor: dict,
         v1 = semaforo(Voc_fr,  inversor["Vdc_max"],          invertir=False)
         v2 = semaforo(Vmp_re,  inversor["Vmppt_activo_min"], invertir=True)
         v3 = semaforo(Vmp_ex,  inversor["Vmppt_activo_min"], invertir=True)
-        v4 = semaforo(I_equiv, inversor["I_max_tracker"],    invertir=False)
+        # Check 4-Isimax: comparar contra Isc_max_tracker (cortocircuito),
+        # no contra I_max_tracker (operación/MPP). Fallback a I_max_tracker si falta.
+        _isc_lim = inversor.get("Isc_max_tracker") or inversor.get("I_max_tracker", 0)
+        v4 = semaforo(I_equiv, _isc_lim,                    invertir=False)
 
         riesgos = sum(1 for v in [v1, v2, v3, v4] if v in ("ALERTA", "FALLA"))
         resultados.append(ResultadoString(
