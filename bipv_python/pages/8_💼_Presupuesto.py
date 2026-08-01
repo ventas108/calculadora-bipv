@@ -954,10 +954,12 @@ st.subheader("📊 Resumen CAPEX Total del Proyecto")
 _est_activa  = st.session_state.get("est_rapida_aplicada", False)
 _tabs_sum    = sub1 + sub2 + sub3 + sub4 + sub5 + sub6
 # "Cotización real" solo si los tabs tienen valores coherentes con el tamaño del sistema.
-# Cualquier valor > 0 no es suficiente — los tabs pueden tener datos de un sistema pequeño
-# que no corresponden al kWp actual. Umbral mínimo: USD 0.50/Wp para p_stc > 20 kWp.
-if _tabs_sum > 0 and p_stc > 20:
-    _usdwp_tabs  = _tabs_sum / (p_stc * 1000)
+# IMPORTANTE: usar el kWp de la Estimación Rápida (est_rapida_config) como referencia,
+# NO p_stc de session_state — p_stc puede ser ~4 kWp si la sesión se reinició,
+# lo que haría pasar 0.34 USD/Wp como "coherente" al dividir 33k / 4kWp = 8.5.
+_kwp_ref = (st.session_state.get("est_rapida_config") or {}).get("kwp") or p_stc
+if _tabs_sum > 0 and _kwp_ref > 20:
+    _usdwp_tabs  = _tabs_sum / (_kwp_ref * 1000)
     _cotizacion_real = _usdwp_tabs >= 0.50   # mínimo absoluto para cualquier inst. solar
 elif _tabs_sum > 0:
     _cotizacion_real = True   # proyectos pequeños (<20 kWp): cualquier valor positivo vale
@@ -1090,12 +1092,17 @@ else:
     _frac_eq  = (sub3 + sub4 + sub5) / capex_total if capex_total > 0 else 0.65
 
     # ── Publicar en session_state ─────────────────────────────────────────────
-    st.session_state["presupuesto_capex_usd"]       = capex_total
+    # GUARDIA: si la Estimación Rápida fue aplicada (est_rapida_aplicada=True),
+    # NO sobreescribir presupuesto_capex_usd con el valor de los tabs.
+    # La Estimación Rápida tiene autoridad hasta que el usuario presione "Limpiar".
+    # Los tabs incompletos no deben silenciosamente reemplazar el CAPEX paramétrico.
+    if not _est_activa:
+        st.session_state["presupuesto_capex_usd"]       = capex_total
+        st.session_state["presupuesto_opex_anual_usd"]  = sub7
     st.session_state["presupuesto_capex_directo"]   = capex_directo
     st.session_state["presupuesto_capex_blando"]    = sub6
     st.session_state["presupuesto_sub_directo"]     = capex_directo
     st.session_state["presupuesto_fraccion_equipos"]= _frac_eq
-    st.session_state["presupuesto_opex_anual_usd"]  = sub7
 
     st.success(
         f"✅ **CAPEX TOTAL USD {capex_total:,.0f}** ($ {capex_total*tc/1e6:.2f} M COP) "
