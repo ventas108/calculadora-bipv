@@ -266,14 +266,14 @@ with col_t2:
         + str(st.session_state.get("panel_modelo", ""))
         + str(st.session_state.get("panel_seleccionado", ""))
     ).lower()
-    if "cdte" in _panel_info_raw:
+    if "cdte" in _panel_info_raw or "cadmium" in _panel_info_raw:
         _deg_lbl  = "Degradación módulos CdTe (%/año)"
         _deg_help = "CdTe thin-film: 0.30–0.45%/año — la más baja del mercado. Fuente: Jordan & Kurtz 2013."
         _deg_def  = 0.4
-    elif any(x in _panel_info_raw for x in ["n-type", "n type", "ntype", "topcon", "hjt"]):
-        _deg_lbl  = "Degradación módulos N-type (%/año)"
+    elif any(x in _panel_info_raw for x in ["n-type", "n type", "ntype", "topcon", "hjt", "heterojunction"]):
+        _deg_lbl  = "Degradación módulos N-type (TOPCon/HJT) (%/año)"
         _deg_help = "N-type monocristalino (TOPCon / HJT): 0.35–0.50%/año. Fuente: Fraunhofer ISE 2022."
-        _deg_def  = 0.5
+        _deg_def  = 0.45
     elif "perc" in _panel_info_raw:
         _deg_lbl  = "Degradación módulos PERC (%/año)"
         _deg_help = "PERC monocristalino: 0.45–0.60%/año. Fuente: Jordan & Kurtz 2013."
@@ -282,11 +282,32 @@ with col_t2:
         _deg_lbl  = "Degradación módulos bifaciales (%/año)"
         _deg_help = "Bifacial Si-mono: 0.40–0.55%/año. Cara trasera degrada ~10% más lento. Fuente: NREL 2021."
         _deg_def  = 0.5
-    else:
-        _deg_lbl  = "Degradación módulos FV (%/año)"
+    elif any(x in _panel_info_raw for x in ["mono", "monocristalino", "monocrystalline", "rsm", "jinko", "longi", "risen", "canadian", "trina"]):
+        # Panel Si monocristalino convencional sin keyword específico PERC/N-type
+        _deg_lbl  = "Degradación módulos Si monocristalino (%/año)"
         _deg_help = (
-            "Si-mono (PERC/N-type): 0.40–0.55%/año · CdTe: 0.30–0.45%/año · "
-            "Si-poli: 0.50–0.70%/año · Fuente: Jordan & Kurtz 2013."
+            "Si monocristalino estándar: 0.45–0.60%/año. "
+            "Año 1 puede ser mayor (LID). Fuente: Jordan & Kurtz 2013 / NREL 2021."
+        )
+        _deg_def  = 0.5
+    elif any(x in _panel_info_raw for x in ["poli", "poly", "multicristalino", "multicrystalline"]):
+        _deg_lbl  = "Degradación módulos Si policristalino (%/año)"
+        _deg_help = "Si policristalino: 0.50–0.70%/año. Fuente: Jordan & Kurtz 2013."
+        _deg_def  = 0.6
+    elif any(x in _panel_info_raw for x in ["bipv", "fachada", "soltech", "onyx", "issol", "megasol"]):
+        _deg_lbl  = "Degradación módulos BIPV (%/año)"
+        _deg_help = (
+            "Módulos BIPV Si monocristalino: 0.45–0.60%/año. "
+            "Temperatura de operación confinada puede acelerar la degradación. "
+            "Ref: SUPSI / Fraunhofer."
+        )
+        _deg_def  = 0.5
+    else:
+        _deg_lbl  = "Degradación módulos Si monocristalino (%/año)"
+        _deg_help = (
+            "Sin panel específico detectado — usando referencia Si mono estándar: 0.45–0.55%/año. "
+            "Si-mono (PERC): 0.45–0.55% · N-type: 0.35–0.50% · "
+            "Si-poli: 0.50–0.70% · CdTe: 0.30–0.45%. Fuente: Jordan & Kurtz 2013."
         )
         _deg_def  = 0.5
     _deg_saved = float(st.session_state.get("tasa_deg_guardada", _deg_def))
@@ -431,18 +452,38 @@ with col_t3:
                  "%CAPEX es útil cuando no se conoce el detalle.",
         )
         if _opex_modo == "USD/kWp·año":
-            _opex_kw = st.slider(
-                "O&M anual (USD/kWp·año)",
-                min_value=3.0, max_value=25.0,
-                value=float(st.session_state.get("opex_kw_guardado", 10.0)),
-                step=0.5,
-                help=(
-                    "Referencia Colombia zona tropical: **8–12 USD/kWp·año**. "
+            # ── Default OPEX según tipo de instalación ───────────────────────
+            _tipo_inst_fin = str(st.session_state.get("tipo_instalacion", "")).lower()
+            if any(x in _tipo_inst_fin for x in ["bipv", "fachada", "pergola", "pérgola", "marquesina"]):
+                _opex_kw_default = 20.0
+                _opex_kw_help = (
+                    "**BIPV fachada/pérgola: 18–32 USD/kWp·año** (referencia Colombia 2026). "
+                    "Mayor que FV convencional porque incluye: O&M especializado de fachada integrada, "
+                    "seguro sobre CAPEX alto (0.2–0.4%/yr), inspección estructural semestral. "
+                    "Con contrato O&M especializado: 20–28 USD/kWp·año."
+                )
+            elif any(x in _tipo_inst_fin for x in ["techo", "roof", "cubierta"]):
+                _opex_kw_default = 12.0
+                _opex_kw_help = (
+                    "**Techo industrial/comercial: 9–16 USD/kWp·año** (referencia Colombia 2026). "
+                    "Incluye: limpieza mensual, revisión semestral inversores, monitoreo remoto. "
+                    "IRENA 2023 rooftop: 10–15 USD/kWp·año zona tropical."
+                )
+            else:  # Granja FV campo / utility-scale
+                _opex_kw_default = 10.0
+                _opex_kw_help = (
+                    "**Granja FV campo / utility-scale: 8–14 USD/kWp·año** (referencia Colombia 2026). "
                     "Incluye: limpieza bimestral módulos, revisión semestral inversores, "
                     "monitoreo remoto y mantenimiento preventivo. "
                     "Con contrato O&M local: 9–11 USD/kWp·año. "
                     "IRENA 2023 utility-scale: 9–15 USD/kWp·año zona tropical."
-                ),
+                )
+            _opex_kw = st.slider(
+                "O&M anual (USD/kWp·año)",
+                min_value=3.0, max_value=35.0,
+                value=float(st.session_state.get("opex_kw_guardado", _opex_kw_default)),
+                step=0.5,
+                help=_opex_kw_help,
             )
             st.session_state["opex_kw_guardado"] = _opex_kw
             _opex_usd_anual = _opex_kw * p_stc
