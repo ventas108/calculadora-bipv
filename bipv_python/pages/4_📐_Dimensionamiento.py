@@ -34,10 +34,20 @@ with col2:
     T_extr   = st.number_input("T_celda caliente extremo (°C)", value=float(
                                 st.session_state.get("T_cel_extremo", 41.94)),
                 key="T_cel_extremo")
-    N_str_tr = st.number_input("N_strings por tracker (via combinadoras)", value=int(st.session_state.get("N_str_tr", 8)), min_value=1, key="N_str_tr")
+    N_str_tr = st.number_input("N_strings por tracker (via combinadoras)", value=int(st.session_state.get("N_str_tr", 1)), min_value=1, key="N_str_tr")
     col_nm1, col_nm2 = st.columns(2)
     with col_nm1:
-        N_min_scan = st.number_input("N mínimo a explorar", value=int(st.session_state.get("N_min_scan", 5)),  min_value=1, max_value=40, key="N_min_scan")
+        # Auto-calcular N_min eléctrico desde MPPT del inversor para evitar que
+        # un restart resetee a 5 y el optimizador proponga N inviables para el MPPT
+        _vmppt_min  = inversor.get("Vmppt_min") or inversor.get("Vmppt_activo_min") or 0
+        _vmp_panel  = panel.get("Vmp_stc") or panel.get("Vmp") or 1
+        _n_min_elec = max(1, math.ceil(_vmppt_min / _vmp_panel)) if _vmppt_min else 5
+        _n_min_def  = max(_n_min_elec, int(st.session_state.get("N_min_scan", _n_min_elec)))
+        N_min_scan = st.number_input(
+            f"N mínimo a explorar (eléctrico: {_n_min_elec})",
+            value=_n_min_def, min_value=1, max_value=40, key="N_min_scan",
+            help=f"Calculado como ⌈Vmppt_min({_vmppt_min}V) / Vmp_panel({_vmp_panel:.1f}V)⌉ = {_n_min_elec}"
+        )
     with col_nm2:
         N_max_scan = st.number_input("N máximo a explorar", value=int(st.session_state.get("N_max_scan", 20)), min_value=2, max_value=40, key="N_max_scan")
 
