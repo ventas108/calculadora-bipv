@@ -126,11 +126,11 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
                                         "3-Vmp_ext≥Vmppt", "4-I≤Imax"])
     st.dataframe(styled, use_container_width=True)
 
-    # Mejor opción
+    # Mejor opción: N con 0 riesgos y MÁXIMA Vmp (mejor aprovechamiento MPPT)
     sin_riesgos = [r for r in resultados if r.riesgos == 0]
     if sin_riesgos:
-        mejor = sin_riesgos[0]
-        st.success(f"✅ N óptimo = **{mejor.N_serie} paneles/string** — 0 riesgos")
+        mejor = max(sin_riesgos, key=lambda r: r.Vmp_real)
+        st.success(f"✅ N óptimo = **{mejor.N_serie} paneles/string** — 0 riesgos · Vmp = {mejor.Vmp_real:.1f} V (máximo MPPT)")
         st.session_state["N_serie"] = mejor.N_serie
 
         # Dimensionamiento del sistema
