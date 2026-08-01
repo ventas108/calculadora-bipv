@@ -24,6 +24,10 @@ with col1:
     _idx_inv = next((i for i,k in enumerate(_lista_inv) if "MID15KTL3" in k or "MID 15KTL3" in k), 0)
     inversor_nombre = st.selectbox("Inversor", _lista_inv, index=_idx_inv)
 
+# Cargar dicts antes de col2 para que estén disponibles al calcular N_min_scan
+panel    = obtener_panel_excel(panel_nombre) if _cat_excel else MODULOS_BIPV[panel_nombre]
+inversor = obtener_inversor_excel(inversor_nombre) if _cat_inv else seleccionar_inversor(inversor_nombre)
+
 with col2:
     T_frio   = st.number_input("T_mín diseño (°C)", value=float(
                                 st.session_state.get("T_min_diseno", 5.0)),
@@ -51,7 +55,7 @@ with col2:
     with col_nm2:
         N_max_scan = st.number_input("N máximo a explorar", value=int(st.session_state.get("N_max_scan", 20)), min_value=2, max_value=40, key="N_max_scan")
 
-panel    = obtener_panel_excel(panel_nombre) if _cat_excel else MODULOS_BIPV[panel_nombre]
+# (panel e inversor ya cargados arriba)
 if panel.get("costo_usd"):
     st.session_state["costo_modulo_usd"] = panel["costo_usd"]
 
@@ -70,7 +74,7 @@ if panel.get("notas"):
 # ── Guardar panel en session_state para Motor IV automático (#7) ─────────────
 st.session_state["panel_dict"]        = panel
 st.session_state["panel_nombre_dim"]  = panel_nombre
-inversor = obtener_inversor_excel(inversor_nombre) if _cat_inv else seleccionar_inversor(inversor_nombre)
+# inversor ya cargado antes de col2
 if inversor.get("costo_usd"):
     st.session_state["costo_inversor_usd"] = inversor["costo_usd"]
 # Propagar inversor a session_state para compatibilidad baterías (#25)
