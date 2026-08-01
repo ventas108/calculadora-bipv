@@ -8,6 +8,8 @@ import numpy as np
 from calculos.produccion import simular_produccion_anual, perdidas_desglosadas
 from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_inversores import INVERSORES
+from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
+from datos.catalogo_inversores_excel import cargar_catalogo_inversores
 
 st.set_page_config(page_title="Producción — BIPV", page_icon="📊", layout="wide")
 st.title("📊 Producción Anual — IEC 61724")
@@ -90,40 +92,46 @@ st.subheader("⚙️ Configuración del sistema")
 col_c1, col_c2, col_c3 = st.columns(3)
 
 with col_c1:
-    panel_nombre = st.selectbox(
-        "Panel fotovoltaico",
-        list(MODULOS_BIPV.keys()),
-        index=list(MODULOS_BIPV.keys()).index("ASP-ST1-T40"),
-    )
-    panel = MODULOS_BIPV[panel_nombre]
+    _cat_excel  = cargar_catalogo_excel() or {}
+    _lista_pan  = sorted(_cat_excel.keys()) if _cat_excel else list(MODULOS_BIPV.keys())
+    _pan_default = st.session_state.get("panel_nombre_dim", "")
+    _pan_idx     = _lista_pan.index(_pan_default) if _pan_default in _lista_pan else 0
+    panel_nombre = st.selectbox("Panel fotovoltaico", _lista_pan, index=_pan_idx)
+    panel = obtener_panel_excel(panel_nombre) if _cat_excel else MODULOS_BIPV.get(panel_nombre, {})
 
     # Mostrar ficha rápida
     st.caption(
         f"Pmax STC: {panel.get('Pmax_stc','—')} W · "
-        f"Área: {panel['area_m2']} m² · "
-        f"NOCT: {panel.get('NOCT',45)}°C"
+        f"Área: {panel.get('area_m2','—')} m² · "
+        f"NOCT: {panel.get('NOCT',45)}°C · "
+        f"{'🟢 SDM' if panel.get('I_L_ref') else '🟡 Modelo simplificado'}"
     )
 
 with col_c2:
-    # Tomar N_paneles de Dimensionamiento si existe
-    n_default = st.session_state.get("N_paneles_dim", 0)
-    p_default = st.session_state.get("P_dc_stc_kW_dim", 0.0)
+    # Prioridad: total granja > por inversor > default
+    n_granja  = st.session_state.get("N_paneles_granja", 0)
+    n_inv     = st.session_state.get("N_paneles_dim", 0)
+    n_default = n_granja if n_granja > 0 else (n_inv if n_inv > 0 else 64)
 
     N_paneles = st.number_input(
         "Número de módulos (N_paneles)",
-        min_value=1, max_value=5000,
-        value=int(n_default) if n_default > 0 else 64,
+        min_value=1, max_value=50000,
+        value=int(n_default),
         step=1,
-        help="Resultado de la página 📐 Dimensionamiento, o ingresar manualmente.",
+        help="Se toma automáticamente del Proyecto completo en 📐 Dimensionamiento.",
     )
 
-    area_ocup = N_paneles * panel["area_m2"]
+    area_ocup = N_paneles * (panel.get("area_m2") or 0)
     P_stc_kW  = round(panel.get("Pmax_stc", 60) * N_paneles / 1000, 3)
     st.metric("Potencia instalada", f"{P_stc_kW:.2f} kWp")
     st.metric("Área módulos",       f"{area_ocup:.1f} m²")
 
 with col_c3:
-    inversor_nombre = st.selectbox("Inversor", list(INVERSORES.keys()))
+    _cat_inv_p   = cargar_catalogo_inversores() or {}
+    _lista_inv_p = sorted(_cat_inv_p.keys()) if _cat_inv_p else list(INVERSORES.keys())
+    _inv_default = st.session_state.get("inversor_nombre_dim", "")
+    _inv_idx_p   = _lista_inv_p.index(_inv_default) if _inv_default in _lista_inv_p else 0
+    inversor_nombre = st.selectbox("Inversor", _lista_inv_p, index=_inv_idx_p)
     eta_inv = st.slider(
         "Eficiencia del inversor (%)",
         min_value=90.0, max_value=99.0,

@@ -44,6 +44,15 @@ def _calcular_pmax_vectorizado(
 
     Retorna: array 1D de Pmax (W) por módulo
     """
+    # ── Fallback para paneles sin parámetros SDM completos ───────────────────
+    # (paneles del catálogo Excel que no tienen a_ref, I_L_ref, etc.)
+    if panel.get("I_L_ref") is None or panel.get("R_s") is None or panel.get("a_ref") is None:
+        gamma = float(panel.get("Tk_gamma", -0.45)) / 100.0   # %/°C → 1/°C
+        pmax_stc = float(panel.get("Pmax_stc", 0))
+        pmax = pmax_stc * np.where(G > 5.0, G / 1000.0, 0.0) * (1.0 + gamma * (T_cel - 25.0))
+        pmax = np.maximum(pmax, 0.0)
+        return pmax
+
     constantes = obtener_constantes_tecnologia(panel["tecnologia"])
 
     # nNsVth_ref en Voltios (pvlib convention)

@@ -146,7 +146,8 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
             g3.metric("kWp instalados",   f"{total_kWp:,.1f} kWp")
             g4.metric("Área cubierta",    f"{total_area:,.0f} m²")
             g5.metric("Cobertura total",  f"{cobert_total} %")
-            st.session_state["N_inv_total"]    = N_inv
-            st.session_state["P_dc_total_kWp"] = round(total_kWp, 2)
+            st.session_state["N_inv_total"]      = N_inv
+            st.session_state["P_dc_total_kWp"]  = round(total_kWp, 2)
+            st.session_state["N_paneles_granja"] = total_panels
     else:
         st.error("❌ Ningún N válido en el rango. Revisar parámetros del inversor o temperaturas.")
