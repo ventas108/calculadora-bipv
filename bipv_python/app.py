@@ -42,14 +42,31 @@ for k, v in defaults.items():
 # ── Página principal ───────────────────────────────────────────────────────
 st.title("☀️ Calculadora BIPV — Colombia")
 
-# ── Subtítulo dinámico: panel e inversor desde session_state ─────────────────
-_panel_home    = st.session_state.get("panel_nombre",    "ASP-ST1-T40")
-_inversor_home = st.session_state.get("inversor_nombre", "Growatt-MID15KTL3-X")
-st.markdown(
-    f"**Panel:** {_panel_home}  •  "
-    f"**Inversor:** {_inversor_home}  •  "
-    "**Motor físico:** De Soto 2006 + pvlib"
-)
+# ── Subtítulo dinámico — solo muestra panel/inversor si fueron configurados ───
+# Si el usuario no ha corrido Motor IV ni Dimensionamiento en esta sesión,
+# los valores son los defaults y no corresponden al proyecto real.
+_PANEL_DEFAULT    = "ASP-ST1-T40"
+_INVERSOR_DEFAULT = "Growatt-MID15KTL3-X"
+_panel_home    = st.session_state.get("panel_nombre",    _PANEL_DEFAULT)
+_inversor_home = st.session_state.get("inversor_nombre", _INVERSOR_DEFAULT)
+_sistema_conf  = st.session_state.get("simulacion_ok", False) or \
+                 st.session_state.get("produccion_ok",  False) or \
+                 bool(st.session_state.get("N_serie") and
+                      st.session_state.get("panel_nombre") != _PANEL_DEFAULT)
+
+if _sistema_conf:
+    st.markdown(
+        f"**Panel:** {_panel_home}  •  "
+        f"**Inversor:** {_inversor_home}  •  "
+        "**Motor físico:** De Soto 2006 + pvlib"
+    )
+else:
+    _tipo_sub = st.session_state.get("tipo_instalacion", "")
+    _tipo_str = f" · {_tipo_sub}" if _tipo_sub else ""
+    st.markdown(
+        f"**Motor físico:** De Soto 2006 + pvlib{_tipo_str}  •  "
+        "Configura el proyecto y ejecuta los módulos para ver el resumen aquí."
+    )
 
 col1, col2, col3 = st.columns(3)
 
@@ -89,16 +106,22 @@ with col3:
 st.markdown("---")
 st.markdown(
     "### Navegación\n"
-    "Usa el menú lateral para acceder a cada módulo:\n\n"
+    "Utilice el menú lateral para acceder a cada módulo:\n\n"
     "| Página | Función |\n"
     "|--------|--------|\n"
-    "| 🏠 Proyecto | Configuración básica del proyecto |\n"
-    "| ☀️ Recurso Solar | TMY + PVGIS + irradiancia POA |\n"
-    "| 🔬 Motor IV | Curva I-V + validación SDM vs ficha |\n"
-    "| 📐 Dimensionamiento | String sizing con semáforo OK/ALERTA/FALLA |\n"
-    "| ⚡ Mismatch | Análisis de mismatch MPPT |\n"
-    "| 📊 Producción | Simulación IEC 61724 hora a hora |\n"
-    "| 💰 Financiero | VPN, TIR, Ley 1715/2014 Colombia |\n"
+    "| 🏠 Proyecto | Ciudad de referencia climática, coordenadas del predio, tipo de instalación |\n"
+    "| ☀️ Recurso Solar | Datos TMY desde PVGIS + irradiancia POA hora a hora |\n"
+    "| 🔬 Motor IV | Curva I-V, modelo De Soto 2006, validación SDM vs ficha |\n"
+    "| 📐 Dimensionamiento | String sizing con semáforo OK / ALERTA / FALLA |\n"
+    "| 🔆 Motor Óptico | Factor óptico por sombra, suciedad y reflectividad |\n"
+    "| ⚡ Desajuste | Análisis de mismatch MPPT por sombra parcial |\n"
+    "| 📊 Producción | Simulación energética IEC 61724 hora a hora |\n"
+    "| 💰 Financiero | VPN, TIR, Payback, LCOE — Ley 1715/2014 Colombia |\n"
+    "| 💼 Presupuesto | CAPEX detallado por ítem + OPEX + estimación rápida paramétrica |\n"
+    "| 🗺️ Vista 3D | Modelo 3D del sistema con sombreado |\n"
+    "| 📄 Informe en PDF | Reporte técnico descargable con todos los resultados |\n"
+    "| 🔋 Baterías y Balance | Dimensionamiento de almacenamiento y balance de energía |\n"
+    "| 🌿 Impacto CO₂ | Huella de carbono evitada y equivalencias ambientales |\n"
 )
 
 st.markdown("---")
