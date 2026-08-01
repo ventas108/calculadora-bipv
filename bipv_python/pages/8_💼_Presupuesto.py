@@ -470,30 +470,65 @@ with t0:
         help="Base = mediana de mercado. Optimista = compra directa + negociación. Conservador = + contingencias."
     )
 
-    # Auto-detectar zona desde ciudad del recurso solar
-    _ciudad_ss  = str(st.session_state.get("tmy_ciudad", "")).lower()
+    # Auto-detectar zona — prioridad: municipio_predio (coords reales) > tmy_ciudad (ref. climática)
+    _municipio_predio = str(st.session_state.get("municipio_predio", "")).lower()
+    _ciudad_tmy       = str(st.session_state.get("tmy_ciudad", "")).lower()
     _zona_opts  = list(_ZONA_FACTOR.keys())
     _zona_map   = {
-        "bogot": 0, "saban": 0, "tunja": 0,
-        "medell": 1, "antioq": 1, "rionegro": 1,
-        "cali": 2, "valle": 2, "palmira": 2,
+        "bogot": 0, "saban": 0, "tunja": 0, "cundinam": 0,
+        "medell": 1, "antioq": 1, "rionegro": 1, "manizal": 1,
+        "pereira": 1, "armenia": 1, "caldas": 1, "quindio": 1,
+        "risaral": 1,
+        "cali": 2, "valle": 2, "palmira": 2, "buenaven": 2,
+        "popayan": 2, "cauca": 2,
         "barranq": 3, "santa marta": 3, "cartagena": 3, "costa": 3,
+        "monteria": 3, "sincelejo": 3, "valledup": 3, "cesar": 3,
+        "sucre": 3, "cordoba": 3, "magdalena": 3,
         "urab": 4, "apartad": 4, "turbo": 4, "choc": 4,
-        "villavicencio": 5, "llano": 5, "vichada": 5,
+        "necoclí": 4, "necocli": 4, "chigorodo": 4, "chigorodó": 4,
+        "mutata": 4, "mutatá": 4, "carepa": 4, "arboletes": 4,
+        "villavicencio": 5, "llano": 5, "vichada": 5, "orinoquia": 5,
+        "leticia": 5, "amazona": 5,
     }
-    _zona_idx = 0
-    for kw, idx in _zona_map.items():
-        if kw in _ciudad_ss:
-            _zona_idx = idx
+
+    # Buscar zona primero en municipio_predio (coordenadas reales), luego en ciudad TMY
+    _zona_idx   = 0
+    _zona_fuente = None
+    for _buscar, _fuente_label in [(_municipio_predio, "predio"), (_ciudad_tmy, "TMY")]:
+        if not _buscar:
+            continue
+        for kw, idx in _zona_map.items():
+            if kw in _buscar:
+                _zona_idx    = idx
+                _zona_fuente = _fuente_label
+                break
+        if _zona_fuente:
             break
+
+    # Pre-poblar session_state cuando la fuente es el predio real
+    # (evita que la zona de la ciudad TMY quede "pegada" del render anterior)
+    if _zona_fuente == "predio":
+        st.session_state["est_zona"] = _zona_opts[_zona_idx]
 
     zona_est = col_s3.selectbox(
         "Zona geográfica", _zona_opts, index=_zona_idx, key="est_zona",
-        help="Se auto-detecta desde la ciudad del Recurso Solar. Factor logístico y climático."
+        help="Se auto-detecta desde las coordenadas del predio (prioridad) o la ciudad de referencia climática."
     )
-    if _ciudad_ss:
-        st.caption(f"📍 Ciudad detectada del Recurso Solar: **{st.session_state.get('tmy_ciudad', '—')}** "
-                   f"→ zona asignada: **{zona_est}** (factor ×{_ZONA_FACTOR[zona_est]:.2f})")
+
+    # Caption explicativo según la fuente de detección
+    if _zona_fuente == "predio":
+        st.caption(
+            f"📍 Zona detectada desde las **coordenadas del predio** "
+            f"({st.session_state.get('municipio_predio', '—')}) → "
+            f"**{zona_est}** (factor ×{_ZONA_FACTOR[zona_est]:.2f})"
+        )
+    elif _zona_fuente == "TMY":
+        st.caption(
+            f"🌡️ Zona estimada desde ciudad de referencia TMY: "
+            f"**{st.session_state.get('tmy_ciudad', '—')}** → "
+            f"**{zona_est}** (factor ×{_ZONA_FACTOR[zona_est]:.2f})  \n"
+            f"ℹ️ Ingresa coordenadas del predio en **Proyecto** para una detección más precisa."
+        )
 
     st.markdown("---")
 
