@@ -453,6 +453,18 @@ with t0:
         "Tipo de instalación", _tipo_opts, index=_tipo_idx, key="est_tipo",
         help="Se auto-detecta según la densidad de paneles del Dimensionamiento."
     )
+    # Advertencia para proyectos BIPV micro: los costos fijos (scada, permisos,
+    # conexión) elevan el USD/Wp significativamente por debajo de ~20 kWp.
+    if "BIPV" in tipo_est and kwp_est < 20:
+        st.warning(
+            f"⚠️ **Proyecto BIPV muy pequeño ({kwp_est:.1f} kWp)** — "
+            f"los costos fijos del modelo (SCADA, permisos RETIE/UPME, conexión a red) "
+            f"representan más del 50 % del CAPEX a esta escala, elevando el indicador "
+            f"USD/Wp por encima de los rangos de mercado típicos. "
+            f"Esta estimación es válida como referencia de prefactibilidad, pero para "
+            f"proyectos < 20 kWp se recomienda solicitar cotización EPC directamente. "
+            f"Los rangos referenciales asumen proyectos ≥ 30 kWp."
+        )
     escenario_est = col_s2.selectbox(
         "Escenario de costo", ["Optimista", "Base", "Conservador"], index=1, key="est_esc",
         help="Base = mediana de mercado. Optimista = compra directa + negociación. Conservador = + contingencias."

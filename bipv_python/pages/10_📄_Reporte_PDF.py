@@ -805,9 +805,20 @@ def generar_html_reporte() -> str:
         _er_equip_r = _er_feq_r * _er_dir_r
         _er_epc_r   = max(0.0, _er_dir_r - _er_equip_r)
         _tc_er_r    = tipo_cambio_rep
-        _ref_wp     = ("0.70–1.10 USD/Wp" if "Granja" in _er_tipo_r
-                       else "0.90–1.45 USD/Wp" if "Techo" in _er_tipo_r
-                       else "1.60–3.20 USD/Wp")
+        # Referencia USD/Wp ajustada por tipo Y escala del proyecto
+        # Los costos fijos (permisos, scada, conexión) dominan en proyectos pequeños
+        # y elevan el USD/Wp — es economía de escala normal, no un error del modelo.
+        if "Granja" in _er_tipo_r:
+            _ref_wp = "0.70–1.20 USD/Wp"
+        elif "Techo" in _er_tipo_r:
+            _ref_wp = "0.85–1.60 USD/Wp"
+        else:  # BIPV fachada / pérgola: rango varía con escala (costos fijos)
+            if _er_kwp_r < 50:
+                _ref_wp = "1.20–4.50+ USD/Wp (costos fijos dominan a escala pequeña)"
+            elif _er_kwp_r < 200:
+                _ref_wp = "0.85–2.80 USD/Wp"
+            else:
+                _ref_wp = "0.75–2.00 USD/Wp"
 
         html += seccion(
             "Fundamentación del Presupuesto — Estimación Rápida Paramétrica",
