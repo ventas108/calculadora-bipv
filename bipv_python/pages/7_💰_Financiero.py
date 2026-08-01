@@ -260,12 +260,44 @@ with col_t2:
         help="Colombia: inflación energética histórica ~5–8%/año. "
              "Escenario base: 5%.",
     )
+    # ── Label dinámico según tecnología del panel ─────────────────────────────
+    _panel_info_raw = (
+        str(st.session_state.get("panel_nombre", ""))
+        + str(st.session_state.get("panel_modelo", ""))
+        + str(st.session_state.get("panel_seleccionado", ""))
+    ).lower()
+    if "cdte" in _panel_info_raw:
+        _deg_lbl  = "Degradación módulos CdTe (%/año)"
+        _deg_help = "CdTe thin-film: 0.30–0.45%/año — la más baja del mercado. Fuente: Jordan & Kurtz 2013."
+        _deg_def  = 0.4
+    elif any(x in _panel_info_raw for x in ["n-type", "n type", "ntype", "topcon", "hjt"]):
+        _deg_lbl  = "Degradación módulos N-type (%/año)"
+        _deg_help = "N-type monocristalino (TOPCon / HJT): 0.35–0.50%/año. Fuente: Fraunhofer ISE 2022."
+        _deg_def  = 0.5
+    elif "perc" in _panel_info_raw:
+        _deg_lbl  = "Degradación módulos PERC (%/año)"
+        _deg_help = "PERC monocristalino: 0.45–0.60%/año. Fuente: Jordan & Kurtz 2013."
+        _deg_def  = 0.5
+    elif any(x in _panel_info_raw for x in ["bifacial", "bifi"]):
+        _deg_lbl  = "Degradación módulos bifaciales (%/año)"
+        _deg_help = "Bifacial Si-mono: 0.40–0.55%/año. Cara trasera degrada ~10% más lento. Fuente: NREL 2021."
+        _deg_def  = 0.5
+    else:
+        _deg_lbl  = "Degradación módulos FV (%/año)"
+        _deg_help = (
+            "Si-mono (PERC/N-type): 0.40–0.55%/año · CdTe: 0.30–0.45%/año · "
+            "Si-poli: 0.50–0.70%/año · Fuente: Jordan & Kurtz 2013."
+        )
+        _deg_def  = 0.5
+    _deg_saved = float(st.session_state.get("tasa_deg_guardada", _deg_def))
     tasa_deg = st.slider(
-        "Degradación módulos CdTe (%/año)",
-        min_value=0.2, max_value=1.5, value=0.5, step=0.1,
-        help="CdTe SolTech: 0.5%/año (mejor que c-Si ~0.7%). "
-             "Fuente: Jordan & Kurtz 2013.",
+        _deg_lbl,
+        min_value=0.2, max_value=1.5,
+        value=_deg_saved,
+        step=0.1,
+        help=_deg_help,
     )
+    st.session_state["tasa_deg_guardada"] = tasa_deg
     # ── #28 · Usar tasa calculada desde historial PR real ────────────────────
     _tasa_calc = st.session_state.get("tasa_degradacion_calculada", None)
     if _tasa_calc is not None and _tasa_calc > 0:
@@ -312,16 +344,50 @@ with col_t3:
         else:
             opex_pct = st.slider(
                 "O&M anual (%CAPEX) — paramétrico",
-                min_value=0.5, max_value=3.0, value=1.0, step=0.25,
-                help="BIPV fachada: 0.5–1.5%/año.",
+                min_value=0.5, max_value=3.0, value=1.5, step=0.25,
+                help="FV Colombia zona tropical: 1.5–2.5%/año. "
+                     "Incluye limpieza bimestral, revisión semestral y monitoreo.",
             )
     else:
-        opex_pct = st.slider(
-            "O&M anual (%CAPEX)",
-            min_value=0.5, max_value=3.0, value=1.0, step=0.25,
-            help="BIPV fachada: 0.5–1.5%/año. Incluye limpieza, revisión y seguros. "
-                 "Completa 📅 OPEX Anual en Presupuesto para usar valores reales.",
+        # ── Modo O&M: USD/kWp·año (realista) o % CAPEX ──────────────────────
+        _opex_modo = st.radio(
+            "Modo O&M",
+            ["USD/kWp·año", "% del CAPEX"],
+            index=0,
+            horizontal=True,
+            key="opex_modo_radio",
+            label_visibility="collapsed",
+            help="USD/kWp·año es más preciso para proyectos grandes; "
+                 "%CAPEX es útil cuando no se conoce el detalle.",
         )
+        if _opex_modo == "USD/kWp·año":
+            _opex_kw = st.slider(
+                "O&M anual (USD/kWp·año)",
+                min_value=3.0, max_value=25.0,
+                value=float(st.session_state.get("opex_kw_guardado", 10.0)),
+                step=0.5,
+                help=(
+                    "Referencia Colombia zona tropical: **8–12 USD/kWp·año**. "
+                    "Incluye: limpieza bimestral módulos, revisión semestral inversores, "
+                    "monitoreo remoto y mantenimiento preventivo. "
+                    "Con contrato O&M local: 9–11 USD/kWp·año. "
+                    "IRENA 2023 utility-scale: 9–15 USD/kWp·año zona tropical."
+                ),
+            )
+            st.session_state["opex_kw_guardado"] = _opex_kw
+            _opex_usd_anual = _opex_kw * p_stc
+            opex_pct = _opex_usd_anual / capex_total * 100 if capex_total > 0 else 1.5
+            st.caption(
+                f"≡ **USD {_opex_usd_anual:,.0f}/año** · {opex_pct:.2f}% del CAPEX"
+            )
+        else:
+            opex_pct = st.slider(
+                "O&M anual (%CAPEX)",
+                min_value=0.5, max_value=3.0, value=1.5, step=0.25,
+                help="FV Colombia zona tropical: 1.5–2.5%/año. "
+                     "Incluye limpieza, revisión y seguros. "
+                     "Completa 📅 OPEX Anual en Presupuesto para usar valores reales.",
+            )
     tasa_desc = st.slider(
         "Tasa de descuento WACC (%)",
         min_value=5.0, max_value=20.0, value=10.0, step=0.5,
@@ -756,6 +822,107 @@ if btn_fin or st.session_state.get("financiero_ok"):
         st.caption(
             "⚠️ Los beneficios Art. 11 y 14 requieren declaración de renta con utilidades suficientes. "
             "Art. 12 aplica desde la compra de equipos. Requiere certificación UPME previa."
+        )
+
+    # ── Sensibilidad de tarifa eléctrica ──────────────────────────────────────
+    with st.expander("💡 Sensibilidad de tarifa — ¿qué pasa si vendo a diferente precio?"):
+        st.markdown(
+            "Compara TIR, Payback y VPN según el precio al que vendas o ahorres la energía. "
+            "Aplica **con Ley 1715**, todos los demás parámetros iguales al escenario principal."
+        )
+
+        _tarifas_sens = [
+            ("Autoconsumo industrial",           650),
+            ("Medición neta alta (CREG 174)",    450),
+            ("PPA bilateral privado",            280),
+            ("Precio bolsa XM (promedio)",       220),
+            ("Precio bolsa XM (mínimo histór.)", 160),
+        ]
+
+        # Calcular umbral donde VPN ≈ 0 (búsqueda binaria)
+        def _metricas_tarifa(t_cop):
+            try:
+                _c = comparativo_ley_1715(
+                    capex_usd        = capex_total,
+                    e_ac_kWh_anual   = e_ac,
+                    tarifa_cop_kWh   = float(t_cop),
+                    tipo_cambio      = tipo_cambio,
+                    tasa_descuento   = tasa_desc / 100,
+                    tasa_escalacion  = esc_tarifa,
+                    tasa_degradacion = tasa_deg,
+                    opex_pct         = opex_pct,
+                    n_anos           = n_anos,
+                    beneficios_1715  = ben,
+                )
+                return _c["con"]["metricas"]
+            except Exception:
+                return None
+
+        _tlo, _thi = 50.0, 600.0
+        for _ in range(22):
+            _tmid = (_tlo + _thi) / 2
+            _mm = _metricas_tarifa(_tmid)
+            if _mm and (_mm.get("vpn_usd") or 0) > 0:
+                _thi = _tmid
+            else:
+                _tlo = _tmid
+        _t_umbral = int(round((_tlo + _thi) / 2))
+
+        _rows_sens = []
+        for _nm, _tc in _tarifas_sens:
+            _m2 = _metricas_tarifa(_tc)
+            if _m2:
+                _vpn_ok = (_m2.get("vpn_usd") or 0) > 0
+                _rows_sens.append({
+                    "Escenario":             _nm,
+                    "COP/kWh":               _tc,
+                    "USD/kWh":               round(_tc / tipo_cambio, 4),
+                    "Ingreso año 1 (USD)":   int(e_ac * _tc / tipo_cambio),
+                    "Payback":               f"{_m2['payback_simple']:.1f} a" if _m2.get("payback_simple") else f">{n_anos}a",
+                    "TIR":                   f"{_m2['tir_pct']:.1f}%" if _m2.get("tir_pct") else "—",
+                    "VPN a WACC (USD)":      f"{_m2['vpn_usd']:,.0f}",
+                    "Estado":                "✅ Bancable" if _vpn_ok else "⚠️ Revisar",
+                })
+
+        _m_umb = _metricas_tarifa(_t_umbral)
+        _rows_sens.append({
+            "Escenario":             f"⛔ Umbral mínimo (VPN ≈ 0)",
+            "COP/kWh":               _t_umbral,
+            "USD/kWh":               round(_t_umbral / tipo_cambio, 4),
+            "Ingreso año 1 (USD)":   int(e_ac * _t_umbral / tipo_cambio),
+            "Payback":               f"≈{n_anos}a",
+            "TIR":                   f"≈{tasa_desc:.0f}% (WACC)",
+            "VPN a WACC (USD)":      "≈ 0",
+            "Estado":                "⛔ Límite",
+        })
+
+        _df_sens = pd.DataFrame(_rows_sens)
+
+        def _hl_tarifa(row):
+            base = [""] * len(row)
+            if int(row["COP/kWh"]) == int(tarifa_cop):
+                return ["background-color:#E8F5E9; font-weight:bold"] * len(row)
+            if "⚠️" in str(row.get("Estado", "")):
+                return ["background-color:#FFF9C4"] * len(row)
+            if "⛔" in str(row.get("Estado", "")):
+                return ["background-color:#FFEBEE"] * len(row)
+            return base
+
+        st.dataframe(
+            _df_sens.style.apply(_hl_tarifa, axis=1).format({
+                "COP/kWh":             "{:,.0f}",
+                "USD/kWh":             "{:.4f}",
+                "Ingreso año 1 (USD)": "{:,.0f}",
+            }),
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.caption(
+            f"🟢 Verde = escenario activo ({tarifa_cop:.0f} COP/kWh) · "
+            f"🟡 Amarillo = rentable con menor margen · "
+            f"🔴 Rojo = no viable al WACC del {tasa_desc:.0f}% · "
+            f"**Umbral calculado: {_t_umbral} COP/kWh** — "
+            f"por debajo de este precio el VPN se vuelve negativo."
         )
 
     # ── Tabla flujo de caja completo ─────────────────────────────────────────
