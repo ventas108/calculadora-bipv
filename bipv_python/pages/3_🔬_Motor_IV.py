@@ -16,6 +16,7 @@ from calculos.modelo_iv import (
 )
 from calculos.temperatura import temperatura_celda_noct
 from datos.tecnologias_bipv import ASP_ST1_T40, MODULOS_BIPV
+from datos.catalogo_paneles_excel import cargar_catalogo_paneles
 
 st.set_page_config(page_title="Motor IV — BIPV", page_icon="🔬", layout="wide")
 st.title("🔬 Motor I-V — Modelo De Soto 2006")
@@ -63,23 +64,68 @@ if _panel_ss and _panel_nom_ss:
             )
 
 # ── Selector manual como alternativa / fallback ────────────────────────────────
+# Combinar catálogo SDM calibrado (BIPV) + catálogo Excel (FV granja/techo)
+_cat_excel = {}
+try:
+    _cat_excel = cargar_catalogo_paneles()
+except Exception:
+    _cat_excel = {}
+
+# Separar por fuente para mostrar grupos en el selector
+_opciones_sdm   = list(MODULOS_BIPV.keys())            # SDM calibrado completo
+_opciones_excel = [k for k in _cat_excel if k not in MODULOS_BIPV]  # catálogo Excel
+
+# Lista combinada con separadores de grupo
+_GROUP_SDM   = "── Paneles BIPV (SDM calibrado) ──"
+_GROUP_EXCEL = "── Catálogo FV (estimación SDM) ──"
+_opciones_all = [_GROUP_SDM] + _opciones_sdm + [_GROUP_EXCEL] + _opciones_excel
+
 st.markdown("---")
 with st.expander(
     "🔧 Seleccionar panel manualmente" if _modo_auto else "🔬 Seleccionar panel",
     expanded=not _modo_auto,
 ):
+    st.caption(
+        f"📦 {len(_opciones_sdm)} paneles BIPV con SDM calibrado · "
+        f"📋 {len(_opciones_excel)} paneles del catálogo Excel (SDM estimado)"
+    )
     _panel_manual_nom = st.selectbox(
-        "Panel del catálogo interno (SDM calibrado)",
-        list(MODULOS_BIPV.keys()),
-        index=list(MODULOS_BIPV.keys()).index("ASP-ST1-T40"),
+        "Panel del catálogo interno",
+        _opciones_all,
+        index=_opciones_all.index("ASP-ST1-T40") if "ASP-ST1-T40" in _opciones_all else 1,
         key="motor_iv_panel_manual",
     )
-    if st.button("▶️ Usar este panel", key="btn_panel_manual"):
-        _panel_activo = MODULOS_BIPV[_panel_manual_nom]
-        _modo_auto    = True
-        _estimado     = False
-        _panel_nom_ss = _panel_manual_nom
-        st.success(f"✅ Panel manual cargado: **{_panel_manual_nom}**")
+    # Bloquear si el usuario seleccionó un separador de grupo
+    _es_separador = _panel_manual_nom.startswith("──")
+    if _es_separador:
+        st.info("☝️ Selecciona un panel de la lista (no el encabezado de grupo).")
+    else:
+        # Mostrar badge de fuente
+        if _panel_manual_nom in MODULOS_BIPV:
+            st.success("✅ SDM calibrado — parámetros completos.")
+        else:
+            st.warning("🟡 Catálogo Excel — SDM se estimará desde ficha técnica. Resultados orientativos.")
+
+    if st.button("▶️ Usar este panel", key="btn_panel_manual", disabled=_es_separador):
+        if _panel_manual_nom in MODULOS_BIPV:
+            _panel_activo = MODULOS_BIPV[_panel_manual_nom]
+            _estimado     = False
+        else:
+            # Panel del catálogo Excel → estimar SDM
+            from calculos.modelo_iv import estimar_sdm_desde_ficha
+            _base = _cat_excel[_panel_manual_nom]
+            _sdm  = estimar_sdm_desde_ficha(_base)
+            if _sdm:
+                _panel_activo = _sdm
+                _estimado     = True
+                _metodo_est   = _sdm.get("_metodo", "estimado")
+            else:
+                st.error(f"❌ No se pudo estimar SDM para **{_panel_manual_nom}** — faltan Voc, Isc, Vmp o Imp en el catálogo.")
+                _panel_activo = None
+        if _panel_activo is not None:
+            _modo_auto    = True
+            _panel_nom_ss = _panel_manual_nom
+            st.success(f"✅ Panel cargado: **{_panel_manual_nom}**")
 
 # Si aún no hay panel activo, usar el default
 if _panel_activo is None:
