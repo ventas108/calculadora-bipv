@@ -952,7 +952,17 @@ st.subheader("📊 Resumen CAPEX Total del Proyecto")
 
 # ── Detectar modo activo: paramétrico vs cotización real ─────────────────────
 _est_activa  = st.session_state.get("est_rapida_aplicada", False)
-_cotizacion_real = (sub1 + sub2 + sub3 + sub4 + sub5 + sub6) > 0
+_tabs_sum    = sub1 + sub2 + sub3 + sub4 + sub5 + sub6
+# "Cotización real" solo si los tabs tienen valores coherentes con el tamaño del sistema.
+# Cualquier valor > 0 no es suficiente — los tabs pueden tener datos de un sistema pequeño
+# que no corresponden al kWp actual. Umbral mínimo: USD 0.50/Wp para p_stc > 20 kWp.
+if _tabs_sum > 0 and p_stc > 20:
+    _usdwp_tabs  = _tabs_sum / (p_stc * 1000)
+    _cotizacion_real = _usdwp_tabs >= 0.50   # mínimo absoluto para cualquier inst. solar
+elif _tabs_sum > 0:
+    _cotizacion_real = True   # proyectos pequeños (<20 kWp): cualquier valor positivo vale
+else:
+    _cotizacion_real = False
 
 if _est_activa and not _cotizacion_real:
     # ── MODO PARAMÉTRICO: usar los valores ya guardados en session_state ──────
@@ -991,9 +1001,21 @@ else:
     # ── MODO COTIZACIÓN REAL: calcular desde tabs ─────────────────────────────
     if _est_activa and _cotizacion_real:
         st.success("✅ Cotización real detectada en tabs — usando esos valores (estimación paramétrica ignorada).")
-        # Desactivar flag para no confundir en futuras recargas
-        st.session_state.pop("est_rapida_aplicada", None)
-        st.session_state.pop("est_rapida_config", None)
+        # ⚠️  NO borrar est_rapida_aplicada aquí: el session_state de la estimación
+        # debe persistir para que Financiero siga usando el CAPEX correcto hasta que
+        # el usuario presione explícitamente "Limpiar". El Resumen solo muestra los tabs
+        # pero no fuerza a Financiero a cambiar de fuente automáticamente.
+    elif not _est_activa and _tabs_sum > 0 and not _cotizacion_real:
+        # Tabs con valores insuficientes (USD/Wp < 0.50 para este kWp) → avisar
+        _usdwp_tabs_disp = _tabs_sum / (p_stc * 1000) if p_stc > 0 else 0
+        st.warning(
+            f"⚠️ **Tabs con valores incompletos** — los datos ingresados suman "
+            f"**USD {_tabs_sum:,.0f}** ({_usdwp_tabs_disp:.2f} USD/Wp) para {p_stc:.0f} kWp. "
+            f"El mínimo de referencia para cualquier instalación solar es **0.50 USD/Wp** "
+            f"(= USD {p_stc*500:,.0f} para este proyecto).  \n"
+            f"💡 Completa los tabs con cotizaciones reales, o usa la pestaña "
+            f"**🧮 Estimación Rápida** para valores paramétricos."
+        )
 
     capex_directo = sub1 + sub2 + sub3 + sub4 + sub5
     capex_base    = capex_directo + sub6
