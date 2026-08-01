@@ -41,16 +41,40 @@ for k, v in defaults.items():
 
 # ── Página principal ───────────────────────────────────────────────────────
 st.title("☀️ Calculadora BIPV — Colombia")
+
+# ── Subtítulo dinámico: panel e inversor desde session_state ─────────────────
+_panel_home    = st.session_state.get("panel_nombre",    "ASP-ST1-T40")
+_inversor_home = st.session_state.get("inversor_nombre", "Growatt-MID15KTL3-X")
 st.markdown(
-    "**Panel:** ASP-ST1-T40 (SolTech Energy LaTam, CdTe)  •  "
-    "**Inversor:** Growatt MID15KTL3-X  •  "
+    f"**Panel:** {_panel_home}  •  "
+    f"**Inversor:** {_inversor_home}  •  "
     "**Motor físico:** De Soto 2006 + pvlib"
 )
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.metric("🏙️ Ciudad", st.session_state["ciudad"])
+    # Prioridad de ubicación: municipio geocodificado > nombre proyecto > ciudad ref.
+    _ciudad_home    = st.session_state.get("ciudad", "—")
+    _municipio_home = st.session_state.get("municipio_predio", "").strip()
+    _nombre_home    = st.session_state.get("nombre_proyecto", "").strip()
+    _default_nom    = "Proyecto BIPV"
+
+    if _municipio_home:
+        _ubicacion_label = "📍 Ubicación del predio"
+        _ubicacion_val   = _municipio_home
+        _ubicacion_delta = f"Ref. TMY: {_ciudad_home}"
+    elif _nombre_home and _nombre_home != _default_nom:
+        _ubicacion_label = "📍 Proyecto"
+        _ubicacion_val   = _nombre_home
+        _ubicacion_delta = f"Ref. climática: {_ciudad_home}"
+    else:
+        _ubicacion_label = "🌡️ Ref. climática TMY"
+        _ubicacion_val   = _ciudad_home
+        _ubicacion_delta = "Ingresa coords del predio en Proyecto"
+
+    st.metric(_ubicacion_label, _ubicacion_val,
+              delta=_ubicacion_delta, delta_color="off")
 
 with col2:
     _tipo_inst = st.session_state.get("tipo_instalacion", "Fachada BIPV")
