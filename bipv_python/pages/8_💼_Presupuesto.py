@@ -749,16 +749,61 @@ with t5:
 with t6:
     st.markdown("""
     ##### Costos blandos — ingeniería, trámites, legal, PM, seguros construcción
-    > 💡 Referencia Colombia: costos blandos = **8–18% del CAPEX directo**.
+    > 💡 Referencia Colombia: costos blandos = **10–20% del CAPEX directo** para BIPV.
     > ITA obligatorio para financiamiento bancario > USD 200k.
     > PM típico: 3–5% CAPEX. Póliza CAR: 0.4–0.6% CAPEX.
     """)
 
     ss_soft = "df_sec_soft"
-    col_rs, col_fs = st.columns([2, 4])
+
+    # ── CAPEX directo disponible en este tab (sub1–sub5 ya calculados arriba) ──
+    _capex_dir_proxy = sub1 + sub2 + sub3 + sub4 + sub5
+
+    # ── Función: valores conservadores por ítem según CAPEX directo ───────────
+    def _soft_conservador(capex_dir: float) -> list:
+        """Retorna lista compatible con _BASE_COLS con porcentajes conservadores."""
+        cd = max(capex_dir, 0.0)
+        def _v(pct, minv, maxv=None):
+            v = cd * pct
+            v = max(v, minv)
+            if maxv is not None:
+                v = min(v, maxv)
+            return round(v, 2)
+        return [
+            # Descripcion                                       Ref        Cant  Uni    USD_un
+            ["Ingeniería, diseño y memorias de cálculo",       "ENG-001",  1.0, "glb", _v(0.050, 1_500, 25_000)],
+            ["Estudio de sombreado y simulación BIPV",         "ENG-002",  1.0, "glb", _v(0.015,   800,  5_000)],
+            ["Registro UPME y trámites Ley 1715",              "TRM-001",  1.0, "glb", _v(0.060, 3_000, 15_000)],
+            ["Concepto de conexión — operador de red",         "TRM-002",  1.0, "glb", _v(0.030, 1_500,  7_000)],
+            ["Certificación RETIE / RITEL",                    "TRM-003",  1.0, "glb", _v(0.025, 1_200,  4_500)],
+            ["Gestión del proyecto — Project Manager",         "PM-001",   1.0, "glb", _v(0.040, 1_000, 20_000)],
+            ["Asesoría legal y estructuración financiera",     "LEG-001",  1.0, "glb", _v(0.015,   600,  8_000)],
+            ["Auditoría técnica independiente (ITA)",          "ITA-001",  1.0, "glb",  0.0],   # desact. por defecto
+            ["Póliza CAR — construcción todo riesgo",          "SEG-001",  1.0, "glb", _v(0.005,   300,  5_000)],
+            ["Gastos notariales, registros y licencias",       "LEG-002",  1.0, "glb", _v(0.005,   500,  2_000)],
+        ]
+
+    # ── Botón: sugerir valores conservadores ─────────────────────────────────
+    col_rs, col_sug, col_fs = st.columns([2, 2, 4])
     if col_rs.button("↺ Resetear 'Costos Blandos'", key="reset_soft"):
         st.session_state.pop(ss_soft, None)
         st.rerun()
+
+    _btn_sug = col_sug.button("🪄 Sugerir valores conservadores", key="sug_soft",
+        help="Calcula cada ítem como % del CAPEX directo con mínimos Colombia 2026. "
+             "Puedes ajustar ítem a ítem después.")
+    if _btn_sug:
+        if _capex_dir_proxy > 0:
+            st.session_state[ss_soft] = _df_con_activo(_soft_conservador(_capex_dir_proxy))
+            # Desmarcar ITA (fila índice 7) — opcional solo para proyectos > 200k
+            _df_tmp = st.session_state[ss_soft].copy()
+            _df_tmp.at[7, "Activo"] = False
+            st.session_state[ss_soft] = _df_tmp
+            st.toast(f"✅ Costos blandos sugeridos sobre CAPEX directo USD {_capex_dir_proxy:,.0f}", icon="🪄")
+        else:
+            st.warning("⚠️ Completa primero al menos una pestaña de cotización (Perfilería, Mano de Obra, etc.) "
+                       "para que la sugerencia se calcule sobre el CAPEX real de tu proyecto.")
+
     fuente_s = col_fs.text_input("Fuente / cotización soft costs",
         value=st.session_state.get("fuente_soft",""),
         placeholder="Ej.: Propuesta consultoría XYZ, cotización póliza ABC, julio 2026",
@@ -767,6 +812,21 @@ with t6:
 
     if ss_soft not in st.session_state:
         st.session_state[ss_soft] = _df_con_activo(_SOFT_DEFAULT)
+
+    # ── Indicador % actual sobre CAPEX directo ────────────────────────────────
+    if _capex_dir_proxy > 0:
+        _soft_actual = float(
+            pd.to_numeric(st.session_state[ss_soft].get("Cantidad", 0), errors="coerce").fillna(0)
+            .mul(pd.to_numeric(st.session_state[ss_soft].get("USD_un", 0), errors="coerce").fillna(0))
+            .sum()
+        )
+        _pct_actual = _soft_actual / _capex_dir_proxy * 100 if _capex_dir_proxy > 0 else 0
+        _color = "🟢" if 8 <= _pct_actual <= 22 else ("🟡" if _pct_actual < 8 else "🔴")
+        st.caption(
+            f"{_color} Costos blandos actuales: **USD {_soft_actual:,.0f}** = "
+            f"**{_pct_actual:.1f}% del CAPEX directo** (USD {_capex_dir_proxy:,.0f})  "
+            f"· Referencia Colombia BIPV: 10–20%"
+        )
 
     df_soft = st.session_state[ss_soft].copy()
     if "Activo" not in df_soft.columns:
