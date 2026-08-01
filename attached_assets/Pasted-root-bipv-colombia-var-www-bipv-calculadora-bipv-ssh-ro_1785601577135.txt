@@ -1,0 +1,48 @@
+root@bipv-colombia:/var/www/bipv/calculadora-bipv# ssh root@198.199.75.160 "cd /var/www/bipv/calculadora-bipv && git pull origin main && pm2 restart bipv-streamlit"
+root@198.199.75.160's password:
+From https://github.com/ventas108/calculadora-bipv
+ * branch                main       -> FETCH_HEAD
+   548eb97e5..cf4e03dfa  main       -> origin/main
+Updating 548eb97e5..cf4e03dfa
+Fast-forward
+ .agents/agent_assets_metadata.toml                 |   7 +
+ attached_assets/image_1785589556666.png            | Bin 0 -> 250947 bytes
+ attached_assets/image_1785590226721.png            | Bin 0 -> 207436 bytes
+ attached_assets/image_1785591105112.png            | Bin 0 -> 246355 bytes
+ attached_assets/image_1785591661776.png            | Bin 0 -> 232404 bytes
+ attached_assets/image_1785596110293.png            | Bin 0 -> 215298 bytes
+ attached_assets/image_1785597179693.png            | Bin 0 -> 207012 bytes
+ attached_assets/image_1785598097006.png            | Bin 0 -> 253016 bytes
+ attached_assets/image_1785598113869.png            | Bin 0 -> 229779 bytes
+ attached_assets/image_1785598809735.png            | Bin 0 -> 348091 bytes
+ attached_assets/image_1785599232597.png            | Bin 0 -> 250835 bytes
+ attached_assets/image_1785599249245.png            | Bin 0 -> 247909 bytes
+ attached_assets/image_1785599289091.png            | Bin 0 -> 227946 bytes
+ attached_assets/image_1785599311429.png            | Bin 0 -> 246384 bytes
+ .../pages/7_\360\237\222\260_Financiero.py"        | 189 ++++++++++++-
+ informe_granja_fv_uraba_2026.md                    | 291 +++++++++++++++++++++
+ 16 files changed, 476 insertions(+), 11 deletions(-)
+ create mode 100644 attached_assets/image_1785589556666.png
+ create mode 100644 attached_assets/image_1785590226721.png
+ create mode 100644 attached_assets/image_1785591105112.png
+ create mode 100644 attached_assets/image_1785591661776.png
+ create mode 100644 attached_assets/image_1785596110293.png
+ create mode 100644 attached_assets/image_1785597179693.png
+ create mode 100644 attached_assets/image_1785598097006.png
+ create mode 100644 attached_assets/image_1785598113869.png
+ create mode 100644 attached_assets/image_1785598809735.png
+ create mode 100644 attached_assets/image_1785599232597.png
+ create mode 100644 attached_assets/image_1785599249245.png
+ create mode 100644 attached_assets/image_1785599289091.png
+ create mode 100644 attached_assets/image_1785599311429.png
+ create mode 100644 informe_granja_fv_uraba_2026.md
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [bipv-streamlit](ids: [ 1 ])
+[PM2] [bipv-streamlit](1) ✓
+┌────┬─────────────────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name                │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼─────────────────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ bipv-streamlit      │ default     │ 1.0.0   │ fork    │ 901993   │ 0s     │ 113  │ online    │ 0%       │ 7.0mb    │ root     │ disabled │
+│ 0  │ calculadora-bipv    │ default     │ 1.0.0   │ fork    │ 846877   │ 2D     │ 61   │ online    │ 1.4%     │ 137.2mb  │ root     │ disabled │
+└────┴─────────────────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+root@bipv-colombia:/var/www/bipv/calculadora-bipv#
