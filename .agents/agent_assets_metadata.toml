@@ -134,3 +134,10 @@ uri = "file://Informe_Flujo_Acumulado_Granja_FV_Uraba.docx"
 type = "word_document"
 title = "Informe Flujo Acumulado — Granja FV Urabá (Word)"
 description = "Verificación de coherencia aritmética completa + análisis persuasivo del flujo acumulado año a año + tabla de sensibilidad de tarifa + 6 conclusiones asertivas para inversionista + resumen ejecutivo de una página."
+
+[[outputs]]
+id = "UpV_7eY9bjiwDvC_LdIVu"
+uri = "file://attached_assets/MANUAL_CALCULADORA_BIPV_v3_agosto2026.docx"
+type = "word_document"
+title = "Manual Calculadora BIPV v3 — agosto 2026"
+description = "Manual de usuario actualizado con la sección completa de Estimación Rápida paramétrica integrada en la Página 8 — Presupuesto Bancable."
