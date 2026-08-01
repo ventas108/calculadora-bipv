@@ -5,6 +5,35 @@ import streamlit as st
 from datos.ciudades_colombia import CIUDADES, LISTA_CIUDADES
 from calculos.tz_utils import utc_offset_latam, tz_label
 
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _geocodificar_inverso(lat: float, lon: float) -> str:
+    """Obtiene municipio/región desde coordenadas — Nominatim OSM, sin clave."""
+    import urllib.request
+    import urllib.parse
+    try:
+        params = urllib.parse.urlencode({
+            "lat": lat, "lon": lon, "format": "json", "zoom": 10,
+            "accept-language": "es",
+        })
+        url = f"https://nominatim.openstreetmap.org/reverse?{params}"
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "BIPV-Calculadora/1.0 (calc.innovacionquimica.com.co)"}
+        )
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode())
+        addr = data.get("address", {})
+        municipio = (addr.get("municipality") or addr.get("city")
+                     or addr.get("town") or addr.get("village")
+                     or addr.get("county") or "")
+        region    = addr.get("state_district") or addr.get("region") or ""
+        estado    = addr.get("state") or ""
+        partes    = [p for p in [municipio, region, estado] if p]
+        return ", ".join(partes)
+    except Exception:
+        return ""
+
 # ── Ruta del archivo de proyecto (persiste entre recargas) ───────────────────
 _DIR_DATOS = os.path.join(os.path.dirname(__file__), "..", "datos")
 PROJECT_FILE = os.path.join(_DIR_DATOS, "proyecto_actual.json")
@@ -204,17 +233,31 @@ with col2:
                 alt_custom != c["alt_m"]
             )
             if _coords_personalizadas:
-                st.success(
-                    f"✅ Coordenadas del predio: **{lat_custom:.5f}°**, "
-                    f"**{lon_custom:.5f}°**, **{alt_custom} m.s.n.m.**  "
-                    f"— Se usarán estas coordenadas en Recurso Solar."
-                )
+                # ── Geocodificación inversa — municipio real del predio ───────
+                with st.spinner("Detectando municipio…"):
+                    _municipio = _geocodificar_inverso(lat_custom, lon_custom)
+                if _municipio:
+                    st.success(
+                        f"✅ Coordenadas del predio: **{lat_custom:.5f}°**, "
+                        f"**{lon_custom:.5f}°**, **{alt_custom} m.s.n.m.**  \n"
+                        f"📍 **Municipio detectado: {_municipio}**  \n"
+                        f"Se usarán estas coordenadas en Recurso Solar."
+                    )
+                    st.session_state["municipio_predio"] = _municipio
+                else:
+                    st.success(
+                        f"✅ Coordenadas del predio: **{lat_custom:.5f}°**, "
+                        f"**{lon_custom:.5f}°**, **{alt_custom} m.s.n.m.**  "
+                        f"— Se usarán estas coordenadas en Recurso Solar."
+                    )
+                    st.session_state.pop("municipio_predio", None)
             else:
                 st.info(
                     f"Usando coordenadas de referencia de {ciudad}: "
                     f"{c['lat']}°, {c['lon']}°. "
                     "Modifica los valores para usar las del predio específico."
                 )
+                st.session_state.pop("municipio_predio", None)
 
             st.session_state["_lat_custom_temp"] = lat_custom
             st.session_state["_lon_custom_temp"] = lon_custom

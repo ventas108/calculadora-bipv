@@ -103,6 +103,26 @@ def _fmt(val, decimals=1, suffix="", fallback="—"):
 def generar_html_reporte() -> str:
     # Colectar datos de session_state
     ciudad          = st.session_state.get("tmy_ciudad", st.session_state.get("ciudad", "—"))
+    # ── Localización real del predio (tarea #88) ──────────────────────────────
+    _ciudad_ref     = st.session_state.get("ciudad", "—")
+    _lat_pdf        = st.session_state.get("lat_proyecto")
+    _lon_pdf        = st.session_state.get("lon_proyecto")
+    _municipio_pdf  = st.session_state.get("municipio_predio", "")
+    from datos.ciudades_colombia import CIUDADES as _CIUDADES_PDF
+    _c_ref_data     = _CIUDADES_PDF.get(_ciudad_ref, {})
+    _coord_es_predio = (
+        _lat_pdf is not None and _c_ref_data and
+        abs(float(_lat_pdf) - _c_ref_data.get("lat", 0)) > 0.001
+    )
+    if _coord_es_predio:
+        if _municipio_pdf:
+            _localizacion_pdf  = f"{_municipio_pdf}  ({float(_lat_pdf):.4f}°N, {abs(float(_lon_pdf)):.4f}°O)"
+        else:
+            _localizacion_pdf  = f"Predio: {float(_lat_pdf):.5f}°N, {float(_lon_pdf):.5f}°O"
+        _localizacion_nota = f"Ciudad de referencia climática TMY: {_ciudad_ref}"
+    else:
+        _localizacion_pdf  = ciudad
+        _localizacion_nota = "Clima extraído de base TMY/PVGIS"
     area_m2         = st.session_state.get("area_fachada_m2", "—")
     orientacion     = st.session_state.get("orientacion_label", "—")
     tilt            = st.session_state.get("tilt_fachada", "—")
@@ -254,7 +274,7 @@ def generar_html_reporte() -> str:
     html += seccion("Información General del Proyecto", "🏠")
     html += tabla_kv([
         ("Nombre del proyecto",  nombre_proyecto,          "",         ""),
-        ("Ciudad / Localización", ciudad,                   "",         "Clima extraído de base TMY/PVGIS"),
+        ("Ciudad / Localización", _localizacion_pdf,         "",         _localizacion_nota),
         ("Área de fachada",      _fmt(area_m2, 1),         "m²",       "Superficie total disponible para BIPV"),
         ("Orientación",          str(orientacion),          "",         "Azimut de la fachada"),
         ("Inclinación (tilt)",   str(tilt),                "°",        "90° = fachada vertical típica"),

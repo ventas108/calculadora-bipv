@@ -49,9 +49,16 @@ _coord_personalizada = (
 
 # ── Panel de configuración ───────────────────────────────────────────────────
 if _coord_personalizada:
-    # Mostrar nombre del proyecto si existe, de lo contrario las coordenadas
-    _nombre_proy = st.session_state.get("nombre_proyecto", "").strip()
-    _label_sitio = _nombre_proy if _nombre_proy else f"{lat:.4f}°N, {abs(lon):.4f}°O"
+    # Prioridad: municipio geocodificado > nombre del proyecto > coordenadas
+    _nombre_proy    = st.session_state.get("nombre_proyecto", "").strip()
+    _municipio_rs   = st.session_state.get("municipio_predio", "").strip()
+    _default_nombre = "Proyecto BIPV"
+    if _municipio_rs:
+        _label_sitio = _municipio_rs
+    elif _nombre_proy and _nombre_proy != _default_nombre:
+        _label_sitio = _nombre_proy
+    else:
+        _label_sitio = f"{lat:.4f}°N, {abs(lon):.4f}°O"
     st.subheader(f"📍 Sitio: {_label_sitio}  ·  📌 Predio personalizado  ·  {icono_tipo} {tipo_instalacion}")
     st.success(
         f"✅ **Coordenadas exactas del predio:** "
