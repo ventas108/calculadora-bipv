@@ -247,11 +247,23 @@ with col_t1:
     tipo_cambio = st.number_input(
         "Tipo de cambio (COP/USD)",
         min_value=3000.0, max_value=6000.0,
-        value=float(st.session_state.get("tipo_cambio", 3400.0)),
+        value=float(st.session_state.get("tipo_cambio", 4200.0)),
         step=50.0,
-        help="TRM actual (jul 2026): ~3.400 COP/USD. Ajusta según la tasa del día.",
+        help="TRM referencia ago 2026: ~4.200 COP/USD. Ajusta según la tasa del día "
+             "(Banco de la República: banrep.gov.co).",
     )
     st.session_state["tipo_cambio"] = tipo_cambio
+    # ── Alerta TRM desactualizado (tarea #86) ─────────────────────────────────
+    # El campo persiste entre sesiones. Si el valor guardado es < 3,900
+    # (rango pre-2024) avisamos al usuario con sugerencia de actualizar.
+    if tipo_cambio < 3_900:
+        st.warning(
+            f"⚠️ **TRM {tipo_cambio:,.0f} COP/USD parece desactualizado.** "
+            f"La tasa de referencia en agosto 2026 ronda **~4.200 COP/USD**. "
+            f"Con TRM bajo, el CAPEX y los beneficios Ley 1715 quedarán "
+            f"subestimados en COP. "
+            f"Ajusta el valor para resultados correctos."
+        )
 
 with col_t2:
     esc_tarifa = st.slider(

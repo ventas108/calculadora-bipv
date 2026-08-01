@@ -64,21 +64,59 @@ if _panel_ss and _panel_nom_ss:
             )
 
 # ── Selector manual como alternativa / fallback ────────────────────────────────
-# Combinar catálogo SDM calibrado (BIPV) + catálogo Excel (FV granja/techo)
+# Combinar catálogo SDM calibrado (BIPV ASP-ST1) + catálogo Excel por tecnología
 _cat_excel = {}
 try:
     _cat_excel = cargar_catalogo_paneles()
 except Exception:
     _cat_excel = {}
 
-# Separar por fuente para mostrar grupos en el selector
-_opciones_sdm   = list(MODULOS_BIPV.keys())            # SDM calibrado completo
-_opciones_excel = [k for k in _cat_excel if k not in MODULOS_BIPV]  # catálogo Excel
+_opciones_sdm   = list(MODULOS_BIPV.keys())
+_opciones_excel = [k for k in _cat_excel if k not in MODULOS_BIPV]
 
-# Lista combinada con separadores de grupo
-_GROUP_SDM   = "── BIPV ASP-ST1 (SDM calibrado) ──"
-_GROUP_EXCEL = "── Catálogo Excel: CdTe / CIGS / Mono-Si / Poli-Si (SDM estimado) ──"
-_opciones_all = [_GROUP_SDM] + _opciones_sdm + [_GROUP_EXCEL] + _opciones_excel
+# ── Función auxiliar: comprobar si un panel Excel tiene datos IV completos ──────
+def _tiene_iv(panel_dict: dict) -> bool:
+    voc = panel_dict.get("Voc") or panel_dict.get("V_oc_ref") or 0
+    isc = panel_dict.get("Isc") or panel_dict.get("I_sc_ref") or 0
+    vmp = panel_dict.get("Vmp") or panel_dict.get("V_mp_ref") or 0
+    imp = panel_dict.get("Imp") or panel_dict.get("I_mp_ref") or 0
+    return float(voc) > 10 and float(isc) > 0.1 and float(vmp) > 5 and float(imp) > 0.05
+
+# ── Agrupar paneles Excel por tecnología (tarea #84) ────────────────────────────
+from collections import defaultdict as _ddict
+_tech_groups: dict = _ddict(list)
+for _k in _opciones_excel:
+    _tech = (_cat_excel.get(_k) or {}).get("tecnologia") or "Otros"
+    _tech_groups[_tech.strip()].append(_k)
+
+_TECH_ORDER = ["CdTe", "CIGS", "Mono-Si", "Poli-Si"]
+
+# Lista combinada: ASP-ST1 primero, luego grupos por tecnología
+_opciones_all = ["── BIPV ASP-ST1 (SDM calibrado) ──"] + _opciones_sdm
+for _t in _TECH_ORDER:
+    if _tech_groups.get(_t):
+        _opciones_all += [f"── {_t} (SDM estimado) ──"] + _tech_groups[_t]
+for _t, _plist in sorted(_tech_groups.items()):
+    if _t not in _TECH_ORDER:
+        _opciones_all += [f"── {_t} ──"] + _plist
+
+# ── format_func: agrega ✅/⚠️ y potencia al nombre (tarea #85) ─────────────────
+def _fmt_panel(name: str) -> str:
+    if name.startswith("──"):
+        return name
+    if name in MODULOS_BIPV:
+        p = MODULOS_BIPV[name]
+        return f"✅ {name} — {p.get('Pmax_stc', '?')} W (SDM calibrado)"
+    p = _cat_excel.get(name, {})
+    ok   = _tiene_iv(p)
+    pmax = p.get("Pmax_stc") or 0
+    wpstr = f" — {pmax:.0f} W" if pmax else ""
+    badge = "✅" if ok else "⚠️"
+    return f"{badge} {name}{wpstr}"
+
+# Contadores para caption
+_n_completos = sum(1 for k in _opciones_excel if _tiene_iv(_cat_excel.get(k, {})))
+_n_incompletos = len(_opciones_excel) - _n_completos
 
 st.markdown("---")
 with st.expander(
@@ -86,42 +124,54 @@ with st.expander(
     expanded=not _modo_auto,
 ):
     st.caption(
-        f"📦 {len(_opciones_sdm)} paneles BIPV con SDM calibrado · "
-        f"📋 {len(_opciones_excel)} paneles del catálogo Excel (SDM estimado)"
+        f"✅ {len(_opciones_sdm)} BIPV ASP-ST1 (SDM calibrado) · "
+        f"✅ {_n_completos} catálogo Excel con datos IV completos · "
+        f"⚠️ {_n_incompletos} catálogo Excel con datos incompletos"
     )
     _panel_manual_nom = st.selectbox(
         "Panel del catálogo interno",
         _opciones_all,
         index=_opciones_all.index("ASP-ST1-T40") if "ASP-ST1-T40" in _opciones_all else 1,
+        format_func=_fmt_panel,
         key="motor_iv_panel_manual",
     )
-    # Bloquear si el usuario seleccionó un separador de grupo
+
     _es_separador = _panel_manual_nom.startswith("──")
     if _es_separador:
         st.info("☝️ Selecciona un panel de la lista (no el encabezado de grupo).")
+    elif _panel_manual_nom in MODULOS_BIPV:
+        st.success("✅ SDM calibrado — parámetros completos y verificados.")
     else:
-        # Mostrar badge de fuente
-        if _panel_manual_nom in MODULOS_BIPV:
-            st.success("✅ SDM calibrado — parámetros completos.")
+        _p_sel = _cat_excel.get(_panel_manual_nom, {})
+        if _tiene_iv(_p_sel):
+            st.warning("🟡 Catálogo Excel — SDM estimado desde ficha. Resultados orientativos.")
         else:
-            st.warning("🟡 Catálogo Excel — SDM se estimará desde ficha técnica. Resultados orientativos.")
+            _falt = [f for f, k in [("Voc","Voc"),("Isc","Isc"),("Vmp","Vmp"),("Imp","Imp")]
+                     if not (_p_sel.get(k) or _p_sel.get(f"I_{k.lower()}_ref") or _p_sel.get(f"V_{k.lower()}_ref"))]
+            st.error(
+                f"⚠️ **Datos incompletos** — faltan: **{', '.join(_falt) if _falt else 'valores IV'}**. "
+                f"Completa la ficha en el Excel antes de usar este panel."
+            )
 
     if st.button("▶️ Usar este panel", key="btn_panel_manual", disabled=_es_separador):
         if _panel_manual_nom in MODULOS_BIPV:
             _panel_activo = MODULOS_BIPV[_panel_manual_nom]
             _estimado     = False
         else:
-            # Panel del catálogo Excel → estimar SDM
             from calculos.modelo_iv import estimar_sdm_desde_ficha
-            _base = _cat_excel[_panel_manual_nom]
-            _sdm  = estimar_sdm_desde_ficha(_base)
-            if _sdm:
-                _panel_activo = _sdm
-                _estimado     = True
-                _metodo_est   = _sdm.get("_metodo", "estimado")
-            else:
-                st.error(f"❌ No se pudo estimar SDM para **{_panel_manual_nom}** — faltan Voc, Isc, Vmp o Imp en el catálogo.")
+            _base = _cat_excel.get(_panel_manual_nom, {})
+            if not _tiene_iv(_base):
+                st.error(f"❌ **{_panel_manual_nom}** — no tiene Voc, Isc, Vmp e Imp completos. Completa la ficha en el catálogo Excel.")
                 _panel_activo = None
+            else:
+                _sdm = estimar_sdm_desde_ficha(_base)
+                if _sdm:
+                    _panel_activo = _sdm
+                    _estimado     = True
+                    _metodo_est   = _sdm.get("_metodo", "estimado")
+                else:
+                    st.error(f"❌ No se pudo estimar SDM para **{_panel_manual_nom}**.")
+                    _panel_activo = None
         if _panel_activo is not None:
             _modo_auto    = True
             _panel_nom_ss = _panel_manual_nom
