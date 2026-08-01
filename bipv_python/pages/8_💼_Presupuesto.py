@@ -476,57 +476,68 @@ with t0:
                "Base Art. 12 IVA + Art. 11 renta", delta_color="off")
 
     # ── Tabla de desglose por categoría ──────────────────────────────────────
-    _pct = lambda v: f"{v/r['capex_total']*100:.1f}%"
-    desglose_rows = [
-        ("🔩 EQUIPOS / DUROS",            None,           None),
-        ("  · Módulos FV",                r["mod"],       _pct(r["mod"])),
-        ("  · Inversores",                r["inv"],       _pct(r["inv"])),
-        ("  · Estructura de montaje",     r["est"],       _pct(r["est"])),
-        ("  · Cableado DC + AC",          r["cable"],     _pct(r["cable"])),
-        ("  · Protecciones DC/AC",        r["prot"],      _pct(r["prot"])),
-        ("  · Transformador MT",          r["trafo"],     _pct(r["trafo"])) if r["trafo"] > 0 else None,
-        ("  · SCADA / Medición",          r["scada"],     _pct(r["scada"])),
-        ("  · Logística / Transporte",    r["log_eq"],    _pct(r["log_eq"])),
-        ("  Subtotal Equipos",            r["equip_total"], _pct(r["equip_total"])),
-        ("🏗️ CONSTRUCCIÓN / EPC",         None,           None),
-        ("  · Obra civil + cimentación",  r["civil"],     _pct(r["civil"])),
-        ("  · Montaje estructural",        r["montaje"],   _pct(r["montaje"])),
-        ("  · Instalación eléctrica",     r["elect"],     _pct(r["elect"])),
-        ("  · Puesta en marcha / Tests",  r["pm_obra"],   _pct(r["pm_obra"])),
-        ("  Subtotal EPC",                r["epc_total"], _pct(r["epc_total"])),
-        ("🧾 COSTOS BLANDOS",             None,           None),
-        ("  · Ingeniería + diseño",       r["ing"],       _pct(r["ing"])),
-        ("  · Gestión de proyecto (PM)",  r["pm"],        _pct(r["pm"])),
-        ("  · Permisos / RETIE / UPME",   r["perm"],      _pct(r["perm"])),
-        ("  · Conexión a la red",         r["conex"],     _pct(r["conex"])),
-        ("  Subtotal Costos Blandos",     r["soft_total"],_pct(r["soft_total"])),
-        ("⚙️ CONTINGENCIAS",              r["cont"],      _pct(r["cont"])),
-        ("✅ CAPEX TOTAL",                r["capex_total"], "100.0%"),
-    ]
-    desglose_rows = [x for x in desglose_rows if x is not None]
+    # Todas las celdas se pre-formatean como strings para evitar que pandas
+    # convierta None → NaN (NaN es truthy → ".format()" mostraría "nan").
+    _ct = r["capex_total"]
+    def _fmt(v):
+        """USD formateado + % del CAPEX + COP en millones. Devuelve (usd_str, pct_str, cop_str)."""
+        usd = f"{v:>12,.0f}"
+        pct = f"{v/_ct*100:.1f}%"
+        cop = f"{v*tc/1e6:.2f}"
+        return usd, pct, cop
+
+    # Tipo de fila: "H"=encabezado, "S"=subtotal, "T"=total, "I"=ítem
+    _RAW: list[tuple] = []
+    def add_h(label):                    _RAW.append(("H", label, "", "", ""))
+    def add_i(label, v):
+        u, p, c = _fmt(v);               _RAW.append(("I", label, u, p, c))
+    def add_s(label, v):
+        u, p, c = _fmt(v);               _RAW.append(("S", label, u, p, c))
+
+    add_h("🔩 EQUIPOS / DUROS")
+    add_i("  · Módulos FV",               r["mod"])
+    add_i("  · Inversores",               r["inv"])
+    add_i("  · Estructura de montaje",    r["est"])
+    add_i("  · Cableado DC + AC",         r["cable"])
+    add_i("  · Protecciones DC/AC",       r["prot"])
+    if r["trafo"] > 0:
+        add_i("  · Transformador MT",     r["trafo"])
+    add_i("  · SCADA / Medición",         r["scada"])
+    add_i("  · Logística / Transporte",   r["log_eq"])
+    add_s("  Subtotal Equipos",           r["equip_total"])
+
+    add_h("🏗️ CONSTRUCCIÓN / EPC")
+    add_i("  · Obra civil + cimentación", r["civil"])
+    add_i("  · Montaje estructural",      r["montaje"])
+    add_i("  · Instalación eléctrica",    r["elect"])
+    add_i("  · Puesta en marcha / Tests", r["pm_obra"])
+    add_s("  Subtotal EPC",               r["epc_total"])
+
+    add_h("🧾 COSTOS BLANDOS")
+    add_i("  · Ingeniería + diseño",      r["ing"])
+    add_i("  · Gestión de proyecto (PM)", r["pm"])
+    add_i("  · Permisos / RETIE / UPME",  r["perm"])
+    add_i("  · Conexión a la red",        r["conex"])
+    add_s("  Subtotal Costos Blandos",    r["soft_total"])
+
+    _RAW.append(("S", "⚙️ CONTINGENCIAS", *_fmt(r["cont"])))
+    _RAW.append(("T", "✅ CAPEX TOTAL", f"{_ct:>12,.0f}", "100.0%", f"{_ct*tc/1e6:.2f}"))
 
     df_des = pd.DataFrame(
-        [(d[0], d[1], d[2]) for d in desglose_rows],
-        columns=["Categoría", "USD", "% CAPEX"]
+        [(d[1], d[2], d[3], d[4]) for d in _RAW],
+        columns=["Categoría", "USD", "% CAPEX", "COP (M)"]
     )
-    df_des["COP (M)"] = df_des["USD"].apply(
-        lambda v: round(v * tc / 1e6, 2) if v is not None else None
-    )
+    _tipos = [d[0] for d in _RAW]   # lista paralela: H/S/T/I por índice
 
-    def _style_desglose(row):
-        cat = str(row["Categoría"])
-        if cat.startswith("✅") or cat.startswith("  Subtotal"):
-            return ["font-weight:bold; background:#EAF4FB"] * len(row)
-        if row["USD"] is None:
-            return ["font-weight:bold; color:#1a3c5e; background:#f0f4f8"] * len(row)
+    def _style_tabla(row):
+        t = _tipos[row.name]
+        if t == "T":   return ["font-weight:bold; background:#d0e8ff; color:#003060"] * len(row)
+        if t == "S":   return ["font-weight:bold; background:#EAF4FB"] * len(row)
+        if t == "H":   return ["font-weight:bold; background:#f0f4f8; color:#1a3c5e"] * len(row)
         return [""] * len(row)
 
     st.dataframe(
-        df_des.style
-            .apply(_style_desglose, axis=1)
-            .format({"USD": lambda v: f"{v:,.0f}" if v else "—",
-                     "COP (M)": lambda v: f"{v:.2f}" if v else "—",
-                     "% CAPEX": lambda v: v if v else "—"}),
+        df_des.style.apply(_style_tabla, axis=1),
         use_container_width=True, hide_index=True, height=560
     )
 
