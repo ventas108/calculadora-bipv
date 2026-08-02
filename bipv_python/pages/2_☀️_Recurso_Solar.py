@@ -1,7 +1,36 @@
 """Página 2 — Recurso Solar: TMY desde PVGIS + POA para sistemas solares."""
+import os
+import pickle
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
+
+# ── Caché de disco para TMY+POA — sobrevive reinicios de PM2 ─────────────────
+_SOLAR_CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "datos", "solar_cache")
+
+def _cache_path(lat, lon, tilt, azimuth, alt_m):
+    os.makedirs(_SOLAR_CACHE_DIR, exist_ok=True)
+    return os.path.join(
+        _SOLAR_CACHE_DIR,
+        f"solar_{lat:.4f}_{lon:.4f}_t{tilt}_a{int(azimuth)}_h{alt_m}.pkl",
+    )
+
+def _leer_cache(lat, lon, tilt, azimuth, alt_m):
+    try:
+        p = _cache_path(lat, lon, tilt, azimuth, alt_m)
+        if os.path.exists(p):
+            with open(p, "rb") as f:
+                return pickle.load(f)
+    except Exception:
+        pass
+    return None
+
+def _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa):
+    try:
+        with open(_cache_path(lat, lon, tilt, azimuth, alt_m), "wb") as f:
+            pickle.dump({"tmy": tmy, "poa": poa}, f, protocol=4)
+    except Exception:
+        pass
 
 from datos.ciudades_colombia import CIUDADES
 from calculos.solar import (
@@ -119,7 +148,48 @@ with col_or3:
 
 st.markdown("---")
 
-# ── Función cacheada para PVGIS ──────────────────────────────────────────────
+# ── Auto-restaurar desde caché de disco (sobrevive reinicios de PM2) ─────────
+# Si los parámetros actuales coinciden con un caché en disco y la sesión aún no
+# tiene datos, restaurar silenciosamente para evitar la descarga de PVGIS.
+if not st.session_state.get("recurso_solar_ok"):
+    _auto_cached = _leer_cache(lat, lon, tilt, azimuth, alt_m)
+    if _auto_cached is not None:
+        _tmy_r = _auto_cached["tmy"]
+        _poa_r = _auto_cached["poa"]
+        _poa_anual_r = _poa_r["poa_global"].sum() / 1000.0
+        _ghi_anual_r = _tmy_r["G_h"].sum() / 1000.0
+        _t_media_r   = _tmy_r["T2m"].mean()
+        def _zona_por_coords_rs(la, lo):
+            if 4.5 <= la <= 8.5 and lo <= -76.0:              return "Urabá / Chocó (tropical)"
+            if la > 8.5 or (la > 7.5 and lo > -76.0):         return "Barranquilla / Costa"
+            if lo > -74.0:                                     return "Llanos Orientales"
+            if la < 4.5 and lo < -74.0:                        return "Cali / Valle"
+            if la < 5.5 and lo > -74.5:                        return "Bogotá / Sabana"
+            return "Medellín / Antioquia"
+        st.session_state.update({
+            "tmy_df":             _tmy_r,
+            "poa_df":             _poa_r,
+            "tmy_ciudad":         ciudad,
+            "tilt_fachada":       tilt,
+            "tilt_default":       tilt,
+            "azimuth_fachada":    azimuth,
+            "orientacion_label":  orientacion_label,
+            "poa_anual_kWh_m2":   round(_poa_anual_r, 1),
+            "ghi_anual_kWh_m2":   round(_ghi_anual_r, 1),
+            "t_media_anual":      round(_t_media_r, 1),
+            "zona_geo_coords":    _zona_por_coords_rs(lat, lon),
+            "recurso_solar_ok":   True,
+        })
+        st.info(
+            f"📂 **Recurso solar restaurado desde caché local** — "
+            f"POA: **{_poa_anual_r:,.0f} kWh/m²/año** · "
+            f"GHI: **{_ghi_anual_r:,.0f} kWh/m²/año** · "
+            f"{icono_tipo} {orientacion_label} / {tilt}°  \n"
+            f"*(Sin descarga de PVGIS. Usa 🔄 **Limpiar caché** si necesitas datos frescos.)*"
+        )
+        st.rerun()
+
+# ── Función cacheada para PVGIS (RAM, 24 h) ──────────────────────────────────
 @st.cache_data(ttl=86400, show_spinner=False)
 def cargar_tmy(lat, lon):
     return obtener_tmy_pvgis(lat, lon)
@@ -131,6 +201,14 @@ _recalc_btn   = _btn_col2.button("🔄 Limpiar caché", use_container_width=True
                                   help="Fuerza nueva descarga desde PVGIS, descartando datos anteriores.")
 if _recalc_btn:
     cargar_tmy.clear()
+    # También borrar caché de disco para este predio/orientación
+    try:
+        _p = _cache_path(lat, lon, tilt, azimuth, alt_m)
+        if os.path.exists(_p):
+            os.remove(_p)
+    except Exception:
+        pass
+    st.session_state["recurso_solar_ok"] = False
     st.success("✅ Caché limpiada — presiona **Descargar TMY** para obtener datos frescos.")
 
 if _descarga_btn:
@@ -139,18 +217,26 @@ if _descarga_btn:
         f"predio en {ciudad} ({lat:.5f}°, {lon:.5f}°)"
         if _coord_personalizada else f"{ciudad} ({lat}°, {lon}°)"
     )
-    with st.spinner(f"Conectando a PVGIS para {_sitio_label}..."):
-        try:
-            tmy = cargar_tmy(lat, lon)
-        except Exception as e:
-            st.error(f"❌ Error conectando a PVGIS: {e}")
-            st.info("Verifica la conexión a internet del servidor. PVGIS requiere acceso a re.jrc.ec.europa.eu")
-            st.stop()
-
-    with st.spinner(f"Calculando irradiancia POA para {icono_tipo} {tipo_instalacion} ({tilt}°)..."):
-        poa = calcular_poa(tmy, lat, lon, alt_m, tilt, azimuth)
+    # Intentar caché de disco antes de ir a PVGIS
+    _disco = _leer_cache(lat, lon, tilt, azimuth, alt_m)
+    if _disco is not None:
+        tmy = _disco["tmy"]
+        poa = _disco["poa"]
         monthly = resumen_mensual(tmy, poa)
+        st.info("📂 Datos recuperados de caché local — sin conexión a PVGIS.")
+    else:
+        with st.spinner(f"Conectando a PVGIS para {_sitio_label}..."):
+            try:
+                tmy = cargar_tmy(lat, lon)
+            except Exception as e:
+                st.error(f"❌ Error conectando a PVGIS: {e}")
+                st.info("Verifica la conexión a internet del servidor. PVGIS requiere acceso a re.jrc.ec.europa.eu")
+                st.stop()
 
+        with st.spinner(f"Calculando irradiancia POA para {icono_tipo} {tipo_instalacion} ({tilt}°)..."):
+            poa = calcular_poa(tmy, lat, lon, alt_m, tilt, azimuth)
+            monthly = resumen_mensual(tmy, poa)
+            _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa)
     # ── Métricas anuales ─────────────────────────────────────────────────────
     ghi_anual  = tmy["G_h"].sum() / 1000.0
     poa_anual  = poa["poa_global"].sum() / 1000.0

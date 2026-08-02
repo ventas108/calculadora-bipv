@@ -2,7 +2,8 @@
 import json
 import os
 import streamlit as st
-from datos.ciudades_colombia import CIUDADES, LISTA_CIUDADES
+from datetime import date
+from datos.ciudades_colombia import CIUDADES, LISTA_CIUDADES, FECHA_VALIDACION_TARIFAS
 from calculos.tz_utils import utc_offset_latam, tz_label
 
 
@@ -199,6 +200,24 @@ with col1:
             "Ajusta con el valor real de la factura del cliente."
         )
     )
+
+    # ── Aviso si las tarifas del catálogo llevan más de 6 meses sin actualizar ─
+    try:
+        _fv = date.fromisoformat(FECHA_VALIDACION_TARIFAS)
+        _meses_sin_actualizar = (date.today() - _fv).days / 30.44
+        if _meses_sin_actualizar > 6:
+            st.warning(
+                f"⚠️ **Tarifas del catálogo desactualizadas** — la última validación fue el "
+                f"**{_fv.strftime('%d/%m/%Y')}** "
+                f"({int(_meses_sin_actualizar)} meses). "
+                f"Las tarifas de CREG/operadores pueden haber variado. "
+                f"Confirma con la factura real del cliente o la circular CREG más reciente "
+                f"y ajusta el valor arriba. "
+                f"*(Para actualizar el catálogo: `bipv_python/datos/ciudades_colombia.py` → "
+                f"campo `tarifa_comercial_cop_kwh` + actualizar `FECHA_VALIDACION_TARIFAS`.)*"
+            )
+    except Exception:
+        pass
 
     if modo_key == "consumo":
         st.subheader("Consumo / Factura")

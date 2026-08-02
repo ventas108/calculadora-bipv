@@ -7,6 +7,9 @@ por el equipo Innovación Química. Actualizar cuando cambien las
 resoluciones CREG o se disponga de facturas más recientes.
 """
 
+# Fecha de la última validación de tarifas — avisa en Proyecto si llevan >6 meses
+FECHA_VALIDACION_TARIFAS = "2025-01-01"
+
 CIUDADES = {
     "Bogotá": {
         "lat": 4.711, "lon": -74.072, "alt_m": 2600,
@@ -124,6 +127,16 @@ CIUDADES = {
         "region": "Pacífico", "CREG_zona": "Chocó",
         "operador": "DISPAC",
         "tarifa_comercial_cop_kwh": 1000,
+    },
+    "Apartadó (Urabá)": {
+        "lat": 7.884, "lon": -76.635, "alt_m": 30,
+        "GHI_kWh_m2_dia": 5.3, "HSP": 5.3,
+        "T_amb_media": 28.0, "T_min_diseno": 20.0,
+        "T_cel_realista": 55.0, "T_cel_extremo": 64.0,
+        "region": "Caribe/Tropical", "CREG_zona": "Antioquia",
+        "operador": "EPM",
+        # Tarifa EPM zona Urabá (comercial/industrial, sin subsidio). Fuente: EPM 2025.
+        "tarifa_comercial_cop_kwh": 950,
     },
 }
 

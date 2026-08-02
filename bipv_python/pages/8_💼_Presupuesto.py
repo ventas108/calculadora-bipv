@@ -492,6 +492,20 @@ with t0:
     _zona_geo_coords  = st.session_state.get("zona_geo_coords", "")   # set en Recurso Solar
     _zona_opts  = list(_ZONA_FACTOR.keys())
 
+    # Si Recurso Solar aún no se ha ejecutado, calcular la zona directamente desde
+    # lat/lon del proyecto — misma lógica que _zona_por_coords() en Recurso Solar.
+    if not _zona_geo_coords:
+        _lat_p = float(st.session_state.get("lat_proyecto", 0.0))
+        _lon_p = float(st.session_state.get("lon_proyecto", 0.0))
+        if _lat_p and _lon_p:
+            if   4.5 <= _lat_p <= 8.5 and _lon_p <= -76.0:              _zona_geo_coords = "Urabá / Chocó (tropical)"
+            elif _lat_p > 8.5 or (_lat_p > 7.5 and _lon_p > -76.0):     _zona_geo_coords = "Barranquilla / Costa"
+            elif _lon_p > -74.0:                                         _zona_geo_coords = "Llanos Orientales"
+            elif _lat_p < 4.5 and _lon_p < -74.0:                       _zona_geo_coords = "Cali / Valle"
+            elif _lat_p < 5.5 and _lon_p > -74.5:                       _zona_geo_coords = "Bogotá / Sabana"
+            else:                                                         _zona_geo_coords = "Medellín / Antioquia"
+            st.session_state["zona_geo_coords"] = _zona_geo_coords
+
     # IMPORTANTE: keywords más específicos primero. "antioq" es substring de
     # "Antioquia" que aparece tanto en "Medellín, Antioquia" como en
     # "Apartadó, Urabá, Antioquia" — Urabá debe ir ANTES que "antioq".
