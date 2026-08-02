@@ -1,0 +1,66 @@
+root@bipv-colombia:/var/www/bipv/calculadora-bipv# pm2 logs calculadora-bipv --lines 30
+[TAILING] Tailing last 30 lines for [calculadora-bipv] process (change the value with --lines option)
+/root/.pm2/logs/calculadora-bipv-error.log last 30 lines:
+0|calculad |     at decodeURIComponent (<anonymous>)
+0|calculad |     at decode_param (/var/www/bipv/calculadora/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/layer.js:172:12)
+0|calculad |     at Layer.match (/var/www/bipv/calculadora/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/layer.js:123:27)
+0|calculad |     at matchLayer (/var/www/bipv/calculadora/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:585:18)
+0|calculad |     at next (/var/www/bipv/calculadora/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:226:15)
+0|calculad |     at SendStream.error (/var/www/bipv/calculadora/node_modules/.pnpm/serve-static@1.16.2/node_modules/serve-static/index.js:121:7)
+0|calculad |     at SendStream.emit (node:events:519:28)
+0|calculad |     at SendStream.error (/var/www/bipv/calculadora/node_modules/.pnpm/send@0.19.0/node_modules/send/index.js:270:17)
+0|calculad |     at SendStream.pipe (/var/www/bipv/calculadora/node_modules/.pnpm/send@0.19.0/node_modules/send/index.js:515:10)
+0|calculad |     at serveStatic (/var/www/bipv/calculadora/node_modules/.pnpm/serve-static@1.16.2/node_modules/serve-static/index.js:125:12)
+0|calculad | [Auth] Missing session cookie
+0|calculad | URIError: Failed to decode param '/%c0'
+0|calculad |     at decodeURIComponent (<anonymous>)
+0|calculad |     at decode_param (/var/www/bipv/calculadora/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/layer.js:172:12)
+0|calculad |     at Layer.match (/var/www/bipv/calculadora/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/layer.js:123:27)
+0|calculad |     at matchLayer (/var/www/bipv/calculadora/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:585:18)
+0|calculad |     at next (/var/www/bipv/calculadora/node_modules/.pnpm/express@4.21.2/node_modules/express/lib/router/index.js:226:15)
+0|calculad |     at SendStream.error (/var/www/bipv/calculadora/node_modules/.pnpm/serve-static@1.16.2/node_modules/serve-static/index.js:121:7)
+0|calculad |     at SendStream.emit (node:events:519:28)
+0|calculad |     at SendStream.error (/var/www/bipv/calculadora/node_modules/.pnpm/send@0.19.0/node_modules/send/index.js:270:17)
+0|calculad |     at SendStream.pipe (/var/www/bipv/calculadora/node_modules/.pnpm/send@0.19.0/node_modules/send/index.js:515:10)
+0|calculad |     at serveStatic (/var/www/bipv/calculadora/node_modules/.pnpm/serve-static@1.16.2/node_modules/serve-static/index.js:125:12)
+0|calculad | [OAuth] ERROR: OAUTH_SERVER_URL is not configured! Set OAUTH_SERVER_URL environment variable.
+0|calculad | [Auth] Missing session cookie
+0|calculad | [Auth] Missing session cookie
+0|calculad | [Auth] Missing session cookie
+0|calculad | [Auth] Missing session cookie
+0|calculad | [Auth] Missing session cookie
+0|calculad | [Auth] Missing session cookie
+0|calculad | [OAuth] ERROR: OAUTH_SERVER_URL is not configured! Set OAUTH_SERVER_URL environment variable.
+
+/root/.pm2/logs/calculadora-bipv-out.log last 30 lines:
+0|calculad | Server running on http://localhost:3000/
+0|calculad | [OAuth] Initialized with baseURL:
+0|calculad | [PVGIS Proxy] Registered at /api/pvgis/:endpoint
+0|calculad | [PVWatts Proxy] Registered at /api/pvwatts
+0|calculad | Server running on http://localhost:3000/
+0|calculad | [OAuth] Initialized with baseURL:
+0|calculad | [PVGIS Proxy] Registered at /api/pvgis/:endpoint
+0|calculad | [PVWatts Proxy] Registered at /api/pvwatts
+0|calculad | Server running on http://localhost:3000/
+0|calculad | [OAuth] Initialized with baseURL:
+0|calculad | [PVGIS Proxy] Registered at /api/pvgis/:endpoint
+0|calculad | [PVWatts Proxy] Registered at /api/pvwatts
+0|calculad | Server running on http://localhost:3000/
+0|calculad | [OAuth] Initialized with baseURL:
+0|calculad | [PVGIS Proxy] Registered at /api/pvgis/:endpoint
+0|calculad | [PVWatts Proxy] Registered at /api/pvwatts
+0|calculad | Server running on http://localhost:3000/
+0|calculad | [PVGIS Proxy] Fetching: https://re.jrc.ec.europa.eu/api/v5_3/MRcalc?lat=4.1715&lon=-74.5215&horirrad=1&outputformat=json
+0|calculad | [PVGIS Proxy] Fetching: https://re.jrc.ec.europa.eu/api/v5_3/MRcalc?lat=4.6220&lon=-74.5215&horirrad=1&outputformat=json
+0|calculad | [PVGIS Proxy] Fetching: https://re.jrc.ec.europa.eu/api/v5_3/MRcalc?lat=4.1715&lon=-74.0710&horirrad=1&outputformat=json
+0|calculad | [PVGIS Proxy] Fetching: https://re.jrc.ec.europa.eu/api/v5_3/MRcalc?lat=4.1715&lon=-73.6205&horirrad=1&outputformat=json
+0|calculad | [PVGIS Proxy] Fetching: https://re.jrc.ec.europa.eu/api/v5_3/MRcalc?lat=4.6220&lon=-74.0710&horirrad=1&outputformat=json
+0|calculad | [PVGIS Proxy] Fetching: https://re.jrc.ec.europa.eu/api/v5_3/MRcalc?lat=4.6220&lon=-73.6205&horirrad=1&outputformat=json
+0|calculad | [PVGIS Proxy] Fetching: https://re.jrc.ec.europa.eu/api/v5_3/MRcalc?lat=5.0725&lon=-74.5215&horirrad=1&outputformat=json
+0|calculad | [PVGIS Proxy] Fetching: https://re.jrc.ec.europa.eu/api/v5_3/MRcalc?lat=5.0725&lon=-74.0710&horirrad=1&outputformat=json
+0|calculad | [PVGIS Proxy] Fetching: https://re.jrc.ec.europa.eu/api/v5_3/MRcalc?lat=5.0725&lon=-73.6205&horirrad=1&outputformat=json
+0|calculad | [OAuth] Initialized with baseURL:
+0|calculad | [PVGIS Proxy] Registered at /api/pvgis/:endpoint
+0|calculad | [PVWatts Proxy] Registered at /api/pvwatts
+0|calculad | Server running on http://localhost:3000/
+
