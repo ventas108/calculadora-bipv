@@ -1003,11 +1003,18 @@ _tabs_sum    = sub1 + sub2 + sub3 + sub4 + sub5 + sub6
 # NO p_stc de session_state — p_stc puede ser ~4 kWp si la sesión se reinició,
 # lo que haría pasar 0.34 USD/Wp como "coherente" al dividir 33k / 4kWp = 8.5.
 _kwp_ref = (st.session_state.get("est_rapida_config") or {}).get("kwp") or p_stc
-if _tabs_sum > 0 and _kwp_ref > 20:
-    _usdwp_tabs  = _tabs_sum / (_kwp_ref * 1000)
+# Usar el mejor kWp disponible: est_rapida_config > Dimensionamiento > 0
+_kwp_para_check = _kwp_ref or (p_stc if p_stc > 0 else 0)
+
+if _tabs_sum > 0 and _kwp_para_check > 20:
+    _usdwp_tabs  = _tabs_sum / (_kwp_para_check * 1000)
     _cotizacion_real = _usdwp_tabs >= 0.50   # mínimo absoluto para cualquier inst. solar
+elif _tabs_sum > 0 and _kwp_para_check == 0:
+    # kWp desconocido: solo aceptar si los tabs suman >500 USD (no son basura de sesión)
+    _cotizacion_real = _tabs_sum > 500
 elif _tabs_sum > 0:
-    _cotizacion_real = True   # proyectos pequeños (<20 kWp): cualquier valor positivo vale
+    # Proyectos pequeños conocidos (<20 kWp): cualquier valor positivo vale
+    _cotizacion_real = True
 else:
     _cotizacion_real = False
 
