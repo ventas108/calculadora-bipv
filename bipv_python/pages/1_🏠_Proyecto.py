@@ -39,16 +39,25 @@ _DIR_DATOS = os.path.join(os.path.dirname(__file__), "..", "datos")
 PROJECT_FILE = os.path.join(_DIR_DATOS, "proyecto_actual.json")
 
 def _cargar_proyecto():
-    """Lee proyecto_actual.json y vuelca en session_state (solo si existe)."""
-    if not os.path.exists(PROJECT_FILE):
-        return
-    try:
-        with open(PROJECT_FILE, "r", encoding="utf-8") as f:
-            saved = json.load(f)
-        for k, v in saved.items():
-            st.session_state.setdefault(k, v)
-    except Exception:
-        pass
+    """Lee proyecto_actual.json y consumo_cache.json — vuelca en session_state."""
+    if os.path.exists(PROJECT_FILE):
+        try:
+            with open(PROJECT_FILE, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+            for k, v in saved.items():
+                st.session_state.setdefault(k, v)
+        except Exception:
+            pass
+    # También cargar consumo auto-guardado (no requiere click en Guardar)
+    _consumo_path = os.path.join(_DIR_DATOS, "consumo_cache.json")
+    if os.path.exists(_consumo_path):
+        try:
+            with open(_consumo_path, "r", encoding="utf-8") as _fc:
+                consumo_saved = json.load(_fc)
+            for k, v in consumo_saved.items():
+                st.session_state.setdefault(k, v)
+        except Exception:
+            pass
 
 def _guardar_proyecto(datos: dict):
     """Persiste datos del proyecto en JSON a disco."""
@@ -410,6 +419,26 @@ with col2:
             )
             st.session_state["energia_anual_estimada"] = E_con_area
             st.session_state["consumo_kwh_mes"]        = consumo_mes
+
+            # ── Auto-persistir consumo a disco (sin requerir click en Guardar) ──
+            try:
+                _consumo_cache = {
+                    "consumo_kwh_mes": consumo_mes,
+                    "factura_cop":     factura_cop,
+                    "cobertura_pct":   cobertura_pct,
+                    "modo_calculo":    "consumo",
+                    "tarifa_cop_kwh":  tarifa_kwh,
+                }
+                _consumo_path = os.path.join(_DIR_DATOS, "consumo_cache.json")
+                _prev_c: dict = {}
+                if os.path.exists(_consumo_path):
+                    with open(_consumo_path, "r", encoding="utf-8") as _fcc:
+                        _prev_c = json.load(_fcc)
+                if _consumo_cache != _prev_c:
+                    with open(_consumo_path, "w", encoding="utf-8") as _fcc:
+                        json.dump(_consumo_cache, _fcc, ensure_ascii=False)
+            except Exception:
+                pass
 
 # ── Guardar ──────────────────────────────────────────────────────────────────
 if st.button("💾 Guardar configuración", type="primary"):

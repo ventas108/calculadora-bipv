@@ -123,12 +123,77 @@ else:
     )
 
 
-# TRM disponible desde el inicio (se actualiza en Sección 2)
-# Default 4200 para consistencia con Presupuesto y el widget de Sección 2
+# TRM — fuente de verdad (se actualiza en Sección 2)
 tipo_cambio = float(st.session_state.get("tipo_cambio", 4200.0))
 
-# TRM disponible desde el inicio (se actualiza en Sección 2)
-tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))
+# ═══════════════════════════════════════════════════════════════════════════════
+# PANEL PREVIO — Consumo vs Producción estimada
+# ═══════════════════════════════════════════════════════════════════════════════
+_consumo_mes_fin = float(st.session_state.get("consumo_kwh_mes", 0.0))
+_tarifa_prev_fin = float(st.session_state.get("tarifa_cop_kwh", 0.0))
+
+if _consumo_mes_fin > 0 and e_ac > 0 and _tarifa_prev_fin > 0:
+    _consumo_anual_fin = _consumo_mes_fin * 12
+    _cob_real_fin      = min(e_ac / _consumo_anual_fin * 100, 100.0) if _consumo_anual_fin > 0 else 0.0
+    _prod_mes_fin      = e_ac / 12
+    _ahorro_mes_fin    = min(_prod_mes_fin, _consumo_mes_fin) * _tarifa_prev_fin
+    _deficit_kwh_fin   = max(_consumo_anual_fin - e_ac, 0)
+    _cobertura_obj_fin = int(st.session_state.get("cobertura_pct", 0))
+
+    st.markdown("---")
+    st.subheader("⚡ Consumo vs Producción estimada")
+    st.caption(
+        "Resumen energético del proyecto antes del análisis financiero. "
+        "Tarifa y consumo pre-cargados desde 🏠 Proyecto."
+    )
+
+    _pc1, _pc2, _pc3, _pc4 = st.columns(4)
+    _pc1.metric(
+        "Consumo mensual",
+        f"{_consumo_mes_fin:,.0f} kWh/mes",
+        delta=f"{_consumo_anual_fin:,.0f} kWh/año",
+        delta_color="off",
+    )
+    _pc2.metric(
+        "Producción estimada",
+        f"{_prod_mes_fin:,.0f} kWh/mes",
+        delta=f"{e_ac:,.0f} kWh/año",
+        delta_color="off",
+    )
+    _pc3.metric(
+        "Cobertura solar",
+        f"{_cob_real_fin:.0f}%",
+        delta=(
+            f"+{e_ac - _consumo_anual_fin:,.0f} kWh/año excedente"
+            if e_ac >= _consumo_anual_fin
+            else f"−{_deficit_kwh_fin:,.0f} kWh/año déficit"
+        ),
+        delta_color="normal" if e_ac >= _consumo_anual_fin else "inverse",
+    )
+    _pc4.metric(
+        "Ahorro estimado",
+        f"${_ahorro_mes_fin:,.0f} COP/mes",
+        delta=f"${_ahorro_mes_fin * 12 / 1e6:.2f} M COP/año",
+        delta_color="off",
+    )
+
+    if e_ac >= _consumo_anual_fin:
+        _exc_kwh = e_ac - _consumo_anual_fin
+        st.success(
+            f"✅ El sistema **cubre el 100% del consumo** y genera "
+            f"**{_exc_kwh:,.0f} kWh/año de excedente** para venta a la red "
+            f"(Res. CREG 174 de 2021)."
+        )
+    else:
+        _msg_cob = f"⚡ El sistema cubre el **{_cob_real_fin:.0f}%** del consumo anual."
+        if _cobertura_obj_fin > 0:
+            _delta_obj = _cob_real_fin - _cobertura_obj_fin
+            _semaforo  = "🟢" if abs(_delta_obj) <= 5 else ("🟡" if abs(_delta_obj) <= 15 else "🔴")
+            _msg_cob  += (
+                f" {_semaforo} Objetivo configurado en Proyecto: "
+                f"**{_cobertura_obj_fin}%** ({_delta_obj:+.0f}% vs meta)."
+            )
+        st.info(_msg_cob)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 1 — CAPEX
