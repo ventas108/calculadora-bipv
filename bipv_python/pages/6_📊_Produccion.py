@@ -214,9 +214,42 @@ if btn_sim or st.session_state.get("produccion_ok"):
     m4.metric("Y_r (Ref. yield)",  f"{res['Y_r']:,.0f} h",
               help="POA efectiva / 1 kW/m² — horas sol pico equivalentes")
     m5.metric("PR (Perf. Ratio)",  f"{res['PR']*100:.1f}%",
-              help="Performance Ratio IEC 61724 = Y_f / Y_r. Bueno: >75%")
+              help=(
+                  "**Performance Ratio IEC 61724**  \n"
+                  "PR = Y_f / Y_r = E_ac / (P_stc × H_POA_bruta)  \n\n"
+                  "Mide la eficiencia global del sistema frente a su potencial teórico "
+                  "(irradiancia × potencia nominal).  \n\n"
+                  "**Rangos típicos Colombia BIPV:**  \n"
+                  "· Fachada vertical: 55–70 %  \n"
+                  "· Techo inclinado optimizado: 70–80 %  \n"
+                  "· PR > 100 %: normal en climas fríos (Bogotá, Manizales) — "
+                  "los módulos CdTe ganan eficiencia por debajo de 25 °C"
+              ))
     m6.metric("Factor de Planta",  f"{res['CF_pct']:.1f}%",
               help="Capacity Factor = E_ac / (P_STC × 8760 h)")
+
+    # ── Alertas de rango PR IEC 61724 ─────────────────────────────────────────
+    _pr_pct = res["PR"] * 100
+    if _pr_pct < 50:
+        st.error(
+            f"🔴 **PR = {_pr_pct:.1f}% — MUY BAJO (< 50%).**  \n"
+            "Posibles causas: inversor sobredimensionado, pérdidas de cableado altas, "
+            "paneles degradados o datos de entrada inconsistentes.  \n"
+            "Revisa la simulación antes de utilizarla en un análisis financiero."
+        )
+    elif _pr_pct < 60:
+        st.warning(
+            f"⚠️ **PR = {_pr_pct:.1f}% — por debajo del rango típico Colombia BIPV (60–75%).**  \n"
+            "Para fachadas verticales con orientación desfavorable puede ser esperado. "
+            "Verifica la orientación, inclinación y las pérdidas del sistema."
+        )
+    elif 90 < _pr_pct <= 100:
+        st.warning(
+            f"⚠️ **PR = {_pr_pct:.1f}% — alto (> 90%).**  \n"
+            "Verifica que la potencia nominal del sistema y la POA de referencia sean correctas. "
+            "PR > 90 % es inusual en zonas tropicales — si no estás en clima frío de altitud, revisa los datos."
+        )
+    # PR > 100%: ya se maneja abajo con contexto de sobre-rendimiento en climas fríos
 
     # ── Gráfica mensual ───────────────────────────────────────────────────────
     st.subheader("📅 Producción mensual")
@@ -452,6 +485,21 @@ if btn_sim or st.session_state.get("produccion_ok"):
 - Si PR_corr ≈ PR_conv → temperatura no es el problema principal; buscar fallas mecánicas/eléctricas
 - Si PR_corr >> PR_conv → temperatura está consumiendo una fracción importante de la producción (común en BIPV fachada)
 - Si PR_corr < 0.85 → existen pérdidas no térmicas significativas (suciedad, sombras, degradación, strings)
+
+---
+**Referencia IEC 61724 — rangos Colombia BIPV:**
+
+| Tipo de sistema | PR típico | Nota |
+|---|---|---|
+| Fachada vertical (Sur/Occidente) | 55–65 % | Ángulo de incidencia alto → menor captura |
+| Fachada vertical (Norte/Oriente) | 60–70 % | Mejor orientación para Colombia |
+| Techo inclinado 15–25° | 70–80 % | Óptimo para la latitud colombiana |
+| Pérgola / sombreadero | 65–75 % | Depende de la inclinación |
+| PR < 50 % | ⚠️ Revisar | Posible error de datos o pérdidas anómalas |
+| PR > 90 % | ⚠️ Verificar | Inusual en zonas tropicales |
+| PR > 100 % | ✅ Normal frío | Climas Andinos > 2 000 m (Bogotá, Manizales, Pasto) |
+
+*Fuente: UPME / CREG, proyectos BIPV Colombia 2022–2025.*
         """)
 
     # ── Pre-cómputos desde la simulación ─────────────────────────────────────

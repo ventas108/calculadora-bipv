@@ -96,3 +96,54 @@ def test_vmp_n8_vs_xlsm():
     from calculos.dimensionamiento import calcular_vmp_string
     Vmp = calcular_vmp_string(8, ASP_ST1_T40["Vmp_stc"], ASP_ST1_T40["Tk_gamma"], 36.35)
     assert abs(Vmp - 666.0) < 2.0, f"Vmp={Vmp:.1f}V vs VBA=666.0V"
+
+
+# ── Tests anti-regresión: curva IV a temperaturas de campo ────────────────────
+#
+# El bug histórico (agosto 2026) calculaba alpha_sc = Tk_alfa/100 (%/°C)
+# en lugar de alpha_sc = Tk_alfa/100 × Isc_stc (A/°C).
+# Para CdTe con Isc_stc=0.80: error = 25 % en alpha_sc, ~ 0.5 % en Isc a 60 °C.
+# Para Si con Isc_stc≈10 A:   error = ~10× en alpha_sc, ~10 % en Isc a 60 °C.
+# Estos tests se ejecutan todos a T ≠ 25°C para que alpha_sc × ΔT ≠ 0.
+#
+# Valores de referencia (alpha_sc_correcto = 0.060/100 × 0.80 = 0.000480 A/°C):
+#   T=45°C (ΔT=20): Isc_ref = 0.8000 + 0.000480×20 = 0.80960 A
+#   T=60°C (ΔT=35): Isc_ref = 0.8000 + 0.000480×35 = 0.81680 A
+
+@pytest.mark.parametrize("T_cel_C, Isc_ref", [
+    (25.0, 0.80000),   # STC — sin ΔT, validación baseline
+    (45.0, 0.80960),   # ΔT = +20 °C
+    (60.0, 0.81680),   # ΔT = +35 °C  ← error bug = 0.53 % > tolerancia 0.5 %
+])
+def test_isc_temperatura_campo(T_cel_C, Isc_ref):
+    """Isc a temperatura de campo debe seguir alpha_sc = Tk_alfa/100 × Isc_stc (A/°C).
+
+    Con el bug histórico alpha_sc sería Tk_alfa/100 = 0.000600 A/°C en lugar de
+    0.000480 A/°C, dando a T=60°C: Isc=0.8210 A en vez de 0.8168 A (error 0.53 %).
+    """
+    res = resolver_curva_iv(1000.0, T_cel_C, ASP_ST1_T40, n_puntos=0)
+    err_pct = abs(res["Isc"] - Isc_ref) / ASP_ST1_T40["Isc_stc"] * 100
+    assert err_pct < 0.5, (
+        f"T={T_cel_C}°C: Isc={res['Isc']:.5f} A  ref={Isc_ref:.5f} A  "
+        f"error={err_pct:.3f}% > 0.5 % de Isc_stc.  "
+        f"Causa probable: alpha_sc usa Tk_alfa/100 en lugar de Tk_alfa/100 × Isc_stc."
+    )
+
+
+def test_alpha_sc_pendiente():
+    """La pendiente dIsc/dT debe coincidir con alpha_sc = Tk_alfa/100 × Isc_stc.
+
+    Con el bug, la pendiente sería Tk_alfa/100 = 0.000600 A/°C (25 % mayor que el
+    valor correcto 0.000480 A/°C). Tolerancia del test: 5 % relativo sobre la pendiente.
+    """
+    res_25 = resolver_curva_iv(1000.0, 25.0, ASP_ST1_T40, n_puntos=0)
+    res_60 = resolver_curva_iv(1000.0, 60.0, ASP_ST1_T40, n_puntos=0)
+    pendiente_medida  = (res_60["Isc"] - res_25["Isc"]) / (60.0 - 25.0)   # A/°C
+    alpha_sc_correcto = ASP_ST1_T40["Tk_alfa"] / 100.0 * ASP_ST1_T40["Isc_stc"]
+    error_rel_pct     = abs(pendiente_medida - alpha_sc_correcto) / alpha_sc_correcto * 100
+    assert error_rel_pct < 5.0, (
+        f"Pendiente dIsc/dT medida = {pendiente_medida:.6f} A/°C  "
+        f"vs alpha_sc correcto = {alpha_sc_correcto:.6f} A/°C  "
+        f"(error relativo = {error_rel_pct:.1f}% > 5%).  "
+        f"Con el bug histórico el error sería ~25 %."
+    )

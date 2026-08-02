@@ -41,7 +41,7 @@ def calcular_rsh_cdte(G, R_sh_ref, c_Rsh=5.5, R_sh_base=0.0, G_ref=1000.0):
     G_arr  = np.atleast_1d(np.asarray(G, dtype=float))
     G_safe = np.where(G_arr > 0, G_arr, 1.0)
     rsh    = R_sh_ref * np.exp(-c_Rsh * (G_safe / G_ref - 1.0)) + R_sh_base
-    return float(rsh) if rsh.size == 1 else rsh
+    return rsh.item() if rsh.size == 1 else rsh   # .item() compatible numpy 1.x y 2.x
 
 
 def trasladar_parametros_gt(G, T_cel_C, panel: dict):
