@@ -439,6 +439,53 @@ with t0:
         )
         st.caption("💡 Ejecuta 📐 Dimensionamiento para que este valor se vincule automáticamente.")
 
+    # ── #79 — Detectar zona fresca ANTES del auto-update ────────────────────────
+    # La detección (predio → coords → TMY) debe correr antes del bloque de
+    # auto-actualización para que éste use siempre la zona vigente del proyecto.
+    _zona_opts  = list(_ZONA_FACTOR.keys())
+    _municipio_predio = str(st.session_state.get("municipio_predio", "")).lower()
+    _ciudad_tmy       = str(st.session_state.get("tmy_ciudad", "")).lower()
+    _zona_geo_coords  = st.session_state.get("zona_geo_coords", "")
+    if not _zona_geo_coords:
+        _lat_p = float(st.session_state.get("lat_proyecto", 0.0))
+        _lon_p = float(st.session_state.get("lon_proyecto", 0.0))
+        if _lat_p and _lon_p:
+            if   4.5 <= _lat_p <= 8.5 and _lon_p <= -76.0:              _zona_geo_coords = "Urabá / Chocó (tropical)"
+            elif _lat_p > 8.5 or (_lat_p > 7.5 and _lon_p > -76.0):     _zona_geo_coords = "Barranquilla / Costa"
+            elif _lon_p > -74.0:                                         _zona_geo_coords = "Llanos Orientales"
+            elif _lat_p < 4.5 and _lon_p < -74.0:                       _zona_geo_coords = "Cali / Valle"
+            elif _lat_p < 5.5 and _lon_p > -74.5:                       _zona_geo_coords = "Bogotá / Sabana"
+            else:                                                         _zona_geo_coords = "Medellín / Antioquia"
+            st.session_state["zona_geo_coords"] = _zona_geo_coords
+    # IMPORTANTE: keywords más específicos primero (Urabá antes que "antioq").
+    _zona_map = {
+        "villavicencio": 5, "vichada": 5, "orinoquia": 5,
+        "leticia": 5, "amazona": 5, "llano": 5,
+        "urab": 4, "apartad": 4, "turbo": 4,
+        "necoclí": 4, "necocli": 4, "chigorodo": 4, "chigorodó": 4,
+        "mutata": 4, "mutatá": 4, "carepa": 4, "arboletes": 4,
+        "choc": 4, "quibd": 4,
+        "barranq": 3, "santa marta": 3, "cartagena": 3,
+        "monteria": 3, "sincelejo": 3, "valledup": 3,
+        "cordoba": 3, "sucre": 3, "cesar": 3, "magdalena": 3, "costa": 3,
+        "cali": 2, "palmira": 2, "buenaven": 2, "popayan": 2,
+        "valle": 2, "cauca": 2,
+        "medell": 1, "rionegro": 1, "manizal": 1,
+        "pereira": 1, "armenia": 1, "risaral": 1, "quindio": 1, "caldas": 1,
+        "antioq": 1,
+        "bogot": 0, "saban": 0, "tunja": 0, "cundinam": 0,
+    }
+    _zona_idx = 0; _zona_fuente = None
+    for kw, idx in _zona_map.items():
+        if kw in _municipio_predio:
+            _zona_idx = idx; _zona_fuente = "predio"; break
+    if not _zona_fuente and _zona_geo_coords in _zona_opts:
+        _zona_idx = _zona_opts.index(_zona_geo_coords); _zona_fuente = "coords"
+    if not _zona_fuente:
+        for kw, idx in _zona_map.items():
+            if kw in _ciudad_tmy:
+                _zona_idx = idx; _zona_fuente = "TMY"; break
+
     # ── Auto-actualización silenciosa cuando el kWp del sistema cambió ────────
     # Si la estimación ya fue aplicada y el sistema cambió >5% de potencia,
     # recalcula y re-aplica automáticamente con el mismo tipo/escenario/zona.
@@ -448,7 +495,8 @@ with t0:
         if _kwp_prev_er > 0 and abs(p_stc - _kwp_prev_er) / _kwp_prev_er > 0.05:
             _tipo_auto = _er_cfg_prev.get("tipo", list(_BENCH.keys())[0])
             _esc_auto  = _er_cfg_prev.get("escenario", "Base")
-            _zona_auto = _er_cfg_prev.get("zona", list(_ZONA_FACTOR.keys())[0])
+            # #79 — zona fresca desde coords/predio/TMY; stale-config solo como fallback
+            _zona_auto = _zona_opts[_zona_idx] if _zona_fuente else _er_cfg_prev.get("zona", _zona_opts[0])
             _r_auto    = _calc_parametrico(p_stc, _tipo_auto, _esc_auto, _zona_auto)
             st.session_state["presupuesto_capex_usd"]        = _r_auto["capex_total"]
             st.session_state["presupuesto_opex_anual_usd"]   = _r_auto["opex_total"]
@@ -459,10 +507,15 @@ with t0:
             st.session_state["presupuesto_capex_directo"] = _r_auto["directo"]
             st.session_state["presupuesto_sub_directo"]   = _r_auto["directo"]
             st.session_state["presupuesto_capex_blando"]  = _r_auto["soft_total"]
-            st.session_state["est_rapida_config"] = {**_er_cfg_prev, "kwp": p_stc}
+            _zona_prev_er = _er_cfg_prev.get("zona", _zona_opts[0])
+            st.session_state["est_rapida_config"] = {**_er_cfg_prev, "kwp": p_stc, "zona": _zona_auto}
+            _zona_cambio_txt = (
+                f" · zona actualizada de **{_zona_prev_er}** → **{_zona_auto}**"
+                if _zona_auto != _zona_prev_er else ""
+            )
             st.info(
                 f"🔄 **Estimación Rápida auto-actualizada** — el sistema cambió de "
-                f"**{_kwp_prev_er:.1f} → {p_stc:.1f} kWp**. "
+                f"**{_kwp_prev_er:.1f} → {p_stc:.1f} kWp**{_zona_cambio_txt}. "
                 f"CAPEX actualizado a **USD {_r_auto['capex_total']:,.0f}** "
                 f"({_tipo_auto} · {_esc_auto} · {_zona_auto}). "
                 f"💰 Financiero refleja el nuevo valor automáticamente."
@@ -504,79 +557,7 @@ with t0:
         help="Base = mediana de mercado. Optimista = compra directa + negociación. Conservador = + contingencias."
     )
 
-    # Auto-detectar zona — prioridad:
-    #   1. municipio_predio  (nombre real del predio, keyword matching)
-    #   2. zona_geo_coords   (lat/lon del proyecto → calculada en Recurso Solar, nombre exacto)
-    #   3. tmy_ciudad        (ciudad de referencia TMY, keyword matching — menos fiable)
-    _municipio_predio = str(st.session_state.get("municipio_predio", "")).lower()
-    _ciudad_tmy       = str(st.session_state.get("tmy_ciudad", "")).lower()
-    _zona_geo_coords  = st.session_state.get("zona_geo_coords", "")   # set en Recurso Solar
-    _zona_opts  = list(_ZONA_FACTOR.keys())
-
-    # Si Recurso Solar aún no se ha ejecutado, calcular la zona directamente desde
-    # lat/lon del proyecto — misma lógica que _zona_por_coords() en Recurso Solar.
-    if not _zona_geo_coords:
-        _lat_p = float(st.session_state.get("lat_proyecto", 0.0))
-        _lon_p = float(st.session_state.get("lon_proyecto", 0.0))
-        if _lat_p and _lon_p:
-            if   4.5 <= _lat_p <= 8.5 and _lon_p <= -76.0:              _zona_geo_coords = "Urabá / Chocó (tropical)"
-            elif _lat_p > 8.5 or (_lat_p > 7.5 and _lon_p > -76.0):     _zona_geo_coords = "Barranquilla / Costa"
-            elif _lon_p > -74.0:                                         _zona_geo_coords = "Llanos Orientales"
-            elif _lat_p < 4.5 and _lon_p < -74.0:                       _zona_geo_coords = "Cali / Valle"
-            elif _lat_p < 5.5 and _lon_p > -74.5:                       _zona_geo_coords = "Bogotá / Sabana"
-            else:                                                         _zona_geo_coords = "Medellín / Antioquia"
-            st.session_state["zona_geo_coords"] = _zona_geo_coords
-
-    # IMPORTANTE: keywords más específicos primero. "antioq" es substring de
-    # "Antioquia" que aparece tanto en "Medellín, Antioquia" como en
-    # "Apartadó, Urabá, Antioquia" — Urabá debe ir ANTES que "antioq".
-    _zona_map   = {
-        # Zonas remotas / llanos (específico antes que nombres de depto)
-        "villavicencio": 5, "vichada": 5, "orinoquia": 5,
-        "leticia": 5, "amazona": 5, "llano": 5,
-        # Urabá / Chocó ANTES de "antioq" (evita falso match Antioquia→Medellín)
-        "urab": 4, "apartad": 4, "turbo": 4,
-        "necoclí": 4, "necocli": 4, "chigorodo": 4, "chigorodó": 4,
-        "mutata": 4, "mutatá": 4, "carepa": 4, "arboletes": 4,
-        "choc": 4, "quibd": 4,
-        # Costa Caribe (ciudades específicas antes de términos genéricos)
-        "barranq": 3, "santa marta": 3, "cartagena": 3,
-        "monteria": 3, "sincelejo": 3, "valledup": 3,
-        "cordoba": 3, "sucre": 3, "cesar": 3, "magdalena": 3, "costa": 3,
-        # Sur-Occidente
-        "cali": 2, "palmira": 2, "buenaven": 2, "popayan": 2,
-        "valle": 2, "cauca": 2,
-        # Eje Cafetero / Antioquia (genérico — al final del grupo)
-        "medell": 1, "rionegro": 1, "manizal": 1,
-        "pereira": 1, "armenia": 1, "risaral": 1, "quindio": 1, "caldas": 1,
-        "antioq": 1,   # ← genérico: solo llega aquí si ningún keyword anterior hizo match
-        # Bogotá / Sabana
-        "bogot": 0, "saban": 0, "tunja": 0, "cundinam": 0,
-    }
-
-    _zona_idx    = 0
-    _zona_fuente = None
-
-    # Fuente 1: nombre del predio (keyword matching)
-    for kw, idx in _zona_map.items():
-        if kw in _municipio_predio:
-            _zona_idx    = idx
-            _zona_fuente = "predio"
-            break
-
-    # Fuente 2: lat/lon del proyecto (nombre exacto desde Recurso Solar)
-    if not _zona_fuente and _zona_geo_coords in _zona_opts:
-        _zona_idx    = _zona_opts.index(_zona_geo_coords)
-        _zona_fuente = "coords"
-
-    # Fuente 3: ciudad TMY de referencia (keyword matching — menos precisa)
-    if not _zona_fuente:
-        for kw, idx in _zona_map.items():
-            if kw in _ciudad_tmy:
-                _zona_idx    = idx
-                _zona_fuente = "TMY"
-                break
-
+    # Auto-detectar zona — ya computado antes del auto-update (#79).
     # FIX: pre-poblar session_state para TODAS las fuentes automáticas.
     # Sin esto, Streamlit ignora `index=` en renders sucesivos porque el key
     # ya existe en session_state con el valor anterior.
