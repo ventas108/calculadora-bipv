@@ -238,11 +238,35 @@ with col_b1:
                         f"({bat_v_min:.0f}–{bat_v_max:.0f} V)."
                     )
 
-            # 3. HV check: si no hay info de rango pero la batería es HV y el inversor no parece híbrido
+            # 3. Batería HV con inversor no identificado como híbrido
             if not tipo_inv and not es_string and bat_v and bat_v > 150:
                 motivos.append(
                     f"La batería es **alta tensión ({bat_v:.0f} V)**. "
-                    "Confirme que el inversor seleccionado es híbrido y soporta ese rango de voltaje."
+                    "Confirme que el inversor seleccionado es **híbrido** y soporta ese rango de voltaje."
+                )
+
+            # 4. Batería LV (≤ 80 V) con híbrido que normalmente requiere HV
+            # Growatt SPH/SPA, Huawei SUN2000, Sungrow SH, Solax X-Hybrid solo aceptan
+            # bancos de alta tensión (100–550 V). Una batería de 48 V no es compatible.
+            _hv_only_heuristic = any(x in inv_lower for x in
+                                     ["sph", "spa", "sun2000", "sungrow", "sh-", "x-hybrid", "solax"])
+            if tipo_inv and bat_v and bat_v <= 80 and not bat_v_min and _hv_only_heuristic:
+                motivos.append(
+                    f"La batería es de **baja tensión ({bat_v:.0f} V)** y **`{inv_nom}`** "
+                    "normalmente requiere bancos de **alta tensión (100–550 V)**. "
+                    "Verifique el rango de tensión DC de batería en la ficha técnica del inversor."
+                )
+
+            # 5. Inversor híbrido pero la batería no tiene voltaje definido en el catálogo
+            if tipo_inv and not bat_v and not motivos:
+                motivos_advertencia = [
+                    "La batería **no tiene voltaje definido** en el catálogo. "
+                    "No es posible verificar la compatibilidad de tensión con el inversor. "
+                    "Agregue el campo `Voltaje Nominal (V)` en la hoja `Catalogo_Baterias` del Excel."
+                ]
+                return "warning", (
+                    f"⚠️ **Inversor híbrido detectado ({inv_nom})** pero sin datos suficientes:  \n"
+                    + "\n".join(f"- {m}" for m in motivos_advertencia)
                 )
 
             if motivos:
@@ -250,19 +274,24 @@ with col_b1:
             elif tipo_inv and bat_v:
                 if bat_v_min and bat_v_max:
                     return "ok", (
-                        f"✅ Inversor híbrido · Voltaje batería {bat_v:.0f} V ✓ "
-                        f"dentro del rango {bat_v_min:.0f}–{bat_v_max:.0f} V"
+                        f"✅ Inversor híbrido · Voltaje batería **{bat_v:.0f} V** ✓ "
+                        f"dentro del rango admitido **{bat_v_min:.0f}–{bat_v_max:.0f} V**"
                     )
-                return "ok", f"✅ Inversor híbrido compatible con baterías ({inv_nom})"
+                return "ok", (
+                    f"✅ Inversor híbrido detectado (**{inv_nom}**) · Voltaje batería {bat_v:.0f} V  \n"
+                    "*(Rango DC de batería no definido en el catálogo — verifique la ficha del inversor.)*"
+                )
             elif not _inv_dim and not inv_nom:
                 return "warning", (
-                    "ℹ️ Selecciona el inversor en Página 4 para verificar la compatibilidad."
+                    "ℹ️ Selecciona el inversor en **Página 4 › Dimensionamiento** para "
+                    "verificar la compatibilidad antes de dimensionar."
                 )
             else:
                 return "warning", (
-                    f"⚠️ No se puede verificar la compatibilidad automáticamente para **{inv_nom}**. "
-                    + (f"Voltaje de batería: **{bat_v:.0f} V**. " if bat_v else "")
-                    + "Confirme con el fabricante del inversor que acepta batería externa."
+                    f"⚠️ No se pudo determinar el tipo de **`{inv_nom}`** automáticamente.  \n"
+                    + (f"Voltaje de batería: **{bat_v:.0f} V**.  \n" if bat_v else "")
+                    + "Confirme en la ficha del inversor que tiene **puerto DC para batería** "
+                    "y que el rango de tensión es compatible."
                 )
 
         _compat_estado, _compat_msg = _check_compatibilidad(bat, _inv_dim, _inv_nombre)
@@ -358,6 +387,36 @@ if dim_res and not dim_res.get("error"):
 
     for adv in dim_res.get("advertencias", []):
         st.warning(f"⚠️ {adv}")
+
+    # ── #25 — Check potencia post-dimensionamiento ────────────────────────────
+    # Una vez conocido N_baterias, verificar que la potencia total del banco no
+    # supere la capacidad del inversor (cuello de botella de carga/descarga).
+    _n_bat       = dim_res.get("N_baterias", 1)
+    _p_bat_unit  = bat.get("potencia_kW") or 0
+    _p_bat_total = _n_bat * _p_bat_unit
+    _p_inv_w     = (_inv_dim.get("P_ac_nom_W") or _inv_dim.get("P_dc_max_W") or 0)
+    _p_inv_kw    = _p_inv_w / 1000
+    if _p_bat_total > 0 and _p_inv_kw > 0:
+        _ratio = _p_bat_total / _p_inv_kw
+        if _ratio > 1.5:
+            st.error(
+                f"🔴 **Potencia del banco sobredimensionada:** {_n_bat} × {_p_bat_unit:.1f} kW = "
+                f"**{_p_bat_total:.1f} kW** vs inversor **{_p_inv_kw:.1f} kW**.  \n"
+                f"El inversor limitará la carga/descarga a {_p_inv_kw:.1f} kW — "
+                "considera reducir el número de unidades o usar un inversor de mayor potencia."
+            )
+        elif _ratio > 1.1:
+            st.warning(
+                f"⚠️ **Potencia del banco ({_p_bat_total:.1f} kW) supera la del inversor "
+                f"({_p_inv_kw:.1f} kW) en {(_ratio-1)*100:.0f}%.** "
+                "El inversor será el cuello de botella en picos de carga/descarga."
+            )
+        else:
+            st.info(
+                f"⚡ Potencia del banco: **{_p_bat_total:.1f} kW** "
+                f"({_n_bat} × {_p_bat_unit:.1f} kW) — "
+                f"dentro de la capacidad del inversor ({_p_inv_kw:.1f} kW)."
+            )
 
     with st.expander("📐 Tabla de dimensionamiento detallada"):
         tabla_dim = {
