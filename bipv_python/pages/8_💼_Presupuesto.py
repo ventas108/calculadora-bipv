@@ -986,10 +986,40 @@ with t7:
     """)
 
     ss_opex = "df_sec_opex"
-    col_ro, col_fo = st.columns([2, 4])
+    col_ro, col_sug_o, col_fo = st.columns([2, 2, 4])
     if col_ro.button("↺ Resetear 'OPEX'", key="reset_opex"):
         st.session_state.pop(ss_opex, None)
         st.rerun()
+
+    # ── #72 — Botón sugerir valores O&M desde benchmarks paramétricos ─────────
+    _btn_sug_o = col_sug_o.button("🪄 Sugerir valores O&M", key="sug_opex",
+        help="Rellena los ítems con valores de referencia Colombia 2026 calculados "
+             "desde el tipo de instalación, zona geográfica y potencia del sistema.")
+    if _btn_sug_o:
+        if p_stc > 0:
+            _tipo_sug = st.session_state.get("est_tipo", list(_BENCH.keys())[1])
+            _esc_sug  = st.session_state.get("est_esc",  "Base")
+            _zona_sug = st.session_state.get("est_zona", list(_ZONA_FACTOR.keys())[0])
+            _r_sug = _calc_parametrico(p_stc, _tipo_sug, _esc_sug, _zona_sug)
+            _sug_rows = [
+                ["O&M preventivo — visitas técnicas anuales",   "OM-001", 1.0, "año",  round(_r_sug["opex_om"],   2)],
+                ["Limpieza de módulos (aprox. 4 veces/año)",    "OM-002", 4.0, "serv", round(_r_sug["opex_limp"] / 4, 2)],
+                ["Seguro operativo — todo riesgo instalación",  "SEG-002",1.0, "año",  round(_r_sug["opex_seg"],  2)],
+                ["Monitoreo remoto (plataforma Growatt/SCADA)", "MON-001",1.0, "año",  round(_r_sug["opex_mon"],  2)],
+                ["Revisión anual inversor y comunicaciones",    "OM-003", 1.0, "año",  0.0],
+                ["Fondo de reposición inversor (año 12–15)",    "RES-001",1.0, "año",  round(_r_sug["opex_repos"] * 0.70, 2)],
+                ["Fondo de reposición módulos / garantías",     "RES-002",1.0, "año",  round(_r_sug["opex_repos"] * 0.30, 2)],
+                ["Administración y costos fijos anuales",       "ADM-001",1.0, "año",  0.0],
+            ]
+            st.session_state[ss_opex] = _df_con_activo(_sug_rows)
+            st.toast(
+                f"✅ OPEX sugerido: USD {_r_sug['opex_total']:,.0f}/año "
+                f"≈ {_r_sug['opex_total']/p_stc:.0f} USD/kWp·año "
+                f"({_tipo_sug} · {_esc_sug} · {_zona_sug})", icon="🪄"
+            )
+        else:
+            st.warning("⚠️ Completa 📐 Dimensionamiento primero para conocer la potencia del sistema.")
+
     fuente_o = col_fo.text_input("Fuente / cotización OPEX",
         value=st.session_state.get("fuente_opex",""),
         placeholder="Ej.: Contrato O&M empresa Z, póliza seguro W, julio 2026",
@@ -1040,6 +1070,40 @@ with t7:
     if excl_o > 0:
         co3.metric("Excluidos", f"USD {excl_o:,.0f}/año", "no suma al total", delta_color="off")
     st.caption(f"📋 {len(ed_opex)} ítems — {int(act_o.sum())} activos. → Este valor reemplaza el slider O&M en 💰 Financiero.")
+
+    # ── #72 — Avisar cuando OPEX por kWp está por debajo del mínimo referencia ──
+    if p_stc > 0 and sub7 > 0:
+        _opex_kw_real = sub7 / p_stc
+        _tipo_inst_t7 = str(st.session_state.get("tipo_instalacion", "")).lower()
+        if any(x in _tipo_inst_t7 for x in ["bipv", "fachada", "pergola", "pérgola", "marquesina"]):
+            _opex_ref_lo, _opex_ref_hi, _tipo_lbl = 18.0, 32.0, "BIPV fachada/pérgola"
+        elif any(x in _tipo_inst_t7 for x in ["techo", "roof", "cubierta"]):
+            _opex_ref_lo, _opex_ref_hi, _tipo_lbl = 9.0,  16.0, "techo industrial"
+        else:
+            _opex_ref_lo, _opex_ref_hi, _tipo_lbl = 8.0,  14.0, "granja FV campo"
+        if _opex_kw_real < _opex_ref_lo * 0.6:
+            st.error(
+                f"🚨 **OPEX muy bajo: USD {_opex_kw_real:.0f}/kWp·año** — "
+                f"la referencia para {_tipo_lbl} es **{_opex_ref_lo:.0f}–{_opex_ref_hi:.0f} USD/kWp·año**. "
+                f"Un OPEX subestimado sobreestima la TIR y el VPN en el análisis financiero. "
+                f"Usa **🪄 Sugerir valores O&M** para obtener valores de referencia."
+            )
+        elif _opex_kw_real < _opex_ref_lo:
+            st.warning(
+                f"⚠️ **OPEX bajo: USD {_opex_kw_real:.0f}/kWp·año** — "
+                f"la referencia para {_tipo_lbl} es {_opex_ref_lo:.0f}–{_opex_ref_hi:.0f} USD/kWp·año. "
+                f"Verifica que estén incluidos seguro, monitoreo y fondos de reposición."
+            )
+        elif _opex_kw_real > _opex_ref_hi * 1.3:
+            st.info(
+                f"ℹ️ OPEX alto: USD {_opex_kw_real:.0f}/kWp·año (ref. {_tipo_lbl}: "
+                f"{_opex_ref_lo:.0f}–{_opex_ref_hi:.0f}). Revisa si hay ítems duplicados."
+            )
+    elif p_stc > 0 and sub7 == 0:
+        st.info(
+            "ℹ️ **OPEX = USD 0** — usa **🪄 Sugerir valores O&M** para pre-llenar con benchmarks "
+            "de mercado colombiano, o ingresa los costos reales de O&M, seguro y reposición."
+        )
 
 # ══════════════════════════════════════════════════════════════════════════════
 # RESUMEN CAPEX + CONTINGENCIAS
@@ -1215,3 +1279,16 @@ else:
         + (f" · **OPEX USD {sub7:,.0f}/año** enviado al flujo de caja." if sub7 > 0 else
            " · ⚠️ OPEX = USD 0 — completa la pestaña 📅 OPEX Anual.")
     )
+
+    # ── #81 — Avisar si Costos Blandos están vacíos en modo cotización real ────
+    if sub6 == 0 and capex_directo > 0:
+        _ref_blando_lo = capex_directo * 0.10
+        _ref_blando_hi = capex_directo * 0.20
+        st.warning(
+            f"⚠️ **Costos Blandos = USD 0** — la pestaña 🧾 Costos Blandos está vacía. "
+            f"Para un presupuesto bancable, ingeniería, permisos RETIE/UPME, PM y seguros "
+            f"representan el **10–20% del CAPEX directo** "
+            f"(≈ USD {_ref_blando_lo:,.0f} – USD {_ref_blando_hi:,.0f} para este proyecto).  \n"
+            f"Ve a la pestaña **🧾 Costos Blandos** → **🪄 Sugerir valores conservadores** para completarlos "
+            f"antes de enviar el presupuesto a Financiero."
+        )

@@ -338,6 +338,15 @@ with col_cx2:
             f"✅ CAPEX activo: **USD {capex_total:,.0f}** "
             f"($ {capex_total * _tc0 / 1e6:.2f} M COP) — desde 💼 Presupuesto detallado"
         )
+        # ── #81 — Avisar si Costos Blandos están vacíos en el Presupuesto ─────
+        if _ppto_blando == 0 and _ppto_directo > 0:
+            st.warning(
+                f"⚠️ **Costos Blandos = USD 0** en el Presupuesto — ingeniería, permisos "
+                f"RETIE/UPME, PM y seguros de construcción no están incluidos en el CAPEX.  \n"
+                f"Referencia Colombia: **10–20% del CAPEX directo** "
+                f"(≈ USD {_ppto_directo*0.10:,.0f} – USD {_ppto_directo*0.20:,.0f}).  \n"
+                f"Ve a 💼 **Presupuesto → 🧾 Costos Blandos → 🪄 Sugerir valores** para completarlos."
+            )
     else:
         # Tabla paramétrica original
         st.markdown("**Desglose CAPEX**")
