@@ -103,9 +103,25 @@ else:
         "— cada pestaña es una sesión independiente. "
         "Navega a Producción desde el menú lateral y vuelve aquí."
     )
-    # Usar valores de Dimensionamiento si existen; si no, dejar en 0 para que el
-    # usuario los ingrese — nunca mostrar defaults de prueba que confundan.
-    _e_ac_default  = float(st.session_state.get("E_ac_anual_kWh", 0.0)) or 0.0
+    # Usar valores de Dimensionamiento si existen; si no, usar estimación de
+    # Proyecto (modo consumo/área); si no hay nada, dejar en 0.
+    _e_ac_dim     = float(st.session_state.get("E_ac_anual_kWh", 0.0))
+    _e_estimada   = float(st.session_state.get("energia_anual_estimada", 0.0))
+    _modo_calculo = st.session_state.get("modo_calculo", "area")
+    _e_ac_default = _e_ac_dim or _e_estimada or 0.0
+
+    # Banner informativo cuando se usa la estimación de Proyecto
+    if not _e_ac_dim and _e_estimada > 0:
+        _modo_label = (
+            "Modo Consumo (factura)"
+            if _modo_calculo == "consumo"
+            else "Modo Área (superficie disponible)"
+        )
+        st.info(
+            f"📐 **Usando estimación de 🏠 Proyecto ({_modo_label}): "
+            f"{_e_estimada:,.0f} kWh/año** — Ejecuta ☀️ Recurso Solar → ⚡ Motor IV → "
+            f"📊 Producción para obtener la energía real del sistema."
+        )
     _p_stc_default = float(p_stc) if p_stc > 0 else 0.0
     _n_pan_default = int(n_pan) if n_pan > 0 else 1
 

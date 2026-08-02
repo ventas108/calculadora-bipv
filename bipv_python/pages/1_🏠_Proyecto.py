@@ -390,9 +390,24 @@ with col2:
             E_anual = area * eta * GHI_anual * PR
             ahorro_mes = E_anual / 12.0 * tarifa_kwh
             st.subheader("📊 Estimación de producción")
-            m1, m2 = st.columns(2)
-            m1.metric("Energía anual proyectada", f"{E_anual:,.0f} kWh/año")
-            m2.metric("Ahorro estimado", f"${ahorro_mes:,.0f} COP/mes")
+
+            # % cobertura si existe consumo previo en session_state
+            _consumo_prev = float(st.session_state.get("consumo_kwh_mes", 0.0))
+            if _consumo_prev > 0:
+                _cob_area = min(E_anual / (_consumo_prev * 12) * 100, 100)
+                m1, m2, m3 = st.columns(3)
+                m1.metric("Energía anual proyectada", f"{E_anual:,.0f} kWh/año")
+                m2.metric("Ahorro estimado", f"${ahorro_mes:,.0f} COP/mes")
+                m3.metric("Cobertura de consumo", f"{_cob_area:.0f}%",
+                          help=f"Sobre un consumo previo de {_consumo_prev:.0f} kWh/mes")
+            else:
+                m1, m2 = st.columns(2)
+                m1.metric("Energía anual proyectada", f"{E_anual:,.0f} kWh/año")
+                m2.metric("Ahorro estimado", f"${ahorro_mes:,.0f} COP/mes")
+                st.caption(
+                    "💡 Para ver el **% de cobertura** cambia al modo Consumo o "
+                    "guarda un proyecto con consumo conocido."
+                )
             st.session_state["energia_anual_estimada"] = E_anual
 
         else:
@@ -402,15 +417,41 @@ with col2:
             E_con_area  = area * eta * GHI_anual * PR
             cob_real    = min(E_con_area / (consumo_mes * 12) * 100, 100) if consumo_mes > 0 else 0.0
 
+            # N paneles estimados — usar panel activo si está disponible
+            _panel_area = panel_ss.get("area_m2") if panel_ss else None
+            _panel_pmax = panel_ss.get("Pmax_stc") if panel_ss else None
+            if _panel_area and _panel_area > 0 and area_nec > 0:
+                import math
+                _n_est = math.ceil(area_nec / _panel_area)
+                _n_label = f"{_n_est} paneles"
+                _n_help = (
+                    f"Panel: {panel_ss['nombre']} ({_panel_area:.2f} m²) — "
+                    f"área necesaria {area_nec:.1f} m² ÷ área panel {_panel_area:.2f} m²"
+                )
+            else:
+                _kWp_nec = area_nec * dens_Wm2 / 1000.0
+                _n_est = None
+                _n_label = f"{_kWp_nec:.1f} kWp"
+                _n_help = (
+                    "Selecciona un panel en ⚡ Motor IV para ver el número exacto de módulos. "
+                    f"Potencia requerida estimada: {_kWp_nec:.2f} kWp "
+                    f"({area_nec:.1f} m² × {dens_Wm2:.0f} W/m²)"
+                )
+
             st.subheader("📊 Resultados del diseño")
             delta_m2 = area - area_nec
-            m1, m2 = st.columns(2)
+            m1, m2, m3 = st.columns(3)
             m1.metric("Área necesaria", f"{area_nec:.1f} m²",
                       delta=f"{delta_m2:+.1f} m² vs disponible",
                       delta_color="normal" if delta_m2 >= 0 else "inverse")
             m2.metric("Cobertura alcanzable", f"{cob_real:.0f}%",
                       delta=f"objetivo {cobertura_pct}%",
                       delta_color="normal" if cob_real >= cobertura_pct else "inverse")
+            m3.metric(
+                "N paneles estimados" if _n_est is not None else "Potencia estimada",
+                _n_label,
+                help=_n_help,
+            )
 
             semaforo = "🟢" if area >= area_nec else "🔴"
             st.info(
