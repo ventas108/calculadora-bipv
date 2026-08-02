@@ -167,10 +167,10 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
             return "background-color: #D4EDDA; color: #155724; font-weight: bold"
         return ""
 
-    styled = df.style.applymap(colorear,
-                                subset=["1-Voc≤Vdc", "2-Vmp≥Vmppt_min",
-                                        "3-Vmp_ext≥Vmppt_min", "4-I≤Imax",
-                                        "5-Vmp≤Vmppt_max"])
+    styled = df.style.map(colorear,
+                          subset=["1-Voc≤Vdc", "2-Vmp≥Vmppt_min",
+                                  "3-Vmp_ext≥Vmppt_min", "4-I≤Imax",
+                                  "5-Vmp≤Vmppt_max"])
     st.dataframe(styled, use_container_width=True)
 
     # Mejor opción: N con 0 riesgos y MÁXIMA utilización del rango MPPT

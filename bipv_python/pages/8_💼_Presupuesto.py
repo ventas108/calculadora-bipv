@@ -156,7 +156,9 @@ def _df_con_activo(rows_or_df):
 def _plantilla_con_activo(key, inyectar=None):
     raw = _secciones_raw.get(key, pd.DataFrame(columns=_BASE_COLS)).copy()
     if inyectar is not None and not inyectar.empty:
-        raw = pd.concat([raw, inyectar], ignore_index=True)
+        _iny = inyectar.dropna(how="all")
+        if not _iny.empty:
+            raw = pd.concat([raw, _iny], ignore_index=True)
     return _df_con_activo(raw)
 
 # ── Editor genérico con persistencia + fuente de precios ─────────────────────
