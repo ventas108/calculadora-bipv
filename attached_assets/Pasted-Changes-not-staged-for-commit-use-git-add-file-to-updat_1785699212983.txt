@@ -1,0 +1,44 @@
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   bipv_python/calculos/__pycache__/dimensionamiento.cpython-312.pyc
+        modified:   bipv_python/calculos/__pycache__/modelo_iv.cpython-312.pyc
+        modified:   bipv_python/calculos/__pycache__/produccion.cpython-312.pyc
+        modified:   bipv_python/calculos/__pycache__/solar.cpython-312.pyc
+        modified:   bipv_python/datos/__pycache__/catalogo_inversores.cpython-312.pyc
+        modified:   bipv_python/datos/__pycache__/catalogo_inversores_excel.cpython-312.pyc
+        modified:   bipv_python/datos/__pycache__/catalogo_paneles_excel.cpython-312.pyc
+        modified:   bipv_python/datos/__pycache__/ciudades_colombia.cpython-312.pyc
+        modified:   bipv_python/datos/ciudades_colombia.py
+        modified:   "bipv_python/pages/1_\360\237\217\240_Proyecto.py"
+        modified:   "bipv_python/pages/2_\342\230\200\357\270\217_Recurso_Solar.py"
+        modified:   "bipv_python/pages/7_\360\237\222\260_Financiero.py"
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        bipv_python/calculos/__pycache__/mismatch_bypass.cpython-312.pyc
+        bipv_python/calculos/__pycache__/trm_utils.cpython-312.pyc
+        bipv_python/calculos/__pycache__/tz_utils.cpython-312.pyc
+        bipv_python/datos/proyecto_actual.json
+
+no changes added to commit (use "git add" and/or "git commit -a")
+Dropped refs/stash@{0} (1b46c8e515e173f2bac94f3fe7b99abcc0b55c5a)
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# # Aplicar todos los parches pendientes
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_tarifa_sync.py
+python3: can't open file '/var/www/bipv/calculadora-bipv/bipv_python/scripts/patch_tarifa_sync.py': [Errno 2] No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_detectar_columnas_baterias.py
+python3: can't open file '/var/www/bipv/calculadora-bipv/bipv_python/scripts/patch_detectar_columnas_baterias.py': [Errno 2] No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_catalogo_baterias_recarga.py
+python3: can't open file '/var/www/bipv/calculadora-bipv/bipv_python/scripts/patch_catalogo_baterias_recarga.py': [Errno 2] No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_pdf_ubicacion_predio.py
+python3: can't open file '/var/www/bipv/calculadora-bipv/bipv_python/scripts/patch_pdf_ubicacion_predio.py': [Errno 2] No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_bypass_produccion_financiero.py
+python3: can't open file '/var/www/bipv/calculadora-bipv/bipv_python/scripts/patch_bypass_produccion_financiero.py': [Errno 2] No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_multiproyecto.py
+python3: can't open file '/var/www/bipv/calculadora-bipv/bipv_python/scripts/patch_multiproyecto.py': [Errno 2] No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_vista3d.py
+python3: can't open file '/var/www/bipv/calculadora-bipv/bipv_python/scripts/patch_vista3d.py': [Errno 2] No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# pm2 restart streamlit-bipv
+
