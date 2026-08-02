@@ -5,6 +5,7 @@ import streamlit as st
 from datetime import date
 from datos.ciudades_colombia import CIUDADES, LISTA_CIUDADES, FECHA_VALIDACION_TARIFAS
 from calculos.tz_utils import utc_offset_latam, tz_label
+from calculos.tarifa_utils import init_tarifa, set_tarifa_from_ciudad, tarifa_widget
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
@@ -127,9 +128,8 @@ with col1:
         st.session_state["_lat_custom_temp"] = c_nueva.get("lat", 4.711)
         st.session_state["_lon_custom_temp"] = c_nueva.get("lon", -74.072)
         st.session_state["_alt_custom_temp"] = c_nueva.get("alt_m", 0)
-        # Pre-cargar tarifa del operador local de la nueva ciudad
-        if "tarifa_comercial_cop_kwh" in c_nueva:
-            st.session_state["tarifa_cop_kwh"] = float(c_nueva["tarifa_comercial_cop_kwh"])
+        # Pre-cargar tarifa del operador local de la nueva ciudad (con metadata de ciudad/operador)
+        set_tarifa_from_ciudad(ciudad, CIUDADES)
         # Limpiar datos de proyecto + recurso solar (coords del sitio cambian)
         _KEYS_LIMPIAR_CIUDAD = (
             "lat_proyecto", "lon_proyecto", "alt_proyecto",
@@ -190,26 +190,9 @@ with col1:
     factura_cop   = 0.0
     cobertura_pct = int(st.session_state.get("cobertura_pct", 80))
 
-    _c_actual = CIUDADES.get(ciudad, {})
-    _tarifa_default = float(
-        st.session_state.get(
-            "tarifa_cop_kwh",
-            _c_actual.get("tarifa_comercial_cop_kwh", 850.0)
-        )
-    )
-    _operador_txt = _c_actual.get("operador", "")
-    _operador_help = f" (operador: **{_operador_txt}**)" if _operador_txt else ""
-    tarifa_kwh = st.number_input(
-        "Tarifa local (COP/kWh)",
-        min_value=100.0, max_value=2000.0,
-        value=_tarifa_default,
-        step=10.0,
-        help=(
-            f"Tarifa comercial/industrial sin subsidio{_operador_help}. "
-            "Se actualiza automáticamente al cambiar ciudad. "
-            "Ajusta con el valor real de la factura del cliente."
-        )
-    )
+    # ── Tarifa sincronizada con Financiero — patrón TRM ──────────────────────
+    init_tarifa(ciudad, CIUDADES)   # no-op si ya fue inicializada
+    tarifa_kwh = tarifa_widget("proy")
 
     # ── Aviso si las tarifas del catálogo llevan más de 6 meses sin actualizar ─
     try:

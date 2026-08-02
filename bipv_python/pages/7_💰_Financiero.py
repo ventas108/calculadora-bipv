@@ -13,9 +13,11 @@ from calculos.financiero import (
     comparativo_ley_1715,
 )
 from calculos.trm_utils import init_trm, trm_widget
+from calculos.tarifa_utils import init_tarifa, tarifa_widget
 
 st.set_page_config(page_title="Financiero — BIPV", page_icon="💰", layout="wide")
 init_trm()   # fetch TRM del API en primera carga; session_state["tipo_cambio"] listo antes de línea 126
+init_tarifa()   # garantiza tarifa_cop_kwh en session_state antes del panel preview
 st.title("💰 Análisis Financiero — Ley 1715 de 2014")
 st.caption(
     "Art. 11 Deducción renta · Art. 12 Exclusión IVA · Art. 14 Depreciación acelerada "
@@ -392,19 +394,8 @@ tipo_cambio = trm_widget("fin")
 col_t1, col_t2, col_t3 = st.columns(3)
 
 with col_t1:
-    # ── Tarifa sincronizada con Proyecto — fuente de verdad: tarifa_cop_kwh ──
-    _tarifa_init = float(st.session_state.get(
-        "tarifa_cop_kwh",                          # clave canónica (Proyecto)
-        st.session_state.get("tarifa_cop_kWh", 650.0)  # fallback clave antigua
-    ))
-    tarifa_cop = st.number_input(
-        "Tarifa electricidad (COP/kWh)",
-        min_value=100.0, max_value=2000.0,
-        value=_tarifa_init, step=25.0,
-        help="Tarifa comercial/industrial Bogotá 2024: ~550–750 COP/kWh. "
-             "Residencial estrato 4-6: ~600–850 COP/kWh. "
-             "📍 Pre-cargada desde Proyecto.",
-    )
+    # ── Tarifa sincronizada con Proyecto — patrón TRM ─────────────────────────
+    tarifa_cop = tarifa_widget("fin")
 
 with col_t2:
     esc_tarifa = st.slider(
