@@ -474,21 +474,31 @@ with t0:
     _municipio_predio = str(st.session_state.get("municipio_predio", "")).lower()
     _ciudad_tmy       = str(st.session_state.get("tmy_ciudad", "")).lower()
     _zona_opts  = list(_ZONA_FACTOR.keys())
+    # IMPORTANTE: keywords más específicos primero. "antioq" es substring de
+    # "Antioquia" que aparece tanto en "Medellín, Antioquia" como en
+    # "Apartadó, Urabá, Antioquia" — Urabá debe ir ANTES que "antioq".
     _zona_map   = {
-        "bogot": 0, "saban": 0, "tunja": 0, "cundinam": 0,
-        "medell": 1, "antioq": 1, "rionegro": 1, "manizal": 1,
-        "pereira": 1, "armenia": 1, "caldas": 1, "quindio": 1,
-        "risaral": 1,
-        "cali": 2, "valle": 2, "palmira": 2, "buenaven": 2,
-        "popayan": 2, "cauca": 2,
-        "barranq": 3, "santa marta": 3, "cartagena": 3, "costa": 3,
-        "monteria": 3, "sincelejo": 3, "valledup": 3, "cesar": 3,
-        "sucre": 3, "cordoba": 3, "magdalena": 3,
-        "urab": 4, "apartad": 4, "turbo": 4, "choc": 4,
+        # Zonas remotas / llanos (específico antes que nombres de depto)
+        "villavicencio": 5, "vichada": 5, "orinoquia": 5,
+        "leticia": 5, "amazona": 5, "llano": 5,
+        # Urabá / Chocó ANTES de "antioq" (evita falso match Antioquia→Medellín)
+        "urab": 4, "apartad": 4, "turbo": 4,
         "necoclí": 4, "necocli": 4, "chigorodo": 4, "chigorodó": 4,
         "mutata": 4, "mutatá": 4, "carepa": 4, "arboletes": 4,
-        "villavicencio": 5, "llano": 5, "vichada": 5, "orinoquia": 5,
-        "leticia": 5, "amazona": 5,
+        "choc": 4, "quibd": 4,
+        # Costa Caribe (ciudades específicas antes de términos genéricos)
+        "barranq": 3, "santa marta": 3, "cartagena": 3,
+        "monteria": 3, "sincelejo": 3, "valledup": 3,
+        "cordoba": 3, "sucre": 3, "cesar": 3, "magdalena": 3, "costa": 3,
+        # Sur-Occidente
+        "cali": 2, "palmira": 2, "buenaven": 2, "popayan": 2,
+        "valle": 2, "cauca": 2,
+        # Eje Cafetero / Antioquia (genérico — al final del grupo)
+        "medell": 1, "rionegro": 1, "manizal": 1,
+        "pereira": 1, "armenia": 1, "risaral": 1, "quindio": 1, "caldas": 1,
+        "antioq": 1,   # ← genérico: solo llega aquí si ningún keyword anterior hizo match
+        # Bogotá / Sabana
+        "bogot": 0, "saban": 0, "tunja": 0, "cundinam": 0,
     }
 
     # Buscar zona primero en municipio_predio (coordenadas reales), luego en ciudad TMY
