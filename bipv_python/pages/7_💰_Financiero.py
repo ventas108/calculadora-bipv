@@ -264,12 +264,18 @@ tipo_cambio = trm_widget("fin")
 col_t1, col_t2, col_t3 = st.columns(3)
 
 with col_t1:
+    # ── Tarifa sincronizada con Proyecto — fuente de verdad: tarifa_cop_kwh ──
+    _tarifa_init = float(st.session_state.get(
+        "tarifa_cop_kwh",                          # clave canónica (Proyecto)
+        st.session_state.get("tarifa_cop_kWh", 650.0)  # fallback clave antigua
+    ))
     tarifa_cop = st.number_input(
         "Tarifa electricidad (COP/kWh)",
         min_value=100.0, max_value=2000.0,
-        value=650.0, step=25.0,
+        value=_tarifa_init, step=25.0,
         help="Tarifa comercial/industrial Bogotá 2024: ~550–750 COP/kWh. "
-             "Residencial estrato 4-6: ~600–850 COP/kWh",
+             "Residencial estrato 4-6: ~600–850 COP/kWh. "
+             "📍 Pre-cargada desde Proyecto.",
     )
 
 with col_t2:
@@ -1101,5 +1107,6 @@ if btn_fin or st.session_state.get("financiero_ok"):
     st.session_state["metricas_financiero_p90"] = m_p90   # para Reporte PDF
     st.session_state["e_ac_p90_kWh"]           = e_ac_p90
     st.session_state["factor_p90_pct"]         = factor_p90
-    st.session_state["tarifa_cop_kWh"]         = tarifa_cop
+    st.session_state["tarifa_cop_kWh"]         = tarifa_cop   # clave legacy
+    st.session_state["tarifa_cop_kwh"]         = tarifa_cop   # clave canónica
     st.session_state["financiero_ok"]          = True

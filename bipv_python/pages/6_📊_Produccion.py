@@ -730,7 +730,11 @@ if btn_sim or st.session_state.get("produccion_ok"):
             for m in meses_con_dato if len(_e_ac_stc_mes[_e_ac_stc_mes.index == m]) > 0
         )
         perdida_t_kwh_total = max(0.0, total_stc - total_sim)
-        tarifa_ref  = st.session_state.get("tarifa_kwh", 650)
+        tarifa_ref  = float(st.session_state.get(
+            "tarifa_cop_kwh",                         # clave canónica (Proyecto/Financiero)
+            st.session_state.get("tarifa_cop_kWh",    # fallback legacy
+            st.session_state.get("tarifa_kwh", 650))  # fallback original
+        ))
         perdida_cop = max(0.0, (total_sim - total_real) * tarifa_ref)
 
         # PR globales acumulados (meses con dato)

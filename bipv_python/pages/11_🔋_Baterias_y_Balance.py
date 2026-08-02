@@ -712,7 +712,10 @@ if df_bal is not None and metr and clase:
         }), use_container_width=True, hide_index=True)
 
     # ── Flujo de ahorro estimado ─────────────────────────────────────────────
-    tarifa = float(st.session_state.get("tarifa_cop_kWh", 650.0))
+    tarifa = float(st.session_state.get(
+        "tarifa_cop_kwh",                        # clave canónica (Proyecto/Financiero)
+        st.session_state.get("tarifa_cop_kWh", 650.0)  # fallback legacy
+    ))
     if tarifa > 0 and metr["E_autoconsumo_anual_kWh"] > 0:
         ahorro_anual_cop = metr["E_autoconsumo_anual_kWh"] * tarifa
         tipo_cambio = float(st.session_state.get("tipo_cambio", 4100.0))
