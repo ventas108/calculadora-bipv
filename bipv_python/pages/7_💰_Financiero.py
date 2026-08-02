@@ -252,7 +252,7 @@ with col_cx1:
     )
 
 with col_cx2:
-    # Cálculo automático de CAPEX
+    # ── Cálculo automático de CAPEX paramétrico ───────────────────────────────
     capex_modulos     = n_pan * costo_modulo_usd
     capex_inversor    = p_stc * costo_inversor_usd_kw
     capex_estructura  = p_stc * costo_estructura_usd_kw
@@ -260,32 +260,106 @@ with col_cx2:
     capex_instalacion = capex_equipos * costo_instalacion_pct / 100
     capex_sub_total   = capex_equipos + capex_instalacion
     capex_imprev      = capex_sub_total * imprevistos_pct / 100
-    capex_total       = capex_sub_total + capex_imprev
+    capex_parametrico = capex_sub_total + capex_imprev          # siempre paramétrico
+    capex_total       = capex_parametrico
     fraccion_equipos  = capex_equipos / capex_total if capex_total > 0 else 0.65
 
-    # Override: CAPEX real desde Presupuesto Detallado
-    _ppto = float(st.session_state.get("presupuesto_capex_usd", 0.0))
-    if _ppto > 0:
-        capex_total      = _ppto
-        _sub             = float(st.session_state.get("presupuesto_sub_directo", _ppto*0.65))
-        fraccion_equipos = _sub / capex_total if capex_total > 0 else 0.65
-        st.info(f"💼 CAPEX real desde Presupuesto Detallado: **USD {capex_total:,.0f}** "
-                f"| $ {capex_total*tipo_cambio/1e6:.2f} M COP")
+    # ── Toggle Presupuesto (aparece antes de la tabla para decidir qué mostrar) ─
+    _ppto_capex = float(st.session_state.get("presupuesto_capex_usd", 0.0))
+    _ppto_frac  = float(st.session_state.get("presupuesto_fraccion_equipos", fraccion_equipos))
+    _tc0        = float(st.session_state.get("tipo_cambio", 4200.0))
 
-    st.markdown("**Desglose CAPEX**")
-    items_capex = {
-        "Módulos BIPV":        capex_modulos,
-        "Inversor":            capex_inversor,
-        "Estructura/cables":   capex_estructura,
-        "Ingeniería/instal.":  capex_instalacion,
-        "Imprevistos":         capex_imprev,
-    }
-    df_capex = pd.DataFrame.from_dict(
-        items_capex, orient="index", columns=["USD"]
-    )
-    df_capex["COP (M)"] = (df_capex["USD"] * tipo_cambio / 1e6).round(1)
-    st.dataframe(df_capex.style.format({"USD": "{:,.0f}", "COP (M)": "{:.1f}"}),
-                 use_container_width=True)
+    usar_ppto = False
+    if _ppto_capex > 0:
+        _diff_pct = abs(_ppto_capex - capex_parametrico) / max(capex_parametrico, 1) * 100
+        _color    = "🟢" if _diff_pct < 20 else "🟡" if _diff_pct < 60 else "🔴"
+        usar_ppto = st.toggle(
+            f"{_color} Usar CAPEX del 💼 Presupuesto detallado "
+            f"— **USD {_ppto_capex:,.0f}** ($ {_ppto_capex*_tc0/1e6:.2f} M COP)",
+            value=True,
+            key="toggle_usar_ppto",
+            help=(
+                f"Presupuesto detallado: USD {_ppto_capex:,.0f}  |  "
+                f"Modelo paramétrico: USD {capex_parametrico:,.0f}  |  "
+                f"Diferencia: {_diff_pct:.0f}%. "
+                f"Cuando está activo, todos los cálculos financieros usan el total "
+                f"del Presupuesto. Los costos unitarios de la izquierda son solo referencia."
+            ),
+        )
+        if usar_ppto:
+            capex_total      = _ppto_capex
+            fraccion_equipos = _ppto_frac if _ppto_frac > 0 else fraccion_equipos
+        else:
+            st.info(
+                f"ℹ️ Usando CAPEX paramétrico: USD {capex_parametrico:,.0f}. "
+                f"Activa el toggle para usar el Presupuesto detallado."
+            )
+
+    # ── Desglose condicional ──────────────────────────────────────────────────
+    if usar_ppto:
+        # Resumen de las secciones del Presupuesto
+        st.markdown("**Resumen del Presupuesto detallado**")
+        st.caption(
+            "⚠️ Los cálculos financieros usan el **total del Presupuesto**. "
+            "Los costos unitarios de la izquierda son solo referencia y no aplican."
+        )
+        _ppto_directo = float(st.session_state.get("presupuesto_capex_directo",
+                              st.session_state.get("presupuesto_sub_directo", 0.0)))
+        _ppto_blando  = float(st.session_state.get("presupuesto_capex_blando", 0.0))
+        _ppto_contg   = max(_ppto_capex - _ppto_directo - _ppto_blando, 0.0)
+
+        _secciones = [
+            ("🔩 Costos Directos (Perfilería, M.O., FV, Inversor, Catálogo)",
+             _ppto_directo),
+            ("🧾 Costos Blandos (ingeniería, permisos, PM)",
+             _ppto_blando),
+            ("⚙️ Contingencias e indirectos",
+             _ppto_contg),
+        ]
+        _df_ppto = pd.DataFrame(
+            [{"Categoría": cat, "USD": val,
+              "COP (M)": round(val * _tc0 / 1e6, 2)}
+             for cat, val in _secciones if val > 0]
+        )
+        _df_ppto.loc[len(_df_ppto)] = {
+            "Categoría": "✅ CAPEX TOTAL Presupuesto",
+            "USD": _ppto_capex,
+            "COP (M)": round(_ppto_capex * _tc0 / 1e6, 2),
+        }
+        st.dataframe(
+            _df_ppto.style
+                .format({"USD": "{:,.0f}", "COP (M)": "{:.2f}"})
+                .apply(lambda r: ["font-weight:bold; background:#EAF4FB"] * len(r)
+                       if "CAPEX TOTAL" in str(r["Categoría"]) else [""] * len(r),
+                       axis=1),
+            use_container_width=True, hide_index=True,
+        )
+        st.success(
+            f"✅ CAPEX activo: **USD {capex_total:,.0f}** "
+            f"($ {capex_total * _tc0 / 1e6:.2f} M COP) — desde 💼 Presupuesto detallado"
+        )
+    else:
+        # Tabla paramétrica original
+        st.markdown("**Desglose CAPEX**")
+        items_capex = {
+            "Módulos BIPV":        capex_modulos,
+            "Inversor":            capex_inversor,
+            "Estructura/cables":   capex_estructura,
+            "Ingeniería/instal.":  capex_instalacion,
+            "Imprevistos":         capex_imprev,
+        }
+        df_capex = pd.DataFrame.from_dict(
+            items_capex, orient="index", columns=["USD"]
+        )
+        df_capex["COP (M)"] = (df_capex["USD"] * tipo_cambio / 1e6).round(1)
+        st.dataframe(df_capex.style.format({"USD": "{:,.0f}", "COP (M)": "{:.1f}"}),
+                     use_container_width=True)
+
+        if not _ppto_capex:
+            st.caption(
+                "💡 Completa la página 💼 **Presupuesto** para vincular el CAPEX real "
+                "aquí automáticamente."
+            )
 
     c1, c2, c3 = st.columns(3)
     c1.metric("CAPEX total",    f"USD {capex_total:,.0f}",
@@ -296,45 +370,6 @@ with col_cx2:
     c3.metric("Costo módulo",   f"USD {capex_total/n_pan:,.0f}/módulo" if n_pan > 0 else "—",
               delta=f"$ {capex_total*tipo_cambio/n_pan:,.0f} COP/módulo" if n_pan > 0 else None,
               delta_color="off")
-
-# ── Puente con Presupuesto detallado ──────────────────────────────────────────
-_ppto_capex = float(st.session_state.get("presupuesto_capex_usd", 0.0))
-_ppto_frac  = float(st.session_state.get("presupuesto_fraccion_equipos", fraccion_equipos))
-_tc0        = float(st.session_state.get("tipo_cambio", 4200.0))
-
-if _ppto_capex > 0:
-    _diff_pct = abs(_ppto_capex - capex_total) / max(capex_total, 1) * 100
-    _color    = "🟢" if _diff_pct < 20 else "🟡" if _diff_pct < 60 else "🔴"
-    st.markdown("---")
-    usar_ppto = st.toggle(
-        f"{_color} Reemplazar CAPEX paramétrico con el 💼 Presupuesto detallado "
-        f"— **USD {_ppto_capex:,.0f}** ($ {_ppto_capex*_tc0/1e6:.2f} M COP)",
-        value=True,
-        help=(
-            f"Presupuesto detallado: USD {_ppto_capex:,.0f}  |  "
-            f"Modelo paramétrico: USD {capex_total:,.0f}  |  "
-            f"Diferencia: {_diff_pct:.0f}%. "
-            f"Si la diferencia supera el 50% verifica que los precios del "
-            f"Presupuesto estén en USD (no en COP)."
-        ),
-    )
-    if usar_ppto:
-        capex_total      = _ppto_capex
-        fraccion_equipos = _ppto_frac if _ppto_frac > 0 else fraccion_equipos
-        st.success(
-            f"✅ CAPEX activo: **USD {capex_total:,.0f}** "
-            f"($ {capex_total*_tc0/1e6:.2f} M COP) — desde 💼 Presupuesto detallado"
-        )
-    else:
-        st.info(
-            f"ℹ️ Usando CAPEX paramétrico: USD {capex_total:,.0f}. "
-            f"Activa el toggle para usar el Presupuesto detallado."
-        )
-else:
-    st.caption(
-        "💡 Completa la página 💼 **Presupuesto** para vincular el CAPEX real "
-        "aquí automáticamente."
-    )
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 2 — TARIFA Y PARÁMETROS OPERATIVOS
