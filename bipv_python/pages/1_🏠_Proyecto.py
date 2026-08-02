@@ -109,7 +109,7 @@ with col1:
         ),
     )
 
-    # Si la ciudad cambió → pre-cargar coords de la nueva ciudad y rerenderizar limpio
+    # Si la ciudad cambió → pre-cargar coords Y tarifa de la nueva ciudad
     if ciudad != ciudad_anterior:
         c_nueva = CIUDADES.get(ciudad, {})
         st.session_state["ciudad"] = ciudad
@@ -117,6 +117,9 @@ with col1:
         st.session_state["_lat_custom_temp"] = c_nueva.get("lat", 4.711)
         st.session_state["_lon_custom_temp"] = c_nueva.get("lon", -74.072)
         st.session_state["_alt_custom_temp"] = c_nueva.get("alt_m", 0)
+        # Pre-cargar tarifa del operador local de la nueva ciudad
+        if "tarifa_comercial_cop_kwh" in c_nueva:
+            st.session_state["tarifa_cop_kwh"] = float(c_nueva["tarifa_comercial_cop_kwh"])
         for _k in ("lat_proyecto", "lon_proyecto", "alt_proyecto",
                    "densidad_Wm2", "PR", "tilt_default"):
             st.session_state.pop(_k, None)
@@ -167,12 +170,26 @@ with col1:
     factura_cop   = 0.0
     cobertura_pct = int(st.session_state.get("cobertura_pct", 80))
 
+    _c_actual = CIUDADES.get(ciudad, {})
+    _tarifa_default = float(
+        st.session_state.get(
+            "tarifa_cop_kwh",
+            _c_actual.get("tarifa_comercial_cop_kwh", 850.0)
+        )
+    )
+    _operador_txt = _c_actual.get("operador", "")
+    _operador_help = f" (operador: **{_operador_txt}**)" if _operador_txt else ""
     tarifa_kwh = st.number_input(
         "Tarifa local (COP/kWh)",
         min_value=100.0, max_value=2000.0,
-        value=float(st.session_state.get("tarifa_cop_kwh", 850.0)),
+        value=_tarifa_default,
         step=10.0,
-        help="Varía por ciudad y empresa prestadora. Consulta tu factura de energía.")
+        help=(
+            f"Tarifa comercial/industrial sin subsidio{_operador_help}. "
+            "Se actualiza automáticamente al cambiar ciudad. "
+            "Ajusta con el valor real de la factura del cliente."
+        )
+    )
 
     if modo_key == "consumo":
         st.subheader("Consumo / Factura")

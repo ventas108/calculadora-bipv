@@ -1,6 +1,10 @@
 """
 Base de datos de ciudades colombianas con datos solares validados.
 Fuente: IDEAM / UPME / PVGIS.
+
+Tarifas comerciales/industriales (sin subsidio) validadas 2025
+por el equipo Innovación Química. Actualizar cuando cambien las
+resoluciones CREG o se disponga de facturas más recientes.
 """
 
 CIUDADES = {
@@ -10,6 +14,8 @@ CIUDADES = {
         "T_amb_media": 14.0, "T_min_diseno": 5.0,
         "T_cel_realista": 36.35, "T_cel_extremo": 41.94,
         "region": "Andina", "CREG_zona": "Centro",
+        "operador": "Codensa",
+        "tarifa_comercial_cop_kwh": 1200,
     },
     "Medellín": {
         "lat": 6.244, "lon": -75.574, "alt_m": 1495,
@@ -17,6 +23,8 @@ CIUDADES = {
         "T_amb_media": 22.0, "T_min_diseno": 10.0,
         "T_cel_realista": 45.0, "T_cel_extremo": 52.0,
         "region": "Andina", "CREG_zona": "Antioquia",
+        "operador": "EPM",
+        "tarifa_comercial_cop_kwh": 900,
     },
     "Cali": {
         "lat": 3.437, "lon": -76.522, "alt_m": 1000,
@@ -24,6 +32,8 @@ CIUDADES = {
         "T_amb_media": 24.0, "T_min_diseno": 12.0,
         "T_cel_realista": 47.0, "T_cel_extremo": 55.0,
         "region": "Andina", "CREG_zona": "Valle",
+        "operador": "EMCALI",
+        "tarifa_comercial_cop_kwh": 850,
     },
     "Barranquilla": {
         "lat": 10.964, "lon": -74.796, "alt_m": 18,
@@ -31,6 +41,8 @@ CIUDADES = {
         "T_amb_media": 28.0, "T_min_diseno": 20.0,
         "T_cel_realista": 55.0, "T_cel_extremo": 65.0,
         "region": "Caribe", "CREG_zona": "Costa",
+        "operador": "Air-e",
+        "tarifa_comercial_cop_kwh": 900,
     },
     "Cartagena": {
         "lat": 10.391, "lon": -75.479, "alt_m": 2,
@@ -38,6 +50,8 @@ CIUDADES = {
         "T_amb_media": 28.5, "T_min_diseno": 20.0,
         "T_cel_realista": 56.0, "T_cel_extremo": 66.0,
         "region": "Caribe", "CREG_zona": "Costa",
+        "operador": "Afinia",
+        "tarifa_comercial_cop_kwh": 900,
     },
     "Bucaramanga": {
         "lat": 7.119, "lon": -73.123, "alt_m": 959,
@@ -45,6 +59,8 @@ CIUDADES = {
         "T_amb_media": 26.0, "T_min_diseno": 15.0,
         "T_cel_realista": 50.0, "T_cel_extremo": 58.0,
         "region": "Andina", "CREG_zona": "Santander",
+        "operador": "ESSA",
+        "tarifa_comercial_cop_kwh": 950,
     },
     "Pereira": {
         "lat": 4.814, "lon": -75.696, "alt_m": 1411,
@@ -52,6 +68,8 @@ CIUDADES = {
         "T_amb_media": 21.0, "T_min_diseno": 8.0,
         "T_cel_realista": 43.0, "T_cel_extremo": 50.0,
         "region": "Andina", "CREG_zona": "Eje Cafetero",
+        "operador": "CHEC",
+        "tarifa_comercial_cop_kwh": 850,
     },
     "Manizales": {
         "lat": 5.070, "lon": -75.513, "alt_m": 2153,
@@ -59,6 +77,8 @@ CIUDADES = {
         "T_amb_media": 17.0, "T_min_diseno": 2.0,
         "T_cel_realista": 38.0, "T_cel_extremo": 45.0,
         "region": "Andina", "CREG_zona": "Eje Cafetero",
+        "operador": "CHEC",
+        "tarifa_comercial_cop_kwh": 850,
     },
     "Santa Marta": {
         "lat": 11.240, "lon": -74.199, "alt_m": 15,
@@ -66,6 +86,8 @@ CIUDADES = {
         "T_amb_media": 29.0, "T_min_diseno": 22.0,
         "T_cel_realista": 57.0, "T_cel_extremo": 67.0,
         "region": "Caribe", "CREG_zona": "Costa",
+        "operador": "Air-e",
+        "tarifa_comercial_cop_kwh": 900,
     },
     "Ibagué": {
         "lat": 4.438, "lon": -75.232, "alt_m": 1285,
@@ -73,6 +95,8 @@ CIUDADES = {
         "T_amb_media": 23.0, "T_min_diseno": 10.0,
         "T_cel_realista": 46.0, "T_cel_extremo": 53.0,
         "region": "Andina", "CREG_zona": "Tolima",
+        "operador": "ENERTOLIMA",
+        "tarifa_comercial_cop_kwh": 900,
     },
     "Villavicencio": {
         "lat": 4.142, "lon": -73.626, "alt_m": 467,
@@ -80,6 +104,8 @@ CIUDADES = {
         "T_amb_media": 27.0, "T_min_diseno": 18.0,
         "T_cel_realista": 52.0, "T_cel_extremo": 61.0,
         "region": "Llanos", "CREG_zona": "Meta",
+        "operador": "ENERCA",
+        "tarifa_comercial_cop_kwh": 950,
     },
     "Pasto": {
         "lat": 1.215, "lon": -77.281, "alt_m": 2527,
@@ -87,6 +113,17 @@ CIUDADES = {
         "T_amb_media": 13.0, "T_min_diseno": -2.0,
         "T_cel_realista": 34.0, "T_cel_extremo": 40.0,
         "region": "Andina", "CREG_zona": "Sur",
+        "operador": "CEDENAR",
+        "tarifa_comercial_cop_kwh": 900,
+    },
+    "Quibdó": {
+        "lat": 5.694, "lon": -76.658, "alt_m": 54,
+        "GHI_kWh_m2_dia": 4.3, "HSP": 4.3,
+        "T_amb_media": 28.0, "T_min_diseno": 20.0,
+        "T_cel_realista": 53.0, "T_cel_extremo": 62.0,
+        "region": "Pacífico", "CREG_zona": "Chocó",
+        "operador": "DISPAC",
+        "tarifa_comercial_cop_kwh": 1000,
     },
 }
 
