@@ -12,8 +12,10 @@ from calculos.financiero import (
     calcular_metricas,
     comparativo_ley_1715,
 )
+from calculos.trm_utils import init_trm, trm_widget
 
 st.set_page_config(page_title="Financiero — BIPV", page_icon="💰", layout="wide")
+init_trm()   # fetch TRM del API en primera carga; session_state["tipo_cambio"] listo antes de línea 126
 st.title("💰 Análisis Financiero — Ley 1715 de 2014")
 st.caption(
     "Art. 11 Deducción renta · Art. 12 Exclusión IVA · Art. 14 Depreciación acelerada "
@@ -256,6 +258,9 @@ else:
 st.markdown("---")
 st.subheader("⚡ 2. Tarifa eléctrica y parámetros operativos")
 
+# ── TRM sincronizada — fuente de verdad global con Presupuesto ────────────────
+tipo_cambio = trm_widget("fin")
+
 col_t1, col_t2, col_t3 = st.columns(3)
 
 with col_t1:
@@ -266,26 +271,6 @@ with col_t1:
         help="Tarifa comercial/industrial Bogotá 2024: ~550–750 COP/kWh. "
              "Residencial estrato 4-6: ~600–850 COP/kWh",
     )
-    tipo_cambio = st.number_input(
-        "Tipo de cambio (COP/USD)",
-        min_value=3000.0, max_value=6000.0,
-        value=float(st.session_state.get("tipo_cambio", 4200.0)),
-        step=50.0,
-        help="TRM referencia ago 2026: ~4.200 COP/USD. Ajusta según la tasa del día "
-             "(Banco de la República: banrep.gov.co).",
-    )
-    st.session_state["tipo_cambio"] = tipo_cambio
-    # ── Alerta TRM desactualizado (tarea #86) ─────────────────────────────────
-    # El campo persiste entre sesiones. Si el valor guardado es < 3,900
-    # (rango pre-2024) avisamos al usuario con sugerencia de actualizar.
-    if tipo_cambio < 3_900:
-        st.warning(
-            f"⚠️ **TRM {tipo_cambio:,.0f} COP/USD parece desactualizado.** "
-            f"La tasa de referencia en agosto 2026 ronda **~4.200 COP/USD**. "
-            f"Con TRM bajo, el CAPEX y los beneficios Ley 1715 quedarán "
-            f"subestimados en COP. "
-            f"Ajusta el valor para resultados correctos."
-        )
 
 with col_t2:
     esc_tarifa = st.slider(
@@ -548,7 +533,7 @@ with col_t3:
 # ═══════════════════════════════════════════════════════════════════════════════
 st.markdown("---")
 with st.expander("💱 Conversor de cifras USD → COP (TRM del día)", expanded=True):
-    st.caption(f"Usando TRM: **{tipo_cambio:,.0f} COP/USD** — ajusta la tasa en la sección anterior para actualizar.")
+    st.caption(f"Usando TRM: **{tipo_cambio:,.0f} COP/USD** (sincronizada con 💼 Presupuesto · edita en Sección 2)")
 
     col_cv1, col_cv2, col_cv3, col_cv4 = st.columns(4)
     col_cv1.metric("CAPEX bruto",

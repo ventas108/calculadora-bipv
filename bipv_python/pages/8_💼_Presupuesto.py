@@ -2,8 +2,10 @@
 import streamlit as st
 import pandas as pd
 from datetime import date
+from calculos.trm_utils import init_trm, trm_widget
 
 st.set_page_config(page_title="Presupuesto BIPV", page_icon="💼", layout="wide")
+init_trm()   # fetch TRM del API en primera carga; garantiza session_state["tipo_cambio"]
 st.title("💼 Presupuesto Bancable — CAPEX · Costos Blandos · OPEX")
 st.caption(
     "Presupuesto completo para bancabilidad (P90). "
@@ -23,10 +25,8 @@ with st.expander("📋 Encabezado del presupuesto", expanded=False):
         "Los precios deben actualizarse si la TRM varía >5% o los insumos tienen nueva cotización."
     )
 
-# ── TRM y datos del Dimensionamiento ─────────────────────────────────────────
-tc = st.number_input("💱 TRM (COP/USD)", min_value=1000.0, max_value=10000.0,
-    value=float(st.session_state.get("tipo_cambio", 4200.0)), step=50.0)
-st.session_state["tipo_cambio"] = tc
+# ── TRM sincronizada — widget compartido con Financiero ──────────────────────
+tc = trm_widget("ppto")
 
 n_pan   = int(st.session_state.get("N_paneles_final", 0))
 p_stc   = float(st.session_state.get("P_stc_kW_sistema", 0.0))
