@@ -121,7 +121,8 @@ else:
 
 
 # TRM disponible desde el inicio (se actualiza en Sección 2)
-tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))
+# Default 4200 para consistencia con Presupuesto y el widget de Sección 2
+tipo_cambio = float(st.session_state.get("tipo_cambio", 4200.0))
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 1 — CAPEX
@@ -212,7 +213,7 @@ with col_cx2:
 # ── Puente con Presupuesto detallado ──────────────────────────────────────────
 _ppto_capex = float(st.session_state.get("presupuesto_capex_usd", 0.0))
 _ppto_frac  = float(st.session_state.get("presupuesto_fraccion_equipos", fraccion_equipos))
-_tc0        = float(st.session_state.get("tipo_cambio", 3400.0))
+_tc0        = float(st.session_state.get("tipo_cambio", 4200.0))
 
 if _ppto_capex > 0:
     _diff_pct = abs(_ppto_capex - capex_total) / max(capex_total, 1) * 100
