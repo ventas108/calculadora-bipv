@@ -46,22 +46,76 @@ if _panel_ss and _panel_nom_ss:
         )
     else:
         # ── Ficha básica (catálogo Excel) → estimar SDM ────────────────────────
-        _sdm_est = estimar_sdm_desde_ficha(_panel_ss)
-        if _sdm_est is not None:
-            _modo_auto    = True
-            _panel_activo = _sdm_est
-            _estimado     = True
-            _metodo_est   = _sdm_est.get("_metodo", "estimado")
-            st.warning(
-                f"🟡 **Auto-activado con estimación** — Panel: **{_panel_nom_ss}** "
-                f"(catálogo Excel). Parámetros SDM estimados por **{_metodo_est}** "
-                f"desde ficha técnica. Resultados orientativos — valida con datos calibrados."
+        _err_auto, _adv_auto = _analizar_panel_motiv(_panel_ss)
+        if _err_auto:
+            # Campos esenciales ausentes — no se puede estimar
+            _falt_str = ", ".join(f"**{c}**" for c, _ in _err_auto)
+            st.error(
+                f"❌ **Panel `{_panel_nom_ss}` no tiene datos suficientes para el Motor IV.**  \n"
+                f"Campos requeridos ausentes en el catálogo Excel: {_falt_str}.  \n\n"
+                "| Campo | Descripción |\n|---|---|\n"
+                + "\n".join(f"| `{c}` | {d} |" for c, d in _err_auto)
+                + f"\n\n⬇️ Se usará el panel por defecto **ASP-ST1-T40** para esta simulación."
             )
+            # _panel_activo queda None → caerá al default más abajo, pero ahora avisado
         else:
-            st.info(
-                f"ℹ️ Panel **{_panel_nom_ss}** no tiene datos suficientes para el Motor IV "
-                f"(faltan Voc, Isc, Vmp o Imp). Selecciona manualmente un panel con ficha completa."
-            )
+            _sdm_est = estimar_sdm_desde_ficha(_panel_ss)
+            if _sdm_est is not None:
+                _modo_auto    = True
+                _panel_activo = _sdm_est
+                _estimado     = True
+                _metodo_est   = _sdm_est.get("_metodo", "estimado")
+                _adv_lines = ""
+                if _adv_auto:
+                    _adv_lines = "  \n" + "  \n".join(
+                        f"- ⚠️ `{c}` no definido — {d}" for c, d in _adv_auto
+                    )
+                st.warning(
+                    f"🟡 **Auto-activado con estimación** — Panel: **{_panel_nom_ss}** "
+                    f"(catálogo Excel). Parámetros SDM estimados por **{_metodo_est}** "
+                    f"desde ficha técnica. Resultados orientativos.{_adv_lines}"
+                )
+            else:
+                st.error(
+                    f"❌ **No se pudo estimar el SDM para `{_panel_nom_ss}`.**  \n"
+                    "Los datos básicos (Voc, Isc, Vmp, Imp) están presentes pero el ajuste "
+                    "De Soto no convergió. Verifica que los valores sean físicamente coherentes "
+                    "(Vmp < Voc, Imp < Isc, Pmax = Vmp × Imp).  \n"
+                    "⬇️ Se usará el panel por defecto **ASP-ST1-T40** para esta simulación."
+                )
+
+# ── Helper: detectar campos faltantes para Motor IV ───────────────────────────
+def _analizar_panel_motiv(p: dict) -> tuple:
+    """
+    Retorna (errores, advertencias) donde:
+      errores      = [(campo, descripción)] — bloquean la simulación
+      advertencias = [(campo, descripción)] — estimación con default, resultados menos precisos
+    """
+    _val = lambda *keys: any(
+        p.get(k) not in (None, 0, 0.0, "", "nan", "0") for k in keys
+    )
+    errores = []
+    if not _val("Voc_stc", "Voc"):
+        errores.append(("Voc", "Tensión de circuito abierto en STC (V)"))
+    if not _val("Isc_stc", "Isc"):
+        errores.append(("Isc", "Corriente de cortocircuito en STC (A)"))
+    if not _val("Vmp_stc", "Vmp"):
+        errores.append(("Vmp", "Tensión en el punto de máxima potencia en STC (V)"))
+    if not _val("Imp_stc", "Imp"):
+        errores.append(("Imp", "Corriente en el punto de máxima potencia en STC (A)"))
+
+    advertencias = []
+    if not errores:  # solo mostramos advertencias si los campos críticos están
+        if not _val("N_s", "NsA"):
+            advertencias.append(("N_s", "Número de celdas en serie — se estimará desde Voc/0.65 V"))
+        if not p.get("tecnologia"):
+            advertencias.append(("Tecnología", "Tecnología del panel — se asumirá Mono-Si"))
+        if not _val("Tk_beta", "CoefVoc_C", "beta_oc"):
+            advertencias.append(("Coef. Temp. Voc (β)", "Coeficiente de temperatura de Voc — se usará default por tecnología"))
+        if not _val("Tk_alfa", "alpha_sc"):
+            advertencias.append(("Coef. Temp. Isc (α)", "Coeficiente de temperatura de Isc — se usará default por tecnología"))
+    return errores, advertencias
+
 
 # ── Selector manual como alternativa / fallback ────────────────────────────────
 # Combinar catálogo SDM calibrado (BIPV ASP-ST1) + catálogo Excel por tecnología
@@ -143,14 +197,23 @@ with st.expander(
         st.success("✅ SDM calibrado — parámetros completos y verificados.")
     else:
         _p_sel = _cat_excel.get(_panel_manual_nom, {})
-        if _tiene_iv(_p_sel):
-            st.warning("🟡 Catálogo Excel — SDM estimado desde ficha. Resultados orientativos.")
-        else:
-            _falt = [f for f, k in [("Voc","Voc"),("Isc","Isc"),("Vmp","Vmp"),("Imp","Imp")]
-                     if not (_p_sel.get(k) or _p_sel.get(f"I_{k.lower()}_ref") or _p_sel.get(f"V_{k.lower()}_ref"))]
+        _err_sel, _adv_sel = _analizar_panel_motiv(_p_sel)
+        if _err_sel:
             st.error(
-                f"⚠️ **Datos incompletos** — faltan: **{', '.join(_falt) if _falt else 'valores IV'}**. "
-                f"Completa la ficha en el Excel antes de usar este panel."
+                f"❌ **Datos insuficientes para simular `{_panel_manual_nom}`.**  \n"
+                "Campos requeridos ausentes en el catálogo Excel:\n\n"
+                "| Campo | Descripción |\n|---|---|\n"
+                + "\n".join(f"| `{c}` | {d} |" for c, d in _err_sel)
+                + "\n\nCompleta estos campos en la hoja `Catalogo_Paneles` del Excel antes de usar este panel."
+            )
+        else:
+            _msg_adv = ""
+            if _adv_sel:
+                _msg_adv = "  \n" + "  \n".join(
+                    f"- ⚠️ `{c}` ausente — {d}" for c, d in _adv_sel
+                )
+            st.warning(
+                f"🟡 **Catálogo Excel** — SDM estimado desde ficha. Resultados orientativos.{_msg_adv}"
             )
 
     if st.button("▶️ Usar este panel", key="btn_panel_manual", disabled=_es_separador):
@@ -161,7 +224,12 @@ with st.expander(
             from calculos.modelo_iv import estimar_sdm_desde_ficha
             _base = _cat_excel.get(_panel_manual_nom, {})
             if not _tiene_iv(_base):
-                st.error(f"❌ **{_panel_manual_nom}** — no tiene Voc, Isc, Vmp e Imp completos. Completa la ficha en el catálogo Excel.")
+                _err_btn, _ = _analizar_panel_motiv(_base)
+                _falt_btn = ", ".join(f"`{c}`" for c, _ in _err_btn) if _err_btn else "Voc, Isc, Vmp o Imp"
+                st.error(
+                    f"❌ **{_panel_manual_nom}** — faltan campos requeridos: {_falt_btn}.  \n"
+                    "Completa la ficha en la hoja `Catalogo_Paneles` del Excel."
+                )
                 _panel_activo = None
             else:
                 _sdm = estimar_sdm_desde_ficha(_base)
@@ -177,11 +245,18 @@ with st.expander(
             _panel_nom_ss = _panel_manual_nom
             st.success(f"✅ Panel cargado: **{_panel_manual_nom}**")
 
-# Si aún no hay panel activo, usar el default
+# Si aún no hay panel activo, usar el default con aviso explícito
 if _panel_activo is None:
     _panel_activo = ASP_ST1_T40
     _panel_nom_ss = "ASP-ST1-T40"
     _estimado     = False
+    if _panel_ss and st.session_state.get("panel_nombre_dim"):
+        # El usuario tenía un panel seleccionado pero no pudo cargarse
+        st.warning(
+            f"⚠️ No se pudo cargar **{st.session_state.get('panel_nombre_dim')}** — "
+            "la simulación está usando el panel de referencia **ASP-ST1-T40 (SDM calibrado)**.  \n"
+            "Selecciona manualmente un panel con ficha completa en el selector de abajo."
+        )
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 2. CONDICIONES DE SIMULACIÓN
