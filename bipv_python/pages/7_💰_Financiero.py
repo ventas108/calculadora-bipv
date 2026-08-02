@@ -22,8 +22,11 @@ st.caption(
 
 # ── Prerequisitos ─────────────────────────────────────────────────────────────
 prod_ok = st.session_state.get("produccion_ok", False)
-p_stc   = st.session_state.get("P_stc_kW_sistema", 0.0)
-n_pan   = st.session_state.get("N_paneles_final", 64)
+# Fallback: Producción > Dimensionamiento > 0  (nunca usar defaults de prueba hardcodeados)
+p_stc   = (st.session_state.get("P_stc_kW_sistema")
+           or st.session_state.get("P_dc_stc_kW_dim", 0.0))
+n_pan   = (st.session_state.get("N_paneles_final")
+           or st.session_state.get("N_paneles_dim", 0))
 ciudad  = st.session_state.get("tmy_ciudad", "Bogotá")
 
 # ── Prioridad E_ac: multi-superficie > bypass > base ─────────────────────────
@@ -91,13 +94,30 @@ if prod_ok and e_ac > 0:
                 "la E_ac corregida por sombra parcial en este análisis financiero."
             )
 else:
-    st.warning("⚠️ Primero ejecuta 📊 Producción para calcular la energía anual del sistema.")
+    st.warning(
+        "⚠️ **Producción no detectada en esta sesión.** "
+        "Si ya ejecutaste 📊 Producción, asegúrate de estar en la **misma pestaña** del navegador "
+        "— cada pestaña es una sesión independiente. "
+        "Navega a Producción desde el menú lateral y vuelve aquí."
+    )
+    # Usar valores de Dimensionamiento si existen; si no, dejar en 0 para que el
+    # usuario los ingrese — nunca mostrar defaults de prueba que confundan.
+    _e_ac_default  = float(st.session_state.get("E_ac_anual_kWh", 0.0)) or 0.0
+    _p_stc_default = float(p_stc) if p_stc > 0 else 0.0
+    _n_pan_default = int(n_pan) if n_pan > 0 else 1
+
     e_ac = st.number_input(
         "Ingresa la energía AC anual manualmente (kWh/año)",
-        min_value=100.0, max_value=1e6, value=3391.0, step=100.0,
+        min_value=0.0, max_value=1e7, value=_e_ac_default, step=1000.0,
     )
-    p_stc = st.number_input("Potencia instalada (kWp)", min_value=0.1, value=4.03, step=0.1)
-    n_pan = st.number_input("Número de módulos", min_value=1, value=64, step=1)
+    p_stc = st.number_input(
+        "Potencia instalada (kWp)",
+        min_value=0.0, max_value=100000.0, value=_p_stc_default, step=1.0,
+    )
+    n_pan = st.number_input(
+        "Número de módulos",
+        min_value=0, max_value=100000, value=_n_pan_default, step=1,
+    )
 
 
 # TRM disponible desde el inicio (se actualiza en Sección 2)
