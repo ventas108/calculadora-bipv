@@ -1,0 +1,521 @@
+root@bipv-colombia:/var/www/bipv/calculadora-bipv# grep -rn "pvwatts\|PVWatts\|getPVWatts\|nrel\|NREL\|nasa\|NASA" \
+>   bipv_python/ --include="*.py" | grep -v "__pycache__"
+bipv_python/datos/tecnologias_bipv.py:15:        "n_mediana": 1.094,    # — factor idealidad mediana CdTe (CEC/NREL NCL)
+bipv_python/venv/lib/python3.12/site-packages/h5py/tests/test_dataset_getitem.py:15:    unreliable ways; for example, compound and array types.
+bipv_python/venv/lib/python3.12/site-packages/packaging/licenses/_spdx.py:464:    'nasa-1.3': {'id': 'NASA-1.3', 'deprecated': False},
+bipv_python/venv/lib/python3.12/site-packages/pygments/lexers/_lasso_builtins.py:4181:        'makenonrelative',
+bipv_python/venv/lib/python3.12/site-packages/pygments/lexers/_lilypond_builtins.py:4859:  "nonstaff-unrelatedstaff-spacing",
+bipv_python/venv/lib/python3.12/site-packages/streamlit/runtime/state/session_state.py:710:    # If we're running 1 or more fragments, but this widget is unrelated to any of the
+bipv_python/venv/lib/python3.12/site-packages/streamlit/runtime/caching/cache_utils.py:251:        #   the entire cache, so that unrelated value computations don't block on each other.
+bipv_python/venv/lib/python3.12/site-packages/PIL/SunImagePlugin.py:65:        # data_length = i32(s, 16)   # unreliable, ignore.
+bipv_python/venv/lib/python3.12/site-packages/charset_normalizer/models.py:79:            # is unreliable. Strip the decoded BOM character instead.
+bipv_python/venv/lib/python3.12/site-packages/charset_normalizer/api.py:266:                "Encoding %s won't be tested as-is because detection is unreliable without BOM/SIG.",
+bipv_python/venv/lib/python3.12/site-packages/charset_normalizer/api.py:303:        # mess_ratio + coherence_ratio on clearly unrelated candidates (e.g., Cyrillic
+bipv_python/venv/lib/python3.12/site-packages/charset_normalizer/api.py:829:        # running expensive mess_ratio + coherence_ratio on clearly unrelated
+bipv_python/venv/lib/python3.12/site-packages/scipy/stats/_stats_py.py:1066:                       "are nearly identical. Results may be unreliable.")
+bipv_python/venv/lib/python3.12/site-packages/scipy/stats/_stats_py.py:6422:               "calculations may be unreliable. Use the p-value result, with "
+bipv_python/venv/lib/python3.12/site-packages/scipy/stats/_fit.py:1096:    may be caused by unreliable fitting. These do not necessarily invalidate
+bipv_python/venv/lib/python3.12/site-packages/scipy/sparse/linalg/_eigen/tests/test_svds.py:723:            pytest.skip("PROPACK failures unrelated to PR #16712")
+bipv_python/venv/lib/python3.12/site-packages/scipy/optimize/_minpack_py.py:721:        unreliable.
+bipv_python/venv/lib/python3.12/site-packages/scipy/optimize/_minpack_py.py:845:    redundant parameters can cause unreliable covariance matrices and, in some
+bipv_python/venv/lib/python3.12/site-packages/scipy/optimize/_remove_redundancy.py:415:    # but that function is unreliable at finding singular values near zero.
+bipv_python/venv/lib/python3.12/site-packages/fontTools/misc/bezierTools.py:888:        # returns unreliable results, so we fall back to quad.
+bipv_python/venv/lib/python3.12/site-packages/pyarrow/tests/test_fs.py:1500:    # Sometimes fails on unrelated network error, so next call would also fail.
+bipv_python/venv/lib/python3.12/site-packages/pyarrow/tests/util.py:390:        # which is unrelated to the minio mc
+bipv_python/venv/lib/python3.12/site-packages/narwhals/_native.py:60:This problem differs as we need to *create* a relationship between *otherwise-unrelated* types.
+bipv_python/venv/lib/python3.12/site-packages/tornado/test/testing_test.py:264:            # unrelated IOLoop/testing internals.
+bipv_python/venv/lib/python3.12/site-packages/tornado/test/template_test.py:172:        # be nice if apply didn't cause seemingly unrelated breakage
+bipv_python/venv/lib/python3.12/site-packages/tornado/test/netutil_test.py:158:# C-ares returns the results, making the "bad_host" tests unreliable.
+bipv_python/venv/lib/python3.12/site-packages/pandas/core/reshape/melt.py:262:        B-two,.., and you have an unrelated column A-rating, you can ignore the
+bipv_python/venv/lib/python3.12/site-packages/pandas/tests/test_nanops.py:1235:    # GH 42878 bottleneck sometimes produces unreliable results for mean and sum
+bipv_python/venv/lib/python3.12/site-packages/pandas/tests/computation/test_eval.py:293:                # Update assert statement due to unreliable numerical
+bipv_python/venv/lib/python3.12/site-packages/pandas/plotting/_matplotlib/core.py:749:        """Common post process unrelated to data"""
+bipv_python/venv/lib/python3.12/site-packages/pip/_internal/exceptions.py:724:        # unreliable, so we fall back to the locale-less vendor message. This
+bipv_python/venv/lib/python3.12/site-packages/pip/_vendor/packaging/licenses/_spdx.py:486:    'nasa-1.3': {'id': 'NASA-1.3', 'deprecated': False},
+bipv_python/venv/lib/python3.12/site-packages/matplotlib/backends/backend_qt.py:345:        # provided (`isNull()`) and is unreliable on X11 ("xcb").
+bipv_python/venv/lib/python3.12/site-packages/matplotlib/__init__.py:1221:        Switching to an interactive backend is not possible if an unrelated
+bipv_python/venv/lib/python3.12/site-packages/matplotlib/widgets.py:4170:        self.connect_event('button_release_event', self.onrelease)
+bipv_python/venv/lib/python3.12/site-packages/matplotlib/widgets.py:4173:    def onrelease(self, event):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:32:                      method='nrel_numpy',
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:58:    method : string, default 'nrel_numpy'
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:59:        'nrel_numpy' uses an implementation of the NREL SPA algorithm
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:62:        'nrel_numba' uses an implementation of the NREL SPA algorithm
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:70:        'nrel_c' uses the NREL SPA C code [3]: :py:func:`spa_c`
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:88:    .. [3] NREL SPA code: https://midcdmz.nrel.gov/spa/
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:103:    if method == 'nrel_c':
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:106:    elif method == 'nrel_numba':
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:110:    elif method == 'nrel_numpy':
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:132:    Calculate the solar position using the C implementation of the NREL
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:176:    .. [1] NREL SPA reference: https://midcdmz.nrel.gov/spa/
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:286:    NREL SPA algorithm.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:288:    The details of the NREL SPA algorithm are described in [1]_.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:396:    NREL SPA algorithm.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:398:    The details of the NREL SPA algorithm are described in [1]_.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:434:       radiation applications. Technical report: NREL/TP-560- 34302. Golden,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:435:       USA, http://www.nrel.gov.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:474:    # utility from unreleased PyEphem 3.6.7.1
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:483:    # utility from unreleased PyEphem 3.6.7.1
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:955:def nrel_earthsun_distance(time, how='numpy', delta_t=67.0, numthreads=4):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:958:    NREL SPA algorithm.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:960:    The details of the NREL SPA algorithm are described in [1]_.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:989:       radiation applications. Technical report: NREL/TP-560- 34302. Golden,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/solarposition.py:990:       USA, http://www.nrel.gov.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spectrum/mismatch.py:234:       Laboratory, 2014. http://www.nrel.gov/docs/fy14osti/61610.pdf
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spectrum/spectrl2.py:206:        model, while a later implementation by NREL uses the
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spectrum/spectrl2.py:247:    NREL's C implementation ``spectrl2_2.c`` [2]_ of the model differs in
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spectrum/spectrl2.py:272:       earth's surface for cloudless atmospheres", NREL Technical Report
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spectrum/spectrl2.py:275:       https://www.nrel.gov/grid/solar-resource/spectral.html
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spectrum/irradiance.py:56:    Excel file distributed by NREL, which is found here:
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spectrum/irradiance.py:57:    https://www.nrel.gov/grid/solar-resource/assets/data/astmg173.xls
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spectrum/irradiance.py:60:    https://www.nrel.gov/grid/solar-resource/spectra-am1.5.html
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spectrum/irradiance.py:113:    an Excel file distributed by NREL, which is found here [2]_:
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spectrum/irradiance.py:114:    https://www.nrel.gov/grid/solar-resource/assets/data/astmg173.xls
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spectrum/irradiance.py:144:    .. [2] “Reference Air Mass 1.5 Spectra,” www.nrel.gov.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spectrum/irradiance.py:145:       https://www.nrel.gov/grid/solar-resource/spectra-am1.5.html
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tracking.py:111:       Single-Axis Trackers", Technical Report NREL/TP-5K00-76626, July 2020.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tracking.py:112:       https://www.nrel.gov/docs/fy20osti/76626.pdf
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tracking.py:237:       Tracking of One-Axis Trackers", Technical Report NREL/TP-6A20-58891,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tracking.py:296:       Single-Axis Trackers", Technical Report NREL/TP-5K00-76626, July 2020.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tracking.py:297:       https://www.nrel.gov/docs/fy20osti/76626.pdf
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tracking.py:405:       Single-Axis Trackers", Technical Report NREL/TP-5K00-76626, July 2020.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tracking.py:406:       https://www.nrel.gov/docs/fy20osti/76626.pdf
+bipv_python/venv/lib/python3.12/site-packages/pvlib/shading.py:90:       Reference Update", NREL Technical Report NREL/TP-6A20-67399.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/shading.py:91:       Available at https://www.nrel.gov/docs/fy18osti/67399.pdf
+bipv_python/venv/lib/python3.12/site-packages/pvlib/shading.py:231:       Reference Update", NREL Technical Report NREL/TP-6A20-67399.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/shading.py:232:       Available at https://www.nrel.gov/docs/fy18osti/67399.pdf
+bipv_python/venv/lib/python3.12/site-packages/pvlib/shading.py:307:       Single-Axis Trackers', National Renewable Energy Lab. (NREL), Golden,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/shading.py:309:       NREL/TP-5K00-76626, Jul. 2020. :doi:`10.2172/1660126`.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/clearsky.py:923:    Based on NREL Excel implementation by Daryl R. Myers [1, 2].
+bipv_python/venv/lib/python3.12/site-packages/pvlib/clearsky.py:934:    in PVLIB is tested against the NREL Excel implementation by Daryl
+bipv_python/venv/lib/python3.12/site-packages/pvlib/clearsky.py:982:    .. [3] `NREL Bird Clear Sky Model <http://rredc.nrel.gov/solar/models/
+bipv_python/venv/lib/python3.12/site-packages/pvlib/clearsky.py:985:    .. [4] `SERI/TR-642-761 <https://www.nrel.gov/docs/legosti/old/761.pdf>`_
+bipv_python/venv/lib/python3.12/site-packages/pvlib/clearsky.py:987:    .. [5] `Error Reports <http://rredc.nrel.gov/solar/models/clearsky/
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:120:    .. [2] System Advisor Model web page. https://sam.nrel.gov.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:333:def pvwatts(pdc, pdc0, eta_inv_nom=0.96, eta_inv_ref=0.9637):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:335:    NREL's PVWatts inverter model.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:337:    The PVWatts inverter model [1]_ calculates inverter efficiency :math:`\eta`
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:362:        Reference inverter efficiency. PVWatts defines it to be 0.9637
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:373:    (e.g. :py:func:`pvlib.pvsystem.pvwatts_dc`) their DC power output is in W,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:377:    :py:func:`pvlib.pvsystem.pvwatts_dc`. ``pdc0`` in this function refers to
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:379:    :py:func:`pvlib.pvsystem.pvwatts_dc` refers to the DC power of the modules
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:384:    pvlib.inverter.pvwatts_multi
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:388:    .. [1] A. P. Dobos, "PVWatts Version 5 Manual,"
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:389:       http://pvwatts.nrel.gov/downloads/pvwattsv5.pdf (2014).
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:412:def pvwatts_multi(pdc, pdc0, eta_inv_nom=0.96, eta_inv_ref=0.9637):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:414:    Extend NREL's PVWatts inverter model for multiple MPP inputs.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:417:    input to the PVWatts inverter model. See :py:func:`pvlib.inverter.pvwatts`
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:430:        Reference inverter efficiency. PVWatts defines it to be 0.9637
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:440:    pvlib.inverter.pvwatts
+bipv_python/venv/lib/python3.12/site-packages/pvlib/inverter.py:442:    return pvwatts(sum(pdc), pdc0, eta_inv_nom, eta_inv_ref)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/atmosphere.py:372:       `SERI/TR-335-344 <http://www.nrel.gov/docs/legosti/old/344.pdf>`_
+bipv_python/venv/lib/python3.12/site-packages/pvlib/atmosphere.py:669:       https://web.archive.org/web/20230418202422/https://www2.jpl.nasa.gov/adv_tech/photovol/2016CTR/SNL%20-%20Est%20Wind%20Speed%20vs%20Height_1985.pdf
+bipv_python/venv/lib/python3.12/site-packages/pvlib/bifacial/infinite_sheds.py:166:       Single-Axis Trackers", Technical Report NREL/TP-5K00-76626, July 2020.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/bifacial/infinite_sheds.py:167:       https://www.nrel.gov/docs/fy20osti/76626.pdf
+bipv_python/venv/lib/python3.12/site-packages/pvlib/bifacial/loss_models.py:138:    `bifacial_radiance <https://github.com/NREL/bifacial_radiance>`_
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/tmy.py:169:       The function is able to handle midnight represented as 24:00 (NREL TMY3
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/tmy.py:186:       NREL/TP-581-43156, Revised May 2008.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/tmy.py:189:       Update: Users Manual. 472 pp.; NREL Report No. TP-581-41364.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/tmy.py:430:       for TMY2s". NREL 1995.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:3:see https://developer.nrel.gov/docs/solar/nsrdb/psm3_data_download/
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:13:NSRDB_API_BASE = "https://developer.nrel.gov"
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:81:       (``"https://developer.nrel.gov/api/nsrdb/v2/solar/psm3-download.csv"``).
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:90:        NREL Developer Network API key
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:92:        NREL API uses this to automatically communicate messages back
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:127:        timeseries data from NREL PSM3
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:129:        metadata from NREL PSM3 about the record, see
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:142:    The required NREL developer key, `api_key`, is available for free by
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:143:    registering at the `NREL Developer Network <https://developer.nrel.gov/>`_.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:160:    .. [1] `NREL National Solar Radiation Database (NSRDB)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:161:       <https://nsrdb.nrel.gov/>`_
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:163:       <https://developer.nrel.gov/docs/solar/nsrdb/psm3-2-2-download/>`_
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:165:       <https://developer.nrel.gov/docs/solar/nsrdb/psm3-tmy-download/>`_
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:167:       <https://developer.nrel.gov/docs/solar/nsrdb/psm3-5min-download/>`_
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:197:    # request CSV download from NREL PSM3
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:243:        timeseries data from NREL PSM3
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:245:        metadata from NREL PSM3 about the record, see notes for fields
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:252:    The second item is a dictionary with metadata from NREL PSM3 about the
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:314:    .. [1] `NREL National Solar Radiation Database (NSRDB)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:315:       <https://nsrdb.nrel.gov/>`_
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:317:       <https://web.archive.org/web/20170207203107/https://sam.nrel.gov/sites/default/files/content/documents/pdf/wfcsv.pdf>`_
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:381:        timeseries data from NREL PSM3
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:383:        metadata from NREL PSM3 about the record, see
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:392:    .. [1] `NREL National Solar Radiation Database (NSRDB)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:393:       <https://nsrdb.nrel.gov/>`_
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/psm3.py:395:       <https://web.archive.org/web/20170207203107/https://sam.nrel.gov/sites/default/files/content/documents/pdf/wfcsv.pdf>`_
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/__init__.py:7:from pvlib.iotools.midc import read_midc_raw_data_from_nrel  # noqa: F401
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/sodapro.py:81:        from the NASA SRTM database
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/sodapro.py:182:    if altitude is None:  # Let SoDa get elevation from the NASA SRTM database
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/midc.py:1:"""Functions to read NREL MIDC data.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/midc.py:18:#     https://midcdmz.nrel.gov/apps/daily.pl?site=<SITE ID>&live=1
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/midc.py:199:    `MIDC site <https://midcdmz.nrel.gov/>`_.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/midc.py:203:    .. [1] NREL: Measurement and Instrumentation Data Center
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/midc.py:204:        `https://midcdmz.nrel.gov/ <https://midcdmz.nrel.gov/>`_
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/midc.py:215:def read_midc_raw_data_from_nrel(site, start, end, variable_map={},
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/midc.py:251:    `here <https://midcdmz.nrel.gov/apps/data_api_doc.pl?_idtextlist>`_
+bipv_python/venv/lib/python3.12/site-packages/pvlib/iotools/midc.py:257:    url = 'https://midcdmz.nrel.gov/apps/data_api.pl'
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:50:    'pvwatts': {'pdc0', 'gamma_pdc'}
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:178:        Losses parameters as defined by PVWatts or other.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:752:            Must be one of 'sandia', 'adr', or 'pvwatts'.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:771:            If model is not one of 'sandia', 'adr' or 'pvwatts'.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:780:        pvlib.inverter.pvwatts
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:781:        pvlib.inverter.pvwatts_multi
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:792:        elif model == 'pvwatts':
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:797:                return inverter.pvwatts_multi(
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:799:            return inverter.pvwatts(
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:814:                ' model must be one of "sandia", "adr" or "pvwatts"')
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:842:    def pvwatts_dc(self, g_poa_effective, temp_cell):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:844:        Calculates DC power according to the PVWatts model using
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:845:        :py:func:`pvlib.pvsystem.pvwatts_dc`, `self.module_parameters['pdc0']`,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:848:        See :py:func:`pvlib.pvsystem.pvwatts_dc` for details.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:853:            pvwatts_dc(g_poa_effective, temp_cell,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:861:    def pvwatts_losses(self):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:864:        :py:func:`pvlib.pvsystem.pvwatts_losses` and
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:867:        See :py:func:`pvlib.pvsystem.pvwatts_losses` for details.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:873:        return pvwatts_losses(**kwargs)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:1529:        cell types in the parameter estimation algorithm used by NREL.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:1537:        types in the parameter estimation algorithm used by NREL.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:1572:    .. [2] System Advisor Model web page. https://sam.nrel.gov.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:1745:        cell types in the parameter estimation algorithm used by NREL.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:1753:        types in the parameter estimation algorithm used by NREL.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:1788:    .. [2] System Advisor Model web page. https://sam.nrel.gov.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:2014:        https://github.com/NREL/SAM/tree/develop/deploy/libraries
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:2016:        https://sam.nrel.gov/photovoltaic/pv-sub-page-2.html
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:2767:def pvwatts_dc(g_poa_effective, temp_cell, pdc0, gamma_pdc, temp_ref=25.):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:2769:    Implements NREL's PVWatts DC power model. The PVWatts DC model [1]_ is:
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:2776:    :py:func:`pvlib.inverter.pvwatts`. ``pdc0`` in this function refers to the DC
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:2778:    :py:func:`pvlib.inverter.pvwatts` refers to the DC power input limit of
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:2785:        fully consistent with PVWatts, the user must have already
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:2796:        Cell reference temperature. PVWatts defines it to be 25 C and
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:2806:    .. [1] A. P. Dobos, "PVWatts Version 5 Manual"
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:2807:           http://pvwatts.nrel.gov/downloads/pvwattsv5.pdf
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:2817:def pvwatts_losses(soiling=2, shading=3, snow=0, mismatch=2, wiring=2,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:2821:    Implements NREL's PVWatts system loss model.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:2822:    The PVWatts loss model [1]_ is:
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:2852:    .. [1] A. P. Dobos, "PVWatts Version 5 Manual"
+bipv_python/venv/lib/python3.12/site-packages/pvlib/pvsystem.py:2853:           http://pvwatts.nrel.gov/downloads/pvwattsv5.pdf
+bipv_python/venv/lib/python3.12/site-packages/pvlib/temperature.py:657:    model [1]_ that is used in PVWatts for cell temperature modeling [2]_.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/temperature.py:672:        PVWatts assumes this value to be 45 C for rack-mounted arrays and
+bipv_python/venv/lib/python3.12/site-packages/pvlib/temperature.py:677:        The height above ground of the center of the module. The PVWatts
+bipv_python/venv/lib/python3.12/site-packages/pvlib/temperature.py:682:        PVWatts default is 9.144 [m]
+bipv_python/venv/lib/python3.12/site-packages/pvlib/temperature.py:712:    This function returns slightly different values from PVWatts at night
+bipv_python/venv/lib/python3.12/site-packages/pvlib/temperature.py:723:    .. [2] Dobos, A. P., 2014, "PVWatts Version 5 Manual", NREL/TP-6A20-62641,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/temperature.py:908:           NREL/TP-6A20-67399.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/snow.py:16:def fully_covered_nrel(snowfall, threshold_snowfall=1.):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/snow.py:46:       of a PV Snow Coverage Model in SAM" (2017) NREL Technical Report
+bipv_python/venv/lib/python3.12/site-packages/pvlib/snow.py:47:       NREL/TP-6A20-68705
+bipv_python/venv/lib/python3.12/site-packages/pvlib/snow.py:62:def coverage_nrel(snowfall, poa_irradiance, temp_air, surface_tilt,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/snow.py:115:       Application of a PV Snow Coverage Model in SAM" NREL Technical Report
+bipv_python/venv/lib/python3.12/site-packages/pvlib/snow.py:116:       NREL/TP-6A20-68705
+bipv_python/venv/lib/python3.12/site-packages/pvlib/snow.py:120:    new_snowfall = fully_covered_nrel(snowfall, threshold_snowfall)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/snow.py:150:def dc_loss_nrel(snow_coverage, num_strings):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/snow.py:184:       Reference Update", NREL Technical Report NREL/TP-6A20-67399.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/snow.py:185:       Available at https://www.nrel.gov/docs/fy18osti/67399.pdf
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spa.py:2:Calculate the solar position using the NREL SPA algorithm either using
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spa.py:405:    """This is the original way to calculate the julian day from the NREL paper.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spa.py:1032:    NREL SPA algorithm described in [1].
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spa.py:1215:    NREL SPA algorithm described in [1].
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spa.py:1236:    radiation applications. Technical report: NREL/TP-560- 34302. Golden,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spa.py:1237:    USA, http://www.nrel.gov.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/spa.py:1250:    Equations taken from http://eclipse.gsfc.nasa.gov/SEcat5/deltatpoly.html
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:42:# ModelChain.with_pvwatts, ModelChain.with_sapm, etc.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:44:# pvwatts documentation states that it uses the following reference for
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:51:    dc_model='pvwatts', ac_model='pvwatts', losses_model='pvwatts',
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:284:    appropriate model parameters. For example, if ``dc_model='pvwatts'``,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:306:    solar_position_method : str, default 'nrel_numpy'
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:315:        Valid strings are 'sapm', 'desoto', 'cec', 'pvsyst', 'pvwatts'.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:322:        Valid strings are 'sandia', 'adr', 'pvwatts'. The
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:351:        Valid strings are 'pvwatts', 'no_loss'. The ModelChain instance
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:361:                 solar_position_method='nrel_numpy',
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:391:    def with_pvwatts(cls, system, location,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:397:        ModelChain that follows the PVWatts methods.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:425:        The PVWatts model defaults to 14 % total system losses. The PVWatts
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:441:        >>> modelchain.ModelChain.with_pvwatts(system, loc)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:446:        >>> pvwatts_losses = {'soiling': 2, 'shading': 3, 'snow': 0, 'mismatch': 2,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:454:        >>>     losses_parameters=pvwatts_losses)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:455:        >>> modelchain.ModelChain.with_pvwatts(system_with_custom_losses, loc)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:460:          solar_position_method: nrel_numpy
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:462:          dc_model: pvwatts_dc
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:463:          ac_model: pvwatts_inverter
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:467:          losses_model: pvwatts_losses
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:483:                  solar_position_method='nrel_numpy',
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:507:        solar_position_method : str, default 'nrel_numpy'
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:538:          solar_position_method: nrel_numpy
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:601:                elif model == 'pvwatts':
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:602:                    self._dc_model = self.pvwatts_dc
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:623:            return self.pvwatts_dc, 'pvwatts'
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:674:    def pvwatts_dc(self):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:675:        """Calculate DC power using the PVWatts model.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:687:        pvlib.pvsystem.PVSystem.pvwatts_dc
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:690:        dc = self.system.pvwatts_dc(
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:714:            elif model == 'pvwatts':
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:715:                self._ac_model = self.pvwatts_inverter
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:733:        if _pvwatts_params(inverter_params):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:734:            return self.pvwatts_inverter
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:756:    def pvwatts_inverter(self):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:757:        ac = self.system.get_ac('pvwatts', self.results.dc)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:1073:            if model == 'pvwatts':
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:1074:                self._losses_model = self.pvwatts_losses
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:1085:    def pvwatts_losses(self):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:1086:        self.results.losses = (100 - self.system.pvwatts_losses()) / 100.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:1882:def _pvwatts_params(inverter_params):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/modelchain.py:1884:    PVWatts inverter model."""
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/conftest.py:383:        'Version': 'NRELv1',
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/conftest.py:418:        'Version': 'NRELv1',
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:148:def pvwatts_dc_snl_ac_system(cec_inverter_parameters):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:157:def pvwatts_dc_pvwatts_ac_system(sapm_temperature_cs5p_220m):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:169:def pvwatts_dc_pvwatts_ac_system_arrays(sapm_temperature_cs5p_220m):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:189:def pvwatts_dc_pvwatts_ac_faiman_temp_system():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:201:def pvwatts_dc_pvwatts_ac_pvsyst_temp_system():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:214:def pvwatts_dc_pvwatts_ac_fuentes_temp_system():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:226:def pvwatts_dc_pvwatts_ac_noct_sam_temp_system():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:344:def test_with_pvwatts(pvwatts_dc_pvwatts_ac_system, location, weather):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:345:    mc = ModelChain.with_pvwatts(pvwatts_dc_pvwatts_ac_system, location)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:346:    assert mc.dc_model == mc.pvwatts_dc
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:611:@pytest.mark.parametrize('ac_model', ['sandia', 'pvwatts'])
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:614:                                  pvwatts_dc_pvwatts_ac_system_arrays,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:617:              'pvwatts': pvwatts_dc_pvwatts_ac_system_arrays}
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:951:        pvwatts_dc_pvwatts_ac_system, location, weather, mocker):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:952:    mc = ModelChain(pvwatts_dc_pvwatts_ac_system, location,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1182:    'sapm', 'cec', 'desoto', 'pvsyst', 'singlediode', 'pvwatts_dc'])
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1184:                        pvsyst_dc_snl_ac_system, pvwatts_dc_pvwatts_ac_system,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1191:                  'pvwatts_dc': pvwatts_dc_pvwatts_ac_system}
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1197:                         'pvwatts_dc': 'pvwatts_dc'}
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1203:                           'pvwatts_dc': 'sapm'}
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1278:                          pvwatts_dc_pvwatts_ac_pvsyst_temp_system,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1279:                          pvwatts_dc_pvwatts_ac_faiman_temp_system,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1280:                          pvwatts_dc_pvwatts_ac_fuentes_temp_system,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1281:                          pvwatts_dc_pvwatts_ac_noct_sam_temp_system,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1284:                  'pvsyst_temp': pvwatts_dc_pvwatts_ac_pvsyst_temp_system,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1285:                  'faiman_temp': pvwatts_dc_pvwatts_ac_faiman_temp_system,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1286:                  'fuentes_temp': pvwatts_dc_pvwatts_ac_fuentes_temp_system,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1287:                  'noct_sam_temp': pvwatts_dc_pvwatts_ac_noct_sam_temp_system}
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1322:def test_dc_model_user_func(pvwatts_dc_pvwatts_ac_system, location, weather,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1325:    mc = ModelChain(pvwatts_dc_pvwatts_ac_system, location, dc_model=poadc,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1333:def test_pvwatts_dc_multiple_strings(pvwatts_dc_pvwatts_ac_system, location,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1335:    system = pvwatts_dc_pvwatts_ac_system
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1357:                                            'pvwatts', 'sandia_multi',
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1358:                                            'pvwatts_multi'])
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1360:                   pvwatts_dc_pvwatts_ac_system, cec_dc_snl_ac_arrays,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1361:                   pvwatts_dc_pvwatts_ac_system_arrays,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1366:                  'pvwatts': pvwatts_dc_pvwatts_ac_system,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1367:                  'pvwatts_multi': pvwatts_dc_pvwatts_ac_system_arrays}
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1372:        'pvwatts': 'pvwatts',
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1373:        'pvwatts_multi': 'pvwatts'}
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1393:def test_ac_model_user_func(pvwatts_dc_pvwatts_ac_system, location, weather,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1396:    mc = ModelChain(pvwatts_dc_pvwatts_ac_system, location, ac_model=acdc,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1404:def test_ac_model_not_a_model(pvwatts_dc_pvwatts_ac_system, location, weather):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1407:        ModelChain(pvwatts_dc_pvwatts_ac_system, location,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1663:def test_losses_models_pvwatts(pvwatts_dc_pvwatts_ac_system, location, weather,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1666:    pvwatts_dc_pvwatts_ac_system.losses_parameters = dict(age=age)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1667:    m = mocker.spy(pvsystem, 'pvwatts_losses')
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1668:    mc = ModelChain(pvwatts_dc_pvwatts_ac_system, location, dc_model='pvwatts',
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1670:                    losses_model='pvwatts')
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1679:    mc = ModelChain(pvwatts_dc_pvwatts_ac_system, location, dc_model='pvwatts',
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1686:def test_losses_models_pvwatts_arrays(multi_array_sapm_dc_snl_ac_system,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1693:                    losses_model='pvwatts')
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1705:def test_losses_models_ext_def(pvwatts_dc_pvwatts_ac_system, location, weather,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1708:    mc = ModelChain(pvwatts_dc_pvwatts_ac_system, location, dc_model='pvwatts',
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1718:def test_losses_models_no_loss(pvwatts_dc_pvwatts_ac_system, location, weather,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1720:    m = mocker.spy(pvsystem, 'pvwatts_losses')
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1721:    mc = ModelChain(pvwatts_dc_pvwatts_ac_system, location, dc_model='pvwatts',
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1731:                                 pvwatts_dc_pvwatts_ac_system, location):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1746:    kwargs['dc_model'] = 'pvwatts'
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1747:    kwargs['ac_model'] = 'pvwatts'
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1748:    for array in pvwatts_dc_pvwatts_ac_system.arrays:
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1753:        ModelChain(pvwatts_dc_pvwatts_ac_system, location, **kwargs)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:1761:    kwargs = {'dc_model': 'pvwatts', 'ac_model': 'pvwatts',
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_modelchain.py:2001:        '  solar_position_method: nrel_numpy',
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/spectrum/test_spectrl2.py:9:    # compare against output from solar_utils wrapper around NREL spectrl2_2.c
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_shading.py:114:def true_tracking_angle_and_inputs_NREL():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_shading.py:115:    # data from NREL 'Slope-Aware Backtracking for Single-Axis Trackers'
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_shading.py:168:    true_tracking_angle_and_inputs_NREL,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_shading.py:172:    axis_tilt, axis_azimuth, timedata = true_tracking_angle_and_inputs_NREL
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_shading.py:173:    # test against data provided by NREL
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_shading.py:212:    cast_type, cast_func, true_tracking_angle_and_inputs_NREL
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_shading.py:215:    axis_tilt, axis_azimuth, timedata = true_tracking_angle_and_inputs_NREL
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_snow.py:12:def test_fully_covered_nrel():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_snow.py:18:    fully_covered = snow.fully_covered_nrel(snowfall_data)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_snow.py:22:def test_coverage_nrel_hourly():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_snow.py:31:    snow_coverage = snow.coverage_nrel(
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_snow.py:41:def test_coverage_nrel_subhourly():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_snow.py:53:    snow_coverage = snow.coverage_nrel(
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_snow.py:63:def test_fully_covered_nrel_irregular():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_snow.py:68:    snow_coverage = snow.fully_covered_nrel(snowfall_data,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_snow.py:75:def test_coverage_nrel_initial():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_snow.py:84:    snow_coverage = snow.coverage_nrel(
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_snow.py:94:def test_dc_loss_nrel():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_snow.py:98:    actual = snow.dc_loss_nrel(snow_coverage, num_strings)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_temperature.py:183:def _read_pvwatts_8760(filename):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_temperature.py:194:    ('pvwatts_8760_rackmount.csv', 45),
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_temperature.py:195:    ('pvwatts_8760_roofmount.csv', 49),
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_temperature.py:198:    # Test against data exported from pvwatts.nrel.gov
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_temperature.py:199:    data = _read_pvwatts_8760(DATA_DIR / filename)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_temperature.py:210:    # the SSC implementation of PVWatts diverges from the Fuentes model at
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_temperature.py:218:    # the accuracy is probably higher than 3 digits here, but the PVWatts
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_temperature.py:225:    # sanity check on night values -- Fuentes not much lower than PVWatts
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_inverter.py:137:def test_pvwatts_scalars():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_inverter.py:139:    out = inverter.pvwatts(90, 100, 0.95)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_inverter.py:143:    out = inverter.pvwatts(0., 100)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_inverter.py:147:def test_pvwatts_possible_negative():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_inverter.py:148:    # pvwatts could return a negative value for (pdc / pdc0) < 0.006
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_inverter.py:151:    out = inverter.pvwatts(0.001, 1)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_inverter.py:155:def test_pvwatts_arrays():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_inverter.py:162:    out = inverter.pvwatts(pdc, pdc0, 0.95)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_inverter.py:166:def test_pvwatts_series():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_inverter.py:170:    out = inverter.pvwatts(pdc, pdc0, 0.95)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_inverter.py:174:def test_pvwatts_multi():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_inverter.py:178:    out = inverter.pvwatts_multi((pdc, pdc), pdc0, 0.95)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_inverter.py:182:    out = inverter.pvwatts_multi(pdc_2d, pdc0, 0.95)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_inverter.py:186:    out = inverter.pvwatts_multi((pdc, pdc), pdc0, 0.95)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_inverter.py:189:    out = inverter.pvwatts_multi([pdc, pdc], pdc0, 0.95)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_tracking.py:349:    Test validation data set from https://www.nrel.gov/docs/fy20osti/76626.pdf
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1706:def test_PVSystem_get_ac_pvwatts(pvwatts_system_defaults, mocker):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1707:    mocker.spy(inverter, 'pvwatts')
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1709:    out = pvwatts_system_defaults.get_ac('pvwatts', pdc)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1710:    inverter.pvwatts.assert_called_once_with(
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1711:        pdc, **pvwatts_system_defaults.inverter_parameters)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1715:def test_PVSystem_get_ac_pvwatts_kwargs(pvwatts_system_kwargs, mocker):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1716:    mocker.spy(inverter, 'pvwatts')
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1718:    out = pvwatts_system_kwargs.get_ac('pvwatts', pdc)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1719:    inverter.pvwatts.assert_called_once_with(
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1720:        pdc, **pvwatts_system_kwargs.inverter_parameters)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1724:def test_PVSystem_get_ac_pvwatts_multi(
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1725:        pvwatts_system_defaults, pvwatts_system_kwargs, mocker):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1726:    mocker.spy(inverter, 'pvwatts_multi')
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1729:    systems = [pvwatts_system_defaults, pvwatts_system_kwargs]
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1737:        pacs = system.get_ac('pvwatts', (pdcs, pdcs))
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1739:    assert inverter.pvwatts_multi.call_count == 2
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1742:        system.get_ac('pvwatts', (pdcs,))
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1745:        system.get_ac('pvwatts', pdcs)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1748:        system.get_ac('pvwatts', (pdcs, pdcs, pdcs))
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1751:@pytest.mark.parametrize('model', ['sandia', 'adr', 'pvwatts'])
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1754:        pvwatts_system_defaults,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1759:        'pvwatts': None,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1764:            'pvwatts': 50}
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1768:        'pvwatts': pvwatts_system_defaults.inverter_parameters
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1779:    if model == 'pvwatts':
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:1780:        assert ac < pdcs['pvwatts']
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2138:def test_pvwatts_dc_scalars():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2140:    out = pvsystem.pvwatts_dc(900, 30, 100, -0.003)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2144:def test_pvwatts_dc_arrays():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2151:    out = pvsystem.pvwatts_dc(irrad_trans, temp_cell, 100, -0.003)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2155:def test_pvwatts_dc_series():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2159:    out = pvsystem.pvwatts_dc(irrad_trans, temp_cell, 100, -0.003)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2163:def test_pvwatts_losses_default():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2165:    out = pvsystem.pvwatts_losses()
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2169:def test_pvwatts_losses_arrays():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2172:    out = pvsystem.pvwatts_losses(age=age)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2176:def test_pvwatts_losses_series():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2179:    out = pvsystem.pvwatts_losses(age=age)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2184:def pvwatts_system_defaults():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2193:def pvwatts_system_kwargs():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2201:def test_PVSystem_pvwatts_dc(pvwatts_system_defaults, mocker):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2202:    mocker.spy(pvsystem, 'pvwatts_dc')
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2206:    out = pvwatts_system_defaults.pvwatts_dc(irrad, temp_cell)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2207:    pvsystem.pvwatts_dc.assert_called_once_with(
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2209:        **pvwatts_system_defaults.arrays[0].module_parameters)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2213:def test_PVSystem_pvwatts_dc_kwargs(pvwatts_system_kwargs, mocker):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2214:    mocker.spy(pvsystem, 'pvwatts_dc')
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2218:    out = pvwatts_system_kwargs.pvwatts_dc(irrad, temp_cell)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2219:    pvsystem.pvwatts_dc.assert_called_once_with(
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2220:        irrad, temp_cell, **pvwatts_system_kwargs.arrays[0].module_parameters)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2224:def test_PVSystem_multiple_array_pvwatts_dc():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2244:    expected_one = pvsystem.pvwatts_dc(irrad_one, temp_cell_one,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2246:    expected_two = pvsystem.pvwatts_dc(irrad_two, temp_cell_two,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2248:    dc_one, dc_two = system.pvwatts_dc((irrad_one, irrad_two),
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2254:def test_PVSystem_multiple_array_pvwatts_dc_value_error():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2262:        system.pvwatts_dc(10, (1, 1, 1))
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2264:        system.pvwatts_dc((10, 10), (1, 1, 1))
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2266:        system.pvwatts_dc((10, 10, 10, 10), (1, 1, 1))
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2268:        system.pvwatts_dc((1, 1, 1), 1)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2270:        system.pvwatts_dc((1, 1, 1), (1,))
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2272:        system.pvwatts_dc((1,), 1)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2274:        system.pvwatts_dc((1, 1, 1, 1), (1, 1))
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2276:        system.pvwatts_dc(2, 3)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2279:        system.pvwatts_dc((1, 1, 1), pd.Series([1, 2, 3]))
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2282:def test_PVSystem_pvwatts_losses(pvwatts_system_defaults, mocker):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2283:    mocker.spy(pvsystem, 'pvwatts_losses')
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2285:    pvwatts_system_defaults.losses_parameters = dict(age=age)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2287:    out = pvwatts_system_defaults.pvwatts_losses()
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_pvsystem.py:2288:    pvsystem.pvwatts_losses.assert_called_once_with(age=age)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_midc.py:26:# midc_network_testfile = ('https://midcdmz.nrel.gov/apps/data_api.pl'
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_midc.py:68:def test_read_midc_raw_data_from_nrel():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_midc.py:72:    data = midc.read_midc_raw_data_from_nrel('UAT', start_ts, end_ts, var_map)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_midc.py:86:    data = midc.read_midc_raw_data_from_nrel('', start, end)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_tmy.py:122:    # NREL TMY3 format utilizes 24:00. The SolarAnywhere file is therefore
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:31:def nrel_api_key():
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:32:    """Supplies pvlib-python's NREL Developer Network API key.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:34:    Azure Pipelines CI utilizes a secret variable set to NREL_API_KEY
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:40:        demo_key = os.environ["NREL_API_KEY"]
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:43:            "WARNING: NREL API KEY environment variable not set! "
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:77:def test_get_psm3_tmy(nrel_api_key):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:79:    data, metadata = psm3.get_psm3(LATITUDE, LONGITUDE, nrel_api_key,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:88:def test_get_psm3_singleyear(nrel_api_key):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:90:    data, metadata = psm3.get_psm3(LATITUDE, LONGITUDE, nrel_api_key,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:100:def test_get_psm3_5min(nrel_api_key):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:102:    data, metadata = psm3.get_psm3(LATITUDE, LONGITUDE, nrel_api_key,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:113:def test_get_psm3_check_leap_day(nrel_api_key):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:114:    data_2012, _ = psm3.get_psm3(LATITUDE, LONGITUDE, nrel_api_key,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:122:                          (51, -5, nrel_api_key, 'tmy-2017', 60),
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:123:                          (LATITUDE, LONGITUDE, nrel_api_key, 'bad', 60),
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:124:                          (LATITUDE, LONGITUDE, nrel_api_key, '2017', 15),
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:185:def test_get_psm3_attribute_mapping(nrel_api_key):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/iotools/test_psm3.py:188:    data, meta = psm3.get_psm3(LATITUDE, LONGITUDE, nrel_api_key, PVLIB_EMAIL,
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_irradiance.py:95:    'asce', 'spencer', 'nrel', pytest.param('pyephem', marks=requires_ephem)])
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_irradiance.py:102:    out = irradiance.get_extra_radiation(doy, method='nrel', epoch_year=2012)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_irradiance.py:107:def test_get_extra_radiation_nrel_numba(times):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_irradiance.py:112:            times, method='nrel', how='numba', numthreads=4)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_irradiance.py:114:        irradiance.get_extra_radiation(times, method='nrel')
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:40:    # for Golden, CO, from NREL SPA website
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:88:# the physical tests are run at the same time as the NREL SPA test.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:89:# pyephem reproduces the NREL result to 2 decimal places.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:144:    # solution from NREL SAP web calculator
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:173:    # test for Golden, CO compare to NREL SPA
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:481:    (None, 'nrel_numba'),
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:482:    (67.0, 'nrel_numba'),
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:483:    (np.array([67.0, 67.0]), 'nrel_numba'),
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:485:    (None, 'nrel_numpy'),
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:486:    (67.0, 'nrel_numpy'),
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:487:    (np.array([67.0, 67.0]), 'nrel_numpy'),
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:509:@pytest.mark.parametrize("method", ['nrel_numba', 'nrel_numpy'])
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:549:def test_nrel_earthsun_distance(delta_t):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:553:    result = solarposition.nrel_earthsun_distance(times, delta_t=delta_t)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:560:        result = solarposition.nrel_earthsun_distance(times, delta_t=delta_t)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:675:    inputs from NREL SPA calculator at Golden, CO
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:690:    # FIXME: there are differences from expected NREL SPA calculator values
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:791:    'nrel_numpy',
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:794:    pytest.param('nrel_numba', marks=requires_numba),
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:795:    pytest.param('nrel_c', marks=requires_spa_c),
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:817:def test_nrel_earthsun_distance_microsecond_index(tz):
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:825:    esd_ns = solarposition.nrel_earthsun_distance(index_ns)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/tests/test_solarposition.py:826:    esd_us = solarposition.nrel_earthsun_distance(index_us)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/irradiance.py:48:        Options include ``'pyephem', 'spencer', 'asce', 'nrel'``.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/irradiance.py:52:        applies to day of year input used with the pyephem or nrel
+bipv_python/venv/lib/python3.12/site-packages/pvlib/irradiance.py:56:        Passed to solarposition.nrel_earthsun_distance
+bipv_python/venv/lib/python3.12/site-packages/pvlib/irradiance.py:102:    elif method == 'nrel':
+bipv_python/venv/lib/python3.12/site-packages/pvlib/irradiance.py:105:            solarposition.nrel_earthsun_distance(times, **kwargs) ** (-2)
+bipv_python/venv/lib/python3.12/site-packages/pvlib/irradiance.py:1675:        NREL's SRRL Fortran code used 0.82 for hourly data.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/irradiance.py:1720:        NREL's SRRL Fortran code used 0.82 for hourly data.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/irradiance.py:1764:    airmass. However, the NREL implementation of the DISC model [2]_
+bipv_python/venv/lib/python3.12/site-packages/pvlib/irradiance.py:1819:       https://www.nrel.gov/grid/solar-resource/disc.html
+bipv_python/venv/lib/python3.12/site-packages/pvlib/ivtools/sdm.py:80:        if NREL-PySAM is not installed.
+bipv_python/venv/lib/python3.12/site-packages/pvlib/ivtools/sdm.py:104:        raise ImportError("Requires NREL's PySAM package at "
+bipv_python/venv/lib/python3.12/site-packages/pvlib/ivtools/sdm.py:105:                          "https://pypi.org/project/NREL-PySAM/.")
+bipv_python/venv/lib/python3.12/site-packages/pvlib/ivtools/utils.py:473:    # Adapted from https://github.com/NREL/iv_params
+bipv_python/venv/lib/python3.12/site-packages/pvlib/ivtools/sde.py:388:    # unreliable near the left endpoint
+bipv_python/venv/lib/python3.12/site-packages/pvlib/ivtools/sde.py:394:    # unreliable near the right endpoint
+bipv_python/venv/lib/python3.12/site-packages/mpl_toolkits/axes_grid1/parasite_axes.py:100:            If None, the parasite's and the host's ``transData`` are unrelated.
+bipv_python/venv/lib/python3.12/site-packages/numpy/core/tests/test_dtype.py:774:             marks=pytest.mark.skip("unreliable due to python's behaviour")),
+bipv_python/venv/lib/python3.12/site-packages/numpy/core/tests/test_ufunc.py:1039:        # should be able to deal with bad unrelated kwargs.
+bipv_python/venv/lib/python3.12/site-packages/numpy/core/tests/test_multiarray.py:8285:            # Also check (unrelated and more limited but similar) frombuffer:
+bipv_python/venv/lib/python3.12/site-packages/numpy/ma/tests/test_core.py:4330:            #       and warns.  Unrelated to this test, but probably undesired.
+bipv_python/venv/lib/python3.12/site-packages/numpy/lib/recfunctions.py:1484:    will make the output quite unreliable. Note that duplicates are not
+bipv_python/venv/lib/python3.12/site-packages/numpy/lib/polynomial.py:501:        to be unreliable except in a relative sense and everything is scaled
+bipv_python/venv/lib/python3.12/site-packages/numpy/testing/_private/utils.py:2138:            it unreliable for external modules.
+bipv_python/venv/lib/python3.12/site-packages/numpy/testing/_private/utils.py:2163:            it unreliable for external modules.
+bipv_python/venv/lib/python3.12/site-packages/numpy/tests/test_scripts.py:36:@pytest.mark.xfail(reason="Test is unreliable")
+bipv_python/venv/lib/python3.12/site-packages/git/cmd.py:257:            creation flags, but that is unrelated to path search.
+bipv_python/venv/lib/python3.12/site-packages/git/cmd.py:602:as when a sibling class has an unrelated metaclass and a shared lower bound metaclass
+bipv_python/venv/lib/python3.12/site-packages/git/refs/tag.py:52:    def commit(self) -> "Commit":  # LazyMixin has unrelated commit method
+bipv_python/venv/lib/python3.12/site-packages/google/protobuf/json_format.py:918:        # Checking for unpaired surrogates appears to be unreliable,
+root@bipv-colombia:/var/www/bipv/calculadora-bipv#

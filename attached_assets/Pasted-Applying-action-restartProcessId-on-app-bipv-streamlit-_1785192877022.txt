@@ -1,0 +1,183 @@
+Applying action restartProcessId on app [bipv-streamlit](ids: [ 1 ])
+[PM2] [bipv-streamlit](1) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 1  │ bipv-streamlit     │ fork     │ 12   │ online    │ 0%       │ 6.5mb    │
+│ 0  │ calculadora-bipv   │ fork     │ 60   │ online    │ 0%       │ 183.1mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+root@bipv-colombia:/var/www/bipv/calculadora-bipv# cat -n /var/www/bipv/calculadora-bipv/bipv_python/calculos/modelo_iv.py
+     1  """
+     2  Motor SDM — De Soto 2006 + Rsh exponencial CdTe (Mermoud 2005).
+     3  Equivalente Python de: Mod_ModeloDiodo + SimuladorIV_CdTe_v2 (VBA).
+     4
+     5  Validación numérica disponible en tests/test_validacion_vba.py:
+     6    FF @ G=200 W/m² debe ser 76.28% ± 0.5% (hoja FF_vs_Irradiancia del XLSM)
+     7  """
+     8  import numpy as np
+     9  import pvlib
+    10  from datos.tecnologias_bipv import CONSTANTES_TECNOLOGIA
+    11
+    12
+    13  # ── Constantes físicas ─────────────────────────────────────────────────────
+    14  K_BOLTZMANN = 1.380649e-23   # J/K
+    15  Q_ELECTRON  = 1.602176634e-19  # C
+    16  T_REF_K     = 298.15           # 25°C en Kelvin
+    17  G_REF       = 1000.0           # W/m² referencia STC
+    18
+    19
+    20  def obtener_constantes_tecnologia(tecnologia: str) -> dict:
+    21      """
+    22      Equivalente de ObtenerConstantesTecnologia (VBA).
+    23      Lanza ValueError explícito en lugar del MsgBox silencioso del VBA.
+    24      """
+    25      tech = tecnologia.strip()
+    26      if tech not in CONSTANTES_TECNOLOGIA:
+    27          raise ValueError(
+    28              f"Tecnología '{tech}' no reconocida. "
+    29              f"Válidas: {list(CONSTANTES_TECNOLOGIA.keys())}"
+    30          )
+    31      return CONSTANTES_TECNOLOGIA[tech]
+    32
+    33
+    34  def calcular_rsh_cdte(G, R_sh_ref, c_Rsh=5.5, R_sh_base=0.0, G_ref=1000.0):
+    35      """
+    36      Rsh exponencial CdTe — Mermoud 2005.
+    37      Equivalente al bloque interno de TrasladarParametrosGT (VBA).
+    38
+    39      Rsh(G) = R_sh_ref × exp(−c_Rsh × (G/G_ref − 1)) + R_sh_base
+    40      """
+    41      G_arr  = np.atleast_1d(np.asarray(G, dtype=float))
+    42      G_safe = np.where(G_arr > 0, G_arr, 1.0)
+    43      rsh    = R_sh_ref * np.exp(-c_Rsh * (G_safe / G_ref - 1.0)) + R_sh_base
+    44      return float(rsh) if rsh.size == 1 else rsh
+    45
+    46
+    47  def trasladar_parametros_gt(G, T_cel_C, panel: dict):
+    48      """
+    49      Equivalente Python de TrasladarParametrosGT (VBA, Mod_ModeloDiodo).
+    50      Traduce los parámetros SDM de STC a condiciones reales (G, T_celda).
+    51
+    52      Usa pvlib.calcparams_desoto() para I_L, I_o, nNsVth, R_s
+    53      y reemplaza R_sh por el modelo exponencial CdTe de Mermoud 2005.
+    54      """
+    55      constantes = obtener_constantes_tecnologia(panel["tecnologia"])
+    56
+    57      # nNsVth_ref en Voltios (pvlib espera Voltios, no adimensional)
+    58      Vt_ref      = K_BOLTZMANN * T_REF_K / Q_ELECTRON   # 0.025693 V @ 25°C
+    59      nNsVth_ref  = panel["a_ref"] * Vt_ref               # 154 × 0.025693 = 3.957 V
+    60
+    61      # R_sh exponencial CdTe (Mermoud 2005) — reemplaza el lineal de pvlib
+    62      R_sh_exp = calcular_rsh_cdte(
+    63          G,
+    64          panel["R_sh_ref"],
+    65          c_Rsh     = constantes["c_Rsh"],
+    66          R_sh_base = panel.get("R_sh_base", 0.0),
+    67      )
+    68
+    69      # pvlib.calcparams_desoto para I_L, I_o, R_s, nNsVth
+    70      I_L, I_o, R_s, _R_sh_pvlib, nNsVth = pvlib.pvsystem.calcparams_desoto(
+    71          effective_irradiance = G,
+    72          temp_cell            = T_cel_C,
+    73          alpha_sc             = panel["Tk_alfa"] / 100.0,
+    74          a_ref                = nNsVth_ref,
+    75          I_L_ref              = panel["I_L_ref"],
+    76          I_o_ref              = panel["I_o_ref"],
+    77          R_sh_ref             = panel["R_sh_ref"],
+    78          R_s                  = panel["R_s"],
+    79          EgRef                = constantes["Eg_ref"],
+    80          dEgdT                = constantes["dEgdT"],
+    81          irrad_ref            = G_REF,
+    82          temp_ref             = 25.0,
+    83      )
+    84
+    85      # Devuelve con Rsh exponencial CdTe en lugar del lineal de pvlib
+    86      return I_L, I_o, R_s, R_sh_exp, nNsVth
+    87
+    88
+    89  def resolver_curva_iv(G, T_cel_C, panel: dict, n_puntos=100):
+    90      """
+    91      Equivalente Python de CurvaIV_CdTe (VBA, SimuladorIV_CdTe_v2).
+    92      Retorna curva I-V completa + puntos clave (Voc, Isc, Vmp, Imp, Pmax, FF).
+    93      """
+    94      if G <= 0:
+    95          return {"Voc": 0, "Isc": 0, "Vmp": 0, "Imp": 0, "Pmax": 0, "FF": 0,
+    96                  "V": None, "I": None}
+    97
+    98      I_L, I_o, R_s, R_sh, nNsVth = trasladar_parametros_gt(G, T_cel_C, panel)
+    99
+   100      resultado = pvlib.pvsystem.singlediode(
+   101          photocurrent       = I_L,
+   102          saturation_current = I_o,
+   103          resistance_series  = R_s,
+   104          resistance_shunt   = R_sh,
+   105          nNsVth             = nNsVth,
+   106          ivcurve_pnts       = n_puntos,
+   107          method             = 'lambertw',
+   108      )
+   109
+   110      Voc  = float(resultado['v_oc'])
+   111      Isc  = float(resultado['i_sc'])
+   112      Pmax = float(resultado['p_mp'])
+   113      FF   = Pmax / (Voc * Isc) if (Voc * Isc) > 0 else 0.0
+   114
+   115      return {
+   116          "Voc":  Voc,
+   117          "Isc":  Isc,
+   118          "Vmp":  float(resultado['v_mp']),
+   119          "Imp":  float(resultado['i_mp']),
+   120          "Pmax": Pmax,
+   121          "FF":   FF,
+   122          "V":    resultado.get('v', None),
+   123          "I":    resultado.get('i', None),
+   124      }
+   125
+   126
+   127  def simular_iv_hora_a_hora(G_array, T_cel_array, panel: dict):
+   128      """
+   129      Equivalente de simular_iv_hora_a_hora() (plan maestro).
+   130      Procesa arrays de G y T_celda hora a hora.
+   131      Retorna DataFrame con Voc, Isc, Vmp, Imp, Pmax, FF por hora.
+   132      """
+   133      import pandas as pd
+   134      registros = []
+   135      for G, T in zip(G_array, T_cel_array):
+   136          registros.append(resolver_curva_iv(float(G), float(T), panel, n_puntos=0))
+   137      return pd.DataFrame(registros)
+   138
+   139
+   140  def validar_sdm_vs_ficha(panel: dict, tolerancia_pct=5.0) -> dict:
+   141      """
+   142      Compara el SDM calibrado contra los valores STC de la ficha.
+   143      Valores de referencia del XLSM (hoja FF_vs_Irradiancia, G=1000, T=25°C):
+   144        Voc calculado  = 116.44 V  (ficha: 116.0 V  → error 0.38% ✓)
+   145        Isc calculado  =   0.800 A  (ficha:   0.8 A  → error 0.00% ✓)
+   146        Pmax calculado =  60.48 W  (ficha:  63.0 W  → error 3.97% ✓ <5%)
+   147        FF calculado   =  64.92%   (VBA: 64.92% ✓)
+   148      """
+   149      res = resolver_curva_iv(1000.0, 25.0, panel, n_puntos=0)
+   150
+   151      campos = {
+   152          "Voc":  (res["Voc"],  panel["Voc_stc"]),
+   153          "Isc":  (res["Isc"],  panel["Isc_stc"]),
+   154          "Pmax": (res["Pmax"], panel["Pmax_stc"]),
+   155      }
+   156      resultado = {}
+   157      todo_ok   = True
+   158      for param, (calc, ref) in campos.items():
+   159          err = abs(calc - ref) / ref * 100
+   160          ok  = err <= tolerancia_pct
+   161          if not ok:
+   162              todo_ok = False
+   163          resultado[param] = {
+   164              "calculado": round(calc, 4),
+   165              "referencia": ref,
+   166              "error_pct": round(err, 2),
+   167              "ok": ok,
+   168          }
+   169      resultado["validacion_ok"] = todo_ok
+   170      return resultado
+root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+
+
+

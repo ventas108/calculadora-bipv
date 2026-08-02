@@ -1,0 +1,51 @@
+S C:\Users\Mauricio> ssh root@198.199.75.160
+root@198.199.75.160's password:
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-124-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Tue Jul 28 22:10:33 UTC 2026
+
+  System load:  0.08               Processes:             123
+  Usage of /:   24.4% of 47.39GB   Users logged in:       1
+  Memory usage: 30%                IPv4 address for eth0: 198.199.75.160
+  Swap usage:   0%                 IPv4 address for eth0: 10.10.0.5
+
+Expanded Security Maintenance for Applications is not enabled.
+
+27 updates can be applied immediately.
+1 of these updates is a standard security update.
+To see these additional updates run: apt list --upgradable
+
+3 additional security updates can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+*** System restart required ***
+Last login: Tue Jul 28 21:06:05 2026 from 181.130.99.163
+root@bipv-colombia:~# cd /var/www/bipv/calculadora-bipv && python3 -c "import sys; sys.path.insert(0,'bipv_python'); from datos.catalogo_inversores_excel import lista_inversores_excel; inv=lista_inversores_excel(); print(f'Inversores: {len(inv)}'); print(inv[:5])"
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/var/www/bipv/calculadora-bipv/bipv_python/datos/catalogo_inversores_excel.py", line 6, in <module>
+    import pandas as pd
+ModuleNotFoundError: No module named 'pandas'
+Error in sys.excepthook:
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/apport_python_hook.py", line 228, in partial_apport_excepthook
+    return apport_excepthook(binary, exc_type, exc_obj, exc_tb)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/apport_python_hook.py", line 114, in apport_excepthook
+    report["ExecutableTimestamp"] = str(int(os.stat(binary).st_mtime))
+                                            ^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/var/www/bipv/calculadora-bipv/-c'
+
+Original exception was:
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/var/www/bipv/calculadora-bipv/bipv_python/datos/catalogo_inversores_excel.py", line 6, in <module>
+    import pandas as pd
+ModuleNotFoundError: No module named 'pandas'
+root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+

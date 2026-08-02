@@ -127,6 +127,9 @@ else:
 # Default 4200 para consistencia con Presupuesto y el widget de Sección 2
 tipo_cambio = float(st.session_state.get("tipo_cambio", 4200.0))
 
+# TRM disponible desde el inicio (se actualiza en Sección 2)
+tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 1 — CAPEX
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1101,12 +1104,36 @@ if btn_fin or st.session_state.get("financiero_ok"):
     )
 
     # Guardar para Reporte
-    st.session_state["capex_total_usd"]        = capex_total
-    st.session_state["ben_1715"]               = ben
-    st.session_state["metricas_financiero"]    = m_con
+    st.session_state["capex_total_usd"]         = capex_total
+    st.session_state["ben_1715"]                = ben
+    st.session_state["metricas_financiero"]     = m_con
     st.session_state["metricas_financiero_p90"] = m_p90   # para Reporte PDF
-    st.session_state["e_ac_p90_kWh"]           = e_ac_p90
-    st.session_state["factor_p90_pct"]         = factor_p90
-    st.session_state["tarifa_cop_kWh"]         = tarifa_cop   # clave legacy
-    st.session_state["tarifa_cop_kwh"]         = tarifa_cop   # clave canónica
-    st.session_state["financiero_ok"]          = True
+    st.session_state["e_ac_p90_kWh"]            = e_ac_p90
+    st.session_state["factor_p90_pct"]          = factor_p90
+    st.session_state["tarifa_cop_kWh"]          = tarifa_cop   # clave legacy
+    st.session_state["tarifa_cop_kwh"]          = tarifa_cop   # clave canónica
+    st.session_state["financiero_ok"]           = True
+
+    # ── Exportar reporte PDF ───────────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("📄 Exportar reporte")
+    st.caption(
+        "Genera un PDF técnico completo con datos del proyecto, producción anual, "
+        "indicadores financieros TIR · VPN · Payback · LCOE y beneficios Ley 1715."
+    )
+    if st.button("📄 Exportar reporte PDF", use_container_width=True):
+        try:
+            from utils.generador_reporte import generar_pdf, nombre_archivo
+            with st.spinner("Generando PDF..."):
+                pdf_bytes = generar_pdf(dict(st.session_state))
+            st.download_button(
+                label="⬇️ Descargar reporte PDF",
+                data=pdf_bytes,
+                file_name=nombre_archivo(dict(st.session_state)),
+                mime="application/pdf",
+                use_container_width=True,
+            )
+        except ImportError as e:
+            st.error(f"❌ fpdf2 no está instalado: {e}. Ejecuta `pip install fpdf2` en el servidor.")
+        except Exception as e:
+            st.error(f"❌ Error al generar el PDF: {e}")

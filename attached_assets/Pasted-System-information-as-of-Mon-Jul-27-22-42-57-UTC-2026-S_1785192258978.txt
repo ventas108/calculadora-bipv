@@ -1,0 +1,40 @@
+System information as of Mon Jul 27 22:42:57 UTC 2026
+
+  System load:  0.13               Processes:             124
+  Usage of /:   24.3% of 47.39GB   Users logged in:       0
+  Memory usage: 32%                IPv4 address for eth0: 198.199.75.160
+  Swap usage:   0%                 IPv4 address for eth0: 10.10.0.5
+
+Expanded Security Maintenance for Applications is not enabled.
+
+27 updates can be applied immediately.
+1 of these updates is a standard security update.
+To see these additional updates run: apt list --upgradable
+
+3 additional security updates can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+*** System restart required ***
+Last login: Mon Jul 27 14:38:15 2026 from 181.130.99.163
+root@bipv-colombia:~# cd /var/www/bipv/calculadora-bipv
+root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+root@bipv-colombia:/var/www/bipv/calculadora-bipv# sed -i 's/return pvlib.temperature.faiman(G_poa, T_amb, noct=NOCT, module_efficiency=0.0)/return pvlib.temperature.noct_sam(G_poa, T_amb, wind_speed=1.0, noct=NOCT, module_efficiency=0.0)/' bipv_python/calculos/temperatura.py
+root@bipv-colombia:/var/www/bipv/calculadora-bipv# grep -n "temperatura" bipv_python/calculos/temperatura.py
+2:Cálculo de temperatura de celda.
+8:def temperatura_celda_noct(G_poa, T_amb, NOCT=45.0):
+root@bipv-colombia:/var/www/bipv/calculadora-bipv# git add bipv_python/calculos/temperatura.py
+root@bipv-colombia:/var/www/bipv/calculadora-bipv# git commit -m "fix: noct_sam en lugar de faiman para temperatura de celda"
+[main 02f3916d] fix: noct_sam en lugar de faiman para temperatura de celda
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+root@bipv-colombia:/var/www/bipv/calculadora-bipv# git push origin main
+Enumerating objects: 9, done.
+Counting objects: 100% (9/9), done.
+Delta compression using up to 2 threads
+Compressing objects: 100% (5/5), done.
+Writing objects: 100% (5/5), 497 bytes | 497.00 KiB/s, done.
+Total 5 (delta 4), reused 0 (delta 0), pack-reused 0
+remote: Resolving deltas: 100% (4/4), completed with 4 local objects.
+To https://github.com/ventas108/calculadora-bipv.git
+   7dca2bf4..02f3916d  main -> main
+root@bipv-colombia:/var/www/bipv/calculadora-bipv# pm2 restart bipv-streamlit

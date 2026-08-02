@@ -1,0 +1,143 @@
+Carga el catálogo de paneles desde paneles_catalogo.xlsx.
+> Filtra filas con Incluir=Si y datos eléctricos completos.
+> """
+> import re, pathlib
+> import pandas as pd
+> import streamlit as st
+>
+> _EXCEL   = pathlib.Path(__file__).parent / "paneles_catalogo.xlsx"
+> _SHEET   = "Paneles_Comparativa"
+> _COLS_REQ = ["Voc (V)","Isc (A)","Vmp (V)","Imp (A)","Pmax (W)",
+>              "Tk-beta Voc (%/C)","Tk-gamma Pmax (%/C)","NOCT (C)"]
+>
+> def _area(nombre):
+>     m = re.search(r'\((\d+)x(\d+)mm\)', nombre)
+>     return int(m.group(1))*int(m.group(2))/1e6 if m else None
+>
+> @st.cache_data(ttl=3600, show_spinner="Cargando catálogo…")
+> def cargar_catalogo_excel() -> dict:
+>     if not _EXCEL.exists():
+>         return {}
+>     df = pd.read_excel(_EXCEL, sheet_name=_SHEET, header=4)
+>     df.columns = df.columns.str.strip()
+>     df = df.replace("N/D", pd.NA)
+>     df = df[df["Incluir (Si/No)"].astype(str).str.strip().str.upper() == "SI"]
+>     for col in _COLS_REQ:
+>         if col in df.columns:
+>             df[col] = pd.to_numeric(df[col], errors="coerce")
+>     df = df.dropna(subset=_COLS_REQ).reset_index(drop=True)
+>     out = {}
+>     for _, r in df.iterrows():
+>         nom = str(r["Nombre panel"]).strip()
+>         nsa = r.get("NsA (n\u00d7Ns)")
+>         out[nom] = {
+>             "nombre":    nom,
+>             "fabricante": str(r.get("Fuente","")).strip(),
+>             "tecnologia": str(r.get("Tecnologia","CdTe")).strip(),
+>             "Voc_stc":  float(r["Voc (V)"]),
+>             "Isc_stc":  float(r["Isc (A)"]),
+>             "Vmp_stc":  float(r["Vmp (V)"]),
+>             "Imp_stc":  float(r["Imp (A)"]),
+>             "Pmax_stc": float(r["Pmax (W)"]),
+>             "Tk_beta":  float(r["Tk-beta Voc (%/C)"]),
+>             "Tk_alfa":  float(r.get("Tk-alfa Isc (%/C)") or 0),
+>             "Tk_gamma": float(r["Tk-gamma Pmax (%/C)"]),
+>             "NOCT":     float(r["NOCT (C)"]),
+>             "a_ref":    float(nsa) if pd.notna(nsa) else None,
+>             "I_L_ref":  None, "I_o_ref": None,
+>             "R_s":      None, "R_sh_ref": None,
+>             "area_m2":  _area(nom),
+>         }
+>     return out
+>
+> def lista_paneles_excel():
+>     return list(cargar_catalogo_excel().keys())
+>
+> def obtener_panel_excel(nombre):
+>     cat = cargar_catalogo_excel()
+>     if nombre not in cat:
+>         raise KeyError(f"Panel '{nombre}' no encontrado. Disponibles: {list(cat.keys())}")
+>     return cat[nombre]
+> PYEOF
+(venv) root@bipv-colombia:~# echo "✅ loader creado"
+✅ loader creado
+(venv) root@bipv-colombia:~# python3 << 'EOF'
+> path = "/var/www/bipv/calculadora-bipv/bipv_python/pages/4_📐_Dimensionamiento.py"
+> with open(path, encoding="utf-8") as f:
+>     txt = f.read()
+>
+> # 1. Agregar import del loader junto al import existente
+> txt = txt.replace(
+>     "from datos.tecnologias_bipv import MODULOS_BIPV",
+>     "from datos.tecnologias_bipv import MODULOS_BIPV\n"
+>     "from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel"
+> )
+>
+> # 2. Reemplazar selectbox de paneles para usar Excel + fallback
+> txt = txt.replace(
+>     'panel_nombre   = st.selectbox("Panel", list(MODULOS_BIPV.keys()),\n'
+>     '                                   index=list(MODULOS_BIPV.keys()).index("ASP-ST1-T40"))',
+>     '_cat_excel = cargar_catalogo_excel()\n'
+>     '    _lista_paneles = list(_cat_excel.keys()) if _cat_excel else list(MODULOS_BIPV.keys())\n'
+>     '    _idx_default = _lista_paneles.index("ASP-ST1-T40") if "ASP-ST1-T40" in _lista_paneles else 0\n'
+>     '    panel_nombre   = st.selectbox("Panel", _lista_paneles, index=_idx_default)'
+> )
+>
+> # 3. Reemplazar lookup del panel
+> txt = txt.replace(
+>     "panel    = MODULOS_BIPV[panel_nombre]",
+>     "panel    = obtener_panel_excel(panel_nombre) if _cat_excel else MODULOS_BIPV[panel_nombre]"
+> )
+>
+> with open(path, "w", encoding="utf-8") as f:
+>     f.write(txt)
+> print("✅ Dimensionamiento.py modificado")
+> EOF
+✅ Dimensionamiento.py modificado
+(venv) root@bipv-colombia:~# scp "C:\Users\Mauricio\Downloads\Paneles_Comparativa_20260728_1531.xlsx" root@198.199.75.160:/var/www/bipv/calculadora-bipv/bipv_python/datos/paneles_catalogo.xlsx
+root@198.199.75.160's password:
+ssh: Could not resolve hostname c: Temporary failure in name resolution
+scp: Connection closed
+(venv) root@bipv-colombia:~# cd /var/www/bipv/calculadora-bipv
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 -c "
+> import sys; sys.path.insert(0, 'bipv_python')
+> from datos.catalogo_paneles_excel import lista_paneles_excel
+> p = lista_paneles_excel()
+> print(f'Paneles cargados: {len(p)}')
+> print('Primeros 5:', p[:5])
+> "
+2026-07-28 21:25:34.251 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-07-28 21:25:34.399 WARNING streamlit:
+  Warning: to view a Streamlit app on a browser, use Streamlit in a file and
+  run it with the following command:
+
+    streamlit run [FILE_NAME] [ARGUMENTS]
+2026-07-28 21:25:34.400 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+Paneles cargados: 42
+Primeros 5: ['ASP-LAM3-T0 (1200x1800mm)', 'ASP-LAM3-T0 (1215x2300mm)', 'ASP-LAM3-T10 (1200x1200mm)', 'ASP-LAM3-T10 (1200x1800mm)', 'ASP-LAM3-T10 (1215x2300mm)']
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git add bipv_python/datos/catalogo_paneles_excel.py "bipv_python/pages/4_📐_Dimensionamiento.py"
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git commit -m "feat: selector de paneles desde Excel (45 modelos)"
+[main b115ab00] feat: selector de paneles desde Excel (45 modelos)
+ 2 files changed, 67 insertions(+), 3 deletions(-)
+ create mode 100644 bipv_python/datos/catalogo_paneles_excel.py
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git push origin main
+Enumerating objects: 12, done.
+Counting objects: 100% (12/12), done.
+Delta compression using up to 2 threads
+Compressing objects: 100% (7/7), done.
+Writing objects: 100% (7/7), 1.78 KiB | 1.78 MiB/s, done.
+Total 7 (delta 5), reused 0 (delta 0), pack-reused 0
+remote: Resolving deltas: 100% (5/5), completed with 5 local objects.
+To https://github.com/ventas108/calculadora-bipv.git
+   efa3fc0c..b115ab00  main -> main
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# pm2 restart bipv-streamlit
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [bipv-streamlit](ids: [ 1 ])
+[PM2] [bipv-streamlit](1) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 1  │ bipv-streamlit     │ fork     │ 16   │ online    │ 0%       │ 5.9mb    │
+│ 0  │ calculadora-bipv   │ fork     │ 60   │ online    │ 0%       │ 183.1mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#

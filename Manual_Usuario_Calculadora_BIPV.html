@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; margin: 2.5cm 3cm; color: #222; line-height: 1.5; }
+
+  /* Títulos */
+  h1 { font-size: 17pt; color: #1F497D; border-bottom: 3px solid #1F497D; padding-bottom: 5px; margin-top: 30px; page-break-before: always; }
+  h1.no-break { page-break-before: avoid; }
+  h2 { font-size: 13pt; color: #2E74B5; margin-top: 20px; border-left: 4px solid #2E74B5; padding-left: 8px; }
+  h3 { font-size: 11pt; color: #1F497D; margin-top: 14px; }
+
+  /* Bloques de código */
+  pre, code { font-family: 'Courier New', monospace; font-size: 9pt; background: #F5F5F5; }
+  pre { border-left: 4px solid #2E74B5; padding: 10px 14px; white-space: pre-wrap; margin: 8px 0; }
+
+  /* Tablas */
+  table { border-collapse: collapse; width: 100%; margin: 12px 0 18px 0; font-size: 10pt; }
+  th { background: #1F497D; color: #fff; padding: 8px 10px; text-align: left; }
+  td { border: 1px solid #BBBBBB; padding: 6px 10px; vertical-align: top; }
+  tr:nth-child(even) td { background: #EBF3FB; }
+
+  /* Alertas */
+  .prohibido { background: #FFF0F0; border-left: 5px solid #C00000; padding: 10px 14px; margin: 10px 0; }
+  .prohibido strong { color: #C00000; }
+  .advertencia { background: #FFFBE6; border-left: 5px solid #BF8700; padding: 10px 14px; margin: 10px 0; }
+  .advertencia strong { color: #BF8700; }
+  .correcto { background: #F0FFF0; border-left: 5px solid #006400; padding: 10px 14px; margin: 10px 0; }
+  .correcto strong { color: #006400; }
+  .info { background: #EBF3FB; border-left: 5px solid #2E74B5; padding: 10px 14px; margin: 10px 0; }
+
+  /* Listas */
+  ul, ol { margin-left: 22px; }
+  li { margin-bottom: 4px; }
+
+  /* Portada */
+  .portada { text-align: center; padding-top: 100px; }
+
+  /* Pie */
+  .footer { font-size: 9pt; color: #888; text-align: center; margin-top: 40px; border-top: 1px solid #ccc; padding-top: 8px; }
+
+  /* Paso numerado */
+  .paso { display: flex; gap: 12px; align-items: flex-start; margin: 8px 0; }
+  .paso-num { background: #2E74B5; color: white; font-weight: bold; border-radius: 50%;
+              min-width: 26px; height: 26px; display: flex; align-items: center;
+              justify-content: center; font-size: 10pt; flex-shrink: 0; }
+
+  /* Flujo de páginas */
+  .flujo { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+  .flojo-item { background: #2E74B5; color: white; padding: 6px 14px;
+                border-radius: 4px; font-size: 10pt; font-weight: bold; }
+  .flojo-arrow { font-size: 18pt; color: #2E74B5; align-self: center; }
+
+  @media print { body { margin: 1.5cm 2cm; } }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- PORTADA                                                            -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div class="portada">
+  <p style="font-size:9pt; color:#888; letter-spacing:2px;">INGENIERÍA BIPV COLOMBIA</p>
+  <br>
+  <p style="font-size:26pt; font-weight:bold; color:#1F497D; line-height:1.2;">
+    MANUAL DE USUARIO<br>Calculadora BIPV Python
+  </p>
+  <p style="font-size:14pt; color:#2E74B5; margin-top:10px;">
+    Guía de uso paso a paso — Errores frecuentes y restricciones
+  </p>
+  <br><br>
+  <p style="font-size:11pt;">
+    <strong>Versión:</strong> 1.0 &nbsp;|&nbsp;
+    <strong>Fecha:</strong> 27 de julio de 2026<br><br>
+    <strong>Autor:</strong> Mauricio Acevedo<br>
+    Ingeniería BIPV Colombia<br><br>
+    <strong>URL de acceso:</strong><br>
+    <a href="https://calc.innovacionquimica.com.co" style="color:#2E74B5; font-size:13pt;">
+      https://calc.innovacionquimica.com.co
+    </a>
+  </p>
+  <br><br><br>
+  <p style="font-size:9pt; color:#888;">
+    Motor de simulación: De Soto 2006 (pvlib) · Modelo térmico: Faiman/NOCT<br>
+    Validado contra XLSM auditado · FF_max CdTe = 76.28% @ G=200 W/m²
+  </p>
+</div>
+
+<div style="page-break-after:always"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- ÍNDICE                                                             -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h1 class="no-break" style="page-break-before:avoid;">CONTENIDO</h1>
+
+<table>
+  <tr><th>#</th><th>Sección</th></tr>
+  <tr><td>1</td><td>¿Qué es la Calculadora BIPV?</td></tr>
+  <tr><td>2</td><td>Arquitectura y páginas del sistema</td></tr>
+  <tr><td>3</td><td>⚠️ REGLA DE ORO — Orden obligatorio de ejecución</td></tr>
+  <tr><td>4</td><td>Página 1 — 🏠 Proyecto</td></tr>
+  <tr><td>5</td><td>Página 2 — ☀️ Recurso Solar</td></tr>
+  <tr><td>6</td><td>Página 3 — 🔬 Motor IV</td></tr>
+  <tr><td>7</td><td>Página 4 — 📐 Dimensionamiento</td></tr>
+  <tr><td>8</td><td>Página 5 — ⚡ Mismatch</td></tr>
+  <tr><td>9</td><td>Página 6 — 📊 Producción</td></tr>
+  <tr><td>10</td><td>Página 7 — 💰 Financiero</td></tr>
+  <tr><td>11</td><td>Errores frecuentes y soluciones</td></tr>
+  <tr><td>12</td><td>Flujo completo de un proyecto tipo</td></tr>
+  <tr><td>13</td><td>Glosario técnico</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECCIÓN 1                                                          -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h1>1. ¿Qué es la Calculadora BIPV?</h1>
+
+<p>La <strong>Calculadora BIPV Python</strong> es una herramienta web de ingeniería que permite diseñar,
+simular y evaluar financieramente proyectos de <em>Building-Integrated Photovoltaics</em> (BIPV)
+en Colombia, bajo el marco normativo de la <strong>Ley 1715 de 2014</strong>.</p>
+
+<p>Está construida con <strong>Streamlit</strong> y ejecuta un motor de simulación basado en
+<strong>pvlib</strong> (modelo De Soto 2006), con datos TMY de 12 ciudades colombianas.</p>
+
+<table>
+  <tr><th>Característica</th><th>Detalle</th></tr>
+  <tr><td>Tecnología</td><td>Python 3.12 · Streamlit 1.36 · pvlib 0.11</td></tr>
+  <tr><td>Motor fotovoltaico</td><td>Modelo SDM De Soto 2006 — parámetros calibrados ASP-ST1-T40 (CdTe)</td></tr>
+  <tr><td>Modelo térmico</td><td>NOCT con pvlib.temperature.faiman()</td></tr>
+  <tr><td>Datos solares</td><td>TMY (Typical Meteorological Year) — 12 ciudades Colombia</td></tr>
+  <tr><td>Marco financiero</td><td>Ley 1715/2014 · Art. 11 (renta) · Art. 12 (IVA) · Art. 14 (depreciación)</td></tr>
+  <tr><td>Módulo de referencia</td><td>Growatt MID15KTL3-X (inversor) · ASP-ST1-T40 (panel CdTe)</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECCIÓN 2                                                          -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h1>2. Arquitectura y páginas del sistema</h1>
+
+<p>La calculadora tiene <strong>7 páginas</strong> conectadas entre sí mediante
+<code>st.session_state</code> — la memoria compartida de Streamlit. Cada página
+<strong>lee resultados de la anterior y escribe los suyos</strong> para que los use la siguiente.</p>
+
+<div class="flujo">
+  <span class="flojo-item">1 🏠 Proyecto</span>
+  <span class="flojo-arrow">→</span>
+  <span class="flojo-item">2 ☀️ Recurso Solar</span>
+  <span class="flojo-arrow">→</span>
+  <span class="flojo-item">3 🔬 Motor IV</span>
+  <span class="flojo-arrow">→</span>
+  <span class="flojo-item">4 📐 Dimensionamiento</span>
+  <span class="flojo-arrow">→</span>
+  <span class="flojo-item">5 ⚡ Mismatch</span>
+  <span class="flojo-arrow">→</span>
+  <span class="flojo-item">6 📊 Producción</span>
+  <span class="flojo-arrow">→</span>
+  <span class="flojo-item">7 💰 Financiero</span>
+</div>
+
+<table>
+  <tr><th>Página</th><th>Qué calcula</th><th>Qué entrega al siguiente</th></tr>
+  <tr><td>1 🏠 Proyecto</td><td>Ciudad, área de fachada, datos del proyecto</td><td>Ciudad seleccionada, coordenadas, área disponible</td></tr>
+  <tr><td>2 ☀️ Recurso Solar</td><td>Irradiancia TMY, temperatura, POA</td><td>Perfil horario G_poa, T_amb, tmy_ciudad</td></tr>
+  <tr><td>3 🔬 Motor IV</td><td>Curva I-V, punto MPP, FF, validación SDM</td><td>Parámetros SDM calibrados, FF validado</td></tr>
+  <tr><td>4 📐 Dimensionamiento</td><td>Número de módulos, strings, sizing eléctrico</td><td>N_paneles_final, P_stc_kW_sistema, config. string</td></tr>
+  <tr><td>5 ⚡ Mismatch</td><td>Pérdidas por desajuste MPPT en fachada</td><td>Factor de mismatch, pérdida porcentual</td></tr>
+  <tr><td>6 📊 Producción</td><td>Simulación hora a hora IEC 61724, PR, kWh/año</td><td>E_ac_anual_kWh, PR, produccion_ok = True</td></tr>
+  <tr><td>7 💰 Financiero</td><td>CAPEX, VPN, TIR, Payback, LCOE, beneficios Ley 1715</td><td>Reporte financiero completo</td></tr>
+</table>
+
+<div class="info">
+  <strong>ℹ️ Cómo funciona session_state:</strong> Es como una hoja de cálculo en memoria.
+  Cuando cierras el navegador, recargas la página o la sesión expira, todos los datos
+  calculados se pierden y debes empezar desde la Página 1.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECCIÓN 3 — REGLA DE ORO                                          -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h1>3. ⚠️ REGLA DE ORO — Orden obligatorio de ejecución</h1>
+
+<div class="prohibido">
+  <strong>🚫 NUNCA saltes páginas ni ejecutes una página sin haber completado la anterior.</strong><br><br>
+  La calculadora NO funciona de forma independiente por página. Cada módulo
+  depende de variables calculadas por el módulo anterior. Saltarse pasos produce
+  errores como <code>NameError</code>, valores en cero, gráficas vacías o resultados incorrectos.
+</div>
+
+<table>
+  <tr><th>❌ Lo que NO debes hacer</th><th>✅ Lo correcto</th></tr>
+  <tr>
+    <td>Abrir directamente la Página 7 (Financiero) sin haber ejecutado Producción</td>
+    <td>Ejecutar todas las páginas en orden, de la 1 a la 7</td>
+  </tr>
+  <tr>
+    <td>Recargar el navegador (F5) a mitad del proceso</td>
+    <td>Mantener la misma pestaña abierta durante toda la sesión</td>
+  </tr>
+  <tr>
+    <td>Abrir la calculadora en dos pestañas distintas simultáneamente</td>
+    <td>Usar siempre una sola pestaña por sesión</td>
+  </tr>
+  <tr>
+    <td>Cambiar la ciudad en Página 1 después de haber calculado Motor IV o Producción</td>
+    <td>Definir la ciudad al inicio y no cambiarla durante la sesión</td>
+  </tr>
+  <tr>
+    <td>Cerrar el navegador y pretender continuar donde quedaste</td>
+    <td>Reiniciar desde Página 1 en cada nueva sesión de trabajo</td>
+  </tr>
+  <tr>
+    <td>Ingresar valores fuera del rango indicado en los campos numéricos</td>
+    <td>Respetar los rangos min/max de cada campo de entrada</td>
+  </tr>
+</table>
+
+<div class="advertencia">
+  <strong>⚠️ Tiempo de sesión:</strong> Streamlit mantiene la sesión activa mientras
+  el navegador esté abierto. Si la pestaña está inactiva más de ~30 minutos, la sesión
+  puede expirar. Si ves que los datos anteriores desaparecieron, debes reiniciar desde Página 1.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECCIÓN 4 — PÁGINA 1                                              -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h1>4. Página 1 — 🏠 Proyecto</h1>
+
+<h2>¿Qué hace?</h2>
+<p>Establece las condiciones base del proyecto: ubicación geográfica, descripción del edificio
+y área de fachada disponible para instalar módulos BIPV.</p>
+
+<h2>Cómo usarla — paso a paso</h2>
+<ol>
+  <li>Accede a <strong>https://calc.innovacionquimica.com.co</strong></li>
+  <li>En el menú lateral izquierdo selecciona <strong>🏠 Proyecto</strong></li>
+  <li>Completa los campos:
+    <ul>
+      <li><strong>Ciudad:</strong> selecciona de la lista (12 ciudades disponibles)</li>
+      <li><strong>Nombre del proyecto:</strong> referencia libre (ej: "Edificio Torre Norte")</li>
+      <li><strong>Área de fachada disponible (m²):</strong> superficie neta instalable</li>
+      <li><strong>Orientación de fachada:</strong> azimut en grados (0° = Norte, 180° = Sur)</li>
+      <li><strong>Inclinación:</strong> ángulo de la fachada respecto a la horizontal</li>
+    </ul>
+  </li>
+  <li>Haz clic en <strong>"Guardar datos del proyecto"</strong></li>
+  <li>Verifica que aparezca el mensaje verde: <em>"✅ Datos del proyecto guardados"</em></li>
+</ol>
+
+<div class="prohibido">
+  <strong>🚫 NO hagas esto en Página 1:</strong>
+  <ul>
+    <li>No dejes campos en blanco — todos son obligatorios para las páginas siguientes</li>
+    <li>No ingreses área = 0 m² — causará división por cero en Dimensionamiento</li>
+    <li>No cambies la ciudad después de haber ejecutado páginas posteriores — invalida los cálculos TMY</li>
+    <li>No uses coordenadas manuales si la ciudad está en la lista — usa siempre la lista predefinida para garantizar datos TMY correctos</li>
+  </ul>
+</div>
+
+<h2>Ciudades disponibles y sus datos de referencia</h2>
+<table>
+  <tr><th>Ciudad</th><th>GHI ref. (kWh/m²/año)</th><th>T_amb media (°C)</th></tr>
+  <tr><td>Bogotá</td><td>~1,460</td><td>14</td></tr>
+  <tr><td>Medellín</td><td>~1,620</td><td>22</td></tr>
+  <tr><td>Cali</td><td>~1,700</td><td>24</td></tr>
+  <tr><td>Barranquilla</td><td>~1,950</td><td>28</td></tr>
+  <tr><td>Cartagena</td><td>~1,900</td><td>28</td></tr>
+  <tr><td>Bucaramanga</td><td>~1,580</td><td>24</td></tr>
+  <tr><td>Manizales</td><td>~1,400</td><td>18</td></tr>
+  <tr><td>Pereira</td><td>~1,550</td><td>22</td></tr>
+  <tr><td>Ibagué</td><td>~1,680</td><td>21</td></tr>
+  <tr><td>Cúcuta</td><td>~1,800</td><td>29</td></tr>
+  <tr><td>Santa Marta</td><td>~2,000</td><td>28</td></tr>
+  <tr><td>Pasto</td><td>~1,380</td><td>13</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECCIÓN 5 — PÁGINA 2                                              -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h1>5. Página 2 — ☀️ Recurso Solar</h1>
+
+<h2>¿Qué hace?</h2>
+<p>Carga el año meteorológico típico (TMY) de la ciudad seleccionada en Página 1,
+calcula la irradiancia en el plano del módulo (POA — Plane Of Array) según la
+orientación e inclinación de la fachada, y genera los perfiles horarios de G y T_amb
+que usarán Motor IV y Producción.</p>
+
+<h2>Cómo usarla — paso a paso</h2>
+<ol>
+  <li>Navega a <strong>☀️ Recurso Solar</strong> en el menú lateral</li>
+  <li>Verifica que muestre el banner verde con la ciudad guardada en Página 1</li>
+  <li>Haz clic en <strong>"Calcular recurso solar TMY"</strong></li>
+  <li>Espera ~5-15 segundos mientras procesa 8,760 horas del año</li>
+  <li>Revisa los gráficos de irradiancia mensual y temperatura para confirmar que son coherentes con la ciudad</li>
+  <li>Verifica el mensaje: <em>"✅ Recurso solar calculado"</em></li>
+</ol>
+
+<div class="prohibido">
+  <strong>🚫 NO hagas esto en Página 2:</strong>
+  <ul>
+    <li>No hagas clic en "Calcular" varias veces seguidas — puede duplicar o sobreescribir los datos TMY en session_state</li>
+    <li>No navegues a otra página DURANTE el cálculo (mientras gira el spinner) — espera siempre a que termine</li>
+    <li>No modifiques la orientación/inclinación de la fachada aquí si ya la definiste en Página 1 — usa un solo punto de entrada para esos parámetros</li>
+  </ul>
+</div>
+
+<div class="advertencia">
+  <strong>⚠️ Si no aparece el banner de ciudad:</strong> Regresa a Página 1 y vuelve a guardar los datos. La sesión puede haber perdido ese dato.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECCIÓN 6 — PÁGINA 3                                              -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h1>6. Página 3 — 🔬 Motor IV</h1>
+
+<h2>¿Qué hace?</h2>
+<p>Ejecuta el modelo eléctrico del módulo CdTe (ASP-ST1-T40) usando el modelo de
+De Soto 2006 implementado en pvlib. Calcula y grafica la curva I-V, el punto de
+máxima potencia (MPP), el factor de forma (FF) y valida los parámetros SDM contra
+la ficha técnica del fabricante.</p>
+
+<h2>Cómo usarla — paso a paso</h2>
+<ol>
+  <li>Navega a <strong>🔬 Motor IV</strong></li>
+  <li>Selecciona las condiciones de irradiancia (G) y temperatura de celda (T_c) que deseas analizar</li>
+  <li>Haz clic en <strong>"Calcular curva I-V"</strong></li>
+  <li>Revisa la gráfica interactiva — verifica que V_oc, I_sc y P_max sean coherentes con la ficha técnica</li>
+  <li>Observa la tabla de validación: los valores deben estar dentro del ±2% de los datos del fabricante</li>
+  <li>Verifica el mensaje de validación verde al final</li>
+</ol>
+
+<div class="prohibido">
+  <strong>🚫 NO hagas esto en Página 3:</strong>
+  <ul>
+    <li>No ingreses G = 0 W/m² — la división por cero en el modelo De Soto genera NaN y rompe los cálculos posteriores</li>
+    <li>No ingreses T_c &lt; -20 °C ni T_c &gt; 85 °C — están fuera del rango de validez del modelo SDM calibrado</li>
+    <li>No ignores advertencias de validación (&gt;5% de error vs. ficha) — indican que los parámetros SDM están fuera de rango</li>
+    <li>No modifiques manualmente los parámetros SDM (IL, I0, Rs, Rsh, a) a menos que tengas una calibración auditada</li>
+  </ul>
+</div>
+
+<h2>Parámetros SDM calibrados — módulo ASP-ST1-T40 (CdTe)</h2>
+<table>
+  <tr><th>Parámetro</th><th>Valor calibrado</th><th>Condición</th></tr>
+  <tr><td>P_max STC</td><td>40 Wp</td><td>G=1000 W/m², T_c=25 °C, AM=1.5</td></tr>
+  <tr><td>V_oc STC</td><td>~90 V</td><td>G=1000 W/m², T_c=25 °C</td></tr>
+  <tr><td>I_sc STC</td><td>~0.56 A</td><td>G=1000 W/m², T_c=25 °C</td></tr>
+  <tr><td>FF_max CdTe</td><td>76.28%</td><td>G=200 W/m² (validado XLSM)</td></tr>
+  <tr><td>NOCT</td><td>45 °C</td><td>G=800 W/m², T_amb=20 °C, v=1 m/s</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECCIÓN 7 — PÁGINA 4                                              -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h1>7. Página 4 — 📐 Dimensionamiento</h1>
+
+<h2>¿Qué hace?</h2>
+<p>Calcula el número óptimo de módulos que caben en el área de fachada disponible,
+define la configuración eléctrica de strings (series/paralelo), verifica compatibilidad
+con el inversor Growatt MID15KTL3-X y presenta un semáforo de estado: OK / ALERTA / FALLA.</p>
+
+<h2>Cómo usarla — paso a paso</h2>
+<ol>
+  <li>Navega a <strong>📐 Dimensionamiento</strong></li>
+  <li>Verifica que aparezca el área de fachada de Página 1 y los parámetros del módulo de Página 3</li>
+  <li>Selecciona el inversor del catálogo (por defecto: Growatt MID15KTL3-X)</li>
+  <li>Haz clic en <strong>"Calcular dimensionamiento"</strong></li>
+  <li>Revisa la tabla de resultados:
+    <ul>
+      <li><strong>🟢 OK:</strong> configuración eléctrica válida y segura</li>
+      <li><strong>🟡 ALERTA:</strong> funciona pero con advertencias (ej: V_oc de string cerca al límite del inversor)</li>
+      <li><strong>🔴 FALLA:</strong> configuración inválida — debes ajustar el número de módulos por string</li>
+    </ul>
+  </li>
+  <li>Si el semáforo es FALLA, ajusta los parámetros y vuelve a calcular hasta obtener OK o ALERTA</li>
+</ol>
+
+<div class="prohibido">
+  <strong>🚫 NO hagas esto en Página 4:</strong>
+  <ul>
+    <li>No pases a Página 5 si el semáforo está en 🔴 FALLA — los resultados de Mismatch y Producción serán incorrectos</li>
+    <li>No ignores los límites del inversor (V_max, I_max, rango MPP) — un diseño fuera de rango daña el equipo real</li>
+    <li>No uses un número de módulos mayor al que cabe físicamente en el área de fachada declarada en Página 1</li>
+    <li>No dejes el campo de módulos por string en 1 — el modelo IV no es válido para strings de módulo único en esta configuración</li>
+  </ul>
+</div>
+
+<div class="correcto">
+  <strong>✅ Criterio de aceptación:</strong> Continúa a Página 5 solo cuando el semáforo
+  de dimensionamiento sea <strong>🟢 OK</strong> o <strong>🟡 ALERTA con justificación técnica</strong>.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECCIÓN 8 — PÁGINA 5                                              -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h1>8. Página 5 — ⚡ Mismatch</h1>
+
+<h2>¿Qué hace?</h2>
+<p>Analiza las pérdidas por desajuste (mismatch) entre módulos de la misma string
+cuando operan bajo sombreado parcial o dispersión de parámetros en fachada. Cuantifica
+el porcentaje de energía perdida por este efecto.</p>
+
+<h2>Cómo usarla — paso a paso</h2>
+<ol>
+  <li>Navega a <strong>⚡ Mismatch</strong></li>
+  <li>Verifica que la configuración de strings de Página 4 esté cargada</li>
+  <li>Selecciona el escenario de sombreado (ninguno / parcial / total por fila)</li>
+  <li>Haz clic en <strong>"Calcular mismatch"</strong></li>
+  <li>Anota el factor de mismatch (%) que se usará en Producción</li>
+</ol>
+
+<div class="prohibido">
+  <strong>🚫 NO hagas esto en Página 5:</strong>
+  <ul>
+    <li>No selecciones "sombreado total" si la fachada no tiene obstrucciones reales — sobreestimarás las pérdidas y el proyecto parecerá inviable cuando no lo es</li>
+    <li>No uses el factor de mismatch de otro proyecto — depende de la configuración de string específica calculada en Página 4</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECCIÓN 9 — PÁGINA 6                                              -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h1>9. Página 6 — 📊 Producción</h1>
+
+<h2>¿Qué hace?</h2>
+<p>Ejecuta la simulación completa hora a hora según IEC 61724, combinando:
+irradiancia TMY (Página 2), curva I-V (Página 3), dimensionamiento (Página 4)
+y factor de mismatch (Página 5). Entrega la energía AC anual (kWh/año) y el
+Performance Ratio (PR).</p>
+
+<p>Esta página activa la bandera <code>produccion_ok = True</code> y guarda
+<code>E_ac_anual_kWh</code> en session_state — <strong>datos críticos que necesita Página 7</strong>.</p>
+
+<h2>Cómo usarla — paso a paso</h2>
+<ol>
+  <li>Navega a <strong>📊 Producción</strong></li>
+  <li>Verifica el banner que muestra: ciudad, potencia del sistema (kWp) y número de módulos</li>
+  <li>Confirma que los parámetros de pérdidas (cableado, inversor, suciedad) sean razonables</li>
+  <li>Haz clic en <strong>"Ejecutar simulación de producción"</strong></li>
+  <li>Espera entre 15 y 60 segundos — es la operación más pesada del sistema (8,760 iteraciones)</li>
+  <li>Verifica los resultados:
+    <ul>
+      <li><strong>E_ac anual (kWh/año):</strong> energía entregada a la red</li>
+      <li><strong>Performance Ratio (PR):</strong> valor esperado entre 0.70 y 0.85 para BIPV en fachada</li>
+      <li><strong>Gráfica mensual:</strong> perfil estacional coherente con la ciudad</li>
+    </ul>
+  </li>
+  <li>Confirma el mensaje: <em>"✅ Simulación completada — produccion_ok = True"</em></li>
+</ol>
+
+<div class="prohibido">
+  <strong>🚫 NO hagas esto en Página 6:</strong>
+  <ul>
+    <li>No navegues a otra página durante la simulación — espera el mensaje de finalización</li>
+    <li>No aceptes un PR &lt; 0.50 ni &gt; 0.90 sin revisar los parámetros — probablemente hay un error de entrada</li>
+    <li>No uses los valores de kWh/año si el banner de ciudad no está presente — significa que Página 1 no fue completada y los datos TMY son inválidos</li>
+    <li>No saltes esta página para ir a Financiero — sin <code>produccion_ok = True</code>, Financiero muestra un formulario manual que puede introducir errores</li>
+  </ul>
+</div>
+
+<div class="correcto">
+  <strong>✅ Rango de referencia — PR para BIPV en fachada Colombia:</strong><br>
+  PR entre <strong>0.72 y 0.82</strong> es normal para fachadas verticales con módulos CdTe.
+  PR &gt; 0.85 sugiere pérdidas subestimadas. PR &lt; 0.65 sugiere pérdidas sobreestimadas o error de configuración.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECCIÓN 10 — PÁGINA 7                                             -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h1>10. Página 7 — 💰 Financiero</h1>
+
+<h2>¿Qué hace?</h2>
+<p>Calcula la viabilidad financiera del proyecto BIPV aplicando los beneficios de la
+<strong>Ley 1715 de 2014</strong>:</p>
+<ul>
+  <li><strong>Art. 11:</strong> Deducción del 50% de la inversión en renta (año 0)</li>
+  <li><strong>Art. 12:</strong> Exclusión del IVA en la compra de equipos</li>
+  <li><strong>Art. 14:</strong> Depreciación acelerada en 5 años (vs. 20 años normal)</li>
+</ul>
+<p>Métricas calculadas: <strong>VPN</strong> (Valor Presente Neto), <strong>TIR</strong> (Tasa Interna de Retorno),
+<strong>Payback</strong> (período de retorno) y <strong>LCOE</strong> (Costo Nivelado de Energía).</p>
+
+<h2>Cómo usarla — paso a paso</h2>
+<ol>
+  <li>Navega a <strong>💰 Financiero</strong></li>
+  <li>Verifica el banner verde: <em>"✅ Producción cargada — X kWh/año | Y kWp | Ciudad"</em>
+    <br><em>(Si aparece aviso amarillo, regresa a Página 6 y ejecuta la simulación primero)</em></li>
+  <li>
+    <strong>Sección 1 — TRM (Tasa Representativa del Mercado):</strong><br>
+    Ingresa o confirma el valor COP/USD (default: 3,400). Este valor se aplica a TODAS las cifras del análisis.
+  </li>
+  <li>
+    <strong>Sección 2 — CAPEX:</strong><br>
+    Ingresa los costos de inversión inicial:
+    <ul>
+      <li>Costo de módulos (USD/Wp o COP total)</li>
+      <li>Costo de inversor (USD o COP)</li>
+      <li>Instalación y obra civil (COP)</li>
+      <li>Ingeniería y tramitología (COP)</li>
+    </ul>
+  </li>
+  <li>
+    <strong>Sección 3 — Parámetros financieros:</strong>
+    <ul>
+      <li>Tasa de descuento (%)</li>
+      <li>Tarifa eléctrica actual (COP/kWh)</li>
+      <li>Escalamiento anual de tarifa (%)</li>
+      <li>Horizonte del proyecto (años, típico: 25)</li>
+      <li>Tasa de impuesto de renta (%)</li>
+    </ul>
+  </li>
+  <li>Haz clic en <strong>"Calcular análisis financiero"</strong></li>
+  <li>Revisa los resultados de VPN, TIR, Payback y LCOE</li>
+  <li>Revisa el cuadro comparativo <em>con Ley 1715</em> vs. <em>sin Ley 1715</em> para cuantificar el beneficio normativo</li>
+</ol>
+
+<div class="prohibido">
+  <strong>🚫 NO hagas esto en Página 7:</strong>
+  <ul>
+    <li>No ingreses el CAPEX en pesos si el campo pide dólares, ni viceversa — usa siempre las unidades indicadas en cada campo</li>
+    <li>No uses una TRM de 0 — divide por cero en la conversión USD→COP</li>
+    <li>No ingreses tasa de descuento = 0% — el VPN diverge y el resultado no tiene sentido económico</li>
+    <li>No aceptes resultados si el banner amarillo dice "ejecuta Producción primero" — los kWh/año serán el valor manual por defecto (3,391 kWh/año) y no corresponden a tu proyecto real</li>
+    <li>No uses TIR &gt; 100% como válida sin revisar el CAPEX — probablemente hay un error de unidades en los costos</li>
+    <li>No interpretes VPN negativo como fracaso automático — revisa la tasa de descuento; tasas &gt;15% en proyectos BIPV de baja potencia suelen dar VPN negativo aunque el proyecto sea razonable</li>
+  </ul>
+</div>
+
+<div class="correcto">
+  <strong>✅ Rangos de referencia para BIPV en Colombia (2026):</strong>
+  <table style="margin-top:8px;">
+    <tr><th>Métrica</th><th>Valor típico aceptable</th><th>Señal de alerta</th></tr>
+    <tr><td>LCOE</td><td>200–450 COP/kWh</td><td>&gt;600 COP/kWh → revisar CAPEX</td></tr>
+    <tr><td>Payback simple</td><td>8–15 años</td><td>&gt;20 años → revisar tarifa o CAPEX</td></tr>
+    <tr><td>TIR</td><td>6–18%</td><td>&lt;5% → proyecto marginal; &gt;25% → revisar datos</td></tr>
+    <tr><td>VPN (tasa 10%)</td><td>Positivo en 25 años</td><td>Negativo → aumentar horizonte o revisar tarifa</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECCIÓN 11 — ERRORES                                              -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h1>11. Errores frecuentes y soluciones</h1>
+
+<table>
+  <tr><th>Error / Síntoma</th><th>Causa probable</th><th>Solución</th></tr>
+  <tr>
+    <td><code>NameError: name 'tipo_cambio' is not defined</code></td>
+    <td>Variable TRM no inicializada antes del bloque CAPEX (bug corregido en v1.0)</td>
+    <td>Actualizar la app (ya corregido en producción). Verificar que la app esté en versión ≥ commit 7dca2bf4</td>
+  </tr>
+  <tr>
+    <td>Página 7 muestra aviso amarillo en lugar de banner verde</td>
+    <td>Página 6 (Producción) no fue ejecutada en esta sesión</td>
+    <td>Regresar a Página 6, ejecutar la simulación y volver a Página 7</td>
+  </tr>
+  <tr>
+    <td>Gráfica I-V plana o en cero</td>
+    <td>G = 0 W/m² ingresado en Motor IV</td>
+    <td>Ingresar G ≥ 100 W/m²</td>
+  </tr>
+  <tr>
+    <td>Producción da 0 kWh/año</td>
+    <td>Recurso Solar no calculado o número de módulos = 0</td>
+    <td>Ejecutar Páginas 2, 3 y 4 en orden antes de Producción</td>
+  </tr>
+  <tr>
+    <td>PR = 0% o PR &gt; 100%</td>
+    <td>Error en parámetros de pérdidas o potencia STC = 0</td>
+    <td>Verificar que N_paneles_final y P_stc_kW_sistema estén correctos en Página 4</td>
+  </tr>
+  <tr>
+    <td>VPN = infinito o NaN en Financiero</td>
+    <td>Tasa de descuento = 0% o CAPEX = 0</td>
+    <td>Ingresar tasa de descuento &gt; 0% y CAPEX &gt; 0</td>
+  </tr>
+  <tr>
+    <td>Los datos de ciudad desaparecieron</td>
+    <td>Sesión expirada o página recargada con F5</td>
+    <td>Reiniciar desde Página 1 — no hay forma de recuperar la sesión anterior</td>
+  </tr>
+  <tr>
+    <td>Spinner girando sin parar en Producción</td>
+    <td>Proceso pesado en servidor compartido o error silencioso</td>
+    <td>Esperar hasta 90 segundos. Si no termina, recargar y reiniciar desde Página 1</td>
+  </tr>
+  <tr>
+    <td>Error 502 / página en blanco</td>
+    <td>PM2 reiniciando el proceso Streamlit en el servidor</td>
+    <td>Esperar 30 segundos y recargar. Si persiste, contactar al administrador</td>
+  </tr>
+  <tr>
+    <td>Semáforo 🔴 FALLA en Dimensionamiento</td>
+    <td>String de módulos fuera del rango MPP del inversor</td>
+    <td>Reducir módulos por string hasta que V_mpp_string esté dentro del rango del inversor (200–800 V para Growatt MID15KTL3-X)</td>
+  </tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECCIÓN 12 — FLUJO COMPLETO                                       -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h1>12. Flujo completo de un proyecto tipo</h1>
+
+<p>Ejemplo: <em>Edificio de oficinas en Medellín, fachada sur 120 m², sistema BIPV CdTe.</em></p>
+
+<table>
+  <tr><th>#</th><th>Página</th><th>Acción</th><th>Resultado esperado</th></tr>
+  <tr>
+    <td>1</td><td>🏠 Proyecto</td>
+    <td>Seleccionar Medellín · Área: 120 m² · Azimut: 180° · Inclinación: 90° (fachada vertical)</td>
+    <td>✅ "Datos del proyecto guardados"</td>
+  </tr>
+  <tr>
+    <td>2</td><td>☀️ Recurso Solar</td>
+    <td>Clic "Calcular recurso solar TMY"</td>
+    <td>✅ TMY Medellín cargado · GHI ~1,620 kWh/m²/año</td>
+  </tr>
+  <tr>
+    <td>3</td><td>🔬 Motor IV</td>
+    <td>G=1000 W/m², T_c=25°C · Clic "Calcular curva I-V"</td>
+    <td>✅ Curva I-V · FF ~76% · P_max ~40 Wp</td>
+  </tr>
+  <tr>
+    <td>4</td><td>📐 Dimensionamiento</td>
+    <td>Inversor: Growatt MID15KTL3-X · Clic "Calcular dimensionamiento"</td>
+    <td>✅ 64 módulos · 4 strings × 16 módulos · Semáforo 🟢 OK</td>
+  </tr>
+  <tr>
+    <td>5</td><td>⚡ Mismatch</td>
+    <td>Escenario: sombreado parcial bajo · Clic "Calcular mismatch"</td>
+    <td>✅ Factor mismatch: ~2.5%</td>
+  </tr>
+  <tr>
+    <td>6</td><td>📊 Producción</td>
+    <td>Confirmar parámetros · Clic "Ejecutar simulación"</td>
+    <td>✅ E_ac: ~3,391 kWh/año · PR: ~0.76 · produccion_ok = True</td>
+  </tr>
+  <tr>
+    <td>7</td><td>💰 Financiero</td>
+    <td>TRM: 4,200 · CAPEX total: $8,000 USD · Tarifa: 650 COP/kWh · Tasa: 10%</td>
+    <td>✅ VPN positivo · TIR ~9% · Payback ~11 años · LCOE ~280 COP/kWh</td>
+  </tr>
+</table>
+
+<div class="correcto">
+  <strong>✅ Duración típica del flujo completo:</strong> 10–20 minutos en condiciones normales,
+  incluyendo tiempos de cálculo del servidor.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- SECCIÓN 13 — GLOSARIO                                             -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h1>13. Glosario técnico</h1>
+
+<table>
+  <tr><th>Término</th><th>Definición</th></tr>
+  <tr><td>BIPV</td><td>Building-Integrated Photovoltaics — paneles solares integrados como elemento constructivo de la fachada o cubierta</td></tr>
+  <tr><td>CdTe</td><td>Telururo de cadmio — tecnología de película delgada usada en el módulo ASP-ST1-T40</td></tr>
+  <tr><td>TMY</td><td>Typical Meteorological Year — año meteorológico típico construido con datos históricos estadísticos</td></tr>
+  <tr><td>POA</td><td>Plane Of Array — irradiancia en el plano del módulo (considera inclinación y orientación)</td></tr>
+  <tr><td>GHI</td><td>Global Horizontal Irradiance — irradiancia global horizontal (referencia de sitio)</td></tr>
+  <tr><td>SDM</td><td>Single Diode Model — modelo eléctrico de un diodo para simular la curva I-V del módulo</td></tr>
+  <tr><td>MPP</td><td>Maximum Power Point — punto de máxima potencia en la curva I-V</td></tr>
+  <tr><td>FF</td><td>Fill Factor (Factor de Forma) — relación P_max / (V_oc × I_sc). Indica calidad eléctrica del módulo</td></tr>
+  <tr><td>PR</td><td>Performance Ratio — eficiencia global del sistema (E_ac real / E_ac ideal). Rango típico: 0.70–0.85</td></tr>
+  <tr><td>NOCT</td><td>Nominal Operating Cell Temperature — temperatura de celda en condiciones de referencia de campo</td></tr>
+  <tr><td>CAPEX</td><td>Capital Expenditure — inversión inicial total del proyecto (módulos + inversor + instalación + ingeniería)</td></tr>
+  <tr><td>VPN</td><td>Valor Presente Neto — suma de flujos de caja descontados. VPN &gt; 0 indica proyecto rentable</td></tr>
+  <tr><td>TIR</td><td>Tasa Interna de Retorno — tasa a la que el VPN = 0. Comparar con la tasa de descuento</td></tr>
+  <tr><td>LCOE</td><td>Levelized Cost of Energy — costo nivelado de energía (COP/kWh producido durante la vida útil)</td></tr>
+  <tr><td>TRM</td><td>Tasa Representativa del Mercado — tasa de cambio oficial COP/USD del Banco de la República</td></tr>
+  <tr><td>Ley 1715</td><td>Ley colombiana de energías renovables (2014) que otorga beneficios fiscales: Art. 11 renta, Art. 12 IVA, Art. 14 depreciación acelerada</td></tr>
+  <tr><td>session_state</td><td>Memoria interna de Streamlit que comparte datos entre páginas durante una sesión activa</td></tr>
+  <tr><td>String</td><td>Cadena de módulos fotovoltaicos conectados en serie</td></tr>
+  <tr><td>Mismatch</td><td>Pérdida de energía por desajuste eléctrico entre módulos de una misma string</td></tr>
+</table>
+
+<div class="footer">
+  Manual de Usuario — Calculadora BIPV v1.0<br>
+  Motor SDM validado contra XLSM auditado (De Soto 2006) · FF_max CdTe = 76.28% @ G=200 W/m²<br>
+  Mauricio Acevedo — Ingeniería BIPV Colombia · 27 de julio de 2026
+</div>
+
+</body>
+</html>

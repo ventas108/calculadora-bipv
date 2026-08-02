@@ -1,0 +1,119 @@
+PS C:\Users\Mauricio> cd /var/www/bipv/calculadora-bipv
+cd : No se encuentra la ruta de acceso 'C:\var\www\bipv\calculadora-bipv' porque no existe.
+En línea: 1 Carácter: 1
++ cd /var/www/bipv/calculadora-bipv
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (C:\var\www\bipv\calculadora-bipv:String) [Set-Location], ItemNotFoundEx
+   ception
+    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.SetLocationCommand
+
+PS C:\Users\Mauricio>
+PS C:\Users\Mauricio> python3 - << 'EOF'
+En línea: 1 Carácter: 12
++ python3 - << 'EOF'
++            ~
+Falta la especificación de archivo después del operador de redirección.
+En línea: 1 Carácter: 11
++ python3 - << 'EOF'
++           ~
+El operador '<' está reservado para uso futuro.
+En línea: 1 Carácter: 12
++ python3 - << 'EOF'
++            ~
+El operador '<' está reservado para uso futuro.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : MissingFileSpecification
+
+PS C:\Users\Mauricio> path = "bipv_python/calculos/temperatura.py"
+path : El término 'path' no se reconoce como nombre de un cmdlet, función, archivo de script o programa ejecutable.
+Compruebe si escribió correctamente el nombre o, si incluyó una ruta de acceso, compruebe que dicha ruta es correcta e
+inténtelo de nuevo.
+En línea: 1 Carácter: 1
++ path = "bipv_python/calculos/temperatura.py"
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (path:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\Users\Mauricio> old = "return pvlib.temperature.faiman(G_poa, T_amb, noct=NOCT, module_efficiency=0.0)"
+old : El término 'old' no se reconoce como nombre de un cmdlet, función, archivo de script o programa ejecutable.
+Compruebe si escribió correctamente el nombre o, si incluyó una ruta de acceso, compruebe que dicha ruta es correcta e
+inténtelo de nuevo.
+En línea: 1 Carácter: 1
++ old = "return pvlib.temperature.faiman(G_poa, T_amb, noct=NOCT, modul ...
++ ~~~
+    + CategoryInfo          : ObjectNotFound: (old:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\Users\Mauricio> new = "return pvlib.temperature.noct_sam(G_poa, T_amb, wind_speed=1.0, noct=NOCT, module_efficiency=0.0)"
+new : El término 'new' no se reconoce como nombre de un cmdlet, función, archivo de script o programa ejecutable.
+Compruebe si escribió correctamente el nombre o, si incluyó una ruta de acceso, compruebe que dicha ruta es correcta e
+inténtelo de nuevo.
+En línea: 1 Carácter: 1
++ new = "return pvlib.temperature.noct_sam(G_poa, T_amb, wind_speed=1.0 ...
++ ~~~
+    + CategoryInfo          : ObjectNotFound: (new:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\Users\Mauricio> content = open(path).read()
+path : El término 'path' no se reconoce como nombre de un cmdlet, función, archivo de script o programa ejecutable.
+Compruebe si escribió correctamente el nombre o, si incluyó una ruta de acceso, compruebe que dicha ruta es correcta e
+inténtelo de nuevo.
+En línea: 1 Carácter: 16
++ content = open(path).read()
++                ~~~~
+    + CategoryInfo          : ObjectNotFound: (path:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\Users\Mauricio> if old in content:
+En línea: 1 Carácter: 3
++ if old in content:
++   ~
+Falta '(' después de 'if' en la instrucción if.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : MissingOpenParenthesisInIfStatement
+
+PS C:\Users\Mauricio>     open(path, 'w').write(content.replace(old, new, 1))
+En línea: 1 Carácter: 14
++     open(path, 'w').write(content.replace(old, new, 1))
++              ~
+Falta un argumento en la lista de parámetros.
+En línea: 1 Carácter: 27
++     open(path, 'w').write(content.replace(old, new, 1))
++                           ~
+Falta el paréntesis de cierre ')' en la llamada al método.
+En línea: 1 Carácter: 46
++     open(path, 'w').write(content.replace(old, new, 1))
++                                              ~
+Falta un argumento en la lista de parámetros.
+En línea: 1 Carácter: 55
++     open(path, 'w').write(content.replace(old, new, 1))
++                                                       ~
+Token ')' inesperado en la expresión o la instrucción.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : MissingArgument
+
+PS C:\Users\Mauricio>     print(" Fix aplicado")
+No se puede inicializar el dispositivo PRN
+PS C:\Users\Mauricio> else:
+else: : El término 'else:' no se reconoce como nombre de un cmdlet, función, archivo de script o programa ejecutable.
+Compruebe si escribió correctamente el nombre o, si incluyó una ruta de acceso, compruebe que dicha ruta es correcta e
+inténtelo de nuevo.
+En línea: 1 Carácter: 1
++ else:
++ ~~~~~
+    + CategoryInfo          : ObjectNotFound: (else::String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\Users\Mauricio>     print("  Lnea no encontrada  muestra el archivo:")
+No se puede inicializar el dispositivo PRN
+PS C:\Users\Mauricio>     print(open(path).read())
+path : El término 'path' no se reconoce como nombre de un cmdlet, función, archivo de script o programa ejecutable.
+Compruebe si escribió correctamente el nombre o, si incluyó una ruta de acceso, compruebe que dicha ruta es correcta e
+inténtelo de nuevo.
+En línea: 1 Carácter: 16
++     print(open(path).read())
++                ~~~~
+    + CategoryInfo          : ObjectNotFound: (path:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+PS C:\Users\Mauricio> EOF

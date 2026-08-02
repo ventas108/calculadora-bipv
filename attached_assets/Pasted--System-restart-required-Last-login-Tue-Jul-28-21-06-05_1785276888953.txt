@@ -1,0 +1,36 @@
+* System restart required ***
+Last login: Tue Jul 28 21:06:05 2026 from 181.130.99.163
+root@bipv-colombia:~# cd /var/www/bipv/calculadora-bipv && python3 -c "import sys; sys.path.insert(0,'bipv_python'); from datos.catalogo_inversores_excel import lista_inversores_excel; inv=lista_inversores_excel(); print(f'Inversores: {len(inv)}'); print(inv[:5])"
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/var/www/bipv/calculadora-bipv/bipv_python/datos/catalogo_inversores_excel.py", line 6, in <module>
+    import pandas as pd
+ModuleNotFoundError: No module named 'pandas'
+Error in sys.excepthook:
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/apport_python_hook.py", line 228, in partial_apport_excepthook
+    return apport_excepthook(binary, exc_type, exc_obj, exc_tb)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/apport_python_hook.py", line 114, in apport_excepthook
+    report["ExecutableTimestamp"] = str(int(os.stat(binary).st_mtime))
+                                            ^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/var/www/bipv/calculadora-bipv/-c'
+
+Original exception was:
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/var/www/bipv/calculadora-bipv/bipv_python/datos/catalogo_inversores_excel.py", line 6, in <module>
+    import pandas as pd
+ModuleNotFoundError: No module named 'pandas'
+root@bipv-colombia:/var/www/bipv/calculadora-bipv# source /var/www/bipv/calculadora-bipv/bipv_python/venv/bin/activate
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 -c "import sys; sys.path.insert(0,'bipv_python'); from datos.catalogo_inversores_excel import lista_inversores_excel; inv=lista_inversores_excel(); print(f'Inversores: {len(inv)}'); print(inv[:5])"
+2026-07-28 22:14:17.634 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+2026-07-28 22:14:17.775 WARNING streamlit:
+  Warning: to view a Streamlit app on a browser, use Streamlit in a file and
+  run it with the following command:
+
+    streamlit run [FILE_NAME] [ARGUMENTS]
+2026-07-28 22:14:17.776 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+Inversores: 66
+['Growatt-MID15KTL3-X', 'Growatt-MID17KTL3-X', 'Growatt-MID20KTL3-X', 'Growatt-MID22KTL3-X', 'Growatt-MID25KTL3-X']
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#

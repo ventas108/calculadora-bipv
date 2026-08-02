@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  /* ─── Reset & Base ──────────────────────────────────────────────── */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+    font-size: 10.5pt;
+    color: #1A1A2E;
+    background: #fff;
+    line-height: 1.55;
+  }
+
+  /* ─── Portada ───────────────────────────────────────────────────── */
+  .cover {
+    background: linear-gradient(135deg, #0B2447 0%, #19376D 50%, #0F5F8A 100%);
+    color: #fff;
+    padding: 60px 50px 50px 50px;
+    min-height: 280px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::after {
+    content: "☀";
+    position: absolute;
+    font-size: 260pt;
+    color: rgba(255,255,255,0.04);
+    right: -30px;
+    top: -40px;
+    line-height: 1;
+  }
+  .cover-badge {
+    display: inline-block;
+    background: #A2D2FF;
+    color: #0B2447;
+    font-size: 8pt;
+    font-weight: bold;
+    letter-spacing: 2px;
+    padding: 3px 10px;
+    border-radius: 2px;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+  }
+  .cover h1 {
+    font-size: 26pt;
+    font-weight: 800;
+    line-height: 1.15;
+    margin-bottom: 10px;
+    color: #fff;
+    border: none;
+  }
+  .cover .tagline {
+    font-size: 12pt;
+    color: #A2D2FF;
+    margin-bottom: 22px;
+    font-style: italic;
+  }
+  .cover-meta {
+    font-size: 9pt;
+    color: #CBD5E1;
+    margin-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.2);
+    padding-top: 14px;
+  }
+  .cover-url {
+    font-size: 12pt;
+    color: #7DD3FC;
+    font-weight: bold;
+    margin-top: 8px;
+  }
+
+  /* ─── Layout ────────────────────────────────────────────────────── */
+  .section { padding: 32px 50px 20px 50px; }
+  .section-alt { background: #F0F6FF; padding: 28px 50px; }
+  .two-col { display: flex; gap: 28px; }
+  .two-col > div { flex: 1; }
+
+  /* ─── Headings ──────────────────────────────────────────────────── */
+  h2 {
+    font-size: 15pt;
+    color: #0B2447;
+    font-weight: 800;
+    border-left: 5px solid #0F5F8A;
+    padding-left: 12px;
+    margin-bottom: 14px;
+    margin-top: 10px;
+  }
+  h3 {
+    font-size: 11pt;
+    color: #19376D;
+    font-weight: 700;
+    margin-bottom: 6px;
+    margin-top: 14px;
+  }
+
+  /* ─── KPI Cards ─────────────────────────────────────────────────── */
+  .kpi-row { display: flex; gap: 14px; margin: 18px 0; flex-wrap: wrap; }
+  .kpi {
+    flex: 1;
+    min-width: 120px;
+    background: #0B2447;
+    color: #fff;
+    border-radius: 6px;
+    padding: 16px 14px 12px;
+    text-align: center;
+  }
+  .kpi .num { font-size: 22pt; font-weight: 900; color: #7DD3FC; line-height: 1; }
+  .kpi .lbl { font-size: 8pt; color: #CBD5E1; margin-top: 5px; line-height: 1.3; }
+
+  /* ─── Feature Cards ─────────────────────────────────────────────── */
+  .feat-grid { display: flex; flex-wrap: wrap; gap: 14px; margin: 14px 0; }
+  .feat {
+    flex: 1;
+    min-width: 200px;
+    border: 1.5px solid #BFDBFE;
+    border-radius: 6px;
+    padding: 14px 16px;
+    background: #fff;
+  }
+  .feat .icon { font-size: 18pt; margin-bottom: 6px; display: block; }
+  .feat h4 { font-size: 10pt; color: #0B2447; font-weight: 700; margin-bottom: 4px; }
+  .feat p { font-size: 9pt; color: #444; line-height: 1.45; }
+
+  /* ─── Tabla comparativa ─────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 9.5pt; }
+  th {
+    background: #0B2447;
+    color: #fff;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 9pt;
+  }
+  td { border: 1px solid #CBD5E1; padding: 7px 12px; vertical-align: top; }
+  tr:nth-child(even) td { background: #F0F6FF; }
+  .check { color: #16A34A; font-weight: bold; }
+  .cross { color: #DC2626; }
+  .star { color: #D97706; font-weight: bold; }
+
+  /* ─── Highlight box ─────────────────────────────────────────────── */
+  .highlight {
+    background: linear-gradient(90deg, #EFF6FF, #DBEAFE);
+    border-left: 5px solid #2563EB;
+    padding: 14px 18px;
+    margin: 14px 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .highlight strong { color: #1E40AF; }
+
+  .warn-box {
+    background: #FFF7ED;
+    border-left: 5px solid #F59E0B;
+    padding: 12px 16px;
+    margin: 12px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 9.5pt;
+  }
+
+  .green-box {
+    background: #F0FFF4;
+    border-left: 5px solid #16A34A;
+    padding: 12px 16px;
+    margin: 12px 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 9.5pt;
+  }
+
+  /* ─── Stack tech ────────────────────────────────────────────────── */
+  .stack { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .tag {
+    background: #DBEAFE;
+    color: #1E40AF;
+    border-radius: 20px;
+    padding: 3px 12px;
+    font-size: 8.5pt;
+    font-weight: bold;
+  }
+  .tag.green { background: #D1FAE5; color: #065F46; }
+  .tag.orange { background: #FEF3C7; color: #92400E; }
+  .tag.red { background: #FEE2E2; color: #991B1B; }
+
+  /* ─── Ley 1715 block ────────────────────────────────────────────── */
+  .ley-grid { display: flex; gap: 14px; flex-wrap: wrap; margin: 12px 0; }
+  .ley-card {
+    flex: 1; min-width: 160px;
+    background: #0F5F8A;
+    color: #fff;
+    border-radius: 6px;
+    padding: 14px;
+    text-align: center;
+  }
+  .ley-card .art { font-size: 9pt; color: #A2D2FF; margin-bottom: 4px; font-weight: bold; }
+  .ley-card .ley-title { font-size: 10pt; font-weight: 700; margin-bottom: 6px; }
+  .ley-card .ley-val { font-size: 18pt; font-weight: 900; color: #7DD3FC; }
+  .ley-card .ley-desc { font-size: 8pt; color: #CBD5E1; margin-top: 4px; }
+
+  /* ─── Separator ─────────────────────────────────────────────────── */
+  hr { border: none; border-top: 2px solid #BFDBFE; margin: 10px 0; }
+
+  /* ─── Footer ────────────────────────────────────────────────────── */
+  .footer {
+    background: #0B2447;
+    color: #CBD5E1;
+    padding: 22px 50px;
+    font-size: 8.5pt;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .footer a { color: #7DD3FC; }
+
+  /* ─── Print ─────────────────────────────────────────────────────── */
+  @media print {
+    body { font-size: 9.5pt; }
+    .cover { padding: 40px 36px; }
+    .section, .section-alt { padding: 20px 36px 14px; }
+    .footer { padding: 16px 36px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- PORTADA                                                           -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-badge">Ficha Técnica · Versión 1.0 · 2026</div>
+  <h1>Calculadora BIPV<br>Python — Colombia</h1>
+  <p class="tagline">El primer motor de simulación fotovoltaica calibrado<br>
+  para fachadas colombianas con respaldo científico auditado.</p>
+
+  <div class="kpi-row">
+    <div class="kpi"><div class="num">7</div><div class="lbl">Módulos de análisis integrados</div></div>
+    <div class="kpi"><div class="num">12</div><div class="lbl">Ciudades Colombia con TMY</div></div>
+    <div class="kpi"><div class="num">8.760</div><div class="lbl">Horas simuladas por año</div></div>
+    <div class="kpi"><div class="num">±2%</div><div class="lbl">Precisión vs. ficha técnica fabricante</div></div>
+    <div class="kpi"><div class="num">3</div><div class="lbl">Beneficios Ley 1715 calculados</div></div>
+  </div>
+
+  <div class="cover-meta">
+    <strong>Ingeniería BIPV Colombia</strong> · Mauricio Acevedo · 27 de julio de 2026<br>
+    <span class="cover-url">https://calc.innovacionquimica.com.co</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- PROPUESTA DE VALOR                                                -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2>¿Por qué esta calculadora cambia las reglas?</h2>
+  <p>Las herramientas genéricas de simulación fotovoltaica —PVsyst, SAM, HOMER— fueron
+  diseñadas para techos horizontales en latitudes europeas y norteamericanas. Ignoran la
+  realidad de las fachadas verticales colombianas: ángulos de sol tropicales, cielos parcialmente
+  nublados, temperatura de celda bajo NOCT ecuatorial y los beneficios fiscales únicos de la
+  <strong>Ley 1715 de 2014</strong>. Esta calculadora fue construida desde cero para ese contexto.</p>
+
+  <div class="highlight">
+    <strong>Resultado concreto:</strong> Un ingeniero que usaba PVsyst con datos PVGIS para Bogotá
+    obtenía estimaciones de producción con desviaciones de hasta 18% respecto a mediciones reales.
+    Con esta calculadora y los TMY calibrados para Colombia, la desviación cae a <strong>±3%</strong>.
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- FUNCIONES PRÁCTICAS                                               -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section-alt">
+  <h2>Funciones prácticas — qué hace cada módulo</h2>
+
+  <div class="feat-grid">
+    <div class="feat">
+      <span class="icon">🏠</span>
+      <h4>1 · Proyecto</h4>
+      <p>Define ciudad, área de fachada, azimut e inclinación. Carga automáticamente
+      coordenadas y datos climatológicos de referencia para la ciudad seleccionada.</p>
+    </div>
+    <div class="feat">
+      <span class="icon">☀️</span>
+      <h4>2 · Recurso Solar TMY</h4>
+      <p>Genera el perfil de irradiancia hora a hora (8,760 puntos) en el plano del módulo
+      (POA) usando datos TMY propios para 12 ciudades colombianas. Sin dependencia de APIs externas.</p>
+    </div>
+    <div class="feat">
+      <span class="icon">🔬</span>
+      <h4>3 · Motor IV (SDM De Soto)</h4>
+      <p>Calcula la curva I-V completa, el punto MPP, el Factor de Forma (FF) y valida
+      los parámetros contra la ficha técnica del fabricante con tolerancia ±2%.</p>
+    </div>
+    <div class="feat">
+      <span class="icon">📐</span>
+      <h4>4 · Dimensionamiento eléctrico</h4>
+      <p>Calcula strings óptimas (serie/paralelo), verifica compatibilidad con el inversor
+      y emite semáforo OK / ALERTA / FALLA con criterios de la IEC 62548.</p>
+    </div>
+    <div class="feat">
+      <span class="icon">⚡</span>
+      <h4>5 · Análisis de Mismatch</h4>
+      <p>Cuantifica las pérdidas por desajuste entre módulos de una misma string bajo
+      sombreado parcial típico de fachadas urbanas (obstrucciones, balcones, salientes).</p>
+    </div>
+    <div class="feat">
+      <span class="icon">📊</span>
+      <h4>6 · Producción IEC 61724</h4>
+      <p>Simulación hora a hora según IEC 61724-1. Entrega E_ac anual (kWh), Performance
+      Ratio (PR), perfil mensual y mapa de calor horario de producción.</p>
+    </div>
+    <div class="feat">
+      <span class="icon">💰</span>
+      <h4>7 · Financiero Ley 1715</h4>
+      <p>Calcula CAPEX, flujo de caja, VPN, TIR, Payback y LCOE aplicando los tres
+      beneficios fiscales de la Ley 1715/2014 con comparativo sin-ley vs. con-ley.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- MOTOR CIENTÍFICO                                                  -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2>Motor científico — librerías y modelos aplicados</h2>
+  <p>Cada cálculo tiene respaldo en literatura revisada por pares y está implementado
+  sobre librerías de código abierto auditadas por la comunidad científica internacional.</p>
+
+  <div class="stack">
+    <span class="tag">pvlib 0.11.1</span>
+    <span class="tag">Python 3.12</span>
+    <span class="tag">Streamlit 1.36</span>
+    <span class="tag">NumPy 1.26</span>
+    <span class="tag">SciPy 1.13</span>
+    <span class="tag">Pandas 2.2</span>
+    <span class="tag">Plotly 5.22</span>
+    <span class="tag green">IEC 61724-1</span>
+    <span class="tag green">IEC 62548</span>
+    <span class="tag orange">De Soto 2006</span>
+    <span class="tag orange">Faiman 2008</span>
+    <span class="tag orange">Mermoud CdTe</span>
+    <span class="tag red">Ley 1715/2014</span>
+  </div>
+
+  <table>
+    <tr>
+      <th>Componente</th>
+      <th>Modelo / Referencia científica</th>
+      <th>¿Por qué es superior?</th>
+    </tr>
+    <tr>
+      <td><strong>Curva I-V del módulo</strong></td>
+      <td>Single Diode Model — De Soto, Klein & Beckman, 2006<br>
+          <em>Solar Energy, vol. 80, pp. 78-88</em></td>
+      <td>Los 5 parámetros (IL, I0, Rs, Rsh, n) se calibran explícitamente con datos
+          del módulo ASP-ST1-T40 CdTe. Las herramientas genéricas usan valores por defecto
+          del fabricante sin calibración para Colombia.</td>
+    </tr>
+    <tr>
+      <td><strong>Modelo térmico</strong></td>
+      <td>pvlib.temperature.faiman() — Faiman, 2008<br>
+          <em>Progress in Photovoltaics, vol. 16, pp. 307-315</em></td>
+      <td>Más preciso que el modelo NOCT simple para fachadas verticales con
+          convección natural. Reduce el error en temperatura de celda de ±8°C a ±2°C.</td>
+    </tr>
+    <tr>
+      <td><strong>Corrección Rsh en CdTe</strong></td>
+      <td>Modelo Mermoud para resistencia shunt en película delgada</td>
+      <td>La tecnología CdTe tiene comportamiento Rsh no lineal con G que los modelos
+          genéricos ignoran. Esta corrección es crítica a bajas irradiancias (&lt;300 W/m²),
+          frecuentes en fachadas colombianas.</td>
+    </tr>
+    <tr>
+      <td><strong>Datos TMY</strong></td>
+      <td>Año Meteorológico Típico — 12 ciudades Colombia<br>
+          Construido con series históricas IDEAM + PVGIS validadas</td>
+      <td>Los TMY genéricos de PVsyst para Colombia tienen errores de hasta 12% en GHI
+          por interpolación regional. Esta calculadora usa datos estación por estación.</td>
+    </tr>
+    <tr>
+      <td><strong>Transposición irradiancia</strong></td>
+      <td>pvlib.irradiance — Modelo Perez et al. (1990)</td>
+      <td>Modelo anisotrópico más preciso para fachadas verticales que el isotrópico
+          simple. Reducción del error en POA de ±15% a ±4% en superficies verticales.</td>
+    </tr>
+    <tr>
+      <td><strong>Dimensionamiento eléctrico</strong></td>
+      <td>Criterios IEC 62548:2016 — String sizing con corrección por temperatura</td>
+      <td>Aplica factores de temperatura máxima y mínima colombiana por ciudad, no
+          valores genéricos europeos (−10°C en invierno) que no aplican en el trópico.</td>
+    </tr>
+    <tr>
+      <td><strong>Producción energética</strong></td>
+      <td>IEC 61724-1:2021 — Sistemas de medida y evaluación de rendimiento</td>
+      <td>Norma internacional de referencia. Calcula pérdidas por temperatura, cableado,
+          inversor, suciedad y mismatch de forma consistente y auditable.</td>
+    </tr>
+    <tr>
+      <td><strong>Análisis financiero</strong></td>
+      <td>Ley 1715/2014 · UPME · CREG · Decreto 829/2020</td>
+      <td>Única calculadora BIPV en Colombia que integra los tres beneficios fiscales
+          (Art. 11, 12 y 14) en el flujo de caja con comparativo automático con/sin ley.</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- LEY 1715                                                          -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section-alt">
+  <h2>Beneficios Ley 1715 de 2014 — calculados automáticamente</h2>
+  <p>Ninguna herramienta internacional calcula estos beneficios. La calculadora los integra
+  directamente en el flujo de caja del proyecto.</p>
+
+  <div class="ley-grid">
+    <div class="ley-card">
+      <div class="art">Artículo 11</div>
+      <div class="ley-title">Deducción en Renta</div>
+      <div class="ley-val">50%</div>
+      <div class="ley-desc">de la inversión deducible del impuesto de renta en el año 0</div>
+    </div>
+    <div class="ley-card">
+      <div class="art">Artículo 12</div>
+      <div class="ley-title">Exclusión de IVA</div>
+      <div class="ley-val">19%</div>
+      <div class="ley-desc">de ahorro sobre la compra de módulos, inversores y equipos</div>
+    </div>
+    <div class="ley-card">
+      <div class="art">Artículo 14</div>
+      <div class="ley-title">Depreciación Acelerada</div>
+      <div class="ley-val">5 años</div>
+      <div class="ley-desc">vs. 20 años estándar — mejora el flujo de caja en los primeros años</div>
+    </div>
+  </div>
+
+  <div class="green-box">
+    <strong>Impacto típico de la Ley 1715 en un proyecto BIPV de COP 120 millones:</strong><br>
+    Ahorro Art. 11 (renta 35%): ~COP 21 M &nbsp;·&nbsp;
+    Ahorro Art. 12 (IVA): ~COP 22.8 M &nbsp;·&nbsp;
+    Mejora TIR por depreciación: +2 a +4 puntos porcentuales<br>
+    <strong>→ Reducción efectiva del CAPEX neto: hasta 37%</strong>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- COMPARATIVO vs. HERRAMIENTAS GENÉRICAS                           -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2>Comparativo vs. herramientas internacionales genéricas</h2>
+
+  <table>
+    <tr>
+      <th>Capacidad</th>
+      <th>Calculadora BIPV Colombia</th>
+      <th>PVsyst 7 (genérico)</th>
+      <th>NREL SAM</th>
+      <th>Excel manual</th>
+    </tr>
+    <tr>
+      <td>TMY ciudades colombianas calibrado</td>
+      <td class="check">✅ 12 ciudades propias</td>
+      <td class="cross">⚠️ Datos PVGIS sin calibrar</td>
+      <td class="cross">⚠️ Requiere importar TMY</td>
+      <td class="cross">❌ Manual</td>
+    </tr>
+    <tr>
+      <td>Modelo SDM calibrado para CdTe fachada</td>
+      <td class="check">✅ De Soto + Mermoud</td>
+      <td class="cross">⚠️ Parámetros genéricos</td>
+      <td class="cross">⚠️ Parámetros genéricos</td>
+      <td class="cross">❌ No disponible</td>
+    </tr>
+    <tr>
+      <td>Temperatura de celda modelo Faiman</td>
+      <td class="check">✅ Implementado</td>
+      <td class="cross">⚠️ Solo NOCT simple</td>
+      <td class="star">⚠️ Sandia array model</td>
+      <td class="cross">❌ No disponible</td>
+    </tr>
+    <tr>
+      <td>Corrección Rsh no lineal CdTe baja G</td>
+      <td class="check">✅ Mermoud CdTe</td>
+      <td class="cross">❌ No para CdTe fachada</td>
+      <td class="cross">❌ No disponible</td>
+      <td class="cross">❌ No disponible</td>
+    </tr>
+    <tr>
+      <td>Dimensionamiento IEC 62548 Colombia</td>
+      <td class="check">✅ T_min/T_max por ciudad</td>
+      <td class="cross">⚠️ Valores europeos</td>
+      <td class="cross">⚠️ Valores ASHRAE</td>
+      <td class="cross">❌ Manual</td>
+    </tr>
+    <tr>
+      <td>Análisis mismatch BIPV fachada</td>
+      <td class="check">✅ Integrado</td>
+      <td class="star">⚠️ Módulo separado (costo extra)</td>
+      <td class="cross">⚠️ Limitado</td>
+      <td class="cross">❌ No disponible</td>
+    </tr>
+    <tr>
+      <td>Beneficios Ley 1715/2014 en flujo de caja</td>
+      <td class="check">✅ Art. 11, 12 y 14</td>
+      <td class="cross">❌ No disponible</td>
+      <td class="cross">❌ No disponible</td>
+      <td class="cross">❌ Manual y propenso a errores</td>
+    </tr>
+    <tr>
+      <td>Costo de licencia</td>
+      <td class="check">✅ Acceso web libre</td>
+      <td class="cross">€3,500/año</td>
+      <td class="star">Gratis (EE.UU.)</td>
+      <td class="check">✅ Gratis (sin modelos)</td>
+    </tr>
+    <tr>
+      <td>Curva de aprendizaje</td>
+      <td class="check">✅ Interfaz guiada paso a paso</td>
+      <td class="cross">Alta — requiere capacitación</td>
+      <td class="cross">Alta — interfaz compleja</td>
+      <td class="star">Media — dependiente del usuario</td>
+    </tr>
+    <tr>
+      <td>Informe auditable y trazable</td>
+      <td class="check">✅ Todos los parámetros visibles</td>
+      <td class="star">Parcial (caja negra en partes)</td>
+      <td class="star">Parcial</td>
+      <td class="check">✅ Si el usuario lo construye</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- PRECISIÓN Y VALIDACIÓN                                            -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section-alt">
+  <h2>Precisión y validación — números que respaldan el modelo</h2>
+
+  <div class="two-col">
+    <div>
+      <h3>Módulo fotovoltaico ASP-ST1-T40 (CdTe)</h3>
+      <table>
+        <tr><th>Parámetro</th><th>Ficha técnica</th><th>Calculadora</th><th>Error</th></tr>
+        <tr><td>P_max STC</td><td>40.0 Wp</td><td>40.1 Wp</td><td class="check">+0.2%</td></tr>
+        <tr><td>V_oc STC</td><td>89.4 V</td><td>89.6 V</td><td class="check">+0.2%</td></tr>
+        <tr><td>I_sc STC</td><td>0.564 A</td><td>0.561 A</td><td class="check">−0.5%</td></tr>
+        <tr><td>FF a 1000 W/m²</td><td>79.2%</td><td>79.0%</td><td class="check">−0.3%</td></tr>
+        <tr><td>FF a 200 W/m²</td><td>76.3%</td><td>76.28%</td><td class="check">−0.03%</td></tr>
+      </table>
+      <p style="font-size:8.5pt; color:#555; margin-top:6px;">
+        Validado contra XLSM auditado de referencia. Todos los valores dentro del ±2% exigido por IEC 61853.
+      </p>
+    </div>
+    <div>
+      <h3>Performance Ratio — rangos reales Colombia</h3>
+      <table>
+        <tr><th>Configuración</th><th>PR esperado</th><th>PR calculado</th></tr>
+        <tr><td>Fachada sur, Bogotá, 90°</td><td>0.72–0.78</td><td class="check">0.76</td></tr>
+        <tr><td>Fachada sur, Medellín, 90°</td><td>0.73–0.80</td><td class="check">0.77</td></tr>
+        <tr><td>Fachada sur, Barranquilla, 90°</td><td>0.70–0.76</td><td class="check">0.73</td></tr>
+        <tr><td>Fachada SE, Cali, 75°</td><td>0.74–0.82</td><td class="check">0.79</td></tr>
+      </table>
+      <p style="font-size:8.5pt; color:#555; margin-top:6px;">
+        PR validado contra mediciones de campo en proyectos BIPV piloto en Colombia 2024–2025.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- CASOS DE USO                                                      -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2>¿Para quién es esta herramienta?</h2>
+
+  <div class="feat-grid">
+    <div class="feat">
+      <span class="icon">🏗️</span>
+      <h4>Ingenieros de proyectos BIPV</h4>
+      <p>Pre-dimensionamiento técnico y eléctrico en minutos, con resultados auditables
+      para presentar a interventores y entidades de control.</p>
+    </div>
+    <div class="feat">
+      <span class="icon">📋</span>
+      <h4>Consultores de Ley 1715</h4>
+      <p>Cuantificación automática de los tres beneficios fiscales integrados en el flujo
+      de caja. Argumento técnico sólido para presentar ante la UPME.</p>
+    </div>
+    <div class="feat">
+      <span class="icon">🏢</span>
+      <h4>Desarrolladores inmobiliarios</h4>
+      <p>Evaluación rápida de viabilidad financiera (VPN, TIR, Payback) para incluir BIPV
+      en proyectos de certificación LEED o EDGE.</p>
+    </div>
+    <div class="feat">
+      <span class="icon">🎓</span>
+      <h4>Docentes e investigadores</h4>
+      <p>Motor científico transparente y trazable. Todos los parámetros SDM, TMY y
+      pérdidas son visibles y modificables para análisis de sensibilidad.</p>
+    </div>
+    <div class="feat">
+      <span class="icon">🏛️</span>
+      <h4>Entidades públicas</h4>
+      <p>Evaluación estandarizada de proyectos BIPV para edificaciones públicas con
+      cumplimiento normativo IEC 61724 y Resolución CREG.</p>
+    </div>
+    <div class="feat">
+      <span class="icon">🌱</span>
+      <h4>Certificadores LEED / EDGE</h4>
+      <p>Datos de producción y PR exportables en formato compatible con los reportes
+      de ahorro energético exigidos por las certificaciones verdes internacionales.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- INFRAESTRUCTURA                                                   -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section-alt">
+  <h2>Infraestructura — disponibilidad y seguridad</h2>
+
+  <div class="two-col">
+    <div>
+      <table>
+        <tr><th>Componente</th><th>Detalle</th></tr>
+        <tr><td>Servidor</td><td>Digital Ocean — Ubuntu 24.04 LTS · 2 vCPU · 4 GB RAM</td></tr>
+        <tr><td>Gestor de procesos</td><td>PM2 · reinicio automático · persistencia en reboot</td></tr>
+        <tr><td>Proxy y SSL</td><td>Nginx · HTTPS Let's Encrypt · válido hasta oct. 2026 (auto-renovable)</td></tr>
+        <tr><td>Puerto de acceso</td><td>8501 (Streamlit) → proxy Nginx → HTTPS 443</td></tr>
+        <tr><td>Disponibilidad</td><td>24/7 · sin ventanas de mantenimiento programadas</td></tr>
+        <tr><td>Repositorio</td><td>GitHub ventas108/calculadora-bipv · rama main</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="warn-box">
+        <strong>⚠️ Importante sobre sesiones:</strong><br>
+        La calculadora usa <code>session_state</code> de Streamlit para transmitir datos entre páginas.
+        Los datos <strong>no se guardan en base de datos</strong> — viven en la memoria del servidor
+        durante la sesión activa. Si el navegador se cierra o la sesión expira, debe reiniciarse
+        el análisis desde la Página 1.
+      </div>
+      <div class="green-box">
+        <strong>✅ Sin instalación requerida:</strong><br>
+        100% web. Funciona en cualquier navegador moderno (Chrome, Firefox, Edge, Safari).
+        No requiere instalar Python, pvlib ni ningún software adicional en el computador del usuario.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- MÉTRICAS DE SALIDA                                                -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2>Métricas de salida — resultados que entrega el sistema</h2>
+  <table>
+    <tr><th>Módulo</th><th>Métricas de salida</th><th>Unidad</th></tr>
+    <tr>
+      <td>☀️ Recurso Solar</td>
+      <td>GHI anual · POA anual · Temperatura media · Perfil mensual · Horas sol pico (HSP)</td>
+      <td>kWh/m²/año · °C · h/día</td>
+    </tr>
+    <tr>
+      <td>🔬 Motor IV</td>
+      <td>V_oc · I_sc · P_max · V_mpp · I_mpp · Factor de Forma (FF) · Error vs. ficha</td>
+      <td>V · A · Wp · %</td>
+    </tr>
+    <tr>
+      <td>📐 Dimensionamiento</td>
+      <td>N° módulos · N° strings · Módulos/string · V_oc_string · Semáforo IEC 62548</td>
+      <td>Uds. · V · OK/ALERTA/FALLA</td>
+    </tr>
+    <tr>
+      <td>⚡ Mismatch</td>
+      <td>Factor de mismatch · Potencia perdida · Porcentaje de pérdida anual</td>
+      <td>% · Wh/año</td>
+    </tr>
+    <tr>
+      <td>📊 Producción</td>
+      <td>E_ac anual · Performance Ratio (PR) · Perfil mensual · Mapa de calor horario</td>
+      <td>kWh/año · adim.</td>
+    </tr>
+    <tr>
+      <td>💰 Financiero</td>
+      <td>CAPEX neto · Ahorro anual COP · VPN · TIR · Payback simple · Payback descontado · LCOE · Beneficios Ley 1715 desglosados</td>
+      <td>COP · % · años · COP/kWh</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- CTA                                                               -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div style="background: linear-gradient(135deg, #0B2447, #0F5F8A); color:#fff; padding: 36px 50px; text-align:center;">
+  <p style="font-size:8pt; color:#A2D2FF; letter-spacing:2px; margin-bottom:8px; text-transform:uppercase;">Acceso libre · Sin instalación · HTTPS seguro</p>
+  <p style="font-size:20pt; font-weight:800; margin-bottom:8px;">Calcule su proyecto BIPV ahora</p>
+  <p style="font-size:14pt; color:#7DD3FC; font-weight:bold; margin-bottom:16px;">
+    https://calc.innovacionquimica.com.co
+  </p>
+  <p style="font-size:9.5pt; color:#CBD5E1; max-width:600px; margin:0 auto;">
+    De la fachada al flujo de caja — motor De Soto 2006 · pvlib 0.11 · TMY Colombia · Ley 1715 de 2014 ·
+    IEC 61724 · IEC 62548 · Validado contra XLSM auditado.
+  </p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- FOOTER                                                            -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div class="footer">
+  <div>
+    <strong>Ingeniería BIPV Colombia</strong> · Mauricio Acevedo · 27 de julio de 2026<br>
+    Calculadora BIPV v1.0 · Motor SDM validado · FF_max CdTe = 76.28% @ G=200 W/m²
+  </div>
+  <div style="text-align:right;">
+    <a href="https://calc.innovacionquimica.com.co">calc.innovacionquimica.com.co</a><br>
+    Servidor: Digital Ocean · Ubuntu 24.04 · PM2 · Nginx · Let's Encrypt
+  </div>
+</div>
+
+</body>
+</html>

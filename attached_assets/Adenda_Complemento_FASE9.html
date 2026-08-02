@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; margin: 2.5cm 3cm; color: #222; }
+  h1 { font-size: 16pt; color: #1F497D; border-bottom: 2px solid #1F497D; padding-bottom: 4px; margin-top: 24px; }
+  h2 { font-size: 13pt; color: #2E74B5; margin-top: 18px; }
+  h3 { font-size: 11pt; color: #2E74B5; margin-top: 14px; }
+  .portada { text-align: center; margin-top: 80px; }
+  .portada h0 { font-size: 20pt; color: #1F497D; font-weight: bold; }
+  .portada p { font-size: 12pt; margin: 6px 0; }
+  pre { background: #F2F2F2; border-left: 4px solid #2E74B5; padding: 10px 14px;
+        font-family: 'Courier New', monospace; font-size: 9pt;
+        white-space: pre-wrap; margin: 8px 0; }
+  .ok   { color: #006400; font-weight: bold; }
+  .warn { color: #B8860B; font-weight: bold; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 16px 0; }
+  th { background: #2E74B5; color: #fff; padding: 7px 10px; text-align: left; font-size: 10pt; }
+  td { border: 1px solid #AAAAAA; padding: 6px 10px; font-size: 10pt; }
+  tr:nth-child(even) td { background: #EBF3FB; }
+  ol { margin-left: 20px; }
+  .footer { font-size: 9pt; color: #707070; text-align: center; margin-top: 40px;
+            border-top: 1px solid #ccc; padding-top: 8px; }
+  .before-after { display: flex; gap: 16px; }
+  .before-after div { flex: 1; }
+  .before-after .label { font-weight: bold; font-size: 10pt; margin-bottom: 4px; }
+  @media print { body { margin: 1.5cm 2cm; } }
+</style>
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <p style="font-size:20pt; font-weight:bold; color:#1F497D;">ADENDA DE DESPLIEGUE — COMPLEMENTO</p>
+  <p style="font-size:13pt;">Calculadora BIPV Python → Digital Ocean</p>
+  <p style="font-size:12pt; color:#555;">Post-Despliegue: Corrección Crítica Página 7 y Sincronización GitHub</p>
+  <br><br>
+  <p><strong>Mauricio Acevedo</strong> — Ingeniería BIPV Colombia</p>
+  <p>Fecha: 27 de julio de 2026</p>
+</div>
+
+<div style="page-break-after:always"></div>
+
+<!-- FASE 9 -->
+<h1>FASE 9 — Corrección de Error en Producción: Página 7 💰 Financiero</h1>
+
+<h2>Contexto</h2>
+<p>Tras el despliegue exitoso descrito en la Adenda principal, se detectó un <code>NameError</code>
+en la Página 7 (Análisis Financiero — Ley 1715 de 2014) al intentar acceder a ella desde la app en producción.</p>
+
+<h2>Error detectado</h2>
+<pre>NameError: name 'tipo_cambio' is not defined</pre>
+<p><strong>Causa raíz:</strong> La variable <code>tipo_cambio</code> se utilizaba en la sección de cálculo CAPEX
+(línea ~120) pero se definía más abajo en la Sección 2 del formulario. Al ejecutarse el flujo lineal de
+Streamlit, Python intentaba usar la variable antes de que existiera en el scope.</p>
+
+<!-- 9.1 -->
+<h3>PASO 9.1 — Diagnóstico del archivo en el servidor</h3>
+<p>Verificación de la posición de <code>tipo_cambio</code> en el archivo en producción:</p>
+<pre>(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+grep -n "tipo_cambio = float" bipv_python/pages/7_💰_Financiero.py</pre>
+<p>Resultado: <code>tipo_cambio</code> aparecía definida en la sección 2 del formulario (línea ~120) pero
+era referenciada antes en el bloque CAPEX → <strong>NameError confirmado</strong>.</p>
+
+<!-- 9.2 -->
+<h3>PASO 9.2 — Aplicación del fix con nano</h3>
+<p>Se abrió el archivo con el editor nano en el servidor:</p>
+<pre>(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+nano bipv_python/pages/7_💰_Financiero.py</pre>
+
+<p>Fix aplicado — líneas 44-45 añadidas inmediatamente después del bloque de prerequisitos,
+<strong>ANTES</strong> de cualquier referencia a <code>tipo_cambio</code>:</p>
+
+<div class="before-after">
+  <div>
+    <div class="label">ANTES (estructura incorrecta):</div>
+    <pre>42:     n_pan = st.number_input("Número de módulos", ...)
+43:
+     ← tipo_cambio no existía; CAPEX la usaba
+       y lanzaba NameError</pre>
+  </div>
+  <div>
+    <div class="label">DESPUÉS (estructura corregida):</div>
+    <pre>42:     n_pan = st.number_input("Número de módulos", ...)
+43:
+44: # TRM disponible desde el inicio
+45: tipo_cambio = float(
+        st.session_state.get("tipo_cambio", 3400.0))</pre>
+  </div>
+</div>
+
+<p>Guardado y cierre en nano:</p>
+<pre>Ctrl + O  →  [nano: "Save modified buffer?"]  →  Y  →  Enter  →  Ctrl + X</pre>
+
+<p>Verificación inmediata:</p>
+<pre>(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+grep -n "tipo_cambio = float" bipv_python/pages/7_💰_Financiero.py
+
+45:tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))</pre>
+<p><span class="ok">✅</span> Fix confirmado en línea 45 del archivo en producción.</p>
+
+<!-- 9.3 -->
+<h3>PASO 9.3 — Commit del fix en Git local</h3>
+<pre>(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+git add bipv_python/pages/7_💰_Financiero.py
+
+git commit -m "fix: tipo_cambio definido al inicio antes de CAPEX"</pre>
+<p>Resultado:</p>
+<pre>[main 7dca2bf4] fix: tipo_cambio definido al inicio antes de CAPEX
+ 1 file changed, 1 insertion(+)</pre>
+<p><span class="ok">✅</span> Commit <code>7dca2bf4</code> creado exitosamente.</p>
+
+<!-- 9.4 -->
+<h3>PASO 9.4 — Fallo en git push (token vencido) y diagnóstico</h3>
+<pre>(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+git push origin main</pre>
+<p>ERROR obtenido:</p>
+<pre>remote: Invalid username or token.
+Password authentication is not supported for Git operations.
+fatal: Authentication failed for
+  'https://github.com/ventas108/calculadora-bipv.git/'</pre>
+<p><strong>Causa:</strong> El Personal Access Token (PAT) de GitHub embebido en la URL del remote había
+vencido. GitHub eliminó la autenticación por contraseña en agosto 2021; requiere PAT o clave SSH.</p>
+
+<!-- 9.5 -->
+<h3>PASO 9.5 — Generación de nuevo PAT en GitHub</h3>
+<p>Procedimiento en el navegador:</p>
+<ol>
+  <li>Ir a: <code>https://github.com/settings/tokens/new</code></li>
+  <li><strong>Note:</strong> servidor-bipv</li>
+  <li><strong>Expiration:</strong> 90 days</li>
+  <li><strong>Scope:</strong> ✅ <code>repo</code> (acceso completo a repositorios privados)</li>
+  <li>Clic <strong>"Generate token"</strong> → copiar el token generado.</li>
+</ol>
+<p><span class="warn">⚠️</span> El token solo se muestra una vez al crearse. Guardarlo antes de cerrar la página.</p>
+
+<!-- 9.6 -->
+<h3>PASO 9.6 — Actualización de la URL del remote y push exitoso</h3>
+<pre>(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+git remote set-url origin \
+  https://&lt;NUEVO_TOKEN&gt;@github.com/ventas108/calculadora-bipv.git
+
+git push origin main</pre>
+<p>Resultado:</p>
+<pre>Enumerating objects: 14, done.
+Counting objects: 100% (14/14), done.
+Delta compression using up to 2 threads
+Compressing objects: 100% (10/10), done.
+Writing objects: 100% (10/10), 963 bytes | 963.00 KiB/s, done.
+Total 10 (delta 8), reused 0 (delta 0), pack-reused 0
+remote: Resolving deltas: 100% (8/8), completed with 4 local objects.
+To https://github.com/ventas108/calculadora-bipv.git
+   77112e3f..7dca2bf4  main -> main</pre>
+<p><span class="ok">✅</span> Push exitoso — rama main actualizada: <code>77112e3f → 7dca2bf4</code></p>
+
+<p>Verificación del historial de commits:</p>
+<pre>git log --oneline -3
+
+7dca2bf4 (HEAD -> main, origin/main, origin/HEAD)
+            fix: tipo_cambio definido al inicio antes de CAPEX
+289ac5c3    fix: tipo_cambio definido al inicio antes de CAPEX
+77112e3f    feat: Financiero — TRM default 3400, panel conversor USD→COP</pre>
+<p><span class="ok">✅</span> Repositorio GitHub sincronizado con el estado del servidor.</p>
+
+<!-- 9.7 -->
+<h3>PASO 9.7 — Reinicio de PM2 para aplicar el fix</h3>
+<pre>(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+pm2 restart bipv-streamlit</pre>
+<p>Resultado:</p>
+<pre>Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [bipv-streamlit](ids: [1])
+[PM2] [bipv-streamlit](1) ✓
+
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┐
+│ id │ name               │ mode     │  ↺   │ status    │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┤
+│  1 │ bipv-streamlit     │ fork     │  10  │ online    │ 6.4mb    │
+│  0 │ calculadora-bipv   │ fork     │  60  │ online    │ 183.1mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┘</pre>
+<p><span class="ok">✅</span> <code>bipv-streamlit</code> online — fix activo en producción.</p>
+<p><span class="ok">✅</span> <code>calculadora-bipv</code> online — app Node.js sin cambios.</p>
+
+<!-- RESULTADO -->
+<h1>🏆 RESULTADO FASE 9 — PÁGINA 7 OPERATIVA</h1>
+<p><strong>URL:</strong> https://calc.innovacionquimica.com.co &nbsp;|&nbsp;
+<strong>Página:</strong> 💰 Análisis Financiero — Ley 1715 de 2014</p>
+
+<table>
+  <tr><th>✅ Logro</th><th>Detalle</th></tr>
+  <tr><td>Fix aplicado</td><td><code>tipo_cambio</code> definida en línea 45 (scope global, antes de CAPEX)</td></tr>
+  <tr><td>Commit</td><td><code>7dca2bf4</code> en rama main</td></tr>
+  <tr><td>GitHub sincronizado</td><td>77112e3f → 7dca2bf4 (origin/main)</td></tr>
+  <tr><td>PM2 reiniciado</td><td>bipv-streamlit online (restart #10)</td></tr>
+  <tr><td>Página 7 operativa</td><td>Sin NameError; CAPEX, Art. 11/12/14, TIR, VPN, Payback y LCOE correctos</td></tr>
+</table>
+
+<!-- MÓDULOS -->
+<h1>TABLA DE MÓDULOS — ESTADO ACTUALIZADO (27 jul 2026)</h1>
+<table>
+  <tr><th>Página</th><th>Función</th><th>Estado</th></tr>
+  <tr><td>🏠 Proyecto</td><td>Ciudad, área fachada, datos de sitio</td><td>✅ Funcional</td></tr>
+  <tr><td>☀️ Recurso Solar</td><td>TMY + PVGIS + irradiancia POA</td><td>🔲 Pendiente</td></tr>
+  <tr><td>🔬 Motor IV</td><td>Curva I-V + validación SDM</td><td>✅ Funcional</td></tr>
+  <tr><td>📐 Dimensionamiento</td><td>String sizing con semáforo</td><td>✅ Funcional</td></tr>
+  <tr><td>⚡ Mismatch</td><td>Análisis desajuste MPPT</td><td>🔲 Pendiente</td></tr>
+  <tr><td>📊 Producción</td><td>Simulación IEC 61724 hora a hora</td><td>🔲 Pendiente</td></tr>
+  <tr><td>💰 Financiero</td><td>VPN, TIR, Payback, Ley 1715/2014</td><td>✅ Funcional <em>(corregida)</em></td></tr>
+</table>
+
+<!-- SEGURIDAD -->
+<h1>NOTA DE SEGURIDAD — Buenas Prácticas con Tokens GitHub</h1>
+<p>Durante operaciones de emergencia en producción, los tokens pueden quedar expuestos en el historial
+de terminal. Medidas tras cada sesión:</p>
+<ol>
+  <li>Ir a <code>https://github.com/settings/tokens</code></li>
+  <li>Revocar el token utilizado en la sesión.</li>
+  <li>Generar un nuevo token solo cuando sea necesario.</li>
+</ol>
+<p><strong>Alternativa recomendada a largo plazo — autenticación SSH (sin tokens):</strong></p>
+<pre># En el servidor Digital Ocean:
+ssh-keygen -t ed25519 -C "bipv-colombia-server"
+cat ~/.ssh/id_ed25519.pub
+# Agregar la clave en: GitHub → Settings → SSH and GPG keys → New SSH key
+
+# Cambiar remote a SSH:
+git remote set-url origin git@github.com:ventas108/calculadora-bipv.git</pre>
+<p>Con SSH, <code>git push/pull</code> no requiere token; la autenticación es por clave criptográfica
+almacenada en el servidor.</p>
+
+<div class="footer">
+  Calculadora BIPV v1.0 — Motor SDM validado contra XLSM auditado (De Soto 2006).
+  FF_max CdTe = 76.28% @ G=200 W/m²
+</div>
+
+</body>
+</html>

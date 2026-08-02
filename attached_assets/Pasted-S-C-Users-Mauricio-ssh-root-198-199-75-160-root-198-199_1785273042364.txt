@@ -1,0 +1,57 @@
+S C:\Users\Mauricio> ssh root@198.199.75.160
+root@198.199.75.160's password:
+Welcome to Ubuntu 24.04.4 LTS (GNU/Linux 6.8.0-124-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Tue Jul 28 21:06:03 UTC 2026
+
+  System load:  0.0                Processes:             122
+  Usage of /:   24.4% of 47.39GB   Users logged in:       0
+  Memory usage: 31%                IPv4 address for eth0: 198.199.75.160
+  Swap usage:   0%                 IPv4 address for eth0: 10.10.0.5
+
+Expanded Security Maintenance for Applications is not enabled.
+
+27 updates can be applied immediately.
+1 of these updates is a standard security update.
+To see these additional updates run: apt list --upgradable
+
+3 additional security updates can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+*** System restart required ***
+Last login: Tue Jul 28 00:48:43 2026 from 181.130.99.163
+root@bipv-colombia:~# source /var/www/bipv/calculadora-bipv/bipv_python/venv/bin/activate
+(venv) root@bipv-colombia:~# python3 -c "import openpyxl; print('OK:', openpyxl.__version__)"
+OK: 3.1.4
+(venv) root@bipv-colombia:~# grep -n "panel\|MODULOS\|selectbox\|obtener_panel\|ASP" \
+>   /var/www/bipv/calculadora-bipv/pages/4_📐_Dimensionamiento.py
+grep: /var/www/bipv/calculadora-bipv/pages/4_📐_Dimensionamiento.py: No such file or directory
+(venv) root@bipv-colombia:~# ls /var/www/bipv/calculadora-bipv/pages/
+ls: cannot access '/var/www/bipv/calculadora-bipv/pages/': No such file or directory
+(venv) root@bipv-colombia:~# find /var/www/bipv -name "*.py" | grep -i "dimension\|pages" | head -20
+/var/www/bipv/calculadora-bipv/bipv_python/calculos/dimensionamiento.py
+/var/www/bipv/calculadora-bipv/bipv_python/pages/2_☀️_Recurso_Solar.py
+/var/www/bipv/calculadora-bipv/bipv_python/pages/6_📊_Produccion.py
+/var/www/bipv/calculadora-bipv/bipv_python/pages/4_📐_Dimensionamiento.py
+/var/www/bipv/calculadora-bipv/bipv_python/pages/7_💰_Financiero.py
+/var/www/bipv/calculadora-bipv/bipv_python/pages/3_🔬_Motor_IV.py
+/var/www/bipv/calculadora-bipv/bipv_python/pages/1_🏠_Proyecto.py
+/var/www/bipv/calculadora-bipv/bipv_python/pages/5_🔀_Mismatch.py
+/var/www/bipv/calculadora-bipv/bipv_python/venv/lib/python3.12/site-packages/h5py/tests/test_dimension_scales.py
+/var/www/bipv/calculadora-bipv/bipv_python/venv/lib/python3.12/site-packages/h5py/tests/test_dims_dimensionproxy.py
+/var/www/bipv/calculadora-bipv/bipv_python/venv/lib/python3.12/site-packages/plotly/graph_objs/splom/dimension/__init__.py
+/var/www/bipv/calculadora-bipv/bipv_python/venv/lib/python3.12/site-packages/plotly/graph_objs/splom/dimension/_axis.py
+/var/www/bipv/calculadora-bipv/bipv_python/venv/lib/python3.12/site-packages/plotly/graph_objs/splom/_dimension.py
+/var/www/bipv/calculadora-bipv/bipv_python/venv/lib/python3.12/site-packages/plotly/graph_objs/parcats/_dimension.py
+/var/www/bipv/calculadora-bipv/bipv_python/venv/lib/python3.12/site-packages/plotly/graph_objs/parcoords/_dimension.py
+/var/www/bipv/calculadora-bipv/bipv_python/venv/lib/python3.12/site-packages/plotly/validators/splom/dimension/_visible.py
+/var/www/bipv/calculadora-bipv/bipv_python/venv/lib/python3.12/site-packages/plotly/validators/splom/dimension/__init__.py
+/var/www/bipv/calculadora-bipv/bipv_python/venv/lib/python3.12/site-packages/plotly/validators/splom/dimension/_axis.py
+/var/www/bipv/calculadora-bipv/bipv_python/venv/lib/python3.12/site-packages/plotly/validators/splom/dimension/_valuessrc.py
+/var/www/bipv/calculadora-bipv/bipv_python/venv/lib/python3.12/site-packages/plotly/validators/splom/dimension/_templateitemname.py
+(venv) root@bipv-colombia:~#

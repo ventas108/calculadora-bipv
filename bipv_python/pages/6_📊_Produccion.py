@@ -929,3 +929,27 @@ if len(_hist_data) >= 2:
             "✅ **No se detecta degradación significativa** — PR estable o en mejora. "
             "Posible causa: mejora en limpieza/mantenimiento entre años."
         )
+
+    # ── Exportar reporte PDF ───────────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("📄 Exportar reporte")
+    st.caption(
+        "Genera un PDF técnico con los datos del proyecto, configuración del sistema, "
+        "métricas IEC 61724 y (si ya ejecutaste 💰 Financiero) los indicadores financieros."
+    )
+    if st.button("📄 Exportar reporte PDF", use_container_width=True):
+        try:
+            from utils.generador_reporte import generar_pdf, nombre_archivo
+            with st.spinner("Generando PDF..."):
+                pdf_bytes = generar_pdf(dict(st.session_state))
+            st.download_button(
+                label="⬇️ Descargar reporte PDF",
+                data=pdf_bytes,
+                file_name=nombre_archivo(dict(st.session_state)),
+                mime="application/pdf",
+                use_container_width=True,
+            )
+        except ImportError as e:
+            st.error(f"❌ fpdf2 no está instalado: {e}. Ejecuta `pip install fpdf2` en el servidor.")
+        except Exception as e:
+            st.error(f"❌ Error al generar el PDF: {e}")

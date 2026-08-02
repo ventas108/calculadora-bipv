@@ -1,0 +1,42 @@
+     open('bipv_python/pages/7_💰_Financiero.py','w').write(content.replace(marker, fix+marker, 1))
+>     print('OK - fix aplicado')
+> else:
+>     print('OK - ya estaba corregido')
+> "
+ambio definido al inicio antes de CAPEX"
+git push OK - ya estaba corregido
+origin main
+pm2 restart bipv-streamlit(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git add bipv_python/pages/7_💰_Financiero.py
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git commit -m "fix: tipo_cambio definido al inicio antes de CAPEX"
+[main 289ac5c3] fix: tipo_cambio definido al inicio antes de CAPEX
+ 1 file changed, 4 insertions(+)
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git push origin main
+remote: Invalid username or token. Password authentication is not supported for Git operations.
+fatal: Authentication failed for 'https://github.com/ventas108/calculadora-bipv.git/'
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# pm2 restart bipv-streamlit
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [bipv-streamlit](ids: [ 1 ])
+[PM2] [bipv-streamlit](1) ✓
+┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 1  │ bipv-streamlit     │ fork     │ 10   │ online    │ 0%       │ 6.4mb    │
+│ 0  │ calculadora-bipv   │ fork     │ 60   │ online    │ 0%       │ 183.1mb  │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# cd /var/www/bipv/calculadora-bipv
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# # 1. Verificar que el fix está en el servidor
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# grep -n "tipo_cambio = float" bipv_python/pages/7_💰_Financiero.py
+45:tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# nano bipv_python/pages/7_💰_Financiero.py
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# cd /var/www/bipv/calculadora-bipv
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git add bipv_python/pages/7_💰_Financiero.py
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git commit -m "fix: tipo_cambio definido al inicio antes de CAPEX"
+[main 7dca2bf4] fix: tipo_cambio definido al inicio antes de CAPEX
+ 1 file changed, 1 insertion(+)
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git push origin main
+remote: Invalid username or token. Password authentication is not supported for Git operations.
+fatal: Authentication failed for 'https://github.com/ventas108/calculadora-bipv.git/'
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# pm2 restart bipv-streamlit
+

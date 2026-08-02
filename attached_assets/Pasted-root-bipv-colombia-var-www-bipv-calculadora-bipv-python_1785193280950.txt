@@ -1,0 +1,56 @@
+root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 - << 'PYEOF'
+> path = "bipv_python/calculos/modelo_iv.py"
+> lines = open(path).readlines()
+>
+> insert_code = """\
+>     # Generar curva I-V manualmente (pvlib >=0.9 elimino ivcurve_pnts)
+>     if n_puntos > 0 and Voc > 0:
+>         V_arr = np.linspace(0, Voc, n_puntos)
+>         I_arr = pvlib.pvsystem.i_from_v(
+>             resistance_shunt   = R_sh,
+>             resistance_series  = R_s,
+>             nNsVth             = nNsVth,
+>             voltage            = V_arr,
+>             saturation_current = I_o,
+>             photocurrent       = I_L,
+>             method             = 'lambertw',
+>         )
+>     else:
+>         V_arr = None
+>         I_arr = None
+>
+> """
+>
+> new_lines = []
+> inserted = False
+> changes = []
+>
+> for i, line in enumerate(lines):
+>     # 1. Eliminar linea ivcurve_pnts
+>     if 'ivcurve_pnts' in line:
+>         changes.append(f"  - linea {i+1} eliminada: ivcurve_pnts")
+>         continue
+>     # 2. Corregir resultado.get('v')
+>     if "resultado.get('v', None)" in line:
+>         line = line.replace("resultado.get('v', None)", "V_arr")
+>         changes.append(f"  - linea {i+1}: V corregida -> V_arr")
+>     # 3. Corregir resultado.get('i')
+>     if "resultado.get('i', None)" in line:
+>         line = line.replace("resultado.get('i', None)", "I_arr")
+>         changes.append(f"  - linea {i+1}: I corregida -> I_arr")
+>     # 4. Insertar bloque curva antes del return {"Voc":...}
+>     if (not inserted
+>             and line.strip() == 'return {'
+>             and i + 1 < len(lines)
+>             and '"Voc"' in lines[i + 1]):
+>         new_lines.append(insert_code)
+>         inserted = True
+>         changes.append(f"  - bloque i_from_v insertado antes de linea {i+1}")
+>     new_lines.append(line)
+>
+> open(path, 'w').writelines(new_lines)
+> print("CAMBIOS APLICADOS:" if changes else "SIN CAMBIOS — revisa el archivo")
+> for c in changes:
+>     print(c)
+> print(f"Bloque insercion OK: {inserted}")
+> PYEOF
