@@ -6,6 +6,10 @@ from datetime import date
 from datos.ciudades_colombia import CIUDADES, LISTA_CIUDADES, FECHA_VALIDACION_TARIFAS
 from calculos.tz_utils import utc_offset_latam, tz_label
 from calculos.tarifa_utils import init_tarifa, set_tarifa_from_ciudad, tarifa_widget
+from calculos.proyectos_manager import (
+    listar_proyectos, guardar_proyecto_actual,
+    cargar_proyecto, eliminar_proyecto,
+)
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
@@ -74,6 +78,78 @@ if "proyecto_cargado_desde_disco" not in st.session_state:
 
 st.set_page_config(page_title="Proyecto — BIPV", page_icon="🏠", layout="wide")
 st.title("🏠 Datos del Proyecto")
+
+# ── 📁 Gestión de múltiples proyectos (tarea #63) ────────────────────────────
+with st.expander("📁 Mis Proyectos — guardar / cambiar proyecto", expanded=False):
+    _proyectos = listar_proyectos()
+    _nombre_actual = st.session_state.get("nombre_proyecto", "Proyecto BIPV")
+
+    # ── Guardar proyecto actual ───────────────────────────────────────────────
+    st.markdown("**💾 Guardar proyecto actual**")
+    _col_nombre, _col_btn = st.columns([3, 1])
+    _nombre_guardar = _col_nombre.text_input(
+        "Nombre del proyecto a guardar",
+        value=_nombre_actual,
+        key="_pm_nombre_guardar",
+        label_visibility="collapsed",
+        placeholder="Nombre del proyecto",
+    )
+    if _col_btn.button("💾 Guardar", key="_pm_btn_guardar", use_container_width=True):
+        try:
+            # Sincronizar nombre en session_state antes de guardar
+            st.session_state["nombre_proyecto"] = _nombre_guardar
+            _slug_guardado = guardar_proyecto_actual(_nombre_guardar)
+            st.success(f"✅ Proyecto «{_nombre_guardar}» guardado correctamente.")
+            st.rerun()
+        except Exception as _e_pm:
+            st.error(f"Error al guardar: {_e_pm}")
+
+    st.divider()
+
+    # ── Lista de proyectos guardados ──────────────────────────────────────────
+    if not _proyectos:
+        st.info(
+            "No hay proyectos guardados todavía. "
+            "Ingresa los datos del proyecto y pulsa **💾 Guardar** para crear el primero."
+        )
+    else:
+        st.markdown(f"**📂 Proyectos guardados** ({len(_proyectos)})")
+        for _p in _proyectos:
+            _es_actual = (
+                _p["nombre"].strip().lower() == _nombre_actual.strip().lower()
+            )
+            _fecha_corta = _p["guardado"][:16].replace("T", " ") if _p["guardado"] else "—"
+            _e_ac_label  = (
+                f"{_p['e_ac_kWh']:,.0f} kWh/año"
+                if _p["e_ac_kWh"] > 0 else "sin E_ac"
+            )
+            _area_label  = f"{_p['area_m2']:.0f} m²" if _p["area_m2"] > 0 else "—"
+            _tag = " 🔵 **(actual)**" if _es_actual else ""
+
+            _pc1, _pc2, _pc3 = st.columns([4, 1, 1])
+            _pc1.markdown(
+                f"**{_p['nombre']}**{_tag}  \n"
+                f"<span style='color:#888;font-size:0.85em'>"
+                f"{_p['ciudad']} · {_area_label} · {_e_ac_label} · {_fecha_corta}"
+                f"</span>",
+                unsafe_allow_html=True,
+            )
+            if _pc2.button("📂 Cargar", key=f"_pm_cargar_{_p['slug']}", use_container_width=True):
+                try:
+                    _nombre_cargado = cargar_proyecto(_p["slug"])
+                    st.success(f"✅ Proyecto «{_nombre_cargado}» cargado. Revisa los datos abajo.")
+                    st.rerun()
+                except Exception as _e_carga:
+                    st.error(f"Error al cargar: {_e_carga}")
+            if _pc3.button("🗑️", key=f"_pm_del_{_p['slug']}", help="Eliminar proyecto", use_container_width=True):
+                eliminar_proyecto(_p["slug"])
+                st.rerun()
+
+    st.caption(
+        "💡 Los resultados de simulación (Producción, Bypass, Motor IV) "
+        "no se guardan — deberás volver a ejecutarlos tras cargar un proyecto. "
+        "Los datos de entrada (ciudad, área, equipos, presupuesto) sí se preservan."
+    )
 
 # ── Tipos de instalación con defaults técnicos ────────────────────────────────
 TIPOS_INSTALACION = {
