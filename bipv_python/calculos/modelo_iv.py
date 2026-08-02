@@ -67,10 +67,15 @@ def trasladar_parametros_gt(G, T_cel_C, panel: dict):
     )
 
     # pvlib.calcparams_desoto para I_L, I_o, R_s, nNsVth
+    # alpha_sc: pvlib espera A/°C (no %/°C).
+    # Conversión: Tk_alfa [%/°C] / 100 × Isc_stc [A] = A/°C
+    _Isc_stc = float(panel.get("Isc_stc") or panel.get("Isc") or 1.0)
+    _alpha_sc = panel["Tk_alfa"] / 100.0 * _Isc_stc
+
     I_L, I_o, R_s, _R_sh_pvlib, nNsVth = pvlib.pvsystem.calcparams_desoto(
         effective_irradiance = G,
         temp_cell            = T_cel_C,
-        alpha_sc             = panel["Tk_alfa"] / 100.0,
+        alpha_sc             = _alpha_sc,
         a_ref                = nNsVth_ref,
         I_L_ref              = panel["I_L_ref"],
         I_o_ref              = panel["I_o_ref"],

@@ -67,7 +67,7 @@ def _calcular_pmax_vectorizado(
     I_L, I_o, R_s, _rsh_pvlib, nNsVth = pvlib.pvsystem.calcparams_desoto(
         effective_irradiance = G,
         temp_cell            = T_cel,
-        alpha_sc             = panel["Tk_alfa"] / 100.0,
+        alpha_sc             = panel["Tk_alfa"] / 100.0 * float(panel.get("Isc_stc") or panel.get("Isc") or 1.0),
         a_ref                = nNsVth_ref,
         I_L_ref              = panel["I_L_ref"],
         I_o_ref              = panel["I_o_ref"],
@@ -166,9 +166,11 @@ def simular_produccion_anual(
     perdida_inv_kWh  = E_dc_anual - E_ac_anual
 
     # ── Métricas IEC 61724 ────────────────────────────────────────────────────
-    H_i  = float(G_raw.sum()) / 1000.0          # GHI bruta kWh/m²
-    H_ef = float(G_eff.sum()) / 1000.0          # POA efectiva kWh/m²
-    Y_r  = H_ef                                  # Reference yield [h]  (G_STC = 1 kW/m²)
+    H_i  = float(G_raw.sum()) / 1000.0          # POA bruta kWh/m²
+    H_ef = float(G_eff.sum()) / 1000.0          # POA efectiva kWh/m² (post-mismatch)
+    Y_r  = H_i                                   # Reference yield [h] = H_t / G_STC (IEC 61724)
+    # NOTA: Y_r usa POA bruta (H_i), no H_ef, para que el PR incluya las pérdidas
+    # de mismatch como una pérdida real (PR más conservador y correcto según IEC 61724).
     Y_a  = E_dc_anual  / P_dc_stc_kW if P_dc_stc_kW > 0 else 0.0   # Array yield
     Y_f  = E_ac_anual  / P_dc_stc_kW if P_dc_stc_kW > 0 else 0.0   # Final yield
     PR   = Y_f / Y_r   if Y_r > 0    else 0.0   # Performance Ratio

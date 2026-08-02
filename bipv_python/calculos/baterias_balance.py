@@ -216,8 +216,10 @@ def balance_mensual(
         for m in range(12):
             dias = DIAS_MES[m]
             # Capacidad mensual almacenable (C_util × ciclos_mes × eta)
-            cap_mensual = C_util * dias * eta_rte
+            cap_mensual = C_util * dias
             # Se carga con el excedente solar (limitado por cap mensual)
+            # Nota: C_util ya incluye el factor eta_rte aplicado en dimensionar_bateria().
+            # No multiplicar de nuevo para evitar doble conteo de pérdidas RTE.
             bat_cargada[m]    = min(excedente[m], cap_mensual)
             # Se descarga para cubrir déficit (limitado por lo que se cargó)
             bat_descargada[m] = min(deficit[m], bat_cargada[m])

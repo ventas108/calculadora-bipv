@@ -37,9 +37,10 @@ def calcular_beneficios_ley_1715(
         Generalmente aplicable en el año 1 (o repartido en ≤5 años).
 
     Art. 12 — Exclusión IVA
-        Los equipos para SRFNC están excluidos de IVA (19%).
-        Ahorro = IVA que NO se paga = 0.19 / 1.19 × CAPEX_equipos
-        (porque el precio cotizado NO incluye IVA para estos proyectos)
+        Los equipos para SRFNC están excluidos de IVA (Ley 1715/Art.12).
+        Ahorro = IVA que NO se paga = 0.19 × CAPEX_equipos
+        Supuesto: el CAPEX ingresado en la app es el precio SIN IVA (precio base del proyecto).
+        Si el CAPEX ingresado YA incluye IVA, usar 0.19/1.19 en su lugar.
 
     Art. 14 — Depreciación acelerada
         5 años (20%/año) vs depreciación estándar 10 años (10%/año).

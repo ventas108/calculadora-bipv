@@ -57,7 +57,7 @@ def _sdm_vectorizado(
     I_L, I_o, R_s, _, nNsVth = pvlib.pvsystem.calcparams_desoto(
         effective_irradiance = G,
         temp_cell            = T_cel,
-        alpha_sc             = panel["Tk_alfa"] / 100.0,
+        alpha_sc             = panel["Tk_alfa"] / 100.0 * float(panel.get("Isc_stc") or panel.get("Isc") or 1.0),
         a_ref                = nNsVth_ref,
         I_L_ref              = panel["I_L_ref"],
         I_o_ref              = panel["I_o_ref"],
