@@ -85,10 +85,12 @@ if not _src_vista3d.exists():
     print(f"  [ERROR] Fuente no encontrada: {_src_vista3d}")
     sys.exit(1)
 
-backup(DST_VISTA3D, "B5B")
-
-shutil.copy2(_src_vista3d, DST_VISTA3D)
-print(f"  [✓] 9_🗺️_Vista_3D.py copiado ({_src_vista3d.stat().st_size:,} bytes)")
+if _src_vista3d.resolve() == DST_VISTA3D.resolve():
+    print(f"  [OK] Origen y destino son el mismo archivo — ya desplegado vía git.")
+else:
+    backup(DST_VISTA3D, "B5B")
+    shutil.copy2(_src_vista3d, DST_VISTA3D)
+    print(f"  [✓] 9_🗺️_Vista_3D.py copiado ({_src_vista3d.stat().st_size:,} bytes)")
 
 # ── Verificar dependencias del módulo ──────────────────────────────────────────
 print("\n[C] Verificando dependencias...")
