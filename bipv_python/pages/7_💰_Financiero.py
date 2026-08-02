@@ -27,7 +27,8 @@ p_stc   = (st.session_state.get("P_stc_kW_sistema")
            or st.session_state.get("P_dc_stc_kW_dim", 0.0))
 n_pan   = (st.session_state.get("N_paneles_final")
            or st.session_state.get("N_paneles_dim", 0))
-ciudad  = st.session_state.get("tmy_ciudad", "Bogotá")
+ciudad  = (st.session_state.get("municipio_predio")
+           or st.session_state.get("tmy_ciudad", "Bogotá"))
 
 # ── Prioridad E_ac: multi-superficie > bypass > base ─────────────────────────
 # Claves exclusivas — nunca se sobreescriben entre sí
@@ -1092,7 +1093,8 @@ if btn_fin or st.session_state.get("financiero_ok"):
     # ── Mensaje final ─────────────────────────────────────────────────────────
     color_vpn = "✅" if m_con["vpn_positivo"] else "⚠️"
     st.success(
-        f"{color_vpn} **{ciudad}** — {n_pan} módulos ASP-ST1-T40 | "
+        f"{color_vpn} **{ciudad}** — {n_pan} módulos "
+        f"{st.session_state.get('panel_nombre_dim') or st.session_state.get('panel_nombre') or st.session_state.get('panel_modelo') or '—'} | "
         f"CAPEX neto: **USD {ben['capex_neto_usd']:,.0f}** ($ {ben['capex_neto_usd']*tipo_cambio/1e6:.2f} M COP) | "
         f"TIR: **{m_con['tir_pct']:.1f}%** | " if m_con['tir_pct'] else "TIR: **N/A** | "
         f"VPN: **USD {m_con['vpn_usd']:,.0f}** ($ {m_con['vpn_usd']*tipo_cambio/1e6:.1f} M COP) | "
