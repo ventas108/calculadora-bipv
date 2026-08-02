@@ -1,0 +1,107 @@
+
+# 6 — Reiniciar
+pm2 restart streamlit-bipvUse --update-env to update environment variables
+[PM2][ERROR] Process or Namespace streamlit-bipvcd not found
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# # 1 — Guardar cambios locales del servidor (ciudades_colombia.py, páginas)
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git stash
+Saved working directory and index state WIP on main: d1fec80f5 feat: tarifas reales 2025 por ciudad y pre-carga automática al cambiar ciudad
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# # 2 — Forzar sincronización con origin (ignora la divergencia)
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git fetch origin
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git reset --hard origin/main
+Updating files: 100% (43175/43175), done.
+HEAD is now at 2a902c39f Remove file with token from tracking
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# # 3 — Verificar que scripts ya existen
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# ls bipv_python/scripts/
+patch_bateria_compat_v2.py             patch_features_agosto2026.py             patch_opex_sugerir_y_floor.py
+patch_bugs_auditoria.py                patch_invalidar_recurso_solar_coords.py  patch_pdf_ubicacion_predio.py
+patch_bypass_produccion_financiero.py  patch_motor_iv_avisos_datos.py           patch_pr_tests_agosto2026.py
+patch_catalogo_baterias_recarga.py     patch_multiproyecto.py                   patch_tarifa_sync.py
+patch_costos_blandos_aviso.py          patch_n_optimo_mppt.py                   patch_vista3d.py
+patch_detectar_columnas_baterias.py    patch_ns_halfcut_deteccion.py            patch_zona_estimacion_rapida.py
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# # 4 — Restaurar cambios locales del servidor
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git stash pop
+CONFLICT (modify/delete): bipv_python/calculos/__pycache__/dimensionamiento.cpython-312.pyc deleted in Updated upstream and modified in Stashed changes.  Version Stashed changes of bipv_python/calculos/__pycache__/dimensionamiento.cpython-312.pyc left in tree.
+CONFLICT (modify/delete): bipv_python/calculos/__pycache__/modelo_iv.cpython-312.pyc deleted in Updated upstream and modified in Stashed changes.  Version Stashed changes of bipv_python/calculos/__pycache__/modelo_iv.cpython-312.pyc left in tree.
+CONFLICT (modify/delete): bipv_python/calculos/__pycache__/produccion.cpython-312.pyc deleted in Updated upstream and modified in Stashed changes.  Version Stashed changes of bipv_python/calculos/__pycache__/produccion.cpython-312.pyc left in tree.
+CONFLICT (modify/delete): bipv_python/calculos/__pycache__/solar.cpython-312.pyc deleted in Updated upstream and modified in Stashed changes.  Version Stashed changes of bipv_python/calculos/__pycache__/solar.cpython-312.pyc left in tree.
+CONFLICT (modify/delete): bipv_python/datos/__pycache__/catalogo_inversores.cpython-312.pyc deleted in Updated upstream and modified in Stashed changes.  Version Stashed changes of bipv_python/datos/__pycache__/catalogo_inversores.cpython-312.pyc left in tree.
+CONFLICT (modify/delete): bipv_python/datos/__pycache__/catalogo_inversores_excel.cpython-312.pyc deleted in Updated upstream and modified in Stashed changes.  Version Stashed changes of bipv_python/datos/__pycache__/catalogo_inversores_excel.cpython-312.pyc left in tree.
+CONFLICT (modify/delete): bipv_python/datos/__pycache__/catalogo_paneles_excel.cpython-312.pyc deleted in Updated upstream and modified in Stashed changes.  Version Stashed changes of bipv_python/datos/__pycache__/catalogo_paneles_excel.cpython-312.pyc left in tree.
+CONFLICT (modify/delete): bipv_python/datos/__pycache__/ciudades_colombia.cpython-312.pyc deleted in Updated upstream and modified in Stashed changes.  Version Stashed changes of bipv_python/datos/__pycache__/ciudades_colombia.cpython-312.pyc left in tree.
+Auto-merging bipv_python/datos/ciudades_colombia.py
+CONFLICT (content): Merge conflict in bipv_python/datos/ciudades_colombia.py
+Auto-merging bipv_python/pages/1_🏠_Proyecto.py
+Auto-merging bipv_python/pages/2_☀️_Recurso_Solar.py
+CONFLICT (content): Merge conflict in bipv_python/pages/2_☀️_Recurso_Solar.py
+Auto-merging bipv_python/pages/7_💰_Financiero.py
+CONFLICT (content): Merge conflict in bipv_python/pages/7_💰_Financiero.py
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+        modified:   "bipv_python/pages/1_\360\237\217\240_Proyecto.py"
+
+Unmerged paths:
+  (use "git restore --staged <file>..." to unstage)
+  (use "git add/rm <file>..." as appropriate to mark resolution)
+        deleted by us:   bipv_python/calculos/__pycache__/dimensionamiento.cpython-312.pyc
+        deleted by us:   bipv_python/calculos/__pycache__/modelo_iv.cpython-312.pyc
+        deleted by us:   bipv_python/calculos/__pycache__/produccion.cpython-312.pyc
+        deleted by us:   bipv_python/calculos/__pycache__/solar.cpython-312.pyc
+        deleted by us:   bipv_python/datos/__pycache__/catalogo_inversores.cpython-312.pyc
+        deleted by us:   bipv_python/datos/__pycache__/catalogo_inversores_excel.cpython-312.pyc
+        deleted by us:   bipv_python/datos/__pycache__/catalogo_paneles_excel.cpython-312.pyc
+        deleted by us:   bipv_python/datos/__pycache__/ciudades_colombia.cpython-312.pyc
+        both modified:   bipv_python/datos/ciudades_colombia.py
+        both modified:   "bipv_python/pages/2_\342\230\200\357\270\217_Recurso_Solar.py"
+        both modified:   "bipv_python/pages/7_\360\237\222\260_Financiero.py"
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        bipv_python/calculos/__pycache__/mismatch_bypass.cpython-312.pyc
+        bipv_python/calculos/__pycache__/trm_utils.cpython-312.pyc
+        bipv_python/calculos/__pycache__/tz_utils.cpython-312.pyc
+        bipv_python/datos/proyecto_actual.json
+
+The stash entry is kept in case you need it again.
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# # (si hay conflicto en páginas, no importa — los parches las actualizan)
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# # Si hay conflicto irresoluble:  git checkout --theirs <archivo> && git add <archivo>
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# # 5 — Aplicar parches (de sesiones anteriores + esta sesión)
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_bateria_compat_v2.py
+-bash: /var/www/bipv/calculadora-bipv/bipv_python/venv/bin/python3: No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_motor_iv_avisos_datos.py
+-bash: /var/www/bipv/calculadora-bipv/bipv_python/venv/bin/python3: No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_ns_halfcut_deteccion.py
+-bash: /var/www/bipv/calculadora-bipv/bipv_python/venv/bin/python3: No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_invalidar_recurso_solar_coords.py
+-bash: /var/www/bipv/calculadora-bipv/bipv_python/venv/bin/python3: No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_zona_estimacion_rapida.py
+-bash: /var/www/bipv/calculadora-bipv/bipv_python/venv/bin/python3: No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_costos_blandos_aviso.py
+-bash: /var/www/bipv/calculadora-bipv/bipv_python/venv/bin/python3: No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_opex_sugerir_y_floor.py
+-bash: /var/www/bipv/calculadora-bipv/bipv_python/venv/bin/python3: No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_tarifa_sync.py
+-bash: /var/www/bipv/calculadora-bipv/bipv_python/venv/bin/python3: No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_detectar_columnas_baterias.py
+-bash: /var/www/bipv/calculadora-bipv/bipv_python/venv/bin/python3: No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_catalogo_baterias_recarga.py
+-bash: /var/www/bipv/calculadora-bipv/bipv_python/venv/bin/python3: No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_pdf_ubicacion_predio.py
+-bash: /var/www/bipv/calculadora-bipv/bipv_python/venv/bin/python3: No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_bypass_produccion_financiero.py
+-bash: /var/www/bipv/calculadora-bipv/bipv_python/venv/bin/python3: No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_multiproyecto.py
+-bash: /var/www/bipv/calculadora-bipv/bipv_python/venv/bin/python3: No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# python3 bipv_python/scripts/patch_vista3d.py
+-bash: /var/www/bipv/calculadora-bipv/bipv_python/venv/bin/python3: No such file or directory
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# # 6 — Reiniciar
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# pm2 restart streamlit-bipv
+
