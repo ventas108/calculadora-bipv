@@ -121,6 +121,27 @@ except Exception as e:
     st.error(f"No se pudo leer insumos_template.xlsx: {e}")
     _secciones_raw = {}
 
+# ── Advertencia visible cuando alguna sección quedó vacía ────────────────────
+_SEC_LABELS = {
+    "perfileria":  "1. Materiales de Perfilería",
+    "mano_obra":   "2. Mano de Obra y Servicios",
+    "sistema_fv":  "3. Sistema Fotovoltaico",
+    "inversor":    "4. Inversor y Equipos Eléctricos",
+}
+_secciones_vacias = [
+    label for key, label in _SEC_LABELS.items()
+    if key not in _secciones_raw or _secciones_raw[key].empty
+]
+if _secciones_vacias:
+    st.warning(
+        "⚠️ **Las siguientes secciones del Excel no cargaron filas** — "
+        "se usará tabla vacía como punto de partida. "
+        "Verifica que `insumos_template.xlsx` → Hoja1 contenga los encabezados "
+        "`1. MATERIALES`, `2. MANO DE OBRA`, `3. SISTEMA FOTOVOLTAICO`, `4. INVERSOR` "
+        "y una fila con `Descripcion` debajo de cada uno:  \n"
+        + "  \n".join(f"• {s}" for s in _secciones_vacias)
+    )
+
 # ── Función: inicializar DataFrame con Activo=True ────────────────────────────
 def _df_con_activo(rows_or_df):
     if isinstance(rows_or_df, pd.DataFrame):
