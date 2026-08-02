@@ -121,8 +121,13 @@ def generar_html_reporte() -> str:
             _localizacion_pdf  = f"Predio: {float(_lat_pdf):.5f}°N, {float(_lon_pdf):.5f}°O"
         _localizacion_nota = f"Ciudad de referencia climática TMY: {_ciudad_ref}"
     else:
-        _localizacion_pdf  = ciudad
-        _localizacion_nota = "Clima extraído de base TMY/PVGIS"
+        # Sin coordenadas personalizadas: usar municipio detectado > ciudad de referencia > tmy_ciudad
+        _localizacion_pdf  = _municipio_pdf if _municipio_pdf else _ciudad_ref
+        _localizacion_nota = (
+            f"TMY descargado para referencia climática: {ciudad}"
+            if ciudad != _ciudad_ref
+            else "Clima extraído de base TMY/PVGIS"
+        )
     area_m2         = st.session_state.get("area_fachada_m2", "—")
     orientacion     = st.session_state.get("orientacion_label", "—")
     tilt            = st.session_state.get("tilt_fachada", "—")

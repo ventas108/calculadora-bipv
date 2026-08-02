@@ -335,11 +335,24 @@ def _calc_parametrico(kwp, tipo, escenario, zona):
     capex_total = capex_base + cont
 
     # ── OPEX anual ─────────────────────────────────────────────────────
-    opex_om     = g("opex_om_kw")        * kwp
-    opex_limp   = g("opex_limpieza_kw")  * kwp
-    opex_repos  = g("opex_reposicion_kw") * kwp
-    opex_mon    = g("opex_monitoreo_kw") * kwp
+    # O&M y limpieza escalan con zona: requieren visitas presenciales → más
+    # costosas en zonas remotas (Urabá zf=1.17, Llanos zf=1.12, etc.)
+    opex_om     = g("opex_om_kw")         * kwp * zf
+    opex_limp   = g("opex_limpieza_kw")   * kwp * zf
+    opex_repos  = g("opex_reposicion_kw") * kwp        # repuestos: costo similar
+    opex_mon    = g("opex_monitoreo_kw")  * kwp        # monitoreo remoto: no escala
     opex_seg    = capex_total * g("opex_seguro_pct")
+    # ── Mínimo absoluto O&M para instalaciones ≥ 50 kWp ───────────────
+    # Representa el costo mínimo de un contrato de mantenimiento preventivo
+    # (visitas periódicas + mano de obra). Por debajo de este piso el modelo
+    # subestima costos reales en proyectos medianos/grandes en Colombia.
+    # Referencia: contrato básico BIPV/FV Colombia = USD 6,000–10,000/año.
+    _opex_om_limp_calc = opex_om + opex_limp
+    _opex_om_limp_min  = 8000.0 if kwp >= 300 else (5000.0 if kwp >= 50 else 0.0)
+    if _opex_om_limp_calc < _opex_om_limp_min:
+        _factor_min = _opex_om_limp_min / _opex_om_limp_calc if _opex_om_limp_calc > 0 else 1.0
+        opex_om   *= _factor_min
+        opex_limp *= _factor_min
     opex_total  = opex_om + opex_limp + opex_repos + opex_mon + opex_seg
 
     return {

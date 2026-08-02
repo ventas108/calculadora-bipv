@@ -280,10 +280,16 @@ with col_t2:
              "Escenario base: 5%.",
     )
     # ── Label dinámico según tecnología del panel ─────────────────────────────
+    # panel_dict es la fuente limpia (tecnologia directa del catálogo).
+    # panel_seleccionado se excluye: es un dict serializado que puede contener
+    # datos de una selección anterior (p.ej. CdTe) y contaminar la detección.
+    _panel_dict_tech = str(
+        st.session_state.get("panel_dict", {}).get("tecnologia", "")
+    ).lower()
     _panel_info_raw = (
         str(st.session_state.get("panel_nombre", ""))
-        + str(st.session_state.get("panel_modelo", ""))
-        + str(st.session_state.get("panel_seleccionado", ""))
+        + " " + str(st.session_state.get("panel_modelo", ""))
+        + " " + _panel_dict_tech
     ).lower()
     if "cdte" in _panel_info_raw or "cadmium" in _panel_info_raw:
         _deg_lbl  = "Degradación módulos CdTe (%/año)"
@@ -301,7 +307,7 @@ with col_t2:
         _deg_lbl  = "Degradación módulos bifaciales (%/año)"
         _deg_help = "Bifacial Si-mono: 0.40–0.55%/año. Cara trasera degrada ~10% más lento. Fuente: NREL 2021."
         _deg_def  = 0.5
-    elif any(x in _panel_info_raw for x in ["mono", "monocristalino", "monocrystalline", "rsm", "jinko", "longi", "risen", "canadian", "trina"]):
+    elif any(x in _panel_info_raw for x in ["mono", "monocristalino", "monocrystalline", "rsm", "jinko", "longi", "risen", "canadian", "trina", "ja solar", "jam", "jkm", "phono"]):
         # Panel Si monocristalino convencional sin keyword específico PERC/N-type
         _deg_lbl  = "Degradación módulos Si monocristalino (%/año)"
         _deg_help = (
