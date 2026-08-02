@@ -456,7 +456,8 @@ with tab_modelo:
     def panel_grid_traces(w, h, pw, ph, gap, poa_val, poa_min, poa_max, n_pan_target):
         """
         Genera un Mesh3d con la cuadrícula de paneles en la fachada (Y=-0.01).
-        Colorea todos los paneles con el POA del mes seleccionado.
+        Colorea paneles instalados con POA del mes; posiciones vacías en gris.
+        n_pan_target > 0 limita los módulos al número dimensionado (#125).
         """
         n_cols = max(1, int(w / (pw + gap)))
         n_rows = max(1, int(h / (ph + gap)))
@@ -465,12 +466,20 @@ with tab_modelo:
         actual_pw = max(0.1, (w - gap * (n_cols - 1)) / n_cols)
         actual_ph = max(0.1, (h - gap * (n_rows - 1)) / n_rows)
 
-        color = _color_poa(poa_val, poa_min, poa_max)
+        n_capacity = n_rows * n_cols
+        # Respetar el conteo real de módulos dimensionados (#125)
+        n_active = n_capacity
+        if n_pan_target and 0 < int(n_pan_target) < n_capacity:
+            n_active = int(n_pan_target)
+
+        color       = _color_poa(poa_val, poa_min, poa_max)
+        color_ghost = "#2a2a3a"   # posiciones vacías — gris azulado oscuro
 
         all_x, all_y, all_z = [], [], []
         all_i, all_j, all_k = [], [], []
         face_colors = []
         vert = 0
+        panel_count = 0
 
         for row in range(n_rows):
             for col in range(n_cols):
@@ -479,6 +488,8 @@ with tab_modelo:
                 z0 = row * (actual_ph + gap)
                 z1 = z0 + actual_ph
                 yp = -0.01   # ligeramente por delante de la fachada
+
+                c = color if panel_count < n_active else color_ghost
 
                 # 4 vértices del panel
                 all_x += [x0, x1, x1, x0]
@@ -489,10 +500,15 @@ with tab_modelo:
                 all_i += [vert,   vert]
                 all_j += [vert+1, vert+2]
                 all_k += [vert+2, vert+3]
-                face_colors += [color, color]
+                face_colors += [c, c]
                 vert += 4
+                panel_count += 1
 
-        n_shown = n_rows * n_cols
+        n_shown = n_active
+        _ghost_label = (
+            f" · {n_capacity - n_active} posiciones vacías"
+            if n_active < n_capacity else ""
+        )
 
         panels_mesh = go.Mesh3d(
             x=all_x, y=all_y, z=all_z,
@@ -501,12 +517,13 @@ with tab_modelo:
             opacity=0.95,
             flatshading=True,
             showscale=False,
-            name=f"Paneles BIPV ({n_shown} unid.)",
+            name=f"Paneles BIPV ({n_shown} unid.{_ghost_label})",
             hovertemplate=(
                 f"<b>Paneles BIPV</b><br>"
                 f"POA {mes_nombre}: {poa_val:.0f} kWh/m²<br>"
-                f"Paneles visualizados: {n_shown}<br>"
-                f"<extra></extra>"
+                f"Módulos instalados: {n_shown}"
+                + (f" / {n_capacity} posibles" if n_active < n_capacity else "")
+                + "<br><extra></extra>"
             ),
         )
 

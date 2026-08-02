@@ -137,7 +137,7 @@ with st.expander("📁 Mis Proyectos — guardar / cambiar proyecto", expanded=F
             if _pc2.button("📂 Cargar", key=f"_pm_cargar_{_p['slug']}", use_container_width=True):
                 try:
                     _nombre_cargado = cargar_proyecto(_p["slug"])
-                    st.success(f"✅ Proyecto «{_nombre_cargado}» cargado. Revisa los datos abajo.")
+                    st.session_state["_proyecto_recien_cargado"] = True
                     st.rerun()
                 except Exception as _e_carga:
                     st.error(f"Error al cargar: {_e_carga}")
@@ -150,6 +150,29 @@ with st.expander("📁 Mis Proyectos — guardar / cambiar proyecto", expanded=F
         "no se guardan — deberás volver a ejecutarlos tras cargar un proyecto. "
         "Los datos de entrada (ciudad, área, equipos, presupuesto) sí se preservan."
     )
+
+# ── Banner de pasos pendientes tras cargar un proyecto (#124) ────────────────
+if st.session_state.get("_proyecto_recien_cargado"):
+    _pasos = []
+    if not st.session_state.get("recurso_solar_ok"):
+        _pasos.append("☀️ **Recurso Solar**")
+    if not st.session_state.get("produccion_ok"):
+        _pasos.append("📊 **Producción**")
+    if not st.session_state.get("financiero_ok"):
+        _pasos.append("💰 **Financiero**")
+
+    if _pasos:
+        _col_banner, _col_x = st.columns([10, 1])
+        _col_banner.info(
+            f"📂 **Proyecto cargado.** Para activar todos los módulos, "
+            f"re-ejecuta en orden: {' → '.join(_pasos)}"
+        )
+        if _col_x.button("✕", key="_pm_dismiss_banner", help="Descartar aviso"):
+            st.session_state.pop("_proyecto_recien_cargado", None)
+            st.rerun()
+    else:
+        # Todos los pasos están listos — limpiar flag
+        st.session_state.pop("_proyecto_recien_cargado", None)
 
 # ── Tipos de instalación con defaults técnicos ────────────────────────────────
 TIPOS_INSTALACION = {

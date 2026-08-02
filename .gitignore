@@ -56,6 +56,13 @@ coverage/
 # Dependency directories
 jspm_packages/
 
+# Python virtual environments (incompatible across systems — never commit)
+bipv_python/venv/
+**/venv/
+**/__pycache__/
+*.pyc
+*.pyo
+
 # TypeScript cache
 *.tsbuildinfo
 
