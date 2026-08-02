@@ -470,10 +470,15 @@ with t0:
         help="Base = mediana de mercado. Optimista = compra directa + negociación. Conservador = + contingencias."
     )
 
-    # Auto-detectar zona — prioridad: municipio_predio (coords reales) > tmy_ciudad (ref. climática)
+    # Auto-detectar zona — prioridad:
+    #   1. municipio_predio  (nombre real del predio, keyword matching)
+    #   2. zona_geo_coords   (lat/lon del proyecto → calculada en Recurso Solar, nombre exacto)
+    #   3. tmy_ciudad        (ciudad de referencia TMY, keyword matching — menos fiable)
     _municipio_predio = str(st.session_state.get("municipio_predio", "")).lower()
     _ciudad_tmy       = str(st.session_state.get("tmy_ciudad", "")).lower()
+    _zona_geo_coords  = st.session_state.get("zona_geo_coords", "")   # set en Recurso Solar
     _zona_opts  = list(_ZONA_FACTOR.keys())
+
     # IMPORTANTE: keywords más específicos primero. "antioq" es substring de
     # "Antioquia" que aparece tanto en "Medellín, Antioquia" como en
     # "Apartadó, Urabá, Antioquia" — Urabá debe ir ANTES que "antioq".
@@ -501,23 +506,33 @@ with t0:
         "bogot": 0, "saban": 0, "tunja": 0, "cundinam": 0,
     }
 
-    # Buscar zona primero en municipio_predio (coordenadas reales), luego en ciudad TMY
-    _zona_idx   = 0
+    _zona_idx    = 0
     _zona_fuente = None
-    for _buscar, _fuente_label in [(_municipio_predio, "predio"), (_ciudad_tmy, "TMY")]:
-        if not _buscar:
-            continue
-        for kw, idx in _zona_map.items():
-            if kw in _buscar:
-                _zona_idx    = idx
-                _zona_fuente = _fuente_label
-                break
-        if _zona_fuente:
+
+    # Fuente 1: nombre del predio (keyword matching)
+    for kw, idx in _zona_map.items():
+        if kw in _municipio_predio:
+            _zona_idx    = idx
+            _zona_fuente = "predio"
             break
 
-    # Pre-poblar session_state cuando la fuente es el predio real
-    # (evita que la zona de la ciudad TMY quede "pegada" del render anterior)
-    if _zona_fuente == "predio":
+    # Fuente 2: lat/lon del proyecto (nombre exacto desde Recurso Solar)
+    if not _zona_fuente and _zona_geo_coords in _zona_opts:
+        _zona_idx    = _zona_opts.index(_zona_geo_coords)
+        _zona_fuente = "coords"
+
+    # Fuente 3: ciudad TMY de referencia (keyword matching — menos precisa)
+    if not _zona_fuente:
+        for kw, idx in _zona_map.items():
+            if kw in _ciudad_tmy:
+                _zona_idx    = idx
+                _zona_fuente = "TMY"
+                break
+
+    # FIX: pre-poblar session_state para TODAS las fuentes automáticas.
+    # Sin esto, Streamlit ignora `index=` en renders sucesivos porque el key
+    # ya existe en session_state con el valor anterior.
+    if _zona_fuente:
         st.session_state["est_zona"] = _zona_opts[_zona_idx]
 
     zona_est = col_s3.selectbox(
@@ -532,12 +547,20 @@ with t0:
             f"({st.session_state.get('municipio_predio', '—')}) → "
             f"**{zona_est}** (factor ×{_ZONA_FACTOR[zona_est]:.2f})"
         )
+    elif _zona_fuente == "coords":
+        st.caption(
+            f"🛰️ Zona detectada desde las **coordenadas del proyecto** "
+            f"(lat/lon registradas en Recurso Solar) → "
+            f"**{zona_est}** (factor ×{_ZONA_FACTOR[zona_est]:.2f})  \n"
+            f"ℹ️ Ingresa el nombre del municipio en **Proyecto** para mayor precisión."
+        )
     elif _zona_fuente == "TMY":
         st.caption(
             f"🌡️ Zona estimada desde ciudad de referencia TMY: "
             f"**{st.session_state.get('tmy_ciudad', '—')}** → "
             f"**{zona_est}** (factor ×{_ZONA_FACTOR[zona_est]:.2f})  \n"
-            f"ℹ️ Ingresa coordenadas del predio en **Proyecto** para una detección más precisa."
+            f"⚠️ La ciudad TMY puede diferir del predio real. Ejecuta **Recurso Solar** "
+            f"con las coordenadas exactas del predio para mejorar la detección."
         )
 
     st.markdown("---")

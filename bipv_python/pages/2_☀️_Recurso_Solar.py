@@ -230,6 +230,16 @@ if _descarga_btn:
         st.dataframe(monthly_display.style.format("{:.1f}"), use_container_width=True)
 
     # ── Guardar en session_state ─────────────────────────────────────────────
+    # Detectar zona geográfica desde coordenadas del proyecto (referencia directa para Presupuesto)
+    def _zona_por_coords(la, lo):
+        if 4.5 <= la <= 8.5 and lo <= -76.0:              return "Urabá / Chocó (tropical)"
+        if la > 8.5 or (la > 7.5 and lo > -76.0):         return "Barranquilla / Costa"
+        if lo > -74.0:                                     return "Llanos Orientales"
+        if la < 4.5 and lo < -74.0:                        return "Cali / Valle"
+        if la < 5.5 and lo > -74.5:                        return "Bogotá / Sabana"
+        return "Medellín / Antioquia"
+    st.session_state["zona_geo_coords"]   = _zona_por_coords(lat, lon)
+
     st.session_state["tmy_df"]            = tmy
     st.session_state["poa_df"]            = poa
     st.session_state["tmy_ciudad"]        = ciudad
