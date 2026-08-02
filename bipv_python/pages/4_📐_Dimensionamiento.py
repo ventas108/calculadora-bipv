@@ -147,9 +147,11 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
             "Vmp extremo (V)": r.Vmp_extremo,
             "I equiv (A)": r.I_equiv_tracker,
             "1-Voc≤Vdc": r.v1_voc_max,
-            "2-Vmp≥Vmppt": r.v2_vmp_real,
-            "3-Vmp_ext≥Vmppt": r.v3_vmp_extr,
+            "2-Vmp≥Vmppt_min": r.v2_vmp_real,
+            "3-Vmp_ext≥Vmppt_min": r.v3_vmp_extr,
             "4-I≤Imax": r.v4_i_max,
+            "5-Vmp≤Vmppt_max": r.v5_vmp_max,
+            "MPPT util %": r.mppt_util_pct,
             "Riesgos": r.riesgos,
             "": r.semaforo_color(),
         })
@@ -166,15 +168,22 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
         return ""
 
     styled = df.style.applymap(colorear,
-                                subset=["1-Voc≤Vdc", "2-Vmp≥Vmppt",
-                                        "3-Vmp_ext≥Vmppt", "4-I≤Imax"])
+                                subset=["1-Voc≤Vdc", "2-Vmp≥Vmppt_min",
+                                        "3-Vmp_ext≥Vmppt_min", "4-I≤Imax",
+                                        "5-Vmp≤Vmppt_max"])
     st.dataframe(styled, use_container_width=True)
 
-    # Mejor opción: N con 0 riesgos y MÁXIMA Vmp (mejor aprovechamiento MPPT)
+    # Mejor opción: N con 0 riesgos y MÁXIMA utilización del rango MPPT
+    # (Vmp_real / Vmppt_max). Con el check v5 activo, candidatos con Vmp > Vmppt_max
+    # ya quedan excluidos por riesgos > 0, así que max(mppt_util_pct) es seguro.
     sin_riesgos = [r for r in resultados if r.riesgos == 0]
     if sin_riesgos:
-        mejor = max(sin_riesgos, key=lambda r: r.Vmp_real)
-        st.success(f"✅ N óptimo = **{mejor.N_serie} paneles/string** — 0 riesgos · Vmp = {mejor.Vmp_real:.1f} V (máximo MPPT)")
+        mejor = max(sin_riesgos, key=lambda r: r.mppt_util_pct if r.mppt_util_pct > 0 else r.Vmp_real)
+        _util_msg = f" · {mejor.mppt_util_pct:.1f}% MPPT" if mejor.mppt_util_pct > 0 else ""
+        st.success(
+            f"✅ N óptimo = **{mejor.N_serie} paneles/string** — "
+            f"0 riesgos · Vmp = {mejor.Vmp_real:.1f} V{_util_msg}"
+        )
         st.session_state["N_serie"] = mejor.N_serie
 
         # Dimensionamiento del sistema

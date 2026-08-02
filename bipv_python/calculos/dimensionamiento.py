@@ -26,13 +26,16 @@ class ResultadoString:
     v2_vmp_real:  EstadoVerif = "OK"
     v3_vmp_extr:  EstadoVerif = "OK"
     v4_i_max:     EstadoVerif = "OK"
+    v5_vmp_max:   EstadoVerif = "OK"   # Vmp_real ≤ Vmppt_max — límite superior MPPT
     riesgos: int = 0
+    mppt_util_pct: float = 0.0         # Vmp_real / Vmppt_max × 100 — aprovechamiento del rango MPPT
 
     def semaforo_color(self) -> str:
         if self.riesgos == 0:
             return "🟢"
         elif any(v == "FALLA" for v in [self.v1_voc_max, self.v2_vmp_real,
-                                         self.v3_vmp_extr, self.v4_i_max]):
+                                         self.v3_vmp_extr, self.v4_i_max,
+                                         self.v5_vmp_max]):
             return "🔴"
         return "🟡"
 
@@ -95,13 +98,20 @@ def optimizar_n_serie(panel: dict, inversor: dict,
         # no contra I_max_tracker (operación/MPP). Fallback a I_max_tracker si falta.
         _isc_lim = inversor.get("Isc_max_tracker") or inversor.get("I_max_tracker", 0)
         v4 = semaforo(I_equiv, _isc_lim,                    invertir=False)
+        # Check 5: Vmp_real ≤ Vmppt_max — límite superior del rango MPPT.
+        # Si Vmp supera Vmppt_max el inversor opera fuera de su ventana de seguimiento.
+        _vmppt_max = inversor.get("Vmppt_max") or inversor.get("Vmppt_activo_max", 0)
+        v5 = semaforo(Vmp_re, _vmppt_max, invertir=False) if _vmppt_max else "OK"
 
-        riesgos = sum(1 for v in [v1, v2, v3, v4] if v in ("ALERTA", "FALLA"))
+        # MPPT utilization: qué fracción del techo MPPT aprovecha este string
+        _util = round(Vmp_re / _vmppt_max * 100, 1) if _vmppt_max else 0.0
+
+        riesgos = sum(1 for v in [v1, v2, v3, v4, v5] if v in ("ALERTA", "FALLA"))
         resultados.append(ResultadoString(
             N_serie=N, Voc_frio=round(Voc_fr, 1), Vmp_real=round(Vmp_re, 1),
             Vmp_extremo=round(Vmp_ex, 1), I_equiv_tracker=round(I_equiv, 2),
             v1_voc_max=v1, v2_vmp_real=v2, v3_vmp_extr=v3, v4_i_max=v4,
-            riesgos=riesgos,
+            v5_vmp_max=v5, riesgos=riesgos, mppt_util_pct=_util,
         ))
     return resultados
 
