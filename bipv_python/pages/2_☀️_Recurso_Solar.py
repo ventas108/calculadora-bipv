@@ -148,6 +148,37 @@ with col_or3:
 
 st.markdown("---")
 
+# ── #64 — Invalidar recurso solar si las coordenadas cambiaron ───────────────
+# Compara las coords actuales del proyecto con las que se usaron para calcular
+# el recurso solar almacenado. Si difieren, limpia los resultados y avisa.
+_SOLAR_SS_KEYS = (
+    "recurso_solar_ok", "tmy_df", "poa_df", "tmy_ciudad",
+    "tilt_fachada", "tilt_default", "azimuth_fachada", "orientacion_label",
+    "poa_anual_kWh_m2", "ghi_anual_kWh_m2", "t_media_anual",
+    "zona_geo_coords", "poa_efectiva_df",
+)
+_s_lat = st.session_state.get("_solar_lat_guardada")
+_s_lon = st.session_state.get("_solar_lon_guardada")
+_s_alt = st.session_state.get("_solar_alt_guardada")
+if st.session_state.get("recurso_solar_ok") and _s_lat is not None:
+    _drift = (
+        abs(lat - float(_s_lat)) > 0.0001 or
+        abs(lon - float(_s_lon)) > 0.0001 or
+        abs(alt_m - int(_s_alt))  > 10
+    )
+    if _drift:
+        for _k in _SOLAR_SS_KEYS:
+            st.session_state.pop(_k, None)
+        for _k in ("_solar_lat_guardada", "_solar_lon_guardada", "_solar_alt_guardada"):
+            st.session_state.pop(_k, None)
+        st.warning(
+            f"⚠️ **Recurso solar invalidado** — las coordenadas del proyecto cambiaron.  \n"
+            f"Recurso calculado para: **{float(_s_lat):.5f}°**, **{float(_s_lon):.5f}°**, "
+            f"**{int(_s_alt)} m**  \n"
+            f"Coordenadas actuales: **{lat:.5f}°**, **{lon:.5f}°**, **{alt_m} m**  \n"
+            "Presiona **🌐 Descargar TMY de PVGIS** para recalcular con las coordenadas actuales."
+        )
+
 # ── Auto-restaurar desde caché de disco (sobrevive reinicios de PM2) ─────────
 # Si los parámetros actuales coinciden con un caché en disco y la sesión aún no
 # tiene datos, restaurar silenciosamente para evitar la descarga de PVGIS.
@@ -167,18 +198,22 @@ if not st.session_state.get("recurso_solar_ok"):
             if la < 5.5 and lo > -74.5:                        return "Bogotá / Sabana"
             return "Medellín / Antioquia"
         st.session_state.update({
-            "tmy_df":             _tmy_r,
-            "poa_df":             _poa_r,
-            "tmy_ciudad":         ciudad,
-            "tilt_fachada":       tilt,
-            "tilt_default":       tilt,
-            "azimuth_fachada":    azimuth,
-            "orientacion_label":  orientacion_label,
-            "poa_anual_kWh_m2":   round(_poa_anual_r, 1),
-            "ghi_anual_kWh_m2":   round(_ghi_anual_r, 1),
-            "t_media_anual":      round(_t_media_r, 1),
-            "zona_geo_coords":    _zona_por_coords_rs(lat, lon),
-            "recurso_solar_ok":   True,
+            "tmy_df":              _tmy_r,
+            "poa_df":              _poa_r,
+            "tmy_ciudad":          ciudad,
+            "tilt_fachada":        tilt,
+            "tilt_default":        tilt,
+            "azimuth_fachada":     azimuth,
+            "orientacion_label":   orientacion_label,
+            "poa_anual_kWh_m2":    round(_poa_anual_r, 1),
+            "ghi_anual_kWh_m2":    round(_ghi_anual_r, 1),
+            "t_media_anual":       round(_t_media_r, 1),
+            "zona_geo_coords":     _zona_por_coords_rs(lat, lon),
+            "recurso_solar_ok":    True,
+            # ── #64 — Guardar coords para detectar cambios futuros ───────────
+            "_solar_lat_guardada": lat,
+            "_solar_lon_guardada": lon,
+            "_solar_alt_guardada": alt_m,
         })
         st.info(
             f"📂 **Recurso solar restaurado desde caché local** — "
@@ -209,6 +244,9 @@ if _recalc_btn:
     except Exception:
         pass
     st.session_state["recurso_solar_ok"] = False
+    # ── #64 — Limpiar coords guardadas para que la próxima ejecución las reescriba
+    for _k in ("_solar_lat_guardada", "_solar_lon_guardada", "_solar_alt_guardada"):
+        st.session_state.pop(_k, None)
     st.success("✅ Caché limpiada — presiona **Descargar TMY** para obtener datos frescos.")
 
 if _descarga_btn:
@@ -324,7 +362,7 @@ if _descarga_btn:
         if la < 4.5 and lo < -74.0:                        return "Cali / Valle"
         if la < 5.5 and lo > -74.5:                        return "Bogotá / Sabana"
         return "Medellín / Antioquia"
-    st.session_state["zona_geo_coords"]   = _zona_por_coords(lat, lon)
+    st.session_state["zona_geo_coords"]    = _zona_por_coords(lat, lon)
 
     st.session_state["tmy_df"]            = tmy
     st.session_state["poa_df"]            = poa
@@ -337,6 +375,10 @@ if _descarga_btn:
     st.session_state["ghi_anual_kWh_m2"]  = round(ghi_anual, 1)
     st.session_state["t_media_anual"]     = round(t_media, 1)
     st.session_state["recurso_solar_ok"]  = True
+    # ── #64 — Guardar coords usadas para detectar drift futuro ───────────────
+    st.session_state["_solar_lat_guardada"] = lat
+    st.session_state["_solar_lon_guardada"] = lon
+    st.session_state["_solar_alt_guardada"] = alt_m
 
     st.success(
         f"✅ Recurso solar calculado para **{ciudad}**  |  "

@@ -130,8 +130,18 @@ with col1:
         # Pre-cargar tarifa del operador local de la nueva ciudad
         if "tarifa_comercial_cop_kwh" in c_nueva:
             st.session_state["tarifa_cop_kwh"] = float(c_nueva["tarifa_comercial_cop_kwh"])
-        for _k in ("lat_proyecto", "lon_proyecto", "alt_proyecto",
-                   "densidad_Wm2", "PR", "tilt_default"):
+        # Limpiar datos de proyecto + recurso solar (coords del sitio cambian)
+        _KEYS_LIMPIAR_CIUDAD = (
+            "lat_proyecto", "lon_proyecto", "alt_proyecto",
+            "densidad_Wm2", "PR", "tilt_default",
+            # ── #64 — Recurso solar para las coordenadas anteriores ──────────
+            "recurso_solar_ok", "tmy_df", "poa_df", "tmy_ciudad",
+            "tilt_fachada", "azimuth_fachada", "orientacion_label",
+            "poa_anual_kWh_m2", "ghi_anual_kWh_m2", "t_media_anual",
+            "zona_geo_coords", "poa_efectiva_df",
+            "_solar_lat_guardada", "_solar_lon_guardada", "_solar_alt_guardada",
+        )
+        for _k in _KEYS_LIMPIAR_CIUDAD:
             st.session_state.pop(_k, None)
         st.rerun()  # Re-render limpio para evitar DOM error al cambiar ciudad
 
