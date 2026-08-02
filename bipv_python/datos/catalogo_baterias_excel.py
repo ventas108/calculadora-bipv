@@ -109,6 +109,26 @@ _NUM_KEYS = {"capacidad_kWh", "potencia_kW", "voltaje_V",
              "dod_pct", "ciclos_vida", "eta_rte_pct",
              "costo_usd", "garantia_anos"}
 
+# ── #24 — Aliases canónicos por campo (para mensajes de acción en UI) ─────────
+# Lista de nombres de columna sugeridos para agregar al Excel si el campo falta.
+_CAMPO_ALIASES_SUGERIDOS: dict[str, list[str]] = {
+    "capacidad_kWh": ["Capacidad (kWh)", "Energía Nominal (kWh)", "Energy (kWh)"],
+    "potencia_kW":   ["Potencia Continua (kW)", "Potencia Max (kW)", "Continuous Power (kW)"],
+    "voltaje_V":     ["Voltaje Nominal (V)", "Tensión Nominal (V)", "Nominal Voltage (V)"],
+    "dod_pct":       ["DoD Máximo (%)", "Profundidad Descarga (%)", "Depth of Discharge (%)"],
+    "ciclos_vida":   ["Ciclos de Vida", "Cycle Life", "Cycles"],
+    "eta_rte_pct":   ["Eficiencia RTE (%)", "Round-trip Efficiency (%)", "RTE (%)"],
+    "tipo":          ["Tecnología", "Química", "Chemistry"],
+    "costo_usd":     ["Costo (USD)", "Precio (USD)", "Price (USD)"],
+    "garantia_anos": ["Garantía (años)", "Warranty (years)"],
+    "fabricante":    ["Fabricante", "Manufacturer"],
+}
+
+# Campos que bloquean el dimensionamiento si no se encuentran en el Excel
+_CAMPOS_CRITICOS   = {"capacidad_kWh", "potencia_kW"}
+# Campos que afectan precisión pero tienen defaults seguros
+_CAMPOS_IMPORTANTES = {"dod_pct", "eta_rte_pct", "ciclos_vida"}
+
 
 def _f(val, default=None):
     """Convierte a float; devuelve default para None, NaN o no-numérico."""
@@ -277,18 +297,34 @@ def diagnostico_catalogo() -> dict:
                                 "datos_completos": b.get("datos_completos")})
     info["modelos_incompletos"] = incompletos
 
-    # Columnas del Excel que no están en _COL_MAP
+    # Columnas del Excel que no están en _COL_MAP  +  campos sin ningún alias en Excel
     for h in range(5):
         try:
             df_cand = pd.read_excel(_EXCEL, sheet_name=sheet_found,
                                     header=h, engine="openpyxl")
             cols = [_normalizar_col(c) for c in df_cand.columns]
             if any(c.lower() in _MODELO_ALIASES for c in cols):
-                mapeadas   = set(_COL_MAP.keys())
+                mapeadas    = set(_COL_MAP.keys())
                 no_mapeadas = [c for c in cols if c not in mapeadas
                                and c.lower() not in _MODELO_ALIASES
                                and "unnamed" not in c.lower()]
                 info["columnas_no_mapeadas"] = no_mapeadas
+
+                # ── #24 — Campos internos cuyo alias NO aparece en el Excel ──────────
+                # Distingue "columna existe pero celda vacía" de "columna ausente en total"
+                cols_excel_set = set(cols)
+                campos_sin_columna = []
+                for campo_int, aliases_sug in _CAMPO_ALIASES_SUGERIDOS.items():
+                    # Todos los alias de este campo interno en _COL_MAP
+                    aliases_del_campo = [k for k, v in _COL_MAP.items() if v == campo_int]
+                    if not any(a in cols_excel_set for a in aliases_del_campo):
+                        campos_sin_columna.append({
+                            "campo":              campo_int,
+                            "critico":            campo_int in _CAMPOS_CRITICOS,
+                            "importante":         campo_int in _CAMPOS_IMPORTANTES,
+                            "columnas_sugeridas": aliases_sug,
+                        })
+                info["campos_sin_columna_excel"] = campos_sin_columna
                 break
         except Exception:
             continue

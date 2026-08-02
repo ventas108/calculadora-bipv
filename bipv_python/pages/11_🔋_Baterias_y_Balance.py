@@ -109,52 +109,102 @@ if not tiene_catalogo:
         st.warning("🟡 **Catálogo vacío** — la hoja existe pero no se cargaron modelos. "
                    "Verifique que las columnas del Excel coincidan con el formato esperado.")
 else:
-    _n_modelos    = _diag.get("modelos_cargados", len(cat_bat))
-    _incompletos  = _diag.get("modelos_incompletos", [])
-    _no_mapeadas  = _diag.get("columnas_no_mapeadas", [])
+    _n_modelos   = _diag.get("modelos_cargados", len(cat_bat))
+    _incompletos = _diag.get("modelos_incompletos", [])
+    _no_mapeadas = _diag.get("columnas_no_mapeadas", [])
+    # #24 — campos cuyo alias no apareció en NINGUNA columna del Excel
+    _ausentes    = _diag.get("campos_sin_columna_excel", [])
 
-    if _incompletos or _no_mapeadas:
+    _criticos_aus    = [c for c in _ausentes if c.get("critico")]
+    _importantes_aus = [c for c in _ausentes if c.get("importante") and not c.get("critico")]
+
+    # ── Alertas de columnas ausentes — visibles sin abrir el expander ──────────
+    if _criticos_aus:
+        st.error(
+            "🔴 **Columnas críticas ausentes en el Excel** — sin ellas ninguna batería "
+            "puede dimensionarse: `"
+            + "`, `".join(c["campo"] for c in _criticos_aus) + "`  \n"
+            "Abre el diagnóstico ↓ para ver exactamente qué encabezados agregar al Excel."
+        )
+    if _importantes_aus:
         st.warning(
-            f"🟡 **Catálogo parcial** — hoja `{_hoja_usada}` · "
-            f"**{_n_modelos} modelos** cargados · "
-            f"{len(_incompletos)} modelos con datos incompletos"
+            "⚠️ **Columnas importantes ausentes en el Excel**: `"
+            + "`, `".join(c["campo"] for c in _importantes_aus) + "`  \n"
+            "Se usarán valores por defecto (80 % DoD · 95 % RTE · 3 000 ciclos). "
+            "Abre el diagnóstico ↓ para ver qué encabezados agregar."
+        )
+
+    if _ausentes or _incompletos or _no_mapeadas:
+        st.warning(
+            f"🟡 **Catálogo parcial** — hoja `{_hoja_usada}` · **{_n_modelos} modelos** cargados"
+            + (f" · {len(_ausentes)} columnas ausentes en Excel" if _ausentes else "")
+            + (f" · {len(_incompletos)} modelos con valores vacíos" if _incompletos else "")
             + (f" · {len(_no_mapeadas)} columnas no reconocidas" if _no_mapeadas else "")
         )
     else:
         st.success(
-            f"✅ **Catálogo OK** — hoja `{_hoja_usada}` · **{_n_modelos} modelos** · todos los campos reconocidos"
+            f"✅ **Catálogo OK** — hoja `{_hoja_usada}` · **{_n_modelos} modelos** · "
+            "todas las columnas reconocidas y sin valores vacíos"
         )
 
-# ── #24 — Expander de diagnóstico detallado ───────────────────────────────────
+# ── #24 — Expander de diagnóstico detallado ──────────────────────────────────
 if tiene_catalogo:
     _incompletos = _diag.get("modelos_incompletos", [])
     _no_mapeadas = _diag.get("columnas_no_mapeadas", [])
-    if _incompletos or _no_mapeadas:
+    _ausentes    = _diag.get("campos_sin_columna_excel", [])
+    if _ausentes or _incompletos or _no_mapeadas:
         with st.expander("🔍 Diagnóstico detallado del catálogo"):
+
+            # ① Columnas completamente ausentes del Excel (#24)
+            if _ausentes:
+                st.markdown("**① Columnas sin ningún alias en el Excel:**")
+                st.caption(
+                    "Estas columnas internas no tienen NINGUNA columna mapeada en tu Excel. "
+                    "Agrega **UNA** de las opciones sugeridas como encabezado de columna en "
+                    f"la hoja `{_diag.get('hoja_usada', 'Catalogo_Baterias')}`."
+                )
+                _rows_aus = []
+                for _c in _ausentes:
+                    _nivel = (
+                        "🔴 Crítico"    if _c.get("critico")    else
+                        "🟡 Importante" if _c.get("importante") else
+                        "🔵 Opcional"
+                    )
+                    _rows_aus.append({
+                        "Campo interno":  _c["campo"],
+                        "Nivel":          _nivel,
+                        "Agregar UNA de estas columnas al Excel":
+                            " | ".join(_c.get("columnas_sugeridas", [])),
+                    })
+                st.dataframe(pd.DataFrame(_rows_aus), use_container_width=True, hide_index=True)
+
+            # ② Columnas del Excel no reconocidas
             if _no_mapeadas:
-                st.markdown("**Columnas del Excel NO reconocidas por el loader:**")
+                st.markdown("**② Columnas del Excel NO reconocidas por el loader:**")
                 st.code(", ".join(_no_mapeadas))
                 st.caption(
                     "Estas columnas están en el Excel pero no tienen un alias en el loader. "
-                    "Si contienen datos importantes (voltaje, DoD, ciclos…), agrega el nombre exacto "
-                    "al `_COL_MAP` en `datos/catalogo_baterias_excel.py`."
+                    "Si contienen datos importantes, agrega el nombre exacto al `_COL_MAP` "
+                    "en `datos/catalogo_baterias_excel.py`."
                 )
+
+            # ③ Modelos con valores vacíos (la columna existe pero la celda está vacía)
             if _incompletos:
-                st.markdown("**Modelos con campos críticos faltantes:**")
-                rows = []
-                for m in _incompletos:
-                    rows.append({
-                        "Modelo": m["modelo"],
-                        "Campos faltantes": ", ".join(m["campos_faltantes"]) if m["campos_faltantes"] else "—",
-                        "Ficha marcada": "✅ Sí" if m.get("datos_completos") else "🟡 No",
+                st.markdown("**③ Modelos con valores vacíos en campos críticos:**")
+                _rows_inc = []
+                for _m in _incompletos:
+                    _rows_inc.append({
+                        "Modelo":                   _m["modelo"],
+                        "Campos con valor vacío":   ", ".join(_m["campos_faltantes"]) if _m["campos_faltantes"] else "—",
+                        "Ficha marcada completa":   "✅ Sí" if _m.get("datos_completos") else "🟡 No",
                     })
                 st.dataframe(
-                    pd.DataFrame(rows), use_container_width=True, hide_index=True
+                    pd.DataFrame(_rows_inc), use_container_width=True, hide_index=True
                 )
                 st.caption(
                     "Modelos sin `capacidad_kWh` no pueden dimensionarse. "
                     "Modelos sin `dod_pct`, `eta_rte_pct` o `ciclos_vida` usan valores por defecto "
-                    "(80% DoD · 95% RTE · 3000 ciclos)."
+                    "(80 % DoD · 95 % RTE · 3 000 ciclos)."
                 )
 elif not tiene_catalogo:
     with st.expander("📋 Columnas esperadas en la hoja Catalogo_Baterias"):
