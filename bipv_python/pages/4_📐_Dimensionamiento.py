@@ -28,16 +28,50 @@ with col1:
 panel    = obtener_panel_excel(panel_nombre) if _cat_excel else MODULOS_BIPV[panel_nombre]
 inversor = obtener_inversor_excel(inversor_nombre) if _cat_inv else seleccionar_inversor(inversor_nombre)
 
+# ── Auto-población de temperaturas desde TMY ──────────────────────────────────
+# Se recalcula SOLO cuando cambia el origen de datos climáticos (nueva ciudad/TMY).
+# Una vez aplicado para una ciudad, el usuario puede editar libremente los campos.
+_tmy_df    = st.session_state.get("tmy_df")
+_ciudad_ss = st.session_state.get("tmy_ciudad", "")
+_ciudad_applied = st.session_state.get("_dim_tmy_ciudad_ref", None)
+_temp_auto_info = None
+
+if _tmy_df is not None and _ciudad_ss and _ciudad_ss != _ciudad_applied:
+    try:
+        _noct    = float(panel.get("NOCT", 45.0))
+        _t2m     = _tmy_df["T2m"] if "T2m" in _tmy_df.columns else _tmy_df.iloc[:, 0]
+        _t_min   = round(float(_t2m.min()), 1)
+        _t_p95   = round(float(_t2m.quantile(0.95)), 1)
+        _t_max   = round(float(_t2m.max()), 1)
+        # T_celda = T_amb + (NOCT-20)/800 * G  (fórmula Mod_TemperaturasDiseno VBA)
+        _t_real  = round(_t_p95 + (_noct - 20.0) / 800.0 * 800.0, 1)   # G=800 W/m²
+        _t_extr  = round(_t_max + (_noct - 20.0) / 800.0 * 1000.0, 1)  # G=1000 W/m²
+        # Pre-poblar session_state ANTES de renderizar los widgets
+        st.session_state["T_min_diseno"]       = _t_min
+        st.session_state["T_cel_realista"]     = _t_real
+        st.session_state["T_cel_extremo"]      = _t_extr
+        st.session_state["_dim_tmy_ciudad_ref"] = _ciudad_ss
+        _temp_auto_info = (
+            f"🌡️ Temperaturas actualizadas desde TMY **{_ciudad_ss}** — "
+            f"T_mín: {_t_min}°C · T_celda realista: {_t_real}°C · T_celda extremo: {_t_extr}°C "
+            f"(NOCT {_noct}°C del panel)"
+        )
+    except Exception:
+        pass  # Si falla, usa defaults anteriores sin interrumpir
+
 with col2:
     T_frio   = st.number_input("T_mín diseño (°C)", value=float(
                                 st.session_state.get("T_min_diseno", 5.0)),
-                key="T_min_diseno")
+                key="T_min_diseno",
+                help="Auto-calculado como mínimo histórico del TMY. Determina Voc_max y riesgo sobre Vdc_max del inversor.")
     T_real   = st.number_input("T_celda caliente realista (°C)", value=float(
                                 st.session_state.get("T_cel_realista", 36.35)),
-                key="T_cel_realista")
+                key="T_cel_realista",
+                help="T_amb P95 + (NOCT-20)/800×800 W/m². Determina Vmp de operación habitual.")
     T_extr   = st.number_input("T_celda caliente extremo (°C)", value=float(
                                 st.session_state.get("T_cel_extremo", 41.94)),
-                key="T_cel_extremo")
+                key="T_cel_extremo",
+                help="T_amb máxima histórica + (NOCT-20)/800×1000 W/m². Determina Vmp mínimo (peor caso MPPT).")
     N_str_tr = st.number_input("N_strings por tracker (via combinadoras)", value=int(st.session_state.get("N_str_tr", 1)), min_value=1, key="N_str_tr")
     col_nm1, col_nm2 = st.columns(2)
     with col_nm1:
@@ -54,6 +88,10 @@ with col2:
         )
     with col_nm2:
         N_max_scan = st.number_input("N máximo a explorar", value=int(st.session_state.get("N_max_scan", 20)), min_value=2, max_value=40, key="N_max_scan")
+
+# Banner de auto-actualización de temperaturas
+if _temp_auto_info:
+    st.info(_temp_auto_info)
 
 # (panel e inversor ya cargados arriba)
 if panel.get("costo_usd"):
