@@ -67,10 +67,12 @@ if not _src_multisup.exists():
     print(f"  [ERROR] Fuente no encontrada: {_src_multisup}")
     sys.exit(1)
 
-backup(DST_MULTISUP, "B5A")
-
-shutil.copy2(_src_multisup, DST_MULTISUP)
-print(f"  [✓] multi_superficie.py copiado ({_src_multisup.stat().st_size:,} bytes)")
+if _src_multisup.resolve() == DST_MULTISUP.resolve():
+    print(f"  [OK] Origen y destino son el mismo archivo — ya desplegado vía git.")
+else:
+    backup(DST_MULTISUP, "B5A")
+    shutil.copy2(_src_multisup, DST_MULTISUP)
+    print(f"  [✓] multi_superficie.py copiado ({_src_multisup.stat().st_size:,} bytes)")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PARTE B — pages/9_🗺️_Vista_3D.py
