@@ -122,30 +122,8 @@ st.markdown(
     "| 📄 Informe en PDF | Reporte técnico descargable con todos los resultados |\n"
     "| 🔋 Baterías y Balance | Dimensionamiento de almacenamiento y balance de energía |\n"
     "| 🌿 Impacto CO₂ | Huella de carbono evitada y equivalencias ambientales |\n"
-)
-
-st.markdown("---")
-st.markdown(
-    "### ¿Por qué esta calculadora y no PVsyst / SAM?\n\n"
-    "PVsyst y SAM son el estándar de la industria para simulación energética, "
-    "pero son agnósticos en finanzas y trabajan en una sola moneda sin adaptación al mercado colombiano. "
-    "Esta calculadora cubre el tramo que ellos ignoran: **de la producción simulada al presupuesto bancable en pesos colombianos.**\n\n"
-    "| Característica | PVsyst / SAM / RETScreen | Esta calculadora |\n"
-    "|---|:---:|:---:|\n"
-    "| Simulación energética IEC 61724 hora a hora | ✅ | ✅ |\n"
-    "| TRM en tiempo real (Banco de la República) | ❌ | ✅ |\n"
-    "| TRM sincronizada entre Presupuesto y Financiero | ❌ | ✅ |\n"
-    "| Alerta si TRM fuera de rango operativo | ❌ | ✅ |\n"
-    "| Moneda dual COP / USD en presupuesto y flujo de caja | ❌ | ✅ |\n"
-    "| Ley 1715/2014: exclusión IVA + arancel + renta | ❌ | ✅ |\n"
-    "| Zona geográfica CREG detectada desde coordenadas GPS | ❌ | ✅ |\n"
-    "| String sizing con semáforo OK / ALERTA / FALLA | ❌ | ✅ |\n"
-    "| Catálogo de inversores y paneles en Excel editable | ❌ | ✅ |\n"
-    "| Motor óptico BIPV (sombra, suciedad, reflectividad, τ) | ❌ | ✅ |\n"
-    "| Presupuesto CAPEX ítem por ítem exportable | ❌ | ✅ |\n"
-    "| Informe PDF técnico descargable | ❌ | ✅ |\n"
-    "| Dimensionamiento de baterías y balance de energía | ❌ | ✅ |\n"
-    "| Huella de carbono evitada (CO₂eq) | ❌ | ✅ |\n"
+    "| 💱 TRM en tiempo real | Tasa de cambio oficial del Banco de la República — actualización automática por hora |\n"
+    "| 🔄 TRM sincronizada | Cambiar la TRM en Presupuesto la actualiza automáticamente en Financiero y viceversa |\n"
 )
 st.markdown("---")
 st.caption(
