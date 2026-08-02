@@ -125,6 +125,29 @@ st.markdown(
 )
 
 st.markdown("---")
+st.markdown(
+    "### ¿Por qué esta calculadora y no PVsyst / SAM?\n\n"
+    "PVsyst y SAM son el estándar de la industria para simulación energética, "
+    "pero son agnósticos en finanzas y trabajan en una sola moneda sin adaptación al mercado colombiano. "
+    "Esta calculadora cubre el tramo que ellos ignoran: **de la producción simulada al presupuesto bancable en pesos colombianos.**\n\n"
+    "| Característica | PVsyst / SAM / RETScreen | Esta calculadora |\n"
+    "|---|:---:|:---:|\n"
+    "| Simulación energética IEC 61724 hora a hora | ✅ | ✅ |\n"
+    "| TRM en tiempo real (Banco de la República) | ❌ | ✅ |\n"
+    "| TRM sincronizada entre Presupuesto y Financiero | ❌ | ✅ |\n"
+    "| Alerta si TRM fuera de rango operativo | ❌ | ✅ |\n"
+    "| Moneda dual COP / USD en presupuesto y flujo de caja | ❌ | ✅ |\n"
+    "| Ley 1715/2014: exclusión IVA + arancel + renta | ❌ | ✅ |\n"
+    "| Zona geográfica CREG detectada desde coordenadas GPS | ❌ | ✅ |\n"
+    "| String sizing con semáforo OK / ALERTA / FALLA | ❌ | ✅ |\n"
+    "| Catálogo de inversores y paneles en Excel editable | ❌ | ✅ |\n"
+    "| Motor óptico BIPV (sombra, suciedad, reflectividad, τ) | ❌ | ✅ |\n"
+    "| Presupuesto CAPEX ítem por ítem exportable | ❌ | ✅ |\n"
+    "| Informe PDF técnico descargable | ❌ | ✅ |\n"
+    "| Dimensionamiento de baterías y balance de energía | ❌ | ✅ |\n"
+    "| Huella de carbono evitada (CO₂eq) | ❌ | ✅ |\n"
+)
+st.markdown("---")
 st.caption(
     "Calculadora BIPV v1.0 — Motor SDM validado contra XLSM auditado (De Soto 2006). "
     "FF_max CdTe = 76.28% @ G=200 W/m² ✓"
