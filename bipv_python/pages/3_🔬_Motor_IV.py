@@ -13,6 +13,7 @@ from calculos.modelo_iv import (
     validar_sdm_vs_ficha,
     tiene_sdm_completo,
     estimar_sdm_desde_ficha,
+    verificar_ns_halfcut,
 )
 from calculos.temperatura import temperatura_celda_noct
 from datos.tecnologias_bipv import ASP_ST1_T40, MODULOS_BIPV
@@ -75,6 +76,21 @@ if _panel_ss and _panel_nom_ss:
                     f"(catálogo Excel). Parámetros SDM estimados por **{_metodo_est}** "
                     f"desde ficha técnica. Resultados orientativos.{_adv_lines}"
                 )
+                # ── #67 — Aviso si N_s fue corregido por half-cut ────────────
+                if _sdm_est.get("_ns_corregido"):
+                    _hci = _sdm_est.get("_ns_halfcut_info", {})
+                    st.error(
+                        f"🔺 **N_s corregido automáticamente (half-cut):**  \n"
+                        f"El catálogo tiene N_s = **{_sdm_est['_ns_original']}** "
+                        f"(Voc/celda = {_hci.get('Voc_por_celda', '?'):.3f} V, "
+                        f"fuera del rango {_hci.get('rango_esperado', ('?','?'))[0]:.2f}–"
+                        f"{_hci.get('rango_esperado', ('?','?'))[1]:.2f} V para "
+                        f"{_hci.get('tecnologia', '?')}).  \n"
+                        f"Se usó **N_s = {_sdm_est['_N_s_usado']}** para el SDM.  \n"
+                        f"⚠️ Para que todos los motores sean consistentes, corrige "
+                        f"`Ns (Celdas Serie)` = **{_sdm_est['_N_s_usado']}** en la hoja "
+                        f"`Catalogo_Paneles_FV` del Excel."
+                    )
             else:
                 st.error(
                     f"❌ **No se pudo estimar el SDM para `{_panel_nom_ss}`.**  \n"
@@ -108,6 +124,27 @@ def _analizar_panel_motiv(p: dict) -> tuple:
     if not errores:  # solo mostramos advertencias si los campos críticos están
         if not _val("N_s", "NsA"):
             advertencias.append(("N_s", "Número de celdas en serie — se estimará desde Voc/0.65 V"))
+        else:
+            # ── #67 — Detectar N_s incorrecto en paneles half-cut ─────────────
+            _hc = verificar_ns_halfcut(p)
+            if _hc and _hc["tipo"] == "ns_duplicado":
+                _r = _hc["rango_esperado"]
+                advertencias.append((
+                    f"⚠️ N_s incorrecto (half-cut)",
+                    f"N_s={_hc['N_s_ingresado']} da **Voc/celda = {_hc['Voc_por_celda']:.3f} V** "
+                    f"(rango esperado {_r[0]:.2f}–{_r[1]:.2f} V para {_hc['tecnologia']}). "
+                    f"El valor correcto para SDM es N_s = **{_hc['N_s_sugerido']}** "
+                    f"(semiceldas ÷ 2). Corrige el campo `Ns (Celdas Serie)` en el Excel."
+                ))
+            elif _hc and _hc["tipo"] == "ns_mitad":
+                _r = _hc["rango_esperado"]
+                advertencias.append((
+                    f"⚠️ N_s incorrecto (muy bajo)",
+                    f"N_s={_hc['N_s_ingresado']} da **Voc/celda = {_hc['Voc_por_celda']:.3f} V** "
+                    f"(rango esperado {_r[0]:.2f}–{_r[1]:.2f} V para {_hc['tecnologia']}). "
+                    f"Valor sugerido: N_s = **{_hc['N_s_sugerido']}**. "
+                    f"Verifica el conteo de celdas en la ficha técnica."
+                ))
         if not p.get("tecnologia"):
             advertencias.append(("Tecnología", "Tecnología del panel — se asumirá Mono-Si"))
         if not _val("Tk_beta", "CoefVoc_C", "beta_oc"):

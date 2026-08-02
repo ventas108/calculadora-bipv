@@ -166,6 +166,124 @@ def tiene_sdm_completo(panel: dict) -> bool:
     return all(panel.get(k) not in (None, 0, "", "nan") for k in _SDM_KEYS)
 
 
+# ── Rangos Voc/celda @ STC esperados por tecnología (V/celda) ─────────────────
+_VOC_POR_CELDA_RANGO = {
+    "Mono-Si":  (0.55, 0.76),
+    "Poli-Si":  (0.52, 0.70),
+    "CdTe":     (0.76, 1.20),
+    "CIGS":     (0.52, 0.80),
+    "a-Si":     (0.58, 0.90),
+}
+_VOC_POR_CELDA_DEFAULT = (0.48, 1.25)
+
+# Palabras clave que indican panel half-cut en el nombre del modelo
+_HALFCUT_KEYWORDS = ("half-cut", "half cut", "halfcut", "half_cut", " hc ", "-hc-", "-hc ")
+
+
+def verificar_ns_halfcut(panel: dict) -> "dict | None":
+    """
+    Detecta si N_s en el catálogo es incorrecto para paneles half-cut.
+
+    Los paneles half-cut tienen las celdas cortadas a la mitad. Algunos fabricantes
+    listan N_s como el número TOTAL de semiceldas (p.ej. 144), cuando el modelo SDM
+    De Soto necesita el número de celdas EQUIVALENTES en serie desde el punto de vista
+    eléctrico (p.ej. 72 para una string de 72 semiceldas).
+
+    Heurística: calcula Voc / N_s y lo compara con el rango típico por tecnología.
+    - Si Voc/N_s < rango_min × 0.65  → N_s está duplicado  → N_s_sugerido = N_s // 2
+    - Si Voc/N_s > rango_max × 1.40  → N_s está a la mitad → N_s_sugerido = N_s × 2
+
+    Retorna None si no hay problema evidente, o dict con:
+        tipo              str   "ns_duplicado" | "ns_mitad"
+        Voc_por_celda     float Voc / N_s calculado
+        rango_esperado    tuple (min, max) para la tecnología
+        N_s_ingresado     int   valor en catálogo
+        N_s_sugerido      int   valor corregido recomendado
+        es_halfcut_nombre bool  True si el nombre del modelo contiene indicadores
+        tecnologia        str   tecnología normalizada usada
+        mensaje           str   texto para mostrar al usuario
+    """
+    Voc = float(panel.get("Voc_stc") or panel.get("Voc") or 0)
+    N_s = panel.get("N_s")
+    if not (Voc > 10 and N_s and float(N_s) > 0):
+        return None   # sin datos suficientes para verificar
+
+    N_s_f = float(N_s)
+    voc_per_cell = Voc / N_s_f
+
+    # Normalizar tecnología
+    tec_raw = str(panel.get("tecnologia", "")).strip().lower()
+    _MAP = {
+        "mono-si": "Mono-Si", "mono si": "Mono-Si", "monocrystalline": "Mono-Si",
+        "monocristalino": "Mono-Si", "mono": "Mono-Si",
+        "poli-si": "Poli-Si", "poly-si": "Poli-Si", "policristalino": "Poli-Si",
+        "multicrystalline": "Poli-Si", "poly": "Poli-Si",
+        "cdte": "CdTe", "cd te": "CdTe",
+        "cigs": "CIGS", "cis": "CIGS",
+        "a-si": "a-Si", "asi": "a-Si", "amorphous": "a-Si",
+    }
+    tec_norm = _MAP.get(tec_raw, "")
+    rango = _VOC_POR_CELDA_RANGO.get(tec_norm, _VOC_POR_CELDA_DEFAULT)
+    r_min, r_max = rango
+
+    # Detectar indicadores half-cut en el nombre del modelo
+    nombre_lower = str(panel.get("nombre", "")).lower()
+    es_halfcut_nombre = any(kw in nombre_lower for kw in _HALFCUT_KEYWORDS)
+
+    tipo = None
+    N_s_sug = int(N_s_f)
+
+    if voc_per_cell < r_min * 0.65:
+        tipo     = "ns_duplicado"
+        N_s_sug  = max(1, int(round(N_s_f / 2)))
+    elif voc_per_cell > r_max * 1.40:
+        tipo     = "ns_mitad"
+        N_s_sug  = int(round(N_s_f * 2))
+
+    if tipo is None and not es_halfcut_nombre:
+        return None   # todo dentro del rango y sin indicadores en el nombre
+
+    if tipo is None:
+        # Nombre indica half-cut pero el voltaje parece correcto — solo informar
+        return {
+            "tipo":              "nombre_halfcut_ok",
+            "Voc_por_celda":     round(voc_per_cell, 4),
+            "rango_esperado":    rango,
+            "N_s_ingresado":     int(N_s_f),
+            "N_s_sugerido":      int(N_s_f),
+            "es_halfcut_nombre": True,
+            "tecnologia":        tec_norm or tec_raw,
+            "mensaje": (
+                f"El nombre del panel sugiere diseño **half-cut** y N_s={int(N_s_f)} "
+                f"da Voc/celda = {voc_per_cell:.3f} V — dentro del rango esperado "
+                f"({r_min:.2f}–{r_max:.2f} V). N_s parece correcto."
+            ),
+        }
+
+    _desc = {
+        "ns_duplicado": (
+            f"N_s={int(N_s_f)} parece el conteo de **semiceldas** (half-cut). "
+            f"El SDM De Soto necesita el conteo de **celdas equivalentes en serie** "
+            f"= N_s // 2 = **{N_s_sug}**."
+        ),
+        "ns_mitad": (
+            f"N_s={int(N_s_f)} parece demasiado bajo para Voc={Voc:.1f} V. "
+            f"El valor sugerido es **{N_s_sug}**."
+        ),
+    }
+
+    return {
+        "tipo":              tipo,
+        "Voc_por_celda":     round(voc_per_cell, 4),
+        "rango_esperado":    rango,
+        "N_s_ingresado":     int(N_s_f),
+        "N_s_sugerido":      N_s_sug,
+        "es_halfcut_nombre": es_halfcut_nombre,
+        "tecnologia":        tec_norm or tec_raw,
+        "mensaje":           _desc[tipo],
+    }
+
+
 def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
     """
     Estima parámetros SDM (De Soto 2006) a partir de datos básicos de ficha técnica.
@@ -208,13 +326,25 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
     Vt_ref = K_BOLTZMANN * T_REF_K / Q_ELECTRON    # 0.025693 V @ 25°C
 
     # ── a_ref = n × Ns × Vt ───────────────────────────────────────────────────
+    _ns_corregido     = False
+    _ns_original      = None
+    _ns_halfcut_info  = None
+
     if NsA:
         a_ref = float(NsA) * Vt_ref
         N_s_est = N_s or int(round(float(NsA) / const.get("n_mediana", 1.05)))
     elif N_s:
         n_typ = {"CdTe": 1.09, "Mono-Si": 1.05, "Poli-Si": 1.10}.get(tec_norm, 1.05)
-        a_ref = n_typ * float(N_s) * Vt_ref
-        N_s_est = int(N_s)
+        # ── Verificar si N_s es incorrecto por half-cut (tarea #67) ──────────
+        _hc = verificar_ns_halfcut(panel)
+        if _hc and _hc["tipo"] == "ns_duplicado":
+            _ns_original     = int(float(N_s))
+            N_s_est          = _hc["N_s_sugerido"]
+            _ns_corregido    = True
+            _ns_halfcut_info = _hc
+        else:
+            N_s_est = int(N_s)
+        a_ref = n_typ * N_s_est * Vt_ref
     else:
         N_s_est = max(int(round(Voc / 0.65)), 36)  # ≈ 0.65 V/cell c-Si
         n_typ = 1.05
@@ -268,22 +398,27 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
         _metodo = "heurístico"
 
     return {
-        "nombre":     panel.get("nombre", "Panel"),
-        "tecnologia": tec_norm,
-        "I_L_ref":    I_L,
-        "I_o_ref":    I_o,
-        "R_s":        R_s,
-        "R_sh_ref":   R_sh,
-        "a_ref":      a_ref,
-        "Tk_alfa":    float(Tk_alfa) if Tk_alfa else alpha_pct if "alpha_pct" in dir() else 0.05,
-        "Tk_gamma":   float(Tk_gamma) if Tk_gamma else -0.40,
-        "Voc_stc":    Voc,
-        "Isc_stc":    Isc,
-        "Pmax_stc":   Vmp * Imp,
-        "R_sh_base":  0.0,
-        "_estimado":  True,
-        "_metodo":    _metodo,
-        "_tec_norm":  tec_norm,
+        "nombre":            panel.get("nombre", "Panel"),
+        "tecnologia":        tec_norm,
+        "I_L_ref":           I_L,
+        "I_o_ref":           I_o,
+        "R_s":               R_s,
+        "R_sh_ref":          R_sh,
+        "a_ref":             a_ref,
+        "Tk_alfa":           float(Tk_alfa) if Tk_alfa else alpha_pct if "alpha_pct" in dir() else 0.05,
+        "Tk_gamma":          float(Tk_gamma) if Tk_gamma else -0.40,
+        "Voc_stc":           Voc,
+        "Isc_stc":           Isc,
+        "Pmax_stc":          Vmp * Imp,
+        "R_sh_base":         0.0,
+        "_estimado":         True,
+        "_metodo":           _metodo,
+        "_tec_norm":         tec_norm,
+        # ── Corrección half-cut N_s (tarea #67) ──────────────────────────────
+        "_ns_corregido":     _ns_corregido,
+        "_ns_original":      _ns_original,
+        "_N_s_usado":        N_s_est,
+        "_ns_halfcut_info":  _ns_halfcut_info,
     }
 
 
