@@ -8,11 +8,24 @@ Robusto frente a:
   - Título/leyenda en filas 1-3 → se detecta automáticamente la fila de headers
   - Variantes de nombres de columna (~30 alias mapeados)
 """
+import pathlib
 import pandas as pd
 import streamlit as st
 
 _EXCEL  = "/var/www/bipv/calculadora-bipv/bipv_python/datos/inversores_catalogo.xlsx"
 _SHEETS = ["Catalogo_Baterias", "Baterias", "Storage"]
+
+# ── Modificación del Excel — usada para invalidar caché automáticamente ──
+def excel_mtime() -> float:
+    """Timestamp de modificación del Excel; 0.0 si no existe o no es accesible.
+    Pasar como _mtime= a cargar_catalogo_baterias() y diagnostico_catalogo()
+    garantiza que el caché se invalida al modificar el archivo sin reiniciar PM2.
+    """
+    try:
+        return pathlib.Path(_EXCEL).stat().st_mtime
+    except Exception:
+        return 0.0
+
 
 # ── Identificadores que confirman que una fila es el header real ──────────
 _MODELO_ALIASES = {"modelo", "nombre", "model", "battery model", "bateria"}
@@ -166,10 +179,15 @@ def _detectar_header(df_raw: pd.DataFrame) -> pd.DataFrame | None:
 
 
 @st.cache_data(ttl=3600)
-def cargar_catalogo_baterias() -> dict:
-    """
-    Devuelve dict {nombre: {...}} con los parámetros de cada batería.
+def cargar_catalogo_baterias(_mtime: float = 0.0) -> dict:
+    """Devuelve dict {nombre: {...}} con los parámetros de cada batería.
+
     Robusto frente a formatos de Excel con título en filas superiores.
+
+    Args:
+        _mtime: Pasar excel_mtime() para que el caché se invalide automáticamente
+                cuando el archivo Excel cambia en disco (p.ej. tras agregar la hoja
+                Catalogo_Baterias). Caché TTL de 1 hora como respaldo.
     """
     try:
         xl = pd.ExcelFile(_EXCEL, engine="openpyxl")
@@ -259,17 +277,20 @@ def cargar_catalogo_baterias() -> dict:
 
 
 def obtener_bateria(nombre: str) -> dict:
-    return cargar_catalogo_baterias().get(nombre, {})
+    return cargar_catalogo_baterias(_mtime=excel_mtime()).get(nombre, {})
 
 
 def lista_baterias() -> list:
-    return sorted(cargar_catalogo_baterias().keys())
+    return sorted(cargar_catalogo_baterias(_mtime=excel_mtime()).keys())
 
 
-def diagnostico_catalogo() -> dict:
-    """
-    Diagnóstico del catálogo: detecta columnas no reconocidas, modelos incompletos, etc.
-    Útil para debugging desde la página 11 o desde consola.
+@st.cache_data(ttl=3600)
+def diagnostico_catalogo(_mtime: float = 0.0) -> dict:
+    """Diagnóstico del catálogo: detecta columnas no reconocidas, modelos incompletos, etc.
+
+    Args:
+        _mtime: Pasar excel_mtime() para invalidar caché automáticamente al
+                cambiar el archivo. Útil para reflejar cambios sin reiniciar PM2.
     """
     try:
         xl = pd.ExcelFile(_EXCEL, engine="openpyxl")
@@ -284,7 +305,7 @@ def diagnostico_catalogo() -> dict:
         return info
 
     info["hoja_usada"] = sheet_found
-    cat = cargar_catalogo_baterias()
+    cat = cargar_catalogo_baterias(_mtime=_mtime)   # usa la misma entrada de caché
     info["modelos_cargados"] = len(cat)
     info["nombres"] = list(cat.keys())
 

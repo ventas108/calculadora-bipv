@@ -14,6 +14,7 @@ from datos.catalogo_baterias_excel import (
     obtener_bateria,
     lista_baterias,
     diagnostico_catalogo,
+    excel_mtime as _excel_mtime,
 )
 from calculos.baterias_balance import (
     dimensionar_bateria,
@@ -87,13 +88,32 @@ elif prod_ok and e_ac_anual > 0:
 # ══════════════════════════════════════════════════════════════════════════════
 # B-6 — Dimensionado de baterías
 # ══════════════════════════════════════════════════════════════════════════════
-st.header("⚡ B-6 — Dimensionado de Baterías")
+_hdr_col, _btn_col = st.columns([8, 2])
+with _hdr_col:
+    st.header("⚡ B-6 — Dimensionado de Baterías")
+with _btn_col:
+    st.write("")   # alinear verticalmente con el header
+    # #26 — Botón de recarga inmediata (invalida caché sin reiniciar PM2)
+    if st.button(
+        "🔄 Recargar catálogo",
+        help=(
+            "Invalida el caché y recarga el catálogo de baterías desde el Excel del servidor. "
+            "Úsalo tras agregar o modificar la hoja `Catalogo_Baterias` para confirmar "
+            "que los cambios se ven en la app sin necesidad de reiniciar PM2."
+        ),
+        use_container_width=True,
+    ):
+        cargar_catalogo_baterias.clear()
+        diagnostico_catalogo.clear()
+        st.rerun()
 
-cat_bat = cargar_catalogo_baterias()
+# Caché auto-invalidante: si el Excel cambia en disco, _mtime cambia → cache miss
+_mtime_bat = _excel_mtime()
+cat_bat = cargar_catalogo_baterias(_mtime=_mtime_bat)
 tiene_catalogo = len(cat_bat) > 0
 
 # ── #26 — Banner de estado de carga del catálogo ─────────────────────────────
-_diag = diagnostico_catalogo()
+_diag = diagnostico_catalogo(_mtime=_mtime_bat)
 _hojas_disp = _diag.get("hojas_disponibles", [])
 _hoja_usada = _diag.get("hoja_usada")
 
