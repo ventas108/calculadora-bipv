@@ -89,9 +89,15 @@ with col2:
     with col_nm2:
         N_max_scan = st.number_input("N máximo a explorar", value=int(st.session_state.get("N_max_scan", 20)), min_value=2, max_value=40, key="N_max_scan")
 
-# Banner de auto-actualización de temperaturas
-if _temp_auto_info:
-    st.info(_temp_auto_info)
+# Caption estable de temperaturas (siempre presente → evita removeChild de React)
+_tmy_applied = st.session_state.get("_dim_tmy_ciudad_ref", "")
+if _tmy_applied:
+    st.caption(
+        f"🌡️ Temperaturas desde TMY **{_tmy_applied}** — "
+        f"T_mín: {T_frio:.1f}°C · T_cel realista: {T_real:.1f}°C · "
+        f"T_cel extremo: {T_extr:.1f}°C  "
+        f"*(NOCT {panel.get('NOCT', 45.0):.0f}°C · editable manualmente)*"
+    )
 
 # (panel e inversor ya cargados arriba)
 if panel.get("costo_usd"):
