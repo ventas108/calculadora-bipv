@@ -41,7 +41,7 @@ _BRAND_ALIASES: dict = {
 }
 
 _BRANDS = [
-    "Growatt", "Solis", "Ginlong", "Deye", "MUST", "SolaX", "LuxPower",
+    "Growatt", "Solis", "Ginlong", "Deye", "MUST", "SolaX", "LuxPower", "Felicity",
     "POWEST", "Huawei", "SMA", "Fronius", "ABB", "Schneider", "GoodWe",
     "Sofar", "Sungrow", "Victron", "Outback", "Solaredge", "Enphase",
     "Delta", "Chint", "Kstar", "Voltronic", "Axpert", "MPPSolar",
@@ -285,6 +285,8 @@ _PAT_NTRACKERS = [
     (r"N[úu]mero\s+de\s+[Rr]astreadores?\s*[:\|]?\s*([0-9]+)",                     1),
     # Español (Growatt): "Número de MPPTs 8"
     (r"N[úu]mero\s+de\s+MPPTs?\s*[:\|]?\s*([0-9]+)",                               1),
+    # Felicity: "No.of MPP Trackers 4" (sin espacio tras "No.")
+    (r"No\.?\s*of\s+MPP\s+[Tt]rackers?\s*[:\|]?\s*([0-9]+)",                       1),
     # formato "2/(2:2)" — primer número = total trackers
     (r"(\d+)\s*/\s*\(\s*\d+(?:\s*:\s*\d+)*\s*\)",                                  1),
     # Victron/SMA: nMPPT = 2
@@ -309,6 +311,8 @@ _PAT_NSTRINGS = [
     (r"[Cc]adenas?\s+por\s+[Tt]racker\s*[:\|]?\s*([0-9]+)",                        1),
     # Español (Growatt): "Cadenas por MPPT 2"
     (r"[Cc]adenas?\s+por\s+MPPT\s*[:\|]?\s*([0-9]+)",                              1),
+    # Felicity: "No.of Strings Per MPP Tracker 2"
+    (r"No\.?\s*of\s+[Ss]trings\s+[Pp]er\s+MPP\s+[Tt]racker\s*[:\|]?\s*([0-9]+)",   1),
     # formato "2/(2:2)" → segundo número (strings por tracker uniforme)
     (r"\d+\s*/\s*\(\s*(\d+)(?:\s*:\s*\d+)*\s*\)",                                  1),
 ]
@@ -332,6 +336,8 @@ _PAT_IMAX = [
     (r"Corriente\s+M[aá]xima\s+(?:por\s+)?[Tt]racker\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
     # Español (Growatt): "Máxima corriente por MPPT 40A"
     (r"M[aá]xima\s+corriente\s+(?:de\s+entrada\s+)?por\s+MPPT\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
+    # Felicity: "PV Input Current 36+36+36+36(A)" — corriente POR tracker (primer sumando)
+    (r"PV\s+Input\s+Current\s+([0-9]+(?:[.,][0-9]+)?)\s*\+",                       1),
     (r"Max\.\s*input\s+current\s+\[A\]\s*[:\|]?\s*([0-9]+(?:[.,][0-9]+)?)",       1),
 ]
 
@@ -350,6 +356,8 @@ _PAT_ISC = [
     (r"Max\.\s*short\s+circuit\s+current\s*\[A\]\s*[:\|]?\s*([0-9]+(?:[.,][0-9]+)?)", 1),
     # Español (Growatt): "Corriente de corto circuito por MPPT 50A"
     (r"Corriente\s+de\s+corto\s*circuito\s+por\s+MPPT\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
+    # Felicity: "Max. PV Isc 55+55+55+55(A)" — Isc POR tracker (primer sumando)
+    (r"Max\.?\s*PV\s+Isc\s+([0-9]+(?:[.,][0-9]+)?)\s*\+",                          1),
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -511,10 +519,12 @@ def _extract_model(text: str, brand: str) -> str:
     # Patrón 1: línea completa que parece un modelo (alfanumérica con guiones)
     for line in lines[:15]:
         line = line.strip()
+        line = line.strip("_ ")   # OCR: "50KVA_" → "50KVA"
         if re.fullmatch(r"[A-Z0-9][A-Z0-9\-\._ ]{3,35}", line):
             if (len(line) >= 5
                     and line.lower() not in ("datasheet", "technical", "specifications")
-                    and not re.match(r"^MPPT?\b", line)):   # "MPPT 1" del diagrama unifilar
+                    and not re.match(r"^MPPT?\b", line)         # "MPPT 1" del diagrama unifilar
+                    and not re.fullmatch(r"\d+\s*K?[VW]A?", line, re.IGNORECASE)):  # "50KVA" = potencia, no modelo
                 return line
     # Patrón 2: buscar código de modelo típico
     m = re.search(r"\b([A-Z]{2,8}[-_][A-Z0-9\-\.]{3,25})\b", text[:1500])
@@ -573,8 +583,14 @@ def _extract_multimodel_values(text: str) -> dict:
         candidates = [
             (m.group(), m.start())
             for m in _MODEL_COL_RE.finditer(line)
-            if re.search(r'\d', m.group()) and '-' in m.group()
+            # Con guion (X3-FTH-75K) o sin guion pero largo (IVGM50KHP3G2, ≥10):
+            # el mínimo de 10 evita falsos positivos como IEC62116 / IEEE1547
+            if re.search(r'\d', m.group())
+               and ('-' in m.group() or len(m.group()) >= 10)
                and not re.match(r'^\d', m.group())          # no empieza con número
+               # Artefacto de PDFs con texto duplicado carácter a carácter:
+               # "MMAAXX5500" / "KKTTLL33--XXLL22" (cada char aparece 2 veces seguidas)
+               and not re.fullmatch(r'(?:(.)\1)+', m.group())
         ]
         if len(candidates) >= 2:
             header_positions = candidates
@@ -615,7 +631,8 @@ def _extract_multimodel_values(text: str) -> dict:
         # etiqueta se parte en dos líneas y los valores quedan en "recomendada (STC) 100000W ..."
         if not re.search(r'recommended\s+PV\s+(?:array\s+)?power'
                          r'|recomendada\s*\(STC\)'
-                         r'|M[aá]xima\s+potencia\s+FV', line, re.IGNORECASE):
+                         r'|M[aá]xima\s+potencia\s+FV'
+                         r'|Max\.?\s*DC\s+Input\s+Power', line, re.IGNORECASE):
             continue
         found = [
             (float(m.group(1).replace(',', '.')), m.start())
