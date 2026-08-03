@@ -379,21 +379,40 @@ _HYBRID_RE = re.compile(
 # Extracción de texto del PDF
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _extract_text_pdfplumber(pdf_bytes: bytes) -> tuple[str, bool]:
-    """Extrae texto de las primeras 4 páginas. Retorna (texto, es_escaneado)."""
+def _extract_text_pdfplumber(pdf_bytes: bytes) -> tuple[str, bool, int]:
+    """
+    Extrae texto de hasta 8 páginas del PDF. Retorna (texto, es_escaneado, n_pages_total).
+
+    Estrategia adaptativa:
+      - Lee hasta 8 páginas (cubre datasheets multi-producto como SolaX X3-FORTH
+        donde las especificaciones pueden estar en páginas 4-7).
+      - Si las primeras 4 páginas dan texto suficiente (> 400 chars), deja de leer
+        páginas adicionales que suelen ser solo marketing/imágenes.
+    """
     text_parts = []
     with pdfplumber.open(pdf_bytes) as pdf:
-        for page in pdf.pages[:4]:
+        n_pages_total = len(pdf.pages)
+        for i, page in enumerate(pdf.pages[:8]):
             t = page.extract_text() or ""
             text_parts.append(t)
-            # Intentar extraer tablas
-            for table in page.extract_tables():
-                for row in table:
-                    if row:
-                        text_parts.append("  ".join(str(c or "") for c in row))
+            # Intentar extraer tablas (recupera datos en celdas no capturados por extract_text)
+            try:
+                for table in page.extract_tables():
+                    for row in table:
+                        if row:
+                            text_parts.append("  ".join(str(c or "") for c in row))
+            except Exception:
+                pass
+            # Heurística: si ya tenemos texto sustancial en las primeras 4 páginas
+            # y la página actual está vacía, seguimos buscando (podrían ser páginas
+            # de imágenes). Pero si tenemos más de 2000 chars y ya pasamos la 4a
+            # página, podemos parar para no incorporar tablas de garantía / índices.
+            current_len = len("\n".join(text_parts).strip())
+            if i >= 4 and current_len > 2000:
+                break
     full = "\n".join(text_parts)
     es_escaneado = len(full.strip()) < 120
-    return full, es_escaneado
+    return full, es_escaneado, n_pages_total
 
 
 def _ocr_pdf(pdf_bytes: bytes) -> str:
@@ -486,7 +505,7 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
 
     # ── Extracción de texto ───────────────────────────────────────────────────
     try:
-        texto, es_escaneado = _extract_text_pdfplumber(pdf_io)
+        texto, es_escaneado, n_pages_total = _extract_text_pdfplumber(pdf_io)
     except Exception as e:
         return {"error": f"Error leyendo el PDF: {e}"}
 
@@ -650,7 +669,9 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
         "es_escaneado":     es_escaneado,
         "uso_ocr":          uso_ocr,
         "ocr_disponible":   _HAS_OCR,
-        "texto_crudo":      texto[:4000],
+        "n_pages_total":    n_pages_total,
+        "n_chars_extraidos": len(texto.strip()),
+        "texto_crudo":      texto[:6000],
     }
 
 
