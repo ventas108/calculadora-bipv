@@ -1,0 +1,108 @@
+Three-phase C&I On-grid Inverter
+X3-FORTH
+75kW / 80kW / 100kW
+110kW / 120kW / 125kW
+High Efficiency Assured Safety
+Up to 98.6% efficiency IP66 protection degree
+32A per MPP tracker AFCI support (optional)
+180~1000Vdc MPPT voltage range AC terminal temperature detection
+150% PV oversizing, 110% overloading output String current monitoring
+Max. 12 MPPTs, 2 strings per MPP tracker 24 hours operation monitoring
+Type II SPD on DC & AC side
+Intelligent Design Flexible Adaptability
+Night-time reactive power compensation Built-in export power control function
+Smart air cooling enhances fan longevity Remote setting and upgrading
+Heat dissipation reduces system weight & size by over 5% Aluminium AC cable connection available
+I-V curve diagnosis
+solaxpower www.solaxpower.com info@solaxpower.com +86 571-56260008
+*V3.3 Information may be subject to modify without notice. 650.00001.00
+X3-FTH-75K X3-FTH-80K X3-FTH-100K X3-FTH-110K X3-FTH-120K X3-FTH-125K
+PV INPUT
+Max. recommended PV array power 120 kWp 120 kWp 150 kWp 165 kWp 180 kWp 188 kWp
+Max. PV input voltage① 1100 V
+580 V@220 V
+Rated PV input voltage 600 V@230 V
+730 V@277 V
+MPPT voltage range② 180 ~ 1000 V
+Start-up voltage 200 V
+9 / 2
+No. of MPP trackers / strings per MPP tracker 9 / 2 12 / 2③ 12 / 2
+Max. input current per MPPT 32 A
+Max. input short circuit current per MPPT 46 A
+AC INPUT & OUTPUT (ON-GRID)
+Rated output apparent power 75 kVA 80 kVA 100 kVA 110 kVA 120 kVA 125 kVA
+113.7 A@220 V 121.3 A@220 V 151.6 A@220 V 166.7 A@220 V 181.9 A@220 V 189.4 A@220 V
+Rated output current 108.7 A@230 V 116 A@230 V 145 A@230 V 159.5 A@230 V 174 A@230 V 181.2 A@230 V
+90.3 A@277 V 96.3 A@277 V 120.4 A@277 V 132.4 A@277 V 144.5 A@277 V 150.5 A@277 V
+Max. output apparent power 75 kVA 88 kVA 110 kVA 121 kVA 132 kVA 132 kVA
+113.7 A@220 V 133.4 A@220 V 166.7 A@220 V 183.4 A@220 V 200 A@220 V 200 A@220 V
+Max. output continuous current 108.7 A@230 V 127.6 A@230 V 159.5 A@230 V 175.4 A@230 V 191.3 A@230 V 191.4 A@230 V
+90.3 A@277 V 105.9 A@277 V 132.4 A@277 V 145.7 A@277 V 158.9 A@277 V 158.9 A@277 V
+3W / (N) / PE, 220 / 380 V
+Rated AC voltage 3W / (N) / PE, 230 / 400 V
+3W / (N) / PE, 277 / 480 V
+Rated AC frequency 50 / 60 Hz
+AC frequency range④ 50 ± 5 / 60 ± 5 Hz
+Adjustable power factor range ~ 1 (0.8 lagging to 0.8 leading)
+EFFICIENCY
+Max. efficiency 98.6%
+European efficiency 98.3%
+ENVIRONMENT LIMIT
+Ingress protection IP66
+Operating temperature range -25 ~ 60°C
+Max. operating altitude 4000 m
+Relative humidity 4 ~ 100% RH (condensing)
+Overvoltage category Mains: III, PV: II
+GENERAL
+Dimensions (W × H × D) 985 × 660 × 327.5 mm
+Net weight 83 kg 87 kg
+Cooling concept Smart air cooling
+Communication interfaces RS485, DRM
+Power consumption (night) ＜ 10 W
+Topology Non-isolated
+IEC/EN 62109-1, IEC/EN 62109-2, NB/T 32004, EN 50549, AS4777.2, VDE4105, VDE4110, IEC 61727, IEC
+Certifications
+62116, IEC 61683, IEC 60068, EN 50530
+AC auxiliary power supply (APS) Built-in
+PROTECTION
+Over / under voltage protection, DC isolation protection, DC reverse-polarity protection, Grid monitoring,
+Protections DC injection monitoring, Back feed current monitoring, Residual current detection, Over temperature protection,
+AC overcurrent protection, AC short-circuit protection
+Surge protection DC: Type II, AC: Type II
+Arc-fault circuit interrupter (AFCI) Optional
+Anti-PID External
+① The maximum input voltage is the upper limit of the DC voltage. Any higher input DC voltage would probably damage inverter
+② Input voltage exceeding the MPPT voltage range may trigger inverter protection
+③ 9/12MPPTs is optional for 100kW and 110kW models
+④ The AC frequency range may vary from different country codes
+120 kWp  120 kWp  150 kWp  165 kWp  180 kWp
+9 / 2  9 / 2
+12 / 2③
+75 kVA  80 kVA  100 kVA  110 kVA  120 kVA
+113.7 A@220 V
+108.7 A@230 V
+90.3 A@277 V  121.3 A@220 V
+116 A@230 V
+96.3 A@277 V  151.6 A@220 V
+145 A@230 V
+120.4 A@277 V  166.7 A@220 V
+159.5 A@230 V
+132.4 A@277 V  181.9 A@220 V
+174 A@230 V
+144.5 A@277 V
+75 kVA  88 kVA  110 kVA  121 kVA  132 kVA
+113.7 A@220 V
+108.7 A@230 V
+90.3 A@277 V  133.4 A@220 V
+127.6 A@230 V
+105.9 A@277 V  166.7 A@220 V
+159.5 A@230 V
+132.4 A@277 V  183.4 A@220 V
+175.4 A@230 V
+145.7 A@277 V  200 A@220 V
+191.3 A@230 V
+158.9 A@277 V
+  EFFICIENCY
+  ENVIRONMENT LIMIT
+  GENERAL
+  PROTECTION
