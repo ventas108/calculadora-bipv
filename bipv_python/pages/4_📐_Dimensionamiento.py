@@ -7,6 +7,7 @@ from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
 from datos.catalogo_inversores_excel import cargar_catalogo_inversores, obtener_inversor_excel
 from datos.catalogo_inversores import INVERSORES, seleccionar_inversor
+from calculos.panel_iv_check import analizar_panel_motiv as _check_iv_dim
 
 st.set_page_config(page_title="Dimensionamiento — BIPV", page_icon="📐", layout="wide")
 st.title("📐 Dimensionamiento de Strings")
@@ -27,6 +28,25 @@ with col1:
 # Cargar dicts antes de col2 para que estén disponibles al calcular N_min_scan
 panel    = obtener_panel_excel(panel_nombre) if _cat_excel else MODULOS_BIPV[panel_nombre]
 inversor = obtener_inversor_excel(inversor_nombre) if _cat_inv else seleccionar_inversor(inversor_nombre)
+
+# ── Aviso Motor IV: panel sin datos IV suficientes (#118) ─────────────────────
+_iv_err, _iv_adv = _check_iv_dim(panel)
+if _iv_err:
+    _falt = ", ".join(f"`{c}`" for c, _ in _iv_err)
+    st.warning(
+        f"⚠️ **{panel_nombre}** no tiene datos IV suficientes para Motor IV.  \n"
+        f"Campos requeridos ausentes: {_falt}.  \n"
+        f"El dimensionamiento eléctrico funcionará, pero la curva I-V no podrá "
+        f"simularse en Motor IV. Completa el catálogo Excel con estos valores."
+    )
+elif _iv_adv:
+    _adv_campos = [c for c, _ in _iv_adv if not c.startswith("⚠️")]
+    if _adv_campos:
+        st.info(
+            f"ℹ️ **{panel_nombre}** puede simularse en Motor IV con estimaciones.  \n"
+            f"Campos opcionales ausentes: {', '.join(f'`{c}`' for c in _adv_campos)} "
+            f"— se usarán defaults por tecnología."
+        )
 
 # ── Auto-población de temperaturas desde TMY ──────────────────────────────────
 # Se recalcula SOLO cuando cambia el origen de datos climáticos (nueva ciudad/TMY).

@@ -15,6 +15,7 @@ from calculos.modelo_iv import (
     estimar_sdm_desde_ficha,
     verificar_ns_halfcut,
 )
+from calculos.panel_iv_check import analizar_panel_motiv as _analizar_panel_motiv
 from calculos.temperatura import temperatura_celda_noct
 from datos.tecnologias_bipv import ASP_ST1_T40, MODULOS_BIPV
 from datos.catalogo_paneles_excel import cargar_catalogo_paneles
@@ -99,60 +100,6 @@ if _panel_ss and _panel_nom_ss:
                     "(Vmp < Voc, Imp < Isc, Pmax = Vmp × Imp).  \n"
                     "⬇️ Se usará el panel por defecto **ASP-ST1-T40** para esta simulación."
                 )
-
-# ── Helper: detectar campos faltantes para Motor IV ───────────────────────────
-def _analizar_panel_motiv(p: dict) -> tuple:
-    """
-    Retorna (errores, advertencias) donde:
-      errores      = [(campo, descripción)] — bloquean la simulación
-      advertencias = [(campo, descripción)] — estimación con default, resultados menos precisos
-    """
-    _val = lambda *keys: any(
-        p.get(k) not in (None, 0, 0.0, "", "nan", "0") for k in keys
-    )
-    errores = []
-    if not _val("Voc_stc", "Voc"):
-        errores.append(("Voc", "Tensión de circuito abierto en STC (V)"))
-    if not _val("Isc_stc", "Isc"):
-        errores.append(("Isc", "Corriente de cortocircuito en STC (A)"))
-    if not _val("Vmp_stc", "Vmp"):
-        errores.append(("Vmp", "Tensión en el punto de máxima potencia en STC (V)"))
-    if not _val("Imp_stc", "Imp"):
-        errores.append(("Imp", "Corriente en el punto de máxima potencia en STC (A)"))
-
-    advertencias = []
-    if not errores:  # solo mostramos advertencias si los campos críticos están
-        if not _val("N_s", "NsA"):
-            advertencias.append(("N_s", "Número de celdas en serie — se estimará desde Voc/0.65 V"))
-        else:
-            # ── #67 — Detectar N_s incorrecto en paneles half-cut ─────────────
-            _hc = verificar_ns_halfcut(p)
-            if _hc and _hc["tipo"] == "ns_duplicado":
-                _r = _hc["rango_esperado"]
-                advertencias.append((
-                    f"⚠️ N_s incorrecto (half-cut)",
-                    f"N_s={_hc['N_s_ingresado']} da **Voc/celda = {_hc['Voc_por_celda']:.3f} V** "
-                    f"(rango esperado {_r[0]:.2f}–{_r[1]:.2f} V para {_hc['tecnologia']}). "
-                    f"El valor correcto para SDM es N_s = **{_hc['N_s_sugerido']}** "
-                    f"(semiceldas ÷ 2). Corrige el campo `Ns (Celdas Serie)` en el Excel."
-                ))
-            elif _hc and _hc["tipo"] == "ns_mitad":
-                _r = _hc["rango_esperado"]
-                advertencias.append((
-                    f"⚠️ N_s incorrecto (muy bajo)",
-                    f"N_s={_hc['N_s_ingresado']} da **Voc/celda = {_hc['Voc_por_celda']:.3f} V** "
-                    f"(rango esperado {_r[0]:.2f}–{_r[1]:.2f} V para {_hc['tecnologia']}). "
-                    f"Valor sugerido: N_s = **{_hc['N_s_sugerido']}**. "
-                    f"Verifica el conteo de celdas en la ficha técnica."
-                ))
-        if not p.get("tecnologia"):
-            advertencias.append(("Tecnología", "Tecnología del panel — se asumirá Mono-Si"))
-        if not _val("Tk_beta", "CoefVoc_C", "beta_oc"):
-            advertencias.append(("Coef. Temp. Voc (β)", "Coeficiente de temperatura de Voc — se usará default por tecnología"))
-        if not _val("Tk_alfa", "alpha_sc"):
-            advertencias.append(("Coef. Temp. Isc (α)", "Coeficiente de temperatura de Isc — se usará default por tecnología"))
-    return errores, advertencias
-
 
 # ── Selector manual como alternativa / fallback ────────────────────────────────
 # Combinar catálogo SDM calibrado (BIPV ASP-ST1) + catálogo Excel por tecnología
