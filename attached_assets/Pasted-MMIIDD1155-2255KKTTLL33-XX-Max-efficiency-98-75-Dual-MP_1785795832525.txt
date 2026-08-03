@@ -1,0 +1,122 @@
+MMIIDD1155~~2255KKTTLL33--XX
+· Max.efficiency 98.75%
+· Dual MPP trackers
+· Touch key and OLED display
+· Type II SPD on AC and DC side
+· AFCI function optional
+www.ginverter.com
+
+Datasheet MID15KTL3-X MID17KTL3-X MID20KTL3-X MID22KTL3-X MID25KTL3-X
+Input data (DC)
+M (foa r x m. r oe dc uo lm e m STCen )ded PV power 22500W 25500W 30000W 33000W 37500W
+Max. DC voltage 1100V
+Start Voltage 250V
+Normal Voltage 200V-1000V
+MPPT voltage range 580V
+No. of MPP trackers/strings per 2/2 2/2 2/2 2/2 2/3
+MPP tracker
+Max.input current per MPP tracker 27A 27A 27A 27A 27A/40.5A
+MM Pa Px . t rs ah co krt e-c rircuit current per 33.8A 33.8A 33.8A 33.8A 33.8A/50.7A
+Output data (AC)
+Rated AC output power 15000W 17000W 20000W 22000W 25000W
+Max. AC apparent power 16600VA 18800VA 22000VA 24400VA 27700VA
+Nominal AC voltage(range*) 230V/400V; 340-440V
+AC grid frequency;(range*) 50/60 Hz; 45~55Hz/55-65 Hz
+Max. output current 24.2A 27.4A 31.9A 35.5A 40.2A
+Adjustable power factor 0.8 leading - 0.8 lagging
+THDi <3%
+AC grid connection type 3W+N+PE
+Efficiency
+Max.efficiency 98.75%
+European efficiency 98.6%
+MPPT efficiency 99.9%
+Protection devices
+DC reverse polarity protection Yes
+DC Switch Yes
+AC/DC surge protection Type II / Type II
+Insulation resistance monitoring Yes
+AC short-circuit protection Yes
+Ground fault monitoring Yes
+Grid monitoring Yes
+Anti-islanding protection Yes
+Residual-current monitoring unit Yes
+String monitoring Yes
+AFCI protection Optional
+General data
+Dimensions (W / H / D) 525/395/222mm
+Weight 23kg
+Operating temperature range –25 °C ... +60 °C
+Self-Consumption (night) < 1W
+Topology Transformerless
+Cooling Smart air cooling
+Protection degree IP65
+Relative Humidity 0~100%
+Altitude 4000m
+DC connection H4/MC4(Optional)
+AC connection Cable gland+OT terminal
+Display OLED+LED/WIFI+APP
+Interfaces: RS485 / USB / Yes/Yes /Optional/Optional/Optional/Optional
+WiFi/ GPRS / RF/ LAN
+Warranty: 5 years / 10 years Yes/Optional
+CE, VDE0126, Greece, EN50549-1, C10/C11, UTE C 15-712, IEC62116, IEC61727, IEC 60068, IEC 61683,
+CEI0-21, N4105, G98/G99, G100, KSC8565
+* The AC voltage range and frequency range may vary depending on specific country grid standard.
+All specifications are subject to change without notice.
+SHENZHEN GROWATT NEW ENERGY CO.,LTD. A: 4-13/F,Building A,Sino-German(Europe)lndustrial Park,Hangcheng Ave,Bao'an District,Shenzhen,China
+T: + 86 755 2747 1900 F: + 86 755 2749 1460 E: info@ginverter.com
+Datasheet  MID15KTL3-X  MID17KTL3-X  MID20KTL3-X  MID22KTL3-X  MID25KTL3-X
+Input data (DC)          
+Max. recommended PV power
+(for module STC)  22500W  25500W  30000W  33000W  37500W
+Max. DC voltage  1100V        
+Start Voltage  250V        
+Normal Voltage  200V-1000V        
+MPPT voltage range  580V        
+No. of MPP trackers/strings per
+MPP tracker  2/2  2/2  2/2  2/2  2/3
+Max.input current per MPP tracker  27A  27A  27A  27A  27A/40.5A
+Max. short-circuit current per
+MPP tracker  33.8A  33.8A  33.8A  33.8A  33.8A/50.7A
+Output data (AC)          
+Rated AC output power  15000W  17000W  20000W  22000W  25000W
+Max. AC apparent power  16600VA  18800VA  22000VA  24400VA  27700VA
+Nominal AC voltage(range*)  230V/400V; 340-440V        
+AC grid frequency;(range*)  50/60 Hz; 45~55Hz/55-65 Hz        
+Max. output current  24.2A  27.4A  31.9A  35.5A  40.2A
+Adjustable power factor  0.8 leading - 0.8 lagging        
+THDi  <3%        
+AC grid connection type  3W+N+PE        
+Efficiency          
+Max.efficiency  98.75%        
+European efficiency  98.6%        
+MPPT efficiency  99.9%        
+Protection devices          
+DC reverse polarity protection  Yes        
+DC Switch  Yes        
+AC/DC surge protection  Type II / Type II        
+Insulation resistance monitoring  Yes        
+AC short-circuit protection  Yes        
+Ground fault monitoring  Yes        
+Grid monitoring  Yes        
+Anti-islanding protection  Yes        
+Residual-current monitoring unit  Yes        
+String monitoring  Yes        
+AFCI protection  Optional        
+General data          
+Dimensions (W / H / D)  525/395/222mm        
+Weight  23kg        
+Operating temperature range  –25 °C ... +60 °C        
+Self-Consumption (night)  < 1W        
+Topology  Transformerless        
+Cooling  Smart air cooling        
+Protection degree  IP65        
+Relative Humidity  0~100%        
+Altitude  4000m        
+DC connection  H4/MC4(Optional)        
+AC connection  Cable gland+OT terminal        
+Display  OLED+LED/WIFI+APP        
+Interfaces: RS485 / USB /
+WiFi/ GPRS / RF/ LAN  Yes/Yes /Optional/Optional/Optional/Optional        
+Warranty: 5 years / 10 years  Yes/Optional        
+CE, VDE0126, Greece, EN50549-1, C10/C11, UTE C 15-712, IEC62116, IEC61727, IEC 60068, IEC 61683,
+CEI0-21, N4105, G98/G99, G100, KSC8565
