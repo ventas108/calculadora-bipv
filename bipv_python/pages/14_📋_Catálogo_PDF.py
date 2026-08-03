@@ -140,6 +140,10 @@ with tab_agregar:
         ("Transparencia", "transparencia_pct","Transparencia (%)"),
     ]
 
+    # Contenedor SIEMPRE presente: estabiliza el árbol React entre reruns
+    # (evita NotFoundError insertBefore/removeChild al aparecer/desaparecer
+    # la advertencia cuando cambia el modelo seleccionado).
+    _slot_aviso = st.container()
     if _ya_existe:
         _panel_actual = _cat_actual[_modelo_candidato]
         _filas_comp = []
@@ -162,23 +166,24 @@ with tab_agregar:
                 "Acción":              _accion,
             })
 
-        st.warning(
-            f"⚠️ **{_modelo_candidato}** ya existe. Se usa **merge conservador**: "
-            "solo se actualizan los campos que el PDF extrajo — el resto se preserva.",
-            icon="⚠️",
-        )
-        with st.expander("Ver qué cambia y qué se conserva", expanded=False):
-            st.dataframe(
-                pd.DataFrame(_filas_comp),
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Campo":               st.column_config.TextColumn(width="small"),
-                    "Actual en catálogo":  st.column_config.TextColumn(width="small"),
-                    "Nuevo (PDF)":         st.column_config.TextColumn(width="small"),
-                    "Acción":              st.column_config.TextColumn(width="medium"),
-                },
+        with _slot_aviso:
+            st.warning(
+                f"⚠️ **{_modelo_candidato}** ya existe. Se usa **merge conservador**: "
+                "solo se actualizan los campos que el PDF extrajo — el resto se preserva.",
+                icon="⚠️",
             )
+            with st.expander("Ver qué cambia y qué se conserva", expanded=False):
+                st.dataframe(
+                    pd.DataFrame(_filas_comp),
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Campo":               st.column_config.TextColumn(width="small"),
+                        "Actual en catálogo":  st.column_config.TextColumn(width="small"),
+                        "Nuevo (PDF)":         st.column_config.TextColumn(width="small"),
+                        "Acción":              st.column_config.TextColumn(width="medium"),
+                    },
+                )
 
     # ── Formulario de verificación ────────────────────────────────────────────
     with st.form("form_panel_pdf"):

@@ -71,15 +71,22 @@ _PATTERNS = {
         r'Voc\s+coeff?\.?\s*[:\|]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
         # NCL BIPV: "Coeficiente de temperatura para voltaje  -0.28%/ºC"
         r'temperatura\s+para\s+voltaje[^%\n]*?([+-]?[0-9]*\.?[0-9]+)\s*%',
+        # SolTech: "Coeficientes de temperatura de Voc TKβ(%/℃) -0.321"
+        # (el % viene ANTES del número, dentro de la unidad entre paréntesis)
+        r'temperatura\s+de\s+Voc\b[^\n0-9+-]*([+-]?[0-9]+\.[0-9]+)',
     ],
     "CoefIsc": [
         r'(?:α|alpha|α_Isc|Coef(?:icient)?\s+(?:of\s+)?(?:Temp(?:erature)?\s+(?:of\s+)?)?Isc|Temperatura\s+Isc|TK\s*Isc)\s*[:\(]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
         r'(?:α|alpha)I?[Ss][Cc]?\s*=?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
+        # SolTech: "Coeficientes de temperatura de Isc TKα(%/℃) +0.06"
+        r'temperatura\s+de\s+Isc\b[^\n0-9+-]*([+-]?[0-9]+\.[0-9]+)',
     ],
     "CoefPmax": [
         r'(?:γ|gamma|γ_Pmax|Coef(?:icient)?\s+(?:of\s+)?(?:Temp(?:erature)?\s+(?:of\s+)?)?P(?:max|mpp)|Temperatura\s+P(?:max|mpp)|TK\s*P(?:max|mpp))\s*[:\(]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
         r'(?:γ|gamma)P?\s*=?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
         r'Pmax\s+coeff?\.?\s*[:\|]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
+        # SolTech: "Coeficientes de temperatura de Pm TKγ(%/℃) -0.214"
+        r'temperatura\s+de\s+Pm(?:ax|pp)?\b[^\n0-9+-]*([+-]?[0-9]+\.[0-9]+)',
     ],
     "NOCT": [
         r'(?:NOCT|NMOT|Normal(?:ized)?\s+(?:Operating)?\s+Cell\s+Temp(?:erature)?|Temperatura\s+(?:de\s+)?[Oo]peraci[oó]n\s+Normal)\s*[:\(]?\s*([0-9]+(?:\.[0-9]+)?)\s*°?C',
