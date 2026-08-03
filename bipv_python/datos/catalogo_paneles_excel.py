@@ -69,6 +69,74 @@ def cargar_catalogo_paneles() -> dict:
         }
     return paneles
 
+def guardar_panel_excel(datos: dict) -> str:
+    """
+    Agrega o actualiza un panel en el Excel del catálogo.
+    Retorna el nombre del panel guardado.
+    Invalida el cache de st.cache_data para que el próximo cargar_catalogo_paneles() lea el nuevo panel.
+    """
+    import openpyxl, datetime
+
+    nombre = str(datos.get("TipoPanel", "")).strip()
+    if not nombre:
+        raise ValueError("El campo TipoPanel (nombre del modelo) es obligatorio.")
+
+    try:
+        wb = openpyxl.load_workbook(_EXCEL)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"No se encontró el archivo: {_EXCEL}")
+
+    if _SHEET not in wb.sheetnames:
+        raise ValueError(f"La hoja '{_SHEET}' no existe en {_EXCEL}.")
+
+    ws = wb[_SHEET]
+
+    # Leer encabezados de la primera fila
+    headers = [str(c.value).strip() if c.value else "" for c in ws[1]]
+
+    # Comprobar si ya existe una fila con ese nombre (actualizar) o agregar
+    fila_existente = None
+    col_tipo = None
+    try:
+        col_tipo = headers.index("TipoPanel") + 1   # 1-based
+    except ValueError:
+        raise ValueError("La hoja no tiene columna 'TipoPanel'.")
+
+    for row in ws.iter_rows(min_row=2):
+        if str(row[col_tipo - 1].value or "").strip() == nombre:
+            fila_existente = row[0].row
+            break
+
+    if fila_existente is None:
+        fila_existente = ws.max_row + 1
+
+    # Escribir datos — solo columnas que existen en el encabezado
+    for col_nombre, valor in datos.items():
+        if col_nombre in headers:
+            col_idx = headers.index(col_nombre) + 1
+            ws.cell(row=fila_existente, column=col_idx, value=valor)
+
+    # Anotar fecha de ingreso si hay columna
+    for meta_col in ("FechaIngreso", "Fecha_Ingreso", "Fecha"):
+        if meta_col in headers:
+            ws.cell(
+                row=fila_existente,
+                column=headers.index(meta_col) + 1,
+                value=datetime.date.today().isoformat()
+            )
+            break
+
+    wb.save(_EXCEL)
+
+    # Invalidar cache para que la próxima carga refleje el nuevo panel
+    try:
+        cargar_catalogo_paneles.clear()
+    except Exception:
+        pass
+
+    return nombre
+
+
 def obtener_panel_excel(nombre: str) -> dict:
     return cargar_catalogo_paneles().get(nombre, {})
 
