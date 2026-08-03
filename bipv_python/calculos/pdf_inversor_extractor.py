@@ -775,6 +775,13 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
             r"[^\n0-9]*([0-9]{2,4}(?:[.,][0-9]+)?)\s*V",
             texto, re.IGNORECASE,
         )
+        # Español (Growatt XMV): "Voltaje nominal 720V" en sección de entrada CD.
+        # El lookahead (?!\s*CA) evita capturar "Voltaje nominal CA 277V/480V".
+        if not m_rated:
+            m_rated = re.search(
+                r"Voltaje\s+nominal(?!\s*\(?\s*CA)\s*[:\(]?\s*([0-9]{2,4}(?:[.,][0-9]+)?)\s*V",
+                texto, re.IGNORECASE,
+            )
         if m_rated:
             v = _num(m_rated.group(1))
             # Sanity: dentro del rango MPPT si se conoce; si no, 100–1500 V
