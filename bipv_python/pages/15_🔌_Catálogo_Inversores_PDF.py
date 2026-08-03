@@ -223,6 +223,12 @@ with tab1:
                 help="Deja en 0 si el fabricante no lo reporta (MUST, POWEST).",
             )
 
+        if res.get("P_dc_estimado"):
+            st.warning(
+                "⚠️ La ficha no publica la potencia FV máxima recomendada. "
+                "El valor mostrado es **estimado** desde la potencia CA nominal "
+                "con ratio DC/AC 1.5 — ajústalo si el fabricante indica otro límite."
+            )
         P_dc_val = st.number_input(
             "Potencia FV Máxima Recomendada (W)",
             min_value=0.0, step=100.0,

@@ -912,6 +912,30 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
     # ── Multi-modelo: detectar columnas de modelos ─────────────────────────────
     multimodel = _extract_multimodel_values(texto)
 
+    # ── Estimación de P_dc cuando la ficha no la publica (Huawei y similares) ──
+    # Se estima desde la potencia CA nominal con ratio DC/AC 1.5 (práctica
+    # estándar de sobredimensionamiento). Solo si tampoco hay valores por modelo.
+    P_dc_estimado = False
+    tiene_pdc_por_modelo = any(
+        (v or {}).get('P_dc_max_W') for v in multimodel.get('por_modelo', {}).values()
+    )
+    if P_dc_max_W is None and not tiene_pdc_por_modelo:
+        m_pac = re.search(
+            r"(?:Potencia\s+nominal\s+(?:CA|AC)|Potencia\s+activa"
+            r"|Rated\s+(?:AC\s+)?[Oo]utput\s+[Pp]ower|Rated\s+[Aa]ctive\s+[Pp]ower"
+            r"|Nominal\s+(?:AC\s+)?[Oo]utput\s+[Pp]ower|AC\s+[Rr]ated\s+[Pp]ower)"
+            r"[^\n0-9]{0,20}([0-9]+(?:[.,][0-9]+)?)\s*(k?)W\b",
+            texto, re.IGNORECASE,
+        )
+        if m_pac:
+            p_ac = _num(m_pac.group(1))
+            if p_ac is not None:
+                if m_pac.group(2).lower() == 'k' or p_ac < 1000:
+                    p_ac *= 1000
+                if 500 <= p_ac <= 5_000_000:
+                    P_dc_max_W = round(p_ac * 1.5)
+                    P_dc_estimado = True
+
     # ── Batería ───────────────────────────────────────────────────────────────
     # use_sma_fallback=False para evitar que "DC voltage range, min./max." de SMA
     # sea confundido con voltaje de batería
@@ -964,6 +988,8 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
         "I_max_tracker":    I_max_tracker,
         "Isc_max_tracker":  Isc_max_tracker,
         "P_dc_max_W":       P_dc_max_W,
+        # True si P_dc_max_W fue estimada desde la potencia CA nominal (ratio 1.5)
+        "P_dc_estimado":    P_dc_estimado,
         "bat_voltaje_min":  bat_voltaje_min,
         "bat_voltaje_max":  bat_voltaje_max,
         "es_escaneado":     es_escaneado,
