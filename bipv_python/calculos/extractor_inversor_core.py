@@ -5,20 +5,16 @@ Expone `extraer_desde_texto(texto)` para uso directo en tests y debug,
 sin necesitar un PDF real.
 
 Delegación total: usa exactamente las mismas funciones que el extractor de
-PDFs (`_extraer_campos`, `_extract_multimodel_values`, etc.) para que el
-harness sintético ejercite el MISMO código que procesa las fichas reales.
-Así cualquier mejora del extractor de PDFs queda cubierta automáticamente
-y ninguna versión puede quedar rezagada respecto a la otra.
+PDFs (`_extraer_campos`, `_extraer_multimodelo`, etc.) para que el harness
+sintético ejercite el MISMO código que procesa las fichas reales — incluida
+la ruta de folletos de familia (Voltronic).  Así cualquier mejora del
+extractor de PDFs queda cubierta automáticamente y ninguna versión puede
+quedar rezagada respecto a la otra.
 """
 from calculos.pdf_inversor_extractor import (
-    _find, _find_range,
-    _PAT_VDCMAX, _LABEL_MPPT_RANGE, _LABEL_MPPT_ACTIVO,
-    _PAT_VARRANQUE, _PAT_NTRACKERS, _PAT_NSTRINGS,
-    _PAT_IMAX, _PAT_ISC, _PAT_PDCMAX,
-    _LABEL_BAT_RANGE, _PAT_BAT_MIN, _PAT_BAT_MAX,
-    _TRACKER_STR_RE, _HYBRID_RE, _RANGE_RE, _KW_NO_P_RE,
+    _HYBRID_RE,
     _extract_brand, _extract_model, _extract_arch,
-    _extract_multimodel_values, _extraer_campos,
+    _extraer_campos, _extraer_multimodelo,
 )
 import re
 
@@ -41,19 +37,17 @@ def extraer_desde_texto(texto: str) -> dict:
 
     campos = _extraer_campos(texto)
 
-    # Multi-modelo (mismo código que el extractor de PDFs)
-    multimodel = _extract_multimodel_values(texto)
+    # Multi-modelo: mismo código que el extractor de PDFs (columnas + familias)
+    multimodel = _extraer_multimodelo(texto)
 
     # Si hay P_dc real por modelo, descartar la estimación global (AC × 1.5)
-    if campos.get("P_dc_estimado"):
-        reales = [
-            v.get("P_dc_max_W")
-            for v in multimodel.get("por_modelo", {}).values()
-            if v.get("P_dc_max_W") is not None
-        ]
-        if reales:
-            campos["P_dc_max_W"] = None
-            campos["P_dc_estimado"] = False
+    tiene_pdc_pm = any(
+        (v or {}).get("P_dc_max_W") and not (v or {}).get("P_dc_estimado")
+        for v in multimodel.get("por_modelo", {}).values()
+    )
+    if campos.get("P_dc_estimado") and tiene_pdc_pm:
+        campos["P_dc_max_W"] = None
+        campos["P_dc_estimado"] = False
 
     campos.pop("P_dc_estimado", None)
 

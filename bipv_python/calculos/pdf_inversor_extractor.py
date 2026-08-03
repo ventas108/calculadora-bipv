@@ -167,6 +167,10 @@ def _find_range(label_patterns, text, use_sma_fallback=True):
                     # la 'A' de amperios matchea el separador 'a') — probar
                     # con la siguiente etiqueta
                     continue
+                if max(lo, hi) > 2000:
+                    # Sanidad: ningún rango de tensión FV/batería supera 2000 V —
+                    # descartar pares numéricos no eléctricos en tablas densas
+                    continue
                 return (lo, hi) if lo < hi else (hi, lo)
 
     if not use_sma_fallback:
@@ -647,6 +651,8 @@ def _extract_multimodel_values(text: str) -> dict:
             # Con guion (X3-FTH-75K) o sin guion pero largo (IVGM50KHP3G2, ≥10):
             # el mínimo de 10 evita falsos positivos como IEC62116 / IEEE1547
             if re.search(r'\d', m.group())
+               and re.search(r'[A-Za-z]', m.group())   # debe tener letras: no aceptar
+               # tokens puramente numéricos/puntuación como "nombres de modelo"
                and ('-' in m.group() or len(m.group()) >= 10)
                and not re.match(r'^\d', m.group())          # no empieza con número
                # Artefacto de PDFs con texto duplicado carácter a carácter:
@@ -879,30 +885,7 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
     campos = _extraer_campos(texto)
 
     # ── Multi-modelo: columnas (SolaX/Growatt) o folleto de familia (Voltronic) ─
-    multimodel = _extract_multimodel_values(texto)
-    if not multimodel.get('modelos'):
-        fam = _detect_family_sections(texto)
-        if sum(len(nombres) for nombres, _ in fam) >= 2:
-            modelos_fam, por_modelo_fam = [], {}
-            for nombres, sec in fam:
-                campos_sec = _extraer_campos(sec)
-                for nombre in nombres:
-                    nombre = re.sub(r"\s+", " ", nombre).strip()
-                    # Basura de tablas reparadas: tokens repetidos ("InfiniSolar 5KW lar 5KW")
-                    palabras = nombre.split()
-                    if len(set(palabras)) != len(palabras):
-                        continue
-                    if nombre in por_modelo_fam:
-                        # Sección duplicada (texto repetido): rellenar solo los huecos
-                        prev = por_modelo_fam[nombre]
-                        for k, v in campos_sec.items():
-                            if prev.get(k) is None and v is not None:
-                                prev[k] = v
-                    else:
-                        modelos_fam.append(nombre)
-                        por_modelo_fam[nombre] = dict(campos_sec)
-            if len(modelos_fam) >= 2:
-                multimodel = {'modelos': modelos_fam, 'por_modelo': por_modelo_fam}
+    multimodel = _extraer_multimodelo(texto)
 
     # Si hay P_dc real por modelo, descartar la estimación global (ratio 1.5)
     tiene_pdc_pm = any(
@@ -929,6 +912,40 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
         "modelos_detectados":  multimodel.get('modelos', []),
         "valores_por_modelo":  multimodel.get('por_modelo', {}),
     }
+
+
+def _extraer_multimodelo(texto: str) -> dict:
+    """
+    Ruta multi-modelo unificada: primero columnas (SolaX/Growatt/SAJ/TriP2) y,
+    si no hay encabezado de columnas, folleto de familia (Voltronic) con varias
+    tablas "MODEL <nombre>".  La usan tanto el extractor de PDFs como
+    `extraer_desde_texto` (harness) para garantizar la misma cobertura.
+    """
+    multimodel = _extract_multimodel_values(texto)
+    if not multimodel.get('modelos'):
+        fam = _detect_family_sections(texto)
+        if sum(len(nombres) for nombres, _ in fam) >= 2:
+            modelos_fam, por_modelo_fam = [], {}
+            for nombres, sec in fam:
+                campos_sec = _extraer_campos(sec)
+                for nombre in nombres:
+                    nombre = re.sub(r"\s+", " ", nombre).strip()
+                    # Basura de tablas reparadas: tokens repetidos ("InfiniSolar 5KW lar 5KW")
+                    palabras = nombre.split()
+                    if len(set(palabras)) != len(palabras):
+                        continue
+                    if nombre in por_modelo_fam:
+                        # Sección duplicada (texto repetido): rellenar solo los huecos
+                        prev = por_modelo_fam[nombre]
+                        for k, v in campos_sec.items():
+                            if prev.get(k) is None and v is not None:
+                                prev[k] = v
+                    else:
+                        modelos_fam.append(nombre)
+                        por_modelo_fam[nombre] = dict(campos_sec)
+            if len(modelos_fam) >= 2:
+                multimodel = {'modelos': modelos_fam, 'por_modelo': por_modelo_fam}
+    return multimodel
 
 
 # Folletos de familia (Voltronic InfiniSolar): varias tablas "MODEL <nombre(s)>"
@@ -1186,8 +1203,6 @@ def _extraer_campos(texto: str) -> dict:
     if n_strings_tracker is not None and not (1 <= n_strings_tracker <= 6):
         n_strings_tracker = None
     # Corrientes: entre 1 y 200 A
-    for campo in [I_max_tracker, Isc_max_tracker]:
-        pass  # validación inline abajo
     if I_max_tracker is not None and not (1 <= I_max_tracker <= 200):
         I_max_tracker = None
     if Isc_max_tracker is not None and not (1 <= Isc_max_tracker <= 200):

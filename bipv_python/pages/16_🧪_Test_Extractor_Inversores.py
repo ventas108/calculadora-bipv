@@ -149,14 +149,17 @@ st.markdown("---")
 
 st.subheader("🔍 Detalle por fabricante")
 
-fab_sel = st.selectbox(
-    "Selecciona un fabricante para ver el desglose completo",
-    [r["_fab"] for r in resultados],
+# Etiqueta única "fabricante — modelo": hay fabricantes con varios casos
+# (SolaX, Growatt, SAJ...) y con solo el fabricante siempre se mostraba el 1º
+_opciones = [f"{r['_fab']} — {r['_model']}" for r in resultados]
+op_sel = st.selectbox(
+    "Selecciona un caso para ver el desglose completo",
+    _opciones,
     key="fab_detail",
 )
-
-r_sel = next(r for r in resultados if r["_fab"] == fab_sel)
-caso_sel = next(c for c in CASOS if c["fabricante"] == fab_sel)
+_idx_sel = _opciones.index(op_sel)
+r_sel = resultados[_idx_sel]
+caso_sel = CASOS[_idx_sel]
 
 col_det, col_txt = st.columns([1, 1])
 
