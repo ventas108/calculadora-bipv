@@ -271,7 +271,10 @@ def _extract_tables_reparadas(page) -> list:
                 # tienen muchas None legítimas — croparlas inyecta texto basura
                 # (fragmentos de la celda fusionada vecina).
                 _presentes = sum(1 for c in data[ri] if c not in (None, ""))
-                if _presentes < max(2, len(data[ri]) // 2):
+                # Techo verdadero de la mitad: en filas de ancho impar (ej. 5
+                # columnas) exigir 3 presentes, no 2 (floor dejaría pasar filas
+                # dispersas/fusionadas que no deben repararse).
+                if _presentes < max(2, (len(data[ri]) + 1) // 2):
                     continue
                 for ci, cellbox in enumerate(trow.cells):
                     if (
@@ -287,8 +290,14 @@ def _extract_tables_reparadas(page) -> list:
                             txt = page.crop((x0, top, x1, bottom)).extract_text()
                         except Exception:
                             txt = None
-                        if txt and txt.strip():
-                            data[ri][ci] = txt.strip()
+                        # Sanidad: aceptar solo texto de UNA línea y corto.
+                        # Celdas fusionadas (colspan) cropeadas producen texto
+                        # multilínea o fragmentos largos de la celda vecina —
+                        # eso es basura y no debe inyectarse como valor.
+                        if txt:
+                            txt = txt.strip()
+                            if txt and "\n" not in txt and len(txt) <= 60:
+                                data[ri][ci] = txt
         except Exception:
             pass
         tablas.append(data)
