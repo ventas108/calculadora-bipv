@@ -203,6 +203,74 @@ _TABLE_LABEL_RE: dict = {
 }
 
 
+# ── Patrones para tablas auxiliares de 1 fila: CoefVoc / CoefIsc / CoefPmax / NOCT ──
+_AUX_LABEL_RE: dict = {
+    # etiqueta → campo → (regex_etiqueta, regex_valor)
+    "CoefVoc":  (
+        re.compile(r'coef[^%\n]*?voltaje|coef[^%\n]*?voc|temp[^%\n]*?voc|β\s*[Vv]oc', re.I),
+        re.compile(r'([+-]?[0-9]+\.?[0-9]*)\s*%'),
+    ),
+    "CoefIsc":  (
+        re.compile(r'coef[^%\n]*?corriente|coef[^%\n]*?isc|temp[^%\n]*?isc|α\s*[Ii]sc', re.I),
+        re.compile(r'([+-]?[0-9]+\.?[0-9]*)\s*%'),
+    ),
+    "CoefPmax": (
+        re.compile(r'coef[^%\n]*?p(?:max|mpp)|temp[^%\n]*?p(?:max|mpp)|γ\s*[Pp]', re.I),
+        re.compile(r'([+-]?[0-9]+\.?[0-9]*)\s*%'),
+    ),
+    "NOCT": (
+        re.compile(r'noct|nominal\s+operating\s+cell|temperatura\s+nominal\s+de\s+operaci', re.I),
+        re.compile(r'([0-9]+\.?[0-9]*)\s*[°º]?\s*[Cc]\b'),
+    ),
+}
+
+
+def _extract_aux_table_shared(pdf_bytes: bytes) -> dict:
+    """
+    Escanea tablas de 1 fila con 2 celdas (label | valor) en busca de
+    coeficientes de temperatura y NOCT que no están en la tabla multi-modelo.
+
+    Devuelve dict vacío si no encuentra nada o si pdfplumber no está disponible.
+    Esto evita el problema de que pdfplumber rompa en varias líneas la celda de
+    valor, haciendo que el patrón regex sobre texto plano no encuentre el número.
+    """
+    shared: dict = {}
+    if not _HAS_PDF:
+        return shared
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            for page in pdf.pages:
+                for tbl in (page.extract_tables() or []):
+                    if not tbl:
+                        continue
+                    for row in tbl:
+                        if not row or len(row) < 2:
+                            continue
+                        cells = [
+                            unicodedata.normalize("NFC", str(c or "")).strip()
+                            for c in row
+                        ]
+                        # Solo filas con exactamente 2 celdas no vacías
+                        non_empty = [c for c in cells if c]
+                        if len(non_empty) != 2:
+                            continue
+                        label_cell, val_cell = non_empty[0], non_empty[1]
+                        for field, (lbl_re, val_re) in _AUX_LABEL_RE.items():
+                            if field in shared:
+                                continue        # ya encontrado
+                            if lbl_re.search(label_cell):
+                                m = val_re.search(val_cell)
+                                if m:
+                                    v = float(m.group(1))
+                                    if field == "NOCT" and not (30 <= v <= 80):
+                                        continue
+                                    shared[field] = v
+                                    break
+    except Exception:
+        pass
+    return shared
+
+
 def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
     """
     Extrae modelos y parámetros directamente de tablas estructuradas con pdfplumber.
@@ -212,7 +280,7 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
     Este método es más robusto que el basado en texto plano cuando pdfplumber 
     fragmenta columnas en líneas separadas.
     """
-    EMPTY: dict = {"modelos_detectados": [], "valores_por_modelo": {}}
+    EMPTY: dict = {"modelos_detectados": [], "valores_por_modelo": {}, "shared_values": {}}
     if not _HAS_PDF:
         return EMPTY
     try:
@@ -350,6 +418,7 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
                         return {
                             "modelos_detectados": model_names,
                             "valores_por_modelo": por_modelo,
+                            "shared_values": _extract_aux_table_shared(pdf_bytes),
                         }
     except Exception:
         pass
@@ -710,6 +779,13 @@ def extraer_parametros_panel(pdf_bytes: bytes) -> dict:
 
     result["modelos_detectados"] = mm["modelos_detectados"]
     result["valores_por_modelo"]  = mm["valores_por_modelo"]
+
+    # Aplicar valores compartidos (CoefVoc, CoefIsc, CoefPmax, NOCT) extraídos
+    # de tablas auxiliares de 1 fila. Estos no están en la tabla multi-modelo y
+    # el extractor de texto falla cuando pdfplumber rompe la celda en líneas.
+    for _k, _v in mm.get("shared_values", {}).items():
+        if result.get(_k) is None:
+            result[_k] = _v
 
     # Volcado de tablas pdfplumber para diagnóstico (se muestra en el expander de debug)
     result["_debug_tables"] = _dump_tables_pdfplumber(pdf_bytes)
