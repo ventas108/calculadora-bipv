@@ -55,3 +55,9 @@ El loader busca la hoja por nombre; si no existe, retorna `{}` sin error.
 - Algunas fichas (ej. SolTech SMF 520J) no tienen capa de texto: pdfplumber devuelve 0 chars → se activa el fallback OCR (tesseract) en pdf_panel_extractor.py.
 - **Lección OCR:** los subíndices se pierden (Vmp→"Vm") y las unidades no siguen al número — los patrones deben aceptar `Etiqueta (Símbolo) valor` sin unidad. El nombre de modelo debe tomarse de una etiqueta confiable (fila "Rendimiento a STC"), nunca del primer código suelto: el OCR genera basura tipo "MAZM-IDOO" que gana si se busca genéricamente.
 - En fichas con secciones STC y NOMT, el primer match (STC) es el correcto porque STC aparece primero en el texto.
+
+## Extractor inversores — lecciones fichas en español (ago 2026)
+- Fichas Growatt en español insertan caracteres de control (\x01) DENTRO de los nombres de modelo ("MAX\x0150KTL3-XL\x012") → siempre limpiar [\x00-\x1f] del texto antes de detectar modelos multi-columna.
+- Etiquetas españolas ≠ inglesas: "Rango de voltaje de MPPT", "Número de MPPTs", "Cadenas por MPPT", "Voltaje de arranque", "Rango de potencia máxima" (= rango voltaje a plena carga → V_mppt_activo).
+- Etiquetas que se parten en dos líneas ("Máxima potencia FV / recomendada (STC) 100000W...") → los loops línea-a-línea no deben hacer break en la línea de la etiqueta sin valores.
+- Fallbacks conservadores aceptados por el usuario: Vdc_max=Vmppt_max si no publicado; V_mppt_activo desde "Rated PV/DC input voltage" con sanity dentro del rango MPPT y ≥60 V.
