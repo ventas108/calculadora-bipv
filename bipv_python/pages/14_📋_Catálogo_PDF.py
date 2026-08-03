@@ -109,9 +109,9 @@ with tab_agregar:
             options=_modelos_det,
             key="sel_modelo_panel_mm",
         )
-        # Sobrescribir campos variables (Pmax, Voc, Isc, Vmp, Imp) con los del modelo elegido
+        # Sobrescribir campos variables con los del modelo elegido
         _v = _vals_por_mod.get(_modelo_elegido, {})
-        for _campo in ("Pmax", "Voc", "Isc", "Vmp", "Imp"):
+        for _campo in ("Pmax", "Voc", "Isc", "Vmp", "Imp", "Transparencia"):
             if _v.get(_campo) is not None:
                 data[_campo] = _v[_campo]
         # Pre-llenar nombre del modelo con el código seleccionado
@@ -161,7 +161,7 @@ with tab_agregar:
         f1, f2, f3, f4 = st.columns(4)
         n_s    = f1.number_input("Celdas en serie (Ns)", value=int(data.get("N_s") or 0), min_value=0, step=1)
         dims   = f2.text_input("Dimensiones (LxAxE mm)", value=data.get("dimensiones") or "")
-        transp = f3.number_input("Transparencia (%)", value=0.0, min_value=0.0, max_value=100.0, step=1.0)
+        transp = f3.number_input("Transparencia (%)", value=float(data.get("Transparencia") or 0), min_value=0.0, max_value=100.0, step=1.0)
         costo  = f4.number_input("Costo (USD/ud)", value=0.0, min_value=0.0, step=1.0, format="%.2f")
 
         notas = st.text_area(

@@ -69,6 +69,8 @@ _PATTERNS = {
         r'(?:β|beta|β_Voc|Coef(?:icient)?\s+(?:of\s+)?(?:Temp(?:erature)?\s+(?:of\s+)?)?Voc|Temperatura\s+Voc|TK\s*Voc)\s*[:\(]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
         r'(?:β|beta)V?[Oo][Cc]?\s*=?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
         r'Voc\s+coeff?\.?\s*[:\|]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
+        # NCL BIPV: "Coeficiente de temperatura para voltaje  -0.28%/ºC"
+        r'temperatura\s+para\s+voltaje[^%\n]*?([+-]?[0-9]*\.?[0-9]+)\s*%',
     ],
     "CoefIsc": [
         r'(?:α|alpha|α_Isc|Coef(?:icient)?\s+(?:of\s+)?(?:Temp(?:erature)?\s+(?:of\s+)?)?Isc|Temperatura\s+Isc|TK\s*Isc)\s*[:\(]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
@@ -135,11 +137,12 @@ _MULTIMODEL_VAR_PATTERNS = {
 
 # Rangos plausibles para filtrar ruido numérico del PDF
 _MULTIMODEL_PLAUSIBLE: dict = {
-    "Pmax": (5.0,  2000.0),
-    "Voc":  (5.0,   300.0),
-    "Isc":  (0.05,   60.0),
-    "Vmp":  (5.0,   250.0),
-    "Imp":  (0.05,   60.0),
+    "Pmax":          (5.0,  2000.0),
+    "Voc":           (5.0,   300.0),
+    "Isc":           (0.05,   60.0),
+    "Vmp":           (5.0,   250.0),
+    "Imp":           (0.05,   60.0),
+    "Transparencia": (0.0,   100.0),   # % de transparencia del vidrio BIPV
 }
 
 
@@ -247,7 +250,7 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
                     # Algunas tablas (ej. NCL BIPV) alternan filas con etiqueta y filas
                     # sin etiqueta:  Pmax→Voc(vacío)→Isc→Vmp(vacío)→Imp→Transp(vacío)
                     # Mapeo: el campo que viene en la fila vacía SIGUIENTE a cada campo
-                    _EMPTY_FOLLOWS: dict = {"Pmax": "Voc", "Isc": "Vmp"}
+                    _EMPTY_FOLLOWS: dict = {"Pmax": "Voc", "Isc": "Vmp", "Imp": "Transparencia"}
                     last_field_hit: str | None = None
 
                     # ── Paso 2: extraer filas de parámetros ──────────────────
