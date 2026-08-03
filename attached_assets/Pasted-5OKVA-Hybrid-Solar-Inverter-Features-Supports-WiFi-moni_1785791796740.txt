@@ -1,0 +1,150 @@
+5OKVA
+
+Hybrid Solar Inverter
+
+Features
+
+(>) Supports WiFi monitoring and Fsolar smart cloud monitoring system. ©
+elicitysolar®
+
+(0) Customizable battery charge / discharge scheduling.
+Qe Seamless power supply switching within 10ms.
+
+O Configurable parameters and working mode via LCD touch screen. a)
+Q Programmable multiple operation modes: On grid, off grid and UPS.
+
+re) 8-channel PV,4-channel MPPT, 2 times over configuration capacity.
+
+14.) Programmable supply priority for battery or grid.
+
+(2) Wide battery voltage input and high battery charge and discharge o O - :
+(a) ry voltage inp gh battery charg 9 amg” a
+current up to 100A(50A+50A). Pp
+
+(0) 2 independent battery inputs, effectively reducing inter-cluster circulation. IVGM25K-50KHP3G2
+Programmable generator port, support smart load and micro inverter access.
+
+(9) IP65 protection level.
+ti 12pcs in parallel maximum.
+
+i] Auto restart while AC is recovering. ---@>----- 0 O solar APP
+solar
+
+pa (EP or El or Bj
+
+Generator Smart Micro
+Load Inverter
+
+System Configuration
+
+mr y  |
+
+ma DC 8 nm
+a cr J
+a A Grid
+ma AC et | |
+. . Sa YN oo
+---- Communication a ke : wl
+Battery ==, 2, ‘Back-up Load General Load
+
+Guangzhou Felicity Solar Technology Co.,Ltd.
+
+a www.felicitysolar.com B sales@felicitysolar.com
+(A No.2, Donghua Huaye Road, Renhe Town, Baiyun District, Guangzhou, China (Only 10 Mins from Baiyun International Airport) Official Website Facebook
+
+
+| Model =| IVGMBOKHP3G2 IVGM40KHP3G2 IVGM30KHP3G2 IVGM29K9HP3G2 IVGM25KHP3G2
+
+Battery Input Data
+
+Battery Type LFP (LiFePO4)
+
+Battery Voltage Range 160-800Vdc
+
+Max. Charging Current 50+50(A)
+
+Max. Discharging Current 50+50(A)
+
+Number of Battery Input 2
+
+Max. DC Access Power 100kw 80kw 60kW 59.8kW 50kW
+Max. DC Input Power 80kw 64kw 48kW 47.84kW 40kw
+Max. DC Input Voltage 1000Vdc
+
+Min. DC Input Voltage 150Vdc
+
+Start-up Voltage 180Vdc
+
+Rated DC Input Voltage 600Vdc
+
+MPPT Range 150-850Vdc
+
+Full Load DC Voltage Range 550-850Vdc 444-850Vdc 444-850Vdc 443-850Vdc 555-850Vdc
+PV Input Current 36+36+36+36(A) 36+36+36(A) 36+36(A)
+Max. PVIsc 55+55+55+55(A) 55+55+55(A) 55+55(A)
+No.of MPP Trackers 4 3 2
+No.of Strings Per MPP Tracker 2 2 2
+Rated AC Output Power 50kW 40kW 30kW 29.9kW 25kW
+Max. AC Output Power 55kW 44kW 33kW 29.9kW 27.5kW
+AC Output Rated Current 72.54 58A 43.5A 43.4A 36.3A
+Max. AC Current 79.7A 63.8A 4T.9A 43.4A 39.94
+Rated AC Voltage 110V/190V, 115V/200V, 120V/208V, 127V/220V, 133V/230V, 200V/346V, 220V/380V, 230V/400V, 240V/415V, 277V/480V
+AC Wiring Mode 3L+N+PE
+
+Rated AC Frequency 50 /60 Hz (45-55Hz/55-65Hz)
+
+THDI <3% (At Rated Power)
+
+Power Factor 0.8( Leading) to 0.8( Lagging)
+
+Surge Protection Level TYPEII(DC), TYPE II(AC)
+
+Over Voltage Category OVCII (DC), OVC III (AC)
+
+NTS & UNE217001 & UNE217002, CEI 0-21, NRS 097-2-1, EN50549-1/-10+Poland Deviations,
+
+Grid Regulati
+rid Regulation VDE 4105, G99, EN50549-1/-10, EN50549-1/-10+ Netherlands Deviations
+
+Safety Regulation EN 62477-1, IEC 62109-1/-2
+EMC IEC/EN 61000-6-2/4, EN/IEC 61000-3-11/12
+PV Input Lightning Protection Integrated
+
+PV String Input Reverse Integrated
+Polarity Protection
+
+Battery Input Lightning Protection Integrated
+
+AC Output Lightning Protection Integrated
+Battery Input Reverse Polarity Protection Integrated
+Insulation Resistor Detection Integrated
+Residual Current Monitoring Unit Integrated
+Output Over Current Protection Integrated
+
+Output Short-Circuit Protection Integrated
+
+Output Over Voltage Protection Integrated
+Anti-islanding Protection Integrated
+
+Net Weight 87.1KG
+
+Gross Weight 107.1KG
+
+Product Dimension 940*582*340MM
+Package Dimension 1114*774*469MM
+Protection Degree IP65
+Operating Temperature Range -40 to 60°C(> 50°C Derating)
+Humidity 0- 95 % (No Condensation)
+Cooling Smart Cooling
+Communication with BMS RS485,CAN
+Monitor Module WiFi/GPRS
+Installation Style Wall-mounted
+Warranty 10 Years
+
+*Refer to Felicitysolar's Warranty Policy for applicable conditions.
+
+Guangzhou Felicity Solar Technology Co.,Ltd.
+
+a www.felicitysolar.com B sales@felicitysolar.com
+
+(Q No.2, Donghua Huaye Road, Renhe Town, Baiyun District, Guangzhou, China (Only 10 Mins from Baiyun International Airport) Official Website Facebook
