@@ -244,6 +244,12 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
                     n = len(model_names)
                     por_modelo: dict = {m: {} for m in model_names}
 
+                    # Algunas tablas (ej. NCL BIPV) alternan filas con etiqueta y filas
+                    # sin etiqueta:  Pmax→Voc(vacío)→Isc→Vmp(vacío)→Imp→Transp(vacío)
+                    # Mapeo: el campo que viene en la fila vacía SIGUIENTE a cada campo
+                    _EMPTY_FOLLOWS: dict = {"Pmax": "Voc", "Isc": "Vmp"}
+                    last_field_hit: str | None = None
+
                     # ── Paso 2: extraer filas de parámetros ──────────────────
                     for row in table[model_row_idx + 1:]:
                         if not row:
@@ -260,20 +266,30 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
                         label = next((c for c in cells if c), "")
                         label_nfc = unicodedata.normalize("NFC", label)
 
-                        # Identificar campo — prioridad 1: abreviatura entre paréntesis
                         field_hit: str | None = None
-                        for field, pat in _ABBREV_IN_PARENS.items():
-                            if pat.search(label_nfc):
-                                field_hit = field
-                                break
-                        # Prioridad 2: patrón de texto de la etiqueta (NFC normalizado)
-                        if field_hit is None:
-                            for field, pat in _TABLE_LABEL_RE.items():
+
+                        if not label_nfc:
+                            # Fila sin etiqueta — inferir campo por el campo anterior
+                            field_hit = _EMPTY_FOLLOWS.get(last_field_hit)  # type: ignore[arg-type]
+                        else:
+                            # Identificar campo — prioridad 1: abreviatura entre paréntesis
+                            for field, pat in _ABBREV_IN_PARENS.items():
                                 if pat.search(label_nfc):
                                     field_hit = field
                                     break
+                            # Prioridad 2: patrón de texto de la etiqueta (NFC normalizado)
+                            if field_hit is None:
+                                for field, pat in _TABLE_LABEL_RE.items():
+                                    if pat.search(label_nfc):
+                                        field_hit = field
+                                        break
+
                         if field_hit is None:
                             continue
+
+                        # Actualizar contexto solo cuando la fila tiene etiqueta real
+                        if label_nfc:
+                            last_field_hit = field_hit
 
                         lo, hi = _MULTIMODEL_PLAUSIBLE[field_hit]
 
