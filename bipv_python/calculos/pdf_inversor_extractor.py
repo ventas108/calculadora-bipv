@@ -44,7 +44,7 @@ _BRAND_ALIASES: dict = {
 
 _BRANDS = [
     "Growatt", "Solis", "Ginlong", "Deye", "MUST", "SolaX", "LuxPower", "Felicity",
-    "POWEST", "Huawei", "SMA", "Fronius", "ABB", "Schneider", "GoodWe",
+    "POWEST", "Huawei", "SMA", "Fronius", "ABB", "Schneider", "GoodWe", "SAJ",
     "Sofar", "Sungrow", "Victron", "Outback", "Solaredge", "Enphase",
     "Delta", "Chint", "Kstar", "Voltronic", "Axpert", "MPPSolar",
     "Phocos", "Studer", "Steca", "SolarEdge", "Power Electronics",
@@ -189,6 +189,8 @@ def _find_range(label_patterns, text, use_sma_fallback=True):
 # Vdc_max — Tensión DC Máxima (límite físico absoluto)
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_VDCMAX = [
+    # SAJ español con unidad entre corchetes: "Tensión máxima de entrada [V] 1100"
+    (r"Tensi[oó]n\s+m[aá]xima\s+de\s+entrada\s*\[\s*V\s*\]\s*([0-9]{3,4})\b", 1),
     # Voltronic/InfiniSolar (etiquetas dobles con '/'): el segundo valor es el máximo
     # "Nominal DC Voltage / Maximum DC Voltage 720 VDC / 900 VDC"
     (r"Nominal\s+DC\s+Voltage\s*/\s*Max(?:imum)?\.?\s+DC\s+Voltage\s+[0-9.]+\s*V(?:DC)?\s*/\s*([0-9.]+)\s*V(?:DC)?", 1),
@@ -234,6 +236,8 @@ _PAT_VDCMAX = [
 _LABEL_MPPT_RANGE = [
     # Español (Growatt): "Rango de voltaje de MPPT 180V-850VDC"
     r"Rango\s+de\s+[Vv]oltaje\s+de\s+MPPT",
+    # SAJ español: "Rango de tensión MPPT [V] 180~1000"
+    r"Rango\s+de\s+tensi[oó]n\s+MPPT",
     # Huawei español (pdfplumber pega palabras): "Tensiónde funcionamientoMPPT 2 200 V ~ 1000 V"
     r"Tensi[oó]n\s*de\s*funcionamiento\s*(?:de\s*)?MPPT",
     r"MPP(?:T)?\s+[Vv]oltage\s+[Rr]ange",
@@ -268,6 +272,8 @@ _LABEL_MPPT_ACTIVO = [
 # V_arranque — Tensión de arranque (PV, no batería)
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_VARRANQUE = [
+    # SAJ español: "Tensión de arranque [V] 200"
+    (r"Tensi[oó]n\s+de\s+arranque\s*\[\s*V\s*\]\s*([0-9]+(?:[.,][0-9]+)?)\b", 1),
     # Voltronic/InfiniSolar: "Start-up Voltage / Initial Feeding Voltage 320 VDC / 350 VDC"
     (r"Start[- ]?up\s+Voltage\s*/\s*Initial\s+Feeding\s+Voltage\s+([0-9.]+)\s*V",  1),
     # "(V): N" format (LuxPower, Deye): "Start-up Voltage (V): 140"
@@ -289,6 +295,8 @@ _PAT_VARRANQUE = [
 # n_trackers — Número de trackers MPPT
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_NTRACKERS = [
+    # SAJ español: "No. de MPPT 3 4" → primer valor (modelo base)
+    (r"No\.?\s*de\s+MPPT\s+([0-9]{1,2})\b", 1),
     # Voltronic/InfiniSolar: "Number of MPP Trackers / Maximum Input Current 2 / 2 x 18.6A"
     (r"Number\s+of\s+MPP\s+Trackers?\s*/\s*Max(?:imum)?\.?\s+Input\s+Current\s+([0-9]+)\s*/", 1),
     # Tabla de especificaciones — máxima prioridad (spec table beats feature bullets)
@@ -342,6 +350,8 @@ _PAT_NSTRINGS = [
 # I_max_tracker — Corriente máxima de entrada por tracker
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_IMAX = [
+    # SAJ español: "Corriente máxima de entrada [A] 32/32/32" → por MPPT = 1er valor
+    (r"Corriente\s+m[aá]xima\s+de\s+entrada\s*\[\s*A\s*\]\s*([0-9]+(?:[.,][0-9]+)?)\s*/", 1),
     # Voltronic/InfiniSolar: "Number of MPP Trackers / Maximum Input Current 2 / 2 x 18.6A"
     # → corriente POR tracker es el valor tras la 'x'
     (r"Number\s+of\s+MPP\s+Trackers?\s*/\s*Max(?:imum)?\.?\s+Input\s+Current\s+[0-9]+\s*/\s*[0-9]+\s*x\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
@@ -371,6 +381,8 @@ _PAT_IMAX = [
 # Isc_max_tracker — Corriente de cortocircuito máxima por tracker
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_ISC = [
+    # SAJ español: "Corriente máxima de cortocircuito CC [A] 38.4/38.4/38.4" → por MPPT
+    (r"Corriente\s+m[aá]xima\s+de\s+cortocircuito\s+CC\s*\[\s*A\s*\]\s*([0-9]+(?:[.,][0-9]+)?)", 1),
     # Genérico: cubre "short circuit current per MPPT", "short-circuit current input per MPPT"
     (r"Max(?:imum)?\.?\s+(?:PV\s+)?[Ss]hort[- ]?[Cc]ircuit\s+[Cc]urrent\s*(?:input\s+)?(?:per\s+MPPT|per\s+[Tt]racker)?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
     # SolaX X3-FORTH: "Max. input short circuit current per MPPT" (con "input" antes de "short")
@@ -390,6 +402,8 @@ _PAT_ISC = [
 # P_dc_max_W — Potencia FV máxima recomendada (W)
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_PDCMAX = [
+    # SAJ español: "Potencia máxima FV [Wp]@STC 30000 37500 45000" → 1er valor
+    (r"Potencia\s+m[aá]xima\s+FV\s*\[\s*Wp?\s*\]\s*(?:@\s*STC)?\s*([0-9]{4,6})\b", 1),
     # Voltronic/InfiniSolar: "Maximum PV Input Power 14850W"
     (r"Max(?:imum)?\.?\s+PV\s+Input\s+Power\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*W\b", 1),
     # kWp (SolaX con corchetes): "power [kWp]: 36" o "power: 36 kWp"
@@ -660,6 +674,7 @@ def _extract_multimodel_values(text: str) -> dict:
         if not re.search(r'recommended\s+PV\s+(?:array\s+)?power'
                          r'|recomendada\s*\(STC\)'
                          r'|M[aá]xima\s+potencia\s+FV'
+                         r'|Potencia\s+m[aá]xima\s+FV'
                          r'|Max\.?\s*DC\s+Input\s+Power', line, re.IGNORECASE):
             continue
         found = [
@@ -672,6 +687,12 @@ def _extract_multimodel_values(text: str) -> dict:
             found = [
                 (float(m.group(1)) / 1000.0, m.start())
                 for m in re.finditer(r'([0-9]{4,7})\s*W\b', line)
+            ]
+        if not found:
+            # SAJ: valores sin unidad tras la etiqueta ("[Wp]@STC 30000 37500 45000")
+            found = [
+                (float(m.group(1)) / 1000.0, m.start())
+                for m in re.finditer(r'\b([0-9]{4,7})\b', line)
             ]
         if not found:
             continue   # etiqueta partida en dos líneas (Growatt) — seguir buscando
@@ -721,6 +742,34 @@ def _extract_multimodel_values(text: str) -> dict:
                     result['por_modelo'][model]['n_trackers']        = nt
                     result['por_modelo'][model]['n_strings_tracker'] = ns
         break
+
+    # ── 4. n_trackers por columna, formato SAJ español: "No. de MPPT 3 4 4" ────
+    if all(result['por_modelo'][m]['n_trackers'] is None for m in model_names):
+        mejor: list = []
+        for line in lines:
+            m_lab = re.match(r'\s*No\.?\s*de\s+MPPT\b(.*)$', line, re.IGNORECASE)
+            if not m_lab:
+                continue
+            vals = [int(x) for x in re.findall(r'\b([0-9]{1,2})\b', m_lab.group(1))]
+            if len(vals) == n:
+                mejor = vals
+                break
+            if vals and not mejor:
+                mejor = vals
+        if mejor:
+            if len(mejor) < n:
+                mejor = mejor + [mejor[-1]] * (n - len(mejor))
+            for v, model in zip(mejor, model_names):
+                result['por_modelo'][model]['n_trackers'] = float(v)
+        # Strings por MPPT: "No. de cadenas por MPPT 2/2/2 2/2/2/2"
+        for line in lines:
+            m_lab = re.match(r'\s*No\.?\s*de\s+cadenas\s+por\s+MPPT\b(.*)$', line, re.IGNORECASE)
+            if m_lab:
+                m_v = re.search(r'\b([0-9]{1,2})\s*/', m_lab.group(1))
+                if m_v:
+                    for model in model_names:
+                        result['por_modelo'][model]['n_strings_tracker'] = float(m_v.group(1))
+                break
 
     return result
 
@@ -920,7 +969,7 @@ def _extraer_campos(texto: str) -> dict:
         # Huawei español: "Tensión nominal de entrada 600 V @380 Vac ..."
         if not m_rated:
             m_rated = re.search(
-                r"Tensi[oó]n\s+nominal\s+de\s+entrada\s*[:\(]?\s*([0-9]{2,4}(?:[.,][0-9]+)?)\s*V",
+                r"Tensi[oó]n\s+nominal\s+de\s+entrada\s*(?:\[\s*V\s*\])?\s*[:\(]?\s*([0-9]{2,4}(?:[.,][0-9]+)?)\s*V?",
                 texto, re.IGNORECASE,
             )
         if m_rated:
