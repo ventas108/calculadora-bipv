@@ -137,6 +137,64 @@ def guardar_panel_excel(datos: dict) -> str:
     return nombre
 
 
+def eliminar_panel_excel(nombre: str) -> bool:
+    """
+    Elimina la fila del panel con TipoPanel == nombre del Excel.
+    Retorna True si se eliminó, False si no se encontró.
+    Invalida el cache.
+    """
+    import openpyxl
+
+    nombre = nombre.strip()
+    if not nombre:
+        raise ValueError("Nombre vacío.")
+
+    try:
+        wb = openpyxl.load_workbook(_EXCEL)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"No se encontró el archivo: {_EXCEL}")
+
+    if _SHEET not in wb.sheetnames:
+        raise ValueError(f"La hoja '{_SHEET}' no existe.")
+
+    ws = wb[_SHEET]
+    headers = [str(c.value).strip() if c.value else "" for c in ws[1]]
+    try:
+        col_tipo = headers.index("TipoPanel") + 1
+    except ValueError:
+        raise ValueError("La hoja no tiene columna 'TipoPanel'.")
+
+    fila_borrar = None
+    for row in ws.iter_rows(min_row=2):
+        if str(row[col_tipo - 1].value or "").strip() == nombre:
+            fila_borrar = row[0].row
+            break
+
+    if fila_borrar is None:
+        return False
+
+    ws.delete_rows(fila_borrar)
+    wb.save(_EXCEL)
+
+    try:
+        cargar_catalogo_paneles.clear()
+    except Exception:
+        pass
+
+    return True
+
+
+def actualizar_panel_excel(nombre_original: str, datos: dict) -> str:
+    """
+    Actualiza los campos de un panel existente (por nombre_original).
+    Si datos contiene 'TipoPanel' distinto, también renombra el panel.
+    Retorna el nombre final guardado.
+    """
+    datos_completos = {"TipoPanel": nombre_original}
+    datos_completos.update(datos)
+    return guardar_panel_excel(datos_completos)
+
+
 def obtener_panel_excel(nombre: str) -> dict:
     return cargar_catalogo_paneles().get(nombre, {})
 
