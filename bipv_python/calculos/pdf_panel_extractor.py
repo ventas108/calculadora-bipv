@@ -13,6 +13,7 @@ Función principal:
 
 import re
 import io
+import unicodedata
 from typing import Optional
 
 try:
@@ -247,23 +248,28 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
                     for row in table[model_row_idx + 1:]:
                         if not row:
                             continue
-                        cells = [str(c or "").strip() for c in row]
+                        # Normalizar a NFC para que ó/á/í/é en NFD también coincidan
+                        cells = [
+                            unicodedata.normalize("NFC", str(c or "")).strip()
+                            for c in row
+                        ]
                         if not cells:
                             continue
 
                         # Label: primera celda no vacía de la fila
                         label = next((c for c in cells if c), "")
+                        label_nfc = unicodedata.normalize("NFC", label)
 
                         # Identificar campo — prioridad 1: abreviatura entre paréntesis
                         field_hit: str | None = None
                         for field, pat in _ABBREV_IN_PARENS.items():
-                            if pat.search(label):
+                            if pat.search(label_nfc):
                                 field_hit = field
                                 break
-                        # Prioridad 2: patrón de texto de la etiqueta
+                        # Prioridad 2: patrón de texto de la etiqueta (NFC normalizado)
                         if field_hit is None:
                             for field, pat in _TABLE_LABEL_RE.items():
-                                if pat.search(label):
+                                if pat.search(label_nfc):
                                     field_hit = field
                                     break
                         if field_hit is None:
@@ -271,16 +277,45 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
 
                         lo, hi = _MULTIMODEL_PLAUSIBLE[field_hit]
 
-                        # Asignar valor a cada modelo según su columna
+                        def _nums_in(s: str) -> list:
+                            return [
+                                float(m) for m in
+                                re.findall(r'[0-9]+(?:\.[0-9]+)?', s)
+                            ]
+
+                        # Intento 1: extracción por índice exacto de columna
+                        hits_by_idx: dict = {}
                         for mi, col_idx in enumerate(model_col_indices):
                             if mi >= n or col_idx >= len(cells):
                                 continue
-                            raw = cells[col_idx]
-                            nums = re.findall(r'([0-9]+(?:\.[0-9]+)?)', raw)
-                            if nums:
-                                v = float(nums[0])
+                            for v in _nums_in(cells[col_idx]):
                                 if lo <= v <= hi:
-                                    por_modelo[model_names[mi]][field_hit] = v
+                                    hits_by_idx[mi] = v
+                                    break
+
+                        # Intento 2: si menos de la mitad de modelos obtuvo valor,
+                        # usar extracción posicional (recoge todos los números
+                        # plausibles de la fila ignorando columna de etiqueta/unidad)
+                        if len(hits_by_idx) < max(1, n // 2):
+                            plausible_vals: list = []
+                            for ci, cell in enumerate(cells):
+                                if ci == 0:         # columna de etiqueta
+                                    continue
+                                if not re.search(r'[0-9]', cell):
+                                    continue        # columna de unidades ("V","A","W")
+                                for v in _nums_in(cell):
+                                    if lo <= v <= hi:
+                                        plausible_vals.append(v)
+                                        break
+                            # Asignar posicionalmente al número de modelos
+                            if len(plausible_vals) >= n:
+                                hits_by_idx = {mi: plausible_vals[mi] for mi in range(n)}
+                            elif len(plausible_vals) == 1:
+                                # valor único (celda fusionada) → mismo para todos
+                                hits_by_idx = {mi: plausible_vals[0] for mi in range(n)}
+
+                        for mi, v in hits_by_idx.items():
+                            por_modelo[model_names[mi]][field_hit] = v
 
                     # Considerar exitoso si al menos Pmax fue extraído
                     if any("Pmax" in v for v in por_modelo.values()):
