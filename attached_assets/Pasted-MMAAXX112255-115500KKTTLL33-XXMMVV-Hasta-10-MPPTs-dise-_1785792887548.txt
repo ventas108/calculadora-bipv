@@ -1,0 +1,166 @@
+MMAAXX112255~~115500KKTTLL33--XXMMVV
+· Hasta 10 MPPTs, diseño sin fusibles
+· Escáner y diagnóstico inteligente de curvas I/V
+· Monitoreo inteligente de cadenas
+· SPD CA&CD tipo II SPD
+· Protección AFCI
+Topology Diagram
+MPPT 1
+MPPT1
+L1
+DC EMI Output AC EMI
+Filter Filter Filter L2
+L3
+MPPT10
+MPPT 10 N
+DC Link DC/AC AC SPD PE
+DC
+Current DC SPD
+Switch
+Sensor
+MMAAXX112255~~115500KKTTLL33--XXMMVV
+· Hasta 10 MPPTs, diseño sin fusibles
+· Escáner y diagnóstico inteligente de curvas I/V
+· Monitoreo inteligente de cadenas
+· SPD CA&CD tipo II SPD
+· Protección AFCI
+Topology Diagram
+MPPT 1
+MPPT1
+L1
+DC EMI Output AC EMI
+Filter Filter Filter L2
+L3
+MPPT10
+MPPT 10 N
+DC Link DC/AC AC SPD PE
+DC
+Current DC SPD
+Switch
+Sensor
+
+
+
+
+
+
+
+        DC EMI
+Filter
+
+
+        Output
+Filter        AC EMI
+Filter    
+
+
+Primary Specification
+Hoja de datos MAX125KTL3-XMV MAX136KTL3-XMV MAX150KTL3-XMV
+Datos de entrada (CD)
+rM ecá oxim ma en p do ate dn ac (i Sa T CFV ) 187500W 204000W 204000W
+Máximo voltaje CD 1100V
+Voltaje de arranque 195V
+Voltaje nominal 720V
+Rango de voltaje de MPPT 180V-1000V
+Número de MPPTs 10
+Cadenas por MPPT 2
+Máxima corriente por MPPT 32A
+Corriente de corto circuito por MPPT 40A
+Salida (CA)
+Potencia nominal CA 125000W 136000W 1500000W
+Potencia aparente máxima 137500VA 149600VA 165000VA
+Voltaje nominal CA (Rango*) 277V/480V
+408-528VAC
+Frecuencia de red CA (Rango*) 50/60 Hz (45~55Hz/55-65 Hz)
+Corriente máxima de salida 165.4A 179.9A 198.5A
+F aa juc st to ar b d lee potencia nominal/ >0.99 / +0.8 … -0.8
+Distorsión armónica total <3%
+Tipo de conexión CA 3W+PE
+Eficiencia
+Máxima eficiencia 99.00%
+Eficiencia europea 98.50%
+Eficiencia de MPPT 99.90%
+Dispositivos de protección
+Protección de polaridad inversa CD Sí
+Interruptor CD Sí
+Protección contra sobretensión CA/CD Tipo II/Tipo II
+M deo l n ait io slr ae mo id ee nt oresistencia Sí
+Protección de corto circuito CA Sí
+Monitoreo de falla a tierra Sí
+Monitoreo de red Sí
+Protección anti-isla Sí
+AFCI Sí
+Datos generales
+Dimensiones 970/640/345mm
+Peso 84kg
+Rango de temperatura de operación -30°C ... +60°C
+Autoconsumo (noche) < 1W
+Topología Sin transformador
+Enfriamiento Enfriamiento inteligente
+Grado de protección Ip66
+Humedad relativa 0-100%
+Altitud 4000m
+Conexión CD Staubli MC4/Amphenol UTX
+Conexión CA Terminales de conexión OT (Max. 240mm²)
+Pantalla LED/WIFI+APP
+Comunicación: RS485 / USB / PLC Sí/Sí/Opcional
+Garantía: 5 años / 10 años Sí/Opcional
+CE,IEC62116, IEC61727, CQC, VDE0126, VFR2014, EN50549-1, C10/C11, UNE206007, G99
+ROHS, CEI 0-21/0-16, N4105&N4110, UNE206006,MEA, PEA, KSC8565
+SHENZHEN GROWATT NEW ENERGY CO.,LTD. A: 2nd & 3rd Floor,Building 4,Jiayu Industrial Zone,Xibianling,Shangwu Village,Shiyan,Baoan District,Shenzhen
+T: + 86 755 2747 1900 F: + 86 755 2749 1460 E: info@ginverter.com
+Hoja de datos  MAX125KTL3-XMV  MAX136KTL3-XMV  MAX150KTL3-XMV
+Datos de entrada (CD)      
+Máxima potencia FV
+recomendada (STC)  187500W  204000W  204000W
+Máximo voltaje CD  1100V  1100V  
+Voltaje de arranque  195V  195V  
+Voltaje nominal  720V  720V  
+Rango de voltaje de MPPT  180V-1000V  180V-1000V  
+Número de MPPTs  10  10  
+Cadenas por MPPT  2  2  
+Máxima corriente por MPPT  32A  32A  
+Corriente de corto circuito por MPPT  40A  40A  
+Salida (CA)      
+Potencia nominal CA  125000W  136000W  1500000W
+Potencia aparente máxima  137500VA  149600VA  165000VA
+Voltaje nominal CA (Rango*)  277V/480V
+408-528VAC    
+Frecuencia de red CA (Rango*)  50/60 Hz (45~55Hz/55-65 Hz)  50/60 Hz (45~55Hz/55-65 Hz)  
+Corriente máxima de salida  165.4A  179.9A  198.5A
+Factor de potencia nominal/
+ajustable  >0.99 / +0.8 … -0.8  >0.99 / +0.8 … -0.8  
+Distorsión armónica total  <3%  <3%  
+Tipo de conexión CA  3W+PE  3W+PE  
+Eficiencia      
+Máxima eficiencia  99.00%  99.00%  
+Eficiencia europea  98.50%  98.50%  
+Eficiencia de MPPT  99.90%  99.90%  
+Dispositivos de protección      
+Protección de polaridad inversa CD  Sí  Sí  
+Interruptor CD  Sí  Sí  
+Protección contra sobretensión CA/C  D Tipo II/Tipo II  Tipo II/Tipo II  
+Monitoreo de resistencia
+del aislamiento  Sí  Sí  
+Protección de corto circuito CA  Sí  Sí  
+Monitoreo de falla a tierra  Sí  Sí  
+Monitoreo de red  Sí  Sí  
+Protección anti-isla  Sí  Sí  
+AFCI  Sí  Sí  
+Datos generales      
+Dimensiones  970/640/345mm  970/640/345mm  
+Peso  84kg  84kg  
+Rango de temperatura de operación  -30°C ... +60°C  -30°C ... +60°C  
+Autoconsumo (noche)  < 1W  < 1W  
+Topología  Sin transformador  Sin transformador  
+Enfriamiento  Enfriamiento inteligente  Enfriamiento inteligente  
+Grado de protección  Ip66  Ip66  
+Humedad relativa  0-100%  0-100%  
+Altitud  4000m  4000m  
+Conexión CD  Staubli MC4/Amphenol UTX  Staubli MC4/Amphenol UTX  
+Conexión CA  Terminales de conexión OT (Max. 240mm²)  Terminales de conexión OT (Max. 240mm²)  
+Pantalla  LED/WIFI+APP  LED/WIFI+APP  
+Comunicación: RS485 / USB / PLC  Sí/Sí/Opcional  Sí/Sí/Opcional  
+Garantía: 5 años / 10 años  Sí/Opcional  Sí/Opcional  
+CE,IEC62116, IEC61727, CQC, VDE0126, VFR2014, EN50549-1, C10/C11, UNE206007, G99
+ROHS, CEI 0-21/0-16, N4105&N4110, UNE206006,MEA, PEA, KSC8565
