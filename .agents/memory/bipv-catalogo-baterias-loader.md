@@ -42,3 +42,11 @@ Reporta: hoja encontrada, columnas mapeadas, modelos completos/incompletos.
 El archivo maestro `Catalogo_Baterias_BIPV_Maestro.xlsx` (hoja `Catalogo_Baterias`)
 debe agregarse como hoja adicional a `/var/www/bipv/.../inversores_catalogo.xlsx`.
 El loader busca la hoja por nombre; si no existe, retorna `{}` sin error.
+
+## pdfplumber pierde celdas en tablas multi-modelo (extractor de paneles)
+- En filas SIN etiqueta de tablas multi-modelo, pdfplumber puede devolver None
+  en la última columna aunque el valor exista en el PDF (bordes de grilla incompletos).
+- Solución en el extractor: `_extract_tables_reparadas()` repara celdas None
+  cropeando columna×fila; solo en filas ≥ceil(n/2) completas y texto de 1 línea ≤60 chars.
+- La cabecera de modelos se elige por la fila con MÁS códigos (celdas colspan
+  reparadas pueden inyectar códigos sueltos en la fila de grupo).
