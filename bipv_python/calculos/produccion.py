@@ -29,6 +29,18 @@ T_REF_K     = 298.15
 G_REF       = 1000.0
 
 
+# ── Parámetros SDM mínimos requeridos para el modelo De Soto completo ─────────
+_SDM_PARAMS_REQUERIDOS = ("I_L_ref", "I_o_ref", "R_s", "R_sh_ref", "a_ref")
+
+
+def panel_tiene_sdm_completo(panel: dict) -> bool:
+    """Retorna True si el panel tiene todos los parámetros SDM para De Soto 2006."""
+    return all(
+        panel.get(p) is not None and float(panel.get(p)) != 0.0
+        for p in _SDM_PARAMS_REQUERIDOS
+    )
+
+
 def _calcular_pmax_vectorizado(
     G: np.ndarray,
     T_cel: np.ndarray,
@@ -46,7 +58,7 @@ def _calcular_pmax_vectorizado(
     """
     # ── Fallback para paneles sin parámetros SDM completos ───────────────────
     # (paneles del catálogo Excel que no tienen a_ref, I_L_ref, etc.)
-    if panel.get("I_L_ref") is None or panel.get("R_s") is None or panel.get("a_ref") is None:
+    if not panel_tiene_sdm_completo(panel):
         gamma = float(panel.get("Tk_gamma", -0.45)) / 100.0   # %/°C → 1/°C
         pmax_stc = float(panel.get("Pmax_stc", 0))
         pmax = pmax_stc * np.where(G > 5.0, G / 1000.0, 0.0) * (1.0 + gamma * (T_cel - 25.0))
@@ -205,20 +217,21 @@ def simular_produccion_anual(
     df_m.index = [meses_es[m] for m in df_m.index.month]
 
     return {
-        "E_dc_anual_kWh":    round(E_dc_anual, 0),
-        "E_ac_anual_kWh":    round(E_ac_anual, 0),
-        "P_stc_kW":          round(P_dc_stc_kW, 3),
-        "Y_f":               round(Y_f, 0),
-        "Y_r":               round(Y_r, 0),
-        "Y_a":               round(Y_a, 0),
-        "PR":                round(PR, 3),
-        "CF_pct":            round(CF * 100, 1),
-        "perdida_temp_kWh":  round(perdida_temp_kWh, 0),
-        "perdida_inv_kWh":   round(perdida_inv_kWh, 0),
-        "H_i_kWh_m2":        round(H_i, 1),
-        "H_ef_kWh_m2":       round(H_ef, 1),
-        "df_horario":        df_h,
-        "df_mensual":        df_m,
+        "E_dc_anual_kWh":         round(E_dc_anual, 0),
+        "E_ac_anual_kWh":         round(E_ac_anual, 0),
+        "P_stc_kW":               round(P_dc_stc_kW, 3),
+        "Y_f":                    round(Y_f, 0),
+        "Y_r":                    round(Y_r, 0),
+        "Y_a":                    round(Y_a, 0),
+        "PR":                     round(PR, 3),
+        "CF_pct":                 round(CF * 100, 1),
+        "perdida_temp_kWh":       round(perdida_temp_kWh, 0),
+        "perdida_inv_kWh":        round(perdida_inv_kWh, 0),
+        "H_i_kWh_m2":             round(H_i, 1),
+        "H_ef_kWh_m2":            round(H_ef, 1),
+        "df_horario":             df_h,
+        "df_mensual":             df_m,
+        "uso_modelo_simplificado": not panel_tiene_sdm_completo(panel),
     }
 
 

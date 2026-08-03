@@ -5,7 +5,7 @@ import plotly.express as px
 import pandas as pd
 import numpy as np
 
-from calculos.produccion import simular_produccion_anual, perdidas_desglosadas
+from calculos.produccion import simular_produccion_anual, perdidas_desglosadas, panel_tiene_sdm_completo
 from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_inversores import INVERSORES
 from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
@@ -103,12 +103,25 @@ with col_c1:
     panel = obtener_panel_excel(panel_nombre) if _cat_excel else MODULOS_BIPV.get(panel_nombre, {})
 
     # Mostrar ficha rápida
+    _sdm_ok = panel_tiene_sdm_completo(panel)
     st.caption(
         f"Pmax STC: {panel.get('Pmax_stc','—')} W · "
         f"Área: {panel.get('area_m2','—')} m² · "
         f"NOCT: {panel.get('NOCT',45)}°C · "
-        f"{'🟢 SDM' if panel.get('I_L_ref') else '🟡 Modelo simplificado'}"
+        f"{'🟢 SDM De Soto completo' if _sdm_ok else '🟡 Modelo simplificado (±15%)'}"
     )
+    if not _sdm_ok:
+        _faltantes = [p for p in ("I_L_ref","I_o_ref","R_s","R_sh_ref","a_ref")
+                      if panel.get(p) is None or panel.get(p) == 0.0]
+        st.warning(
+            f"⚠️ **{panel_nombre}** no tiene parámetros SDM completos "
+            f"(`{'`, `'.join(_faltantes)}`).  \n"
+            "La simulación usará el **modelo simplificado lineal** — incertidumbre ±10–20% "
+            "respecto al SDM De Soto real, especialmente a irradiancias bajas y en clima frío.  \n"
+            "Para mayor precisión: calibra el SDM en 🔬 **Motor IV** o sube la ficha completa "
+            "en 📋 **Catálogo PDF**.",
+            icon="⚠️",
+        )
 
 with col_c2:
     # Prioridad: total granja > por inversor > default
@@ -181,6 +194,19 @@ if btn_sim or st.session_state.get("produccion_ok"):
 
     if not res:
         st.stop()
+
+    # ── Aviso modelo simplificado (post-simulación) ───────────────────────────
+    if res.get("uso_modelo_simplificado"):
+        st.warning(
+            "⚠️ **Simulación con modelo simplificado** — este panel no tiene parámetros SDM "
+            "completos, por lo que se usó `Pmax = Pmax_stc × G/1000 × (1 + γ·ΔT)` en lugar "
+            "del SDM De Soto 2006.  \n"
+            "La incertidumbre en E_ac es **±10–20%**, mayor en horas de baja irradiancia "
+            "y en climas fríos donde el SDM capta la ganancia real por temperatura.  \n"
+            "Para resultados más precisos, completa los parámetros en 🔬 **Motor IV** "
+            "o sube la ficha técnica en 📋 **Catálogo PDF**.",
+            icon="⚠️",
+        )
 
     # ── Nota sobre correcciones aplicadas ────────────────────────────────────
     st.markdown("---")
