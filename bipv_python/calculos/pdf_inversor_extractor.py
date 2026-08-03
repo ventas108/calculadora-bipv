@@ -357,7 +357,7 @@ _PAT_ISC = [
     # Español (Growatt): "Corriente de corto circuito por MPPT 50A"
     (r"Corriente\s+de\s+corto\s*circuito\s+por\s+MPPT\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
     # Felicity: "Max. PV Isc 55+55+55+55(A)" — Isc POR tracker (primer sumando)
-    (r"Max\.?\s*PV\s+Isc\s+([0-9]+(?:[.,][0-9]+)?)\s*\+",                          1),
+    (r"Max\.?\s*PV\s*Isc\s*([0-9]+(?:[.,][0-9]+)?)\s*\+",                          1),
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
