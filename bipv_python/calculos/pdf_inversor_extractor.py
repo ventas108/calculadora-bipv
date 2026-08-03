@@ -211,6 +211,8 @@ _PAT_VDCMAX = [
     (r"PV\s+[Vv]oltage\s+[Rr]ange.*?~\s*([0-9]+(?:[.,][0-9]+)?)\s*V",             1),
     # Español
     (r"Tensi[oó]n\s+DC\s+M[aá]xima?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",      1),
+    # Growatt español: "Máximo voltaje CD 1100V"
+    (r"M[aá]ximo\s+[Vv]oltaje\s+(?:CD|DC|CC)\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"Tensi[oó]n\s+M[aá]xima?\s+(?:FV|PV|Entrada)\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"Max\.\s*PV\s+array\s+open\s+circuit\s+voltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     # SMA / Fronius style
@@ -523,7 +525,7 @@ def _extract_model(text: str, brand: str) -> str:
         if re.fullmatch(r"[A-Z0-9][A-Z0-9\-\._ ]{3,35}", line):
             if (len(line) >= 5
                     and line.lower() not in ("datasheet", "technical", "specifications")
-                    and not re.match(r"^MPPT?\b", line)         # "MPPT 1" del diagrama unifilar
+                    and not re.match(r"^MPPT?\b|^MPPT?\d", line)  # "MPPT 1"/"MPPT1"/"MPPT 10 N" del diagrama unifilar
                     and not re.fullmatch(r"\d+\s*K?[VW]A?", line, re.IGNORECASE)):  # "50KVA" = potencia, no modelo
                 return line
     # Patrón 2: buscar código de modelo típico
