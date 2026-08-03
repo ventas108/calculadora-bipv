@@ -61,3 +61,6 @@ El loader busca la hoja por nombre; si no existe, retorna `{}` sin error.
 - Etiquetas españolas ≠ inglesas: "Rango de voltaje de MPPT", "Número de MPPTs", "Cadenas por MPPT", "Voltaje de arranque", "Rango de potencia máxima" (= rango voltaje a plena carga → V_mppt_activo).
 - Etiquetas que se parten en dos líneas ("Máxima potencia FV / recomendada (STC) 100000W...") → los loops línea-a-línea no deben hacer break en la línea de la etiqueta sin valores.
 - Fallbacks conservadores aceptados por el usuario: Vdc_max=Vmppt_max si no publicado; V_mppt_activo desde "Rated PV/DC input voltage" con sanity dentro del rango MPPT y ≥60 V.
+
+## Fichas OCR (Felicity y similares)
+- El OCR pega palabras ("PVIsc" sin espacio) y duplica letras en títulos ("MMAAXX5500"). Regla: en patrones de fichas OCR usar `\s*` entre tokens de etiqueta, y rechazar tokens que sean pares de letras duplicadas `(?:(.)\1)+` al detectar modelos.
