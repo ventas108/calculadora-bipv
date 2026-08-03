@@ -150,6 +150,109 @@ def _extract_row_numbers(line: str, from_pos: int = 0) -> list:
     return [float(m) for m in re.findall(r'([0-9]+(?:\.[0-9]+)?)', line[from_pos:])]
 
 
+# Patrones de etiqueta para identificar filas en tablas estructuradas de pdfplumber
+_TABLE_LABEL_RE: dict = {
+    "Pmax": re.compile(
+        r'potencia|pmax|pmpp|peak\s+power|rated\s+power|maximum\s+power|p\.?\s*max', re.I),
+    "Voc": re.compile(
+        r'voc\b|v\s*oc\b|circuito\s+abierto|open.circuit\s+volt|tensión.*abierto|voltaje.*abierto', re.I),
+    "Isc": re.compile(
+        r'isc\b|i\s*sc\b|corto.?circuito|short.circuit\s+curr|corriente.*corto', re.I),
+    "Vmp": re.compile(
+        r'vmpp\b|vmp\b|v\s*mp\b|v.*m[aá]x.*pot|maximum\s+power\s+volt|potencia.*tens|tensión.*m[aá]x', re.I),
+    "Imp": re.compile(
+        r'impp\b|imp\b|i\s*mp\b|i.*m[aá]x.*pot|maximum\s+power\s+curr|corriente.*m[aá]x', re.I),
+}
+
+
+def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
+    """
+    Extrae modelos y parámetros directamente de tablas estructuradas con pdfplumber.
+    
+    Estrategia: busca la fila donde ≥2 celdas son códigos de modelo.
+    Luego asigna a cada columna el valor de las filas de parámetros (Pmax, Voc, …).
+    Este método es más robusto que el basado en texto plano cuando pdfplumber 
+    fragmenta columnas en líneas separadas.
+    """
+    EMPTY: dict = {"modelos_detectados": [], "valores_por_modelo": {}}
+    if not _HAS_PDF:
+        return EMPTY
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            for page in pdf.pages:
+                for table in (page.extract_tables() or []):
+                    if not table or len(table) < 3:
+                        continue
+
+                    # ── Paso 1: encontrar fila de cabecera de modelos ─────────
+                    model_row_idx: int = -1
+                    model_names: list = []
+                    model_col_indices: list = []
+
+                    for ri, row in enumerate(table):
+                        if row is None:
+                            continue
+                        cells = [str(c or "").strip() for c in row]
+                        codes = [
+                            (ci, c) for ci, c in enumerate(cells)
+                            if _MODEL_CODE_RE.fullmatch(c) and re.search(r"\d", c)
+                        ]
+                        if len(codes) >= 2:
+                            model_row_idx = ri
+                            model_col_indices = [ci for ci, _ in codes]
+                            model_names = [c for _, c in codes]
+                            break
+
+                    if model_row_idx == -1 or len(model_names) < 2:
+                        continue
+
+                    n = len(model_names)
+                    por_modelo: dict = {m: {} for m in model_names}
+
+                    # ── Paso 2: extraer filas de parámetros ──────────────────
+                    for row in table[model_row_idx + 1:]:
+                        if not row:
+                            continue
+                        cells = [str(c or "").strip() for c in row]
+                        if not cells:
+                            continue
+
+                        # Label: primera celda no vacía de la fila
+                        label = next((c for c in cells if c), "")
+
+                        # Identificar campo por la etiqueta
+                        field_hit: str | None = None
+                        for field, pat in _TABLE_LABEL_RE.items():
+                            if pat.search(label):
+                                field_hit = field
+                                break
+                        if field_hit is None:
+                            continue
+
+                        lo, hi = _MULTIMODEL_PLAUSIBLE[field_hit]
+
+                        # Asignar valor a cada modelo según su columna
+                        for mi, col_idx in enumerate(model_col_indices):
+                            if mi >= n or col_idx >= len(cells):
+                                continue
+                            raw = cells[col_idx]
+                            nums = re.findall(r'([0-9]+(?:\.[0-9]+)?)', raw)
+                            if nums:
+                                v = float(nums[0])
+                                if lo <= v <= hi:
+                                    por_modelo[model_names[mi]][field_hit] = v
+
+                    # Considerar exitoso si al menos Pmax fue extraído
+                    if any("Pmax" in v for v in por_modelo.values()):
+                        return {
+                            "modelos_detectados": model_names,
+                            "valores_por_modelo": por_modelo,
+                        }
+    except Exception:
+        pass
+    return EMPTY
+
+
 def _extract_multimodel_panel(text: str) -> dict:
     """
     Detecta y extrae parámetros por columna en fichas técnicas multi-modelo.
@@ -440,7 +543,11 @@ def extraer_parametros_panel(pdf_bytes: bytes) -> dict:
         result["Pmax"] = None
 
     # ── Extracción multi-modelo (fichas con varios modelos en columnas) ────────
-    mm = _extract_multimodel_panel(texto)
+    # Prioridad 1: tablas estructuradas de pdfplumber (más robusto)
+    mm = _extract_multimodel_from_tables(pdf_bytes)
+    # Prioridad 2: texto plano (pdftotext / extract_text con columnas preservadas)
+    if len(mm["modelos_detectados"]) < 2:
+        mm = _extract_multimodel_panel(texto)
     result["modelos_detectados"] = mm["modelos_detectados"]
     result["valores_por_modelo"]  = mm["valores_por_modelo"]
 
