@@ -291,6 +291,12 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
                                         break
 
                         if field_hit is None:
+                            # Fila con etiqueta desconocida → romper la cadena de contexto
+                            # para evitar que la siguiente fila vacía herede el último
+                            # campo válido (p.ej. R8 "Estructura vidrio" no reconocido
+                            # no debe dejar que R9 vacía se trate como otra Transparencia).
+                            if label_nfc:
+                                last_field_hit = None
                             continue
 
                         # Actualizar contexto solo cuando la fila tiene etiqueta real
