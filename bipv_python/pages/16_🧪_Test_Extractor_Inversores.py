@@ -79,7 +79,7 @@ def _run_all_cases():
             "_model": caso["modelo"],
             "_arch":  caso["arquitectura"],
         }
-        score_ok = score_total = 0
+        score_ok = score_total = n_nones = 0
         for campo in CAMPOS_CRITICOS:
             esp = caso["esperado"].get(campo)  # None si no está en esperado → N/D
             ex  = ext.get(campo)
@@ -90,6 +90,9 @@ def _run_all_cases():
                 score_total += 1
                 if emoji == "🟢":
                     score_ok += 1
+                if ex is None:           # campo esperado que quedó vacío
+                    n_nones += 1
+        fila["_nones"] = n_nones
         fila["_score"] = f"{score_ok}/{score_total}"
         fila["_pct"]   = score_ok / score_total * 100 if score_total else 0
         resultados.append(fila)
@@ -115,6 +118,18 @@ m1.metric("Fabricantes probados", len(resultados))
 m2.metric("Campos OK 🟢",        total_ok,   delta=None)
 m3.metric("Campos FALLA 🔴",     total_fail, delta=None, delta_color="inverse")
 m4.metric("Cobertura promedio",  f"{avg_cov:.0f}%")
+
+# ── Alerta de extracción probablemente rota ──────────────────────────────────
+# Si un caso deja > 3 campos esperados en None, casi seguro el extractor falló
+# en silencio con ese formato (no es un campo suelto, es el formato completo)
+_rotos = [r for r in resultados if r["_nones"] > 3]
+if _rotos:
+    st.error(
+        "🚨 **Posible fallo de extracción** — estos casos tienen más de 3 campos "
+        "esperados vacíos (None), señal de que el extractor no reconoce el formato:\n\n"
+        + "\n".join(f"- **{r['_fab']} — {r['_model']}**: {r['_nones']} campos vacíos"
+                    for r in _rotos)
+    )
 
 st.markdown("---")
 

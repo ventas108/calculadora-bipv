@@ -824,6 +824,121 @@ Output Voltage Range 88 - 127 VAC*
         },
     },
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # CASO LÍMITE: tabla de 2 columnas — cada etiqueta en una línea y el valor
+    # (con su unidad) en la línea siguiente. Típico de pdfplumber al leer tablas
+    # con celdas combinadas.
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "Genérico (tabla 2 columnas)",
+        "modelo":     "GenericSun 30K",
+        "arquitectura": "Inversor de red trifásico",
+        "texto": """\
+Inversor Trifásico GenericSun 30K
+DC Input
+Max. DC voltage
+1100 V
+MPPT voltage range
+180 - 1000 V
+Start-up voltage
+195 V
+Number of MPP trackers
+3
+Strings per MPP tracker
+2
+Max. input current per MPPT
+32 A
+Max. short-circuit current per MPPT
+40 A
+Max. PV array power
+45000 W
+""",
+        "esperado": {
+            "Vdc_max":           1100,
+            "Vmppt_min":          180,
+            "Vmppt_max":         1000,
+            "V_arranque":         195,
+            "n_trackers":           3,
+            "n_strings_tracker":    2,
+            "I_max_tracker":       32,
+            "Isc_max_tracker":     40,
+            "P_dc_max_W":       45000,
+            "bat_voltaje_min":   None,
+            "bat_voltaje_max":   None,
+        },
+    },
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # CASO LÍMITE: número de trackers opcional "9 or 12" (X3-FTH-100K).
+    # El extractor debe tomar el valor conservador (9), nunca fallar en None.
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "Genérico (trackers opcionales)",
+        "modelo":     "X3-FTH-100K (9 or 12)",
+        "arquitectura": "Inversor de red trifásico",
+        "texto": """\
+SolarMax X3-FTH-100K
+Max. DC input voltage 1100V
+MPPT voltage range 180V-1000V
+Start-up voltage 200V
+No. of MPP trackers 9 or 12
+Strings per MPP tracker 2
+Max. input current per MPPT 32A
+Max. short circuit current per MPPT 46A
+Max. recommended PV array power 150 kWp
+""",
+        "esperado": {
+            "Vdc_max":           1100,
+            "Vmppt_min":          180,
+            "Vmppt_max":         1000,
+            "V_arranque":         200,
+            "n_trackers":           9,    # conservador: el menor de "9 or 12"
+            "n_strings_tracker":    2,
+            "I_max_tracker":       32,
+            "Isc_max_tracker":     46,
+            "P_dc_max_W":      150000,
+            "bat_voltaje_min":   None,
+            "bat_voltaje_max":   None,
+        },
+    },
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # CASO LÍMITE: la ficha NO publica potencia FV máxima — solo potencia AC
+    # nominal. El extractor debe estimarla (AC × 1.5) y marcarla como estimada,
+    # nunca dejar el campo vacío en silencio.
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "Genérico (sin P_dc publicada)",
+        "modelo":     "PowerInv 20K",
+        "arquitectura": "Inversor de red trifásico",
+        "texto": """\
+PowerInv 20K Three Phase Inverter
+Max. DC voltage 1100V
+MPPT voltage range 200V-1000V
+Start Voltage 250V
+No. of MPP trackers 2
+Strings per MPP tracker 2
+Max. input current per MPPT 27A
+Max. short-circuit current 34A
+AC OUTPUT
+Rated AC output power 20000 W
+Nominal output voltage 400V
+""",
+        "esperado": {
+            "Vdc_max":           1100,
+            "Vmppt_min":          200,
+            "Vmppt_max":         1000,
+            "V_arranque":         250,
+            "n_trackers":           2,
+            "n_strings_tracker":    2,
+            "I_max_tracker":       27,
+            "Isc_max_tracker":     34,
+            "P_dc_max_W":       30000,   # estimada: 20000 AC × 1.5
+            "bat_voltaje_min":   None,
+            "bat_voltaje_max":   None,
+        },
+    },
+
 ]
 
 # Campos que se comparan (ordenados para la tabla de cobertura)

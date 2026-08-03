@@ -203,6 +203,9 @@ _PAT_VDCMAX = [
     # Voltronic/InfiniSolar (etiquetas dobles con '/'): el segundo valor es el máximo
     # "Nominal DC Voltage / Maximum DC Voltage 720 VDC / 900 VDC"
     (r"Nominal\s+DC\s+Voltage\s*/\s*Max(?:imum)?\.?\s+DC\s+Voltage\s+[0-9.]+\s*V(?:DC)?\s*/\s*([0-9.]+)\s*V(?:DC)?", 1),
+    # Tabla de 2 columnas (label y valor en líneas distintas): "Max. DC voltage\n1100 V"
+    # Requiere 3-4 dígitos seguidos de V para no capturar otros números
+    (r"Max(?:imum)?\.?\s+(?:PV\s+|DC\s+)(?:input\s+)?voltage\s*\n\s*([0-9]{3,4})\s*V\b", 1),
     # Patrón primario: acepta cualquier separador sin dígito ni newline (≤15 chars) entre
     # el label y el valor. Cubre:
     #   · "Max. PV input voltage: 1100 V"          (separador ": ")
@@ -355,6 +358,10 @@ _PAT_NSTRINGS = [
     (r"No\.?\s*of\s+[Ss]trings\s+[Pp]er\s+MPP\s+[Tt]racker\s*[:\|]?\s*([0-9]+)",   1),
     # Huawei español: "Cantidad máxima de entradas por MPPT 2"
     (r"Cantidad\s+m[aá]xima\s+de\s+entradas\s+por\s+MPPT\s*[:\|]?\s*([0-9]+)",     1),
+    # Tabla sin separador o de 2 columnas (label y valor en líneas distintas):
+    # "Strings per MPP tracker 2" / "Strings per MPP tracker\n2".
+    # Va al final (menor prioridad); 1 dígito y validación 1-6 posterior
+    (r"[Ss]trings?\s+per\s+MPP(?:T)?\s+[Tt]racker\s*\n?\s*([0-9])\b",              1),
     # formato "2/(2:2)" → segundo número (strings por tracker uniforme)
     (r"\d+\s*/\s*\(\s*(\d+)(?:\s*:\s*\d+)*\s*\)",                                  1),
 ]
