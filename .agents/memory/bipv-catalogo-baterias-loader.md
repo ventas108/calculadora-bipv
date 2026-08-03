@@ -64,3 +64,4 @@ El loader busca la hoja por nombre; si no existe, retorna `{}` sin error.
 
 ## Fichas OCR (Felicity y similares)
 - El OCR pega palabras ("PVIsc" sin espacio) y duplica letras en títulos ("MMAAXX5500"). Regla: en patrones de fichas OCR usar `\s*` entre tokens de etiqueta, y rechazar tokens que sean pares de letras duplicadas `(?:(.)\1)+` al detectar modelos.
+- Fichas en español (Huawei/Growatt): normalizar separador de miles `(\d),(\d{3})(?!\d)` antes de extraer; ojo con superíndices de notas al pie pegados al valor ("entrada 1 1100 V") y palabras pegadas por pdfplumber ("Tensiónde funcionamientoMPPT").
