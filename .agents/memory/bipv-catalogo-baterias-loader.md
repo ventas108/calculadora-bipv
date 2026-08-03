@@ -50,3 +50,8 @@ El loader busca la hoja por nombre; si no existe, retorna `{}` sin error.
   cropeando columna×fila; solo en filas ≥ceil(n/2) completas y texto de 1 línea ≤60 chars.
 - La cabecera de modelos se elige por la fila con MÁS códigos (celdas colspan
   reparadas pueden inyectar códigos sueltos en la fila de grupo).
+
+## Fichas PDF 100% imagen (SolTech flexible)
+- Algunas fichas (ej. SolTech SMF 520J) no tienen capa de texto: pdfplumber devuelve 0 chars → se activa el fallback OCR (tesseract) en pdf_panel_extractor.py.
+- **Lección OCR:** los subíndices se pierden (Vmp→"Vm") y las unidades no siguen al número — los patrones deben aceptar `Etiqueta (Símbolo) valor` sin unidad. El nombre de modelo debe tomarse de una etiqueta confiable (fila "Rendimiento a STC"), nunca del primer código suelto: el OCR genera basura tipo "MAZM-IDOO" que gana si se busca genéricamente.
+- En fichas con secciones STC y NOMT, el primer match (STC) es el correcto porque STC aparece primero en el texto.
