@@ -222,6 +222,8 @@ _PAT_VDCMAX = [
 # Vmppt_min, Vmppt_max — Rango MPPT (se extraen juntos desde el rango)
 # ─────────────────────────────────────────────────────────────────────────────
 _LABEL_MPPT_RANGE = [
+    # Español (Growatt): "Rango de voltaje de MPPT 180V-850VDC"
+    r"Rango\s+de\s+[Vv]oltaje\s+de\s+MPPT",
     r"MPP(?:T)?\s+[Vv]oltage\s+[Rr]ange",
     r"MPPT\s+[Rr]ange",
     r"MPP\s+[Tt]racker\s+[Vv]oltage\s+[Rr]ange",
@@ -245,6 +247,9 @@ _LABEL_MPPT_ACTIVO = [
     r"Rated\s+(?:DC\s+)?[Vv]oltage\s+[Rr]ange",
     r"Normal\s+(?:DC\s+)?[Oo]peration\s+[Vv]oltage",
     r"Tensi[oó]n\s+M[ií]nima\s+MPPT\s+[Aa]ctivo",
+    # Español (Growatt): "Rango de potencia máxima 370-600V" = rango de voltaje
+    # a potencia completa → el límite inferior es la tensión mínima MPPT activa
+    r"Rango\s+de\s+potencia\s+m[aá]xima",
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -256,6 +261,8 @@ _PAT_VARRANQUE = [
     (r"[Ss]tart(?:ing|up)?\s+[Vv]oltage\s*(?:\([Vv]\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?", 1),
     (r"[Mm]in(?:imum)?\s+[Ss]tart(?:ing)?\s+[Vv]oltage\s*(?:\([Vv]\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?", 1),
     (r"Tensi[oó]n\s+de\s+[Aa]rranque\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",     1),
+    # Español (Growatt): "Voltaje de arranque 195V"
+    (r"Voltaje\s+de\s+[Aa]rranque\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",        1),
     # SMA: Minimum input voltage (start)
     (r"Minimum\s+input\s+voltage\s*\(start\)\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"U_PV,start\s*[:\(=]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",                        1),
@@ -276,6 +283,8 @@ _PAT_NTRACKERS = [
     (r"#\s*(?:of\s+)?MPPT\s*[:\|]?\s*([0-9]+)",                                    1),
     (r"Trackers?\s+MPPT\s*[:\|]?\s*([0-9]+)",                                      1),
     (r"N[úu]mero\s+de\s+[Rr]astreadores?\s*[:\|]?\s*([0-9]+)",                     1),
+    # Español (Growatt): "Número de MPPTs 8"
+    (r"N[úu]mero\s+de\s+MPPTs?\s*[:\|]?\s*([0-9]+)",                               1),
     # formato "2/(2:2)" — primer número = total trackers
     (r"(\d+)\s*/\s*\(\s*\d+(?:\s*:\s*\d+)*\s*\)",                                  1),
     # Victron/SMA: nMPPT = 2
@@ -298,6 +307,8 @@ _PAT_NSTRINGS = [
     (r"[Ss]trings?\s+per\s+MPP(?:T)?\s+[Tt]racker\s*[:\|\[]\s*([0-9]+)",          1),
     (r"[Ss]trings?\s+per\s+[Ii]nput\s*[:\|]?\s*([0-9]+)",                          1),
     (r"[Cc]adenas?\s+por\s+[Tt]racker\s*[:\|]?\s*([0-9]+)",                        1),
+    # Español (Growatt): "Cadenas por MPPT 2"
+    (r"[Cc]adenas?\s+por\s+MPPT\s*[:\|]?\s*([0-9]+)",                              1),
     # formato "2/(2:2)" → segundo número (strings por tracker uniforme)
     (r"\d+\s*/\s*\(\s*(\d+)(?:\s*:\s*\d+)*\s*\)",                                  1),
 ]
@@ -319,6 +330,8 @@ _PAT_IMAX = [
     (r"Max\.\s*DC\s+[Ii]nput\s+[Cc]urrent\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
     (r"I_?max(?:_?DC|_?pv)?\s*[:\(=]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A",             1),
     (r"Corriente\s+M[aá]xima\s+(?:por\s+)?[Tt]racker\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
+    # Español (Growatt): "Máxima corriente por MPPT 40A"
+    (r"M[aá]xima\s+corriente\s+(?:de\s+entrada\s+)?por\s+MPPT\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
     (r"Max\.\s*input\s+current\s+\[A\]\s*[:\|]?\s*([0-9]+(?:[.,][0-9]+)?)",       1),
 ]
 
@@ -335,6 +348,8 @@ _PAT_ISC = [
     (r"I_?sc_?max\s*[:\(=]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A",                        1),
     (r"Corriente\s+de?\s+[Cc]ortocircuito\s+M[aá]xima?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
     (r"Max\.\s*short\s+circuit\s+current\s*\[A\]\s*[:\|]?\s*([0-9]+(?:[.,][0-9]+)?)", 1),
+    # Español (Growatt): "Corriente de corto circuito por MPPT 50A"
+    (r"Corriente\s+de\s+corto\s*circuito\s+por\s+MPPT\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -497,7 +512,9 @@ def _extract_model(text: str, brand: str) -> str:
     for line in lines[:15]:
         line = line.strip()
         if re.fullmatch(r"[A-Z0-9][A-Z0-9\-\._ ]{3,35}", line):
-            if len(line) >= 5 and not line.lower() in ("datasheet", "technical", "specifications"):
+            if (len(line) >= 5
+                    and line.lower() not in ("datasheet", "technical", "specifications")
+                    and not re.match(r"^MPPT?\b", line)):   # "MPPT 1" del diagrama unifilar
                 return line
     # Patrón 2: buscar código de modelo típico
     m = re.search(r"\b([A-Z]{2,8}[-_][A-Z0-9\-\.]{3,25})\b", text[:1500])
@@ -594,12 +611,25 @@ def _extract_multimodel_values(text: str) -> dict:
 
     # ── 2. P_dc_max por columna ─────────────────────────────────────────────────
     for line in lines:
-        if not re.search(r'recommended\s+PV\s+(?:array\s+)?power', line, re.IGNORECASE):
+        # Inglés (SolaX): "recommended PV array power"; Español (Growatt): la
+        # etiqueta se parte en dos líneas y los valores quedan en "recomendada (STC) 100000W ..."
+        if not re.search(r'recommended\s+PV\s+(?:array\s+)?power'
+                         r'|recomendada\s*\(STC\)'
+                         r'|M[aá]xima\s+potencia\s+FV', line, re.IGNORECASE):
             continue
         found = [
             (float(m.group(1).replace(',', '.')), m.start())
             for m in re.finditer(r'([0-9]+(?:[.,][0-9]+)?)\s*kWp?\b', line, re.IGNORECASE)
         ]
+        if not found:
+            # Valores directamente en W (Growatt: "100000W 120000W ...") → /1000 para
+            # reutilizar la lógica kW→W de abajo
+            found = [
+                (float(m.group(1)) / 1000.0, m.start())
+                for m in re.finditer(r'([0-9]{4,7})\s*W\b', line)
+            ]
+        if not found:
+            continue   # etiqueta partida en dos líneas (Growatt) — seguir buscando
         if len(found) == n:
             # Mapeo 1:1 por orden izquierda→derecha
             for (v, _), model in zip(found, model_names):
@@ -684,6 +714,9 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
     # "1100 d.c. V" → "1100 V"  |  "32 d.c. A" → "32 A"
     texto = re.sub(r"\s*d\.c\.?\s*", " ", texto)
     texto = re.sub(r"\s*a\.c\.?\s*", " ", texto)
+    # Eliminar caracteres de control incrustados (Growatt: "MAX\x0150KTL3-XL\x012"
+    # parte los nombres de modelo y rompe la detección multi-modelo)
+    texto = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", texto)
 
     # ── Metadatos ─────────────────────────────────────────────────────────────
     marca       = _extract_brand(texto)
@@ -696,6 +729,11 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
 
     # ── Rango MPPT (Vmppt_min, Vmppt_max) ────────────────────────────────────
     Vmppt_min, Vmppt_max = _find_range(_LABEL_MPPT_RANGE, texto)
+
+    # Fallback conservador: si la ficha no publica tensión DC máxima (Growatt
+    # en español), usar el tope del rango MPPT — nunca sobreestima el límite
+    if Vdc_max is None and Vmppt_max is not None:
+        Vdc_max = Vmppt_max
 
     # Fallback: extraer rango del texto completo si no se encontró por etiqueta
     if Vmppt_min is None:
