@@ -754,60 +754,178 @@ def generar_html_reporte() -> str:
     _frac_eq_ppto = float(st.session_state.get("presupuesto_fraccion_equipos", 0.65))
 
     if _inc_ppto and _capex_ppto > 0:
-        _area_pp   = float(st.session_state.get("area_fachada_m2", 0) or 0)
-        _potencia_pp = float(st.session_state.get("P_stc_kW_sistema", 0) or 0)
-        _tc_pp     = tipo_cambio_rep
-        _otros_ppto = _capex_ppto - _directo_ppto - _blando_ppto
+        _area_pp       = float(st.session_state.get("area_fachada_m2", 0) or 0)
+        _potencia_pp   = float(st.session_state.get("P_stc_kW_sistema", 0) or 0)
+        _tc_pp         = tipo_cambio_rep
+        # Per-section subtotals (saved by Presupuesto page in cotización-real mode)
+        _sub_pref      = float(st.session_state.get("presupuesto_sub_perfileria", 0.0))
+        _sub_mo        = float(st.session_state.get("presupuesto_sub_mano_obra", 0.0))
+        _sub_sfv       = float(st.session_state.get("presupuesto_sub_sistema_fv", 0.0))
+        _sub_inv       = float(st.session_state.get("presupuesto_sub_inversor", 0.0))
+        _sub_cat       = float(st.session_state.get("presupuesto_sub_catalogo", 0.0))
+        _indirectos    = float(st.session_state.get("presupuesto_capex_indirectos", 0.0))
+        _cont          = float(st.session_state.get("presupuesto_capex_cont", 0.0))
+        _ind_pct       = float(st.session_state.get("presupuesto_ind_pct", 0.0))
+        _cont_pct      = float(st.session_state.get("presupuesto_cont_pct", 0.0))
+        _has_secciones = (_sub_pref + _sub_mo + _sub_sfv + _sub_inv + _sub_cat) > 50
+        _capex_base    = _directo_ppto + _blando_ppto
 
-        html += seccion("Resumen de Costos — Presupuesto del Proyecto", "💼", "#1a5276")
+        html += seccion("Presupuesto Detallado — CAPEX del Proyecto", "💼", "#1a5276")
+
+        # ── Métricas resumen ──────────────────────────────────────────────────
+        html += f"""
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;">
+          <div style="background:#eaf4fb;border-radius:8px;padding:12px 14px;text-align:center;">
+            <div style="font-size:0.78em;color:#555;margin-bottom:4px;">CAPEX TOTAL</div>
+            <div style="font-size:1.3em;font-weight:bold;color:#1a5276;">USD {_capex_ppto:,.0f}</div>
+            <div style="font-size:0.8em;color:#888;">$ {_capex_ppto*_tc_pp/1e6:.2f} M COP</div>
+          </div>
+          {"" if _potencia_pp <= 0 else f'''
+          <div style="background:#eaf4fb;border-radius:8px;padding:12px 14px;text-align:center;">
+            <div style="font-size:0.78em;color:#555;margin-bottom:4px;">COSTO / Wp</div>
+            <div style="font-size:1.3em;font-weight:bold;color:#1a5276;">USD {_capex_ppto/_potencia_pp/1000:.3f}</div>
+            <div style="font-size:0.8em;color:#888;">Ref. BIPV: 0.85–4.50 USD/Wp</div>
+          </div>'''}
+          {"" if _area_pp <= 0 else f'''
+          <div style="background:#eaf4fb;border-radius:8px;padding:12px 14px;text-align:center;">
+            <div style="font-size:0.78em;color:#555;margin-bottom:4px;">COSTO / m²</div>
+            <div style="font-size:1.3em;font-weight:bold;color:#1a5276;">USD {_capex_ppto/_area_pp:,.0f}</div>
+            <div style="font-size:0.8em;color:#888;">Ref. BIPV: USD 180–350/m²</div>
+          </div>'''}
+          {"" if _opex_ppto <= 0 else f'''
+          <div style="background:#e9f7ef;border-radius:8px;padding:12px 14px;text-align:center;">
+            <div style="font-size:0.78em;color:#555;margin-bottom:4px;">OPEX ANUAL</div>
+            <div style="font-size:1.3em;font-weight:bold;color:#1e8449;">USD {_opex_ppto:,.0f}</div>
+            <div style="font-size:0.8em;color:#888;">$ {_opex_ppto*_tc_pp/1e6:.3f} M COP/año</div>
+          </div>'''}
+        </div>"""
+
+        # ── Tabla desglose por sección (cotización real) ──────────────────────
+        if _has_secciones:
+            _capex_directo_secs = _sub_pref + _sub_mo + _sub_sfv + _sub_inv + _sub_cat
+            html += f"""
+            <p style="margin:14px 0 6px;font-weight:600;color:#1a5276;font-size:0.95em;">
+                📋 Desglose por sección (cotización real)
+            </p>
+            <table style="width:100%;border-collapse:collapse;font-size:0.88em;margin-bottom:14px;">
+            <thead><tr style="background:#1a5276;color:#fff;">
+              <th style="padding:7px 10px;text-align:left;">Sección</th>
+              <th style="padding:7px 10px;text-align:right;">USD</th>
+              <th style="padding:7px 10px;text-align:right;">COP (M)</th>
+              <th style="padding:7px 10px;text-align:right;">% CAPEX total</th>
+            </tr></thead><tbody>"""
+            _secs_data = [
+                ("🔩 Perfilería y Estructura",           _sub_pref),
+                ("👷 Mano de Obra y Servicios",          _sub_mo),
+                ("⚡ Sistema FV (cables, protecciones)",  _sub_sfv),
+                ("🔌 Inversor y Equipos Eléctricos",      _sub_inv),
+                ("📦 Módulos + Inversor + Baterías (catálogo)", _sub_cat),
+            ]
+            for _ri, (_lbl, _val) in enumerate(_secs_data):
+                if _val <= 0:
+                    continue
+                _bg = "#f8f9fa" if _ri % 2 == 0 else "white"
+                html += f"""
+                <tr style="background:{_bg};">
+                  <td style="padding:6px 10px;">{_lbl}</td>
+                  <td style="padding:6px 10px;text-align:right;font-weight:600;">{_val:,.0f}</td>
+                  <td style="padding:6px 10px;text-align:right;color:#888;">{_val*_tc_pp/1e6:.2f}</td>
+                  <td style="padding:6px 10px;text-align:right;color:#555;">{_val/_capex_ppto*100:.1f}%</td>
+                </tr>"""
+            # Subtotal directo
+            html += f"""
+                <tr style="background:#eaf4fb;font-weight:bold;">
+                  <td style="padding:7px 10px;">Subtotal CAPEX directo</td>
+                  <td style="padding:7px 10px;text-align:right;">{_capex_directo_secs:,.0f}</td>
+                  <td style="padding:7px 10px;text-align:right;color:#888;">{_capex_directo_secs*_tc_pp/1e6:.2f}</td>
+                  <td style="padding:7px 10px;text-align:right;">{_capex_directo_secs/_capex_ppto*100:.1f}%</td>
+                </tr>"""
+            # Costos blandos
+            if _blando_ppto > 0:
+                html += f"""
+                <tr style="background:#f8f9fa;">
+                  <td style="padding:6px 10px;">🧾 Costos Blandos (ingeniería, trámites, PM)</td>
+                  <td style="padding:6px 10px;text-align:right;font-weight:600;">{_blando_ppto:,.0f}</td>
+                  <td style="padding:6px 10px;text-align:right;color:#888;">{_blando_ppto*_tc_pp/1e6:.2f}</td>
+                  <td style="padding:6px 10px;text-align:right;color:#555;">{_blando_ppto/_capex_ppto*100:.1f}%</td>
+                </tr>"""
+            # Costos indirectos
+            if _indirectos > 0:
+                html += f"""
+                <tr style="background:white;">
+                  <td style="padding:6px 10px;">⚙️ Costos Indirectos — AUI ({_ind_pct*100:.0f}%)</td>
+                  <td style="padding:6px 10px;text-align:right;font-weight:600;">{_indirectos:,.0f}</td>
+                  <td style="padding:6px 10px;text-align:right;color:#888;">{_indirectos*_tc_pp/1e6:.2f}</td>
+                  <td style="padding:6px 10px;text-align:right;color:#555;">{_indirectos/_capex_ppto*100:.1f}%</td>
+                </tr>"""
+            # Contingencias
+            if _cont > 0:
+                html += f"""
+                <tr style="background:#f8f9fa;">
+                  <td style="padding:6px 10px;">🛡️ Contingencias ({_cont_pct*100:.0f}%)</td>
+                  <td style="padding:6px 10px;text-align:right;font-weight:600;">{_cont:,.0f}</td>
+                  <td style="padding:6px 10px;text-align:right;color:#888;">{_cont*_tc_pp/1e6:.2f}</td>
+                  <td style="padding:6px 10px;text-align:right;color:#555;">{_cont/_capex_ppto*100:.1f}%</td>
+                </tr>"""
+            # CAPEX TOTAL
+            html += f"""
+                <tr style="background:#1a5276;color:white;font-weight:bold;">
+                  <td style="padding:8px 10px;">✅ CAPEX TOTAL</td>
+                  <td style="padding:8px 10px;text-align:right;">{_capex_ppto:,.0f}</td>
+                  <td style="padding:8px 10px;text-align:right;">{_capex_ppto*_tc_pp/1e6:.2f}</td>
+                  <td style="padding:8px 10px;text-align:right;">100.0%</td>
+                </tr>
+            </tbody></table>"""
+
+        else:
+            # Estimación rápida / sin desglose por sección
+            _otros_ppto = max(0.0, _capex_ppto - _directo_ppto - _blando_ppto)
+            html += tabla_kv([
+                ("CAPEX directo (equipos + obra)",
+                 f"USD {_directo_ppto:,.0f}",
+                 f"$ {_directo_ppto*_tc_pp/1e6:.2f} M COP",
+                 f"{_directo_ppto/_capex_ppto*100:.1f}% del CAPEX total — módulos, inversor, estructura, instalación"),
+                ("Costos blandos (ingeniería + permisos)",
+                 f"USD {_blando_ppto:,.0f}",
+                 f"$ {_blando_ppto*_tc_pp/1e6:.2f} M COP",
+                 f"{_blando_ppto/_capex_ppto*100:.1f}% del CAPEX — diseño, licencias, interventoría"),
+                *([(
+                    "Contingencias + imprevistos",
+                    f"USD {_otros_ppto:,.0f}",
+                    f"$ {_otros_ppto*_tc_pp/1e6:.2f} M COP",
+                    f"{_otros_ppto/_capex_ppto*100:.1f}% del CAPEX"
+                )] if _otros_ppto > 50 else []),
+                ("CAPEX TOTAL",
+                 f"USD {_capex_ppto:,.0f}",
+                 f"$ {_capex_ppto*_tc_pp/1e6:.2f} M COP",
+                 "Inversión inicial total del proyecto"),
+            ])
+
+        # ── Tabla KPIs + TRM ──────────────────────────────────────────────────
         html += tabla_kv([
-            ("CAPEX directo (equipos + obra)",
-             f"USD {_directo_ppto:,.0f}",
-             f"$ {_directo_ppto*_tc_pp/1e6:.2f} M COP",
-             f"{_directo_ppto/_capex_ppto*100:.1f}% del CAPEX total — módulos, inversor, estructura, instalación"),
-            ("Costos blandos (ingeniería + permisos)",
-             f"USD {_blando_ppto:,.0f}",
-             f"$ {_blando_ppto*_tc_pp/1e6:.2f} M COP",
-             f"{_blando_ppto/_capex_ppto*100:.1f}% del CAPEX — diseño, licencias, interventoría"),
+            ("TRM aplicada",
+             f"$ {_tc_pp:,.0f} COP/USD",
+             "",
+             "Tasa de cambio usada para conversiones COP ↔ USD en este reporte"),
+            ("Fracción equipos (Ley 1715)",
+             f"{_frac_eq_ppto*100:.1f}% del CAPEX",
+             "",
+             "Base para Art. 12 exclusión IVA · Art. 11 deducción renta · Art. 14 depreciación acelerada"),
             *([(
-                "Otros (contingencias + imprevistos)",
-                f"USD {_otros_ppto:,.0f}",
-                f"$ {_otros_ppto*_tc_pp/1e6:.2f} M COP",
-                f"{_otros_ppto/_capex_ppto*100:.1f}% del CAPEX"
-            )] if _otros_ppto > 50 else []),
-            ("CAPEX TOTAL",
-             f"USD {_capex_ppto:,.0f}",
-             f"$ {_capex_ppto*_tc_pp/1e6:.2f} M COP",
-             "Inversión inicial total del proyecto"),
-            *([(
-                "Costo unitario por m²",
-                f"USD {_capex_ppto/_area_pp:,.0f}/m²",
-                f"$ {_capex_ppto*_tc_pp/_area_pp/1e3:.1f} k COP/m²",
-                "Referencia BIPV Colombia: USD 180–350/m²"
-            )] if _area_pp > 0 else []),
-            *([(
-                "Costo por kWp instalado",
-                f"USD {_capex_ppto/_potencia_pp:,.0f}/kWp",
-                f"$ {_capex_ppto*_tc_pp/_potencia_pp/1e6:.2f} M COP/kWp",
-                "Referencia BIPV Colombia: USD 900–1.800/kWp"
-            )] if _potencia_pp > 0 else []),
-            ("Fracción equipos (para Ley 1715)",
-             f"{_frac_eq_ppto*100:.1f}%",
-             "del CAPEX",
-             "Base para calcular beneficios tributarios Art. 11–14 Ley 1715/2014"),
-            *([(
-                "OPEX anual (O&M)",
+                "OPEX anual (O&M proyectado)",
                 f"USD {_opex_ppto:,.0f}/año",
-                f"$ {_opex_ppto*_tc_pp/1e6:.2f} M COP/año",
-                f"{_opex_ppto/_capex_ppto*100:.2f}% del CAPEX — limpieza, revisión, seguros"
+                f"$ {_opex_ppto*_tc_pp/1e6:.3f} M COP/año",
+                f"{_opex_ppto/_capex_ppto*100:.2f}% del CAPEX anual — limpieza, revisión, seguros, monitoreo"
             )] if _opex_ppto > 0 else []),
-        ],
-        nota=(
+        ])
+        html += caja_nota(
             "CAPEX directo = módulos BIPV + inversor + estructura + instalación. "
-            "Costos blandos = diseño técnico, trámites, interventoría, gastos bancables. "
-            "La fracción de equipos determina el monto sobre el que aplican los beneficios tributarios "
-            "de la Ley 1715/2014 (IVA, renta, depreciación acelerada)."
-        ))
+            "Costos blandos = diseño técnico, trámites RETIE/UPME, interventoría, gastos bancables. "
+            "Costos indirectos (AUI) = administración, utilidad e imprevistos del contratista. "
+            "La <strong>fracción de equipos</strong> determina el monto base para los beneficios "
+            "tributarios de la <strong>Ley 1715/2014</strong> (IVA, renta, depreciación acelerada).",
+            color="#eaf4fb", borde="#1a5276", icono="ℹ️"
+        )
         html += cierre()
 
     # ── 5c. Estimación Rápida — Fundamentación del Presupuesto ───────────────

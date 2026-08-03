@@ -1273,6 +1273,16 @@ else:
     st.session_state["presupuesto_capex_blando"]    = sub6
     st.session_state["presupuesto_sub_directo"]     = capex_directo
     st.session_state["presupuesto_fraccion_equipos"]= _frac_eq
+    # ── Subtotales por sección (para el reporte PDF) ──────────────────────────
+    st.session_state["presupuesto_sub_perfileria"]     = sub1
+    st.session_state["presupuesto_sub_mano_obra"]      = sub2
+    st.session_state["presupuesto_sub_sistema_fv"]     = sub3
+    st.session_state["presupuesto_sub_inversor"]       = sub4
+    st.session_state["presupuesto_sub_catalogo"]       = sub5
+    st.session_state["presupuesto_capex_indirectos"]   = indirectos
+    st.session_state["presupuesto_capex_cont"]         = c_tec + c_pre
+    st.session_state["presupuesto_ind_pct"]            = ind_pct
+    st.session_state["presupuesto_cont_pct"]           = c_tec_pct + c_pre_pct
 
     st.success(
         f"✅ **CAPEX TOTAL USD {capex_total:,.0f}** ($ {capex_total*tc/1e6:.2f} M COP) "

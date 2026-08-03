@@ -144,6 +144,9 @@ else:
 # TRM — fuente de verdad (se actualiza en Sección 2)
 tipo_cambio = float(st.session_state.get("tipo_cambio", 4200.0))
 
+# TRM disponible desde el inicio (se actualiza en Sección 2)
+tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # PANEL PREVIO — Consumo vs Producción estimada
 # ═══════════════════════════════════════════════════════════════════════════════
