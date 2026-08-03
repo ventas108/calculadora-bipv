@@ -106,6 +106,16 @@ _TRACKER_STR_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Fila combinada con etiqueta doble: "No. of MPP trackers / strings per MPP
+# tracker 3 / 2" (también con la etiqueta partida en dos líneas, Growatt MID:
+# "No. of MPP trackers/strings per\nMPP tracker 2/2 ...").
+# Grupo 1 = trackers, grupo 2 = strings por tracker.
+_TRACKER_STR_LABEL_RE = re.compile(
+    r"No\.?\s*of\s+MPP\s+trackers?\s*/\s*strings?\s+per"
+    r"(?:\s*\n?\s*MPP\s+trackers?)?\s*[:\|]?\s*(\d+)\s*/\s*(\d+)",
+    re.IGNORECASE,
+)
+
 
 def _find(patterns, text):
     """Prueba lista de (regex, group) en el texto y retorna el primer float."""
@@ -360,8 +370,12 @@ _PAT_NSTRINGS = [
     (r"Cantidad\s+m[aá]xima\s+de\s+entradas\s+por\s+MPPT\s*[:\|]?\s*([0-9]+)",     1),
     # Tabla sin separador o de 2 columnas (label y valor en líneas distintas):
     # "Strings per MPP tracker 2" / "Strings per MPP tracker\n2".
-    # Va al final (menor prioridad); 1 dígito y validación 1-6 posterior
-    (r"[Ss]trings?\s+per\s+MPP(?:T)?\s+[Tt]racker\s*\n?\s*([0-9])\b",              1),
+    # Va al final (menor prioridad); 1 dígito y validación 1-6 posterior.
+    # Guardas: la etiqueta no puede venir de una fila combinada
+    # "No. of MPP trackers / strings per MPP tracker 3 / 2" (ahí el primer
+    # número es el conteo de trackers) → se exige que NO haya "/" antes de la
+    # etiqueta en la misma línea ni después del dígito capturado
+    (r"(?<![/])(?<![/] )[Ss]trings?\s+per\s+MPP(?:T)?\s+[Tt]racker\s*\n?\s*([0-9])\b(?!\s*/)", 1),
     # formato "2/(2:2)" → segundo número (strings por tracker uniforme)
     (r"\d+\s*/\s*\(\s*(\d+)(?:\s*:\s*\d+)*\s*\)",                                  1),
 ]
@@ -1086,6 +1100,14 @@ def _extraer_campos(texto: str) -> dict:
     # ── n_trackers ────────────────────────────────────────────────────────────
     n_trackers = _find(_PAT_NTRACKERS, texto)
     n_strings_tracker = _find(_PAT_NSTRINGS, texto)
+
+    # Fila combinada etiquetada "No. of MPP trackers / strings per MPP tracker 3 / 2"
+    m_tsl = _TRACKER_STR_LABEL_RE.search(texto)
+    if m_tsl:
+        if n_trackers is None:
+            n_trackers = _num(m_tsl.group(1))
+        if n_strings_tracker is None:
+            n_strings_tracker = _num(m_tsl.group(2))
 
     # Verificar formato "2/(2:2)" para ambos campos a la vez
     m_ts = _TRACKER_STR_RE.search(texto)

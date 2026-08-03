@@ -903,6 +903,40 @@ Max. recommended PV array power 150 kWp
     },
 
     # ─────────────────────────────────────────────────────────────────────────
+    # CASO LÍMITE: fila combinada "trackers / strings per MPP tracker 3 / 2" —
+    # el primer número es el conteo de trackers, NO las cadenas. El patrón sin
+    # separador de n_strings no debe capturar el 3.
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "Genérico (fila combinada)",
+        "modelo":     "ComboRow 25K",
+        "arquitectura": "Inversor de red trifásico",
+        "texto": """\
+ComboRow 25K Three Phase Inverter
+Max. DC voltage 1100V
+MPPT voltage range 200V-1000V
+Start-up voltage 250V
+No. of MPP trackers / strings per MPP tracker 3 / 2
+Max. input current per MPPT 26A
+Max. short-circuit current per MPPT 33A
+Max. PV array power 37500W
+""",
+        "esperado": {
+            "Vdc_max":           1100,
+            "Vmppt_min":          200,
+            "Vmppt_max":         1000,
+            "V_arranque":         250,
+            "n_trackers":           3,
+            "n_strings_tracker":    2,
+            "I_max_tracker":       26,
+            "Isc_max_tracker":     33,
+            "P_dc_max_W":       37500,
+            "bat_voltaje_min":   None,
+            "bat_voltaje_max":   None,
+        },
+    },
+
+    # ─────────────────────────────────────────────────────────────────────────
     # CASO LÍMITE: la ficha NO publica potencia FV máxima — solo potencia AC
     # nominal. El extractor debe estimarla (AC × 1.5) y marcarla como estimada,
     # nunca dejar el campo vacío en silencio.
