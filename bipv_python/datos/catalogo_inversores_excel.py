@@ -51,3 +51,142 @@ def obtener_inversor_excel(nombre: str) -> dict:
 
 def lista_inversores_excel() -> list:
     return sorted(cargar_catalogo_inversores().keys())
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Escritura / edición / eliminación en el Excel
+# ══════════════════════════════════════════════════════════════════════════════
+# El archivo inversores_catalogo.xlsx tiene 2 filas de cabecera de título
+# antes de la fila de encabezados de columna (header=2 en pd.read_excel →
+# fila 3 de Excel en openpyxl).  Los datos empiezan en la fila 4.
+_HEADER_ROW = 3   # 1-based row del encabezado de columnas en openpyxl
+_DATA_START  = 4  # primera fila de datos
+
+# Columna clave del catálogo de inversores
+_KEY_COL = "Modelo"
+
+
+def guardar_inversor_excel(datos: dict) -> str:
+    """
+    Agrega o actualiza un inversor en el Excel del catálogo.
+    `datos` debe contener al menos la clave 'Modelo'.
+    Retorna el nombre del inversor guardado e invalida el cache.
+    """
+    import openpyxl, datetime
+
+    nombre = str(datos.get(_KEY_COL, "")).strip()
+    if not nombre:
+        raise ValueError("El campo 'Modelo' es obligatorio.")
+
+    try:
+        wb = openpyxl.load_workbook(_EXCEL)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"No se encontró el archivo: {_EXCEL}")
+
+    if _SHEET not in wb.sheetnames:
+        raise ValueError(f"La hoja '{_SHEET}' no existe en {_EXCEL}.")
+
+    ws = wb[_SHEET]
+
+    # Leer encabezados desde la fila de cabecera real (fila 3 del Excel)
+    headers = [
+        str(c.value).strip() if c.value else ""
+        for c in ws[_HEADER_ROW]
+    ]
+
+    if _KEY_COL not in headers:
+        raise ValueError(f"La hoja no tiene columna '{_KEY_COL}'.")
+
+    col_key = headers.index(_KEY_COL) + 1  # 1-based
+
+    # Buscar fila existente o agregar al final
+    fila_destino = None
+    for row in ws.iter_rows(min_row=_DATA_START):
+        val = str(row[col_key - 1].value or "").strip()
+        if val == nombre:
+            fila_destino = row[0].row
+            break
+    if fila_destino is None:
+        fila_destino = ws.max_row + 1
+
+    # Escribir solo columnas que existen en el encabezado
+    for col_nombre, valor in datos.items():
+        if col_nombre in headers:
+            col_idx = headers.index(col_nombre) + 1
+            ws.cell(row=fila_destino, column=col_idx, value=valor)
+
+    # Anotar fecha si existe la columna
+    for meta_col in ("FechaIngreso", "Fecha_Ingreso", "Fecha"):
+        if meta_col in headers:
+            ws.cell(
+                row=fila_destino,
+                column=headers.index(meta_col) + 1,
+                value=datetime.date.today().isoformat(),
+            )
+            break
+
+    wb.save(_EXCEL)
+
+    try:
+        cargar_catalogo_inversores.clear()
+    except Exception:
+        pass
+
+    return nombre
+
+
+def eliminar_inversor_excel(nombre: str) -> bool:
+    """
+    Elimina la fila del inversor con Modelo == nombre.
+    Retorna True si se eliminó, False si no se encontró.
+    """
+    import openpyxl
+
+    nombre = nombre.strip()
+    if not nombre:
+        raise ValueError("Nombre vacío.")
+
+    try:
+        wb = openpyxl.load_workbook(_EXCEL)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"No se encontró el archivo: {_EXCEL}")
+
+    if _SHEET not in wb.sheetnames:
+        raise ValueError(f"La hoja '{_SHEET}' no existe.")
+
+    ws = wb[_SHEET]
+    headers = [str(c.value).strip() if c.value else "" for c in ws[_HEADER_ROW]]
+
+    if _KEY_COL not in headers:
+        raise ValueError(f"La hoja no tiene columna '{_KEY_COL}'.")
+
+    col_key = headers.index(_KEY_COL) + 1
+    fila_borrar = None
+    for row in ws.iter_rows(min_row=_DATA_START):
+        if str(row[col_key - 1].value or "").strip() == nombre:
+            fila_borrar = row[0].row
+            break
+
+    if fila_borrar is None:
+        return False
+
+    ws.delete_rows(fila_borrar)
+    wb.save(_EXCEL)
+
+    try:
+        cargar_catalogo_inversores.clear()
+    except Exception:
+        pass
+
+    return True
+
+
+def actualizar_inversor_excel(nombre_original: str, datos: dict) -> str:
+    """
+    Actualiza los campos de un inversor existente (por nombre_original).
+    Si datos contiene 'Modelo' distinto, también renombra la entrada.
+    Retorna el nombre final guardado.
+    """
+    datos_completos = {_KEY_COL: nombre_original}
+    datos_completos.update(datos)
+    return guardar_inversor_excel(datos_completos)
