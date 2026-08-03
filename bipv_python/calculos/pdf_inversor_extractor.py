@@ -79,14 +79,20 @@ def _first(*vals):
     return None
 
 
-# ── Regex para rangos tipo "100 ~ 850 V" o "100-850 V" o "100 to 850 V" ─────
+# ── Regex para rangos tipo "100 ~ 850 V" / "100-850 V" / "100 to 850 V"
+#    Gap 1 (Fronius/SMA): añadido separador "..." / ".." (180...800 V)
+# ─────────────────────────────────────────────────────────────────────────────
 _RANGE_RE = re.compile(
-    r"([0-9]+(?:[.,][0-9]+)?)\s*(?:~|–|—|-|to|a)\s*([0-9]+(?:[.,][0-9]+)?)\s*V",
+    r"([0-9]+(?:[.,][0-9]+)?)\s*(?:\.{2,3}|~|–|—|-|to|a)\s*([0-9]+(?:[.,][0-9]+)?)\s*V",
     re.IGNORECASE,
 )
 
 # ── Regex para formato "2/(2:2)" (trackers / strings) ────────────────────────
-_TRACKER_STR_RE = re.compile(r"(\d+)\s*/\s*\(\s*(\d+)(?:\s*:\s*\d+)*\s*\)")
+# Gap 3 (LuxPower variantes): acepta también "2 x (2:2)" y "2x(2)" con 'x'
+_TRACKER_STR_RE = re.compile(
+    r"(\d+)\s*(?:/|x)\s*\(\s*(\d+)(?:\s*:\s*\d+)*\s*\)",
+    re.IGNORECASE,
+)
 
 
 def _find(patterns, text):
@@ -101,23 +107,64 @@ def _find(patterns, text):
     return None
 
 
+# ── Regex SMA "DC voltage range, min." / "DC voltage range, max." separados ──
+# Gap 2: algunas fichas SMA/Fronius reportan mín y máx en campos distintos,
+#         no como un rango "X ~ Y V" en una sola línea.
+_SMA_MIN_RE = re.compile(
+    r"DC\s+voltage\s+range,?\s*min\.?\s*[:\|]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",
+    re.IGNORECASE,
+)
+_SMA_MAX_RE = re.compile(
+    r"DC\s+voltage\s+range,?\s*max\.?\s*[:\|]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",
+    re.IGNORECASE,
+)
+_UMIN_RE = re.compile(
+    r"U_?(?:MPP|mpp|DC|dc),?\s*min\.?\s*[:\(=]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",
+    re.IGNORECASE,
+)
+_UMAX_RE = re.compile(
+    r"U_?(?:MPP|mpp|DC|dc),?\s*max\.?\s*[:\(=]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",
+    re.IGNORECASE,
+)
+
+
 def _find_range(label_patterns, text):
     """
-    Busca una etiqueta (cualquier patron de label_patterns) seguida de un rango
-    "X ~ Y V" y devuelve (min, max). Retorna (None, None) si no encuentra.
+    Busca una etiqueta seguida de un rango "X ~ Y V" y devuelve (min, max).
+
+    Gap 2 (SMA/Fronius): si no hay rango en una sola línea, intenta extraer
+    min y max de campos separados usando _SMA_MIN_RE / _SMA_MAX_RE / _U*_RE.
+    Gap 5: ventana ampliada de 200 → 400 chars para tablas multicolumna.
+    Retorna (None, None) si no encuentra.
     """
     for lp in label_patterns:
-        # Busca la etiqueta y luego captura el rango en la misma línea o siguiente
         m_label = re.search(lp, text, re.IGNORECASE)
         if not m_label:
             continue
-        chunk = text[m_label.start(): m_label.start() + 200]
+        # Gap 5: ventana 400 chars (antes 200)
+        chunk = text[m_label.start(): m_label.start() + 400]
         m_range = _RANGE_RE.search(chunk)
         if m_range:
             lo = _num(m_range.group(1))
             hi = _num(m_range.group(2))
             if lo is not None and hi is not None:
                 return (lo, hi) if lo < hi else (hi, lo)
+
+    # Gap 2: fallback para fichas SMA/Fronius con min y max en líneas separadas
+    lo_sep = hi_sep = None
+    for pat in (_SMA_MIN_RE, _UMIN_RE):
+        m = pat.search(text)
+        if m:
+            lo_sep = _num(m.group(1))
+            break
+    for pat in (_SMA_MAX_RE, _UMAX_RE):
+        m = pat.search(text)
+        if m:
+            hi_sep = _num(m.group(1))
+            break
+    if lo_sep is not None and hi_sep is not None and lo_sep < hi_sep:
+        return (lo_sep, hi_sep)
+
     return (None, None)
 
 
@@ -240,8 +287,11 @@ _PAT_ISC = [
 # P_dc_max_W — Potencia FV máxima recomendada (W)
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_PDCMAX = [
-    # Primero intentar kWp (SolaX) — multiplicar ×1000
+    # kWp (SolaX con corchetes) — multiplicar ×1000 en la lógica de extracción
     (r"Max(?:imum)?\.?\s+PV\s+(?:array\s+)?(?:input\s+)?[Pp]ower\s*\[?kWp?\]?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*kWp?", 1),
+    # Gap 4: kW sin 'p' (Sungrow, Huawei) — también ×1000 en lógica
+    (r"Max(?:imum)?\.?\s+(?:PV\s+)?(?:DC\s+)?(?:[Ii]nput\s+)?[Pp]ower\s*\[?kW\]?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*kW(?!p)", 1),
+    (r"Recommended\s+max(?:imum)?\s+PV\s+power\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*kW(?!p)", 1),
     # Watts directo
     (r"Max(?:imum)?\.?\s+PV\s+[Aa]rray\s+[Pp]ower\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*W",   1),
     (r"Max(?:imum)?\s+DC\s+[Ii]nput\s+[Pp]ower\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*W",       1),
@@ -252,6 +302,12 @@ _PAT_PDCMAX = [
     # SMA
     (r"DC\s+power,\s*max\.\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*W",               1),
 ]
+
+# Regex independiente para detectar kW sin p (para conversión ×1000 en extracción)
+_KW_NO_P_RE = re.compile(
+    r"Max(?:imum)?\.?\s+(?:PV\s+)?(?:DC\s+)?(?:[Ii]nput\s+)?[Pp]ower\s*\[?kW\]?\s*[:\(]?\s*[0-9]+(?:[.,][0-9]+)?\s*kW(?!p)",
+    re.IGNORECASE,
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Batería — voltaje mín/máx
@@ -441,18 +497,31 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
     Isc_max_tracker = _find(_PAT_ISC, texto)
 
     # ── P_dc_max_W ────────────────────────────────────────────────────────────
-    # Primero intentar patrón kWp (multiplicar ×1000)
-    p_kwp = None
+    # Intento 1: kWp explícito (SolaX) — multiplicar ×1000
+    p_kw_converted = None
     m_kwp = re.search(
         r"Max(?:imum)?\.?\s+PV\s+(?:array\s+)?(?:input\s+)?[Pp]ower\s*\[?kWp?\]?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*kWp?",
         texto, re.IGNORECASE,
     )
     if m_kwp:
-        p_kwp = _num(m_kwp.group(1))
-        if p_kwp and p_kwp < 1000:  # sanity: si viene en kWp
-            p_kwp = p_kwp * 1000
+        v = _num(m_kwp.group(1))
+        if v and v < 1000:           # sanity: viene en kWp no en W
+            p_kw_converted = v * 1000
 
-    P_dc_max_W = p_kwp or _find(_PAT_PDCMAX, texto)
+    # Intento 2: Gap 4 — kW sin 'p' (Sungrow, Huawei) — también ×1000
+    if p_kw_converted is None and _KW_NO_P_RE.search(texto):
+        m_kw = re.search(
+            r"(?:Max(?:imum)?\.?\s+(?:PV\s+)?(?:DC\s+)?(?:[Ii]nput\s+)?[Pp]ower"
+            r"|Recommended\s+max(?:imum)?\s+PV\s+power)"
+            r"\s*\[?kW\]?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*kW(?!p)",
+            texto, re.IGNORECASE,
+        )
+        if m_kw:
+            v = _num(m_kw.group(1))
+            if v and v < 10000:      # sanity: valor razonable en kW
+                p_kw_converted = v * 1000
+
+    P_dc_max_W = p_kw_converted or _find(_PAT_PDCMAX, texto)
 
     # ── Batería ───────────────────────────────────────────────────────────────
     bat_min_r, bat_max_r = _find_range(_LABEL_BAT_RANGE, texto)
