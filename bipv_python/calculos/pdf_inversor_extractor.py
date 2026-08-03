@@ -252,8 +252,10 @@ _LABEL_MPPT_RANGE = [
     r"Rango\s+(?:de\s+)?[Oo]peraci[oó]n\s+PV\s+MPPT",
     r"Rango\s+MPPT",
     r"MPPT\s+Range\s+@\s+Operating",
-    # Growatt MID: "Normal Voltage 200V-1000V" (rango operativo de entrada CC)
-    r"Normal\s+Voltage",
+    # Growatt MID: "Normal Voltage 200V-1000V" (rango operativo de entrada CC).
+    # El lookahead excluye líneas de CA ("... VAC", "... AC") para no confundir
+    # el rango de red con el rango MPPT
+    r"Normal\s+Voltage(?![^\n]*V?A[Cc]\b)",
     r"DC\s+[Vv]oltage\s+[Rr]ange",
     r"Input\s+[Vv]oltage\s+[Rr]ange",
     r"PV\s+[Vv]oltage\s+[Rr]ange",
@@ -676,7 +678,12 @@ def _extract_multimodel_values(text: str) -> dict:
             paso = len(toks) // n_m
             for i in range(n_m):
                 sufijos[i] = toks[i * paso:(i + 1) * paso]
-        else:
+            # Validar forma: cada sufijo debe contener un dígito (variante de
+            # potencia); si no, la línea no es continuación de modelos →
+            # reintentar por posición de columna
+            if not all(any(re.search(r"\d", t_) for t_ in sufijos[i]) for i in range(n_m)):
+                sufijos = {i: [] for i in range(n_m)}
+        if not any(sufijos.values()):
             for m_tok in re.finditer(r"\S+", cont):
                 idx = min(range(n_m), key=lambda i: abs(cols_x[i] - m_tok.start()))
                 sufijos[idx].append(m_tok.group())
