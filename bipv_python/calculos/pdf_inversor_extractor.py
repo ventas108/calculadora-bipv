@@ -193,8 +193,9 @@ _PAT_VDCMAX = [
     # SolaX X3-FORTH tabla 3 columnas: "Max. PV input voltage  V  1100"
     # pdfplumber une [Parámetro | Unidad | Valor] con "  " → unidad queda ENTRE label y número
     (r"Max(?:imum)?\.?\s+(?:DC\s+)?(?:PV\s+)?[Ii]nput\s+[Vv]oltage\s+[Vv]\s+([0-9]+(?:[.,][0-9]+)?)", 1),
-    # Multilinea SolaX: label en línea 1, valor en línea 2 (pdfplumber extract_text tabla vertical)
-    (r"Max(?:imum)?\.?\s+(?:DC\s+)?(?:PV\s+)?[Ii]nput\s+[Vv]oltage\s*\n\s*([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?", 1),
+    # Multilinea SolaX: label en línea 1 (con posibles notas ①②③), valor en línea 2
+    # [^\n]* acepta "Max. PV input voltage   ①\n   1100 V" (nota entre label y salto de línea)
+    (r"Max(?:imum)?\.?\s+(?:DC\s+)?(?:PV\s+)?[Ii]nput\s+[Vv]oltage[^\n]*\n\s*([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?", 1),
     (r"Max(?:imum)?\s+PV\s+VOC\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"Max\.\s*DC\s+[Ii]nput\s+[Vv]oltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"PV\s+input\s+voltage\s*\(max\.?\)\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",  1),
@@ -257,8 +258,9 @@ _PAT_VARRANQUE = [
 # n_trackers — Número de trackers MPPT
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_NTRACKERS = [
-    # "Number of MPP trackers" / "No. of MPP trackers"
-    (r"N(?:o|umber|úmero)?\.?\s+(?:of\s+)?(?:independent\s+)?MPP(?:T)?\s+(?:trackers?|inputs?|channels?)\s*[:\|]?\s*([0-9]+)", 1),
+    # Tabla de especificaciones — máxima prioridad (spec table beats feature bullets)
+    # "No. of MPP trackers / strings per MPP tracker   9 / 2"
+    (r"N(?:o|umber|úmero)?\.?\s+(?:of\s+)?(?:independent\s+)?MPP(?:T)?\s+(?:trackers?|inputs?|channels?)\s*[:\|/]?\s*(?:strings?\s+per\s+MPP(?:T)?\s+tracker\s*)?[:\|]?\s*([0-9]+)", 1),
     # Gap 8 (Sungrow): "Number of MPPT: 3" sin sufijo "trackers"
     (r"[Nn]umber\s+of\s+MPPT\s*[:\|]?\s*([0-9]+)",                                 1),
     (r"MPPT\s+[Nn]umber\s*[:\|]?\s*([0-9]+)",                                      1),
@@ -269,7 +271,8 @@ _PAT_NTRACKERS = [
     (r"(\d+)\s*/\s*\(\s*\d+(?:\s*:\s*\d+)*\s*\)",                                  1),
     # Victron/SMA: nMPPT = 2
     (r"n(?:MPPT|_MPPT)\s*[=:\|]?\s*([0-9]+)",                                      1),
-    # SolaX X3-FORTH features: "Max. 12 MPPTs, 2 strings per MPP tracker"
+    # SolaX X3-FORTH feature bullet — solo como fallback (puede describir el máximo de la familia)
+    # IMPORTANTE: viene al final para que la tabla de spec tenga prioridad
     (r"Max\.\s+([0-9]+)\s+MPPTs?",                                                  1),
 ]
 
@@ -496,6 +499,139 @@ def _extract_arch(text: str) -> str:
 # Función principal de extracción
 # ══════════════════════════════════════════════════════════════════════════════
 
+# ══════════════════════════════════════════════════════════════════════════════
+# Multi-modelo: detectar modelos como columnas y extraer valores por columna
+# Usada cuando una ficha técnica cubre varios modelos (ej: SolaX X3-FORTH
+# con 75K / 80K / 100K / 110K / 120K / 125K en columnas paralelas).
+# ══════════════════════════════════════════════════════════════════════════════
+_MODEL_COL_RE = re.compile(r'[A-Z][A-Z0-9\-\.]{3,25}', re.IGNORECASE)
+
+
+def _extract_multimodel_values(text: str) -> dict:
+    """
+    Detecta datasheets con múltiples modelos como columnas y extrae valores
+    por columna para los campos que varían por modelo.
+
+    Algoritmo:
+      1. Busca en las primeras 80 líneas una fila con ≥ 2 tokens que parezcan
+         nombres de modelo (tienen dígitos y guiones, ej: X3-FTH-75K).
+      2. Registra la posición horizontal (índice de carácter) de cada nombre.
+      3. Para cada fila de datos (P_dc_max, n_trackers), extrae todos los
+         valores numéricos y los asigna al modelo cuya posición sea más cercana.
+      4. Propaga el valor asignado al modelo más cercano a los que quedan vacíos.
+
+    Returns:
+        {
+            'modelos': ['X3-FTH-75K', ...],   # vacío si es hoja de un solo modelo
+            'por_modelo': {
+                'X3-FTH-75K': {'P_dc_max_W': 120000, 'n_trackers': 9.0, 'n_strings_tracker': 2.0},
+                ...
+            }
+        }
+    """
+    _EMPTY: dict = {'modelos': [], 'por_modelo': {}}
+    lines = text.split('\n')
+
+    # ── 1. Detectar fila de encabezado con ≥ 2 nombres de modelo ───────────────
+    header_positions: list[tuple[str, int]] = []
+    for line in lines[:80]:
+        candidates = [
+            (m.group(), m.start())
+            for m in _MODEL_COL_RE.finditer(line)
+            if re.search(r'\d', m.group()) and '-' in m.group()
+               and not re.match(r'^\d', m.group())          # no empieza con número
+        ]
+        if len(candidates) >= 2:
+            header_positions = candidates
+            break
+
+    if not header_positions:
+        return _EMPTY
+
+    model_names = [name for name, _ in header_positions]
+    model_x     = [pos  for _,    pos in header_positions]
+    n           = len(model_names)
+    result: dict = {
+        'modelos': model_names,
+        'por_modelo': {
+            m: {'P_dc_max_W': None, 'n_trackers': None, 'n_strings_tracker': None}
+            for m in model_names
+        },
+    }
+
+    def _nearest_idx(val_x: int) -> int:
+        """Índice del modelo con posición horizontal más cercana a val_x."""
+        return min(range(n), key=lambda i: abs(model_x[i] - val_x))
+
+    def _fill_gaps(by_idx: dict) -> dict:
+        """Rellena índices sin valor copiando del índice asignado más cercano."""
+        assigned = list(by_idx.keys())
+        if not assigned:
+            return by_idx
+        for i in range(n):
+            if i not in by_idx:
+                nearest = min(assigned, key=lambda j: abs(model_x[j] - model_x[i]))
+                by_idx[i] = by_idx[nearest]
+        return by_idx
+
+    # ── 2. P_dc_max por columna ─────────────────────────────────────────────────
+    for line in lines:
+        if not re.search(r'recommended\s+PV\s+(?:array\s+)?power', line, re.IGNORECASE):
+            continue
+        found = [
+            (float(m.group(1).replace(',', '.')), m.start())
+            for m in re.finditer(r'([0-9]+(?:[.,][0-9]+)?)\s*kWp?\b', line, re.IGNORECASE)
+        ]
+        if len(found) == n:
+            # Mapeo 1:1 por orden izquierda→derecha
+            for (v, _), model in zip(found, model_names):
+                if 0 < v < 10000:
+                    result['por_modelo'][model]['P_dc_max_W'] = v * 1000
+        elif found:
+            by_idx: dict = {}
+            for v, vx in found:
+                idx = _nearest_idx(vx)
+                if idx not in by_idx and 0 < v < 10000:
+                    by_idx[idx] = v * 1000
+            _fill_gaps(by_idx)
+            for i, model in enumerate(model_names):
+                if i in by_idx:
+                    result['por_modelo'][model]['P_dc_max_W'] = by_idx[i]
+        break
+
+    # ── 3. n_trackers / n_strings por columna ──────────────────────────────────
+    # Buscar la fila de la TABLA (ej: "No. of MPP trackers / strings per MPP tracker   9/2   12/2")
+    # No parar en filas de features que también contienen "MPP tracker" sin valores N/M
+    for line in lines:
+        if not re.search(r'MPP\s+tracker', line, re.IGNORECASE):
+            continue
+        found = [
+            (int(m.group(1)), int(m.group(2)), m.start())
+            for m in re.finditer(r'(\d+)\s*/\s*(\d+)', line)
+        ]
+        if not found:
+            continue   # línea de feature bullet sin N/M — seguir buscando
+        if len(found) == n:
+            for (nt, ns, _), model in zip(found, model_names):
+                result['por_modelo'][model]['n_trackers']        = float(nt)
+                result['por_modelo'][model]['n_strings_tracker'] = float(ns)
+        else:
+            by_idx: dict = {}
+            for nt, ns, vx in found:
+                idx = _nearest_idx(vx)
+                if idx not in by_idx:
+                    by_idx[idx] = (float(nt), float(ns))
+            _fill_gaps(by_idx)
+            for i, model in enumerate(model_names):
+                if i in by_idx:
+                    nt, ns = by_idx[i]
+                    result['por_modelo'][model]['n_trackers']        = nt
+                    result['por_modelo'][model]['n_strings_tracker'] = ns
+        break
+
+    return result
+
+
 def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
     """
     Extrae los parámetros eléctricos de una ficha técnica de inversor BIPV.
@@ -607,9 +743,21 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
             if v and 0 < v < 10000:  # sanity: valor razonable en kW
                 p_kw_converted = v * 1000
 
-    # Intento 3: SolaX X3-FORTH — "Max. recommended PV array power" seguido de
-    # valor kWp en la 1ª–5ª línea siguiente (tabla multicolumna, puede tener
-    # líneas intermedias con otras etiquetas o unidades)
+    # Intento 3a: SolaX X3-FORTH misma línea — "Max. recommended PV array power   120 kWp"
+    # (pdftotext -layout / pdfplumber tabla con todo en una línea)
+    if p_kw_converted is None:
+        m_rec_sl = re.search(
+            r"Max(?:imum)?\.?\s+recommended\s+PV\s+(?:array\s+)?[Pp]ower"
+            r"[^\n]*?([0-9]+(?:[.,][0-9]+)?)\s*kWp?\b",
+            texto, re.IGNORECASE,
+        )
+        if m_rec_sl:
+            v = _num(m_rec_sl.group(1))
+            if v and v < 10000:
+                p_kw_converted = v * 1000
+
+    # Intento 3b: SolaX X3-FORTH multilinea — "Max. recommended PV array power\n...\n120 kWp"
+    # (tabla vertical donde label y valor están en líneas distintas)
     if p_kw_converted is None:
         m_rec = re.search(
             r"Max(?:imum)?\.?\s+recommended\s+PV\s+(?:array\s+)?[Pp]ower[^\n]*\n"
@@ -618,22 +766,25 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
         )
         if m_rec:
             v = _num(m_rec.group(1))
-            if v and v < 10000:      # sanity: viene en kWp (< 10 MWp)
+            if v and v < 10000:
                 p_kw_converted = v * 1000
 
-    # Intento 4: SolaX X3-FORTH tabla 3 columnas en misma línea
-    # "Max. recommended PV array power  kWp  150" (unidad antes del valor)
+    # Intento 4: tabla 3 columnas — "Max. recommended PV array power  kWp  150"
+    # (pdfplumber une [Parámetro | Unidad | Valor]: unidad queda antes del número)
     if p_kw_converted is None:
-        m_rec_sl = re.search(
+        m_rec_3c = re.search(
             r"Max(?:imum)?\.?\s+recommended\s+PV\s+(?:array\s+)?[Pp]ower\s+kWp?\s+([0-9]+(?:[.,][0-9]+)?)",
             texto, re.IGNORECASE,
         )
-        if m_rec_sl:
-            v = _num(m_rec_sl.group(1))
+        if m_rec_3c:
+            v = _num(m_rec_3c.group(1))
             if v and v < 10000:
                 p_kw_converted = v * 1000
 
     P_dc_max_W = p_kw_converted or _find(_PAT_PDCMAX, texto)
+
+    # ── Multi-modelo: detectar columnas de modelos ─────────────────────────────
+    multimodel = _extract_multimodel_values(texto)
 
     # ── Batería ───────────────────────────────────────────────────────────────
     # use_sma_fallback=False para evitar que "DC voltage range, min./max." de SMA
@@ -695,6 +846,9 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
         "n_pages_total":    n_pages_total,
         "n_chars_extraidos": len(texto.strip()),
         "texto_crudo":      texto[:6000],
+        # Multi-modelo: vacío si la ficha sólo tiene un modelo
+        "modelos_detectados":  multimodel.get('modelos', []),
+        "valores_por_modelo":  multimodel.get('por_modelo', {}),
     }
 
 

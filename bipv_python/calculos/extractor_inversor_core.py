@@ -12,6 +12,7 @@ from calculos.pdf_inversor_extractor import (
     _LABEL_BAT_RANGE, _PAT_BAT_MIN, _PAT_BAT_MAX,
     _TRACKER_STR_RE, _HYBRID_RE, _RANGE_RE, _KW_NO_P_RE,
     _extract_brand, _extract_model, _extract_arch,
+    _extract_multimodel_values,
 )
 import re
 
@@ -87,18 +88,32 @@ def extraer_desde_texto(texto: str) -> dict:
             v = _num(m_kw.group(1))
             if v and 0 < v < 10000:
                 p_kw_converted = v * 1000
-    # Intento 3: SolaX X3-FORTH — "Max. recommended PV array power" + kWp multi-línea
+    # Intento 3a: SolaX X3-FORTH misma línea — "Max. recommended PV array power   120 kWp"
+    if p_kw_converted is None:
+        m_rec_sl = _re.search(
+            r"Max(?:imum)?\.?\s+recommended\s+PV\s+(?:array\s+)?[Pp]ower"
+            r"[^\n]*?([0-9]+(?:[.,][0-9]+)?)\s*kWp?\b",
+            texto, _re.IGNORECASE,
+        )
+        if m_rec_sl:
+            v = _num(m_rec_sl.group(1))
+            if v and v < 10000:
+                p_kw_converted = v * 1000
+    # Intento 3b: SolaX X3-FORTH multilinea — label y valor en líneas distintas
     if p_kw_converted is None:
         m_rec = _re.search(
-            r"Max\.\s+recommended\s+PV\s+(?:array\s+)?[Pp]ower[^\n]*\n"
-            r"(?:[^\n]*\n){1,3}\s*([0-9]+(?:[.,][0-9]+)?)\s*kWp?\b",
+            r"Max(?:imum)?\.?\s+recommended\s+PV\s+(?:array\s+)?[Pp]ower[^\n]*\n"
+            r"(?:[^\n]*\n){0,5}\s*([0-9]+(?:[.,][0-9]+)?)\s*kWp?\b",
             texto, _re.IGNORECASE,
         )
         if m_rec:
             v = _num(m_rec.group(1))
-            if v and v < 1000:
+            if v and v < 10000:
                 p_kw_converted = v * 1000
     P_dc_max_W = p_kw_converted or _find(_PAT_PDCMAX, texto)
+
+    # Multi-modelo
+    multimodel = _extract_multimodel_values(texto)
 
     # use_sma_fallback=False: "DC voltage range" SMA es MPPT, no batería
     bat_min_r, bat_max_r = _find_range(_LABEL_BAT_RANGE, texto, use_sma_fallback=False)
@@ -114,4 +129,6 @@ def extraer_desde_texto(texto: str) -> dict:
         "I_max_tracker": I_max_tracker, "Isc_max_tracker": Isc_max_tracker,
         "P_dc_max_W": P_dc_max_W,
         "bat_voltaje_min": bat_voltaje_min, "bat_voltaje_max": bat_voltaje_max,
+        "modelos_detectados": multimodel.get('modelos', []),
+        "valores_por_modelo": multimodel.get('por_modelo', {}),
     }

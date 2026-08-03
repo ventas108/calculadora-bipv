@@ -271,24 +271,61 @@ else:
                     + (" · OCR" if uso_ocr else "")
                 )
 
+            # ── Selector de modelo (ficha técnica multi-modelo) ───────────────
+            modelos_det = res_real.get("modelos_detectados", [])
+            modelo_seleccionado = None
+            if modelos_det:
+                st.info(
+                    f"📋 **Ficha técnica multi-modelo** — se detectaron {len(modelos_det)} modelos "
+                    f"en columnas separadas: `{'`, `'.join(modelos_det)}`  \n"
+                    "Selecciona el modelo que deseas agregar al catálogo para ver sus valores específicos."
+                )
+                modelo_seleccionado = st.selectbox(
+                    "Modelo a utilizar",
+                    modelos_det,
+                    key="sel_modelo_pdf",
+                )
+                # Sobreescribir campos variables con los del modelo elegido
+                vals_mod = res_real.get("valores_por_modelo", {}).get(modelo_seleccionado, {})
+                res_real_view = {**res_real}        # copia shallow para no mutar session_state
+                for campo, val in vals_mod.items():
+                    if val is not None:
+                        res_real_view[campo] = val
+            else:
+                res_real_view = res_real
+
             # ── Tabla de métricas ──────────────────────────────────────────────
             campos_extraidos = sum(
-                1 for c in CAMPOS_CRITICOS if res_real.get(c) is not None
+                1 for c in CAMPOS_CRITICOS if res_real_view.get(c) is not None
             )
             st.markdown(f"**Campos extraídos: {campos_extraidos} / {len(CAMPOS_CRITICOS)}**")
 
-            caso_match = next(
-                (c for c in CASOS
-                 if fab_real and fab_real.lower() in c["fabricante"].lower()),
-                None,
-            ) if fab_real else None
+            # Buscar caso sintético del mismo fabricante Y modelo (si hay modelo seleccionado)
+            caso_match = None
+            if fab_real:
+                for c in CASOS:
+                    fab_ok   = fab_real.lower() in c["fabricante"].lower()
+                    model_ok = (
+                        not modelo_seleccionado
+                        or modelo_seleccionado.lower() in c["modelo"].lower()
+                        or c["modelo"].lower() in (modelo_seleccionado.lower() if modelo_seleccionado else "")
+                    )
+                    if fab_ok and model_ok:
+                        caso_match = c
+                        break
+                # Fallback: sólo por fabricante
+                if caso_match is None:
+                    caso_match = next(
+                        (c for c in CASOS if fab_real.lower() in c["fabricante"].lower()), None
+                    )
 
             if caso_match:
-                st.markdown(f"**Comparación vs caso sintético de {caso_match['fabricante']}:**")
+                mod_ref = modelo_seleccionado or caso_match['modelo']
+                st.markdown(f"**Comparación vs caso sintético — {caso_match['fabricante']} {mod_ref}:**")
                 comp_rows = []
                 for campo in CAMPOS_CRITICOS:
                     esp = caso_match["esperado"].get(campo)
-                    ex  = res_real.get(campo)
+                    ex  = res_real_view.get(campo)
                     emoji, detalle = _comparar(ex, esp)
                     comp_rows.append({
                         "Campo":           CAMPO_LABELS[campo],
@@ -301,7 +338,7 @@ else:
                 label = f"No hay caso sintético para **{fab_real}**." if fab_real else "Marca no detectada."
                 st.info(f"{label} Valores extraídos:")
                 raw_rows = [
-                    {"Campo": CAMPO_LABELS.get(c, c), "Valor": str(res_real.get(c))}
+                    {"Campo": CAMPO_LABELS.get(c, c), "Valor": str(res_real_view.get(c))}
                     for c in CAMPOS_CRITICOS
                 ]
                 st.dataframe(pd.DataFrame(raw_rows), use_container_width=True, hide_index=True)
