@@ -32,6 +32,8 @@ def extraer_desde_texto(texto: str) -> dict:
     # Normalizar notación d.c./a.c. (SolaX X3-FORTH y similar)
     texto = _re.sub(r"\s*d\.c\.?\s*", " ", texto)
     texto = _re.sub(r"\s*a\.c\.?\s*", " ", texto)
+    # Separador de miles ("1,100 V" → "1100 V"), igual que en el extractor PDF
+    texto = _re.sub(r"(\d),(\d{3})(?!\d)", r"\1\2", texto)
 
     marca        = _extract_brand(texto)
     modelo       = _extract_model(texto, marca)

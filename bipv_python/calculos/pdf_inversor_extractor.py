@@ -213,6 +213,8 @@ _PAT_VDCMAX = [
     (r"Tensi[oó]n\s+DC\s+M[aá]xima?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",      1),
     # Growatt español: "Máximo voltaje CD 1100V"
     (r"M[aá]ximo\s+[Vv]oltaje\s+(?:CD|DC|CC)\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
+    # Huawei español: "Tensión máxima de entrada 1 1100 V" (el '1' suelto es nota al pie)
+    (r"Tensi[oó]n\s+m[aá]xima\s+de\s+entrada(?:\s+\d)?\s+([0-9]{3,4})\s*V",       1),
     (r"Tensi[oó]n\s+M[aá]xima?\s+(?:FV|PV|Entrada)\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"Max\.\s*PV\s+array\s+open\s+circuit\s+voltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     # SMA / Fronius style
@@ -226,6 +228,8 @@ _PAT_VDCMAX = [
 _LABEL_MPPT_RANGE = [
     # Español (Growatt): "Rango de voltaje de MPPT 180V-850VDC"
     r"Rango\s+de\s+[Vv]oltaje\s+de\s+MPPT",
+    # Huawei español (pdfplumber pega palabras): "Tensiónde funcionamientoMPPT 2 200 V ~ 1000 V"
+    r"Tensi[oó]n\s*de\s*funcionamiento\s*(?:de\s*)?MPPT",
     r"MPP(?:T)?\s+[Vv]oltage\s+[Rr]ange",
     r"MPPT\s+[Rr]ange",
     r"MPP\s+[Tt]racker\s+[Vv]oltage\s+[Rr]ange",
@@ -289,6 +293,8 @@ _PAT_NTRACKERS = [
     (r"N[úu]mero\s+de\s+MPPTs?\s*[:\|]?\s*([0-9]+)",                               1),
     # Felicity: "No.of MPP Trackers 4" (sin espacio tras "No.")
     (r"No\.?\s*of\s+MPP\s+[Tt]rackers?\s*[:\|]?\s*([0-9]+)",                       1),
+    # Huawei español: "Cantidad de MPPTs 6"
+    (r"Cantidad\s+de\s+MPPTs?\s*[:\|]?\s*([0-9]+)",                                1),
     # formato "2/(2:2)" — primer número = total trackers
     (r"(\d+)\s*/\s*\(\s*\d+(?:\s*:\s*\d+)*\s*\)",                                  1),
     # Victron/SMA: nMPPT = 2
@@ -315,6 +321,8 @@ _PAT_NSTRINGS = [
     (r"[Cc]adenas?\s+por\s+MPPT\s*[:\|]?\s*([0-9]+)",                              1),
     # Felicity: "No.of Strings Per MPP Tracker 2"
     (r"No\.?\s*of\s+[Ss]trings\s+[Pp]er\s+MPP\s+[Tt]racker\s*[:\|]?\s*([0-9]+)",   1),
+    # Huawei español: "Cantidad máxima de entradas por MPPT 2"
+    (r"Cantidad\s+m[aá]xima\s+de\s+entradas\s+por\s+MPPT\s*[:\|]?\s*([0-9]+)",     1),
     # formato "2/(2:2)" → segundo número (strings por tracker uniforme)
     (r"\d+\s*/\s*\(\s*(\d+)(?:\s*:\s*\d+)*\s*\)",                                  1),
 ]
@@ -338,6 +346,8 @@ _PAT_IMAX = [
     (r"Corriente\s+M[aá]xima\s+(?:por\s+)?[Tt]racker\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
     # Español (Growatt): "Máxima corriente por MPPT 40A"
     (r"M[aá]xima\s+corriente\s+(?:de\s+entrada\s+)?por\s+MPPT\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
+    # Huawei español: "Corriente de entrada máxima por MPPT 22 A"
+    (r"Corriente\s+de\s+entrada\s+m[aá]xima\s+(?:por\s+MPPT)?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
     # Felicity: "PV Input Current 36+36+36+36(A)" — corriente POR tracker (primer sumando)
     (r"PV\s+Input\s+Current\s+([0-9]+(?:[.,][0-9]+)?)\s*\+",                       1),
     (r"Max\.\s*input\s+current\s+\[A\]\s*[:\|]?\s*([0-9]+(?:[.,][0-9]+)?)",       1),
@@ -736,6 +746,9 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
     # Eliminar caracteres de control incrustados (Growatt: "MAX\x0150KTL3-XL\x012"
     # parte los nombres de modelo y rompe la detección multi-modelo)
     texto = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", texto)
+    # Separador de miles (Huawei español: "1,100 V", "60,000 W") → "1100 V"
+    # Seguro frente a decimales tipo "0,8" o "99,90" (no tienen 3 dígitos tras la coma)
+    texto = re.sub(r"(\d),(\d{3})(?!\d)", r"\1\2", texto)
 
     # ── Metadatos ─────────────────────────────────────────────────────────────
     marca       = _extract_brand(texto)
@@ -780,6 +793,12 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
         if not m_rated:
             m_rated = re.search(
                 r"Voltaje\s+nominal(?!\s*\(?\s*CA)\s*[:\(]?\s*([0-9]{2,4}(?:[.,][0-9]+)?)\s*V",
+                texto, re.IGNORECASE,
+            )
+        # Huawei español: "Tensión nominal de entrada 600 V @380 Vac ..."
+        if not m_rated:
+            m_rated = re.search(
+                r"Tensi[oó]n\s+nominal\s+de\s+entrada\s*[:\(]?\s*([0-9]{2,4}(?:[.,][0-9]+)?)\s*V",
                 texto, re.IGNORECASE,
             )
         if m_rated:
