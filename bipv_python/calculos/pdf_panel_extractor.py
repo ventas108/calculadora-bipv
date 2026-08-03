@@ -486,6 +486,32 @@ def _extract_brand(text: str) -> str:
     return ""
 
 
+def _extract_text_pdftotext(pdf_bytes: bytes) -> str:
+    """
+    Extrae texto preservando layout de columnas con pdftotext -layout (poppler-utils).
+    Es más confiable que pdfplumber.extract_text() para tablas multi-columna.
+    Retorna string vacío si pdftotext no está disponible.
+    """
+    import subprocess
+    import tempfile
+    import os
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp.write(pdf_bytes)
+            tmp_path = tmp.name
+        result = subprocess.run(
+            ["pdftotext", "-layout", "-enc", "UTF-8", tmp_path, "-"],
+            capture_output=True,
+            timeout=20,
+        )
+        os.unlink(tmp_path)
+        if result.returncode == 0:
+            return result.stdout.decode("utf-8", errors="replace")
+    except Exception:
+        pass
+    return ""
+
+
 def _extract_text_pdfplumber(pdf_bytes: bytes) -> str:
     """Extrae texto + tablas de un PDF digital usando pdfplumber."""
     if not _HAS_PDF:
@@ -503,6 +529,29 @@ def _extract_text_pdfplumber(pdf_bytes: bytes) -> str:
     except Exception:
         pass
     return "\n".join(extra)
+
+
+def _dump_tables_pdfplumber(pdf_bytes: bytes) -> str:
+    """
+    Debug: devuelve un volcado legible de todas las tablas que extrae pdfplumber.
+    Solo se llama cuando se necesita diagnosticar fallos de extracción.
+    """
+    if not _HAS_PDF:
+        return "(pdfplumber no instalado)"
+    lines = []
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            for pi, page in enumerate(pdf.pages):
+                tables = page.extract_tables() or []
+                for ti, table in enumerate(tables):
+                    lines.append(f"=== Página {pi+1}, Tabla {ti+1} ({len(table)} filas) ===")
+                    for ri, row in enumerate(table[:15]):
+                        lines.append(f"  R{ri}: {[str(c or '')[:40] for c in (row or [])]}")
+                    if len(table) > 15:
+                        lines.append(f"  ... ({len(table)-15} filas más)")
+    except Exception as e:
+        lines.append(f"ERROR: {e}")
+    return "\n".join(lines) or "(sin tablas detectadas)"
 
 
 def _ocr_pdf(pdf_bytes: bytes) -> str:
@@ -618,13 +667,24 @@ def extraer_parametros_panel(pdf_bytes: bytes) -> dict:
         result["Pmax"] = None
 
     # ── Extracción multi-modelo (fichas con varios modelos en columnas) ────────
-    # Prioridad 1: tablas estructuradas de pdfplumber (más robusto)
+    # Prioridad 1: tablas estructuradas de pdfplumber
     mm = _extract_multimodel_from_tables(pdf_bytes)
-    # Prioridad 2: texto plano (pdftotext / extract_text con columnas preservadas)
+
     if len(mm["modelos_detectados"]) < 2:
+        # Prioridad 2: pdftotext -layout (preserva columnas; más fiable para tablas)
+        texto_pt = _extract_text_pdftotext(pdf_bytes)
+        if texto_pt.strip():
+            mm = _extract_multimodel_panel(texto_pt)
+
+    if len(mm["modelos_detectados"]) < 2:
+        # Prioridad 3: texto de pdfplumber (peor preservación de columnas)
         mm = _extract_multimodel_panel(texto)
+
     result["modelos_detectados"] = mm["modelos_detectados"]
     result["valores_por_modelo"]  = mm["valores_por_modelo"]
+
+    # Volcado de tablas pdfplumber para diagnóstico (se muestra en el expander de debug)
+    result["_debug_tables"] = _dump_tables_pdfplumber(pdf_bytes)
 
     return result
 

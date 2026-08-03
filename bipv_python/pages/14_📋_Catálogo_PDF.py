@@ -225,6 +225,9 @@ with tab_agregar:
                 )
             else:
                 st.info("No se extrajo texto del PDF.")
+        debug_tables = data.get("_debug_tables", "")
+        if debug_tables:
+            st.text_area("Tablas detectadas por pdfplumber (diagnóstico)", debug_tables, height=300)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
