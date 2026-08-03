@@ -36,6 +36,8 @@ except ImportError:
 # Aliases sin word-boundary (marcas compuestas como "solaxpower")
 _BRAND_ALIASES: dict = {
     "solaxpower": "SolaX",
+    "voltronicpower": "Voltronic",
+    "infinisolar": "Voltronic",
     "ginlong":    "Solis",
     "sma-regul":  "SMA",
 }
@@ -92,7 +94,8 @@ def _first(*vals):
 _RANGE_RE = re.compile(
     # Gap 6 (SolaX X3-PRO, Growatt): acepta "200V ~ 1000V" donde la V del mínimo
     # precede al separador.  La V final también es opcional ("160 ~ 800" sin unidad).
-    r"([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?\s*(?:\.{2,3}|~|–|—|-|to|a)\s*([0-9]+(?:[.,][0-9]+)?)\s*V?",
+    # Voltronic: "350 VDC ~ 850 VDC" — unidad VDC completa a ambos lados
+    r"([0-9]+(?:[.,][0-9]+)?)\s*(?:[Vv](?:DC|dc)?)?\s*(?:\.{2,3}|~|–|—|-|to|a)\s*([0-9]+(?:[.,][0-9]+)?)\s*(?:V(?:DC|dc)?)?",
     re.IGNORECASE,
 )
 
@@ -186,6 +189,9 @@ def _find_range(label_patterns, text, use_sma_fallback=True):
 # Vdc_max — Tensión DC Máxima (límite físico absoluto)
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_VDCMAX = [
+    # Voltronic/InfiniSolar (etiquetas dobles con '/'): el segundo valor es el máximo
+    # "Nominal DC Voltage / Maximum DC Voltage 720 VDC / 900 VDC"
+    (r"Nominal\s+DC\s+Voltage\s*/\s*Max(?:imum)?\.?\s+DC\s+Voltage\s+[0-9.]+\s*V(?:DC)?\s*/\s*([0-9.]+)\s*V(?:DC)?", 1),
     # Patrón primario: acepta cualquier separador sin dígito ni newline (≤15 chars) entre
     # el label y el valor. Cubre:
     #   · "Max. PV input voltage: 1100 V"          (separador ": ")
@@ -262,9 +268,12 @@ _LABEL_MPPT_ACTIVO = [
 # V_arranque — Tensión de arranque (PV, no batería)
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_VARRANQUE = [
+    # Voltronic/InfiniSolar: "Start-up Voltage / Initial Feeding Voltage 320 VDC / 350 VDC"
+    (r"Start[- ]?up\s+Voltage\s*/\s*Initial\s+Feeding\s+Voltage\s+([0-9.]+)\s*V",  1),
     # "(V): N" format (LuxPower, Deye): "Start-up Voltage (V): 140"
-    (r"Start[- ]?up\s+[Vv]oltage\s*(?:\([Vv]\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?", 1),
-    (r"[Ss]tart(?:ing|up)?\s+[Vv]oltage\s*(?:\([Vv]\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?", 1),
+    # (?<![A-Za-z]) evita capturar "Auto Restart Voltage 120" como arranque PV
+    (r"(?<![A-Za-z])Start[- ]?up\s+[Vv]oltage\s*(?:\([Vv]\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?", 1),
+    (r"(?<![A-Za-z])[Ss]tart(?:ing|up)?\s+[Vv]oltage\s*(?:\([Vv]\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?", 1),
     (r"[Mm]in(?:imum)?\s+[Ss]tart(?:ing)?\s+[Vv]oltage\s*(?:\([Vv]\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?", 1),
     (r"Tensi[oó]n\s+de\s+[Aa]rranque\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",     1),
     # Español (Growatt): "Voltaje de arranque 195V"
@@ -280,6 +289,8 @@ _PAT_VARRANQUE = [
 # n_trackers — Número de trackers MPPT
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_NTRACKERS = [
+    # Voltronic/InfiniSolar: "Number of MPP Trackers / Maximum Input Current 2 / 2 x 18.6A"
+    (r"Number\s+of\s+MPP\s+Trackers?\s*/\s*Max(?:imum)?\.?\s+Input\s+Current\s+([0-9]+)\s*/", 1),
     # Tabla de especificaciones — máxima prioridad (spec table beats feature bullets)
     # "No. of MPP trackers / strings per MPP tracker   9 / 2"
     (r"N(?:o|umber|úmero)?\.?\s+(?:of\s+)?(?:independent\s+)?MPP(?:T)?\s+(?:trackers?|inputs?|channels?)\s*[:\|/]?\s*(?:strings?\s+per\s+MPP(?:T)?\s+tracker\s*)?[:\|]?\s*([0-9]+)", 1),
@@ -331,6 +342,9 @@ _PAT_NSTRINGS = [
 # I_max_tracker — Corriente máxima de entrada por tracker
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_IMAX = [
+    # Voltronic/InfiniSolar: "Number of MPP Trackers / Maximum Input Current 2 / 2 x 18.6A"
+    # → corriente POR tracker es el valor tras la 'x'
+    (r"Number\s+of\s+MPP\s+Trackers?\s*/\s*Max(?:imum)?\.?\s+Input\s+Current\s+[0-9]+\s*/\s*[0-9]+\s*x\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
     # "\s*" (no "\s+") antes del sufijo opcional para cubrir "current: 15A" sin espacio previo
     (r"Max(?:imum)?\.?\s+PV\s+[Ii]nput\s+[Cc]urrent\s*(?:per\s+MPPT|per\s+[Tt]racker)?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
     # Gap 7 (SolaX X3-PRO): "Max. PV input current [A]: 32"
@@ -376,6 +390,8 @@ _PAT_ISC = [
 # P_dc_max_W — Potencia FV máxima recomendada (W)
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_PDCMAX = [
+    # Voltronic/InfiniSolar: "Maximum PV Input Power 14850W"
+    (r"Max(?:imum)?\.?\s+PV\s+Input\s+Power\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*W\b", 1),
     # kWp (SolaX con corchetes): "power [kWp]: 36" o "power: 36 kWp"
     # NOTA: la unidad final es opcional porque puede haber sido consumida en [kWp]
     (r"Max(?:imum)?\.?\s+PV\s+(?:array\s+)?(?:input\s+)?[Pp]ower\s*\[?kWp?\]?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)(?:\s*kWp?)?", 1),
@@ -540,7 +556,7 @@ def _extract_model(text: str, brand: str) -> str:
                 return line
     # Patrón 2: buscar código de modelo típico
     m = re.search(r"\b([A-Z]{2,8}[-_][A-Z0-9\-\.]{3,25})\b", text[:1500])
-    if m:
+    if m and m.group(1).upper() not in ("RS-232", "RS-485", "AS-400"):
         return m.group(1)
     return ""
 
@@ -756,6 +772,102 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
     arquitectura = _extract_arch(texto)
     es_hibrido  = bool(_HYBRID_RE.search(texto[:2000]))
 
+    campos = _extraer_campos(texto)
+
+    # ── Multi-modelo: columnas (SolaX/Growatt) o folleto de familia (Voltronic) ─
+    multimodel = _extract_multimodel_values(texto)
+    if not multimodel.get('modelos'):
+        fam = _detect_family_sections(texto)
+        if sum(len(nombres) for nombres, _ in fam) >= 2:
+            modelos_fam, por_modelo_fam = [], {}
+            for nombres, sec in fam:
+                campos_sec = _extraer_campos(sec)
+                for nombre in nombres:
+                    nombre = re.sub(r"\s+", " ", nombre).strip()
+                    # Basura de tablas reparadas: tokens repetidos ("InfiniSolar 5KW lar 5KW")
+                    palabras = nombre.split()
+                    if len(set(palabras)) != len(palabras):
+                        continue
+                    if nombre in por_modelo_fam:
+                        # Sección duplicada (texto repetido): rellenar solo los huecos
+                        prev = por_modelo_fam[nombre]
+                        for k, v in campos_sec.items():
+                            if prev.get(k) is None and v is not None:
+                                prev[k] = v
+                    else:
+                        modelos_fam.append(nombre)
+                        por_modelo_fam[nombre] = dict(campos_sec)
+            if len(modelos_fam) >= 2:
+                multimodel = {'modelos': modelos_fam, 'por_modelo': por_modelo_fam}
+
+    # Si hay P_dc real por modelo, descartar la estimación global (ratio 1.5)
+    tiene_pdc_pm = any(
+        (v or {}).get('P_dc_max_W') and not (v or {}).get('P_dc_estimado')
+        for v in multimodel.get('por_modelo', {}).values()
+    )
+    if campos.get('P_dc_estimado') and tiene_pdc_pm:
+        campos['P_dc_max_W'] = None
+        campos['P_dc_estimado'] = False
+
+    return {
+        "modelo":           modelo,
+        "marca":            marca,
+        "arquitectura":     arquitectura,
+        "es_hibrido":       es_hibrido,
+        **campos,
+        "es_escaneado":     es_escaneado,
+        "uso_ocr":          uso_ocr,
+        "ocr_disponible":   _HAS_OCR,
+        "n_pages_total":    n_pages_total,
+        "n_chars_extraidos": len(texto.strip()),
+        "texto_crudo":      texto[:6000],
+        # Multi-modelo: vacío si la ficha sólo tiene un modelo
+        "modelos_detectados":  multimodel.get('modelos', []),
+        "valores_por_modelo":  multimodel.get('por_modelo', {}),
+    }
+
+
+# Folletos de familia (Voltronic InfiniSolar): varias tablas "MODEL <nombre(s)>"
+_FAMILY_MODEL_RE = re.compile(r"^\s*MODEL(?:O)?\b[ \t]+(\S[^\n]{2,90})$", re.MULTILINE | re.IGNORECASE)
+
+
+def _split_model_names(s: str) -> list:
+    """Divide 'InfiniSolar 2KW InfiniSolar Plus 3KW' por repetición de la 1ª palabra."""
+    words = s.split()
+    if not words:
+        return []
+    first = words[0]
+    idxs = [i for i, w in enumerate(words) if w == first]
+    if len(idxs) >= 2:
+        names = []
+        for j, i0 in enumerate(idxs):
+            i1 = idxs[j + 1] if j + 1 < len(idxs) else len(words)
+            names.append(" ".join(words[i0:i1]))
+        return names
+    return [s.strip()]
+
+
+def _detect_family_sections(texto: str) -> list:
+    """
+    Detecta folletos con varias tablas de especificaciones encabezadas por
+    'MODEL <nombre>'. Devuelve [(nombres, texto_seccion), ...] — cada sección
+    va desde su línea MODEL hasta la siguiente (o el final del documento).
+    """
+    matches = list(_FAMILY_MODEL_RE.finditer(texto))
+    if not matches:
+        return []
+    secciones = []
+    for i, m in enumerate(matches):
+        start = m.start()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(texto)
+        nombres = _split_model_names(m.group(1).strip())
+        if nombres:
+            secciones.append((nombres, texto[start:end]))
+    return secciones
+
+
+def _extraer_campos(texto: str) -> dict:
+    """Extrae los campos eléctricos desde texto plano (documento o sección)."""
     # ── Vdc_max ───────────────────────────────────────────────────────────────
     Vdc_max = _find(_PAT_VDCMAX, texto)
 
@@ -779,6 +891,16 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
     # use_sma_fallback=False: "DC voltage range" de SMA es rango MPPT, no activo
     Vmppt_act_lo, Vmppt_act_hi = _find_range(_LABEL_MPPT_ACTIVO, texto, use_sma_fallback=False)
     V_mppt_activo = Vmppt_act_lo  # interés: límite inferior con carga completa
+
+    # Voltronic/InfiniSolar (etiqueta doble): "MPP Voltage Range / Full Load MPP
+    # Voltage Range 350 VDC ~ 850 VDC / 400 VDC ~ 800 VDC" → activo = 3er valor
+    m_volt = re.search(
+        r"MPP\s+Voltage\s+Range\s*/\s*Full\s+Load\s+MPP\s+Voltage\s+Range\s+"
+        r"[0-9.]+\s*V(?:DC)?\s*~\s*[0-9.]+\s*V(?:DC)?\s*/\s*([0-9.]+)\s*V(?:DC)?\s*~",
+        texto, re.IGNORECASE,
+    )
+    if m_volt:
+        V_mppt_activo = _num(m_volt.group(1))
 
     # Fallback: tensión nominal/rated de entrada FV como valor único
     # (SolaX: "Rated PV input voltage 600 V@230 V"; Huawei/Sungrow: "Rated input voltage")
@@ -909,17 +1031,11 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
 
     P_dc_max_W = p_kw_converted or _find(_PAT_PDCMAX, texto)
 
-    # ── Multi-modelo: detectar columnas de modelos ─────────────────────────────
-    multimodel = _extract_multimodel_values(texto)
-
     # ── Estimación de P_dc cuando la ficha no la publica (Huawei y similares) ──
     # Se estima desde la potencia CA nominal con ratio DC/AC 1.5 (práctica
-    # estándar de sobredimensionamiento). Solo si tampoco hay valores por modelo.
+    # estándar de sobredimensionamiento).
     P_dc_estimado = False
-    tiene_pdc_por_modelo = any(
-        (v or {}).get('P_dc_max_W') for v in multimodel.get('por_modelo', {}).values()
-    )
-    if P_dc_max_W is None and not tiene_pdc_por_modelo:
+    if P_dc_max_W is None:
         m_pac = re.search(
             r"(?:Potencia\s+nominal\s+(?:CA|AC)|Potencia\s+activa"
             r"|Rated\s+(?:AC\s+)?[Oo]utput\s+[Pp]ower|Rated\s+[Aa]ctive\s+[Pp]ower"
@@ -974,10 +1090,6 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
         bat_voltaje_max = None
 
     return {
-        "modelo":           modelo,
-        "marca":            marca,
-        "arquitectura":     arquitectura,
-        "es_hibrido":       es_hibrido,
         "Vdc_max":          Vdc_max,
         "Vmppt_min":        Vmppt_min,
         "Vmppt_max":        Vmppt_max,
@@ -992,15 +1104,6 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
         "P_dc_estimado":    P_dc_estimado,
         "bat_voltaje_min":  bat_voltaje_min,
         "bat_voltaje_max":  bat_voltaje_max,
-        "es_escaneado":     es_escaneado,
-        "uso_ocr":          uso_ocr,
-        "ocr_disponible":   _HAS_OCR,
-        "n_pages_total":    n_pages_total,
-        "n_chars_extraidos": len(texto.strip()),
-        "texto_crudo":      texto[:6000],
-        # Multi-modelo: vacío si la ficha sólo tiene un modelo
-        "modelos_detectados":  multimodel.get('modelos', []),
-        "valores_por_modelo":  multimodel.get('por_modelo', {}),
     }
 
 
