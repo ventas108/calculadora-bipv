@@ -92,10 +92,176 @@ _TECH_PATTERNS = [
     (r'(?:Mono(?:crystalline)?[- ]?Si(?:licon)?|Mono-Si|mSi|HJT|Heterojunction|TOPCon|PERC)', "Mono-Si"),
     (r'(?:Poly(?:crystalline)?[- ]?Si(?:licon)?|Multi[- ]?Si|mPoly)', "Poly-Si"),
     (r'(?:CIS|CIGS|Copper\s+Indium)', "CIS"),
-    (r'(?:CdTe|Cadmium\s+Telluride)', "CdTe"),
+    (r'(?:CdTe|Cadmium\s+Telluride|Telururo\s+de\s+Cadmio)', "CdTe"),
     (r'(?:a-Si|Amorphous\s+Silicon)', "a-Si"),
-    (r'(?:Thin\s+[Ff]ilm|Película\s+[Dd]elgada)', "Thin Film"),
+    (r'(?:Thin\s+[Ff]ilm|Pel[ií]cula\s+[Dd]elgada)', "Thin Film"),
 ]
+
+# ── Multi-modelo: constantes para extracción por columna ─────────────────────
+
+# Detecta códigos de modelo tipo "CS6R-400MS", "NCL-BP-P-C02-327", "LR5-72HTH-540M"
+_MODEL_CODE_RE = re.compile(
+    r'\b([A-Z][A-Z0-9]{1,7}[-][A-Z0-9][-A-Z0-9\-\.]{3,40})\b'
+)
+
+# Campos variables entre variantes de una misma familia de paneles
+_MULTIMODEL_VAR_PATTERNS = {
+    "Pmax": [
+        r'(?:Pmax|P[\s_]?max|Potencia\s+(?:nominal|m[aá]xima?)'
+        r'|Maximum\s+Power|Rated\s+Power|Peak\s+Power)',
+    ],
+    "Voc": [
+        r'(?:Voc\b|V[\s_]?oc\b'
+        r'|Voltaje\s+en\s+circuito\s+abierto'
+        r'|Open[\s-]?Circuit\s+Volt)',
+    ],
+    "Isc": [
+        r'(?:Isc\b|I[\s_]?sc\b'
+        r'|Corriente\s+de\s+corto[- ]?circuito'
+        r'|Short[\s-]?Circuit\s+Curr)',
+    ],
+    "Vmp": [
+        r'(?:Vmpp|Vmp\b|V[\s_]?mp\b'
+        r'|Voltaje\s+en\s+m[aá]xima\s+potencia'
+        r'|Maximum\s+Power\s+Volt)',
+    ],
+    "Imp": [
+        r'(?:Impp|Imp\b|I[\s_]?mp\b'
+        r'|Corriente\s+m[aá]xima\s+potencia'
+        r'|Maximum\s+Power\s+Curr)',
+    ],
+}
+
+# Rangos plausibles para filtrar ruido numérico del PDF
+_MULTIMODEL_PLAUSIBLE: dict = {
+    "Pmax": (5.0,  2000.0),
+    "Voc":  (5.0,   300.0),
+    "Isc":  (0.05,   60.0),
+    "Vmp":  (5.0,   250.0),
+    "Imp":  (0.05,   60.0),
+}
+
+
+def _extract_row_numbers(line: str, from_pos: int = 0) -> list:
+    """
+    Extrae todos los números de una línea a partir de `from_pos`.
+    Maneja valores con unidades embebidas: '327.8W', '124.2V', '3.74A', '1A'.
+    """
+    return [float(m) for m in re.findall(r'([0-9]+(?:\.[0-9]+)?)', line[from_pos:])]
+
+
+def _extract_multimodel_panel(text: str) -> dict:
+    """
+    Detecta y extrae parámetros por columna en fichas técnicas multi-modelo.
+
+    Soporta dos formatos de salida de pdfplumber:
+    (a) Texto plano (extract_text / pdftotext):
+            "NCL-BP-P-C02-108  NCL-BP-P-C08-95  NCL-BP-P-C10-83  NCL-BP-P-C15-60"
+            "Potencia nominal (Pm)  108W  95W  83W  60W  217W  193W  169.2W  121.5W"
+    (b) Tablas pipe-separated (extract_tables):
+            "Potencia nominal  |  108  |  95  |  83  |  60"
+
+    Los campos compartidos entre variantes (CoefVoc, CoefIsc, CoefPmax, NOCT, Ns,
+    tecnología, dimensiones) se siguen extrayendo con _apply_patterns() sobre el
+    texto completo.
+
+    Retorna:
+        {
+          'modelos_detectados': ['NCL-BP-P-C02-108', 'NCL-BP-P-C08-95', ...],
+          'valores_por_modelo': {
+              'NCL-BP-P-C02-108': {'Pmax': 108.0, 'Voc': 124.2, 'Isc': 1.21,
+                                    'Vmp': 96.0,  'Imp': 1.11},
+              ...
+          }
+        }
+    """
+    EMPTY: dict = {"modelos_detectados": [], "valores_por_modelo": {}}
+    lines = text.splitlines()
+
+    # ── Paso 1: detectar línea de cabecera con ≥2 códigos de modelo ──────────
+    model_names: list = []
+
+    for line in lines:
+        # (a) Pipe-separated table header — la tabla de specs puede estar en cualquier página
+        if "|" in line:
+            parts = [p.strip() for p in line.split("|")]
+            codes = [
+                p for p in parts
+                if _MODEL_CODE_RE.fullmatch(p) and re.search(r"\d", p)
+            ]
+            if len(codes) >= 2:
+                model_names = codes
+                break
+
+        # (b) Texto plano: múltiples códigos en la misma línea
+        codes = [c for c in _MODEL_CODE_RE.findall(line) if re.search(r"\d", c)]
+        if len(codes) >= 2:
+            model_names = codes
+            break
+
+    # Fallback: línea con label de Pmax que contiene ≥2 valores plausibles
+    if not model_names:
+        for line in lines:
+            for pat in _MULTIMODEL_VAR_PATTERNS["Pmax"]:
+                m_lbl = re.search(pat, line, re.IGNORECASE)
+                if not m_lbl:
+                    continue
+                nums = _extract_row_numbers(line, m_lbl.end())
+                plausible = [v for v in nums if 5.0 <= v <= 2000.0]
+                if len(plausible) >= 2:
+                    model_names = [
+                        f"{int(v)}Wp" if v == int(v) else f"{v}Wp"
+                        for v in plausible
+                    ]
+                    break
+            if model_names:
+                break
+
+    if len(model_names) < 2:
+        return EMPTY
+
+    n = len(model_names)
+    por_modelo: dict = {m: {} for m in model_names}
+
+    # ── Paso 2: extraer campos variables de las filas de especificaciones ─────
+    for field, pats in _MULTIMODEL_VAR_PATTERNS.items():
+        lo, hi = _MULTIMODEL_PLAUSIBLE[field]
+
+        for line in lines:
+            for pat in pats:
+                m_lbl = re.search(pat, line, re.IGNORECASE)
+                if not m_lbl:
+                    continue
+
+                if "|" in line:
+                    # Formato pipe: extraer primer número de cada celda tras el label
+                    cells = [c.strip() for c in line.split("|")]
+                    vals = []
+                    for cell in cells[1:]:
+                        mn = re.search(r"([0-9]+(?:\.[0-9]+)?)", cell)
+                        if mn:
+                            vals.append(float(mn.group(1)))
+                else:
+                    # Texto plano: números plausibles después del label
+                    vals = [
+                        v for v in _extract_row_numbers(line, m_lbl.end())
+                        if lo <= v <= hi
+                    ]
+
+                if len(vals) >= n:
+                    for model, val in zip(model_names, vals[:n]):
+                        por_modelo[model][field] = val
+                    break
+                elif len(vals) >= 2:
+                    # Asignación parcial (menos valores que modelos)
+                    for i, val in enumerate(vals[:n]):
+                        por_modelo[model_names[i]][field] = val
+                    break
+            else:
+                continue
+            break  # campo asignado; pasar al siguiente
+
+    return {"modelos_detectados": model_names, "valores_por_modelo": por_modelo}
 
 
 def _find_first(text: str, patterns: list) -> Optional[float]:
@@ -265,13 +431,18 @@ def extraer_parametros_panel(pdf_bytes: bytes) -> dict:
     vals = _apply_patterns(texto)
     result.update(vals)
 
-    # Sanity checks
-    if result.get("Voc") and result["Voc"] > 200:
+    # Sanity checks (parámetros base del texto completo)
+    if result.get("Voc") and result["Voc"] > 300:
         result["Voc"] = None
-    if result.get("Isc") and result["Isc"] > 50:
+    if result.get("Isc") and result["Isc"] > 60:
         result["Isc"] = None
-    if result.get("Pmax") and result["Pmax"] > 1500:
+    if result.get("Pmax") and result["Pmax"] > 2000:
         result["Pmax"] = None
+
+    # ── Extracción multi-modelo (fichas con varios modelos en columnas) ────────
+    mm = _extract_multimodel_panel(texto)
+    result["modelos_detectados"] = mm["modelos_detectados"]
+    result["valores_por_modelo"]  = mm["valores_por_modelo"]
 
     return result
 

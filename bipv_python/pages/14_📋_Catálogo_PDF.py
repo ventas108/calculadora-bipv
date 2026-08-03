@@ -94,6 +94,30 @@ with tab_agregar:
     else:
         st.success("✅ PDF analizado. Verifica y corrige los valores antes de guardar.")
 
+    # ── Selector multi-modelo ─────────────────────────────────────────────────
+    _modelos_det   = data.get("modelos_detectados", [])
+    _vals_por_mod  = data.get("valores_por_modelo", {})
+
+    if len(_modelos_det) >= 2:
+        st.info(
+            f"📋 **Ficha técnica multi-modelo** — se detectan **{len(_modelos_det)} modelos** "
+            f"en columnas separadas: {', '.join(f'`{m}`' for m in _modelos_det)}  \n"
+            "Selecciona el modelo que deseas agregar al catálogo para ver sus valores específicos."
+        )
+        _modelo_elegido = st.selectbox(
+            "Modelo a agregar al catálogo",
+            options=_modelos_det,
+            key="sel_modelo_panel_mm",
+        )
+        # Sobrescribir campos variables (Pmax, Voc, Isc, Vmp, Imp) con los del modelo elegido
+        _v = _vals_por_mod.get(_modelo_elegido, {})
+        for _campo in ("Pmax", "Voc", "Isc", "Vmp", "Imp"):
+            if _v.get(_campo) is not None:
+                data[_campo] = _v[_campo]
+        # Pre-llenar nombre del modelo con el código seleccionado
+        if not data.get("modelo") or data["modelo"] in _modelos_det:
+            data["modelo"] = _modelo_elegido
+
     # ── Formulario de verificación ────────────────────────────────────────────
     with st.form("form_panel_pdf"):
         st.subheader("📝 Datos extraídos — revisa y completa")
