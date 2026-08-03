@@ -418,8 +418,17 @@ def _extract_text_pdfplumber(pdf_bytes: bytes) -> tuple[str, bool, int]:
             t = page.extract_text() or ""
             text_parts.append(t)
             # Intentar extraer tablas (recupera datos en celdas no capturados por extract_text)
+            # Usa las "tablas reparadas" del extractor de paneles: pdfplumber puede
+            # devolver None en la última columna aunque el valor exista en el PDF
+            # (falta el borde de la celda); la reparación recorta la página en el
+            # bbox columna×fila y recupera el texto.
             try:
-                for table in page.extract_tables():
+                try:
+                    from calculos.pdf_panel_extractor import _extract_tables_reparadas
+                    _tablas = _extract_tables_reparadas(page)
+                except Exception:
+                    _tablas = page.extract_tables()
+                for table in _tablas:
                     for row in table:
                         if row:
                             text_parts.append("  ".join(str(c or "") for c in row))

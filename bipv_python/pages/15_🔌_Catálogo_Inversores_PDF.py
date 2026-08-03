@@ -93,6 +93,27 @@ with tab1:
     else:
         st.success("✅ PDF digital procesado correctamente.", icon="✅")
 
+    # ── Selector multi-modelo (fichas que cubren varios modelos en columnas) ──
+    # Contenedor SIEMPRE presente: estabiliza el árbol React entre reruns
+    # (misma lección de la página Catálogo PDF — evita NotFoundError
+    # insertBefore/removeChild cuando el bloque aparece/desaparece).
+    _slot_multi = st.container()
+    _modelos_det = res.get("modelos_detectados") or []
+    if len(_modelos_det) >= 2:
+        with _slot_multi:
+            _modelo_sel = st.selectbox(
+                "📌 Esta ficha cubre varios modelos — elige el que quieres agregar:",
+                _modelos_det,
+                key="sel_modelo_inversor_pdf",
+            )
+        # Sobrescribir con los valores específicos del modelo elegido
+        _vals_sel = (res.get("valores_por_modelo") or {}).get(_modelo_sel, {})
+        res = {
+            **res,
+            "modelo": _modelo_sel,
+            **{k: v for k, v in _vals_sel.items() if v is not None},
+        }
+
     # Contar campos extraídos automáticamente
     _campos_num = [
         "Vdc_max", "Vmppt_min", "Vmppt_max", "V_mppt_activo", "V_arranque",

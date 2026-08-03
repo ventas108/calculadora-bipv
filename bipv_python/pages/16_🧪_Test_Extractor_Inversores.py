@@ -272,19 +272,24 @@ else:
                 )
 
             # ── Selector de modelo (ficha técnica multi-modelo) ───────────────
+            # Contenedor SIEMPRE presente: estabiliza el árbol React entre reruns
+            # (misma lección de la página Catálogo PDF — evita NotFoundError
+            # insertBefore/removeChild cuando el bloque aparece/desaparece).
+            _slot_multi = st.container()
             modelos_det = res_real.get("modelos_detectados", [])
             modelo_seleccionado = None
             if modelos_det:
-                st.info(
-                    f"📋 **Ficha técnica multi-modelo** — se detectaron {len(modelos_det)} modelos "
-                    f"en columnas separadas: `{'`, `'.join(modelos_det)}`  \n"
-                    "Selecciona el modelo que deseas agregar al catálogo para ver sus valores específicos."
-                )
-                modelo_seleccionado = st.selectbox(
-                    "Modelo a utilizar",
-                    modelos_det,
-                    key="sel_modelo_pdf",
-                )
+                with _slot_multi:
+                    st.info(
+                        f"📋 **Ficha técnica multi-modelo** — se detectaron {len(modelos_det)} modelos "
+                        f"en columnas separadas: `{'`, `'.join(modelos_det)}`  \n"
+                        "Selecciona el modelo que deseas agregar al catálogo para ver sus valores específicos."
+                    )
+                    modelo_seleccionado = st.selectbox(
+                        "Modelo a utilizar",
+                        modelos_det,
+                        key="sel_modelo_pdf",
+                    )
                 # Sobreescribir campos variables con los del modelo elegido
                 vals_mod = res_real.get("valores_por_modelo", {}).get(modelo_seleccionado, {})
                 res_real_view = {**res_real}        # copia shallow para no mutar session_state
