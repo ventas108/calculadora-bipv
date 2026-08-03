@@ -65,3 +65,9 @@ El loader busca la hoja por nombre; si no existe, retorna `{}` sin error.
 ## Fichas OCR (Felicity y similares)
 - El OCR pega palabras ("PVIsc" sin espacio) y duplica letras en títulos ("MMAAXX5500"). Regla: en patrones de fichas OCR usar `\s*` entre tokens de etiqueta, y rechazar tokens que sean pares de letras duplicadas `(?:(.)\1)+` al detectar modelos.
 - Fichas en español (Huawei/Growatt): normalizar separador de miles `(\d),(\d{3})(?!\d)` antes de extraer; ojo con superíndices de notas al pie pegados al valor ("entrada 1 1100 V") y palabras pegadas por pdfplumber ("Tensiónde funcionamientoMPPT").
+
+## Fichas en español con unidades entre corchetes (SAJ y similares)
+- Etiquetas tipo "Tensión máxima de entrada [V] 1100" requieren patrones con `\[\s*V\s*\]` explícito; los genéricos fallan por el corchete entre etiqueta y número.
+- Valores por MPPT en notación slash ("32/32/32", "38.4/38.4/38.4"): el valor por tracker es el primero de la lista.
+- Filas multi-modelo pueden traer números SIN unidad ("Potencia máxima FV [Wp]@STC 30000 37500 45000") → fallback de números pelados 4-7 dígitos solo en líneas cuya etiqueta ya matcheó potencia FV.
+- "No. de MPPT 3 4 4" (un entero por columna, sin N/M): preferir la línea con tantos valores como modelos; si faltan, rellenar con el último.

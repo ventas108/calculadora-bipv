@@ -1,0 +1,132 @@
+Inversor trifásico conectado a red serie R6
+La serie R6 de SAJ constituye la gama de potencia media a alta para inversores solares conectados a la red, diseñada para ofrecer
+máxima eficiencia operativa y una amplia variedad de funcionalidades avanzadas. Incorpora, protección AFCI, capacidad de
+sobrecarga en CA del 110 % y conexión de control remoto estable para una gestión confiable del sistema.
+Esta línea abarca potencias desde 20 kW hasta 30 kW, con configuraciones de 3 a 4 MPPT, compatibles con redes trifásicas,
+adaptándose a múltiples necesidades de generación solar.
+.
+AFCI
+Corriente por String hasta de
+16A.
+Máxima eficiencia del 98.8%
+SPD integrado para CA y CC
+Sobrecarga del 110 % de CA
+Seguridad y fiabilidad
+R6-20K-T3-32-LV | R6-25K-T3-32-LV | R6-30K-T3-32-LV
+
+
+Model R6-20K-T3-32-LV R6-25K-T4-32-LV R6-30K-T4-32-LV
+Entrada CC
+Potencia máxima FV [Wp]@STC 30000 37500 45000
+Tensión máxima de entrada [V] 1100
+Rango de tensión MPPT [V] 180~1000
+Tensión nominal de entrada [V] 370
+Tensión de arranque [V] 200
+Corriente máxima de entrada [A] 32/32/32 32/32/32/32
+Corriente máxima de cortocircuito CC [A] 38.4/38.4/38.4 38.4/38.4/38.4/38.4
+No. de cadenas por MPPT 2/2/2 2/2/2/2
+No. de MPPT 3 4
+Salida CA
+Potencia de salida CA nominal [W] 20000 25000 30000
+Potencia aparente máxima [VA] 22000 27500 30000
+Corriente de salida CA nominal [A] a 230 VCA 52.5 65.6 78.7
+Corriente de salida CA máxima [A] 57.7 72.2 78.7
+Tensión CA nominal/rango [V] 127V(L-N)/220V(L-L); 101.6-139.7(L-N)
+Frecuencia de red CA nominal/rango [Hz] 50, 60 / 44-55, 54-65
+Distorsión armónica total [THDi] <3%
+Factor de potencia [cos φ] 0.8 Adelantado～0.8 atrasado
+Eficiencia
+Máxima eficiencia 98.8%
+Eficiencia Euro 98.5%
+Protección
+Monitorización DCI Integrado
+Monitorización GFCI Integrado
+Monitorización de red Integrado
+Detección de conexión a tierra CA Integrado
+Protección contra corrientes de cortocircuito
+Integrado
+CA
+Detección de resistencia de aislamiento CC Integrado
+Protección contra sobretensiones CC Tipo II
+Protección contra sobretensiones CA Tipo II
+Protección anti-islanding Integrado
+Protección AFCI Integrado
+Interfaz
+Conexión de CA Bloque de Terminales
+Conexión de CC MC4
+Pantalla LED+APP (Bluetooth)
+Puerto de comunicación RS232+RS485 (RJ45)+DRM(RJ45)
+Comunicación Wi-Fi/Ethernet/4G
+Monitorización de carga 24/7 (Opcional)
+Datos generales
+Topología No aislado
+Consumo nocturno [W] <0,6
+Rango de temperatura de funcionamiento -40 °C~+60 °C
+Método de refrigeración Refrigeración por ventilación inteligente
+Humedad ambiental 0 %~100 % Sin condensación
+Altitud 4000 m (>3000 m Reducción de potencia)
+Ruido [dBA] <50
+Grado de protección IP65
+Montaje Montaje en pared
+Dimensiones [Al*An*Pr] [mm] 473*659.4*240
+Peso [kg] 35.5 37.5
+Garantía [Años]
+Norma aplicable IEC/EN62109-1/2, IEC61683, IEC60068-2, IEC62116, IEC61727, NBR 16149, NBR 16150, RETIE 2024.
+Model  R6-20K-T3-32-LV  R6-25K-T4-32-LV  R6-30K-T4-32-LV
+Entrada CC      
+Potencia máxima FV [Wp]@STC  30000  37500  45000
+Tensión máxima de entrada [V]  1100  1100  
+Rango de tensión MPPT [V]  180~1000  180~1000  
+Tensión nominal de entrada [V]  370  370  
+Tensión de arranque [V]  200  200  
+Corriente máxima de entrada [A]  32/32/32  32/32/32/32  /32/32
+Corriente máxima de cortocircuito CC [A]  38.4/38.4/38.4  38.4/38.4/38.4/38.4  /38.4/38.4
+No. de cadenas por MPPT  2/2/2  2/2/2/2  /2/2
+No. de MPPT  3  4  4
+Salida CA      
+Potencia de salida CA nominal [W]  20000  25000  30000
+Potencia aparente máxima [VA]  22000  27500  30000
+Corriente de salida CA nominal [A] a 230 VCA  52.5  65.6  78.7
+Corriente de salida CA máxima [A]  57.7  72.2  78.7
+Tensión CA nominal/rango [V]  127V(L-N)/220V(L-L); 101.6-139.7(L-N)  127V(L-N)/220V(L-L); 101.6-139.7(L-N  N)
+Frecuencia de red CA nominal/rango [Hz]  50, 60 / 44-55, 54-65  50, 60 / 44-55, 54-65  
+Distorsión armónica total [THDi]  <3%  <3%  
+Factor de potencia [cos φ]  0.8 Adelantado～0.8 atrasado  0.8 Adelantado～0.8 atrasado  
+Eficiencia      
+Máxima eficiencia  98.8%  98.8%  
+Eficiencia Euro  98.5%  98.5%  
+Protección      
+Monitorización DCI  Integrado  Integrado  
+Monitorización GFCI  Integrado  Integrado  
+Monitorización de red  Integrado  Integrado  
+Detección de conexión a tierra CA  Integrado  Integrado  
+Protección contra corrientes de cortocircuito      
+  Integrado    
+CA      
+
+Detección de resistencia de aislamiento CC  Integrado  Integrado  
+Protección contra sobretensiones CC  Tipo II  Tipo II  
+Protección contra sobretensiones CA  Tipo II  Tipo II  
+Protección anti-islanding  Integrado  Integrado  
+Protección AFCI  Integrado  Integrado  
+Interfaz      
+Conexión de CA  Bloque de Terminales  Bloque de Terminales  
+Conexión de CC  MC4  MC4  
+Pantalla  LED+APP (Bluetooth)  LED+APP (Bluetooth)  
+Puerto de comunicación  RS232+RS485 (RJ45)+DRM(RJ45)  RS232+RS485 (RJ45)+DRM(RJ45)  
+Comunicación  Wi-Fi/Ethernet/4G  Wi-Fi/Ethernet/4G  
+Monitorización de carga  24/7 (Opcional)  24/7 (Opcional)  
+Datos generales      
+Topología  No aislado  No aislado  
+Consumo nocturno [W]  <0,6  <0,6  
+Rango de temperatura de funcionamiento  -40 °C~+60 °C  -40 °C~+60 °C  
+Método de refrigeración  Refrigeración por ventilación inteligente  Refrigeración por ventilación inteligente  e
+Humedad ambiental  0 %~100 % Sin condensación  0 %~100 % Sin condensación  
+Altitud  4000 m (>3000 m Reducción de potencia)  4000 m (>3000 m Reducción de potencia  a)
+Ruido [dBA]  <50  <50  
+Grado de protección  IP65  IP65  
+Montaje  Montaje en pared  Montaje en pared  
+Dimensiones [Al*An*Pr] [mm]  473*659.4*240  473*659.4*240  
+Peso [kg]  35.5 37.5  37  7.5
+Garantía [Años]
+Norma aplicable  IEC/EN62109-1/2, IEC61683, IEC60068-2, IEC62116, IEC61727, NBR 16149, NBR 16150, RETIE 2024.  EC60068-2, IEC62116, IEC61727, NBR 1 
