@@ -316,44 +316,34 @@ export async function getPVWattsHourlyData(params: PVWattsParams): Promise<PVWat
 /**
  * Obtener GHI anual rápido para un punto (system_capacity=1 kW)
  * Retorna el Specific Yield (kWh/kWp/año) para colorear el heatmap.
- * 
- * IMPORTANTE: PVWatts solrad_annual es irradiación en el plano del arreglo (POA),
- * NO GHI (Global Horizontal Irradiance). Para obtener GHI real, hacemos una
- * consulta adicional con tilt=0 (horizontal), lo que convierte POA en GHI.
+ *
+ * Una sola llamada a PVWatts es suficiente: solrad_annual es un parámetro
+ * de estación (recurso solar horizontal en el sitio, kWh/m²/día promedio)
+ * y se devuelve igual independientemente del tilt configurado.
+ * La llamada adicional con tilt=0 que existía antes era redundante.
  */
 export async function getPVWattsQuickEstimate(lat: number, lon: number): Promise<{
   specificYield: number;
   annualAC: number;
-  annualGHI: number;  // GHI real (tilt=0)
+  annualGHI: number;  // GHI del sitio (solrad_annual × 365)
   avgTamb: number;
 } | null> {
   try {
-    // Consulta principal: con tilt=lat para producción óptima
+    // Una sola consulta: tilt=lat para producción óptima.
+    // annualGHI_kWhm2 ya contiene el GHI real del sitio vía solrad_annual.
     const result = await getPVWattsCalculation({
       lat,
       lon,
       system_capacity: 1,
       losses: 14.08,
     });
-    
-    // Consulta GHI: con tilt=0 para obtener irradiación horizontal global real
-    const ghiResult = await getPVWattsCalculation({
-      lat,
-      lon,
-      system_capacity: 1,
-      losses: 14.08,
-      tilt: 0,
-      azimuth: 180,
-    });
-    
+
     const avgTamb = result.monthly.reduce((s, m) => s + m.tamb_C, 0) / 12;
-    // GHI real = solrad_annual con tilt=0 (horizontal)
-    const realGHI = ghiResult.annualGHI_kWhm2;
-    
+
     return {
       specificYield: result.specificYield,
       annualAC: result.annualAC_kWh,
-      annualGHI: realGHI,
+      annualGHI: result.annualGHI_kWhm2,
       avgTamb,
     };
   } catch {

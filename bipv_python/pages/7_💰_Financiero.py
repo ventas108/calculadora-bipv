@@ -216,6 +216,9 @@ if _consumo_mes_fin > 0 and e_ac > 0 and _tarifa_prev_fin > 0:
             )
         st.info(_msg_cob)
 
+# TRM disponible desde el inicio (se actualiza en Sección 2)
+tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 1 — CAPEX
 # ═══════════════════════════════════════════════════════════════════════════════
