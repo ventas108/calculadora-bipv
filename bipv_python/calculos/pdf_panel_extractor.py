@@ -200,6 +200,8 @@ _TABLE_LABEL_RE: dict = {
         r'|potencia\s+(?:nominal|m[aá]xima?|pico|cresta|punta)'
         r'|peak\s+power|rated\s+power'
         r'|maximum\s+power(?!\s+(?:volt|curr))', re.I | re.UNICODE),
+    # Transparencia: para vidrio BIPV (fila puede venir reparada CON etiqueta)
+    "Transparencia": re.compile(r'transparen', re.I | re.UNICODE),
 }
 
 
@@ -235,6 +237,64 @@ _AUX_LABEL_RE: dict = {
 }
 
 
+def _extract_tables_reparadas(page) -> list:
+    """
+    Como page.extract_tables(), pero repara celdas None recuperando su texto
+    con un crop de la página en el rectángulo columna×fila.
+
+    pdfplumber pierde celdas (devuelve None) cuando la grilla de una fila no
+    define el borde de una columna — típico en filas SIN etiqueta de tablas
+    multi-modelo, donde la última columna queda como None aunque el valor sí
+    existe en el PDF (ej. filas de Voc/Vmp/Transparencia del brochure NCL).
+    """
+    try:
+        found = page.find_tables() or []
+    except Exception:
+        return page.extract_tables() or []
+    tablas: list = []
+    for t in found:
+        try:
+            data = t.extract()
+        except Exception:
+            continue
+        if not data:
+            continue
+        # Fila de referencia: la que tenga más celdas bbox definidas
+        try:
+            ref = max(t.rows, key=lambda r: sum(1 for c in r.cells if c))
+            ref_cells = ref.cells
+            for ri, trow in enumerate(t.rows):
+                if ri >= len(data) or not data[ri]:
+                    continue
+                # Solo reparar filas MAYORMENTE completas (≥ mitad de celdas con
+                # dato). Filas de encabezado o con celdas fusionadas (colspan)
+                # tienen muchas None legítimas — croparlas inyecta texto basura
+                # (fragmentos de la celda fusionada vecina).
+                _presentes = sum(1 for c in data[ri] if c not in (None, ""))
+                if _presentes < max(2, len(data[ri]) // 2):
+                    continue
+                for ci, cellbox in enumerate(trow.cells):
+                    if (
+                        ci < len(data[ri])
+                        and cellbox is None
+                        and data[ri][ci] is None
+                        and ci < len(ref_cells)
+                        and ref_cells[ci] is not None
+                    ):
+                        x0, _, x1, _ = ref_cells[ci]
+                        top, bottom = trow.bbox[1], trow.bbox[3]
+                        try:
+                            txt = page.crop((x0, top, x1, bottom)).extract_text()
+                        except Exception:
+                            txt = None
+                        if txt and txt.strip():
+                            data[ri][ci] = txt.strip()
+        except Exception:
+            pass
+        tablas.append(data)
+    return tablas
+
+
 def _extract_aux_table_shared(pdf_bytes: bytes) -> dict:
     """
     Escanea tablas de 1 fila con 2 celdas (label | valor) en busca de
@@ -250,7 +310,7 @@ def _extract_aux_table_shared(pdf_bytes: bytes) -> dict:
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
             for page in pdf.pages:
-                for tbl in (page.extract_tables() or []):
+                for tbl in _extract_tables_reparadas(page):
                     if not tbl:
                         continue
                     for row in tbl:
@@ -296,7 +356,7 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
     try:
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
             for page in pdf.pages:
-                for table in (page.extract_tables() or []):
+                for table in _extract_tables_reparadas(page):
                     if not table or len(table) < 3:
                         continue
 
@@ -313,11 +373,13 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
                             (ci, c) for ci, c in enumerate(cells)
                             if _MODEL_CODE_RE.fullmatch(c) and re.search(r"\d", c)
                         ]
-                        if len(codes) >= 2:
+                        # Elegir la fila con MÁS códigos de modelo (no la primera
+                        # con ≥2): filas de encabezado con celdas fusionadas pueden
+                        # contener algunos códigos sueltos y ganarle a la fila real.
+                        if len(codes) >= 2 and len(codes) > len(model_names):
                             model_row_idx = ri
                             model_col_indices = [ci for ci, _ in codes]
                             model_names = [c for _, c in codes]
-                            break
 
                     if model_row_idx == -1 or len(model_names) < 2:
                         continue
