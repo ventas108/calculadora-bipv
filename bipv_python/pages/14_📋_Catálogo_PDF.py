@@ -191,6 +191,7 @@ with tab_agregar:
             "Vmp_STC":            Vmp  if Vmp  > 0 else None,
             "Imp_STC":            Imp  if Imp  > 0 else None,
             "CoefVoc_C":          coef_voc  if coef_voc  != 0 else None,
+            "CoefIsc_C":          coef_isc  if coef_isc  != 0 else None,
             "CoefT_C":            coef_pmax if coef_pmax != 0 else None,
             "NOCT_C":             noct if noct > 0 else None,
             "Ns (Celdas Serie)":  n_s  if n_s  > 0 else None,
@@ -282,10 +283,11 @@ with tab_editar:
             "Vmp (V)":       p.get("Vmp"),
             "Imp (A)":       p.get("Imp"),
             "Ns":            p.get("N_s"),
-            "β Voc (%/°C)":  p.get("CoefVoc_C"),
-            "γ Pmax (%/°C)": p.get("beta_mp"),
-            "NOCT (°C)":     p.get("NOCT"),
-            "Costo USD":     p.get("costo_usd"),
+            "β Voc (%/°C)":       p.get("CoefVoc_C"),
+            "γ Pmax (%/°C)":      p.get("beta_mp"),
+            "NOCT (°C)":          p.get("NOCT"),
+            "Transparencia (%)":  p.get("transparencia_pct"),
+            "Costo USD":          p.get("costo_usd"),
         })
 
     _df_original = pd.DataFrame(_df_rows)
@@ -309,10 +311,11 @@ with tab_editar:
             "Vmp (V)":       st.column_config.NumberColumn("Vmp (V)",  format="%.2f", min_value=0),
             "Imp (A)":       st.column_config.NumberColumn("Imp (A)",  format="%.3f", min_value=0),
             "Ns":            st.column_config.NumberColumn("Ns",       format="%d",   min_value=0, step=1),
-            "β Voc (%/°C)":  st.column_config.NumberColumn("β Voc",   format="%.4f"),
-            "γ Pmax (%/°C)": st.column_config.NumberColumn("γ Pmax",  format="%.4f"),
-            "NOCT (°C)":     st.column_config.NumberColumn("NOCT",     format="%.1f", min_value=0),
-            "Costo USD":     st.column_config.NumberColumn("Costo USD",format="%.2f", min_value=0),
+            "β Voc (%/°C)":      st.column_config.NumberColumn("β Voc",         format="%.4f"),
+            "γ Pmax (%/°C)":     st.column_config.NumberColumn("γ Pmax",        format="%.4f"),
+            "NOCT (°C)":         st.column_config.NumberColumn("NOCT",           format="%.1f", min_value=0),
+            "Transparencia (%)": st.column_config.NumberColumn("Transparencia %",format="%.1f", min_value=0, max_value=100),
+            "Costo USD":         st.column_config.NumberColumn("Costo USD",      format="%.2f", min_value=0),
         },
     )
 
@@ -351,6 +354,7 @@ with tab_editar:
                 "CoefVoc_C":         row_ed["β Voc (%/°C)"],
                 "CoefT_C":           row_ed["γ Pmax (%/°C)"],
                 "NOCT_C":            row_ed["NOCT (°C)"],
+                "TransparenciaPct":  row_ed["Transparencia (%)"],
                 "CostoUSD":          row_ed["Costo USD"],
             }
             try:

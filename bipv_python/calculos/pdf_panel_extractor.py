@@ -203,6 +203,16 @@ _TABLE_LABEL_RE: dict = {
 }
 
 
+# ── Mapeo fila-vacía → campo (tablas multi-modelo que alternan labeled/unlabeled rows) ──
+# Definido a nivel de módulo para no redefinirlo en cada iteración de tabla.
+_EMPTY_FOLLOWS: dict = {"Pmax": "Voc", "Isc": "Vmp", "Imp": "Transparencia"}
+
+
+def _nums_in(s: str) -> list:
+    """Extrae todos los números flotantes de una cadena de texto."""
+    return [float(m) for m in re.findall(r'[0-9]+(?:\.[0-9]+)?', s)]
+
+
 # ── Patrones para tablas auxiliares de 1 fila: CoefVoc / CoefIsc / CoefPmax / NOCT ──
 _AUX_LABEL_RE: dict = {
     # etiqueta → campo → (regex_etiqueta, regex_valor)
@@ -315,10 +325,7 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
                     n = len(model_names)
                     por_modelo: dict = {m: {} for m in model_names}
 
-                    # Algunas tablas (ej. NCL BIPV) alternan filas con etiqueta y filas
-                    # sin etiqueta:  Pmax→Voc(vacío)→Isc→Vmp(vacío)→Imp→Transp(vacío)
-                    # Mapeo: el campo que viene en la fila vacía SIGUIENTE a cada campo
-                    _EMPTY_FOLLOWS: dict = {"Pmax": "Voc", "Isc": "Vmp", "Imp": "Transparencia"}
+                    # _EMPTY_FOLLOWS es constante — definida a nivel de módulo arriba.
                     last_field_hit: str | None = None
 
                     # ── Paso 2: extraer filas de parámetros ──────────────────
@@ -372,12 +379,6 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
                             last_field_hit = field_hit
 
                         lo, hi = _MULTIMODEL_PLAUSIBLE[field_hit]
-
-                        def _nums_in(s: str) -> list:
-                            return [
-                                float(m) for m in
-                                re.findall(r'[0-9]+(?:\.[0-9]+)?', s)
-                            ]
 
                         # Intento 1: extracción por índice exacto de columna
                         hits_by_idx: dict = {}
