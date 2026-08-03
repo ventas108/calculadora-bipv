@@ -1,0 +1,177 @@
+MMAAXX5500~~7755KKTTLL33--XXLL22
+·8 MPPTs y diseño sin fusibles
+·Escaneo y diagnóstico inteligente de I/V
+·Monitoreo inteligente de cadenas
+·SPD tipo II de CA y CC
+·Protección IP66 y C5
+Diagrama unifiliar
+MPPT 1
+MPPT 1
+L1
+DC EMI Output AC EMI
+Filter Filter Filter L2
+L3
+MPPT 8
+MPPT 8 N
+DC Link DC/AC AC SPD PE
+DC
+Current DC SPD
+Switch
+Sensor
+MMAAXX5500~~7755KKTTLL33--XXLL22
+·8 MPPTs y diseño sin fusibles
+·Escaneo y diagnóstico inteligente de I/V
+·Monitoreo inteligente de cadenas
+·SPD tipo II de CA y CC
+·Protección IP66 y C5
+Diagrama unifiliar
+MPPT 1
+MPPT 1
+L1
+DC EMI Output AC EMI
+Filter Filter Filter L2
+L3
+MPPT 8
+MPPT 8 N
+DC Link DC/AC AC SPD PE
+DC
+Current DC SPD
+Switch
+Sensor
+
+
+
+
+
+
+
+
+          DC EMI
+Filter
+
+
+
+        Output
+Filter        AC EMI
+Filter    
+
+
+Especificaciones primarias
+Hoja de datos MAX50KTL3-XL2 MAX60KTL3-XL2 MAX70KTL3-XL2 MAX75KTL3-XL2
+Datos de entrada (CD)
+Máxima potencia FV
+recomendada (STC) 100000W 120000W 105000W 112500W
+Rango de potencia máxima 370-600V
+Voltaje de arranque 195V
+Voltaje nominal 550V
+Rango de voltaje de MPPT 180V-850VDC
+Número de MPPTs 8
+Cadenas por MPPT 2
+Máxima corriente por MPPT 40A
+Corriente de corto circuito por MPPT 50A
+Salida (CA)
+Potencia nominal CA 50000W 60000W 70000W 75000W
+66000VA @208V 71000VA @208V
+Potencia aparente máxima 55000VA 66000VA 70000VA @220V 75000VA @220V
+73000VA @230V 78400VA @230V
+Voltaje nominal CA (Rango*) 127V/220V (101.6-139.7V)
+Frecuencia de red CA (Rango*) 50/60 Hz (45~55Hz/55-65 Hz)
+Corriente máxima de salida 145.8A @220V 175.0A @220V 183.7A @220V 196.9A @220V
+aFa juc st to ar b d lee potencia nominal/ >0.99 / +0.8 … -0.8
+Distorsión armónica total <3%
+Tipo de conexión CA 3W/PE ó 3W/N/PE
+Eficiencia
+Máxima eficiencia 98.80%
+Eficiencia europea 98.30%
+Eficiencia de MPPT 99.90%
+Dispositivos de protección
+Protección de polaridad inversa CD Sí
+Interruptor CD Sí
+Protección contra sobretensión
+CA/CD Clase II / Clase II
+M aiso lani mto ir ee no t ode resistencia de Sí
+Protección de corto circuito CA Sí
+Monitoreo de falla a tierra Sí
+Monitoreo de cadenas Sí
+Función Anti-PID Opcional
+AFCI Sí
+Datos generales
+Dimensiones 970/640/345mm
+Peso 84kg
+Rango de temperatura de operación –30°C ... +60°C
+Autoconsumo (noche) < 1W
+Topología Sin transformador
+Enfriamiento Enfriamiento Inteligente
+Grado de protección IP66
+Humedad relativa 0~100%
+Altitud 4000m
+Conexión CD H4/MC4
+Conexión CA Conectores de terminales OT (máx. 240 mm²)
+Pantalla LED/WIFI+APP
+Comunicación: RS485 / USB / Sí / Sí / Opcional / Opcional / Opcional / Opcional
+WIFI / GPRS / RF / LAN
+Garantía: 5 años / 10 años Sí /Opcional
+CE,IEC62116, IEC61727, Ul1741 IEEE1547
+* El rango de voltaje y frecuencia de CA puede variar dependiendo del estándar de la red del país.
+Todas las especificaciones están sujetas a cambios sin previo aviso.
+SHENZHEN GROWATT NEW ENERGY CO.,LTD. A: 4-13/F,Building A,Sino-German(Europe)lndustrial Park,Hangcheng Ave,Bao'an District,Shenzhen,China
+T: + 86 755 2747 1900 F: + 86 755 2749 1460 E: info@ginverter.com
+Hoja de datos  MAX50KTL3-XL2  MAX60KTL3-XL2  MAX70KTL3-XL2  MAX75KTL3-XL2
+Datos de entrada (CD)        
+Máxima potencia FV
+recomendada (STC)  100000W  120000W  105000W  112500W
+Rango de potencia máxima  370-600V      
+Voltaje de arranque  195V      
+Voltaje nominal  550V      
+Rango de voltaje de MPPT  180V-850VDC      
+Número de MPPTs  8      
+Cadenas por MPPT  2      
+Máxima corriente por MPPT  40A      
+Corriente de corto circuito por MPPT  50A      
+Salida (CA)        
+Potencia nominal CA  50000W  60000W  70000W  75000W
+Potencia aparente máxima  55000VA  66000VA  66000VA @208V
+70000VA @220V
+73000VA @230V  71000VA @208V
+75000VA @220V
+78400VA @230V
+Voltaje nominal CA (Rango*)  127V/220V (101.6-139.7V)      
+Frecuencia de red CA (Rango*)  50/60 Hz (45~55Hz/55-65 Hz)      
+Corriente máxima de salida  145.8A @220V  175.0A @220V  183.7A @220V  196.9A @220V
+Factor de potencia nominal/
+ajustable  >0.99 / +0.8 … -0.8      
+Distorsión armónica total  <3%      
+Tipo de conexión CA  3W/PE ó 3W/N/PE      
+Eficiencia        
+Máxima eficiencia  98.80%      
+Eficiencia europea  98.30%      
+Eficiencia de MPPT  99.90%      
+Dispositivos de protecció  n      
+Protección de polaridad inversa CD  Sí      
+Interruptor CD  Sí      
+Protección contra sobretensión
+CA/CD  Clase II / Clase II      
+Monitoreo de resistencia de
+aislamiento  Sí      
+Protección de corto circuito CA  Sí      
+Monitoreo de falla a tierra  Sí      
+Monitoreo de cadenas  Sí      
+Función Anti-PID  Opcional      
+AFCI  Sí      
+Datos generales        
+Dimensiones  970/640/345mm      
+Peso  84kg      
+Rango de temperatura de operación  –30°C ... +60°C      
+Autoconsumo (noche)  < 1W      
+Topología  Sin transformador      
+Enfriamiento  Enfriamiento Inteligente      
+Grado de protección  IP66      
+Humedad relativa  0~100%      
+Altitud  4000m      
+Conexión CD  H4/MC4      
+Conexión CA  Conectores de terminales OT (máx. 240 mm²)      
+Pantalla  LED/WIFI+APP      
+Comunicación: RS485 / USB /
+WIFI / GPRS / RF / LAN  Sí / Sí / Opcional / Opcional / Opcional / Opcional      
+Garantía: 5 años / 10 años  Sí /Opcional      
+CE,IEC62116, IEC61727, Ul1741 IEEE1547
