@@ -357,6 +357,8 @@ _PAT_NSTRINGS = [
 # I_max_tracker — Corriente máxima de entrada por tracker
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_IMAX = [
+    # Deye/TriP2: "Max. PV input current per MPPT (A) 20 / 20 / 20" → por MPPT = 1er valor
+    (r"Max\.?\s*PV\s+input\s+current\s+per\s+MPPT\s*\(\s*A\s*\)\s*([0-9]+(?:[.,][0-9]+)?)", 1),
     # Growatt MID: "Max.input current per MPP tracker 27A" (sin espacio tras "Max.")
     (r"Max\.?\s*input\s+current\s+per\s+MPP\s+tracker\s*[:\s]\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
     # SAJ español: "Corriente máxima de entrada [A] 32/32/32" → por MPPT = 1er valor
@@ -390,6 +392,8 @@ _PAT_IMAX = [
 # Isc_max_tracker — Corriente de cortocircuito máxima por tracker
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_ISC = [
+    # Deye/TriP2: "Max. PV short-circuit current input per MPPT 25 / 25 / 25" (sin unidad A)
+    (r"short[- ]?circuit\s+current\s+input\s+per\s+MPPT\s*(?:\(\s*A\s*\))?\s*([0-9]+(?:[.,][0-9]+)?)\s*/", 1),
     # Growatt MID (etiqueta partida en dos líneas): "Max. short-circuit current per\nMPP tracker 33.8A"
     (r"(?m)short[- ]?circuit\s+current\s+per\s*\n\s*MPP\s+tracker\s+([0-9]+(?:[.,][0-9]+)?)\s*A\b", 1),
     # SAJ español: "Corriente máxima de cortocircuito CC [A] 38.4/38.4/38.4" → por MPPT
@@ -576,6 +580,7 @@ def _extract_model(text: str, brand: str) -> str:
         if re.fullmatch(r"[A-Z0-9][A-Z0-9\-\._ ]{3,35}", line):
             if (len(line) >= 5
                     and line.lower() not in ("datasheet", "technical", "specifications")
+                    and "SERIES" not in line.upper()  # "HYBRID SERIES" = título de gama, no modelo
                     and not re.match(r"^MPPT?\b|^MPPT?\d", line)  # "MPPT 1"/"MPPT1"/"MPPT 10 N" del diagrama unifilar
                     and not re.fullmatch(r"\d+\s*K?[VW]A?", line, re.IGNORECASE)):  # "50KVA" = potencia, no modelo
                 return line
@@ -632,7 +637,8 @@ def _extract_multimodel_values(text: str) -> dict:
 
     # ── 1. Detectar fila de encabezado con ≥ 2 nombres de modelo ───────────────
     header_positions: list[tuple[str, int]] = []
-    for line in lines[:80]:
+    header_line_idx = -1
+    for li, line in enumerate(lines[:80]):
         candidates = [
             (m.group(), m.start())
             for m in _MODEL_COL_RE.finditer(line)
@@ -647,12 +653,40 @@ def _extract_multimodel_values(text: str) -> dict:
         ]
         if len(candidates) >= 2:
             header_positions = candidates
+            header_line_idx = li
             break
 
     if not header_positions:
         return _EMPTY
 
     model_names = [name for name, _ in header_positions]
+
+    # Nombres partidos en dos líneas (Deye/TriP2): "Model TriP2-LB- TriP2-LB- ..."
+    # + línea siguiente "3P 5K 3P 6K ..." — completar cada nombre con los tokens
+    # de la línea de continuación asignados a la columna más cercana
+    if len(set(model_names)) < len(model_names) and 0 <= header_line_idx + 1 < len(lines):
+        cont = lines[header_line_idx + 1]
+        cols_x = [pos for _, pos in header_positions]
+        toks = re.findall(r"\S+", cont)
+        n_m = len(model_names)
+        sufijos: dict = {i: [] for i in range(n_m)}
+        if toks and len(toks) % n_m == 0:
+            # La línea de continuación no está alineada por columnas: repartir
+            # los tokens en n grupos iguales en orden ("3P 5K 3P 6K ..." → 2 c/u)
+            paso = len(toks) // n_m
+            for i in range(n_m):
+                sufijos[i] = toks[i * paso:(i + 1) * paso]
+        else:
+            for m_tok in re.finditer(r"\S+", cont):
+                idx = min(range(n_m), key=lambda i: abs(cols_x[i] - m_tok.start()))
+                sufijos[idx].append(m_tok.group())
+        nuevos = [
+            (model_names[i] + " ".join(sufijos[i])).strip() if sufijos[i] else model_names[i]
+            for i in range(n_m)
+        ]
+        if len(set(nuevos)) == len(nuevos):
+            model_names = nuevos
+            header_positions = list(zip(model_names, cols_x))
     model_x     = [pos  for _,    pos in header_positions]
     n           = len(model_names)
     result: dict = {
@@ -688,6 +722,7 @@ def _extract_multimodel_values(text: str) -> dict:
                          r'|recomendada\s*\(STC\)'
                          r'|M[aá]xima\s+potencia\s+FV'
                          r'|Potencia\s+m[aá]xima\s+FV'
+                         r'|Max\.?\s*PV\s+input\s+power'
                          r'|Max\.?\s*DC\s+Input\s+Power', line, re.IGNORECASE):
             continue
         found = [
@@ -969,7 +1004,8 @@ def _extraer_campos(texto: str) -> dict:
     if V_mppt_activo is None:
         m_rated = re.search(
             r"(?:Rated|Nominal)\s+(?:PV|DC)\s+input\s+voltage"
-            r"[^\n0-9]*([0-9]{2,4}(?:[.,][0-9]+)?)\s*V",
+            # V final opcional: "Rated PV input voltage (V) 690" (unidad en la etiqueta)
+            r"[^\n0-9]*([0-9]{2,4}(?:[.,][0-9]+)?)\s*V?\b",
             texto, re.IGNORECASE,
         )
         # Español (Growatt XMV): "Voltaje nominal 720V" en sección de entrada CD.

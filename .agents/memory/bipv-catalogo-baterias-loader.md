@@ -76,3 +76,8 @@ El loader busca la hoja por nombre; si no existe, retorna `{}` sin error.
 - _RANGE_RE acepta 'a' como separador (IGNORECASE) → "27A 27A" en tablas multicolumna matchea como rango 27–27. Regla: un rango con mín==máx nunca es real → descartarlo y probar la siguiente etiqueta.
 - Growatt MID: "Normal Voltage 200V-1000V" es el rango MPPT real; "MPPT voltage range 580V" (un solo valor) es la tensión nominal a plena carga → V_mppt_activo.
 - Etiquetas partidas en dos líneas por pdfplumber ("Max. short-circuit current per\nMPP tracker 33.8A", "recommended PV power\n(for module STC) 22500W...") requieren patrones (?m) multilínea o matchear la línea de valores.
+
+## Nombres de modelo partidos en dos líneas (Deye/TriP2)
+- Encabezado multi-modelo "Model TriP2-LB- TriP2-LB- ..." + línea siguiente "3P 5K 3P 6K ...": si los nombres detectados están duplicados, completar con la línea de continuación. La continuación NO está alineada por columnas → si len(tokens) % n == 0, repartir en n grupos iguales en orden; solo usar posición como fallback.
+- "Rated PV input voltage (V) 690": la unidad va en la etiqueta, no tras el número — la V final debe ser opcional en el fallback de tensión nominal.
+- Títulos de gama ("HYBRID SERIES") no son modelo: rechazar líneas con SERIES en _extract_model.
