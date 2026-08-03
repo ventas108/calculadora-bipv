@@ -150,18 +150,52 @@ def _extract_row_numbers(line: str, from_pos: int = 0) -> list:
     return [float(m) for m in re.findall(r'([0-9]+(?:\.[0-9]+)?)', line[from_pos:])]
 
 
-# Patrones de etiqueta para identificar filas en tablas estructuradas de pdfplumber
+# Reconocimiento de campo por abreviatura entre paréntesis — máxima prioridad,
+# unambigua: "(Voc)", "(Vmp)", "(Imp)", "(Isc)", "(Pmax)", "(Pm)"
+_ABBREV_IN_PARENS: dict = {
+    "Pmax": re.compile(r'\(\s*(?:Pmax|Pmpp|P\.?m\.?)\s*\)', re.I),
+    "Voc":  re.compile(r'\(\s*Voc\s*\)',                       re.I),
+    "Isc":  re.compile(r'\(\s*Isc\s*\)',                       re.I),
+    "Vmp":  re.compile(r'\(\s*V(?:mp|mpp)\s*\)',               re.I),
+    "Imp":  re.compile(r'\(\s*I(?:mp|mpp)\s*\)',               re.I),
+}
+
+# Patrones de etiqueta para identificar filas en tablas estructuradas de pdfplumber.
+# IMPORTANTE: el orden importa — los más específicos primero.
+# "potencia" sola no es suficiente (aparece en "máxima potencia" de Vmp e Imp).
 _TABLE_LABEL_RE: dict = {
-    "Pmax": re.compile(
-        r'potencia|pmax|pmpp|peak\s+power|rated\s+power|maximum\s+power|p\.?\s*max', re.I),
+    # Voc: ANTES de Pmax porque "circuito abierto" puede contener "ot" de "potencia"
     "Voc": re.compile(
-        r'voc\b|v\s*oc\b|circuito\s+abierto|open.circuit\s+volt|tensión.*abierto|voltaje.*abierto', re.I),
+        r'voc\b|v[\s_]*oc\b'
+        r'|circuito[\s\-]+abierto|open[\s\-]?circuit'
+        r'|tens[ií](?:on|ón).*abierto|voltaje.*abierto'
+        r'|tensión.*circuito|voltaje.*circuito', re.I | re.UNICODE),
+    # Isc: antes de Imp para no confundir "corto" con "corriente máx"
     "Isc": re.compile(
-        r'isc\b|i\s*sc\b|corto.?circuito|short.circuit\s+curr|corriente.*corto', re.I),
+        r'isc\b|i[\s_]*sc\b'
+        r'|corto[\s\-]?circuito|cortocircuito|short[\s\-]?circuit'
+        r'|corriente.*corto', re.I | re.UNICODE),
+    # Vmp: ANTES de Pmax — detecta "tensión en máxima potencia" y similares
     "Vmp": re.compile(
-        r'vmpp\b|vmp\b|v\s*mp\b|v.*m[aá]x.*pot|maximum\s+power\s+volt|potencia.*tens|tensión.*m[aá]x', re.I),
+        r'vmpp?\b|v[\s_]*mpp?\b'
+        r'|mpp.*tens|mpp.*volt'
+        r'|maximum\s+power\s+volt'
+        r'|tens[ií](?:on|ón).*m[aá]x'
+        r'|voltaje.*m[aá]x'
+        r'|m[aá]xima?\s+potencia.*(?:tens|volt)', re.I | re.UNICODE),
+    # Imp: ANTES de Pmax — detecta "corriente en máxima potencia"
     "Imp": re.compile(
-        r'impp\b|imp\b|i\s*mp\b|i.*m[aá]x.*pot|maximum\s+power\s+curr|corriente.*m[aá]x', re.I),
+        r'impp?\b|i[\s_]*mpp?\b'
+        r'|mpp.*corr'
+        r'|maximum\s+power\s+curr'
+        r'|corriente.*m[aá]x'
+        r'|m[aá]xima?\s+potencia.*corr', re.I | re.UNICODE),
+    # Pmax: AL FINAL y más específico — "potencia nominal/pico/cresta"
+    "Pmax": re.compile(
+        r'pmax\b|pmpp?\b|p[\s_]*max\b'
+        r'|potencia\s+(?:nominal|m[aá]xima?|pico|cresta|punta)'
+        r'|peak\s+power|rated\s+power'
+        r'|maximum\s+power(?!\s+(?:volt|curr))', re.I | re.UNICODE),
 }
 
 
@@ -220,12 +254,18 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
                         # Label: primera celda no vacía de la fila
                         label = next((c for c in cells if c), "")
 
-                        # Identificar campo por la etiqueta
+                        # Identificar campo — prioridad 1: abreviatura entre paréntesis
                         field_hit: str | None = None
-                        for field, pat in _TABLE_LABEL_RE.items():
+                        for field, pat in _ABBREV_IN_PARENS.items():
                             if pat.search(label):
                                 field_hit = field
                                 break
+                        # Prioridad 2: patrón de texto de la etiqueta
+                        if field_hit is None:
+                            for field, pat in _TABLE_LABEL_RE.items():
+                                if pat.search(label):
+                                    field_hit = field
+                                    break
                         if field_hit is None:
                             continue
 
