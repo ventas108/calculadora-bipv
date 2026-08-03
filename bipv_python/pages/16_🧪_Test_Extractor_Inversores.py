@@ -212,10 +212,12 @@ else:
             st.success(f"✅ Extraído: **{res_real.get('modelo','—')}** · Marca: **{fab_real}**")
 
             # ¿Existe caso sintético para este fabricante?
+            # Guardia: evitar que marca vacía ("") coincida con todos los casos
             caso_match = next(
-                (c for c in CASOS if fab_real.lower() in c["fabricante"].lower()),
+                (c for c in CASOS
+                 if fab_real and fab_real.lower() in c["fabricante"].lower()),
                 None,
-            )
+            ) if fab_real else None
 
             if caso_match:
                 st.markdown(f"**Comparación vs caso sintético de {caso_match['fabricante']}:**")

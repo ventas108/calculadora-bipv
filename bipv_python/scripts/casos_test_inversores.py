@@ -413,6 +413,69 @@ Recommended maximum PV power: 30 kW
         },
     },
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # 12. SolaX X3-FORTH-100K — C&I trifásico, 1100 V, 12 MPPTs
+    #     ALIAS ESPECIALES:
+    #       · Marca: "solaxpower" (sin espacio, sin \b → alias dict)
+    #       · Unidades con notación "d.c. V" / "d.c. A" → preprocesamiento
+    #       · n_trackers: desde features "Max. 12 MPPTs, 2 strings per MPP"
+    #       · I_max: "Max. input current per MPPT" (sin paréntesis)
+    #       · Isc:   "Max. input short circuit current per MPPT" (con "input")
+    #       · P_dc:  "Max. recommended PV array power" + valor en línea siguiente
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "SolaX",
+        "modelo":     "X3-FORTH-100K",
+        "arquitectura": "Inversor de red trifásico",
+        "texto": """\
+Three-phase C&I On-grid Inverter
+
+X3-FORTH
+75kW / 80kW / 100kW
+
+Max. 12 MPPTs, 2 strings per MPP tracker
+32A per MPP tracker
+180~1000Vdc MPPT voltage range
+
+solaxpower
+
+PV INPUT
+Max. PV input voltage
+1100 d.c. V
+
+MPPT voltage range
+180 ~ 1000 d.c. V
+
+Start-up voltage
+200 d.c. V
+
+Max. input current per MPPT
+32 d.c. A
+
+Max. input short circuit current per MPPT
+46 d.c. A
+
+Max. recommended PV array power
+Max. PV input voltage
+
+150 kWp
+1100 d.c. V
+""",
+        "esperado": {
+            "Vdc_max":            1100,
+            "Vmppt_min":          180,
+            "Vmppt_max":          1000,
+            "V_arranque":         200,
+            "n_trackers":         12,
+            "n_strings_tracker":  2,
+            "I_max_tracker":      32,
+            "Isc_max_tracker":    46,
+            "P_dc_max_W":         150000,   # 150 kWp × 1000
+            "bat_voltaje_min":    None,
+            "bat_voltaje_max":    None,
+        },
+    },
+
 ]
 
 # Campos que se comparan (ordenados para la tabla de cobertura)

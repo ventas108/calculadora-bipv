@@ -33,6 +33,13 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 # Marcas conocidas de inversores BIPV / fotovoltaicos
 # ══════════════════════════════════════════════════════════════════════════════
+# Aliases sin word-boundary (marcas compuestas como "solaxpower")
+_BRAND_ALIASES: dict = {
+    "solaxpower": "SolaX",
+    "ginlong":    "Solis",
+    "sma-regul":  "SMA",
+}
+
 _BRANDS = [
     "Growatt", "Solis", "Ginlong", "Deye", "MUST", "SolaX", "LuxPower",
     "POWEST", "Huawei", "SMA", "Fronius", "ABB", "Schneider", "GoodWe",
@@ -83,7 +90,9 @@ def _first(*vals):
 #    Gap 1 (Fronius/SMA): añadido separador "..." / ".." (180...800 V)
 # ─────────────────────────────────────────────────────────────────────────────
 _RANGE_RE = re.compile(
-    r"([0-9]+(?:[.,][0-9]+)?)\s*(?:\.{2,3}|~|–|—|-|to|a)\s*([0-9]+(?:[.,][0-9]+)?)\s*V",
+    # Gap 6 (SolaX X3-PRO, Growatt): acepta "200V ~ 1000V" donde la V del mínimo
+    # precede al separador.  La V final también es opcional ("160 ~ 800" sin unidad).
+    r"([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?\s*(?:\.{2,3}|~|–|—|-|to|a)\s*([0-9]+(?:[.,][0-9]+)?)\s*V?",
     re.IGNORECASE,
 )
 
@@ -128,12 +137,14 @@ _UMAX_RE = re.compile(
 )
 
 
-def _find_range(label_patterns, text):
+def _find_range(label_patterns, text, use_sma_fallback=True):
     """
     Busca una etiqueta seguida de un rango "X ~ Y V" y devuelve (min, max).
 
     Gap 2 (SMA/Fronius): si no hay rango en una sola línea, intenta extraer
     min y max de campos separados usando _SMA_MIN_RE / _SMA_MAX_RE / _U*_RE.
+    NOTA: use_sma_fallback=False al buscar rangos de batería, para evitar
+    que "DC voltage range, min./max." (SMA MPPT) sea confundido con batería.
     Gap 5: ventana ampliada de 200 → 400 chars para tablas multicolumna.
     Retorna (None, None) si no encuentra.
     """
@@ -149,6 +160,9 @@ def _find_range(label_patterns, text):
             hi = _num(m_range.group(2))
             if lo is not None and hi is not None:
                 return (lo, hi) if lo < hi else (hi, lo)
+
+    if not use_sma_fallback:
+        return (None, None)
 
     # Gap 2: fallback para fichas SMA/Fronius con min y max en líneas separadas
     lo_sep = hi_sep = None
@@ -172,8 +186,10 @@ def _find_range(label_patterns, text):
 # Vdc_max — Tensión DC Máxima (límite físico absoluto)
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_VDCMAX = [
-    # Inglés directo
-    (r"Max(?:imum)?\.?\s*(?:PV\s+)?(?:Input|Array|DC)\s+(?:Open\s+Circuit\s+)?[Vv]oltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V(?!\s*/)", 1),
+    # Inglés directo — también "(V): N" (LuxPower): "Max. PV input voltage (V): 600"
+    (r"Max(?:imum)?\.?\s*(?:PV\s+)?(?:Input|Array|DC)\s+(?:Open\s+Circuit\s+)?[Vv]oltage\s*(?:\([Vv]\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V?(?!\s*/)", 1),
+    # Gap 7 (SolaX X3-PRO): "Max. PV input voltage [V]: 800" — valor tras corchete [V]
+    (r"Max(?:imum)?\.?\s*(?:PV\s+)?[Ii]nput\s+[Vv]oltage\s*\[V\]\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)", 1),
     (r"Max(?:imum)?\s+PV\s+VOC\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"Max\.\s*DC\s+[Ii]nput\s+[Vv]oltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"PV\s+input\s+voltage\s*\(max\.\?\)\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
@@ -220,15 +236,16 @@ _LABEL_MPPT_ACTIVO = [
 # V_arranque — Tensión de arranque (PV, no batería)
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_VARRANQUE = [
-    (r"Start[- ]?up\s+[Vv]oltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",         1),
-    (r"[Ss]tart(?:ing|up)?\s+[Vv]oltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",  1),
-    (r"[Mm]in(?:imum)?\s+[Ss]tart(?:ing)?\s+[Vv]oltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
+    # "(V): N" format (LuxPower, Deye): "Start-up Voltage (V): 140"
+    (r"Start[- ]?up\s+[Vv]oltage\s*(?:\([Vv]\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?", 1),
+    (r"[Ss]tart(?:ing|up)?\s+[Vv]oltage\s*(?:\([Vv]\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?", 1),
+    (r"[Mm]in(?:imum)?\s+[Ss]tart(?:ing)?\s+[Vv]oltage\s*(?:\([Vv]\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?", 1),
     (r"Tensi[oó]n\s+de\s+[Aa]rranque\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",     1),
     # SMA: Minimum input voltage (start)
     (r"Minimum\s+input\s+voltage\s*\(start\)\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"U_PV,start\s*[:\(=]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",                        1),
     # Growatt/SolaX: Startup Voltage
-    (r"Startup\s+[Vv]oltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",              1),
+    (r"Startup\s+[Vv]oltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?",          1),
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -237,6 +254,8 @@ _PAT_VARRANQUE = [
 _PAT_NTRACKERS = [
     # "Number of MPP trackers" / "No. of MPP trackers"
     (r"N(?:o|umber|úmero)?\.?\s+(?:of\s+)?(?:independent\s+)?MPP(?:T)?\s+(?:trackers?|inputs?|channels?)\s*[:\|]?\s*([0-9]+)", 1),
+    # Gap 8 (Sungrow): "Number of MPPT: 3" sin sufijo "trackers"
+    (r"[Nn]umber\s+of\s+MPPT\s*[:\|]?\s*([0-9]+)",                                 1),
     (r"MPPT\s+[Nn]umber\s*[:\|]?\s*([0-9]+)",                                      1),
     (r"#\s*(?:of\s+)?MPPT\s*[:\|]?\s*([0-9]+)",                                    1),
     (r"Trackers?\s+MPPT\s*[:\|]?\s*([0-9]+)",                                      1),
@@ -245,13 +264,21 @@ _PAT_NTRACKERS = [
     (r"(\d+)\s*/\s*\(\s*\d+(?:\s*:\s*\d+)*\s*\)",                                  1),
     # Victron/SMA: nMPPT = 2
     (r"n(?:MPPT|_MPPT)\s*[=:\|]?\s*([0-9]+)",                                      1),
+    # SolaX X3-FORTH features: "Max. 12 MPPTs, 2 strings per MPP tracker"
+    (r"Max\.\s+([0-9]+)\s+MPPTs?",                                                  1),
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
 # n_strings_tracker — Strings por tracker
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_NSTRINGS = [
-    (r"[Ss]trings?\s+per\s+MPP(?:T)?\s+[Tt]racker\s*[:\|]?\s*([0-9]+)",           1),
+    # SolaX X3-FORTH features: "Max. 12 MPPTs, 2 strings per MPP tracker"
+    # PRIMERO: captura N antes de "strings" cuando viene precedido de "MPPTs,"
+    (r"MPPTs?\s*,\s*([0-9]+)\s+strings?\s+per\s+MPP",                              1),
+    # Genérico bullet: "N strings per MPP tracker" — usa [ \t] para NO cruzar newlines
+    (r"\b([0-9]+)[ \t]+strings?[ \t]+per[ \t]+MPP(?:[ \t]+tracker)?(?=\b|,|$|[ \t])", 1),
+    # Tabla: "Strings per MPP tracker: N" o "Strings per MPP tracker [N]" — separador explícito
+    (r"[Ss]trings?\s+per\s+MPP(?:T)?\s+[Tt]racker\s*[:\|\[]\s*([0-9]+)",          1),
     (r"[Ss]trings?\s+per\s+[Ii]nput\s*[:\|]?\s*([0-9]+)",                          1),
     (r"[Cc]adenas?\s+por\s+[Tt]racker\s*[:\|]?\s*([0-9]+)",                        1),
     # formato "2/(2:2)" → segundo número (strings por tracker uniforme)
@@ -262,8 +289,15 @@ _PAT_NSTRINGS = [
 # I_max_tracker — Corriente máxima de entrada por tracker
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_IMAX = [
-    (r"Max(?:imum)?\.?\s+PV\s+[Ii]nput\s+[Cc]urrent\s+(?:per\s+MPPT|per\s+[Tt]racker)?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
+    # "\s*" (no "\s+") antes del sufijo opcional para cubrir "current: 15A" sin espacio previo
+    (r"Max(?:imum)?\.?\s+PV\s+[Ii]nput\s+[Cc]urrent\s*(?:per\s+MPPT|per\s+[Tt]racker)?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
+    # Gap 7 (SolaX X3-PRO): "Max. PV input current [A]: 32"
+    (r"Max(?:imum)?\.?\s+PV\s+[Ii]nput\s+[Cc]urrent\s*\[A\]\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)", 1),
     (r"Max(?:imum)?\s+[Ii]nput\s+[Cc]urrent\s*(?:\(per\s+MPPT\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
+    # SolaX X3-FORTH: "Max. input current per MPPT" (sin paréntesis)
+    (r"Max(?:imum)?\.?\s+[Ii]nput\s+[Cc]urrent\s+per\s+MPPT\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
+    # SolaX X3-FORTH features: "32A per MPP tracker"
+    (r"([0-9]+(?:[.,][0-9]+)?)\s*A\s+per\s+MPP(?:\s+tracker)?",                    1),
     (r"Maximum\s+PV\s+[Cc]harge\s+[Cc]urrent\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
     (r"Max\.\s*DC\s+[Ii]nput\s+[Cc]urrent\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
     (r"I_?max(?:_?DC|_?pv)?\s*[:\(=]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A",             1),
@@ -275,7 +309,10 @@ _PAT_IMAX = [
 # Isc_max_tracker — Corriente de cortocircuito máxima por tracker
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_ISC = [
-    (r"Max(?:imum)?\.?\s+(?:PV\s+)?[Ss]hort[- ]?[Cc]ircuit\s+[Cc]urrent\s*(?:per\s+MPPT|input)?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
+    # Genérico: cubre "short circuit current per MPPT", "short-circuit current input per MPPT"
+    (r"Max(?:imum)?\.?\s+(?:PV\s+)?[Ss]hort[- ]?[Cc]ircuit\s+[Cc]urrent\s*(?:input\s+)?(?:per\s+MPPT|per\s+[Tt]racker)?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
+    # SolaX X3-FORTH: "Max. input short circuit current per MPPT" (con "input" antes de "short")
+    (r"Max(?:imum)?\.?\s+[Ii]nput\s+[Ss]hort[- ]?[Cc]ircuit\s+[Cc]urrent\s+per\s+MPPT\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
     (r"Max(?:imum)?\s+PV\s+ISC\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A",           1),
     (r"Max\.\s+ISC\s+per\s+MPPT\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A",          1),
     (r"I_?sc_?max\s*[:\(=]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A",                        1),
@@ -287,15 +324,16 @@ _PAT_ISC = [
 # P_dc_max_W — Potencia FV máxima recomendada (W)
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_PDCMAX = [
-    # kWp (SolaX con corchetes) — multiplicar ×1000 en la lógica de extracción
-    (r"Max(?:imum)?\.?\s+PV\s+(?:array\s+)?(?:input\s+)?[Pp]ower\s*\[?kWp?\]?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*kWp?", 1),
+    # kWp (SolaX con corchetes): "power [kWp]: 36" o "power: 36 kWp"
+    # NOTA: la unidad final es opcional porque puede haber sido consumida en [kWp]
+    (r"Max(?:imum)?\.?\s+PV\s+(?:array\s+)?(?:input\s+)?[Pp]ower\s*\[?kWp?\]?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)(?:\s*kWp?)?", 1),
     # Gap 4: kW sin 'p' (Sungrow, Huawei) — también ×1000 en lógica
     (r"Max(?:imum)?\.?\s+(?:PV\s+)?(?:DC\s+)?(?:[Ii]nput\s+)?[Pp]ower\s*\[?kW\]?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*kW(?!p)", 1),
     (r"Recommended\s+max(?:imum)?\s+PV\s+power\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*kW(?!p)", 1),
-    # Watts directo
-    (r"Max(?:imum)?\.?\s+PV\s+[Aa]rray\s+[Pp]ower\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*W",   1),
-    (r"Max(?:imum)?\s+DC\s+[Ii]nput\s+[Pp]ower\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*W",       1),
-    (r"Max\.\s+PV\s+array\s+input\s+power\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*W",             1),
+    # Watts directo — acepta "(W): N" (unit en paréntesis antes del valor)
+    (r"Max(?:imum)?\.?\s+(?:DC\s+)?[Ii]nput\s+[Pp]ower\s*(?:\([A-Za-z]+\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)", 1),
+    (r"Max(?:imum)?\.?\s+PV\s+[Aa]rray\s+[Pp]ower\s*(?:\([A-Za-z]+\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*[Ww]?", 1),
+    (r"Max(?:imum)?\.?\s+PV\s+array\s+input\s+[Pp]ower\s*(?:\([A-Za-z]+\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*[Ww]?", 1),
     (r"Max\s+PV\s+power\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*W",                               1),
     (r"Potencia\s+FV\s+M[aá]xima?\s+(?:[Rr]ecomendada?)?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*W", 1),
     (r"PV\s+array\s+max(?:imum)?\s+power\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*W", 1),
@@ -305,7 +343,10 @@ _PAT_PDCMAX = [
 
 # Regex independiente para detectar kW sin p (para conversión ×1000 en extracción)
 _KW_NO_P_RE = re.compile(
-    r"Max(?:imum)?\.?\s+(?:PV\s+)?(?:DC\s+)?(?:[Ii]nput\s+)?[Pp]ower\s*\[?kW\]?\s*[:\(]?\s*[0-9]+(?:[.,][0-9]+)?\s*kW(?!p)",
+    # Gap 8 (Sungrow): cubre "label [kW]: 30" Y "label: 30 kW" (hasta fin de línea)
+    r"(?:Max(?:imum)?\.?\s+(?:PV\s+)?(?:DC\s+)?(?:[Ii]nput\s+)?[Pp]ower"
+    r"|Recommended\s+max(?:imum)?\s+PV\s+power)"
+    r"[^\n]*\b[0-9]+(?:[.,][0-9]+)?\s*kW(?!p)",
     re.IGNORECASE,
 )
 
@@ -392,6 +433,11 @@ def _extract_brand(text: str) -> str:
     for brand in _BRANDS:
         if re.search(r"\b" + re.escape(brand) + r"\b", text, re.IGNORECASE):
             return brand
+    # Tercera pasada: aliases sin word-boundary (marcas compuestas: "solaxpower")
+    text_lower = text.lower()
+    for alias, brand in _BRAND_ALIASES.items():
+        if alias in text_lower:
+            return brand
     return ""
 
 
@@ -451,6 +497,11 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
             texto = ocr_text
             uso_ocr = True
 
+    # ── Normalizar notación d.c./a.c. (SolaX X3-FORTH y similar) ─────────────
+    # "1100 d.c. V" → "1100 V"  |  "32 d.c. A" → "32 A"
+    texto = re.sub(r"\s*d\.c\.?\s*", " ", texto)
+    texto = re.sub(r"\s*a\.c\.?\s*", " ", texto)
+
     # ── Metadatos ─────────────────────────────────────────────────────────────
     marca       = _extract_brand(texto)
     modelo      = _extract_model(texto, marca)
@@ -472,11 +523,16 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
                 Vmppt_min, Vmppt_max = (lo, hi)
 
     # ── V_mppt_activo ─────────────────────────────────────────────────────────
-    Vmppt_act_lo, Vmppt_act_hi = _find_range(_LABEL_MPPT_ACTIVO, texto)
+    # use_sma_fallback=False: "DC voltage range" de SMA es rango MPPT, no activo
+    Vmppt_act_lo, Vmppt_act_hi = _find_range(_LABEL_MPPT_ACTIVO, texto, use_sma_fallback=False)
     V_mppt_activo = Vmppt_act_lo  # interés: límite inferior con carga completa
 
     # ── V_arranque ────────────────────────────────────────────────────────────
     V_arranque = _find(_PAT_VARRANQUE, texto)
+    # Sanity: V_arranque PV típica ≥60 V; valores < 60 V corresponden a tensión
+    # mínima de batería (p. ej. "Minimum start voltage: 48 V" en inversores híbridos)
+    if V_arranque is not None and V_arranque < 60:
+        V_arranque = None
 
     # ── n_trackers ────────────────────────────────────────────────────────────
     n_trackers = _find(_PAT_NTRACKERS, texto)
@@ -500,7 +556,8 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
     # Intento 1: kWp explícito (SolaX) — multiplicar ×1000
     p_kw_converted = None
     m_kwp = re.search(
-        r"Max(?:imum)?\.?\s+PV\s+(?:array\s+)?(?:input\s+)?[Pp]ower\s*\[?kWp?\]?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*kWp?",
+        r"Max(?:imum)?\.?\s+PV\s+(?:array\s+)?(?:input\s+)?[Pp]ower"
+        r"\s*\[?kWp?\]?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)(?:\s*kWp?)?",
         texto, re.IGNORECASE,
     )
     if m_kwp:
@@ -513,18 +570,33 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
         m_kw = re.search(
             r"(?:Max(?:imum)?\.?\s+(?:PV\s+)?(?:DC\s+)?(?:[Ii]nput\s+)?[Pp]ower"
             r"|Recommended\s+max(?:imum)?\s+PV\s+power)"
-            r"\s*\[?kW\]?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*kW(?!p)",
+            r"[^\n]*\b([0-9]+(?:[.,][0-9]+)?)\s*kW(?!p)",
             texto, re.IGNORECASE,
         )
         if m_kw:
             v = _num(m_kw.group(1))
-            if v and v < 10000:      # sanity: valor razonable en kW
+            if v and 0 < v < 10000:  # sanity: valor razonable en kW
+                p_kw_converted = v * 1000
+
+    # Intento 3: SolaX X3-FORTH — "Max. recommended PV array power" seguido de
+    # valor kWp en la 1ª–3ª línea siguiente (tabla multicolumna)
+    if p_kw_converted is None:
+        m_rec = re.search(
+            r"Max\.\s+recommended\s+PV\s+(?:array\s+)?[Pp]ower[^\n]*\n"
+            r"(?:[^\n]*\n){1,3}\s*([0-9]+(?:[.,][0-9]+)?)\s*kWp?\b",
+            texto, re.IGNORECASE,
+        )
+        if m_rec:
+            v = _num(m_rec.group(1))
+            if v and v < 1000:       # sanity: viene en kWp
                 p_kw_converted = v * 1000
 
     P_dc_max_W = p_kw_converted or _find(_PAT_PDCMAX, texto)
 
     # ── Batería ───────────────────────────────────────────────────────────────
-    bat_min_r, bat_max_r = _find_range(_LABEL_BAT_RANGE, texto)
+    # use_sma_fallback=False para evitar que "DC voltage range, min./max." de SMA
+    # sea confundido con voltaje de batería
+    bat_min_r, bat_max_r = _find_range(_LABEL_BAT_RANGE, texto, use_sma_fallback=False)
     bat_voltaje_min = _first(bat_min_r, _find(_PAT_BAT_MIN, texto))
     bat_voltaje_max = _first(bat_max_r, _find(_PAT_BAT_MAX, texto))
 

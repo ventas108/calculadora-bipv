@@ -21,10 +21,16 @@ def extraer_desde_texto(texto: str) -> dict:
     Extrae parámetros de inversor desde texto plano (sin PDF).
     Útil para tests unitarios, debug de datasheets y harness de cobertura.
     """
+    import re as _re
+
     def _num(s):
         if s is None: return None
         try: return float(str(s).replace(",", ".").strip())
         except: return None
+
+    # Normalizar notación d.c./a.c. (SolaX X3-FORTH y similar)
+    texto = _re.sub(r"\s*d\.c\.?\s*", " ", texto)
+    texto = _re.sub(r"\s*a\.c\.?\s*", " ", texto)
 
     marca        = _extract_brand(texto)
     modelo       = _extract_model(texto, marca)
@@ -41,9 +47,11 @@ def extraer_desde_texto(texto: str) -> dict:
             if lo and hi and lo < hi and hi > 100:
                 Vmppt_min, Vmppt_max = lo, hi
 
-    Vmppt_act_lo, _ = _find_range(_LABEL_MPPT_ACTIVO, texto)
+    Vmppt_act_lo, _ = _find_range(_LABEL_MPPT_ACTIVO, texto, use_sma_fallback=False)
     V_mppt_activo   = Vmppt_act_lo
     V_arranque      = _find(_PAT_VARRANQUE, texto)
+    if V_arranque is not None and V_arranque < 60:
+        V_arranque = None
 
     n_trackers        = _find(_PAT_NTRACKERS, texto)
     n_strings_tracker = _find(_PAT_NSTRINGS, texto)
@@ -61,7 +69,7 @@ def extraer_desde_texto(texto: str) -> dict:
     p_kw_converted = None
     m_kwp = re.search(
         r"Max(?:imum)?\.?\s+PV\s+(?:array\s+)?(?:input\s+)?[Pp]ower"
-        r"\s*\[?kWp?\]?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*kWp?",
+        r"\s*\[?kWp?\]?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)(?:\s*kWp?)?",
         texto, re.IGNORECASE,
     )
     if m_kwp:
@@ -72,16 +80,28 @@ def extraer_desde_texto(texto: str) -> dict:
         m_kw = re.search(
             r"(?:Max(?:imum)?\.?\s+(?:PV\s+)?(?:DC\s+)?(?:[Ii]nput\s+)?[Pp]ower"
             r"|Recommended\s+max(?:imum)?\s+PV\s+power)"
-            r"\s*\[?kW\]?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*kW(?!p)",
+            r"[^\n]*\b([0-9]+(?:[.,][0-9]+)?)\s*kW(?!p)",
             texto, re.IGNORECASE,
         )
         if m_kw:
             v = _num(m_kw.group(1))
-            if v and v < 10000:
+            if v and 0 < v < 10000:
+                p_kw_converted = v * 1000
+    # Intento 3: SolaX X3-FORTH — "Max. recommended PV array power" + kWp multi-línea
+    if p_kw_converted is None:
+        m_rec = _re.search(
+            r"Max\.\s+recommended\s+PV\s+(?:array\s+)?[Pp]ower[^\n]*\n"
+            r"(?:[^\n]*\n){1,3}\s*([0-9]+(?:[.,][0-9]+)?)\s*kWp?\b",
+            texto, _re.IGNORECASE,
+        )
+        if m_rec:
+            v = _num(m_rec.group(1))
+            if v and v < 1000:
                 p_kw_converted = v * 1000
     P_dc_max_W = p_kw_converted or _find(_PAT_PDCMAX, texto)
 
-    bat_min_r, bat_max_r = _find_range(_LABEL_BAT_RANGE, texto)
+    # use_sma_fallback=False: "DC voltage range" SMA es MPPT, no batería
+    bat_min_r, bat_max_r = _find_range(_LABEL_BAT_RANGE, texto, use_sma_fallback=False)
     bat_voltaje_min = bat_min_r or _find(_PAT_BAT_MIN, texto)
     bat_voltaje_max = bat_max_r or _find(_PAT_BAT_MAX, texto)
 
