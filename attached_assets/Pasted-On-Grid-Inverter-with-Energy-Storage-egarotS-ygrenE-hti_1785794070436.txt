@@ -1,0 +1,153 @@
+On-Grid Inverter with Energy Storage
+egarotS
+ygrenE
+htiw
+retrevnI
+dirG-nO
+Solar Power input
+Discharging
+Charging
+9 www.voltronicpower.com
+dirg ot ni-deeF
+InfiniSolar: On-Grid Inverter with Energy Storage
+Innovative and Cost-effective Power Solution
+‧On-Grid Inverter with Energy Storage
+‧Self-consumption and Feed-in to the grid
+‧Programmable supply priority for PV, Battery or Grid
+‧User-adjustable battery charging current suits different types of
+batteries
+‧Programmable multiple operations modes: Grid tie, Off grid,
+and grid-tie with backup
+‧Built-in timer for various mode of on/off operation
+‧Multiple communication for USB, RS-232, Modbus and SNMP
+‧Monitoring software for real time status display and control
+InfiniSolar 2KW/3KW Plus InfiniSolar 5KW InfiniSolar 3-phase 10KW
+InfiniSolar is a flexible and intelligent hybrid inverter which utilizes solar
+power, AC utility, and battery power source to supply continuous power.
+It’s a simple and smart solar power storage system for home users to
+either store energy into battery and wait for night time usage or use for
+self-consumption first depending on demands. Priority for power source
+can be programmed and set up through smart software. During night
+time or power failure, it will automatically extract power from battery. In
+this way, it will reduce the dependence on the utility. Utility power input
+Innovative Way
+Feed-in is not only choice
+In comparison with conventional grid-tie Conventional Way
+inverter, InfiniSolar is able to not only feed-
+in power to grid but also store solar power to
+Solar PV array Utility
+battery for future usage and directly power to
+Inverter
+the loads. Solar PV array Utility
+Battery Load
+Save money by discharging battery for
+self-consumption first No need
+InfiniSolar can save money by using battery Solar PV array Utility
+energy first when PV energy is low. Until
+battery energy is low, InfiniSolar will extract AC
+Battery Load
+power from the grid.
+Power backup when AC failed
+InfiniSolar can operate as an off-grid inverter to
+provide continuous power even without the grid.
+Solar PV array Utility
+It’s perfect power solution for remote regions or
+temporary AC power source such as camping or
+flea market. Battery Load
+Conventional Way  
+
+  Utility
+On-Grid Inverter with Energy Storage
+egarotS
+ygrenE
+htiw
+retrevnI
+dirG-nO
+InfiniSolar 2KW/3KW On-grid Inverter with Energy Storage Selection Guide
+MODEL InfiniSolar 2KW InfiniSolar Plus 3KW
+PHASE 1-phase in / 1-phase out
+RATED OUTPUT POWER 2000 W 3000 W
+MAXIMUM CHARGING POWER 1200 W 1200 W
+GRID-TIE OPERATION
+PV INPUT (DC)
+Maximum PV Input Power 2250W 4500W
+Nominal DC Voltage / Maximum DC Voltage 300 VDC / 350 VDC 360 VDC / 500 VDC
+Start-up Voltage / Initial Feeding Voltage 80 VDC / 120 VDC 116 VDC / 150 VDC
+MPP Voltage Range 150 VDC ~ 320 VDC 250 VDC ~ 450 VDC
+Number of MPP Trackers / Maximum Input Current 1 / 1 x 15 A 1 / 1 x 18 A
+GRID OUTPUT (AC)
+Nominal Output Voltage 101/110/120/127 VAC 208/220/230/240 VAC
+Output Voltage Range 88 - 127 VAC* 184 - 264.5 VAC*
+Nominal Output Current 18 A 13 A
+Power Factor > 0.99
+EFFICIENCY
+Maximum Conversion Efficiency (DC/AC) 95% 96%
+European Efficiency@ Vnominal 94% 95%
+OFF-GRID OPERATION
+AC INPUT
+AC Start-up Voltage/Auto Restart Voltage 60 - 70 VAC / 85 VAC 120 - 140 VAC / 180 VAC
+Acceptable Input Voltage Range 80 - 130 VAC 170 - 280 VAC
+Maximum AC Input Current 30 A
+PV INPUT (DC)
+Maximum DC Voltage 350 VDC 500 VDC
+MPP Voltage Range 150 VDC ~ 320 VDC 250 VDC ~ 450 VDC
+Number of MPP Trackers / Maximum Input Current 1 / 1 x 15 A 1 / 1 x 18 A
+BATTERY MODE OUTPUT (AC)
+Nominal Output Voltage 101/110/120/127 VAC 202/208/220/230/240 VAC
+Output Waveform Pure Sinewave
+Efficiency (DC to AC) 90% 93%
+HYBRID OPERATION
+PV INPUT (DC)
+Nominal DC Voltage / Maximum DC Voltage 300 VDC / 350 VDC 360 VDC / 500 VDC
+Start-up Voltage / Initial Feeding Voltage 80 VDC / 120 VDC 116 VDC / 150 VDC
+MPP Voltage Range 150 VDC ~ 320 VDC 250 VDC ~ 450 VDC
+Number of MPP Trackers / Maximum Input Current 1 / 1 x 15 A 1 / 1 x 18 A
+GRID OUTPUT (AC)
+Nominal Output Voltage 101/110/120/127 VAC 202/208/220/230/240 VAC
+Output Voltage Range 88-127 VAC* 184 - 264.5 VAC*
+Nominal Output Current 18 A 13 A
+AC INPUT
+AC Start-up Voltage / Auto Restart Voltage 60 - 70 VAC / 85 VAC 120 - 140 VAC / 180 VAC
+Acceptable Input Voltage Range 80 - 130 VAC 170 - 280 VAC
+Maximum AC Input Current 30 A
+BATTERY MODE OUTPUT (AC)
+Nominal Output Voltage 101/110/120/127 VAC 202/208/220/230/240 VAC
+Efficiency (DC to AC) 90% 93%
+BATTERY & CHARGER
+Nominal DC Voltage 48 VDC
+Maximum Charging Current Default 25A, 5A - 25A (Adjustable)
+GENERAL
+PHYSICAL
+Dimension, D X W X H (mm) 107 x 438 x 480
+Net Weight (kgs) 15.5
+INTERFACE
+Communication Port RS-232/USB
+Intelligent Slot Optional SNMP, Modbus, and AS-400 cards available
+ENVIRONMENT
+Humidity 0 ~ 90% RH (No condensing)
+Operating Temperature 0 to 40°C 0 to 40°C
+Altitude 0 ~ 1000 m**
+*These figures may vary depending on different AC voltage and country requirements. VDE-AR-N 4105
+**Power derating 1% every 100 m when altitude is over 1000m. VDE 0126-1-1
+Product specifications are subject to change without further notice. AS4777, AS/NZS3100
+NRS-097-2-1
+Advancing Power 10
+  On-Grid Inverter with Energy Storage
+MODEL  InfiniSolar 2KW  InfiniSolar Plus 3KW
+PHASE  1-phase in / 1-phase out  1-phase out
+RATED OUTPUT POWER  2000 W  3000 W
+MAXIMUM CHARGING POWER  1200 W  1200 W
+GRID-TIE OPERATION    
+PV INPUT (DC)    
+Maximum PV Input Power  2250W  4500W
+Nominal DC Voltage / Maximum DC Voltage  300 VDC / 350 VDC  360 VDC / 500 VDC
+Start-up Voltage / Initial Feeding Voltage  80 VDC / 120 VDC  116 VDC / 150 VDC
+MPP Voltage Range  150 VDC ~ 320 VDC  250 VDC ~ 450 VDC
+Number of MPP Trackers / Maximum Input Current  1 / 1 x 15 A  1 / 1 x 18 A
+GRID OUTPUT (AC)    
+Nominal Output Voltage  101/110/120/127 VAC  208/220/230/240 VAC
+Output Voltage Range  88 - 127 VAC*  184 - 264.5 VAC*
+Nominal Output Current  18 A  13 A
+Power Factor  > 0.99  0.99
+EFFICIENCY    
+Maximum Conversion Efficienc
