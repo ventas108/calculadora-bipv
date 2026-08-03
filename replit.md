@@ -38,7 +38,24 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+### Despliegue de la app BIPV Streamlit (servidor externo)
+
+La app Streamlit (`bipv_python/`) corre en un servidor Ubuntu propio (Digital Ocean, `/var/www/bipv/calculadora-bipv`, proceso PM2 `streamlit-bipv`). El venv del servidor vive en `bipv_python/venv/` y **NUNCA debe estar en git** (está en `.gitignore`): el venv de Replit/NixOS no funciona en Ubuntu y sobreescribirlo deja la app caída.
+
+**Actualización incremental (lo normal, cada parche):**
+```bash
+cd /var/www/bipv/calculadora-bipv && git pull && pm2 restart streamlit-bipv
+```
+El venv no se toca. Si el servidor tiene cambios locales, usar `git stash` antes de `git pull`.
+
+**Primer despliegue, o si el venv se dañó / cambió `requirements.txt`:**
+```bash
+cd /var/www/bipv/calculadora-bipv && git pull
+bash bipv_python/scripts/setup_venv.sh   # recrea el venv e instala requirements (~3-5 min)
+pm2 restart streamlit-bipv
+```
+
+Nunca usar `git reset --hard` + borrado de untracked (`git clean -xdf`) en el servidor: eliminaría el venv. Si hay que forzar sincronización, usar `git fetch && git reset --hard origin/main` (no toca archivos ignorados) y solo reconstruir el venv con el script si la app no arranca.
 
 ## Pointers
 
