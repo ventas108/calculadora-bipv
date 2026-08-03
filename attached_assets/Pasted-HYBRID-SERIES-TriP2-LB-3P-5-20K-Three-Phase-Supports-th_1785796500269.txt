@@ -1,0 +1,109 @@
+HYBRID SERIES
+TriP2-LB-3P 5-20K
+(Three-Phase)
+Supports three-phase unbalanced loads for greater compatibility
+with mixed residential or commercial applications
+Max. 3 MPPTs with 3 strings, Max. PV input: 30kW
+Compatible with 48V low-voltage battery systems
+Supports independent grid export control for each phase
+Time of use, 8 time periods for charging & discharging
+Max. 10 pcs parallel for on grid &off grid
+Dedicated GEN port for
+- Auto GEN control
+- Smart load function
+- AC coupling function
+Low Voltage
+Model TriP2-LB- TriP2-LB- TriP2-LB- TriP2-LB- TriP2-LB- TriP2-LB- TriP2-LB-
+3P 5K 3P 6K 3P 8K 3P 10K 3P 12K 3P 15K 3P 20K
+Input (PV DC)
+Max. PV input power (W) 7500 9000 12000 15000 18000 22500 30000
+Rated PV input voltage (V) 690
+Number of independent MPPT inputs 3 / (1:1:1)
+Max. PV input voltage (V) 1000
+MPPT voltage range (V) 200 ~ 900
+Start-up voltage (V) 100
+Max. PV input current per MPPT (A) 20 / 20 / 20
+Max. PV short-circuit current input per MPPT 25 / 25 / 25
+Battery
+Compatible battery type Lithium-ion / Lead-Acid
+Battery voltage range (V) 40 - 60
+Max. charging/discharging current (A) 125 150 200 220 250 250 250
+Max. charging/discharging power (W) 5000 6000 8000 10000 12000 12000 12000
+Charging Strategy for Li-ion Battery Self-adaption to BMS
+Grid
+Rated AC voltage (V) 3L / N / PE, 230 / 400 Vac
+Rated AC frequency (Hz) 50 / 60
+Rated AC output power (W) 5000 6000 8000 10000 12000 15000 20000
+Rated AC output current (A) 7.20 8.70 11.60 14.50 17.40 21.70 29.00
+Max. AC input current (A) 9 10.9 14.5 18.1 21.8 27.1 36.25
+PF 0.99 (Adjustable from 0.8 leading to 0.8 lagging)
+THDI < 3%
+Max. continuous AC passthrough current (A) 30 50 70
+GEN
+Rated GEN voltage (V) 3L / N / PE, 230 / 400Vac
+Rated GEN frequency (Hz) 50/60
+Rated GEN input current (A) 30
+Rated GEN input power (W) 20700
+UPS
+Rated output power (W) 5000 6000 8000 10000 12000 15000(PV+Battery) 20000(PV+Battery)
+Rated output voltage (V) 3L / N / PE, 230 / 400 Vac
+Rated output current (A) 7.20 8.70 11.60 14.50 17.40 21.70 29.00
+Rated output frequency (Hz) 50 / 60
+Surge power, duration 1.5 × rated power for 5min
+Switching time ≤10ms
+Wave form Sine wave
+THDV < 3%
+Efficiency
+Max. efficiency 97.7%
+Max. charge/discharge efficiency 94.0%
+Protection
+PV reverse polarity protection YES
+Over current/voltage protection YES
+Anti-islanding protection YES
+AC Short-circuit protection YES
+Leakage current protecion YES
+Grid monitoring YES
+DC switch YES
+Ingress protection YES
+DC Surge protection Type III
+AC Surge protection Type III
+General
+Dimensions (W × H × D) 480 × 703 × 258mm / 18.9 × 27.7 × 10.2 in
+Weight 53 kg / 116.8 lbs
+Ingress protection rating IP66
+Operating environment temperature range (°C) -25~+60, > 45℃ derating
+Storage temperature range (°C) -25 ~ +60
+Relative humidity 0 ~ 100
+Display & Communication interface Touch color screen, RS485 / Wifi / CAN
+Warranty 5 / 10 years
+Cooling method Smart cooling
+Topology Transformer-less
+Max. Operating Altitude (m) 2000
+Noise emission (dB) 50
+Standards & Certification
+EN 62109/EN 61000, IEC 61683, EN 50549-10, PTPIREE TypeA
+Model TriP2-LB-
+3P 5K  TriP2-LB-
+3P 6K  TriP2-LB-
+3P 8K  TriP2-LB-
+3P 10K  TriP2-LB-
+3P 12K  TriP2-LB-
+3P 15K  TriP2-LB-
+3P 20K
+Input (PV DC)            
+7500  9000  12000  15000  18000  22500
+Battery  
+125  150  200  220  250  250
+5000  6000  8000  10000  12000  12000
+Grid  
+5000  6000  8000  10000  12000  15000
+7.20  8.70  11.60  14.50  17.40  21.70
+9  10.9  14.5  18.1  21.8  27.1
+  30  50
+GEN    
+UPS            
+  5000  6000  8000  10000  12000  15000(PV+Battery)
+7.20  8.70  11.60  14.50  17.40  21.70
+Efficiency  
+Protection  
+General
