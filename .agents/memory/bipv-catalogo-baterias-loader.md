@@ -71,3 +71,8 @@ El loader busca la hoja por nombre; si no existe, retorna `{}` sin error.
 - Valores por MPPT en notación slash ("32/32/32", "38.4/38.4/38.4"): el valor por tracker es el primero de la lista.
 - Filas multi-modelo pueden traer números SIN unidad ("Potencia máxima FV [Wp]@STC 30000 37500 45000") → fallback de números pelados 4-7 dígitos solo en líneas cuya etiqueta ya matcheó potencia FV.
 - "No. de MPPT 3 4 4" (un entero por columna, sin N/M): preferir la línea con tantos valores como modelos; si faltan, rellenar con el último.
+
+## Pseudo-rangos por la 'A' de amperios (Growatt MID)
+- _RANGE_RE acepta 'a' como separador (IGNORECASE) → "27A 27A" en tablas multicolumna matchea como rango 27–27. Regla: un rango con mín==máx nunca es real → descartarlo y probar la siguiente etiqueta.
+- Growatt MID: "Normal Voltage 200V-1000V" es el rango MPPT real; "MPPT voltage range 580V" (un solo valor) es la tensión nominal a plena carga → V_mppt_activo.
+- Etiquetas partidas en dos líneas por pdfplumber ("Max. short-circuit current per\nMPP tracker 33.8A", "recommended PV power\n(for module STC) 22500W...") requieren patrones (?m) multilínea o matchear la línea de valores.

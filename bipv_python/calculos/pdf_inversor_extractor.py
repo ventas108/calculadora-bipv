@@ -162,6 +162,11 @@ def _find_range(label_patterns, text, use_sma_fallback=True):
             lo = _num(m_range.group(1))
             hi = _num(m_range.group(2))
             if lo is not None and hi is not None:
+                if lo == hi:
+                    # Pseudo-rango (ej: "27A 27A" en tablas multicolumna, donde
+                    # la 'A' de amperios matchea el separador 'a') — probar
+                    # con la siguiente etiqueta
+                    continue
                 return (lo, hi) if lo < hi else (hi, lo)
 
     if not use_sma_fallback:
@@ -247,6 +252,8 @@ _LABEL_MPPT_RANGE = [
     r"Rango\s+(?:de\s+)?[Oo]peraci[oó]n\s+PV\s+MPPT",
     r"Rango\s+MPPT",
     r"MPPT\s+Range\s+@\s+Operating",
+    # Growatt MID: "Normal Voltage 200V-1000V" (rango operativo de entrada CC)
+    r"Normal\s+Voltage",
     r"DC\s+[Vv]oltage\s+[Rr]ange",
     r"Input\s+[Vv]oltage\s+[Rr]ange",
     r"PV\s+[Vv]oltage\s+[Rr]ange",
@@ -350,6 +357,8 @@ _PAT_NSTRINGS = [
 # I_max_tracker — Corriente máxima de entrada por tracker
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_IMAX = [
+    # Growatt MID: "Max.input current per MPP tracker 27A" (sin espacio tras "Max.")
+    (r"Max\.?\s*input\s+current\s+per\s+MPP\s+tracker\s*[:\s]\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
     # SAJ español: "Corriente máxima de entrada [A] 32/32/32" → por MPPT = 1er valor
     (r"Corriente\s+m[aá]xima\s+de\s+entrada\s*\[\s*A\s*\]\s*([0-9]+(?:[.,][0-9]+)?)\s*/", 1),
     # Voltronic/InfiniSolar: "Number of MPP Trackers / Maximum Input Current 2 / 2 x 18.6A"
@@ -381,6 +390,8 @@ _PAT_IMAX = [
 # Isc_max_tracker — Corriente de cortocircuito máxima por tracker
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_ISC = [
+    # Growatt MID (etiqueta partida en dos líneas): "Max. short-circuit current per\nMPP tracker 33.8A"
+    (r"(?m)short[- ]?circuit\s+current\s+per\s*\n\s*MPP\s+tracker\s+([0-9]+(?:[.,][0-9]+)?)\s*A\b", 1),
     # SAJ español: "Corriente máxima de cortocircuito CC [A] 38.4/38.4/38.4" → por MPPT
     (r"Corriente\s+m[aá]xima\s+de\s+cortocircuito\s+CC\s*\[\s*A\s*\]\s*([0-9]+(?:[.,][0-9]+)?)", 1),
     # Genérico: cubre "short circuit current per MPPT", "short-circuit current input per MPPT"
@@ -672,6 +683,8 @@ def _extract_multimodel_values(text: str) -> dict:
         # Inglés (SolaX): "recommended PV array power"; Español (Growatt): la
         # etiqueta se parte en dos líneas y los valores quedan en "recomendada (STC) 100000W ..."
         if not re.search(r'recommended\s+PV\s+(?:array\s+)?power'
+                         # Growatt MID: etiqueta partida — valores en línea "(for module STC) 22500W ..."
+                         r'|for\s+module\s+STC'
                          r'|recomendada\s*\(STC\)'
                          r'|M[aá]xima\s+potencia\s+FV'
                          r'|Potencia\s+m[aá]xima\s+FV'
@@ -970,6 +983,13 @@ def _extraer_campos(texto: str) -> dict:
         if not m_rated:
             m_rated = re.search(
                 r"Tensi[oó]n\s+nominal\s+de\s+entrada\s*(?:\[\s*V\s*\])?\s*[:\(]?\s*([0-9]{2,4}(?:[.,][0-9]+)?)\s*V?",
+                texto, re.IGNORECASE,
+            )
+        # Growatt MID: "MPPT voltage range 580V" — un solo valor (tensión MPPT
+        # nominal a plena carga); el (?![-~]) evita capturar un rango real
+        if not m_rated:
+            m_rated = re.search(
+                r"MPPT\s+voltage\s+range\s*[:\s]\s*([0-9]{2,4})\s*V\b\s*(?![-~–—]|to\b)",
                 texto, re.IGNORECASE,
             )
         if m_rated:
