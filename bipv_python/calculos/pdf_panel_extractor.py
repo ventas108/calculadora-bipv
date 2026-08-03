@@ -262,8 +262,11 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
                         if not cells:
                             continue
 
-                        # Label: primera celda no vacía de la fila
-                        label = next((c for c in cells if c), "")
+                        # Label: SIEMPRE cells[0] — primera columna = columna de etiqueta.
+                        # NO usar next(c for c in cells if c) porque para filas sin
+                        # etiqueta eso devuelve el primer VALOR (ej. '124.2V') en lugar
+                        # de '' (vacío), impidiendo la detección de fila-sin-etiqueta.
+                        label = cells[0]
                         label_nfc = unicodedata.normalize("NFC", label)
 
                         field_hit: str | None = None
