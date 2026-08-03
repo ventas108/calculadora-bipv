@@ -179,18 +179,77 @@ with tab_agregar:
             help="Requiere al menos Nombre del modelo y Pmax." if not _campos_ok else "",
         )
 
-    # ── Aviso si el modelo ya existe en el catálogo ───────────────────────────
+    # ── Aviso de actualización con merge conservador ──────────────────────────
     _cat_actual = cargar_catalogo_paneles()
     _ya_existe   = modelo.strip() in _cat_actual if modelo.strip() else False
 
+    # Mapa: clave Excel → (clave catalog dict, etiqueta legible)
+    _MERGE_MAP = [
+        ("PmaxWp",             "Pmax_stc",          "Pmax (W)"),
+        ("Voc_STC",            "Voc",                "Voc (V)"),
+        ("Isc_STC",            "Isc",                "Isc (A)"),
+        ("Vmp_STC",            "Vmp",                "Vmp (V)"),
+        ("Imp_STC",            "Imp",                "Imp (A)"),
+        ("CoefVoc_C",          "CoefVoc_C",          "β Voc (%/°C)"),
+        ("CoefT_C",            "beta_mp",            "γ Pmax (%/°C)"),
+        ("NOCT_C",             "NOCT",               "NOCT (°C)"),
+        ("Ns (Celdas Serie)",  "N_s",                "Ns"),
+        ("DimensionesMM",      "dimensiones_mm",     "Dimensiones"),
+        ("TransparenciaPct",   "transparencia_pct",  "Transparencia (%)"),
+        ("CostoUSD",           "costo_usd",          "Costo USD"),
+    ]
+
     if _ya_existe:
+        _panel_actual = _cat_actual[modelo.strip()]
+        _confianza_prev = "OCR-auto" if uso_ocr else ("PDF-auto" if not es_escaneado else "Manual")
+        _row_preview = {
+            "PmaxWp":             Pmax if Pmax > 0 else None,
+            "Voc_STC":            Voc  if Voc  > 0 else None,
+            "Isc_STC":            Isc  if Isc  > 0 else None,
+            "Vmp_STC":            Vmp  if Vmp  > 0 else None,
+            "Imp_STC":            Imp  if Imp  > 0 else None,
+            "CoefVoc_C":          coef_voc  if coef_voc  != 0 else None,
+            "CoefT_C":            coef_pmax if coef_pmax != 0 else None,
+            "NOCT_C":             noct if noct > 0 else None,
+            "Ns (Celdas Serie)":  n_s  if n_s  > 0 else None,
+            "DimensionesMM":      dims.strip() or None,
+            "TransparenciaPct":   transp if transp > 0 else None,
+            "CostoUSD":           costo if costo > 0 else None,
+        }
+        _filas_comp = []
+        for _excel_k, _cat_k, _label in _MERGE_MAP:
+            _nuevo  = _row_preview.get(_excel_k)
+            _actual = _panel_actual.get(_cat_k)
+            if _nuevo is not None:
+                _accion = "🔄 Se actualiza"
+            elif _actual is not None:
+                _accion = "✅ Se conserva"
+            else:
+                _accion = "— (vacío)"
+            _filas_comp.append({
+                "Campo":    _label,
+                "Actual en catálogo": str(_actual) if _actual is not None else "—",
+                "Nuevo (PDF)":        str(_nuevo)  if _nuevo  is not None else "—",
+                "Acción":             _accion,
+            })
+
         st.warning(
-            f"⚠️ **{modelo.strip()}** ya existe en el catálogo. "
-            "Si guardas, los datos actuales se **reemplazarán** con los valores del formulario. "
-            "Los campos que dejes en 0 (Ns, costo, coeficientes no extraídos) "
-            "también sobreescribirán los que hubiera.",
+            f"⚠️ **{modelo.strip()}** ya existe. Se usa **merge conservador**: "
+            "solo se actualizan los campos que el PDF extrajo — el resto se preserva.",
             icon="⚠️",
         )
+        with st.expander("Ver qué cambia y qué se conserva", expanded=False):
+            st.dataframe(
+                pd.DataFrame(_filas_comp),
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Campo":                  st.column_config.TextColumn(width="small"),
+                    "Actual en catálogo":     st.column_config.TextColumn(width="small"),
+                    "Nuevo (PDF)":            st.column_config.TextColumn(width="small"),
+                    "Acción":                 st.column_config.TextColumn(width="medium"),
+                },
+            )
 
     if submitted:
         _confianza = "OCR-auto" if uso_ocr else ("PDF-auto" if not es_escaneado else "Manual")
@@ -215,11 +274,17 @@ with tab_agregar:
             "Confianza":          _confianza,
         }
         try:
-            nombre_guardado = guardar_panel_excel(_row)
-            st.success(
-                f"✅ **{nombre_guardado}** guardado en el catálogo.  \n"
-                f"Ya puedes seleccionarlo en Dimensionamiento."
-            )
+            nombre_guardado = guardar_panel_excel(_row, merge_conservador=_ya_existe)
+            if _ya_existe:
+                st.success(
+                    f"✅ **{nombre_guardado}** actualizado (merge conservador).  \n"
+                    "Los campos que no venían en el PDF se mantuvieron intactos."
+                )
+            else:
+                st.success(
+                    f"✅ **{nombre_guardado}** guardado en el catálogo.  \n"
+                    "Ya puedes seleccionarlo en Dimensionamiento."
+                )
             st.balloons()
         except Exception as e:
             st.error(f"❌ Error al guardar: {e}")

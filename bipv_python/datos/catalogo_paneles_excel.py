@@ -69,9 +69,22 @@ def cargar_catalogo_paneles() -> dict:
         }
     return paneles
 
-def guardar_panel_excel(datos: dict) -> str:
+def guardar_panel_excel(datos: dict, merge_conservador: bool = False) -> str:
     """
     Agrega o actualiza un panel en el Excel del catálogo.
+
+    Parámetros
+    ----------
+    datos : dict
+        Campos a escribir (claves = nombres de columna del Excel).
+        Los campos con valor None no se escriben en modo merge_conservador.
+    merge_conservador : bool (default False)
+        Si True y el panel ya existe: solo sobreescribe los campos que traigan
+        un valor no-None en `datos`. Los campos con None preservan el valor
+        que ya había en el Excel (Ns, costo, notas, coeficientes curados a mano).
+        Si False (inserción o actualización completa): escribe todos los campos,
+        incluyendo None (borra el valor anterior).
+
     Retorna el nombre del panel guardado.
     Invalida el cache de st.cache_data para que el próximo cargar_catalogo_paneles() lea el nuevo panel.
     """
@@ -96,6 +109,7 @@ def guardar_panel_excel(datos: dict) -> str:
 
     # Comprobar si ya existe una fila con ese nombre (actualizar) o agregar
     fila_existente = None
+    es_actualizacion = False
     col_tipo = None
     try:
         col_tipo = headers.index("TipoPanel") + 1   # 1-based
@@ -105,6 +119,7 @@ def guardar_panel_excel(datos: dict) -> str:
     for row in ws.iter_rows(min_row=2):
         if str(row[col_tipo - 1].value or "").strip() == nombre:
             fila_existente = row[0].row
+            es_actualizacion = True
             break
 
     if fila_existente is None:
@@ -112,9 +127,14 @@ def guardar_panel_excel(datos: dict) -> str:
 
     # Escribir datos — solo columnas que existen en el encabezado
     for col_nombre, valor in datos.items():
-        if col_nombre in headers:
-            col_idx = headers.index(col_nombre) + 1
-            ws.cell(row=fila_existente, column=col_idx, value=valor)
+        if col_nombre not in headers:
+            continue
+        # Merge conservador: si el panel ya existía y el nuevo valor es None,
+        # no sobreescribir — preservar lo que había en el Excel.
+        if merge_conservador and es_actualizacion and valor is None:
+            continue
+        col_idx = headers.index(col_nombre) + 1
+        ws.cell(row=fila_existente, column=col_idx, value=valor)
 
     # Anotar fecha de ingreso si hay columna
     for meta_col in ("FechaIngreso", "Fecha_Ingreso", "Fecha"):
