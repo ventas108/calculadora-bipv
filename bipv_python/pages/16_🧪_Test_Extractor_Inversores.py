@@ -201,68 +201,82 @@ if not _pdf_ok:
     st.warning("pdfplumber no disponible — solo se pueden probar los casos sintéticos.")
 else:
     up = st.file_uploader("Ficha técnica PDF", type=["pdf"], key="pdf_test_up")
-    if up:
-        with st.spinner("Extrayendo texto y métricas del PDF…"):
-            try:
-                res_real = extraer_parametros_inversor(up.read())
-            except Exception as _exc:
-                res_real = {"error": f"Excepción inesperada: {_exc}"}
 
+    # ── Botón explícito: evita problemas con el rerun automático del uploader ──
+    btn_extraer = st.button(
+        "🔍 Extraer métricas del PDF",
+        type="primary",
+        disabled=(up is None),
+        key="btn_extraer_pdf",
+    )
+
+    # Limpiar resultado previo si se sube un archivo nuevo
+    if up is None:
+        st.session_state.pop("pdf_extraccion_result", None)
+
+    # Ejecutar extracción SOLO al presionar el botón
+    if btn_extraer and up is not None:
+        _placeholder = st.empty()
+        _placeholder.info("⏳ Extrayendo texto y métricas del PDF…")
+        try:
+            _raw_bytes = up.read()
+            res_real   = extraer_parametros_inversor(_raw_bytes)
+        except Exception as _exc:
+            import traceback
+            res_real = {"error": f"Excepción inesperada: {_exc}\n{traceback.format_exc()}"}
+        st.session_state["pdf_extraccion_result"] = res_real
+        _placeholder.empty()
+
+    # Mostrar resultado almacenado (persiste tras el rerun del botón)
+    res_real = st.session_state.get("pdf_extraccion_result")
+
+    if res_real is not None:
         if "error" in res_real:
             st.error(f"❌ {res_real['error']}")
         else:
-            fab_real   = res_real.get("marca", "")
+            fab_real    = res_real.get("marca", "")
             modelo_real = res_real.get("modelo", "")
-            n_pages    = res_real.get("n_pages_total", "?")
-            n_chars    = res_real.get("n_chars_extraidos", 0)
-            escaneado  = res_real.get("es_escaneado", False)
-            uso_ocr    = res_real.get("uso_ocr", False)
+            n_pages     = res_real.get("n_pages_total", "?")
+            n_chars     = res_real.get("n_chars_extraidos", 0)
+            escaneado   = res_real.get("es_escaneado", False)
+            uso_ocr     = res_real.get("uso_ocr", False)
 
-            # ── Diagnóstico de calidad de extracción ──────────────────────────
+            # ── Diagnóstico de calidad ─────────────────────────────────────────
             d1, d2, d3, d4 = st.columns(4)
-            d1.metric("Páginas en el PDF",  n_pages)
-            d2.metric("Caracteres extraídos", f"{n_chars:,}")
-            d3.metric("¿PDF escaneado?",    "Sí ⚠️" if escaneado else "No ✅")
-            d4.metric("OCR usado",          "Sí" if uso_ocr else "No")
+            d1.metric("Páginas en el PDF",     n_pages)
+            d2.metric("Caracteres extraídos",  f"{n_chars:,}")
+            d3.metric("¿PDF escaneado?",        "Sí ⚠️" if escaneado else "No ✅")
+            d4.metric("OCR usado",             "Sí" if uso_ocr else "No")
 
-            # Alertas de calidad
             if escaneado and not uso_ocr:
                 st.error(
-                    "🔴 **PDF escaneado sin OCR disponible** — pdfplumber no pudo extraer texto "
-                    "porque el PDF contiene imágenes en lugar de texto seleccionable. "
-                    "Instala `pdf2image` + `tesseract` para activar el fallback OCR, "
-                    "o usa un PDF con texto seleccionable (no escaneado)."
+                    "🔴 **PDF escaneado sin OCR disponible** — el PDF contiene imágenes "
+                    "en lugar de texto seleccionable. Instala `pdf2image` + `tesseract` "
+                    "para el fallback OCR, o usa un PDF con texto seleccionable."
                 )
             elif n_chars < 200:
                 st.warning(
-                    f"⚠️ **Texto muy corto extraído ({n_chars} chars)** — el PDF puede ser "
-                    "escaneado, estar protegido, o tener las especificaciones en páginas > 8. "
-                    "Revisa el texto crudo abajo para diagnosticar."
+                    f"⚠️ **Texto muy corto ({n_chars} chars)** — PDF posiblemente escaneado, "
+                    "protegido, o especificaciones en páginas > 8. Revisa el texto crudo abajo."
                 )
             elif not fab_real:
                 st.warning(
-                    "⚠️ **Marca no detectada** — el extractor leyó texto pero no identificó "
-                    "el fabricante. Puede ser un fabricante no listado o un formato inusual. "
-                    "Revisa el texto crudo para ver qué se extrajo."
+                    "⚠️ **Marca no detectada** — texto extraído pero fabricante no identificado. "
+                    "Revisa el texto crudo para ver qué llegó."
                 )
             else:
                 st.success(
                     f"✅ **{fab_real} — {modelo_real or '(modelo no detectado)'}** · "
-                    f"{n_pages} páginas · {n_chars:,} chars extraídos"
+                    f"{n_pages} págs · {n_chars:,} chars"
                     + (" · OCR" if uso_ocr else "")
                 )
 
-            # ── Tabla de métricas extraídas ───────────────────────────────────
-            # Contar cuántos campos no son None
+            # ── Tabla de métricas ──────────────────────────────────────────────
             campos_extraidos = sum(
-                1 for c in CAMPOS_CRITICOS
-                if res_real.get(c) is not None
+                1 for c in CAMPOS_CRITICOS if res_real.get(c) is not None
             )
-            st.markdown(
-                f"**Campos extraídos: {campos_extraidos} / {len(CAMPOS_CRITICOS)}**"
-            )
+            st.markdown(f"**Campos extraídos: {campos_extraidos} / {len(CAMPOS_CRITICOS)}**")
 
-            # ¿Existe caso sintético para este fabricante?
             caso_match = next(
                 (c for c in CASOS
                  if fab_real and fab_real.lower() in c["fabricante"].lower()),
@@ -277,24 +291,22 @@ else:
                     ex  = res_real.get(campo)
                     emoji, detalle = _comparar(ex, esp)
                     comp_rows.append({
-                        "Campo":              CAMPO_LABELS[campo],
-                        "Estado":             emoji,
-                        "PDF real":           str(ex) if ex is not None else "None",
-                        "Sintético (esp)":    str(esp) if esp is not None else "N/D",
+                        "Campo":           CAMPO_LABELS[campo],
+                        "Estado":          emoji,
+                        "PDF real":        str(ex) if ex is not None else "None",
+                        "Sintético (esp)": str(esp) if esp is not None else "N/D",
                     })
                 st.dataframe(pd.DataFrame(comp_rows), use_container_width=True, hide_index=True)
             else:
-                st.info(
-                    f"{'No hay caso sintético para **' + fab_real + '**.' if fab_real else 'Marca no detectada.'} "
-                    "Valores extraídos:"
-                )
+                label = f"No hay caso sintético para **{fab_real}**." if fab_real else "Marca no detectada."
+                st.info(f"{label} Valores extraídos:")
                 raw_rows = [
                     {"Campo": CAMPO_LABELS.get(c, c), "Valor": str(res_real.get(c))}
                     for c in CAMPOS_CRITICOS
                 ]
                 st.dataframe(pd.DataFrame(raw_rows), use_container_width=True, hide_index=True)
 
-            # Auto-abrir texto crudo cuando hay problemas de calidad
+            # Texto crudo — auto-abierto si hay problemas
             _auto_open = (escaneado or n_chars < 500 or campos_extraidos < 4 or not fab_real)
             with st.expander("🔍 Texto crudo extraído del PDF", expanded=_auto_open):
                 texto_crudo = res_real.get("texto_crudo", "")
@@ -302,7 +314,7 @@ else:
                     st.text(texto_crudo)
                 else:
                     st.warning(
-                        "Sin texto extraído — el PDF es probable que sea escaneado "
+                        "Sin texto extraído — PDF posiblemente escaneado "
                         "(imágenes sin texto seleccionable)."
                     )
 
