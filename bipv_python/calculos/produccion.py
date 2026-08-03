@@ -144,7 +144,12 @@ def simular_produccion_anual(
     G_eff = np.clip(G_raw * factor_pr_mismatch, 0, None)
 
     # ── Temperatura de celda hora a hora (modelo NOCT) ────────────────────────
-    NOCT  = float(panel.get("NOCT", 45.0))
+    try:
+        NOCT = float(panel.get("NOCT") or 45.0)
+        if not (20.0 < NOCT < 100.0):
+            NOCT = 45.0
+    except (TypeError, ValueError):
+        NOCT = 45.0
     T_cel = T_amb + (NOCT - 20.0) / 800.0 * G_eff
 
     # ── SDM vectorizado — Pmax por módulo ─────────────────────────────────────

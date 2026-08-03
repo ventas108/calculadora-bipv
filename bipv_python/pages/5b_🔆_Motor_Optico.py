@@ -29,8 +29,14 @@ if not st.session_state.get("recurso_solar_ok"):
     )
     st.stop()
 
-tmy_df  = st.session_state["tmy_df"]
-poa_df  = st.session_state["poa_df"]
+tmy_df  = st.session_state.get("tmy_df")
+poa_df  = st.session_state.get("poa_df")
+if tmy_df is None or poa_df is None:
+    st.error(
+        "❌ Los datos del Recurso Solar no están disponibles en sesión. "
+        "Ejecuta ☀️ **Recurso Solar** de nuevo y vuelve aquí."
+    )
+    st.stop()
 poa_anual_bruta = st.session_state.get("poa_anual_kWh_m2", 0.0)
 tilt    = st.session_state.get("tilt_fachada", 90)
 azimuth = st.session_state.get("azimuth_fachada", 0)
@@ -87,7 +93,10 @@ if _panel_detectado and _panel_cambio:
         st.session_state["mo_noct"] = 50.0   # BIPV sin datahoja → conservador
 
     # ── γ coeficiente temperatura (%/°C) ──────────────────────────────────
-    _gamma_raw = _panel_dict.get("gamma_mp") or _panel_dict.get("beta_mp")
+    # Usar `is None` para no tratar 0.0 como falsy
+    _gamma_raw = _panel_dict.get("gamma_mp")
+    if _gamma_raw is None:
+        _gamma_raw = _panel_dict.get("beta_mp")
     if _gamma_raw and -0.70 <= float(_gamma_raw) <= -0.05:
         st.session_state["mo_coef_temp"] = float(_gamma_raw)
     else:
@@ -324,7 +333,8 @@ if run_btn:
             )
             # ── Guardar en session_state ──────────────────────────────────────
             poa_ef_df = poa_df.copy()
-            poa_ef_df["poa_global"] = result_df["poa_efectiva"].values
+            # reindex garantiza alineación por índice (no posicional con .values)
+            poa_ef_df["poa_global"] = result_df["poa_efectiva"].reindex(poa_ef_df.index).fillna(0.0)
 
             st.session_state["motor_optico_ok"]            = True
             st.session_state["motor_optico_result_df"]     = result_df
@@ -370,10 +380,13 @@ cm1.metric(
     f"{_bruta:,.0f} kWh/m²/año",
     help="Irradiancia plano de array sin correcciones.",
 )
+def _pct(val, total):
+    return f"−{val/total*100:.1f}%" if total > 0 else "—"
+
 cm2.metric(
     "Pérdida IAM total",
     f"−{summary['perdida_iam_kWh_m2']:,.0f} kWh/m²/año",
-    f"−{summary['perdida_iam_kWh_m2']/_bruta*100:.1f}%",
+    _pct(summary['perdida_iam_kWh_m2'], _bruta),
     delta_color="inverse",
     help=(
         "Reflexión sobre la componente directa (ASHRAE b₀) "
@@ -383,14 +396,14 @@ cm2.metric(
 cm3.metric(
     "Pérdida soiling",
     f"−{summary['perdida_soil_kWh_m2']:,.0f} kWh/m²/año",
-    f"−{summary['perdida_soil_kWh_m2']/_bruta*100:.1f}%",
+    _pct(summary['perdida_soil_kWh_m2'], _bruta),
     delta_color="inverse",
     help=f"Suciedad estacional Colombia × k_vert={summary.get('k_soiling_vert', 1.0):.2f} (auto-limpieza fachada).",
 )
 cm4.metric(
     "Pérdida térmica",
     f"−{summary['perdida_term_kWh_m2']:,.0f} kWh/m²/año",
-    f"−{summary['perdida_term_kWh_m2']/_bruta*100:.1f}%",
+    _pct(summary['perdida_term_kWh_m2'], _bruta),
     delta_color="inverse",
     help=f"Caída de eficiencia por temperatura > 25°C (k_BIPV={summary['k_bipv']}).",
 )
@@ -600,7 +613,8 @@ st.markdown("---")
 st.subheader("⚖️ 5. Impacto en el proyecto: con y sin correcciones ópticas")
 
 delta_kWh   = summary["poa_bruta_anual_kWh_m2"] - summary["poa_efectiva_anual_kWh_m2"]
-pct_impacto = delta_kWh / summary["poa_bruta_anual_kWh_m2"] * 100
+pct_impacto = (delta_kWh / summary["poa_bruta_anual_kWh_m2"] * 100
+               if summary["poa_bruta_anual_kWh_m2"] > 0 else 0.0)
 
 cmp1, cmp2, cmp3 = st.columns(3)
 cmp1.metric(

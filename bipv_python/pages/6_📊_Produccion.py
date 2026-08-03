@@ -23,7 +23,10 @@ if not st.session_state.get("recurso_solar_ok"):
     st.warning("⚠️ Primero ejecuta ☀️ Recurso Solar para obtener el TMY del sitio.")
     st.stop()
 
-tmy             = st.session_state["tmy_df"]
+tmy             = st.session_state.get("tmy_df")
+if tmy is None:
+    st.error("❌ TMY no disponible en sesión. Ejecuta ☀️ **Recurso Solar** de nuevo.")
+    st.stop()
 ciudad          = st.session_state.get("tmy_ciudad", "—")
 poa_bruta_anual = st.session_state.get("poa_anual_kWh_m2", 0.0)
 
@@ -38,7 +41,7 @@ poa_ef    = st.session_state.get("poa_efectiva_kWh_m2", poa_bruta_anual)
 
 if _motor_ok:
     # Motor Óptico disponible — usar POA corregida hora a hora (IAM + Soiling + Térmico)
-    poa_base          = st.session_state["poa_efectiva_df"]
+    poa_base          = st.session_state.get("poa_efectiva_df") or st.session_state.get("poa_df")
     poa_base_label    = "POA efectiva — Motor Óptico"
     poa_display_anual = st.session_state.get("poa_efectiva_anual_kWh_m2", poa_bruta_anual)
     _factor_global_mo = _mo_summary.get("factor_global", 1.0)
@@ -521,8 +524,10 @@ if btn_sim or st.session_state.get("produccion_ok"):
     _e_ac_stc_mes  = (_e_dc_mes + _perdida_t_mes) * eta_inv_frac  # kWh, T=25°C
 
     # Coeficiente de temperatura de Pmax del panel (%/°C → fracción/°C)
-    gamma_pct = panel.get("Tk_gamma", -0.45)          # %/°C  (negativo)
-    gamma_frac = gamma_pct / 100.0                     # fracción/°C
+    # Usar `is None` para no tratar 0.0 como falsy; fallback si clave existe con None
+    _tk_raw = panel.get("Tk_gamma")
+    gamma_pct  = float(_tk_raw) if _tk_raw is not None else -0.45   # %/°C (negativo)
+    gamma_frac = gamma_pct / 100.0                                   # fracción/°C
 
     meses_etiq = ["Ene","Feb","Mar","Abr","May","Jun",
                   "Jul","Ago","Sep","Oct","Nov","Dic"]
