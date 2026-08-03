@@ -186,15 +186,24 @@ def _find_range(label_patterns, text, use_sma_fallback=True):
 # Vdc_max — Tensión DC Máxima (límite físico absoluto)
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_VDCMAX = [
-    # Inglés directo — también "(V): N" (LuxPower): "Max. PV input voltage (V): 600"
-    (r"Max(?:imum)?\.?\s*(?:PV\s+)?(?:Input|Array|DC)\s+(?:Open\s+Circuit\s+)?[Vv]oltage\s*(?:\([Vv]\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V?(?!\s*/)", 1),
-    # Gap 7 (SolaX X3-PRO): "Max. PV input voltage [V]: 800" — valor tras corchete [V]
+    # Patrón primario: acepta cualquier separador sin dígito ni newline (≤15 chars) entre
+    # el label y el valor. Cubre:
+    #   · "Max. PV input voltage: 1100 V"          (separador ": ")
+    #   · "Max. PV input voltage (V): 600"          (LuxPower)
+    #   · "Max. PV input voltage [V]: 800"          (X3-PRO)
+    #   · "Max. PV input voltage  V  1100"          (X3-FORTH pdfplumber 3-columnas)
+    #   · "Max. PV input voltage ① 1100 V"          (X3-FORTH pdfplumber, misma línea)
+    # NO cruza salto de línea ([^\d\n]), por lo que falla limpiamente cuando el valor
+    # está en la línea siguiente (pdftotext -layout) → cae al patrón multilinea.
+    (r"Max(?:imum)?\.?\s*(?:PV\s+)?(?:Input|Array|DC)\s+(?:Open\s+Circuit\s+)?[Vv]oltage[^\d\n]{0,15}([0-9]+(?:[.,][0-9]+)?)\s*V?(?!\s*/)", 1),
+    # Gap 7 (X3-PRO) mantenido como seguridad — ya cubierto arriba
     (r"Max(?:imum)?\.?\s*(?:PV\s+)?[Ii]nput\s+[Vv]oltage\s*\[V\]\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)", 1),
-    # SolaX X3-FORTH tabla 3 columnas: "Max. PV input voltage  V  1100"
-    # pdfplumber une [Parámetro | Unidad | Valor] con "  " → unidad queda ENTRE label y número
-    (r"Max(?:imum)?\.?\s+(?:DC\s+)?(?:PV\s+)?[Ii]nput\s+[Vv]oltage\s+[Vv]\s+([0-9]+(?:[.,][0-9]+)?)", 1),
-    # Multilinea SolaX: label en línea 1 (con posibles notas ①②③), valor en línea 2
-    # [^\n]* acepta "Max. PV input voltage   ①\n   1100 V" (nota entre label y salto de línea)
+    # Multilinea pdftotext -layout: label en línea N (con notas ①②③), valor en línea N+1
+    # Ej: "Max. PV input voltage   ①\n                          1100 V"
+    # IMPORTANTE: este patrón actúa como FALLBACK cuando el patrón primario falla.
+    # Con pdfplumber el valor ya está en la misma línea que el label → el patrón
+    # primario lo captura y NUNCA llega aquí; así se evita capturar "580 V@220 V"
+    # (tensión nominal con red 220 V) que aparece en la línea inmediatamente siguiente.
     (r"Max(?:imum)?\.?\s+(?:DC\s+)?(?:PV\s+)?[Ii]nput\s+[Vv]oltage[^\n]*\n\s*([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?", 1),
     (r"Max(?:imum)?\s+PV\s+VOC\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"Max\.\s*DC\s+[Ii]nput\s+[Vv]oltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
