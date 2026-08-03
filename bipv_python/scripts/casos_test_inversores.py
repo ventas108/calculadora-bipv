@@ -675,6 +675,155 @@ Max. input short circuit current per MPPT   46 d.c. A
         },
     },
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # SAJ R6 — etiquetas en español con unidad entre corchetes [V]/[A]/[Wp]@STC
+    # (valores por modelo en columnas y listas con "/")
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "SAJ",
+        "modelo":     "R6-20K-T3-32-LV",
+        "arquitectura": "Inversor de red trifásico",
+        "texto": """\
+SAJ R6 Series
+Model R6-20K-T3-32-LV R6-25K-T4-32-LV R6-30K-T4-32-LV
+Potencia máxima FV [Wp]@STC 30000 37500 45000
+Tensión máxima de entrada [V] 1100
+Rango de tensión MPPT [V] 180~1000
+Tensión nominal de entrada [V] 370
+Tensión de arranque [V] 200
+Corriente máxima de entrada [A] 32/32/32 32/32/32/32
+Corriente máxima de cortocircuito CC [A] 38.4/38.4/38.4 38.4/38.4/38.4/38.4
+No. de cadenas por MPPT 2/2/2 2/2/2/2
+No. de MPPT 3 4 4
+Corriente de salida CA nominal [A] a 230 VCA 52.5 65.6 78.7
+""",
+        "esperado": {
+            "Vdc_max":           1100,
+            "Vmppt_min":          180,
+            "Vmppt_max":         1000,
+            "V_mppt_activo":      370,
+            "V_arranque":         200,
+            "n_trackers":           3,
+            "n_strings_tracker":    2,
+            "I_max_tracker":       32,
+            "Isc_max_tracker":   38.4,
+            "P_dc_max_W":       30000,
+            "bat_voltaje_min":   None,
+            "bat_voltaje_max":   None,
+        },
+    },
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Growatt MID 15-25KTL3-X — "Normal Voltage" como rango MPPT (con línea CA
+    # adversarial cerca), rango de un solo valor → MPPT activo, pseudo-rango
+    # "27A 27A" que no debe tomarse como rango, e Isc con etiqueta partida
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "Growatt",
+        "modelo":     "MID-25KTL3-X (formato Normal Voltage)",
+        "arquitectura": "Inversor de red trifásico",
+        "texto": """\
+Growatt MID 15-25KTL3-X
+Max. DC voltage 1100V
+Start Voltage 250V
+Normal Voltage 200V-1000V
+MPPT voltage range 580V
+No. of MPP trackers/strings per
+MPP tracker 2/2 2/2 2/2 2/2 2/3
+Max.input current per MPP tracker 27A 27A 27A 27A 27A/40.5A
+Max. short-circuit current per
+MPP tracker 33.8A 33.8A 33.8A 33.8A 33.8A/50.6A
+AC output
+Normal Voltage 230/400VAC
+Max. AC apparent power 16600VA 18800VA 22000VA 24400VA 27700VA
+""",
+        "esperado": {
+            "Vdc_max":           1100,
+            "Vmppt_min":          200,
+            "Vmppt_max":         1000,
+            "V_mppt_activo":      580,
+            "V_arranque":         250,
+            "n_trackers":           2,
+            "n_strings_tracker": None,  # etiqueta partida "trackers/strings per\\nMPP tracker 2/2" — no soportada aún
+            "I_max_tracker":       27,
+            "Isc_max_tracker":   33.8,
+            "P_dc_max_W":        None,
+            "bat_voltaje_min":   None,
+            "bat_voltaje_max":   None,
+        },
+    },
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Deye TriP2-LB-3P — nombres de modelo partidos en dos líneas, unidad en la
+    # etiqueta "(V) 690", corrientes por MPPT con listas "/" y P_dc por columna
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "Deye",
+        "modelo":     "TriP2-LB-3P 5K",
+        "arquitectura": "Inversor híbrido trifásico",
+        "texto": """\
+HYBRID SERIES
+Three Phase Hybrid Inverter
+Model TriP2-LB- TriP2-LB- TriP2-LB- TriP2-LB- TriP2-LB- TriP2-LB- TriP2-LB-
+3P 5K 3P 6K 3P 8K 3P 10K 3P 12K 3P 15K 3P 20K
+Max. PV input power (W) 7500 9000 12000 15000 18000 22500 30000
+Rated PV input voltage (V) 690
+Max. PV input voltage (V) 1000
+MPPT voltage range (V) 200 ~ 900
+Start-up voltage (V) 100
+Number of independent MPPT inputs 3 / (1:1:1)
+Max. PV input current per MPPT (A) 20 / 20 / 20
+Max. PV short-circuit current input per MPPT 25 / 25 / 25
+Battery voltage range (V) 40 - 60
+""",
+        "esperado": {
+            "Vdc_max":           1000,
+            "Vmppt_min":          200,
+            "Vmppt_max":          900,
+            "V_mppt_activo":      690,
+            "V_arranque":         100,
+            "n_trackers":           3,
+            "n_strings_tracker":    1,
+            "I_max_tracker":       20,
+            "Isc_max_tracker":     25,
+            "P_dc_max_W":        None,   # global ausente; por modelo 7500-30000
+            "bat_voltaje_min":     40,
+            "bat_voltaje_max":     60,
+        },
+    },
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Voltronic InfiniSolar — folleto de familia con secciones "MODEL <nombre>"
+    # y etiquetas dobles con "/" (Nominal/Max, Start-up/Initial, Trackers/Imax)
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "Voltronic",
+        "modelo":     "InfiniSolar 2KW",
+        "arquitectura": "Inversor híbrido",
+        "texto": """\
+InfiniSolar Hybrid Inverter
+MODEL InfiniSolar 2KW
+Maximum PV Input Power 2250W
+Nominal DC Voltage / Maximum DC Voltage 300 VDC / 350 VDC
+Start-up Voltage / Initial Feeding Voltage 80 VDC / 120 VDC
+MPP Voltage Range 150 VDC ~ 320 VDC
+Number of MPP Trackers / Maximum Input Current 1 / 1 x 15 A
+Output Voltage Range 88 - 127 VAC*
+""",
+        "esperado": {
+            "Vdc_max":            350,
+            "Vmppt_min":          150,
+            "Vmppt_max":          320,
+            "V_arranque":          80,
+            "n_trackers":           1,
+            "I_max_tracker":       15,
+            "Isc_max_tracker":   None,
+            "P_dc_max_W":        2250,
+            "bat_voltaje_min":   None,
+            "bat_voltaje_max":   None,
+        },
+    },
+
 ]
 
 # Campos que se comparan (ordenados para la tabla de cobertura)
