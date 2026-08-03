@@ -190,9 +190,14 @@ _PAT_VDCMAX = [
     (r"Max(?:imum)?\.?\s*(?:PV\s+)?(?:Input|Array|DC)\s+(?:Open\s+Circuit\s+)?[Vv]oltage\s*(?:\([Vv]\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V?(?!\s*/)", 1),
     # Gap 7 (SolaX X3-PRO): "Max. PV input voltage [V]: 800" — valor tras corchete [V]
     (r"Max(?:imum)?\.?\s*(?:PV\s+)?[Ii]nput\s+[Vv]oltage\s*\[V\]\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)", 1),
+    # SolaX X3-FORTH tabla 3 columnas: "Max. PV input voltage  V  1100"
+    # pdfplumber une [Parámetro | Unidad | Valor] con "  " → unidad queda ENTRE label y número
+    (r"Max(?:imum)?\.?\s+(?:DC\s+)?(?:PV\s+)?[Ii]nput\s+[Vv]oltage\s+[Vv]\s+([0-9]+(?:[.,][0-9]+)?)", 1),
+    # Multilinea SolaX: label en línea 1, valor en línea 2 (pdfplumber extract_text tabla vertical)
+    (r"Max(?:imum)?\.?\s+(?:DC\s+)?(?:PV\s+)?[Ii]nput\s+[Vv]oltage\s*\n\s*([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?", 1),
     (r"Max(?:imum)?\s+PV\s+VOC\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"Max\.\s*DC\s+[Ii]nput\s+[Vv]oltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
-    (r"PV\s+input\s+voltage\s*\(max\.\?\)\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
+    (r"PV\s+input\s+voltage\s*\(max\.?\)\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",  1),
     (r"PV\s+[Vv]oltage\s+[Rr]ange.*?~\s*([0-9]+(?:[.,][0-9]+)?)\s*V",             1),
     # Español
     (r"Tensi[oó]n\s+DC\s+M[aá]xima?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",      1),
@@ -330,6 +335,11 @@ _PAT_PDCMAX = [
     # Gap 4: kW sin 'p' (Sungrow, Huawei) — también ×1000 en lógica
     (r"Max(?:imum)?\.?\s+(?:PV\s+)?(?:DC\s+)?(?:[Ii]nput\s+)?[Pp]ower\s*\[?kW\]?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*kW(?!p)", 1),
     (r"Recommended\s+max(?:imum)?\s+PV\s+power\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*kW(?!p)", 1),
+    # SolaX X3-FORTH tabla 3 columnas: "Max. recommended PV array power  kWp  150"
+    # pdfplumber une [Parámetro | Unidad | Valor] → "kWp" queda entre label y número
+    (r"Max(?:imum)?\.?\s+recommended\s+PV\s+(?:array\s+)?[Pp]ower\s+kWp?\s+([0-9]+(?:[.,][0-9]+)?)", 1),
+    # SolaX X3-FORTH misma línea: "Max. recommended PV array power: 150 kWp"
+    (r"Max(?:imum)?\.?\s+recommended\s+PV\s+(?:array\s+)?[Pp]ower\s*[:\|]?\s*([0-9]+(?:[.,][0-9]+)?)\s*kWp?", 1),
     # Watts directo — acepta "(W): N" (unit en paréntesis antes del valor)
     (r"Max(?:imum)?\.?\s+(?:DC\s+)?[Ii]nput\s+[Pp]ower\s*(?:\([A-Za-z]+\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)", 1),
     (r"Max(?:imum)?\.?\s+PV\s+[Aa]rray\s+[Pp]ower\s*(?:\([A-Za-z]+\))?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*[Ww]?", 1),
@@ -598,16 +608,29 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
                 p_kw_converted = v * 1000
 
     # Intento 3: SolaX X3-FORTH — "Max. recommended PV array power" seguido de
-    # valor kWp en la 1ª–3ª línea siguiente (tabla multicolumna)
+    # valor kWp en la 1ª–5ª línea siguiente (tabla multicolumna, puede tener
+    # líneas intermedias con otras etiquetas o unidades)
     if p_kw_converted is None:
         m_rec = re.search(
-            r"Max\.\s+recommended\s+PV\s+(?:array\s+)?[Pp]ower[^\n]*\n"
-            r"(?:[^\n]*\n){1,3}\s*([0-9]+(?:[.,][0-9]+)?)\s*kWp?\b",
+            r"Max(?:imum)?\.?\s+recommended\s+PV\s+(?:array\s+)?[Pp]ower[^\n]*\n"
+            r"(?:[^\n]*\n){0,5}\s*([0-9]+(?:[.,][0-9]+)?)\s*kWp?\b",
             texto, re.IGNORECASE,
         )
         if m_rec:
             v = _num(m_rec.group(1))
-            if v and v < 1000:       # sanity: viene en kWp
+            if v and v < 10000:      # sanity: viene en kWp (< 10 MWp)
+                p_kw_converted = v * 1000
+
+    # Intento 4: SolaX X3-FORTH tabla 3 columnas en misma línea
+    # "Max. recommended PV array power  kWp  150" (unidad antes del valor)
+    if p_kw_converted is None:
+        m_rec_sl = re.search(
+            r"Max(?:imum)?\.?\s+recommended\s+PV\s+(?:array\s+)?[Pp]ower\s+kWp?\s+([0-9]+(?:[.,][0-9]+)?)",
+            texto, re.IGNORECASE,
+        )
+        if m_rec_sl:
+            v = _num(m_rec_sl.group(1))
+            if v and v < 10000:
                 p_kw_converted = v * 1000
 
     P_dc_max_W = p_kw_converted or _find(_PAT_PDCMAX, texto)
@@ -627,8 +650,8 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
     if Vmppt_min is not None and Vmppt_max is not None:
         if not (10 <= Vmppt_min < Vmppt_max <= 1500):
             Vmppt_min = Vmppt_max = None
-    # n_trackers: entre 1 y 12
-    if n_trackers is not None and not (1 <= n_trackers <= 12):
+    # n_trackers: entre 1 y 24 (inversor C&I de hasta 24 MPPTs)
+    if n_trackers is not None and not (1 <= n_trackers <= 24):
         n_trackers = None
     # n_strings_tracker: entre 1 y 6
     if n_strings_tracker is not None and not (1 <= n_strings_tracker <= 6):
