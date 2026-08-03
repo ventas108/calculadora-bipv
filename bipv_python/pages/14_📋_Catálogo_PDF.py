@@ -179,6 +179,19 @@ with tab_agregar:
             help="Requiere al menos Nombre del modelo y Pmax." if not _campos_ok else "",
         )
 
+    # ── Aviso si el modelo ya existe en el catálogo ───────────────────────────
+    _cat_actual = cargar_catalogo_paneles()
+    _ya_existe   = modelo.strip() in _cat_actual if modelo.strip() else False
+
+    if _ya_existe:
+        st.warning(
+            f"⚠️ **{modelo.strip()}** ya existe en el catálogo. "
+            "Si guardas, los datos actuales se **reemplazarán** con los valores del formulario. "
+            "Los campos que dejes en 0 (Ns, costo, coeficientes no extraídos) "
+            "también sobreescribirán los que hubiera.",
+            icon="⚠️",
+        )
+
     if submitted:
         _confianza = "OCR-auto" if uso_ocr else ("PDF-auto" if not es_escaneado else "Manual")
         _row = {
