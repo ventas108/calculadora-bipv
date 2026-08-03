@@ -520,10 +520,11 @@ with tab_modelo:
             name=f"Paneles BIPV ({n_shown} unid.{_ghost_label})",
             hovertemplate=(
                 f"<b>Paneles BIPV</b><br>"
-                f"POA {mes_nombre}: {poa_val:.0f} kWh/m²<br>"
-                f"Módulos instalados: {n_shown}"
+                f"Módulos: {n_shown}"
                 + (f" / {n_capacity} posibles" if n_active < n_capacity else "")
-                + "<br><extra></extra>"
+                + f"<br>Potencia: {round(n_shown * pmax_panel / 1000, 2):.2f} kWp<br>"
+                f"POA {mes_nombre}: {poa_val:.0f} kWh/m²<br>"
+                f"<extra></extra>"
             ),
         )
 
@@ -694,7 +695,8 @@ with tab_modelo:
         title=dict(
             text=(f"<b>Modelo 3D — {nombre_proy}</b><br>"
                   f"<sub>{ciudad} · {orient_label} · "
-                  f"POA {mes_nombre}: <b>{poa_mes:.0f} kWh/m²</b></sub>"),
+                  f"<b>{n_shown} módulos · {round(n_shown * pmax_panel / 1000, 2):.2f} kWp</b> · "
+                  f"POA {mes_nombre}: {poa_mes:.0f} kWh/m²</sub>"),
             x=0.5, xanchor='center', font=dict(size=14, color='white'),
         ),
         legend=dict(
