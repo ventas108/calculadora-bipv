@@ -39,31 +39,43 @@ _PATTERNS = {
         r'(?:Pmax|P_max|Pmpp|Potencia\s+M[aá]xima?|Maximum\s+Power|Rated\s+Power|STC\s+Power|Peak\s+Power)\s*[:\(]?\s*([0-9]+(?:\.[0-9]+)?)\s*W',
         r'([0-9]{2,3}(?:\.[0-9]+)?)\s*Wp\b',
         r'P\s*[=:]\s*([0-9]+(?:\.[0-9]+)?)\s*W',
+        # SolTech OCR: "Potencia Máxima (Pmax) 520" — sin unidad tras el número
+        r'Potencia\s+M[aá]xima\s*\([^)\n]{1,12}\)\s*[:\|]?\s*([0-9]{2,4}(?:\.[0-9]+)?)\b',
     ],
     "Voc": [
         r'(?:Voc|V_oc|VOC|Open[- ]?[Cc]ircuit\s+[Vv]oltage|Tensi[oó]n\s+(?:de\s+)?[Cc]ircuito\s+[Aa]bierto)\s*[:\(°]?\s*([0-9]+(?:\.[0-9]+)?)\s*V',
         r'VOC?\s*\(V\)\s*[:\|]?\s*([0-9]+(?:\.[0-9]+)?)',
         r'Voc\s*=\s*([0-9]+(?:\.[0-9]+)?)',
+        # SolTech OCR: "Voltaje Circuito Abierto (Voc) 49.8"
+        r'(?:Voltaje|Tensi[oó]n)\s+(?:de\s+)?[Cc]ircuito\s+[Aa]bierto\s*\([^)\n]{1,10}\)\s*([0-9]+(?:\.[0-9]+)?)',
     ],
     "Isc": [
         r'(?:Isc|I_sc|ISC|Short[- ]?[Cc]ircuit\s+[Cc]urrent|Corriente\s+(?:de\s+)?[Cc]ortocircuito)\s*[:\(°]?\s*([0-9]+(?:\.[0-9]+)?)\s*A',
         r'ISC?\s*\(A\)\s*[:\|]?\s*([0-9]+(?:\.[0-9]+)?)',
         r'Isc\s*=\s*([0-9]+(?:\.[0-9]+)?)',
+        # SolTech OCR: "Corriente Corto Circuito (Isc) 13.56"
+        r'Corriente\s+(?:de\s+)?[Cc]orto\s*[Cc]ircuito\s*\([^)\n]{1,10}\)\s*([0-9]+(?:\.[0-9]+)?)',
     ],
     "Vmp": [
         r'(?:Vmpp|Vmp|V_mp|VMPP|Maximum\s+Power\s+Voltage|Tensi[oó]n\s+(?:de\s+)?[Mm][aá]xima?\s+[Pp]otencia)\s*[:\(]?\s*([0-9]+(?:\.[0-9]+)?)\s*V',
         r'VMPP?\s*\(V\)\s*[:\|]?\s*([0-9]+(?:\.[0-9]+)?)',
         r'Vmp\s*=\s*([0-9]+(?:\.[0-9]+)?)',
+        # SolTech OCR: "Voltaje Máximo (Vmp) 42.3" — el subíndice se pierde en OCR
+        r'Voltaje\s+M[aá]ximo\s*\([^)\n]{1,10}\)\s*([0-9]+(?:\.[0-9]+)?)',
     ],
     "Imp": [
         r'(?:Impp|Imp|I_mp|IMPP|Maximum\s+Power\s+Current|Corriente\s+(?:de\s+)?[Mm][aá]xima?\s+[Pp]otencia)\s*[:\(]?\s*([0-9]+(?:\.[0-9]+)?)\s*A',
         r'IMPP?\s*\(A\)\s*[:\|]?\s*([0-9]+(?:\.[0-9]+)?)',
         r'Imp\s*=\s*([0-9]+(?:\.[0-9]+)?)',
+        # SolTech OCR: "Corriente Máxima (Imp) 12.31"
+        r'Corriente\s+M[aá]xima\s*\([^)\n]{1,10}\)\s*([0-9]+(?:\.[0-9]+)?)',
     ],
     "N_s": [
         r'(?:N[oú]mero\s+de\s+c[eé]lulas?|Number\s+of\s+cells?|Cell\s+Number|Cells?\s+[Ss]eries?|Celdas?\s+en\s+[Ss]erie)\s*[:\|]?\s*([0-9]+)',
         r'(?:N_s|Ns|NSA)\s*[:\|=]?\s*([0-9]+)',
         r'\b([0-9]{2,3})\s+(?:cells?|c[eé]lulas?)\b',
+        # SolTech OCR: "N De Celdas 144 (12 x 12)"
+        r'N[°º]?\s*[Dd]e\s+[Cc]eldas\s*[:\|]?\s*([0-9]{1,3})\b',
     ],
     "CoefVoc": [
         r'(?:β|beta|β_Voc|Coef(?:icient)?\s+(?:of\s+)?(?:Temp(?:erature)?\s+(?:of\s+)?)?Voc|Temperatura\s+Voc|TK\s*Voc)\s*[:\(]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
@@ -73,24 +85,26 @@ _PATTERNS = {
         r'temperatura\s+para\s+voltaje[^%\n]*?([+-]?[0-9]*\.?[0-9]+)\s*%',
         # SolTech: "Coeficientes de temperatura de Voc TKβ(%/℃) -0.321"
         # (el % viene ANTES del número, dentro de la unidad entre paréntesis)
-        r'temperatura\s+de\s+Voc\b[^\n0-9+-]*([+-]?[0-9]+\.[0-9]+)',
+        r'temp(?:eratura)?\s+de\s+Voc\b[^\n0-9+-]*([+-]?[0-9]+\.[0-9]+)',
     ],
     "CoefIsc": [
         r'(?:α|alpha|α_Isc|Coef(?:icient)?\s+(?:of\s+)?(?:Temp(?:erature)?\s+(?:of\s+)?)?Isc|Temperatura\s+Isc|TK\s*Isc)\s*[:\(]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
         r'(?:α|alpha)I?[Ss][Cc]?\s*=?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
         # SolTech: "Coeficientes de temperatura de Isc TKα(%/℃) +0.06"
-        r'temperatura\s+de\s+Isc\b[^\n0-9+-]*([+-]?[0-9]+\.[0-9]+)',
+        r'temp(?:eratura)?\s+de\s+Isc\b[^\n0-9+-]*([+-]?[0-9]+\.[0-9]+)',
     ],
     "CoefPmax": [
         r'(?:γ|gamma|γ_Pmax|Coef(?:icient)?\s+(?:of\s+)?(?:Temp(?:erature)?\s+(?:of\s+)?)?P(?:max|mpp)|Temperatura\s+P(?:max|mpp)|TK\s*P(?:max|mpp))\s*[:\(]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
         r'(?:γ|gamma)P?\s*=?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
         r'Pmax\s+coeff?\.?\s*[:\|]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
         # SolTech: "Coeficientes de temperatura de Pm TKγ(%/℃) -0.214"
-        r'temperatura\s+de\s+Pm(?:ax|pp)?\b[^\n0-9+-]*([+-]?[0-9]+\.[0-9]+)',
+        r'temp(?:eratura)?\s+de\s+Pm(?:ax|pp)?\b[^\n0-9+-]*([+-]?[0-9]+\.[0-9]+)',
     ],
     "NOCT": [
         r'(?:NOCT|NMOT|Normal(?:ized)?\s+(?:Operating)?\s+Cell\s+Temp(?:erature)?|Temperatura\s+(?:de\s+)?[Oo]peraci[oó]n\s+Normal)\s*[:\(]?\s*([0-9]+(?:\.[0-9]+)?)\s*°?C',
         r'NOCT\s*=\s*([0-9]+(?:\.[0-9]+)?)',
+        # SolTech OCR: "Temperatura Operativa Nominal Del Módulo 41 +/-2°C"
+        r'Temperatura\s+Operativa\s+Nominal[^\n0-9]*([0-9]{2}(?:\.[0-9]+)?)',
     ],
     "dimensiones": [
         r'([0-9]{3,4})\s*[×xX*]\s*([0-9]{3,4})\s*[×xX*]\s*([0-9]+)\s*mm',
@@ -637,6 +651,16 @@ def _detect_technology(text: str) -> str:
 
 
 def _extract_model_name(text: str) -> str:
+    # Prioridad 1: fichas con columna "Modelo" — el código aparece tras la línea
+    # "(Rendimiento a STC:...)": p.ej. SolTech "SMF 520J - 12X 12UW".
+    # Es más confiable que buscar códigos sueltos (el OCR genera basura tipo
+    # "m4Zm-2700" que de otro modo ganaría).
+    m = re.search(
+        r'\(Rendimiento\s+a\s+STC[^)\n]*\)\s*([A-Z0-9][A-Za-z0-9 \-\./]{3,40}?)\s*$',
+        text, re.IGNORECASE | re.MULTILINE,
+    )
+    if m:
+        return m.group(1).strip()
     for line in text.splitlines()[:30]:
         line = line.strip()
         m = re.match(r'^([A-Z]{2,8}[-_][A-Z0-9\-\.]{4,25})$', line)
@@ -653,7 +677,7 @@ def _extract_brand(text: str) -> str:
         "CSUN", "Seraphim", "SunPower", "Panasonic", "LG", "BYD",
         "Hyundai", "Mitsubishi", "Sharp", "Kyocera", "GreenBrilliance",
         "Solartech Universal", "Vikram", "Waaree", "Adani", "Axitec",
-        "Aleo", "IBC Solar", "Solarwatt",
+        "Aleo", "IBC Solar", "Solarwatt", "SolTech", "NCL",
     ]
     snippet = "\n".join(text.splitlines()[:20])
     for b in BRANDS:
