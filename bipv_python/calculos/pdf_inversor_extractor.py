@@ -710,6 +710,22 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
     Vmppt_act_lo, Vmppt_act_hi = _find_range(_LABEL_MPPT_ACTIVO, texto, use_sma_fallback=False)
     V_mppt_activo = Vmppt_act_lo  # interés: límite inferior con carga completa
 
+    # Fallback: tensión nominal/rated de entrada FV como valor único
+    # (SolaX: "Rated PV input voltage 600 V@230 V"; Huawei/Sungrow: "Rated input voltage")
+    if V_mppt_activo is None:
+        m_rated = re.search(
+            r"(?:Rated|Nominal)\s+(?:PV\s+|DC\s+)?input\s+voltage"
+            r"[^\n0-9]*([0-9]{2,4}(?:[.,][0-9]+)?)\s*V",
+            texto, re.IGNORECASE,
+        )
+        if m_rated:
+            v = _num(m_rated.group(1))
+            # Sanity: dentro del rango MPPT si se conoce; si no, 100–1500 V
+            lo_ok = Vmppt_min if Vmppt_min is not None else 100
+            hi_ok = Vmppt_max if Vmppt_max is not None else 1500
+            if v is not None and lo_ok <= v <= hi_ok:
+                V_mppt_activo = v
+
     # ── V_arranque ────────────────────────────────────────────────────────────
     V_arranque = _find(_PAT_VARRANQUE, texto)
     # Sanity: V_arranque PV típica ≥60 V; valores < 60 V corresponden a tensión
