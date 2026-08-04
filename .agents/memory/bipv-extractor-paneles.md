@@ -1,6 +1,6 @@
 ---
-name: BIPV - extractor de fichas de paneles blindado
-description: Banco de regresión + validador físico del extractor PDF de paneles; cómo agregar fichas nuevas que fallen
+name: BIPV - extractores de fichas blindados (paneles e inversores)
+description: Bancos de regresión + validadores físicos de los extractores PDF de paneles e inversores; cómo agregar fichas nuevas que fallen
 ---
 
 ## Regla
@@ -13,3 +13,8 @@ Cualquier fix al extractor de fichas de paneles (`bipv_python/calculos/pdf_panel
 - Campo irrecuperable por OCR → devolver None, nunca un valor plausible falso.
 - Cada importación guarda el texto OCR crudo en `bipv_python/datos/fichas_ocr/<modelo>.txt` para auditar sin pedir la ficha de nuevo.
 - El usuario suele probar con paneles half-cut: Ns efectivo = medias celdas / 2 (ej. JAM66D46: 132 → 66).
+
+## Inversores (mismo patrón)
+- Validador: `calculos/validador_inversor.py`; bloquea solo invariantes universales (Vdc_max>0, MPPT mín<máx≤Vdc_max, Isc≥I_max por tracker, batería mín<máx); microinversores 60 V y off-grid sin Isc/arranque NO se bloquean.
+- Runner consola: `scripts/test_pdf_inversor_extractor.py` — ejecuta el banco `CASOS` de `scripts/casos_test_inversores.py` (mismo de la página 16) en modo estricto: campo con esperado None (N/D) que aparezca con valor extraído en la salida SIN merge = fallo (atrapa basura). Los valores por modelo legítimos (Deye P_dc) viven en `valores_por_modelo` y no cuentan como basura.
+- Convención de la página 16: esperado None = N/D informativo (🔵), no penaliza — no cambiarla; la estrictez vive solo en el runner.
