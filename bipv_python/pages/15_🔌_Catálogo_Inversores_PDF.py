@@ -22,6 +22,7 @@ from datos.catalogo_inversores_excel import (
     actualizar_inversor_excel,
     eliminar_inversor_excel,
 )
+from calculos.validador_inversor import validar_inversor, icono_estado
 from calculos.seleccion_modelo_inversor import (
     PLACEHOLDER_MODELO,
     debe_bloquear_guardado,
@@ -167,6 +168,51 @@ with tab1:
         f"Modelo: **{res.get('modelo','—')}** · "
         f"Arquitectura: **{res.get('arquitectura','—')}** · "
         f"Campos numéricos extraídos: **{_n_ok}/{len(_campos_num)}**"
+    )
+
+    # ── Semáforo de coherencia física de lo EXTRAÍDO ──────────────────────────
+    import pandas as _pd
+    _val_ext = validar_inversor(res)
+    _ETIQ_VAL = {
+        "Vdc_max": "Tensión DC Máxima (V)", "Vmppt_min": "Rango MPPT mín (V)",
+        "Vmppt_max": "Rango MPPT máx (V)", "V_mppt_activo": "MPPT activo mín (V)",
+        "V_arranque": "Tensión de arranque (V)", "n_trackers": "N° trackers MPPT",
+        "n_strings_tracker": "Strings por tracker", "I_max_tracker": "I máx tracker (A)",
+        "Isc_max_tracker": "Isc máx tracker (A)", "P_dc_max_W": "P FV máx (W)",
+        "bat_voltaje_min": "Batería mín (V)", "bat_voltaje_max": "Batería máx (V)",
+    }
+    _n_err  = sum(1 for c in _val_ext["campos"].values() if c["estado"] == "error")
+    _n_warn = sum(1 for c in _val_ext["campos"].values() if c["estado"] == "warn")
+    st.markdown("#### 🚦 Verificación de coherencia física de lo extraído")
+    if _n_err:
+        st.error(
+            f"🔴 **{_n_err} campo(s) con error** — corrígelos en el formulario "
+            "de abajo. El guardado se bloquea mientras haya errores."
+        )
+    elif _n_warn:
+        st.warning(f"🟠 {_n_warn} campo(s) para revisar — puedes guardar, pero verifícalos.")
+    else:
+        st.success("🟢 Todos los campos extraídos pasan las verificaciones físicas.")
+    _filas_val = []
+    for _campo, _lbl in _ETIQ_VAL.items():
+        _info = _val_ext["campos"].get(_campo)
+        if _info is None:
+            continue
+        _v = res.get(_campo)
+        _filas_val.append({
+            "": icono_estado(_info["estado"]),
+            "Campo": _lbl,
+            "Valor extraído": "—" if _v in (None, 0, "") else str(_v),
+            "Observación": _info["detalle"] or "OK",
+        })
+    st.dataframe(
+        _pd.DataFrame(_filas_val), use_container_width=True, hide_index=True,
+        column_config={
+            "": st.column_config.TextColumn(width="small"),
+            "Campo": st.column_config.TextColumn(width="medium"),
+            "Valor extraído": st.column_config.TextColumn(width="small"),
+            "Observación": st.column_config.TextColumn(width="large"),
+        },
     )
 
     st.markdown("---")
@@ -322,7 +368,22 @@ with tab1:
             st.error("❌ El campo **Modelo** es obligatorio.")
         elif Vdc_max_val <= 0:
             st.error("❌ La **Tensión DC Máxima** debe ser mayor que 0.")
+        elif not (_val_fin := validar_inversor({
+            "Vdc_max": Vdc_max_val, "Vmppt_min": Vmppt_min_val,
+            "Vmppt_max": Vmppt_max_val, "V_mppt_activo": V_mppt_activo_val,
+            "V_arranque": V_arranque_val, "n_trackers": n_trackers_val,
+            "n_strings_tracker": n_strings_val, "I_max_tracker": I_max_val,
+            "Isc_max_tracker": Isc_max_val, "P_dc_max_W": P_dc_val,
+            "es_hibrido": es_hibrido_val,
+            "bat_voltaje_min": bat_min_val, "bat_voltaje_max": bat_max_val,
+        }))["ok"]:
+            st.error(
+                "🔴 **No se guardó** — corrige estos errores y vuelve a presionar Guardar:\n\n"
+                + "\n".join(f"- {e}" for e in _val_fin["errores"])
+            )
         else:
+            for _a in _val_fin["avisos"]:
+                st.warning(f"🟠 {_a}")
             _confianza = "OCR-auto" if res.get("uso_ocr") else ("PDF-auto" if _n_ok > 0 else "Manual")
             _datos_completos = "Si" if all([
                 Vdc_max_val > 0, Vmppt_min_val > 0, Vmppt_max_val > 0,
@@ -354,6 +415,21 @@ with tab1:
 
             try:
                 nombre_guardado = guardar_inversor_excel(_row)
+                # Respaldo diagnóstico: guardar el texto crudo de la extracción.
+                # Si un valor resulta mal después, se audita sin pedir la ficha.
+                try:
+                    import os, re as _re
+                    from datetime import date
+                    _raw = res.get("texto_crudo", "")
+                    if _raw:
+                        _dump_dir = os.path.join(os.path.dirname(__file__), "..", "datos", "fichas_ocr")
+                        os.makedirs(_dump_dir, exist_ok=True)
+                        _safe = _re.sub(r'[^A-Za-z0-9_\-]', '_', nombre_guardado)[:60]
+                        with open(os.path.join(_dump_dir, f"INV_{_safe}.txt"), "w", encoding="utf-8") as _f:
+                            _f.write(f"# Inversor: {nombre_guardado}\n# Fecha: {date.today()}\n"
+                                     f"# Método: {_confianza}\n\n{_raw}")
+                except Exception:
+                    pass  # el respaldo nunca debe impedir el guardado
                 st.success(f"✅ Inversor **{nombre_guardado}** guardado correctamente en el catálogo.")
                 st.balloons()
             except Exception as e:
