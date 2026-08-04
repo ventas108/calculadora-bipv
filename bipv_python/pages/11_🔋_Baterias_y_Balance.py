@@ -397,6 +397,51 @@ with col_b1:
         else:
             st.success(_compat_msg)
 
+        # ── #162 — Semáforo de coherencia física de la batería seleccionada ──
+        from calculos.validador_bateria import validar_bateria, icono_estado
+        _val_bat = validar_bateria(bat)
+        _ETIQ_BAT = {
+            "capacidad_kWh": "Capacidad (kWh)", "potencia_kW": "Potencia (kW)",
+            "voltaje_V": "Voltaje nominal (V)", "dod_pct": "DoD máximo (%)",
+            "eta_rte_pct": "Eficiencia RTE (%)", "ciclos_vida": "Ciclos de vida",
+            "costo_usd": "Costo (USD)", "garantia_anos": "Garantía (años)",
+        }
+        _n_err_bat = sum(1 for c in _val_bat["campos"].values() if c["estado"] == "error")
+        with st.expander("🚦 Verificación de coherencia física de la batería",
+                         expanded=bool(_n_err_bat)):
+            if _n_err_bat:
+                st.error(
+                    f"🔴 **{_n_err_bat} dato(s) físicamente imposible(s)** en la hoja "
+                    "Catalogo_Baterias del Excel — el dimensionamiento se bloquea "
+                    "hasta corregirlos en el archivo del servidor."
+                )
+            elif _val_bat["avisos"]:
+                st.warning(f"🟠 {len(_val_bat['avisos'])} dato(s) para revisar — puedes "
+                           "dimensionar, pero verifícalos en el Excel.")
+            else:
+                st.success("🟢 Todos los datos de la batería pasan las verificaciones físicas.")
+            _filas_bat = []
+            for _campo, _lbl in _ETIQ_BAT.items():
+                _info = _val_bat["campos"].get(_campo)
+                if _info is None:
+                    continue
+                _v = bat.get(_campo)
+                _filas_bat.append({
+                    "": icono_estado(_info["estado"]),
+                    "Campo": _lbl,
+                    "Valor": "—" if _v in (None, 0, "") else str(_v),
+                    "Observación": _info["detalle"] or "OK",
+                })
+            st.dataframe(
+                pd.DataFrame(_filas_bat), use_container_width=True, hide_index=True,
+                column_config={
+                    "": st.column_config.TextColumn(width="small"),
+                    "Campo": st.column_config.TextColumn(width="medium"),
+                    "Valor": st.column_config.TextColumn(width="small"),
+                    "Observación": st.column_config.TextColumn(width="large"),
+                },
+            )
+
         # Ficha técnica
         with st.expander("📋 Ficha técnica del modelo seleccionado"):
             ficha = {
@@ -444,7 +489,13 @@ with col_b2:
     )
 
 if tiene_catalogo and st.button("▶️ Dimensionar batería", type="primary"):
-    if not bat.get("capacidad_kWh"):
+    if not _val_bat["ok"]:
+        st.error(
+            "🔴 **No se dimensionó** — la batería tiene datos físicamente imposibles "
+            "en la hoja Catalogo_Baterias del Excel. Corrige y recarga:\n\n"
+            + "\n".join(f"- {e}" for e in _val_bat["errores"])
+        )
+    elif not bat.get("capacidad_kWh"):
         st.error("❌ La batería seleccionada no tiene capacidad definida en el catálogo.")
     else:
         dim = dimensionar_bateria(bat, E_consumo_diario, autonomia_h)
