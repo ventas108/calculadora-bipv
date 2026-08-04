@@ -102,7 +102,7 @@ with tab1:
     # ── #139: alerta de campos críticos vacíos (fallo silencioso) ─────────────
     # Se omite si el PDF es escaneado sin OCR: ese caso ya tiene su propio error.
     from calculos.pdf_inversor_extractor import contar_campos_vacios
-    from scripts.casos_test_inversores import CAMPO_LABELS as _CAMPO_LABELS_139
+    from calculos.campos_inversor import CAMPO_LABELS as _CAMPO_LABELS_139
     _sin_ocr = res.get("es_escaneado") and not res.get("uso_ocr")
     _campos_vacios = [] if _sin_ocr else contar_campos_vacios(res)
     if len(_campos_vacios) > 3:

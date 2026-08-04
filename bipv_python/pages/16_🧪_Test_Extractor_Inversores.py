@@ -27,7 +27,8 @@ from calculos.seleccion_modelo_inversor import (
     es_seleccion_valida,
     mensaje_bloqueo,
 )
-from scripts.casos_test_inversores import CASOS, CAMPOS_CRITICOS, CAMPO_LABELS
+from scripts.casos_test_inversores import CASOS
+from calculos.campos_inversor import CAMPOS_CRITICOS, CAMPO_LABELS
 
 st.set_page_config(page_title="Test Extractor Inversores", page_icon="🧪", layout="wide")
 st.title("🧪 Harness — Cobertura del Extractor de Inversores")

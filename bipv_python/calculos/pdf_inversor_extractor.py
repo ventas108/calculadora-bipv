@@ -1040,11 +1040,9 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
 # Campos críticos que la UI usa para detectar un fallo silencioso del extractor.
 # Si más de 3 quedan en None, casi seguro el extractor no reconoció el formato
 # de la ficha (no es un dato suelto ausente, es el datasheet completo sin leer).
-CAMPOS_CRITICOS_INVERSOR = [
-    "Vdc_max", "Vmppt_min", "Vmppt_max", "V_arranque",
-    "n_trackers", "n_strings_tracker",
-    "I_max_tracker", "Isc_max_tracker", "P_dc_max_W",
-]
+# #155: definición canónica en calculos/campos_inversor.py; re-export aquí
+# para mantener la API pública del extractor.
+from calculos.campos_inversor import CAMPOS_CRITICOS_INVERSOR  # noqa: F401
 
 
 def contar_campos_vacios(resultado: dict) -> list:

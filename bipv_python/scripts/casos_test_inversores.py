@@ -1146,25 +1146,9 @@ Nominal output voltage 400V
 ]
 
 # Campos que se comparan (ordenados para la tabla de cobertura)
-CAMPOS_CRITICOS = [
-    "Vdc_max", "Vmppt_min", "Vmppt_max", "V_mppt_activo",
-    "V_arranque", "n_trackers", "n_strings_tracker",
-    "I_max_tracker", "Isc_max_tracker", "P_dc_max_W",
-    "bat_voltaje_min", "bat_voltaje_max",
-]
-
-# Etiquetas legibles para la UI
-CAMPO_LABELS = {
-    "Vdc_max":           "Vdc máx (V)",
-    "Vmppt_min":         "MPPT mín (V)",
-    "Vmppt_max":         "MPPT máx (V)",
-    "V_mppt_activo":     "MPPT activo (V)",
-    "V_arranque":        "V arranque (V)",
-    "n_trackers":        "N trackers",
-    "n_strings_tracker": "Strings/tracker",
-    "I_max_tracker":     "I máx (A)",
-    "Isc_max_tracker":   "Isc máx (A)",
-    "P_dc_max_W":        "P FV máx (W)",
-    "bat_voltaje_min":   "Bat mín (V)",
-    "bat_voltaje_max":   "Bat máx (V)",
-}
+# #155: la definición canónica vive en calculos/campos_inversor.py (módulo
+# compartido de producción); aquí solo se re-exporta para retro-compatibilidad.
+import os as _os
+import sys as _sys
+_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), ".."))
+from calculos.campos_inversor import CAMPOS_CRITICOS, CAMPO_LABELS  # noqa: E402,F401
