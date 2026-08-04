@@ -1658,6 +1658,161 @@ with tab_solar:
                                 "✅ Activo en Financiero · Baterías · CO₂"
                             )
 
+                # ── 🔀 6. Strings de distinta orientación en un mismo MPPT (#157) ──
+                st.divider()
+                st.markdown("#### 🔀 6. Strings de distinta orientación en un mismo MPPT")
+                st.caption(
+                    "Cuando dos superficies comparten la misma entrada MPPT, el inversor impone "
+                    "**un solo voltaje** para todas: se resuelve la **curva IV combinada** hora a "
+                    "hora (suma de corrientes de los strings en paralelo) y se compara contra el "
+                    "caso ideal de un MPPT por orientación. **Informativo** — no altera la E_ac "
+                    "oficial del sistema."
+                )
+
+                from calculos.mppt_combinado import simular_mppts_proyecto as _smp
+                from calculos.modelo_iv import tiene_sdm_completo as _tsc
+                from datos.tecnologias_bipv import MODULOS_BIPV as _MBPV_M
+
+                _paneles_iv = {k: v for k, v in _MBPV_M.items() if _tsc(v)}
+                if not _paneles_iv:
+                    st.info("ℹ️ Ningún panel del catálogo tiene ficha SDM completa para el Motor IV.")
+                else:
+                    _mc1, _mc2, _mc3 = st.columns(3)
+                    _mp_panel_sel = _mc1.selectbox(
+                        "Panel fotovoltaico", list(_paneles_iv.keys()),
+                        index=(list(_paneles_iv.keys()).index("ASP-ST1-T40")
+                               if "ASP-ST1-T40" in _paneles_iv else 0),
+                        key="ms_mppt_panel",
+                    )
+                    _mp_panel = _paneles_iv[_mp_panel_sel]
+                    _mp_nser = _mc2.number_input(
+                        "Módulos en serie por string", 1, 30, 8, step=1, key="ms_mppt_nser",
+                        help="Igual para todas las superficies; los strings en paralelo se ajustan por área.",
+                    )
+                    _mp_nmppt = _mc3.number_input(
+                        "Nº de MPPTs del inversor", 1, 12,
+                        int((st.session_state.get("inversor_dict_dim") or {}).get("N_mppt") or 2),
+                        step=1, key="ms_mppt_n",
+                        help="Se toma de la ficha del inversor del Dimensionamiento si existe.",
+                    )
+
+                    st.markdown("**Asignación superficie → MPPT** (dos superficies en el mismo MPPT = strings en paralelo):")
+                    _asig_cols = st.columns(min(4, max(1, len(_sups_p))))
+                    _asig = {}
+                    for _i_sp, _sp_m in enumerate(_sups_p):
+                        _mid = _asig_cols[_i_sp % len(_asig_cols)].selectbox(
+                            f"{TIPOS_SUPERFICIE.get(_sp_m['tipo'],{}).get('icon','')} {_sp_m['nombre']}",
+                            list(range(1, int(_mp_nmppt) + 1)),
+                            index=min(_i_sp, int(_mp_nmppt) - 1),
+                            key=f"ms_mppt_asig_{_sp_m['nombre']}",
+                            format_func=lambda m: f"MPPT {m}",
+                        )
+                        _asig.setdefault(int(_mid), []).append(_sp_m["nombre"])
+
+                    _hay_compartido = any(len(v) > 1 for v in _asig.values())
+                    if not _hay_compartido:
+                        st.info("ℹ️ Cada superficie tiene su propio MPPT — no hay mismatch de MPPT compartido (pérdida = 0).")
+
+                    if st.button("🔀 Simular curva IV combinada por MPPT",
+                                 type="primary", key="btn_mppt_comb"):
+                        _tmy_m = st.session_state.get("tmy_df")
+                        if _tmy_m is None:
+                            st.error("❌ No hay TMY cargado — calcula el Recurso Solar primero.")
+                        else:
+                            _T2m = _tmy_m["T2m"].values.astype(float)
+                            _noct_m = float(_mp_panel.get("NOCT", 45.0))
+                            _grupos_m = {}
+                            for _sp_m in _sups_p:
+                                _poa_sp_m = _poa_p.get(_sp_m["nombre"])
+                                if _poa_sp_m is None or _poa_sp_m.empty:
+                                    continue
+                                _g_m = _poa_sp_m["poa_global"].values.astype(float)
+                                _n_lim = min(len(_g_m), len(_T2m))
+                                _g_m, _t_amb_m = _g_m[:_n_lim], _T2m[:_n_lim]
+                                _n_pan_m = max(1, int(_sp_m["area_m2"] / float(_mp_panel["area_m2"])))
+                                _n_par_m = max(1, round(_n_pan_m / int(_mp_nser)))
+                                _grupos_m[_sp_m["nombre"]] = {
+                                    "nombre":     _sp_m["nombre"],
+                                    "G":          _g_m,
+                                    "T_cel":      _t_amb_m + (_noct_m - 20.0) / 800.0 * _g_m,
+                                    "panel":      _mp_panel,
+                                    "n_serie":    int(_mp_nser),
+                                    "n_paralelo": int(_n_par_m),
+                                }
+                            with st.spinner("Resolviendo curvas IV combinadas (8.760 h por MPPT)..."):
+                                try:
+                                    _res_m = _smp(_asig, _grupos_m)
+                                    st.session_state["mppt_comb_resultado"] = _res_m
+                                    st.session_state["mppt_comb_asig"]      = {k: list(v) for k, v in _asig.items()}
+                                    st.session_state["mppt_comb_ok"]        = True
+                                except Exception as _e_m:
+                                    st.session_state["mppt_comb_ok"] = False
+                                    st.error(f"❌ Error en la simulación MPPT: {_e_m}")
+
+                    if st.session_state.get("mppt_comb_ok"):
+                        _res_m = st.session_state.get("mppt_comb_resultado", {})
+                        _asig_g = st.session_state.get("mppt_comb_asig", {})
+                        _mm1, _mm2, _mm3 = st.columns(3)
+                        _mm1.metric("E_dc ideal (1 MPPT por orientación)",
+                                    f"{_res_m.get('e_dc_indep_kWh',0):,.0f} kWh/año")
+                        _mm2.metric("E_dc con MPPT compartido",
+                                    f"{_res_m.get('e_dc_comb_kWh',0):,.0f} kWh/año")
+                        _mm3.metric("Pérdida por mismatch de MPPT",
+                                    f"{_res_m.get('perdida_pct',0):.2f}%",
+                                    delta=f"-{_res_m.get('perdida_kWh',0):,.0f} kWh/año",
+                                    delta_color="inverse")
+                        _rows_m = []
+                        for _mid_r, _r_m in _res_m.get("por_mppt", {}).items():
+                            _rows_m.append({
+                                "MPPT": f"MPPT {_mid_r}",
+                                "Superficies": ", ".join(_asig_g.get(_mid_r, _asig_g.get(str(_mid_r), []))) or "—",
+                                "Strings": " + ".join(f"{d['n_paralelo']}×{d['n_serie']}s" for d in _r_m["desglose"]),
+                                "E_dc ideal (kWh)": f"{_r_m['e_dc_indep_kWh']:,.0f}",
+                                "E_dc combinada (kWh)": f"{_r_m['e_dc_comb_kWh']:,.0f}",
+                                "Pérdida": f"{_r_m['perdida_pct']:.2f}%",
+                                "Horas con pérdida >0.5%": str(_r_m["horas_con_perdida"]),
+                            })
+                        if _rows_m:
+                            st.dataframe(_pd.DataFrame(_rows_m),
+                                         use_container_width=True, hide_index=True)
+                        _p_tot = _res_m.get("perdida_pct", 0.0)
+                        if _p_tot < 0.5:
+                            st.success(f"🟢 Pérdida {_p_tot:.2f}% — compartir MPPT es aceptable en esta configuración.")
+                        elif _p_tot < 2.0:
+                            st.warning(f"🟠 Pérdida {_p_tot:.2f}% — evalúa si el ahorro del inversor compensa.")
+                        else:
+                            st.error(f"🔴 Pérdida {_p_tot:.2f}% — se recomienda un MPPT por orientación (o un inversor con más MPPTs).")
+
+                        # Curva IV combinada de la peor hora del MPPT con más pérdida
+                        _peor_mid, _peor_r = None, None
+                        for _mid_r, _r_m in _res_m.get("por_mppt", {}).items():
+                            if len(_r_m["desglose"]) > 1 and (_peor_r is None or _r_m["perdida_kWh"] > _peor_r["perdida_kWh"]):
+                                _peor_mid, _peor_r = _mid_r, _r_m
+                        if _peor_r is not None and _peor_r["perdida_kWh"] > 0:
+                            _ph = _peor_r["peor_hora"]
+                            with st.expander(f"📉 Ver curva IV combinada — peor hora del MPPT {_peor_mid}"):
+                                _fig_iv = go.Figure()
+                                for _nm_c, _i_c in zip(_ph["nombres"], _ph["I_grupos"]):
+                                    _fig_iv.add_trace(go.Scatter(
+                                        x=_ph["V"], y=_i_c, mode="lines", name=_nm_c,
+                                        line=dict(dash="dot"),
+                                    ))
+                                _fig_iv.add_trace(go.Scatter(
+                                    x=_ph["V"], y=_ph["I_total"], mode="lines",
+                                    name="Curva combinada (Σ I)", line=dict(width=3, color="black"),
+                                ))
+                                _fig_iv.update_layout(
+                                    height=380, xaxis_title="Voltaje del bus MPPT (V)",
+                                    yaxis_title="Corriente (A)",
+                                    plot_bgcolor="white", paper_bgcolor="white",
+                                    legend=dict(orientation="h", y=-0.25),
+                                    title=dict(
+                                        text=(f"<b>Curva IV combinada</b> — Pmp comb: {_ph['p_comb_W']:,.0f} W "
+                                              f"vs ideal: {_ph['p_indep_W']:,.0f} W"),
+                                        x=0.5, xanchor="center"),
+                                )
+                                st.plotly_chart(_fig_iv, use_container_width=True)
+
         # ════════════════════════════════════════════════════════════════════
         # SUB-TAB 4 — TRAYECTORIA SOLAR (contenido original conservado)
         # ════════════════════════════════════════════════════════════════════
