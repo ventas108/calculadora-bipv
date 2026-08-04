@@ -101,5 +101,13 @@ r = validar_bateria({})
 check("Todo vacío → bloquea por capacidad", not r["ok"] and len(r["errores"]) == 1,
       f"({r['errores']})")
 
+# 16. Defaults del loader marcados → avisa que no vienen del Excel
+r = validar_bateria({"capacidad_kWh": 10, "potencia_kW": 5, "voltaje_V": 48,
+                     "dod_pct": 80, "eta_rte_pct": 95, "ciclos_vida": 3000,
+                     "_defaults_aplicados": ["dod_pct", "eta_rte_pct", "ciclos_vida"]})
+check("Defaults del loader → avisa sin bloquear",
+      r["ok"] and sum("por defecto" in a for a in r["avisos"]) == 3
+      and r["campos"]["dod_pct"]["estado"] == "warn", f"({r['avisos']})")
+
 print(f"\n{'='*60}\nRESULTADO: {PASS} OK · {FAIL} FALLOS")
 sys.exit(1 if FAIL else 0)

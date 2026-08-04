@@ -261,15 +261,22 @@ def cargar_catalogo_baterias(_mtime: float = 0.0) -> dict:
         entry["datos_completos"] = (completo_raw == "si")
 
         # ── Defaults seguros para cálculo ─────────────────────────────────
-        # Solo aplican si el dato NO viene en la ficha
+        # Solo aplican si el dato NO viene en la ficha. Se registra qué campos
+        # fueron rellenados para que el semáforo (#162) no los muestre como
+        # datos verificados del fabricante.
+        _defaults_aplicados = []
         if not entry.get("dod_pct"):
             entry["dod_pct"] = 80.0      # DoD conservador por defecto
+            _defaults_aplicados.append("dod_pct")
         if not entry.get("eta_rte_pct"):
             entry["eta_rte_pct"] = 95.0  # RTE típico LFP
+            _defaults_aplicados.append("eta_rte_pct")
         if not entry.get("tipo"):
             entry["tipo"] = "LFP"
         if not entry.get("ciclos_vida"):
             entry["ciclos_vida"] = 3000  # ciclos mínimo conservador
+            _defaults_aplicados.append("ciclos_vida")
+        entry["_defaults_aplicados"] = _defaults_aplicados
 
         baterias[nombre] = entry
 

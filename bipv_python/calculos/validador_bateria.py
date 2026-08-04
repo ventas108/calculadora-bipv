@@ -174,6 +174,14 @@ def validar_bateria(campos: dict) -> dict:
         marcar("garantia_anos", "warn",
                f"Garantía de {gar:g} años inusual (típico 5–15).")
 
+    # ── 9. Campos rellenados por defecto por el loader (no vienen del Excel) ─
+    _ETIQ_DEF = {"dod_pct": "DoD", "eta_rte_pct": "RTE", "ciclos_vida": "Ciclos de vida"}
+    for campo in campos.get("_defaults_aplicados", []) or []:
+        marcar(campo, "warn",
+               f"{_ETIQ_DEF.get(campo, campo)} no viene en el Excel — se está "
+               "usando un valor por defecto conservador, no el del fabricante. "
+               "Agrégalo a la hoja Catalogo_Baterias para más precisión.")
+
     return {
         "campos": est,
         "errores": errores,

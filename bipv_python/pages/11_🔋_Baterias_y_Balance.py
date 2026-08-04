@@ -488,7 +488,12 @@ with col_b2:
              "24 h = autonomía completa 1 día.",
     )
 
-if tiene_catalogo and st.button("▶️ Dimensionar batería", type="primary"):
+if tiene_catalogo and st.button(
+    "▶️ Dimensionar batería", type="primary",
+    disabled=not _val_bat["ok"],
+    help="Corrige los datos marcados en 🔴 en la hoja Catalogo_Baterias del Excel."
+         if not _val_bat["ok"] else None,
+):
     if not _val_bat["ok"]:
         st.error(
             "🔴 **No se dimensionó** — la batería tiene datos físicamente imposibles "
