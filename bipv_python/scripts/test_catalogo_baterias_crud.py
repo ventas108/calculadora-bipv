@@ -121,6 +121,26 @@ try:
 except ValueError:
     check("Sin nombre → ValueError", True)
 
+# 9a. Renombrar hacia un nombre que YA existe en otra fila → ValueError
+cbe.guardar_bateria_excel({"nombre": "Modelo A", "capacidad_kWh": 5})
+cbe.guardar_bateria_excel({"nombre": "Modelo B", "capacidad_kWh": 10})
+try:
+    cbe.guardar_bateria_excel({"nombre": "Modelo B", "capacidad_kWh": 5},
+                              nombre_original="Modelo A")
+    check("Renombrar a nombre existente → ValueError", False)
+except ValueError:
+    check("Renombrar a nombre existente → ValueError", True)
+cat = leer_catalogo()
+check("Sin duplicados tras el intento",
+      cat["Modelo A"]["capacidad_kWh"] == 5 and cat["Modelo B"]["capacidad_kWh"] == 10)
+
+# 9b. Nombre >60 caracteres → ValueError (el loader lo descartaría en silencio)
+try:
+    cbe.guardar_bateria_excel({"nombre": "X" * 61, "capacidad_kWh": 5})
+    check("Nombre >60 chars → ValueError", False)
+except ValueError:
+    check("Nombre >60 chars → ValueError", True)
+
 # 9. Excel inexistente → FileNotFoundError explícito (nunca silencio)
 cbe._EXCEL = os.path.join(tmp, "no_existe.xlsx")
 try:

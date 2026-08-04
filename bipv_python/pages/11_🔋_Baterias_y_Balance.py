@@ -281,6 +281,13 @@ with st.expander("🛠️ Agregar / Editar / Eliminar batería del catálogo"):
         "Antes de guardar se ejecuta la verificación de coherencia física (#162): "
         "los datos imposibles 🔴 bloquean el guardado."
     )
+    # Mensajes del guardado/eliminación anterior (sobreviven al st.rerun)
+    _flash = st.session_state.pop("bat_mm_flash", None)
+    if _flash:
+        st.success(_flash["exito"])
+        for _a in _flash.get("avisos", []):
+            st.warning(f"🟠 {_a}")
+
     _NUEVA = "➕ Nueva batería…"
     _opciones_mm = [_NUEVA] + (sorted(cat_bat.keys()) if tiene_catalogo else [])
     _sel_mm = st.selectbox("Modelo a editar (o crear uno nuevo)", _opciones_mm,
@@ -296,7 +303,8 @@ with st.expander("🛠️ Agregar / Editar / Eliminar batería del catálogo"):
     with st.form("form_bateria_mm"):
         c1, c2, c3 = st.columns(3)
         with c1:
-            f_nombre = st.text_input("Modelo *", value=_base.get("nombre", ""))
+            f_nombre = st.text_input("Modelo *", value=_base.get("nombre", ""),
+                                     max_chars=60)
             f_fabricante = st.text_input("Fabricante", value=_base.get("fabricante", "") or "")
             f_tipo = st.text_input("Tecnología / Química", value=_base.get("tipo", "") or "",
                                    placeholder="LFP, NMC, Plomo-ácido…")
@@ -347,9 +355,10 @@ with st.expander("🛠️ Agregar / Editar / Eliminar batería del catálogo"):
                 except Exception as _e_mm:
                     st.error(f"❌ No se pudo escribir en el Excel del servidor: {_e_mm}")
                 else:
-                    for _a in _val_mm["avisos"]:
-                        st.warning(f"🟠 {_a}")
-                    st.success(f"✅ Batería **{_datos_mm['nombre']}** guardada en el catálogo.")
+                    st.session_state["bat_mm_flash"] = {
+                        "exito": f"✅ Batería **{_datos_mm['nombre']}** guardada en el catálogo.",
+                        "avisos": _val_mm["avisos"],
+                    }
                     st.rerun()
 
     # ── Eliminar ───────────────────────────────────────────────────────────
@@ -364,7 +373,9 @@ with st.expander("🛠️ Agregar / Editar / Eliminar batería del catálogo"):
                 st.error(f"❌ No se pudo eliminar: {_e_del}")
             else:
                 if _ok_del:
-                    st.success(f"🗑️ **{_sel_mm}** eliminada del catálogo.")
+                    st.session_state["bat_mm_flash"] = {
+                        "exito": f"🗑️ **{_sel_mm}** eliminada del catálogo.", "avisos": [],
+                    }
                     st.rerun()
                 else:
                     st.error(f"❌ No se encontró la fila de **{_sel_mm}** en el Excel.")

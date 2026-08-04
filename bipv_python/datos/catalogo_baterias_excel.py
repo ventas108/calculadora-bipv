@@ -471,6 +471,23 @@ def _invalidar_cache():
         pass  # fuera de Streamlit (tests de consola) no hay caché que limpiar
 
 
+class _LockExcel:
+    """Lock advisorio sobre <_EXCEL>.lock para serializar escrituras entre
+    sesiones Streamlit simultáneas (evita lost updates en el Excel compartido)."""
+
+    def __enter__(self):
+        import fcntl
+        self._fh = open(_EXCEL + ".lock", "w")
+        fcntl.flock(self._fh, fcntl.LOCK_EX)
+        return self
+
+    def __exit__(self, *exc):
+        import fcntl
+        fcntl.flock(self._fh, fcntl.LOCK_UN)
+        self._fh.close()
+        return False
+
+
 def guardar_bateria_excel(datos: dict, nombre_original: str | None = None) -> str:
     """Agrega o actualiza una batería en la hoja Catalogo_Baterias.
 
@@ -488,45 +505,65 @@ def guardar_bateria_excel(datos: dict, nombre_original: str | None = None) -> st
     nombre = str(datos.get("nombre", "")).strip()
     if not nombre:
         raise ValueError("El nombre del modelo es obligatorio.")
+    # El loader descarta en silencio nombres >60 chars — bloquear aquí con
+    # mensaje claro en vez de "guardar" algo que luego desaparece.
+    if len(nombre) > 60:
+        raise ValueError(
+            f"El nombre del modelo tiene {len(nombre)} caracteres; el máximo "
+            "es 60 (el catálogo lo descartaría al recargar). Acórtalo."
+        )
 
-    try:
-        wb = openpyxl.load_workbook(_EXCEL)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"No se encontró el archivo Excel: {_EXCEL}")
+    with _LockExcel():
+        try:
+            wb = openpyxl.load_workbook(_EXCEL)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"No se encontró el archivo Excel: {_EXCEL}")
 
-    ws, header_row = _abrir_hoja(wb)
-    mapa = _mapa_columnas(ws, header_row)
-    col_nombre = _asegurar_columna(ws, header_row, mapa, "nombre")
+        ws, header_row = _abrir_hoja(wb)
+        mapa = _mapa_columnas(ws, header_row)
+        col_nombre = _asegurar_columna(ws, header_row, mapa, "nombre")
 
-    # Fila destino: la del nombre_original (edición), la del nombre (ya existe)
-    # o una nueva al final.
-    fila = None
-    if nombre_original and nombre_original.strip():
-        fila = _fila_de_modelo(ws, header_row, col_nombre, nombre_original)
-    if fila is None:
-        fila = _fila_de_modelo(ws, header_row, col_nombre, nombre)
-    if fila is None:
-        fila = ws.max_row + 1
+        _norm = lambda s: " ".join(str(s).split()).lower()
 
-    for clave in _CANON_COLS:
-        if clave == "_completos":
-            continue  # se escribe abajo según completitud real
-        if clave == "nombre":
-            ws.cell(row=fila, column=col_nombre, value=nombre)
-            continue
-        if clave not in datos and clave not in mapa:
-            continue  # campo no provisto y sin columna: no crear columnas vacías
-        col = _asegurar_columna(ws, header_row, mapa, clave)
-        ws.cell(row=fila, column=col, value=datos.get(clave))
+        # Fila destino: la del nombre_original (edición), la del nombre
+        # (ya existe) o una nueva al final.
+        fila = None
+        if nombre_original and nombre_original.strip():
+            fila = _fila_de_modelo(ws, header_row, col_nombre, nombre_original)
+            # Renombrado: si el nombre NUEVO ya existe en OTRA fila, bloquear
+            # (si no, quedarían dos filas y el loader ocultaría una en silencio)
+            if fila is not None and _norm(nombre) != _norm(nombre_original):
+                fila_choque = _fila_de_modelo(ws, header_row, col_nombre, nombre)
+                if fila_choque is not None and fila_choque != fila:
+                    raise ValueError(
+                        f"Ya existe otra batería llamada '{nombre}' en el "
+                        "catálogo. Elige otro nombre o elimina primero la "
+                        "existente."
+                    )
+        if fila is None:
+            fila = _fila_de_modelo(ws, header_row, col_nombre, nombre)
+        if fila is None:
+            fila = ws.max_row + 1
 
-    # Completitud: Si cuando los campos que usa el dimensionamiento están llenos
-    _claves_completa = ("capacidad_kWh", "potencia_kW", "voltaje_V",
-                        "dod_pct", "ciclos_vida", "eta_rte_pct")
-    completa = all(datos.get(k) not in (None, "", 0) for k in _claves_completa)
-    col_comp = _asegurar_columna(ws, header_row, mapa, "_completos")
-    ws.cell(row=fila, column=col_comp, value="Si" if completa else "No")
+        for clave in _CANON_COLS:
+            if clave == "_completos":
+                continue  # se escribe abajo según completitud real
+            if clave == "nombre":
+                ws.cell(row=fila, column=col_nombre, value=nombre)
+                continue
+            if clave not in datos and clave not in mapa:
+                continue  # campo no provisto y sin columna: no crear columnas vacías
+            col = _asegurar_columna(ws, header_row, mapa, clave)
+            ws.cell(row=fila, column=col, value=datos.get(clave))
 
-    wb.save(_EXCEL)
+        # Completitud: Si cuando los campos que usa el dimensionamiento están llenos
+        _claves_completa = ("capacidad_kWh", "potencia_kW", "voltaje_V",
+                            "dod_pct", "ciclos_vida", "eta_rte_pct")
+        completa = all(datos.get(k) not in (None, "", 0) for k in _claves_completa)
+        col_comp = _asegurar_columna(ws, header_row, mapa, "_completos")
+        ws.cell(row=fila, column=col_comp, value="Si" if completa else "No")
+
+        wb.save(_EXCEL)
     _invalidar_cache()
     return nombre
 
@@ -535,19 +572,20 @@ def eliminar_bateria_excel(nombre: str) -> bool:
     """Elimina la fila de la batería `nombre`. True si la encontró y borró."""
     import openpyxl
 
-    try:
-        wb = openpyxl.load_workbook(_EXCEL)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"No se encontró el archivo Excel: {_EXCEL}")
+    with _LockExcel():
+        try:
+            wb = openpyxl.load_workbook(_EXCEL)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"No se encontró el archivo Excel: {_EXCEL}")
 
-    ws, header_row = _abrir_hoja(wb)
-    mapa = _mapa_columnas(ws, header_row)
-    if "nombre" not in mapa:
-        return False
-    fila = _fila_de_modelo(ws, header_row, mapa["nombre"], nombre)
-    if fila is None:
-        return False
-    ws.delete_rows(fila, 1)
-    wb.save(_EXCEL)
+        ws, header_row = _abrir_hoja(wb)
+        mapa = _mapa_columnas(ws, header_row)
+        if "nombre" not in mapa:
+            return False
+        fila = _fila_de_modelo(ws, header_row, mapa["nombre"], nombre)
+        if fila is None:
+            return False
+        ws.delete_rows(fila, 1)
+        wb.save(_EXCEL)
     _invalidar_cache()
     return True
