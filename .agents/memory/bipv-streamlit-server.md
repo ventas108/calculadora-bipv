@@ -70,3 +70,8 @@ description: Calculadora BIPV en Digital Ocean Ubuntu 24.04, repo ventas108/calc
 - Para comparar: llamar pvwatts/v8.json con tilt=0 -> solrad_annual (kWh/m2/anio) = GHI comparable
 - Requiere API key gratuita de NREL: https://developer.nrel.gov/signup/
 - Endpoint: GET https://developer.nrel.gov/api/pvwatts/v8.json?api_key=KEY&lat=X&lon=Y&system_capacity=1&dataset=intl&tilt=0&azimuth=180&array_type=0
+
+## Autenticación git del servidor (ago 2026)
+- El remote del servidor usa un PAT clásico (scope repo) embebido en la URL (`git remote set-url origin https://TOKEN@github.com/...`).
+- **Why:** un PAT anterior quedó expuesto en un log pegado al chat; GitHub bloqueó un push por push-protection y hubo que reescribir historial local (cherry-pick + redactar) antes de subir.
+- **How to apply:** nunca pedir al usuario que pegue salida de terminal que contenga `git remote -v` o `set-url`; los tokens del usuario aparecen en sus capturas — recordarle borrarlos de GitHub cuando se filtren. El token `BIPV-Replit-Deploy` es el que usa Replit para push: no debe borrarse.
