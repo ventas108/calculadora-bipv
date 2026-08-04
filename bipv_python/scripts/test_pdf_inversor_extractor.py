@@ -32,10 +32,15 @@ def check(nombre, cond, detalle=""):
         print(f"  ❌ {nombre} {detalle}")
 
 
-def _coincide(extraido, esperado, tol=0.05):
-    """Misma convención que la página 16: esperado None = N/D, no se penaliza."""
+def _coincide(extraido, esperado, tol=0.05, strict_nd=False):
+    """
+    Convención de la página 16: esperado None = N/D.
+    strict_nd=True (regresión de consola): un campo N/D que aparezca con valor
+    extraído es FALLO — atrapa extractores que rellenan basura donde no hay dato.
+    (La página 16 sigue mostrando esos casos como 🔵 informativos.)
+    """
     if esperado is None:
-        return True
+        return extraido is None if strict_nd else True
     if extraido is None:
         return False
     try:
@@ -52,17 +57,23 @@ def _coincide(extraido, esperado, tol=0.05):
 # ═════════════════════════════════════════════════════════════════════════════
 print(f"── Banco de casos de fabricantes ({len(CASOS)} fichas) ──")
 for caso in CASOS:
-    res = extraer_desde_texto(caso["texto"])
-    # Si la ficha es multi-modelo, usar los valores del modelo del caso
-    _vpm = (res.get("valores_por_modelo") or {}).get(caso["modelo"])
-    if _vpm:
-        res = {**res, **{k: v for k, v in _vpm.items() if v is not None}}
+    res_base = extraer_desde_texto(caso["texto"])          # salida sin merge (como página 16)
+    # Si la ficha es multi-modelo, valores específicos del modelo del caso
+    _vpm = (res_base.get("valores_por_modelo") or {}).get(caso["modelo"])
+    res = {**res_base, **{k: v for k, v in (_vpm or {}).items() if v is not None}}
     fallos = []
     for campo in CAMPOS_CRITICOS:
         if campo not in caso["esperado"]:
             continue
-        if not _coincide(res.get(campo), caso["esperado"][campo]):
-            fallos.append(f"{campo}: esperado {caso['esperado'][campo]}, obtuvo {res.get(campo)}")
+        esperado = caso["esperado"][campo]
+        if esperado is None:
+            # Estricto sobre la salida SIN merge: un campo N/D que aparezca con
+            # valor es un extractor rellenando basura. (Los valores por modelo
+            # legítimos, ej. P_dc de Deye, viven en el merge y no cuentan aquí.)
+            if not _coincide(res_base.get(campo), None, strict_nd=True):
+                fallos.append(f"{campo}: esperado N/D, obtuvo {res_base.get(campo)}")
+        elif not _coincide(res.get(campo), esperado):
+            fallos.append(f"{campo}: esperado {esperado}, obtuvo {res.get(campo)}")
     check(f"{caso['fabricante']} {caso['modelo']}", not fallos,
           "→ " + "; ".join(fallos) if fallos else "")
 

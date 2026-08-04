@@ -744,7 +744,7 @@ Max. AC apparent power 16600VA 18800VA 22000VA 24400VA 27700VA
             "V_mppt_activo":      580,
             "V_arranque":         250,
             "n_trackers":           2,
-            "n_strings_tracker": None,  # etiqueta partida "trackers/strings per\\nMPP tracker 2/2" — no soportada aún
+            "n_strings_tracker": 2,   # "2/2" = trackers/strings — extracción correcta  # etiqueta partida "trackers/strings per\\nMPP tracker 2/2" — no soportada aún
             "I_max_tracker":       27,
             "Isc_max_tracker":   33.8,
             "P_dc_max_W":        None,
