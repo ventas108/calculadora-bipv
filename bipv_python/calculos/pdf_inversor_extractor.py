@@ -770,14 +770,22 @@ def _extract_multimodel_values(text: str) -> dict:
         return min(range(n), key=lambda i: abs(model_x[i] - val_x))
 
     def _fill_gaps(by_idx: dict) -> dict:
-        """Rellena índices sin valor copiando del índice asignado más cercano."""
-        assigned = list(by_idx.keys())
+        """
+        Rellena índices sin valor copiando del vecino asignado a la DERECHA
+        (si existe), si no del de la izquierda. En datasheets con celdas
+        combinadas ("18000 | 24000" para 3 modelos) el valor combinado cubre
+        los modelos superiores → el modelo intermedio agrupa con el mayor
+        (verificado con coordenadas x del PDF SNA2-EU-LT 10-14K: 24000/35/44
+        están centrados sobre las columnas 12K+14K).
+        """
+        assigned = sorted(by_idx.keys())
         if not assigned:
             return by_idx
         for i in range(n):
             if i not in by_idx:
-                nearest = min(assigned, key=lambda j: abs(model_x[j] - model_x[i]))
-                by_idx[i] = by_idx[nearest]
+                der = [j for j in assigned if j > i]
+                izq = [j for j in assigned if j < i]
+                by_idx[i] = by_idx[der[0]] if der else by_idx[izq[-1]]
         return by_idx
 
     # ── 2. P_dc_max por columna ─────────────────────────────────────────────────
@@ -822,8 +830,16 @@ def _extract_multimodel_values(text: str) -> dict:
                 if 0 < v < 10000:
                     result['por_modelo'][model]['P_dc_max_W'] = v * 1000
         elif found:
+            # Menos valores que modelos (celdas combinadas): anclar primer
+            # valor a la primera columna y último a la última; el resto por
+            # posición. Los huecos heredan del vecino derecho (_fill_gaps).
             by_idx: dict = {}
-            for v, vx in found:
+            fs = sorted(found, key=lambda t: t[1])
+            if 0 < fs[0][0] < 10000:
+                by_idx[0] = fs[0][0] * 1000
+            if 0 < fs[-1][0] < 10000:
+                by_idx[n - 1] = fs[-1][0] * 1000
+            for v, vx in fs[1:-1]:
                 idx = _nearest_idx(vx)
                 if idx not in by_idx and 0 < v < 10000:
                     by_idx[idx] = v * 1000
