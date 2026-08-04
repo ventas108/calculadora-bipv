@@ -106,6 +106,15 @@ _PATTERNS = {
         # SolTech OCR: "Temperatura Operativa Nominal Del Módulo 41 +/-2°C"
         r'Temperatura\s+Operativa\s+Nominal[^\n0-9]*([0-9]{2}(?:\.[0-9]+)?)',
     ],
+    "Bifacialidad": [
+        # "Bifaciality: 80%±5%" / "Bifacialidad 70 ± 5 %" / "Bifacial factor 0.8"(→%)
+        r'(?:Bifacialidad|Bifaciality|Bifacial\s+(?:factor|gain|coefficient|Faktor))'
+        r'[^0-9\n%]{0,25}([0-9]{1,3}(?:\.[0-9]+)?)\s*%',
+        # variante sin % pegado al número: "Bifaciality 80±5 %"
+        r'(?:Bifacialidad|Bifaciality)[^0-9\n]{0,25}([0-9]{2,3})\s*(?:±|\+/?-)\s*[0-9]+\s*%',
+        # fracción: "Bifacial factor 0.80"
+        r'(?:Bifacialidad|Bifaciality|Bifacial\s+factor)[^0-9\n]{0,25}(0\.[0-9]{1,2})\b',
+    ],
     "dimensiones": [
         r'([0-9]{3,4})\s*[×xX*]\s*([0-9]{3,4})\s*[×xX*]\s*([0-9]+)\s*mm',
         r'Dimensions?\s*[:\(]?\s*([0-9]{3,4})\s*[×xX*]\s*([0-9]{3,4})',
@@ -865,6 +874,12 @@ def extraer_parametros_panel(pdf_bytes: bytes) -> dict:
         result["Isc"] = None
     if result.get("Pmax") and result["Pmax"] > 2000:
         result["Pmax"] = None
+    # Bifacialidad: aceptar fracción (0.80 → 80%) y descartar valores implausibles
+    _bif = result.get("Bifacialidad")
+    if _bif is not None:
+        if 0 < _bif <= 1.0:
+            _bif *= 100.0
+        result["Bifacialidad"] = _bif if 30.0 <= _bif <= 100.0 else None
 
     # ── Extracción multi-modelo (fichas con varios modelos en columnas) ────────
     # Prioridad 1: tablas estructuradas de pdfplumber

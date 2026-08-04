@@ -225,11 +225,17 @@ with tab_agregar:
         st.divider()
         st.markdown("**📐 Construcción**")
 
-        f1, f2, f3, f4 = st.columns(4)
+        f1, f2, f3, f4, f5 = st.columns(5)
         n_s    = f1.number_input("Celdas en serie (Ns)", value=int(data.get("N_s") or 0), min_value=0, step=1)
         dims   = f2.text_input("Dimensiones (LxAxE mm)", value=data.get("dimensiones") or "")
         transp = f3.number_input("Transparencia (%)", value=float(data.get("Transparencia") or 0), min_value=0.0, max_value=100.0, step=1.0)
-        costo  = f4.number_input("Costo (USD/ud)", value=0.0, min_value=0.0, step=1.0, format="%.2f")
+        bifac  = f4.number_input(
+            "Bifacialidad (%)", value=float(data.get("Bifacialidad") or 0),
+            min_value=0.0, max_value=100.0, step=1.0,
+            help="Del datasheet ('Bifaciality 80%±5%'). 0 = panel monofacial. "
+                 "Se usa en la simulación bifacial de ☀️ Recurso Solar.",
+        )
+        costo  = f5.number_input("Costo (USD/ud)", value=0.0, min_value=0.0, step=1.0, format="%.2f")
 
         notas = st.text_area(
             "Notas / observaciones",
@@ -264,6 +270,7 @@ with tab_agregar:
             "Ns (Celdas Serie)":  n_s  if n_s  > 0 else None,
             "DimensionesMM":      dims.strip() or None,
             "TransparenciaPct":   transp if transp > 0 else None,
+            "BifacialidadPct":    bifac  if bifac  > 0 else None,
             "CostoUSD":           costo if costo > 0 else None,
             "Notas":              notas.strip() or None,
             "Confianza":          _confianza,
