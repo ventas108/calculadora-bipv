@@ -841,10 +841,23 @@ with tab_solar:
             st.markdown("##### 📋 Superficies configuradas")
 
             _sups_list       = st.session_state["superficies_bipv"]
+
+            # #156: id estable por superficie — las keys de widgets NO pueden
+            # depender del índice, o al eliminar una fila intermedia Streamlit
+            # reaplica el estado de un widget a la superficie equivocada.
+            _next_uid = max(
+                (int(s.get("uid", 0)) for s in _sups_list), default=0
+            ) + 1
+            for _s_mig in _sups_list:
+                if not _s_mig.get("uid"):
+                    _s_mig["uid"] = _next_uid
+                    _next_uid += 1
+
             _sups_actualizado = []
             _idx_eliminar     = None
 
             for _i, _sup in enumerate(_sups_list):
+                _uid = _sup["uid"]
                 _meta_t = TIPOS_SUPERFICIE.get(_sup["tipo"], TIPOS_SUPERFICIE["Fachada"])
                 with st.expander(
                     f"{_meta_t['icon']} **{_sup['nombre']}** — {_sup['tipo']} · "
@@ -855,13 +868,13 @@ with tab_solar:
                     _c1, _c2, _c3, _c4, _c5 = st.columns([2, 1, 1, 1, 1])
                     _c_del = st.columns([6, 1])[1]
 
-                    _nom_e  = _c1.text_input("Nombre",  value=_sup["nombre"],  key=f"snom_{_i}")
+                    _nom_e  = _c1.text_input("Nombre",  value=_sup["nombre"],  key=f"snom_{_uid}")
                     _tipo_e = _c2.selectbox(
                         "Tipo", list(TIPOS_SUPERFICIE.keys()),
                         index=list(TIPOS_SUPERFICIE.keys()).index(
                             _sup["tipo"] if _sup["tipo"] in TIPOS_SUPERFICIE else "Fachada"
                         ),
-                        key=f"stipo_{_i}",
+                        key=f"stipo_{_uid}",
                     )
                     _meta_e = TIPOS_SUPERFICIE[_tipo_e]
                     _tilt_e = _c3.number_input(
@@ -870,22 +883,22 @@ with tab_solar:
                         max_value=float(_meta_e["tilt_max"]),
                         value=float(max(_meta_e["tilt_min"],
                                         min(_meta_e["tilt_max"], _sup["tilt_deg"]))),
-                        step=5.0, key=f"stilt_{_i}",
+                        step=5.0, key=f"stilt_{_uid}",
                         help=_meta_e["descripcion"],
                     )
                     _az_e   = _c4.number_input(
                         "Azimuth (°)", 0.0, 360.0,
                         value=float(_sup["azimuth_deg"]),
-                        step=5.0, key=f"saz_{_i}",
+                        step=5.0, key=f"saz_{_uid}",
                         help="0=Norte · 90=Este · 180=Sur · 270=Oeste",
                     )
                     _area_e = _c5.number_input(
                         "Área (m²)", 1.0, 5000.0,
                         value=float(_sup["area_m2"]),
-                        step=1.0, key=f"sarea_{_i}",
+                        step=1.0, key=f"sarea_{_uid}",
                     )
                     _act_e  = _c1.checkbox(
-                        "Activa", value=bool(_sup.get("activa", True)), key=f"sact_{_i}"
+                        "Activa", value=bool(_sup.get("activa", True)), key=f"sact_{_uid}"
                     )
 
                     # #156: montaje bifacial por fachada (solo superficies verticales)
@@ -900,17 +913,18 @@ with tab_solar:
                             "🔄 Montaje de la fachada (modelo bifacial)",
                             _MONTAJES,
                             index=_MONTAJES.index(_montaje_e) if _montaje_e in _MONTAJES else 0,
-                            key=f"smont_{_i}",
+                            key=f"smont_{_uid}",
                             help="Adosada: la cara trasera no recibe luz — la ganancia bifacial "
                                  "se anula para ESTA fachada. Ventilada: hay cámara de aire con "
                                  "superficie reflejante detrás — la ganancia sí aplica. "
                                  "Heredar: usa el montaje elegido en ☀️ Recurso Solar.",
                         )
 
-                    if _c_del.button("🗑️", key=f"sdel_{_i}", help="Eliminar"):
+                    if _c_del.button("🗑️", key=f"sdel_{_uid}", help="Eliminar"):
                         _idx_eliminar = _i
 
                     _sups_actualizado.append({
+                        "uid":         _uid,
                         "nombre":      _nom_e,
                         "tipo":        _tipo_e,
                         "tilt_deg":    _tilt_e,
