@@ -134,6 +134,8 @@ else:
     _no_mapeadas = _diag.get("columnas_no_mapeadas", [])
     # #24 — campos cuyo alias no apareció en NINGUNA columna del Excel
     _ausentes    = _diag.get("campos_sin_columna_excel", [])
+    # #123 — modelos que aparecen más de una vez en el Excel
+    _duplicados  = _diag.get("modelos_duplicados", [])
 
     _criticos_aus    = [c for c in _ausentes if c.get("critico")]
     _importantes_aus = [c for c in _ausentes if c.get("importante") and not c.get("critico")]
@@ -154,12 +156,13 @@ else:
             "Abre el diagnóstico ↓ para ver qué encabezados agregar."
         )
 
-    if _ausentes or _incompletos or _no_mapeadas:
+    if _ausentes or _incompletos or _no_mapeadas or _duplicados:
         st.warning(
             f"🟡 **Catálogo parcial** — hoja `{_hoja_usada}` · **{_n_modelos} modelos** cargados"
             + (f" · {len(_ausentes)} columnas ausentes en Excel" if _ausentes else "")
             + (f" · {len(_incompletos)} modelos con valores vacíos" if _incompletos else "")
             + (f" · {len(_no_mapeadas)} columnas no reconocidas" if _no_mapeadas else "")
+            + (f" · {len(_duplicados)} modelos duplicados" if _duplicados else "")
         )
     else:
         st.success(
@@ -172,7 +175,8 @@ if tiene_catalogo:
     _incompletos = _diag.get("modelos_incompletos", [])
     _no_mapeadas = _diag.get("columnas_no_mapeadas", [])
     _ausentes    = _diag.get("campos_sin_columna_excel", [])
-    if _ausentes or _incompletos or _no_mapeadas:
+    _duplicados  = _diag.get("modelos_duplicados", [])
+    if _ausentes or _incompletos or _no_mapeadas or _duplicados:
         with st.expander("🔍 Diagnóstico detallado del catálogo"):
 
             # ① Columnas completamente ausentes del Excel (#24)
