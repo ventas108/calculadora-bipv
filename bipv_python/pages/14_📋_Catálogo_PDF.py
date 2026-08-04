@@ -5,6 +5,7 @@ import pandas as pd
 from calculos.pdf_panel_extractor import (
     extraer_parametros_panel, pdf_disponible, ocr_disponible
 )
+from calculos.validador_panel import validar_panel, icono_estado
 from datos.catalogo_paneles_excel import (
     guardar_panel_excel, cargar_catalogo_paneles,
     eliminar_panel_excel, actualizar_panel_excel,
@@ -187,6 +188,49 @@ with tab_agregar:
                     },
                 )
 
+    # ── Semáforo de coherencia física de lo EXTRAÍDO ──────────────────────────
+    _val_ext = validar_panel(data)
+    _ETIQUETAS_VAL = {
+        "Pmax": "Pmax (W)", "Voc": "Voc (V)", "Isc": "Isc (A)",
+        "Vmp": "Vmp (V)", "Imp": "Imp (A)", "N_s": "Celdas en serie (Ns)",
+        "CoefVoc": "β Voc (%/°C)", "CoefIsc": "α Isc (%/°C)",
+        "CoefPmax": "γ Pmax (%/°C)", "NOCT": "NOCT (°C)",
+        "dimensiones": "Dimensiones (mm)", "Bifacialidad": "Bifacialidad (%)",
+    }
+    _n_err  = sum(1 for c in _val_ext["campos"].values() if c["estado"] == "error")
+    _n_warn = sum(1 for c in _val_ext["campos"].values() if c["estado"] == "warn")
+    st.markdown("#### 🚦 Verificación de coherencia física de lo extraído")
+    if _n_err:
+        st.error(
+            f"🔴 **{_n_err} campo(s) con error** — corrígelos en el formulario "
+            "de abajo. El guardado se bloquea mientras haya errores."
+        )
+    elif _n_warn:
+        st.warning(f"🟠 {_n_warn} campo(s) para revisar — puedes guardar, pero verifícalos.")
+    else:
+        st.success("🟢 Todos los campos extraídos pasan las verificaciones físicas.")
+    _filas_val = []
+    for _campo, _lbl in _ETIQUETAS_VAL.items():
+        _info = _val_ext["campos"].get(_campo)
+        if _info is None:
+            continue
+        _v = data.get(_campo)
+        _filas_val.append({
+            "": icono_estado(_info["estado"]),
+            "Campo": _lbl,
+            "Valor extraído": "—" if _v in (None, 0, "") else str(_v),
+            "Observación": _info["detalle"] or "OK",
+        })
+    st.dataframe(
+        pd.DataFrame(_filas_val), use_container_width=True, hide_index=True,
+        column_config={
+            "": st.column_config.TextColumn(width="small"),
+            "Campo": st.column_config.TextColumn(width="medium"),
+            "Valor extraído": st.column_config.TextColumn(width="small"),
+            "Observación": st.column_config.TextColumn(width="large"),
+        },
+    )
+
     # ── Formulario de verificación ────────────────────────────────────────────
     with st.form("form_panel_pdf"):
         st.subheader("📝 Datos extraídos — revisa y completa")
@@ -255,6 +299,22 @@ with tab_agregar:
         )
 
     if submitted:
+        # ── Validación FINAL sobre lo que el usuario va a guardar ─────────────
+        _val_fin = validar_panel({
+            "Pmax": Pmax, "Voc": Voc, "Isc": Isc, "Vmp": Vmp, "Imp": Imp,
+            "N_s": n_s, "CoefVoc": coef_voc, "CoefIsc": coef_isc,
+            "CoefPmax": coef_pmax, "NOCT": noct, "dimensiones": dims,
+            "Bifacialidad": bifac, "Transparencia": transp,
+        })
+        if not _val_fin["ok"]:
+            st.error(
+                "🔴 **No se guardó** — corrige estos errores y vuelve a presionar Guardar:\n\n"
+                + "\n".join(f"- {e}" for e in _val_fin["errores"])
+            )
+            st.stop()
+        for _a in _val_fin["avisos"]:
+            st.warning(f"🟠 {_a}")
+
         _confianza = "OCR-auto" if uso_ocr else ("PDF-auto" if not es_escaneado else "Manual")
         _row = {
             "TipoPanel":          modelo.strip(),
@@ -279,6 +339,21 @@ with tab_agregar:
         }
         try:
             nombre_guardado = guardar_panel_excel(_row, merge_conservador=_ya_existe)
+            # Guardar el texto crudo de la extracción como respaldo diagnóstico:
+            # si un valor resulta mal después, se audita sin pedir la ficha de nuevo.
+            try:
+                import os, re as _re
+                from datetime import date
+                _raw = data.get("texto_crudo", "")
+                if _raw:
+                    _dump_dir = os.path.join(os.path.dirname(__file__), "..", "datos", "fichas_ocr")
+                    os.makedirs(_dump_dir, exist_ok=True)
+                    _safe = _re.sub(r'[^A-Za-z0-9_\-]', '_', nombre_guardado)[:60]
+                    with open(os.path.join(_dump_dir, f"{_safe}.txt"), "w", encoding="utf-8") as _f:
+                        _f.write(f"# Modelo: {nombre_guardado}\n# Fecha: {date.today()}\n"
+                                 f"# Método: {_confianza}\n\n{_raw}")
+            except Exception:
+                pass  # el respaldo nunca debe impedir el guardado
             if _ya_existe:
                 st.success(
                     f"✅ **{nombre_guardado}** actualizado (merge conservador).  \n"

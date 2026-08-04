@@ -1,0 +1,155 @@
+"""
+Banco de regresión del extractor de fichas PDF de paneles + validador físico.
+
+Cada ficha que haya fallado alguna vez entra aquí como fixture con sus
+valores esperados. Regla: NINGÚN fix futuro puede romper una ficha del banco.
+
+Uso:  python scripts/test_pdf_panel_extractor.py
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from calculos import pdf_panel_extractor as ex
+from calculos.validador_panel import validar_panel
+
+_FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures_fichas")
+
+PASS = FAIL = 0
+
+
+def check(nombre, cond, detalle=""):
+    global PASS, FAIL
+    if cond:
+        PASS += 1
+        print(f"  ✅ {nombre}")
+    else:
+        FAIL += 1
+        print(f"  ❌ {nombre} {detalle}")
+
+
+def approx(a, b, tol=1e-6):
+    return a is not None and b is not None and abs(float(a) - float(b)) <= tol
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 1. JA Solar JAM66D46 — OCR real (falló ago-2026: coefs 0, Ns=2384, dims 0,
+#    modelo tomado del pie de página "EN-20250709C")
+# ═════════════════════════════════════════════════════════════════════════════
+print("── Ficha 1: JA Solar JAM66D46 (OCR real) ──")
+texto = open(os.path.join(_FIXTURES, "jasolar_jam66d46_ocr.txt"), encoding="utf-8").read()
+v = ex._apply_patterns(texto)
+
+check("Pmax = 715",        approx(v.get("Pmax"), 715.0))
+check("Voc = 48.80",       approx(v.get("Voc"), 48.8))
+check("Isc = 18.55",       approx(v.get("Isc"), 18.55))
+check("Vmp = 41.00",       approx(v.get("Vmp"), 41.0))
+check("Imp = 17.44",       approx(v.get("Imp"), 17.44))
+check("β Voc = -0.250",    approx(v.get("CoefVoc"), -0.250))
+check("α Isc = +0.045",    approx(v.get("CoefIsc"), 0.045))
+check("γ Pmax = -0.290",   approx(v.get("CoefPmax"), -0.290))
+check("NOCT = 45",         approx(v.get("NOCT"), 45.0))
+check("Bifacialidad = 80", approx(v.get("Bifacialidad"), 80.0))
+check("Dimensiones 2384x1303x33", v.get("dimensiones") == "2384x1303x33",
+      f"(obtuvo {v.get('dimensiones')})")
+# El OCR destruyó "132(6×22)": el extractor DEBE devolver None, nunca basura
+check("Ns irrecuperable → None (no 2384, no 22)",
+      v.get("N_s") is None, f"(obtuvo {v.get('N_s')})")
+check("Modelo = JAM66D46LB (no el 'Version No.')",
+      ex._extract_model_name(texto) == "JAM66D46LB",
+      f"(obtuvo {ex._extract_model_name(texto)!r})")
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 2. Estilo SolTech — OCR español con abreviaturas entre paréntesis
+# ═════════════════════════════════════════════════════════════════════════════
+print("── Ficha 2: estilo SolTech (OCR español) ──")
+texto_st = """
+Potencia Máxima (Pmax) 520
+Voltaje Circuito Abierto (Voc) 49.8
+Corriente Corto Circuito (Isc) 13.56
+Voltaje Máximo (Vmp) 42.3
+Corriente Máxima (Imp) 12.31
+N De Celdas 144 (12 x 12)
+Coeficientes de temperatura de Voc TKβ(%/℃) -0.321
+Coeficientes de temperatura de Isc TKα(%/℃) +0.06
+Coeficientes de temperatura de Pm TKγ(%/℃) -0.214
+Temperatura Operativa Nominal Del Módulo 41 +/-2°C
+Dimensions: 2278 x 1134 x 30 mm
+"""
+v2 = ex._apply_patterns(texto_st)
+for campo, esperado in [("Pmax", 520), ("Voc", 49.8), ("Isc", 13.56),
+                        ("Vmp", 42.3), ("Imp", 12.31), ("N_s", 144),
+                        ("CoefVoc", -0.321), ("CoefIsc", 0.06),
+                        ("CoefPmax", -0.214), ("NOCT", 41)]:
+    check(f"{campo} = {esperado}", approx(v2.get(campo), esperado),
+          f"(obtuvo {v2.get(campo)})")
+check("Dimensiones 2278x1134x30", v2.get("dimensiones") == "2278x1134x30",
+      f"(obtuvo {v2.get('dimensiones')})")
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 3. Estilo NCL BIPV — coeficiente en frase española
+# ═════════════════════════════════════════════════════════════════════════════
+print("── Ficha 3: estilo NCL (frases en español) ──")
+texto_ncl = "Coeficiente de temperatura para voltaje  -0.28%/ºC\n327.8W Potencia\n"
+v3 = ex._apply_patterns(texto_ncl)
+check("CoefVoc = -0.28", approx(v3.get("CoefVoc"), -0.28), f"(obtuvo {v3.get('CoefVoc')})")
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 4. Validador físico — debe atrapar los errores históricos
+# ═════════════════════════════════════════════════════════════════════════════
+print("── Validador de coherencia física ──")
+
+# 4.1 Panel correcto (JAM66D46-715 con Ns=66) → sin errores
+r = validar_panel({"Pmax": 715, "Voc": 48.8, "Isc": 18.55, "Vmp": 41.0,
+                   "Imp": 17.44, "N_s": 66, "CoefVoc": -0.25, "CoefIsc": 0.045,
+                   "CoefPmax": -0.29, "NOCT": 45, "dimensiones": "2384x1303x33",
+                   "Bifacialidad": 80})
+check("Panel correcto → ok (sin errores)", r["ok"], f"(errores: {r['errores']})")
+
+# 4.2 Ns=2384 (el bug histórico) → error con Voc/Ns absurdo
+r = validar_panel({"Pmax": 715, "Voc": 48.8, "Isc": 18.55, "Vmp": 41.0,
+                   "Imp": 17.44, "N_s": 2384})
+check("Ns=2384 → bloquea", not r["ok"] and any("Ns" in e or "celda" in e for e in r["errores"]))
+
+# 4.3 Half-cut mal contado: Ns=132 con Voc=48.8 → error y sugiere 66
+r = validar_panel({"Pmax": 715, "Voc": 48.8, "Isc": 18.55, "Vmp": 41.0,
+                   "Imp": 17.44, "N_s": 132})
+check("Ns=132 half-cut → bloquea y sugiere 66",
+      not r["ok"] and any("66" in e for e in r["errores"]), f"({r['errores']})")
+
+# 4.4 Coeficientes en cero (el fallo de esta ficha) → aviso, no bloquea
+r = validar_panel({"Pmax": 715, "Voc": 48.8, "Isc": 18.55, "Vmp": 41.0,
+                   "Imp": 17.44, "N_s": 66, "CoefVoc": 0, "CoefIsc": 0, "CoefPmax": 0})
+check("Coefs en 0 → avisa sin bloquear",
+      r["ok"] and sum("genérico" in a for a in r["avisos"]) == 3, f"({r['avisos']})")
+
+# 4.5 Vmp > Voc (extracción cruzada) → bloquea
+r = validar_panel({"Pmax": 715, "Voc": 41.0, "Isc": 18.55, "Vmp": 48.8, "Imp": 17.44})
+check("Vmp>Voc → bloquea", not r["ok"])
+
+# 4.6 Imp > Isc → bloquea
+r = validar_panel({"Pmax": 715, "Voc": 48.8, "Isc": 17.44, "Vmp": 41.0, "Imp": 18.55})
+check("Imp>Isc → bloquea", not r["ok"])
+
+# 4.7 Pmax incoherente con Vmp×Imp (>8%) → bloquea
+r = validar_panel({"Pmax": 500, "Voc": 48.8, "Isc": 18.55, "Vmp": 41.0, "Imp": 17.44})
+check("Pmax≠Vmp×Imp (43%) → bloquea", not r["ok"])
+
+# 4.8 Pmax vacío → bloquea
+r = validar_panel({"Pmax": 0, "Voc": 48.8, "Isc": 18.55, "Vmp": 41.0, "Imp": 17.44})
+check("Pmax=0 → bloquea", not r["ok"])
+
+# 4.9 Eficiencia imposible (dimensiones mal) → bloquea
+r = validar_panel({"Pmax": 715, "Voc": 48.8, "Isc": 18.55, "Vmp": 41.0,
+                   "Imp": 17.44, "N_s": 66, "dimensiones": "1200x600"})
+check("Eficiencia 99% (dims mal) → bloquea", not r["ok"])
+
+# 4.10 Panel BIPV semitransparente de baja eficiencia (CdTe) → válido
+r = validar_panel({"Pmax": 108, "Voc": 124.2, "Isc": 1.21, "Vmp": 96.0,
+                   "Imp": 1.11, "dimensiones": "1200x600"})
+check("BIPV CdTe 15% eficiencia → ok", r["ok"], f"(errores: {r['errores']})")
+
+# ═════════════════════════════════════════════════════════════════════════════
+print(f"\n{'='*60}\nRESULTADO: {PASS} OK · {FAIL} FALLOS")
+sys.exit(1 if FAIL else 0)

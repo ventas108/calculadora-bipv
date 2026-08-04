@@ -1,0 +1,115 @@
+Harvest the Sunshine
+
+740 W
+
+- JASOLAR
+
+JAM 66D46 LB n-type Double Glass Bifacial Modules
+
+Premium Cells
+
+MBB Half-Cell Cell Conversion
+Technology Efficiency
+
+18BB
+
+Premium Modules
+
+Higher power LID n-type with very
+generation betterLCOE 4!’ LowerLID
+
+o Better Temperature O Better low irradiance
+Y Coefficient —~ response
+
+— n-type Bifacial Double Glass Module
+000 Linear Performance Warranty
+
+A — Standard Module Linear Performance Warranty
+
+aa ~ 6.3%
+
+83.1%
+
+1 5 10 15 20 25 30
+
+1% Ist-year Degradation — 0.4% Annual Degradation Over 30 years
+12-year product 30-year linear power
+warranty output warranty
+
+Comprehensive Certificates
+IEC 61215, IEC 61730
++ 1509001: 2015 Quality management systems
+ISO 14001: 2015 Environmental management systems
+
+- 1S0 45001: 2018 Occupational health and safety
+management systems
+
+IEC 62941: 2019 Terrestrial photovoltaic (PV) modules - Quality
+system for PV module manufacturing
+
+Sy (€
+
+E
+
+| =
+DEEP BLUE4.0 E
+L-—
+
+JAM66D 6 LB n-type Double Glass Bifacial Modules DEEP BLUE4.0
+
+. 1
+Draining holes
+ma BPlaces _ [4 la
+ditt glk
+mT Mounting Holes Mounting holes A MECHANICAL PARAMETERS
+LW A
+mg Mounting Holes 2
+LW
+mma Nentiocher Conc ar nee
+MLL wy Weight 38.2kg
+ind L- o
+CL E => L | BE Penes Dimensions 2384:t2mm X 1303+2mmX33-+1mm
+A » 33 M1 Cable Cross Section Size Amm?(IEC), 12 AWG(UL)
+lA
+jy 7] . x
+mn 130) No. el cells EG 22)
+A Short frame Junction Box 1P68, 3diodes
+Mn B E Connector QC 4.10-351/MC4-EVO2A
+pr d
+a Seunansten 33 LJ Cable Length Portrait: 400mm(+) /200mm(-)
+LT LU 4 Places BAD a. 30 (Including Connector) Landscape: 1400mm(+)/1400mm(-)
+130337 1262 => Longframe Front Glass/Back Glass 2.0mm/2.0mm
+unit: mm Packaging Configuration 33pcs/Pallet, 594pcs/40HQ Container
+Remark: customized frame color and cable length available upon request
+ELECTRICAL PARAMETERS AT STC CHARACTERISTICS
+JAM66D46 JAMG6D4G JAM66D46 JAMG6D46 JAMG6D46 JAMG66D46 Current-Voltage Curve JAM66D46-730/LB
+TYPE -715/LB -720/LB -725/18_ -730/LB -735/LB -740/LB 2 —
+Rated Maximum Power(Pmax) [W] 715 720 725 730 735 740 oS eo =
+im
+Open Circuit Voltage (Voc) [V] 48.80 49.00 49.20 49.40 49.60 49.80 5 E oow/me
+3
+Maximum Power Voltage(Vmp) [V] 41.00 41.19 41.39 41.58 41.77 41.96 5] E | 400W/m? o
+Short Circuit Current(Isc) [A] 18.55 18.59 18.63 18.67 18.70 18.73 a 200W/m?
+Maximum Power Current(Imp) [A] 17.44 17.48 1752: 17.56 17.60 17.64 a o 10 20 30 40 50
+Module Efficiency [%] 23.0 23.2 23.3 23.5 23.7 23.8 Voltage(V)
+Power Tolerance 0-+3% Power-Voltage Curve JAM66D46-730/LB
+Temperature Coefficient of Isc/a_Isc) +0.045%/°C to | — 2000Ww/me
+— 800w/me =
+Ti ture Coefficient of Voc (B_V -0.250%/* 3 500 00m
+'emperature Coefficient of Voc (B_Voc) %/°C El = cole. ae
+Temperature Coefficient of Pmax(y_Pmp) -0.290%/°C. = 300 PEZ
+STC Irradiance 1000W/m?, cell temperature 25°C, AM1.5G i Zz a \\
+Remark: Electrical data in this catalog do not refer to a single module and they are not part of the offer. 0
+They only serve for comparison among different module types. 0 10 20 30 40 50
+Voltage(V)
+ELECTRICAL CHARACTERISTICS WITH 10% SOLAR IRRADIATION RATIO OPERATING CONDITIONS
+JAM66D46 JAM66D46 JAMGGDAG JAMG6D46 JAMG66D46 JAMG6D46 Maximum System Voltage AS00V.DE
+TYPE -715/LB -720/LB -725/LB__ -730/LB -735/1B__ -740/LB Operating Temperature -40°C~+85°C
+Rated Max Power(Pmax) [W] 772 718 783 788 794 799 Maximum Series Fuse Rating 35A
+Open Circuit Voltage(Voc) [V] 48.80 49.00 49.20 49.40 49.60 49.80 Maximum Static Load, Front* 5400Pa(112 lb/ft?)
+Max Power Voltage(Vmp) [V] 41.00 41.19 4139 41.58 41.77 41.96 Maximum Static Load, Back* 2400Pa(50 lb/ft?)
+Short Circuit Current(Isc) [A] 20.03 20.08 20.12 20.16 20.20 20.23 NOCT 45+2°C
+Max Power Current(Imp) [A] 18.84 18.88 18.92 18.96 19.01 19.05 Bifaciality 80% 5%
+Irradiation Ratio (rear/front) 10% Safety Class Class Il
+* For Nextracker installations, maximum static load please take compatibility approve letter between JA Solar and Nextracker for reference. Fire Performance UL Type 29/Class C
+Headquarters No. 8 Building, Nuode C
