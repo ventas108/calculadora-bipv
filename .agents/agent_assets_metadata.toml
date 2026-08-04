@@ -153,5 +153,5 @@ description = "Comparación completa con puntajes actualizados, estado de cada b
 id = "zbcQHT3BsLhNApHrv6VAk"
 uri = "file://entregables/MANUAL_CALCULADORA_BIPV_v3_agosto2026.docx"
 type = "word_document"
-title = "Manual Calculadora BIPV — actualizado (montaje por fachada)"
-description = "Nueva subsección en Vista 3D multi-superficie: selector de montaje adosado/ventilado por cada fachada, con alertas para evitar errores."
+title = "Manual de Usuario — Calculadora BIPV v3 (agosto 2026)"
+description = "Actualizado con: modo curva IV real en Producción (#105), exportación de cotización cliente Excel/PDF (#109) y strings de distinta orientación en un mismo MPPT (#157)."
