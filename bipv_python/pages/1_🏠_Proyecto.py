@@ -77,6 +77,8 @@ if "proyecto_cargado_desde_disco" not in st.session_state:
     st.session_state["proyecto_cargado_desde_disco"] = True
 
 st.set_page_config(page_title="Proyecto — BIPV", page_icon="🏠", layout="wide")
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 st.title("🏠 Datos del Proyecto")
 
 # ── 📁 Gestión de múltiples proyectos (tarea #63) ────────────────────────────

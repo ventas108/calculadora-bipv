@@ -16,6 +16,8 @@ from calculos.trm_utils import init_trm, trm_widget
 from calculos.tarifa_utils import init_tarifa, tarifa_widget
 
 st.set_page_config(page_title="Financiero — BIPV", page_icon="💰", layout="wide")
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 init_trm()   # fetch TRM del API en primera carga; session_state["tipo_cambio"] listo antes de línea 126
 init_tarifa()   # garantiza tarifa_cop_kwh en session_state antes del panel preview
 st.title("💰 Análisis Financiero — Ley 1715 de 2014")

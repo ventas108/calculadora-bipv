@@ -46,6 +46,8 @@ from calculos.solar import (
 from calculos.tz_utils import utc_offset_latam, tz_label
 
 st.set_page_config(page_title="Recurso Solar — BIPV", page_icon="☀️", layout="wide")
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 st.title("☀️ Recurso Solar")
 st.caption("Datos TMY (Typical Meteorological Year) desde PVGIS v5.2 — JRC European Commission")
 

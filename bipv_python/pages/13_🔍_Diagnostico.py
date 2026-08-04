@@ -14,6 +14,8 @@ st.set_page_config(
     page_icon="🔍",
     layout="wide",
 )
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 
 st.title("🔍 Diagnóstico de Sistema Solar Instalado")
 st.caption(

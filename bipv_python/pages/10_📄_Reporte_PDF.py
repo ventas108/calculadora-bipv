@@ -7,6 +7,8 @@ import streamlit as st
 import datetime
 
 st.set_page_config(page_title="Reporte PDF — BIPV", page_icon="📄", layout="wide")
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 st.title("📄 Reporte Técnico del Proyecto")
 st.caption(
     "Genera un informe completo descargable con resultados, parámetros y notas explicativas. "

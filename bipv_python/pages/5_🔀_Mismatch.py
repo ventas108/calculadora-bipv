@@ -25,6 +25,8 @@ from calculos.tz_utils import utc_offset_latam, tz_label
 from datos.tecnologias_bipv import MODULOS_BIPV
 
 st.set_page_config(page_title="Mismatch — BIPV", page_icon="🔀", layout="wide")
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 st.title("🔀 Mismatch y Pérdidas de Sombreado")
 st.caption(
     "Sombreado de horizonte · Mismatch por orientación múltiple · "

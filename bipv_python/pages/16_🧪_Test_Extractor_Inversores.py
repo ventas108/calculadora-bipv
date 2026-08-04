@@ -31,6 +31,8 @@ from scripts.casos_test_inversores import CASOS
 from calculos.campos_inversor import CAMPOS_CRITICOS, CAMPO_LABELS
 
 st.set_page_config(page_title="Test Extractor Inversores", page_icon="🧪", layout="wide")
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 st.title("🧪 Harness — Cobertura del Extractor de Inversores")
 st.caption(
     "Valida los patrones regex del extractor contra casos sintéticos reales "

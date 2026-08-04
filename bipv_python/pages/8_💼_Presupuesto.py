@@ -5,6 +5,8 @@ from datetime import date
 from calculos.trm_utils import init_trm, trm_widget
 
 st.set_page_config(page_title="Presupuesto BIPV", page_icon="💼", layout="wide")
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 init_trm()   # fetch TRM del API en primera carga; garantiza session_state["tipo_cambio"]
 st.title("💼 Presupuesto Bancable — CAPEX · Costos Blandos · OPEX")
 st.caption(

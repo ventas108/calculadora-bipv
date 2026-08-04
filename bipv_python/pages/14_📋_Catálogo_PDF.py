@@ -11,6 +11,8 @@ from datos.catalogo_paneles_excel import (
 )
 
 st.set_page_config(page_title="Catálogo PDF — BIPV", page_icon="📋", layout="wide")
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 st.title("📋 Gestión del Catálogo de Paneles")
 
 tab_agregar, tab_editar = st.tabs(["➕ Agregar desde PDF", "✏️ Editar / Eliminar"])

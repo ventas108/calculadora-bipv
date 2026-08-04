@@ -21,6 +21,8 @@ from datos.tecnologias_bipv import ASP_ST1_T40, MODULOS_BIPV
 from datos.catalogo_paneles_excel import cargar_catalogo_paneles
 
 st.set_page_config(page_title="Motor IV — BIPV", page_icon="🔬", layout="wide")
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 st.title("🔬 Motor I-V — Modelo De Soto 2006")
 st.caption("Equivalente Python de SimuladorIV_CdTe_v2 + Mod_ModeloDiodo (VBA auditado)")
 

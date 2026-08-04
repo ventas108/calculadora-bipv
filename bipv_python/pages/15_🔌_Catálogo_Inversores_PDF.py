@@ -30,6 +30,8 @@ from calculos.seleccion_modelo_inversor import (
 )
 
 st.set_page_config(page_title="Catálogo Inversores PDF", page_icon="🔌", layout="wide")
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 st.title("🔌 Catálogo de Inversores — Agregar / Editar desde PDF")
 
 tab1, tab2 = st.tabs(["➕ Agregar desde PDF", "✏️ Editar / Eliminar"])

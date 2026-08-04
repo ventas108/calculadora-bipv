@@ -22,6 +22,8 @@ import datetime
 from datos.ciudades_colombia import FACTOR_CO2_COLOMBIA_KG_KWH
 
 st.set_page_config(page_title="Huella CO₂ — BIPV", page_icon="🌿", layout="wide")
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 st.title("🌿 Huella de Carbono Evitada")
 st.caption(
     "GHG Protocol Scope 2 · ISO 14064-1 · CDM AMS-I.D · "

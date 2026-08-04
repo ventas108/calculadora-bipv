@@ -16,6 +16,8 @@ from calculos.motor_optico import (
 )
 
 st.set_page_config(page_title="Motor Óptico — BIPV", page_icon="🔆", layout="wide")
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 st.title("🔆 Motor Óptico BIPV")
 st.caption(
     "Reflexión geométrica ASHRAE (IAM) · Suciedad estacional Colombia · "

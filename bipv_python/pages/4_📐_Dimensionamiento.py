@@ -10,6 +10,8 @@ from datos.catalogo_inversores import INVERSORES, seleccionar_inversor
 from calculos.panel_iv_check import analizar_panel_motiv as _check_iv_dim
 
 st.set_page_config(page_title="Dimensionamiento — BIPV", page_icon="📐", layout="wide")
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 st.title("📐 Dimensionamiento de Strings")
 st.caption("Equivalente de Mod_OptimizarStringSizing + Mod_CalculoStringSizing (VBA)")
 

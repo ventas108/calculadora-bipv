@@ -32,6 +32,8 @@ st.set_page_config(
     page_icon="🔋",
     layout="wide",
 )
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 st.title("🔋 Baterías y Balance Energético")
 st.caption(
     "B-6: Dimensionado de baterías · "

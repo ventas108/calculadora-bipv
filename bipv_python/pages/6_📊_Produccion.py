@@ -13,6 +13,8 @@ from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_ex
 from datos.catalogo_inversores_excel import cargar_catalogo_inversores
 
 st.set_page_config(page_title="Producción — BIPV", page_icon="📊", layout="wide")
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 st.title("📊 Producción Anual — IEC 61724")
 st.caption(
     "Simulación hora a hora · Motor SDM De Soto 2006 · "

@@ -45,6 +45,8 @@ def _interp_horizonte(puntos_az_el: list, az_array) -> "np.ndarray":
     return np.interp(np.asarray(az_array, dtype=float), azs_e, els_e)
 
 st.set_page_config(page_title="Vista 3D — BIPV", page_icon="🗺️", layout="wide")
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 st.title("🗺️ Vista 3D del Sitio")
 st.caption(
     "Mapa geolocalizado del edificio · Modelo volumétrico 3D con paneles BIPV · "

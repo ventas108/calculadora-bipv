@@ -10,6 +10,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
 
 # ── Inicialización de session_state global ─────────────────────────────────
 defaults = {
