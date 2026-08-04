@@ -1304,3 +1304,171 @@ else:
             f"Ve a la pestaña **🧾 Costos Blandos** → **🪄 Sugerir valores conservadores** para completarlos "
             f"antes de enviar el presupuesto a Financiero."
         )
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 📤 EXPORTAR COTIZACIÓN — documento presentable para el cliente final
+# ══════════════════════════════════════════════════════════════════════════════
+st.markdown("---")
+st.subheader("📤 Exportar cotización")
+st.caption(
+    "Genera una cotización limpia para el cliente (Excel o PDF) con los ítems activos "
+    "agrupados por categoría, subtotales y total en COP. No incluye KPIs bancarios ni "
+    "columnas internas de fuente de precios."
+)
+
+# ── Reunir ítems ACTIVOS de todas las secciones → filas en COP ────────────────
+_SEC_LABELS = {
+    "perfileria": "🔩 Perfilería y Estructura",
+    "mano_obra":  "👷 Mano de Obra y Servicios",
+    "sistema_fv": "⚡ Sistema FV (cables, protecciones)",
+    "inversor":   "🔌 Inversor y Equipos Eléctricos",
+    "catalogo":   "📦 Equipos Principales",
+    "soft":       "🧾 Costos Blandos (ingeniería, trámites, gestión)",
+}
+
+def _recolectar_items_cotizacion(trm_cop):
+    """Extrae ítems activos de los DataFrames de sesión → filas de cotización en COP.
+    NO incluye la columna 'Costos Blandos' aquí: se muestra como línea de total aparte
+    para mantener el subtotal = CAPEX directo (materiales + equipos + mano de obra)."""
+    filas = []
+    for _key in ("perfileria", "mano_obra", "sistema_fv", "inversor", "catalogo"):
+        _df = st.session_state.get(f"df_sec_{_key}")
+        if _df is None or not hasattr(_df, "iterrows"):
+            continue
+        for _, _r in _df.iterrows():
+            if not bool(_r.get("Activo", True)):
+                continue
+            try:
+                _cant = float(_r.get("Cantidad", 0) or 0)
+                _uni_usd = float(_r.get("USD_un", 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            _desc = str(_r.get("Descripcion", "") or "").strip()
+            _tot_usd = _cant * _uni_usd
+            if not _desc or _tot_usd <= 0:
+                continue
+            filas.append({
+                "categoria":    _SEC_LABELS.get(_key, _key),
+                "descripcion":  _desc,
+                "cantidad":     _cant,
+                "unidad":       str(_r.get("Unidad", "") or ""),
+                "unitario_cop": _uni_usd * trm_cop,
+                "total_cop":    _tot_usd * trm_cop,
+            })
+    return filas
+
+_items_cot = _recolectar_items_cotizacion(tc)
+
+# ── Totales en COP desde los valores ya publicados por el Resumen ─────────────
+_capex_usd_pub   = float(st.session_state.get("presupuesto_capex_usd", 0.0))
+_capex_dir_usd   = float(st.session_state.get("presupuesto_capex_directo", 0.0))
+_blando_usd      = float(st.session_state.get("presupuesto_capex_blando", 0.0))
+_indirect_usd    = float(st.session_state.get("presupuesto_capex_indirectos", 0.0))
+_cont_usd        = float(st.session_state.get("presupuesto_capex_cont", 0.0))
+
+_subtotal_cop    = _capex_dir_usd * tc
+_blando_cop      = _blando_usd * tc
+_indirect_cop    = _indirect_usd * tc
+_cont_cop        = _cont_usd * tc
+_total_cop       = _capex_usd_pub * tc
+# Fallback: si no hay total publicado (p.ej. tabs sin Resumen calculado), suma ítems.
+if _total_cop <= 0 and _items_cot:
+    _subtotal_cop = sum(i["total_cop"] for i in _items_cot)
+    _total_cop    = _subtotal_cop + _blando_cop + _indirect_cop + _cont_cop
+# Fallback subtotal: si el directo publicado es 0 pero hay ítems, usar la suma real.
+if _subtotal_cop <= 0 and _items_cot:
+    _subtotal_cop = sum(i["total_cop"] for i in _items_cot)
+
+_hay_items = len(_items_cot) > 0 and _total_cop > 0
+
+if not _hay_items:
+    st.warning(
+        "⚠️ No hay ítems activos con valor en la cotización. Completa al menos una "
+        "pestaña de cotización (o aplica la 🧮 Estimación Rápida y luego ingresa "
+        "cotizaciones reales) para habilitar la descarga."
+    )
+
+# ── Campos editables de la cotización ─────────────────────────────────────────
+ce1, ce2 = st.columns([3, 1])
+_cot_cliente = ce1.text_input(
+    "Nombre del cliente / destinatario",
+    value=st.session_state.get("cot_cliente", ""),
+    placeholder="Ej.: Inmobiliaria Andina S.A.S.",
+    key="cot_cliente",
+)
+_cot_validez = ce2.number_input(
+    "Validez de la oferta (días)", min_value=1, max_value=365,
+    value=int(st.session_state.get("cot_validez", 15)), step=1, key="cot_validez",
+)
+
+from calculos.export_cotizacion import NOTAS_DEFAULT as _NOTAS_DEFAULT_COT
+_cot_notas = st.text_area(
+    "Notas y condiciones (pie de la cotización)",
+    value=st.session_state.get("cot_notas", _NOTAS_DEFAULT_COT),
+    height=140, key="cot_notas",
+)
+
+# ── Armar dict de datos para el módulo (funciones puras) ──────────────────────
+_fecha_hoy_str = date.today().strftime("%d/%m/%Y")
+_fecha_iso     = date.today().strftime("%Y%m%d")
+_datos_cot = {
+    "empresa":            ppto_elaboro,
+    "proyecto":           ppto_nombre,
+    "cliente":            _cot_cliente,
+    "fecha":              _fecha_hoy_str,
+    "validez_dias":       int(_cot_validez),
+    "trm":                float(tc),
+    "items":              _items_cot,
+    "subtotal_cop":       _subtotal_cop,
+    "costos_blandos_cop": _blando_cop,
+    "indirectos_cop":     _indirect_cop,
+    "contingencia_cop":   _cont_cop,
+    "total_cop":          _total_cop,
+    "total_usd":          _capex_usd_pub if _capex_usd_pub > 0 else (_total_cop / tc if tc > 0 else 0.0),
+    "notas":              _cot_notas,
+}
+
+# ── Botones de descarga (deshabilitados si no hay ítems) ──────────────────────
+from calculos.export_cotizacion import (
+    generar_cotizacion_excel as _gen_cot_xlsx,
+    generar_cotizacion_pdf as _gen_cot_pdf,
+    nombre_archivo_cotizacion as _nombre_cot,
+)
+
+_xlsx_bytes, _pdf_bytes, _err_cot = None, None, None
+if _hay_items:
+    try:
+        _xlsx_bytes = _gen_cot_xlsx(_datos_cot)
+        _pdf_bytes  = _gen_cot_pdf(_datos_cot)
+    except ValueError as _e:
+        _err_cot = str(_e)
+        _hay_items = False
+    except Exception as _e:  # noqa: BLE001
+        _err_cot = f"Error al generar la cotización: {_e}"
+        _hay_items = False
+
+if _err_cot:
+    st.error(f"❌ {_err_cot}")
+
+cb1, cb2 = st.columns(2)
+cb1.download_button(
+    "⬇️ Descargar cotización (Excel)",
+    data=_xlsx_bytes if _xlsx_bytes else b"",
+    file_name=_nombre_cot(ppto_nombre, _fecha_iso, "xlsx"),
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    use_container_width=True, disabled=not _hay_items, key="dl_cot_xlsx",
+)
+cb2.download_button(
+    "⬇️ Descargar cotización (PDF)",
+    data=_pdf_bytes if _pdf_bytes else b"",
+    file_name=_nombre_cot(ppto_nombre, _fecha_iso, "pdf"),
+    mime="application/pdf",
+    use_container_width=True, disabled=not _hay_items, key="dl_cot_pdf",
+)
+
+if _hay_items:
+    st.caption(
+        f"📄 Cotización lista — {len(_items_cot)} ítems activos · "
+        f"TOTAL $ {round(_total_cop):,.0f}".replace(",", ".") + " COP"
+        + (f" (~USD {_datos_cot['total_usd']:,.0f})" if tc > 0 else "")
+    )

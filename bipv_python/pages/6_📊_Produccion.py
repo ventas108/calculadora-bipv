@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 
 from calculos.produccion import simular_produccion_anual, perdidas_desglosadas, panel_tiene_sdm_completo
+from calculos.produccion_iv import simular_produccion_iv, panel_apto_para_iv
 from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_inversores import INVERSORES
 from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
@@ -162,6 +163,33 @@ with col_c3:
 # ═══════════════════════════════════════════════════════════════════════════════
 st.markdown("---")
 
+# ── Modo Motor IV (opt-in): solo si el panel tiene ficha completa ─────────────
+_panel_apto_iv = panel_apto_para_iv(panel)
+usar_iv = False
+if _panel_apto_iv:
+    usar_iv = st.toggle(
+        "🔬 Usar curva IV real del panel (Motor IV)",
+        value=st.session_state.get("produccion_usar_iv", False),
+        key="produccion_usar_iv",
+        help=(
+            "Deriva la potencia Pmp(G, Tcell) de la curva I-V single-diode calibrada "
+            "de la ficha (De Soto 2006 + Rsh CdTe), en lugar del modelo lineal genérico. "
+            "Solo disponible con ficha SDM completa. Modo opt-in: por defecto se usa el "
+            "modelo base."
+        ),
+    )
+    if usar_iv:
+        st.caption(
+            "🟢 Modo **curva IV real** activo — se comparará contra el modelo base y "
+            "la E_ac oficial (aguas abajo) usará el resultado del Motor IV."
+        )
+else:
+    st.caption(
+        "ℹ️ El modo **curva IV real (Motor IV)** no está disponible: este panel no tiene "
+        "ficha SDM completa (`I_L_ref`, `I_o_ref`, `R_s`, `R_sh_ref`, `a_ref`, `Tk_alfa`). "
+        "Se usa el modelo base. Completa la ficha en 🔬 Motor IV o 📋 Catálogo PDF."
+    )
+
 btn_sim = st.button(
     "▶️ Simular producción anual hora a hora (SDM De Soto 2006)",
     type="primary",
@@ -174,7 +202,7 @@ if btn_sim or st.session_state.get("produccion_ok"):
         with st.spinner(
             f"Simulando 8.760 horas para {N_paneles} módulos {panel_nombre} en {ciudad}..."
         ):
-            res = simular_produccion_anual(
+            _sim_kwargs = dict(
                 tmy               = tmy,
                 poa_base          = poa_base,
                 panel             = panel,
@@ -183,17 +211,65 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 factor_pr_mismatch= factor_pr,
                 P_dc_stc_kW       = P_stc_kW,
             )
-        st.session_state["res_produccion"]    = res
-        st.session_state["produccion_ok"]     = True
-        st.session_state["N_paneles_dim"]     = N_paneles
-        st.session_state["P_dc_stc_kW_dim"]   = P_stc_kW
-        st.session_state["E_ac_anual_kWh"]    = res["E_ac_anual_kWh"]
-        st.session_state["PR_sistema"]        = res["PR"]
+            res_base = simular_produccion_anual(**_sim_kwargs)
+            res_iv   = None
+            if usar_iv and _panel_apto_iv:
+                res_iv = simular_produccion_iv(**_sim_kwargs)
+
+        # El modo IV es opt-in: si está activo y disponible, queda como oficial.
+        res = res_iv if (usar_iv and res_iv is not None) else res_base
+
+        st.session_state["res_produccion"]         = res
+        st.session_state["res_produccion_base"]    = res_base
+        st.session_state["res_produccion_iv"]      = res_iv
+        st.session_state["produccion_modo_iv"]     = bool(usar_iv and res_iv is not None)
+        st.session_state["produccion_ok"]          = True
+        st.session_state["N_paneles_dim"]          = N_paneles
+        st.session_state["P_dc_stc_kW_dim"]        = P_stc_kW
+        # E_ac_anual_kWh = valor "base" oficial (multi-superficie > bypass > base
+        # aguas abajo). Al elegir IV como oficial, la base pasa a ser la IV.
+        st.session_state["E_ac_anual_kWh"]         = res["E_ac_anual_kWh"]
+        st.session_state["PR_sistema"]             = res["PR"]
     else:
-        res = st.session_state.get("res_produccion", {})
+        res       = st.session_state.get("res_produccion", {})
+        res_base  = st.session_state.get("res_produccion_base", res)
+        res_iv    = st.session_state.get("res_produccion_iv", None)
 
     if not res:
         st.stop()
+
+    # ── Comparación modelo IV vs modelo base (solo si IV está activo) ──────────
+    if res_iv is not None and res_base:
+        e_base = res_base["E_ac_anual_kWh"]
+        e_iv   = res_iv["E_ac_anual_kWh"]
+        dif_pct = (e_iv - e_base) / e_base * 100 if e_base > 0 else 0.0
+
+        st.markdown("#### 🔬 Comparación: modelo base vs curva IV real")
+        cc1, cc2, cc3 = st.columns(3)
+        cc1.metric("E_ac — modelo base", f"{e_base:,.0f} kWh",
+                   help="Modelo hora a hora estándar de la página (SDM/lineal)")
+        cc2.metric("E_ac — curva IV real", f"{e_iv:,.0f} kWh",
+                   help="Pmp(G,Tcell) derivada de la curva I-V single-diode de la ficha")
+        cc3.metric("Diferencia", f"{dif_pct:+.1f}%",
+                   delta=f"{e_iv - e_base:+,.0f} kWh")
+
+        if abs(dif_pct) > 10.0:
+            st.error(
+                f"🔴 **La curva IV difiere {dif_pct:+.1f}% del modelo base (> ±10%).**  \n"
+                "Es una señal de **datos de ficha inconsistentes** (Voc/Isc/Vmp/Imp, "
+                "N_s half-cut, o parámetros SDM mal calibrados). Revisa la ficha en "
+                "🔬 **Motor IV** antes de usar este resultado en el análisis financiero."
+            )
+        else:
+            st.success(
+                f"🟢 Ambos modelos coinciden dentro de ±10% (diferencia {dif_pct:+.1f}%). "
+                "**La E_ac oficial aguas abajo usa el modelo de curva IV real.**"
+            )
+    elif st.session_state.get("produccion_modo_iv") is False and _panel_apto_iv and not usar_iv:
+        st.caption(
+            "ℹ️ E_ac oficial = **modelo base**. Activa el toggle de curva IV real "
+            "y vuelve a simular para comparar y usar el Motor IV como oficial."
+        )
 
     # ── Aviso modelo simplificado (post-simulación) ───────────────────────────
     if res.get("uso_modelo_simplificado"):
