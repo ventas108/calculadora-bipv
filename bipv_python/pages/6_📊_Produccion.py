@@ -450,20 +450,23 @@ if btn_sim or st.session_state.get("produccion_ok"):
 
     # ── Aporte de la cara trasera (modelo bifacial) ───────────────────────────
     if poa_base is not None and {"poa_front", "poa_rear"}.issubset(poa_base.columns):
-        _rear_kwh_m2  = float(poa_base["poa_rear"].sum()) / 1000.0
-        _front_kwh_m2 = float(poa_base["poa_front"].sum()) / 1000.0
-        _total_kwh_m2 = _rear_kwh_m2 + _front_kwh_m2
-        _rear_pct     = (_rear_kwh_m2 / _total_kwh_m2 * 100.0) if _total_kwh_m2 > 0 else 0.0
+        # Aporte EFECTIVO al global = poa_global − poa_front
+        # (= bifacialidad × factor_vista_trasera × POA trasera bruta)
+        _front_kwh_m2  = float(poa_base["poa_front"].sum()) / 1000.0
+        _global_kwh_m2 = float(poa_base["poa_global"].sum()) / 1000.0
+        _rear_ef_kwh_m2 = max(_global_kwh_m2 - _front_kwh_m2, 0.0)
+        _rear_pct      = (_rear_ef_kwh_m2 / _global_kwh_m2 * 100.0) if _global_kwh_m2 > 0 else 0.0
 
         st.markdown("---")
         st.subheader("🔆 Aporte de la cara trasera (bifacial)")
         mb1, mb2, mb3 = st.columns(3)
         mb1.metric("Cara frontal (POA)", f"{_front_kwh_m2:,.0f} kWh/m²/año",
-                   help="Irradiación directa+difusa sobre la cara frontal del módulo")
-        mb2.metric("Cara trasera (POA)", f"{_rear_kwh_m2:,.0f} kWh/m²/año",
-                   help="Irradiación reflejada captada por la cara posterior (pvlib infinite_sheds)")
-        mb3.metric("Aporte trasero", f"{_rear_pct:.1f}% del total POA",
-                   help="Fracción de la POA global aportada por la cara trasera")
+                   help="Irradiación sobre la cara frontal (pvlib infinite_sheds, con sombreado fila-fila)")
+        mb2.metric("Aporte trasero efectivo", f"{_rear_ef_kwh_m2:,.0f} kWh/m²/año",
+                   help="Irradiación trasera ya ponderada por la bifacialidad del panel "
+                        "(y el factor de vista si es fachada adosada) — es lo que realmente suma a la POA global")
+        mb3.metric("Aporte trasero", f"{_rear_pct:.1f}% de la POA global",
+                   help="Fracción de la POA global usada en la simulación que proviene de la cara trasera")
         st.caption(
             "Modelo bifacial activo (pvlib infinite_sheds): la POA global usada en la simulación "
             "ya integra el aporte de la cara trasera, por lo que la **E_ac anual ya lo incluye**. "

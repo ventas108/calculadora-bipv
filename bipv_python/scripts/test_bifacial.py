@@ -147,6 +147,20 @@ check("poa_rear" in r_bif["Techo"].columns and
       r_bif["Techo"]["poa_global"].sum() > r_old["Techo"]["poa_global"].sum(),
       "passthrough bifacial aumenta la POA de la superficie")
 
+print("6b. Mixta: fachada adosada (factor 0) + techo (factor 1) — el factor NO se propaga al techo")
+cfg_ados = dict(cfg, factor_vista_trasera=0.0)
+sup_mix = [
+    {"nombre": "Fachada", "tilt_deg": 90, "azimuth_deg": 180, "area_m2": 50,
+     "activa": True, "bifacial": cfg_ados},
+    {"nombre": "Techo2", "tilt_deg": 10, "azimuth_deg": 180, "area_m2": 100,
+     "activa": True, "bifacial": dict(cfg_ados, factor_vista_trasera=1.0)},
+]
+r_mix = calcular_poa_todas(sup_mix, tmy, LAT, LON, ALT, bifacial=cfg_ados)
+_g_fach = (r_mix["Fachada"]["poa_global"] - r_mix["Fachada"]["poa_front"]).sum()
+_g_tech = (r_mix["Techo2"]["poa_global"] - r_mix["Techo2"]["poa_front"]).sum()
+check(_g_fach <= 1e-6, "fachada adosada: aporte trasero efectivo ≈ 0")
+check(_g_tech > 0, "techo en el mismo cálculo conserva su ganancia trasera")
+
 print()
 if fallos:
     print(f"🔴 {len(fallos)} verificación(es) fallaron")

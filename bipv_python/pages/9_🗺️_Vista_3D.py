@@ -933,9 +933,21 @@ with tab_solar:
             if _btn_poa and _tmy_sup is not None:
                 _sups_act = [s for s in _sups_actualizado if s.get("activa", True)]
                 _albedo_ms = float(st.session_state.get("albedo_suelo", 0.20))
+                # #154: el factor_vista_trasera de página 2 aplica al montaje de
+                # ESA fachada — no debe anular la trasera de techos/pérgolas.
+                # Por superficie: tilt < 80° ⇒ factor 1.0; tilt ≥ 80° hereda el
+                # factor elegido en Recurso Solar (0 = adosada, 1 = ventilada).
+                _sups_calc = _sups_act
+                if _usar_bif_ms and _bif_cfg_ms:
+                    _sups_calc = []
+                    for _s in _sups_act:
+                        _cfg_s = dict(_bif_cfg_ms)
+                        if float(_s.get("tilt_deg", 0)) < 80:
+                            _cfg_s["factor_vista_trasera"] = 1.0
+                        _sups_calc.append({**_s, "bifacial": _cfg_s})
                 with st.spinner(f"Calculando POA para {len(_sups_act)} superficies..."):
                     _poa_m = calcular_poa_todas(
-                        _sups_act, _tmy_sup, lat, lon, alt_m,
+                        _sups_calc, _tmy_sup, lat, lon, alt_m,
                         albedo=_albedo_ms,
                         bifacial=_bif_cfg_ms if _usar_bif_ms else None,
                     )
