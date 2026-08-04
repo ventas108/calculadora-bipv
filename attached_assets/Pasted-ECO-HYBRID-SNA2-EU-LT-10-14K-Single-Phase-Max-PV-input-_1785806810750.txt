@@ -1,0 +1,99 @@
+ECO HYBRID
+SNA2-EU-LT 10-14K
+(Single-Phase)
+Max. PV input: 24kW with 2 MPPTs
+Max. charging and discharging current: 250A
+Support up to 16 units in parallel for on/off grid
+Lite Design for Easier Installation
+Support Hybrid Working Modes
+Intelligent Operating Mode to Lower Energy Costs
+& Quick ROI
+Separate Gen Port for
+- Auto start-stop
+- Working with the existing grid-tied system
+- Smart load management
+Model SNA2-EU-LT 10K SNA2-EU-LT 12K SNA2-EU-LT 14K
+Input (PV DC)
+Max. PV input power (W) 18000 (9000/9000) 24000 (12000/12000)
+Rated PV input voltage (V) 320
+Number of independent MPPT inputs 2 / (2:2)
+Max. PV input voltage (V) 480
+MPPT voltage range (V) 120 ~ 440
+Start-up voltage (V) 100
+Max. PV input current per MPPT (A) 26 / 26 35 / 35
+Max. PV short-circuit current input per MPPT (A) 32.5 / 32.5 44 / 44
+Battery
+Compatible battery type Lithium-ion / Lead-Acid
+Rated battery voltage (V) 48 / 51.2
+Battery voltage range (V) 46.4 ~ 60 / 38.4 ~ 60
+Max. charging / discharging current (A) 230 250 270
+Max. charging / discharging power (W) 11000 12000 13000
+Force wake up battery from PV and Grid function YES
+Grid
+Rated AC voltage (V) 230
+AC Start-up Voltage 90
+Acceptable Input Voltage Range (V) 130 ~ 280
+Rated AC frequency (Hz) 50 / 60
+Rated AC input current (A) 100
+Rated AC input power (W) 24000
+PF 0.99
+THDI < 5%
+Max. continuous AC passthrough current (A) 100
+GEN
+Rated GEN voltage (V) 230
+Rated GEN frequency (Hz) 50 / 60
+Rated GEN input current (A) 65
+Rated GEN input power (W) 15000
+UPS
+Rated output power (W) 10000 12000 14000 (with PV + Battery)
+Rated output voltage (V) 230
+Rated output current (A) 43.5 52 61
+Rated output frequency (Hz) 50 / 60
+Switching time ( UPS ) < 10 ms
+Wave form Sine wave
+THDV < 3%
+5s@≥1.5×10K / 5s@≥1.5×12K / 10s@≥1.18 ×12K
+Overload protection
+10s@(1.1~1.5)×10K(Only Battery) 10s@(1.1~1.5)×12K(Only Battery) (With PV+ Battery)
+Efficiency
+Max. MPPT efficiency 99.0%
+Max. efficiency 93.5%
+Max. charge / discharge efficiency 93.0%
+Protection
+Over current / voltage protection (Y/N) YES
+AC Short-circuit current protection (Y/N) YES
+Grid monitoring (Y/N) YES
+DC / AC Surge protection Type Ⅲ
+General
+Dimensions ( W × H × D ) 520 × 580 × 163 mm / 20.5 × 22.8 × 6.4 in
+Weight 32.5 kg / 71.7 lbs
+Ingress protection rating IP20
+Operating environment temperature range (°C) 0 ~ 45
+Storage temperature range (°C) -15 ~ 60
+Relative humidity 5% ~ 95%
+Display & Communication interface LCD + RGB, RS485 / Wifi / CAN
+Warranty 2 years
+Cooling method Smart cooling
+Topology on AC / Battery side Transformer-less / Transformer
+Max. Operating Altitude (m) 2000
+Noise emission (dB) 55
+Standard & Certification
+N R S 0 9 7 , E N 6 2 1 0 9 - 1 / - 2
+Model SNA2-EU-LT 10K  SNA2-EU-LT 12K  SNA2-EU-LT 14K
+Input (PV DC)    
+  26 / 26
+  32.5 / 32.5
+Battery  
+230  250
+11000  12000
+Grid  
+GEN  
+UPS    
+URaPtSed output power (W)  10000  12000
+43.5  52
+  5s@≥1.5×10K /
+10s@(1.1~1.5)×10K(Only Battery)  5s@≥1.5×12K /
+10s@(1.1~1.5)×12K(Only Battery)
+Efficiency    
+Protection  
+General
