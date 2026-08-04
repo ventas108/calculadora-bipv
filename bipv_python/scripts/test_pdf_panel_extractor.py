@@ -150,6 +150,52 @@ r = validar_panel({"Pmax": 108, "Voc": 124.2, "Isc": 1.21, "Vmp": 96.0,
                    "Imp": 1.11, "dimensiones": "1200x600"})
 check("BIPV CdTe 15% eficiencia → ok", r["ok"], f"(errores: {r['errores']})")
 
+# 4.11 Thin-film CdTe con Ns "raro" para silicio → NO bloquea (regla por tecnología)
+r = validar_panel({"Pmax": 120, "Voc": 88.7, "Isc": 1.97, "Vmp": 66.9,
+                   "Imp": 1.79, "N_s": 264, "tecnologia": "CdTe"})
+check("CdTe Ns=264 (0.34 V/celda) → no bloquea", r["ok"], f"(errores: {r['errores']})")
+
+# 4.12 BIPV vidrio muy transparente, eficiencia 4% → avisa, no bloquea
+r = validar_panel({"Pmax": 40, "Voc": 24.0, "Isc": 2.2, "Vmp": 19.5,
+                   "Imp": 2.05, "dimensiones": "1200x800", "tecnologia": "a-Si"})
+check("BIPV 4.2% eficiencia → avisa sin bloquear",
+      r["ok"] and any("eficiencia" in a.lower() for a in r["avisos"]), f"({r['errores']} {r['avisos']})")
+
+# 4.13 Eficiencia >25% sigue bloqueando (imposible en cualquier tecnología)
+r = validar_panel({"Pmax": 715, "Voc": 48.8, "Isc": 18.55, "Vmp": 41.0,
+                   "Imp": 17.44, "N_s": 66, "dimensiones": "1200x600", "tecnologia": "CdTe"})
+check("Eficiencia 99% → bloquea aun siendo CdTe", not r["ok"])
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 5. Regex nuevas contra estilos de otros fabricantes (sintéticos)
+# ═════════════════════════════════════════════════════════════════════════════
+print("── Ficha 5: estilos Trina / Canadian / LONGi (sintéticos) ──")
+
+# Trina: etiquetas con guión y unidad pegada
+v5 = ex._apply_patterns("""
+Maximum Power (Pmax) [W] 400
+Open Circuit Voltage (Voc) [V] 41.10
+Short Circuit Current (Isc) [A] 12.16
+Maximum Power Voltage (Vmp) [V] 34.10
+Maximum Power Current (Imp) [A] 11.74
+Temperature Coefficient of Pmax -0.34%/°C
+Temperature Coefficient of Voc -0.25%/°C
+Temperature Coefficient of Isc +0.04%/°C
+Dimensions 1754×1096×30 mm
+""")
+for campo, esperado in [("Pmax", 400), ("Voc", 41.10), ("Isc", 12.16),
+                        ("Vmp", 34.10), ("Imp", 11.74),
+                        ("CoefPmax", -0.34), ("CoefVoc", -0.25), ("CoefIsc", 0.04)]:
+    check(f"Trina-style {campo} = {esperado}", approx(v5.get(campo), esperado),
+          f"(obtuvo {v5.get(campo)})")
+check("Trina-style dims 1754x1096x30", v5.get("dimensiones") == "1754x1096x30",
+      f"(obtuvo {v5.get('dimensiones')})")
+
+# El patrón "(Voc) [V]" no debe disparar sin la abreviatura entre paréntesis
+v6 = ex._apply_patterns("Este texto menciona el voltaje 9999 sin abreviaturas de panel.")
+check("Sin abreviaturas → Voc None (no captura basura)", v6.get("Voc") is None,
+      f"(obtuvo {v6.get('Voc')})")
+
 # ═════════════════════════════════════════════════════════════════════════════
 print(f"\n{'='*60}\nRESULTADO: {PASS} OK · {FAIL} FALLOS")
 sys.exit(1 if FAIL else 0)

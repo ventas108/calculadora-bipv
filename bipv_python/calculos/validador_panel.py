@@ -84,6 +84,11 @@ def validar_panel(campos: dict) -> dict:
         elif estado == "warn" and detalle:
             avisos.append(detalle)
 
+    # Tecnologías de película delgada: la celda no es de silicio cristalino,
+    # así que las reglas Voc/Ns y eficiencia mínima NO aplican como bloqueo.
+    _tech = str(campos.get("tecnologia") or "").strip().lower()
+    es_thin_film = _tech in {"cdte", "cis", "cigs", "a-si", "thin film", "película delgada"}
+
     pmax = _num(campos.get("Pmax"))
     voc  = _num(campos.get("Voc"))
     isc  = _num(campos.get("Isc"))
@@ -121,10 +126,18 @@ def validar_panel(campos: dict) -> dict:
             marcar("Pmax", "warn",
                    f"Pmax ({pmax:g} W) vs Vmp×Imp ({calc:.1f} W): desviación {dev:.1f}%. Revisa.")
 
-    # ── 4. Voltaje por celda (Ns) ────────────────────────────────────────────
+    # ── 4. Voltaje por celda (Ns) — regla de silicio cristalino ─────────────
     if ns is not None and voc is not None:
         v_celda = voc / ns
-        if not (_V_CELDA_MIN <= v_celda <= _V_CELDA_MAX):
+        if es_thin_film:
+            # CdTe/CIS/a-Si: voltaje por celda distinto — solo avisar si es absurdo
+            if not (0.3 <= v_celda <= 2.0):
+                marcar("N_s", "warn",
+                       f"Voc/Ns = {v_celda:.3f} V/celda inusual incluso para "
+                       f"{_tech.upper()} — verifica Ns.")
+            else:
+                marcar("N_s", "ok")
+        elif not (_V_CELDA_MIN <= v_celda <= _V_CELDA_MAX):
             sugerido = None
             # Sugerir Ns/2 (half-cut contado en medias celdas) si eso lo arregla
             if _V_CELDA_MIN <= voc / (ns / 2) <= _V_CELDA_MAX:
@@ -171,10 +184,19 @@ def validar_panel(campos: dict) -> dict:
     if dims and pmax:
         area_m2 = dims[0] * dims[1] * 1e-6
         ef = pmax / (area_m2 * 1000.0) * 100.0
-        if not (_EF_MIN <= ef <= _EF_MAX):
+        if ef > _EF_MAX:
+            # >25% es físicamente imposible en módulos comerciales de CUALQUIER
+            # tecnología → Pmax o dimensiones están mal extraídos.
             marcar("dimensiones", "error",
-                   f"Eficiencia implícita {ef:.1f}% (Pmax/área) fuera de [{_EF_MIN:g}, "
-                   f"{_EF_MAX:g}]% — Pmax o dimensiones están mal.")
+                   f"Eficiencia implícita {ef:.1f}% (Pmax/área) — imposible (>"
+                   f"{_EF_MAX:g}%). Pmax o dimensiones están mal.")
+        elif ef < _EF_MIN:
+            # Eficiencia baja es VÁLIDA en BIPV semitransparente/thin-film →
+            # solo avisar, nunca bloquear.
+            marcar("dimensiones", "warn",
+                   f"Eficiencia implícita {ef:.1f}% (<{_EF_MIN:g}%) — normal solo en "
+                   "BIPV semitransparente o película delgada; si es un panel "
+                   "estándar, revisa Pmax y dimensiones.")
         else:
             marcar("dimensiones", "ok")
     elif not dims:

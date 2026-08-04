@@ -305,6 +305,7 @@ with tab_agregar:
             "N_s": n_s, "CoefVoc": coef_voc, "CoefIsc": coef_isc,
             "CoefPmax": coef_pmax, "NOCT": noct, "dimensiones": dims,
             "Bifacialidad": bifac, "Transparencia": transp,
+            "tecnologia": tecnologia,
         })
         if not _val_fin["ok"]:
             st.error(
