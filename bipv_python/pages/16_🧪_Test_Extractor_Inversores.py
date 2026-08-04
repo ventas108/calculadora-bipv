@@ -260,7 +260,8 @@ else:
         else:
             # ── #139: alerta de campos críticos vacíos (fallo silencioso) ─────
             from calculos.pdf_inversor_extractor import contar_campos_vacios
-            _campos_vacios = contar_campos_vacios(res_real)
+            _sin_ocr_139 = res_real.get("es_escaneado") and not res_real.get("uso_ocr")
+            _campos_vacios = [] if _sin_ocr_139 else contar_campos_vacios(res_real)
             if len(_campos_vacios) > 3:
                 st.error(
                     f"🚨 **Extracción probablemente incompleta** — {len(_campos_vacios)} campos "
