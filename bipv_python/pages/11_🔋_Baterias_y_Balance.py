@@ -269,6 +269,106 @@ elif not tiene_catalogo:
 | Garantía (años) | Años de garantía | 10 |
         """)
 
+# ══════════════════════════════════════════════════════════════════════════════
+# #163 — Agregar / Editar / Eliminar baterías desde la app (sin SSH al Excel)
+# ══════════════════════════════════════════════════════════════════════════════
+from datos.catalogo_baterias_excel import guardar_bateria_excel, eliminar_bateria_excel
+from calculos.validador_bateria import validar_bateria as _validar_bat_form
+
+with st.expander("🛠️ Agregar / Editar / Eliminar batería del catálogo"):
+    st.caption(
+        "Escribe directamente en la hoja `Catalogo_Baterias` del Excel del servidor. "
+        "Antes de guardar se ejecuta la verificación de coherencia física (#162): "
+        "los datos imposibles 🔴 bloquean el guardado."
+    )
+    _NUEVA = "➕ Nueva batería…"
+    _opciones_mm = [_NUEVA] + (sorted(cat_bat.keys()) if tiene_catalogo else [])
+    _sel_mm = st.selectbox("Modelo a editar (o crear uno nuevo)", _opciones_mm,
+                           key="bat_mm_sel")
+    _base = cat_bat.get(_sel_mm, {}) if _sel_mm != _NUEVA else {}
+
+    def _v0(campo, default=0.0):
+        try:
+            return float(_base.get(campo) or 0)
+        except (TypeError, ValueError):
+            return default
+
+    with st.form("form_bateria_mm"):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            f_nombre = st.text_input("Modelo *", value=_base.get("nombre", ""))
+            f_fabricante = st.text_input("Fabricante", value=_base.get("fabricante", "") or "")
+            f_tipo = st.text_input("Tecnología / Química", value=_base.get("tipo", "") or "",
+                                   placeholder="LFP, NMC, Plomo-ácido…")
+            f_notas = st.text_input("Notas", value=_base.get("notas", "") or "")
+        with c2:
+            f_cap = st.number_input("Capacidad (kWh) *", min_value=0.0, step=0.1,
+                                    value=_v0("capacidad_kWh"), format="%.2f")
+            f_pot = st.number_input("Potencia continua (kW)", min_value=0.0, step=0.1,
+                                    value=_v0("potencia_kW"), format="%.2f")
+            f_volt = st.number_input("Voltaje nominal (V)", min_value=0.0, step=1.0,
+                                     value=_v0("voltaje_V"), format="%.1f")
+            f_costo = st.number_input("Costo unitario (USD)", min_value=0.0, step=50.0,
+                                      value=_v0("costo_usd"), format="%.0f")
+        with c3:
+            f_dod = st.number_input("DoD máximo (%)", min_value=0.0, max_value=150.0,
+                                    step=1.0, value=_v0("dod_pct"), format="%.0f")
+            f_rte = st.number_input("Eficiencia RTE (%)", min_value=0.0, max_value=150.0,
+                                    step=1.0, value=_v0("eta_rte_pct"), format="%.0f")
+            f_cic = st.number_input("Ciclos de vida", min_value=0, step=100,
+                                    value=int(_v0("ciclos_vida")))
+            f_gar = st.number_input("Garantía (años)", min_value=0, step=1,
+                                    value=int(_v0("garantia_anos")))
+        st.caption("Campos en 0 se guardan vacíos (dato no disponible). * = obligatorio.")
+        _guardar_mm = st.form_submit_button("💾 Guardar batería", type="primary")
+
+    if _guardar_mm:
+        _n0 = lambda v: None if not v else v          # 0 / "" → None
+        _datos_mm = {
+            "nombre": f_nombre.strip(), "fabricante": _n0(f_fabricante.strip()),
+            "tipo": _n0(f_tipo.strip()), "notas": _n0(f_notas.strip()),
+            "capacidad_kWh": _n0(f_cap), "potencia_kW": _n0(f_pot),
+            "voltaje_V": _n0(f_volt), "costo_usd": _n0(f_costo),
+            "dod_pct": _n0(f_dod), "eta_rte_pct": _n0(f_rte),
+            "ciclos_vida": _n0(f_cic), "garantia_anos": _n0(f_gar),
+        }
+        if not _datos_mm["nombre"]:
+            st.error("❌ El nombre del modelo es obligatorio.")
+        else:
+            _val_mm = _validar_bat_form(_datos_mm)
+            if not _val_mm["ok"]:
+                st.error("🔴 **No se guardó** — corrige estos datos físicamente "
+                         "imposibles:\n\n"
+                         + "\n".join(f"- {e}" for e in _val_mm["errores"]))
+            else:
+                try:
+                    _orig = _sel_mm if _sel_mm != _NUEVA else None
+                    guardar_bateria_excel(_datos_mm, nombre_original=_orig)
+                except Exception as _e_mm:
+                    st.error(f"❌ No se pudo escribir en el Excel del servidor: {_e_mm}")
+                else:
+                    for _a in _val_mm["avisos"]:
+                        st.warning(f"🟠 {_a}")
+                    st.success(f"✅ Batería **{_datos_mm['nombre']}** guardada en el catálogo.")
+                    st.rerun()
+
+    # ── Eliminar ───────────────────────────────────────────────────────────
+    if _sel_mm != _NUEVA:
+        st.divider()
+        _chk_del = st.checkbox(f"Confirmo que quiero eliminar **{_sel_mm}** del catálogo",
+                               key="bat_mm_chk_del")
+        if st.button("🗑️ Eliminar batería", disabled=not _chk_del, key="bat_mm_btn_del"):
+            try:
+                _ok_del = eliminar_bateria_excel(_sel_mm)
+            except Exception as _e_del:
+                st.error(f"❌ No se pudo eliminar: {_e_del}")
+            else:
+                if _ok_del:
+                    st.success(f"🗑️ **{_sel_mm}** eliminada del catálogo.")
+                    st.rerun()
+                else:
+                    st.error(f"❌ No se encontró la fila de **{_sel_mm}** en el Excel.")
+
 col_b1, col_b2 = st.columns([1, 1])
 
 with col_b1:

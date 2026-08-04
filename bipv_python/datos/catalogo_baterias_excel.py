@@ -381,3 +381,173 @@ def diagnostico_catalogo(_mtime: float = 0.0) -> dict:
             continue
 
     return info
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #163 — Escritura del catálogo desde la app (sin SSH al Excel del servidor)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Encabezados canónicos (los que se usan al crear la hoja o columnas nuevas)
+_CANON_COLS: dict[str, str] = {
+    "nombre":        "Modelo",
+    "fabricante":    "Fabricante",
+    "_completos":    "Datos completos (Si/No)",
+    "capacidad_kWh": "Capacidad (kWh)",
+    "potencia_kW":   "Potencia Continua (kW)",
+    "voltaje_V":     "Voltaje Nominal (V)",
+    "dod_pct":       "DoD Máximo (%)",
+    "ciclos_vida":   "Ciclos de Vida",
+    "eta_rte_pct":   "Eficiencia RTE (%)",
+    "tipo":          "Tecnología",
+    "costo_usd":     "Costo (USD)",
+    "garantia_anos": "Garantía (años)",
+    "notas":         "Notas",
+}
+
+
+def _abrir_hoja(wb):
+    """Devuelve (ws, header_row) de la hoja de baterías, creándola si no existe.
+
+    header_row se detecta buscando en las primeras 5 filas una celda con un
+    alias de 'Modelo' (mismo criterio que el loader). Si la hoja se crea,
+    se escriben los encabezados canónicos en la fila 1.
+    """
+    nombre_hoja = next((s for s in _SHEETS if s in wb.sheetnames), None)
+    if nombre_hoja is None:
+        ws = wb.create_sheet(_SHEETS[0])
+        for j, titulo in enumerate(_CANON_COLS.values(), start=1):
+            ws.cell(row=1, column=j, value=titulo)
+        return ws, 1
+
+    ws = wb[nombre_hoja]
+    for fila in range(1, 6):
+        for celda in ws[fila]:
+            if _normalizar_col(celda.value or "").lower() in _MODELO_ALIASES:
+                return ws, fila
+    raise ValueError(
+        f"La hoja '{nombre_hoja}' existe pero no se encontró la fila de "
+        "encabezados (ninguna celda 'Modelo' en las primeras 5 filas)."
+    )
+
+
+def _mapa_columnas(ws, header_row: int) -> dict:
+    """{clave_interna: índice_columna_1based} según los encabezados actuales."""
+    mapa = {}
+    for celda in ws[header_row]:
+        nombre = _normalizar_col(celda.value or "")
+        if not nombre:
+            continue
+        interna = _COL_MAP.get(nombre)
+        if interna and interna not in mapa:
+            mapa[interna] = celda.column
+    return mapa
+
+
+def _asegurar_columna(ws, header_row: int, mapa: dict, clave: str) -> int:
+    """Devuelve la columna de `clave`, creándola al final si no existe."""
+    if clave in mapa:
+        return mapa[clave]
+    nueva = ws.max_column + 1
+    ws.cell(row=header_row, column=nueva, value=_CANON_COLS[clave])
+    mapa[clave] = nueva
+    return nueva
+
+
+def _fila_de_modelo(ws, header_row: int, col_nombre: int, nombre: str):
+    """Fila (1-based) del modelo, comparando sin mayúsculas ni espacios extra."""
+    clave = " ".join(nombre.split()).lower()
+    for fila in ws.iter_rows(min_row=header_row + 1):
+        val = str(fila[col_nombre - 1].value or "").strip()
+        if " ".join(val.split()).lower() == clave:
+            return fila[0].row
+    return None
+
+
+def _invalidar_cache():
+    try:
+        cargar_catalogo_baterias.clear()
+        diagnostico_catalogo.clear()
+    except Exception:
+        pass  # fuera de Streamlit (tests de consola) no hay caché que limpiar
+
+
+def guardar_bateria_excel(datos: dict, nombre_original: str | None = None) -> str:
+    """Agrega o actualiza una batería en la hoja Catalogo_Baterias.
+
+    datos: claves internas ("nombre", "capacidad_kWh", "potencia_kW", ...).
+           None = dejar la celda vacía (se escribe siempre: es la ficha completa
+           tal como quedó en el formulario, no un merge).
+    nombre_original: si se está editando y el usuario cambió el nombre del
+           modelo, pasar el nombre anterior para actualizar esa fila.
+
+    Retorna el nombre guardado. Lanza ValueError/FileNotFoundError con mensaje
+    claro si algo impide escribir (nunca falla en silencio).
+    """
+    import openpyxl
+
+    nombre = str(datos.get("nombre", "")).strip()
+    if not nombre:
+        raise ValueError("El nombre del modelo es obligatorio.")
+
+    try:
+        wb = openpyxl.load_workbook(_EXCEL)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"No se encontró el archivo Excel: {_EXCEL}")
+
+    ws, header_row = _abrir_hoja(wb)
+    mapa = _mapa_columnas(ws, header_row)
+    col_nombre = _asegurar_columna(ws, header_row, mapa, "nombre")
+
+    # Fila destino: la del nombre_original (edición), la del nombre (ya existe)
+    # o una nueva al final.
+    fila = None
+    if nombre_original and nombre_original.strip():
+        fila = _fila_de_modelo(ws, header_row, col_nombre, nombre_original)
+    if fila is None:
+        fila = _fila_de_modelo(ws, header_row, col_nombre, nombre)
+    if fila is None:
+        fila = ws.max_row + 1
+
+    for clave in _CANON_COLS:
+        if clave == "_completos":
+            continue  # se escribe abajo según completitud real
+        if clave == "nombre":
+            ws.cell(row=fila, column=col_nombre, value=nombre)
+            continue
+        if clave not in datos and clave not in mapa:
+            continue  # campo no provisto y sin columna: no crear columnas vacías
+        col = _asegurar_columna(ws, header_row, mapa, clave)
+        ws.cell(row=fila, column=col, value=datos.get(clave))
+
+    # Completitud: Si cuando los campos que usa el dimensionamiento están llenos
+    _claves_completa = ("capacidad_kWh", "potencia_kW", "voltaje_V",
+                        "dod_pct", "ciclos_vida", "eta_rte_pct")
+    completa = all(datos.get(k) not in (None, "", 0) for k in _claves_completa)
+    col_comp = _asegurar_columna(ws, header_row, mapa, "_completos")
+    ws.cell(row=fila, column=col_comp, value="Si" if completa else "No")
+
+    wb.save(_EXCEL)
+    _invalidar_cache()
+    return nombre
+
+
+def eliminar_bateria_excel(nombre: str) -> bool:
+    """Elimina la fila de la batería `nombre`. True si la encontró y borró."""
+    import openpyxl
+
+    try:
+        wb = openpyxl.load_workbook(_EXCEL)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"No se encontró el archivo Excel: {_EXCEL}")
+
+    ws, header_row = _abrir_hoja(wb)
+    mapa = _mapa_columnas(ws, header_row)
+    if "nombre" not in mapa:
+        return False
+    fila = _fila_de_modelo(ws, header_row, mapa["nombre"], nombre)
+    if fila is None:
+        return False
+    ws.delete_rows(fila, 1)
+    wb.save(_EXCEL)
+    _invalidar_cache()
+    return True
