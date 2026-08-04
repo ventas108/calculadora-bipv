@@ -226,6 +226,25 @@ if tiene_catalogo:
                     "Modelos sin `dod_pct`, `eta_rte_pct` o `ciclos_vida` usan valores por defecto "
                     "(80 % DoD · 95 % RTE · 3 000 ciclos)."
                 )
+
+            # ④ Modelos duplicados en el Excel (solo sobrevive la última fila)
+            _duplicados = _diag.get("modelos_duplicados", [])
+            if _duplicados:
+                st.markdown("**④ Modelos duplicados en el Excel:**")
+                _rows_dup = [{
+                    "Modelo":            _d["modelo"],
+                    "Veces que aparece": _d["n"],
+                    "Filas en el Excel": ", ".join(str(f) for f in _d["filas_excel"]),
+                } for _d in _duplicados]
+                st.dataframe(
+                    pd.DataFrame(_rows_dup), use_container_width=True, hide_index=True
+                )
+                st.warning(
+                    "⚠️ Cuando un modelo se repite, **solo se carga la última fila** y las "
+                    "anteriores se descartan en silencio. Elimina o renombra las filas "
+                    "duplicadas en el Excel para saber exactamente qué datos se están usando.",
+                    icon="⚠️",
+                )
 elif not tiene_catalogo:
     with st.expander("📋 Columnas esperadas en la hoja Catalogo_Baterias"):
         st.markdown("""

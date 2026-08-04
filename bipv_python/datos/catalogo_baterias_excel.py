@@ -346,6 +346,29 @@ def diagnostico_catalogo(_mtime: float = 0.0) -> dict:
                             "columnas_sugeridas": aliases_sug,
                         })
                 info["campos_sin_columna_excel"] = campos_sin_columna
+
+                # ── #123 — Modelos duplicados en el Excel ────────────────────────
+                # El loader usa el nombre como clave del dict: si un modelo aparece
+                # dos veces (exacto o con espacios de más), solo sobrevive la última
+                # fila y el resto se pierde en silencio.
+                col_nombre = next((c for c in df_cand.columns
+                                   if _normalizar_col(c).lower() in _MODELO_ALIASES), None)
+                ocurrencias = {}   # nombre_normalizado → {"nombre": ..., "filas": [...]}
+                if col_nombre is not None:
+                    for idx, raw in df_cand[col_nombre].items():
+                        val = str(raw).strip()
+                        if not val or val.lower() in ("nan", "") or val.lower() in _MODELO_ALIASES:
+                            continue
+                        if val.startswith("⚠") or val.startswith("*") or len(val) > 60:
+                            continue
+                        clave = " ".join(val.split()).lower()   # colapsa espacios, ignora mayúsc.
+                        fila_excel = h + 2 + idx                # fila real en el Excel (1-based)
+                        d = ocurrencias.setdefault(clave, {"nombre": val, "filas": []})
+                        d["filas"].append(int(fila_excel))
+                info["modelos_duplicados"] = [
+                    {"modelo": d["nombre"], "filas_excel": d["filas"], "n": len(d["filas"])}
+                    for d in ocurrencias.values() if len(d["filas"]) > 1
+                ]
                 break
         except Exception:
             continue
