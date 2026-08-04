@@ -973,6 +973,51 @@ Nominal output voltage 400V
         },
     },
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # 26. ECO HYBRID SNA2-EU-LT 10-14K — híbrido monofásico. Formato crítico:
+    # los 3 modelos comparten el nombre base y el diferenciador (10K/12K/14K)
+    # es un token que empieza con dígito en la MISMA línea del encabezado.
+    # Además la potencia FV trae el desglose por MPPT entre paréntesis, que
+    # NO debe confundirse con la potencia total del modelo.
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "ECO HYBRID (SNA2)",
+        "modelo":     "SNA2-EU-LT 10K",
+        "arquitectura": "Híbrido monofásico",
+        "texto": """\
+ECO HYBRID
+SNA2-EU-LT 10-14K
+(Single-Phase)
+Model SNA2-EU-LT 10K SNA2-EU-LT 12K SNA2-EU-LT 14K
+Input (PV DC)
+Max. PV input power (W) 18000 (9000/9000) 24000 (12000/12000)
+Rated PV input voltage (V) 320
+Number of independent MPPT inputs 2 / (2:2)
+Max. PV input voltage (V) 480
+MPPT voltage range (V) 120 ~ 440
+Start-up voltage (V) 100
+Max. PV input current per MPPT (A) 26 / 26 35 / 35
+Max. PV short-circuit current input per MPPT (A) 32.5 / 32.5 44 / 44
+Battery
+Rated battery voltage (V) 48 / 51.2
+Battery voltage range (V) 46.4 ~ 60 / 38.4 ~ 60
+""",
+        "esperado": {
+            "Vdc_max":           480,
+            "Vmppt_min":         120,
+            "Vmppt_max":         440,
+            "V_mppt_activo":     320,
+            "V_arranque":        100,
+            "n_trackers":          2,
+            "n_strings_tracker":   2,
+            "I_max_tracker":      26,
+            "Isc_max_tracker":  32.5,
+            "P_dc_max_W":       None,   # va por modelo (valores_por_modelo)
+            "bat_voltaje_min":  46.4,
+            "bat_voltaje_max":    60,
+        },
+    },
+
 ]
 
 # Campos que se comparan (ordenados para la tabla de cobertura)

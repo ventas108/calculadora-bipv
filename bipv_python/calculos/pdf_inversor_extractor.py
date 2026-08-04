@@ -690,6 +690,39 @@ def _extract_multimodel_values(text: str) -> dict:
 
     model_names = [name for name, _ in header_positions]
 
+    # Nombres repetidos con el sufijo de potencia en la MISMA línea
+    # ("Model SNA2-EU-LT 10K SNA2-EU-LT 12K SNA2-EU-LT 14K"): el sufijo (10K)
+    # empieza con dígito y queda fuera del match del nombre → completarlo con
+    # los tokens numéricos entre cada nombre y el siguiente.
+    # Nombres repetidos con el diferenciador como PREFIJO numérico pegado
+    # ("Master 9R-280R Master 15R-280R" → el regex excluye tokens que empiezan
+    # con dígito, dejando "R-280R" dos veces) → recuperar los dígitos previos.
+    if len(set(model_names)) < len(model_names):
+        hline = lines[header_line_idx]
+        nuevos_pf, pos_pf = [], []
+        for name, pos in header_positions:
+            ini = pos
+            while ini > 0 and hline[ini - 1].isdigit():
+                ini -= 1
+            nuevos_pf.append(hline[ini:pos] + name)
+            pos_pf.append(ini)
+        if len(set(nuevos_pf)) == len(nuevos_pf):
+            model_names = nuevos_pf
+            header_positions = list(zip(nuevos_pf, pos_pf))
+
+    if len(set(model_names)) < len(model_names):
+        hline = lines[header_line_idx]
+        nuevos_sl = []
+        for i, (name, pos) in enumerate(header_positions):
+            fin = header_positions[i + 1][1] if i + 1 < len(header_positions) else len(hline)
+            seg = hline[pos + len(name):fin]
+            sufs = [t for t in re.findall(r'\S+', seg) if re.match(r'^\d[\w.,]*$', t)]
+            nuevos_sl.append((name + ' ' + ' '.join(sufs)).strip() if sufs else name)
+        if len(set(nuevos_sl)) == len(nuevos_sl):
+            model_names = nuevos_sl
+            header_positions = [(nuevos_sl[i], header_positions[i][1])
+                                for i in range(len(nuevos_sl))]
+
     # Nombres partidos en dos líneas (Deye/TriP2): "Model TriP2-LB- TriP2-LB- ..."
     # + línea siguiente "3P 5K 3P 6K ..." — completar cada nombre con los tokens
     # de la línea de continuación asignados a la columna más cercana
@@ -726,7 +759,8 @@ def _extract_multimodel_values(text: str) -> dict:
     result: dict = {
         'modelos': model_names,
         'por_modelo': {
-            m: {'P_dc_max_W': None, 'n_trackers': None, 'n_strings_tracker': None}
+            m: {'P_dc_max_W': None, 'n_trackers': None, 'n_strings_tracker': None,
+                'I_max_tracker': None, 'Isc_max_tracker': None}
             for m in model_names
         },
     }
@@ -759,22 +793,26 @@ def _extract_multimodel_values(text: str) -> dict:
                          r'|Max\.?\s*PV\s+input\s+power'
                          r'|Max\.?\s*DC\s+Input\s+Power', line, re.IGNORECASE):
             continue
+        # Enmascarar contenido entre paréntesis conservando posiciones:
+        # "18000 (9000/9000) 24000 (12000/12000)" → los desgloses por MPPT
+        # no deben confundirse con la potencia total del modelo
+        line_m = re.sub(r'\([^)]*\)', lambda m_: ' ' * len(m_.group()), line)
         found = [
             (float(m.group(1).replace(',', '.')), m.start())
-            for m in re.finditer(r'([0-9]+(?:[.,][0-9]+)?)\s*kWp?\b', line, re.IGNORECASE)
+            for m in re.finditer(r'([0-9]+(?:[.,][0-9]+)?)\s*kWp?\b', line_m, re.IGNORECASE)
         ]
         if not found:
             # Valores directamente en W (Growatt: "100000W 120000W ...") → /1000 para
             # reutilizar la lógica kW→W de abajo
             found = [
                 (float(m.group(1)) / 1000.0, m.start())
-                for m in re.finditer(r'([0-9]{4,7})\s*W\b', line)
+                for m in re.finditer(r'([0-9]{4,7})\s*W\b', line_m)
             ]
         if not found:
             # SAJ: valores sin unidad tras la etiqueta ("[Wp]@STC 30000 37500 45000")
             found = [
                 (float(m.group(1)) / 1000.0, m.start())
-                for m in re.finditer(r'\b([0-9]{4,7})\b', line)
+                for m in re.finditer(r'\b([0-9]{4,7})\b', line_m)
             ]
         if not found:
             continue   # etiqueta partida en dos líneas (Growatt) — seguir buscando
@@ -824,6 +862,54 @@ def _extract_multimodel_values(text: str) -> dict:
                     result['por_modelo'][model]['n_trackers']        = nt
                     result['por_modelo'][model]['n_strings_tracker'] = ns
         break
+
+    # ── 3b. Corrientes por columna ──────────────────────────────────────────────
+    # "Max. PV input current per MPPT (A) 26 / 26 35 / 35" — cada columna trae
+    # "I1 / I2" (una corriente por MPPT); tomamos el máximo del par.
+    for campo, patron in (
+        ('I_max_tracker',   r'Max\.?\s*PV\s+input\s+current'),
+        ('Isc_max_tracker', r'Max\.?\s*PV\s+short[-\s]?circuit\s+current'),
+    ):
+        for line in lines:
+            m_lab = re.search(patron, line, re.IGNORECASE)
+            if not m_lab:
+                continue
+            resto_ini = m_lab.end()
+            found = [
+                (max(float(m.group(1).replace(',', '.')),
+                     float(m.group(2).replace(',', '.'))), m.start())
+                for m in re.finditer(
+                    r'([0-9]+(?:[.,][0-9]+)?)\s*/\s*([0-9]+(?:[.,][0-9]+)?)', line)
+                if m.start() >= resto_ini
+            ]
+            if not found:
+                found = [
+                    (float(m.group(1).replace(',', '.')), m.start())
+                    for m in re.finditer(r'([0-9]+(?:[.,][0-9]+)?)\s*A?\b', line)
+                    if m.start() >= resto_ini
+                ]
+            if not found:
+                continue
+            if len(found) == n:
+                for (v, _), model in zip(found, model_names):
+                    result['por_modelo'][model][campo] = v
+            else:
+                # Menos valores que modelos: en texto comprimido las posiciones
+                # no distinguen columnas → anclar primer valor a la primera
+                # columna y último a la última; el resto por posición.
+                by_idx: dict = {}
+                fs = sorted(found, key=lambda t: t[1])
+                by_idx[0] = fs[0][0]
+                by_idx[n - 1] = fs[-1][0]
+                for v, vx in fs[1:-1]:
+                    idx = _nearest_idx(vx)
+                    if idx not in by_idx:
+                        by_idx[idx] = v
+                _fill_gaps(by_idx)
+                for i, model in enumerate(model_names):
+                    if i in by_idx:
+                        result['por_modelo'][model][campo] = by_idx[i]
+            break
 
     # ── 4. n_trackers por columna, formato SAJ español: "No. de MPPT 3 4 4" ────
     if all(result['por_modelo'][m]['n_trackers'] is None for m in model_names):
