@@ -288,11 +288,83 @@ with st.expander("🛠️ Agregar / Editar / Eliminar batería del catálogo"):
         for _a in _flash.get("avisos", []):
             st.warning(f"🟠 {_a}")
 
+    # ── Extractor PDF de fichas de baterías (como el de paneles/inversores) ──
+    from calculos.pdf_bateria_extractor import extraer_parametros_bateria
+    st.markdown("**📄 Cargar desde ficha técnica PDF** (opcional)")
+    _pdf_bat = st.file_uploader("Ficha técnica de la batería (PDF)", type=["pdf"],
+                                key="bat_pdf_up", label_visibility="collapsed")
+    if _pdf_bat is not None and st.button("🔎 Extraer datos del PDF", key="bat_pdf_btn"):
+        with st.spinner("Leyendo la ficha…"):
+            st.session_state["bat_pdf_extr"] = extraer_parametros_bateria(_pdf_bat.getvalue())
+
+    _extr = st.session_state.get("bat_pdf_extr")
+    if _extr:
+        if _extr.get("error"):
+            st.error(f"❌ {_extr['error']}")
+        elif not _extr["modelos_detectados"]:
+            st.warning(
+                "🟠 No se detectaron modelos en el PDF"
+                + (" (parece escaneado y no hay OCR disponible en el servidor)."
+                   if _extr.get("es_escaneado") and not _extr.get("ocr_disponible")
+                   else ". Revisa que sea una ficha técnica de batería o "
+                        "ingresa los datos a mano abajo.")
+            )
+        else:
+            _mod_pdf = st.selectbox("Modelo detectado en la ficha",
+                                    _extr["modelos_detectados"], key="bat_pdf_modelo")
+            _v_pdf = _extr["valores_por_modelo"].get(_mod_pdf, {})
+            _fmt = lambda v, u="": f"{v:g}{u}" if v is not None else "—"
+            st.markdown(
+                f"| Capacidad | Voltaje | Potencia | Química | Ciclos | C-rate |\n"
+                f"|---|---|---|---|---|---|\n"
+                f"| {_fmt(_v_pdf.get('capacidad_kWh'), ' kWh')} "
+                f"| {_fmt(_v_pdf.get('voltaje_V'), ' V')} "
+                f"| {_fmt(_v_pdf.get('potencia_kW'), ' kW')}"
+                f"{' (estimada a ' + str(_extr['c_rate']) + 'C)' if _v_pdf.get('potencia_estimada') else ''} "
+                f"| {_extr.get('quimica') or '—'} "
+                f"| {_fmt(_extr.get('ciclos'))} "
+                f"| {_fmt(_extr.get('c_rate'), 'C')} |"
+            )
+            _faltan = [n for n, k in [("DoD", "dod_pct"), ("RTE", "rte_pct")]
+                       if _extr.get(k) is None]
+            if _faltan:
+                st.caption(f"🟠 La ficha no trae {' ni '.join(_faltan)} — quedarán "
+                           "vacíos y el sistema usará valores por defecto conservadores.")
+            if st.button("📋 Usar estos datos en el formulario", key="bat_pdf_usar",
+                         type="primary"):
+                _notas_pdf = "Extraída de ficha PDF"
+                if _v_pdf.get("potencia_estimada"):
+                    _notas_pdf += f"; potencia estimada a {_extr['c_rate']:g}C nominal"
+                st.session_state["bat_pdf_prefill"] = {
+                    "nombre": _mod_pdf if _mod_pdf != "(modelo sin nombre)" else "",
+                    "fabricante": _extr.get("fabricante") or None,
+                    "tipo": _extr.get("quimica") or None,
+                    "notas": _notas_pdf,
+                    "capacidad_kWh": _v_pdf.get("capacidad_kWh"),
+                    "potencia_kW": _v_pdf.get("potencia_kW"),
+                    "voltaje_V": _v_pdf.get("voltaje_V"),
+                    "dod_pct": _extr.get("dod_pct"),
+                    "eta_rte_pct": _extr.get("rte_pct"),
+                    "ciclos_vida": _extr.get("ciclos"),
+                    "garantia_anos": _extr.get("garantia_anos"),
+                }
+                # Forzar el modo "Nueva batería" para que Guardar no renombre
+                # el modelo que estuviera seleccionado en el editor.
+                st.session_state["bat_mm_sel"] = "➕ Nueva batería…"
+                st.rerun()
+    st.divider()
+
     _NUEVA = "➕ Nueva batería…"
     _opciones_mm = [_NUEVA] + (sorted(cat_bat.keys()) if tiene_catalogo else [])
     _sel_mm = st.selectbox("Modelo a editar (o crear uno nuevo)", _opciones_mm,
                            key="bat_mm_sel")
     _base = cat_bat.get(_sel_mm, {}) if _sel_mm != _NUEVA else {}
+    # Prefill desde la ficha PDF extraída (un solo uso; se consume aquí)
+    _pref_pdf = st.session_state.pop("bat_pdf_prefill", None)
+    if _pref_pdf is not None:
+        _base = _pref_pdf
+        st.info("📄 Formulario prellenado con los datos de la ficha PDF — "
+                "revisa y completa lo que falte antes de guardar.")
 
     def _v0(campo, default=0.0):
         try:
