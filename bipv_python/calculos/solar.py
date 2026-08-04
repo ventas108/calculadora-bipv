@@ -154,14 +154,15 @@ def calcular_poa(
         bifaciality=bifacialidad,
     ).fillna(0.0)
 
-    # Conservar el POA frontal clásico (haydavies sin sombreado fila-fila) como
-    # base y sumar SOLO la ganancia trasera del modelo bifacial. Así el caso
-    # bifacialidad→0 converge exactamente al resultado monofacial histórico.
+    # En modo bifacial, poa_global proviene ÍNTEGRAMENTE de infinite_sheds
+    # (frente con sombreado fila-a-fila + trasera × bifacialidad), para no
+    # mezclar dos modelos con supuestos geométricos distintos. Las columnas
+    # clásicas (poa_direct, poa_diffuse, ...) se conservan solo como
+    # descomposición informativa del frente sin sombreado fila-fila.
     out = poa.copy()
-    poa_rear = poa_bif["poa_back"].clip(lower=0.0)
-    out["poa_front"] = poa["poa_global"]
-    out["poa_rear"] = poa_rear
-    out["poa_global"] = poa["poa_global"] + bifacialidad * poa_rear
+    out["poa_front"] = poa_bif["poa_front"].clip(lower=0.0)
+    out["poa_rear"] = poa_bif["poa_back"].clip(lower=0.0)
+    out["poa_global"] = poa_bif["poa_global"].clip(lower=0.0)
     return out.fillna(0.0)
 
 

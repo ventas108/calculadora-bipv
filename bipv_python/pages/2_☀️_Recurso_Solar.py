@@ -320,10 +320,12 @@ _recalc_btn   = _btn_col2.button("🔄 Limpiar caché", use_container_width=True
                                   help="Fuerza nueva descarga desde PVGIS, descartando datos anteriores.")
 if _recalc_btn:
     cargar_tmy.clear()
-    # También borrar caché de disco para este predio/orientación
+    # También borrar caché de disco para este predio/orientación — TODAS las
+    # variantes de albedo (sufijo _albXX), no solo la del default 0.20.
     try:
-        _p = _cache_path(lat, lon, tilt, azimuth, alt_m)
-        if os.path.exists(_p):
+        import glob as _glob
+        _base = _cache_path(lat, lon, tilt, azimuth, alt_m)     # sin sufijo
+        for _p in _glob.glob(_base.replace(".pkl", "*.pkl")):
             os.remove(_p)
     except Exception:
         pass
@@ -385,11 +387,14 @@ if _descarga_btn:
     mc5.metric("HSP equivalentes", f"{poa_anual:.0f} h/año", help="Horas Sol Pico — energía base para cálculo")
 
     ganancia_bif_pct = 0.0
-    if bifacial_cfg and poa_anual_mono > 0:
-        ganancia_bif_pct = (poa_anual / poa_anual_mono - 1.0) * 100.0
+    if bifacial_cfg and "poa_front" in poa.columns:
+        _front_anual = poa["poa_front"].sum() / 1000.0
+        _rear_aporte = poa_anual - _front_anual   # = bifacialidad × POA trasera
+        if _front_anual > 0:
+            ganancia_bif_pct = _rear_aporte / _front_anual * 100.0
         st.success(
             f"🔄 **Ganancia bifacial: +{ganancia_bif_pct:.1f}%** — "
-            f"POA frontal: {poa_anual_mono:,.0f} kWh/m²/año → POA bifacial: "
+            f"POA frontal: {_front_anual:,.0f} kWh/m²/año → POA bifacial total: "
             f"{poa_anual:,.0f} kWh/m²/año "
             f"(bifacialidad {bifacial_cfg['bifacialidad']*100:.0f}% · "
             f"altura {bifacial_cfg['altura_m']:.1f} m · "

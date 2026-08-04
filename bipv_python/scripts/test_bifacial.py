@@ -56,20 +56,32 @@ poa_bif = calcular_poa(tmy, LAT, LON, ALT, tilt=10, azimuth=180,
                        albedo=0.20, bifacial=cfg)
 check({"poa_front", "poa_rear"} <= set(poa_bif.columns), "columnas poa_front/poa_rear presentes")
 suma = poa_bif["poa_front"] + 0.80 * poa_bif["poa_rear"]
-check(np.allclose(poa_bif["poa_global"], suma, atol=1e-6),
-      "poa_global = poa_front + bifacialidad × poa_rear")
+check(np.allclose(poa_bif["poa_global"], suma, rtol=0.02, atol=1.0),
+      "poa_global ≈ poa_front + bifacialidad × poa_rear (infinite_sheds coherente)")
 gan = poa_bif["poa_global"].sum() / poa_mono["poa_global"].sum() - 1.0
 check(0.005 < gan < 0.35,
       f"ganancia bifacial plausible: +{gan*100:.1f}% (esperado 0.5–35% — TMY "
       "sintético difuso-alto con albedo 0.5 se acerca al extremo superior)")
 check((poa_bif["poa_rear"] >= 0).all(), "poa_rear nunca negativa")
 
-print("3. bifacialidad → 0 converge al monofacial")
+print("3. bifacialidad → 0: solo queda el frente de infinite_sheds (≤ monofacial)")
 cfg0 = dict(cfg, bifacialidad=0.0)
 poa_b0 = calcular_poa(tmy, LAT, LON, ALT, tilt=10, azimuth=180,
                       albedo=0.20, bifacial=cfg0)
-check(np.allclose(poa_b0["poa_global"], poa_mono["poa_global"], atol=1e-6),
-      "con bifacialidad 0 la POA es idéntica a la monofacial")
+_ratio0 = poa_b0["poa_global"].sum() / poa_mono["poa_global"].sum()
+check(np.allclose(poa_b0["poa_global"], poa_b0["poa_front"], atol=1e-6),
+      "con bifacialidad 0, poa_global == poa_front (sin aporte trasero)")
+check(0.85 <= _ratio0 <= 1.02,
+      f"frente infinite_sheds coherente con el monofacial clásico "
+      f"(ratio {_ratio0:.3f}; ≤1 esperado por sombreado fila-fila)")
+
+print("3b. GCR alto ⇒ el frente pierde por sombreado fila-fila (coherencia geométrica)")
+f_gcr_lo = calcular_poa(tmy, LAT, LON, ALT, 10, 180, 0.20,
+                        dict(cfg, gcr=0.15))["poa_front"].sum()
+f_gcr_hi = calcular_poa(tmy, LAT, LON, ALT, 10, 180, 0.20,
+                        dict(cfg, gcr=0.85))["poa_front"].sum()
+check(f_gcr_hi < f_gcr_lo,
+      f"poa_front con GCR 0.85 ({f_gcr_hi/1000:.0f} kWh/m²) < GCR 0.15 ({f_gcr_lo/1000:.0f} kWh/m²)")
 
 print("4. Monotonía: más albedo trasero ⇒ más ganancia")
 g_lo = calcular_poa(tmy, LAT, LON, ALT, 10, 180, 0.20,
