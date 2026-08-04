@@ -122,7 +122,7 @@ with col_c1:
             "La simulación usará el **modelo simplificado lineal** — incertidumbre ±10–20% "
             "respecto al SDM De Soto real, especialmente a irradiancias bajas y en clima frío.  \n"
             "Para mayor precisión: calibra el SDM en 🔬 **Motor IV** o sube la ficha completa "
-            "en 📋 **Catálogo PDF**.",
+            "en 📋 **Catálogo Paneles**.",
             icon="⚠️",
         )
 
@@ -189,7 +189,7 @@ else:
     st.caption(
         "ℹ️ El modo **curva IV real (Motor IV)** no está disponible: este panel no tiene "
         "ficha SDM completa (`I_L_ref`, `I_o_ref`, `R_s`, `R_sh_ref`, `a_ref`, `Tk_alfa`). "
-        "Se usa el modelo base. Completa la ficha en 🔬 Motor IV o 📋 Catálogo PDF."
+        "Se usa el modelo base. Completa la ficha en 🔬 Motor IV o 📋 Catálogo Paneles."
     )
 
 btn_sim = st.button(
@@ -282,7 +282,7 @@ if btn_sim or st.session_state.get("produccion_ok"):
             "La incertidumbre en E_ac es **±10–20%**, mayor en horas de baja irradiancia "
             "y en climas fríos donde el SDM capta la ganancia real por temperatura.  \n"
             "Para resultados más precisos, completa los parámetros en 🔬 **Motor IV** "
-            "o sube la ficha técnica en 📋 **Catálogo PDF**.",
+            "o sube la ficha técnica en 📋 **Catálogo Paneles**.",
             icon="⚠️",
         )
 

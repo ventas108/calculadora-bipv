@@ -317,7 +317,7 @@ else:
 
             # ── Selector de modelo (ficha técnica multi-modelo) ───────────────
             # Contenedor SIEMPRE presente: estabiliza el árbol React entre reruns
-            # (misma lección de la página Catálogo PDF — evita NotFoundError
+            # (misma lección de la página Catálogo Paneles — evita NotFoundError
             # insertBefore/removeChild cuando el bloque aparece/desaparece).
             _slot_multi = st.container()
             modelos_det = res_real.get("modelos_detectados", [])

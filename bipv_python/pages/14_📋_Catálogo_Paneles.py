@@ -11,10 +11,10 @@ from datos.catalogo_paneles_excel import (
     eliminar_panel_excel, actualizar_panel_excel,
 )
 
-st.set_page_config(page_title="Catálogo PDF — BIPV", page_icon="📋", layout="wide")
+st.set_page_config(page_title="Catálogo Paneles — BIPV", page_icon="📋", layout="wide")
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
-st.title("📋 Gestión del Catálogo de Paneles")
+st.title("📋 Catálogo de Paneles — Agregar / Editar desde PDF")
 
 tab_agregar, tab_editar = st.tabs(["➕ Agregar desde PDF", "✏️ Editar / Eliminar"])
 
