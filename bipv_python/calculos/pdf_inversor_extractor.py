@@ -1037,6 +1037,53 @@ def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
     }
 
 
+# Campos críticos que la UI usa para detectar un fallo silencioso del extractor.
+# Si más de 3 quedan en None, casi seguro el extractor no reconoció el formato
+# de la ficha (no es un dato suelto ausente, es el datasheet completo sin leer).
+CAMPOS_CRITICOS_INVERSOR = [
+    "Vdc_max", "Vmppt_min", "Vmppt_max", "V_arranque",
+    "n_trackers", "n_strings_tracker",
+    "I_max_tracker", "Isc_max_tracker", "P_dc_max_W",
+]
+
+
+def contar_campos_vacios(resultado: dict) -> list:
+    """
+    Devuelve la lista de campos críticos que quedaron en None tras la extracción.
+
+    Considera también los valores por modelo (multi-modelo): si un campo está
+    vacío en el resultado global pero fue extraído para al menos un modelo de la
+    ficha, NO se cuenta como vacío (el dato existe, solo vive en `valores_por_modelo`).
+
+    La UI puede alertar cuando `len(contar_campos_vacios(res)) > 3`, señal de que
+    el extractor probablemente falló en silencio con ese formato de PDF.
+
+    Args:
+        resultado: dict devuelto por `extraer_parametros_inversor` (o
+                   `extraer_desde_texto`).
+
+    Returns:
+        list[str] — nombres de los campos críticos en None (posiblemente vacía).
+    """
+    if not isinstance(resultado, dict):
+        return list(CAMPOS_CRITICOS_INVERSOR)
+
+    por_modelo = resultado.get("valores_por_modelo") or {}
+
+    vacios = []
+    for campo in CAMPOS_CRITICOS_INVERSOR:
+        if resultado.get(campo) is not None:
+            continue
+        # ¿Algún modelo de la ficha sí trae este campo? → no está realmente vacío
+        cubierto_por_modelo = any(
+            (vals or {}).get(campo) is not None
+            for vals in por_modelo.values()
+        )
+        if not cubierto_por_modelo:
+            vacios.append(campo)
+    return vacios
+
+
 def _extraer_multimodelo(texto: str) -> dict:
     """
     Ruta multi-modelo unificada: primero columnas (SolaX/Growatt/SAJ/TriP2) y,

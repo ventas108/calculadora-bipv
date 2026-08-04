@@ -1018,6 +1018,131 @@ Battery voltage range (V) 46.4 ~ 60 / 38.4 ~ 60
         },
     },
 
+    # ═════════════════════════════════════════════════════════════════════════
+    # TAREA #139 — Casos sintéticos para prevenir fallos silenciosos con fichas
+    # de inversores en formatos nuevos. Cada uno replica un formato que, si el
+    # extractor no lo reconoce, dejaría campos críticos en None sin avisar.
+    # ═════════════════════════════════════════════════════════════════════════
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # #139 (a) Tabla de 2 columnas con la UNIDAD FUSIONADA en la misma celda del
+    #          valor ("1100 V"). Al leer con pdfplumber, la etiqueta queda en una
+    #          línea y el valor+unidad ("1100 V") en la siguiente. El patrón
+    #          multilinea de Vdc_max debe capturar el número aunque la 'V' venga
+    #          pegada tras el salto de línea.
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "Genérico #139a (2 col, unidad fusionada)",
+        "modelo":     "MergedUnit 40K",
+        "arquitectura": "Inversor de red trifásico",
+        "texto": """\
+MergedUnit 40K Three Phase Inverter
+DC Input
+Max. DC voltage
+1100 V
+MPPT voltage range
+180 - 1000 V
+Start-up voltage
+200 V
+Number of MPP trackers
+4
+Strings per MPP tracker
+2
+Max. input current per MPPT
+32 A
+Max. short-circuit current per MPPT
+40 A
+Max. PV array power
+60000 W
+""",
+        "esperado": {
+            "Vdc_max":           1100,
+            "Vmppt_min":          180,
+            "Vmppt_max":         1000,
+            "V_arranque":         200,
+            "n_trackers":           4,
+            "n_strings_tracker":    2,
+            "I_max_tracker":       32,
+            "Isc_max_tracker":     40,
+            "P_dc_max_W":       60000,
+            "bat_voltaje_min":   None,
+            "bat_voltaje_max":   None,
+        },
+    },
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # #139 (b) Modelo con RANGO OPCIONAL de trackers en español ("9 o 12"). El
+    #          extractor debe tomar el valor conservador (el menor, 9) y nunca
+    #          quedar en None. Complementa el caso inglés "9 or 12" ya existente.
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "Genérico #139b (trackers '9 o 12')",
+        "modelo":     "RangoTrackers 100K (9 o 12)",
+        "arquitectura": "Inversor de red trifásico",
+        "texto": """\
+RangoTrackers 100K Inversor Trifásico
+Tensión máxima de entrada [V] 1100
+Rango de tensión MPPT [V] 180~1000
+Tensión de arranque [V] 200
+No. de MPPT 9 o 12
+Strings per MPP tracker 2
+Max. input current per MPPT 32A
+Max. short circuit current per MPPT 46A
+Max. recommended PV array power 150 kWp
+""",
+        "esperado": {
+            "Vdc_max":           1100,
+            "Vmppt_min":          180,
+            "Vmppt_max":         1000,
+            "V_arranque":         200,
+            "n_trackers":           9,   # conservador: el menor de "9 o 12"
+            "n_strings_tracker":    2,
+            "I_max_tracker":       32,
+            "Isc_max_tracker":     46,
+            "P_dc_max_W":      150000,
+            "bat_voltaje_min":   None,
+            "bat_voltaje_max":   None,
+        },
+    },
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # #139 (c) Ficha SIN P_dc_max publicada — solo potencia nominal AC. El
+    #          extractor debe estimar P_dc (AC × 1.5) y jamás dejar el campo
+    #          vacío en silencio. Aquí la única potencia declarada es "AC output
+    #          power" (no hay ninguna línea de potencia FV/DC).
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "Genérico #139c (sin P_dc, solo AC)",
+        "modelo":     "SoloAC 15K",
+        "arquitectura": "Inversor de red trifásico",
+        "texto": """\
+SoloAC 15K Three Phase Grid Inverter
+Max. DC voltage 1100V
+MPPT voltage range 200V-1000V
+Start Voltage 200V
+No. of MPP trackers 2
+Strings per MPP tracker 2
+Max. input current per MPPT 25A
+Max. short-circuit current 31A
+AC OUTPUT
+Rated AC output power 15000 W
+Nominal output voltage 400V
+""",
+        "esperado": {
+            "Vdc_max":           1100,
+            "Vmppt_min":          200,
+            "Vmppt_max":         1000,
+            "V_arranque":         200,
+            "n_trackers":           2,
+            "n_strings_tracker":    2,
+            "I_max_tracker":       25,
+            "Isc_max_tracker":     31,
+            "P_dc_max_W":       22500,   # estimada: 15000 AC × 1.5
+            "bat_voltaje_min":   None,
+            "bat_voltaje_max":   None,
+        },
+    },
+
 ]
 
 # Campos que se comparan (ordenados para la tabla de cobertura)

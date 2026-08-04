@@ -21,6 +21,12 @@ if _BASE not in sys.path:
     sys.path.insert(0, _BASE)
 
 from calculos.extractor_inversor_core import extraer_desde_texto
+from calculos.seleccion_modelo_inversor import (
+    PLACEHOLDER_MODELO,
+    debe_bloquear_guardado,
+    es_seleccion_valida,
+    mensaje_bloqueo,
+)
 from scripts.casos_test_inversores import CASOS, CAMPOS_CRITICOS, CAMPO_LABELS
 
 st.set_page_config(page_title="Test Extractor Inversores", page_icon="🧪", layout="wide")
@@ -252,6 +258,22 @@ else:
         if "error" in res_real:
             st.error(f"❌ {res_real['error']}")
         else:
+            # ── #139: alerta de campos críticos vacíos (fallo silencioso) ─────
+            from calculos.pdf_inversor_extractor import contar_campos_vacios
+            _campos_vacios = contar_campos_vacios(res_real)
+            if len(_campos_vacios) > 3:
+                st.error(
+                    f"🚨 **Extracción probablemente incompleta** — {len(_campos_vacios)} campos "
+                    f"críticos quedaron vacíos: **{', '.join(CAMPO_LABELS.get(c, c) for c in _campos_vacios)}**.  \n"
+                    "Es muy probable que el extractor no reconociera el formato de este PDF. "
+                    "Revisa el texto crudo y completa los campos manualmente antes de guardar."
+                )
+            elif _campos_vacios:
+                st.warning(
+                    "⚠️ Algunos campos no se extrajeron: "
+                    + ", ".join(CAMPO_LABELS.get(c, c) for c in _campos_vacios)
+                    + ". Verifícalos manualmente."
+                )
             fab_real    = res_real.get("marca", "")
             modelo_real = res_real.get("modelo", "")
             n_pages     = res_real.get("n_pages_total", "?")
@@ -303,17 +325,28 @@ else:
                         f"en columnas separadas: `{'`, `'.join(modelos_det)}`  \n"
                         "Selecciona el modelo que deseas agregar al catálogo para ver sus valores específicos."
                     )
+                    # Placeholder como primera opción → obliga a una elección
+                    # explícita, igual que en la página del catálogo (Tarea #138).
+                    _opciones_modelo = [PLACEHOLDER_MODELO] + list(modelos_det)
                     modelo_seleccionado = st.selectbox(
                         "Modelo a utilizar",
-                        modelos_det,
+                        _opciones_modelo,
+                        index=0,
                         key="sel_modelo_pdf",
                     )
+                    if debe_bloquear_guardado(modelos_det, modelo_seleccionado):
+                        st.warning(f"⚠️ {mensaje_bloqueo(modelos_det)}", icon="⚠️")
                 # Sobreescribir campos variables con los del modelo elegido
-                vals_mod = res_real.get("valores_por_modelo", {}).get(modelo_seleccionado, {})
+                # solo cuando hay una elección real (no el placeholder).
                 res_real_view = {**res_real}        # copia shallow para no mutar session_state
-                for campo, val in vals_mod.items():
-                    if val is not None:
-                        res_real_view[campo] = val
+                if es_seleccion_valida(modelo_seleccionado):
+                    res_real_view["modelo"] = modelo_seleccionado
+                    vals_mod = res_real.get("valores_por_modelo", {}).get(modelo_seleccionado, {})
+                    for campo, val in vals_mod.items():
+                        if val is not None:
+                            res_real_view[campo] = val
+                else:
+                    modelo_seleccionado = None
             else:
                 res_real_view = res_real
 

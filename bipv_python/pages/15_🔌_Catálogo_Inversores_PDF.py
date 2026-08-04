@@ -22,6 +22,12 @@ from datos.catalogo_inversores_excel import (
     actualizar_inversor_excel,
     eliminar_inversor_excel,
 )
+from calculos.seleccion_modelo_inversor import (
+    PLACEHOLDER_MODELO,
+    debe_bloquear_guardado,
+    es_seleccion_valida,
+    mensaje_bloqueo,
+)
 
 st.set_page_config(page_title="Catálogo Inversores PDF", page_icon="🔌", layout="wide")
 st.title("🔌 Catálogo de Inversores — Agregar / Editar desde PDF")
@@ -93,26 +99,57 @@ with tab1:
     else:
         st.success("✅ PDF digital procesado correctamente.", icon="✅")
 
+    # ── #139: alerta de campos críticos vacíos (fallo silencioso) ─────────────
+    from calculos.pdf_inversor_extractor import contar_campos_vacios
+    from scripts.casos_test_inversores import CAMPO_LABELS as _CAMPO_LABELS_139
+    _campos_vacios = contar_campos_vacios(res)
+    if len(_campos_vacios) > 3:
+        st.error(
+            f"🚨 **Extracción probablemente incompleta** — {len(_campos_vacios)} campos "
+            f"críticos quedaron vacíos: **{', '.join(_CAMPO_LABELS_139.get(c, c) for c in _campos_vacios)}**.  \n"
+            "Es muy probable que el extractor no reconociera el formato de este PDF. "
+            "Completa los campos manualmente y verifica antes de guardar en el catálogo."
+        )
+    elif _campos_vacios:
+        st.warning(
+            "⚠️ Algunos campos no se extrajeron: "
+            + ", ".join(_CAMPO_LABELS_139.get(c, c) for c in _campos_vacios)
+            + ". Verifícalos manualmente antes de guardar."
+        )
+
     # ── Selector multi-modelo (fichas que cubren varios modelos en columnas) ──
     # Contenedor SIEMPRE presente: estabiliza el árbol React entre reruns
     # (misma lección de la página Catálogo PDF — evita NotFoundError
     # insertBefore/removeChild cuando el bloque aparece/desaparece).
     _slot_multi = st.container()
     _modelos_det = res.get("modelos_detectados") or []
+    _guardado_bloqueado = False
+    _modelo_sel = None
     if len(_modelos_det) >= 2:
         with _slot_multi:
+            # Placeholder como primera opción → obliga a una elección explícita.
+            # Sin esto, el selectbox tomaría el primer modelo por defecto y el
+            # catálogo quedaría con valores del modelo equivocado (Tarea #138).
+            _opciones_modelo = [PLACEHOLDER_MODELO] + list(_modelos_det)
             _modelo_sel = st.selectbox(
                 "📌 Esta ficha cubre varios modelos — elige el que quieres agregar:",
-                _modelos_det,
+                _opciones_modelo,
+                index=0,
                 key="sel_modelo_inversor_pdf",
             )
-        # Sobrescribir con los valores específicos del modelo elegido
-        _vals_sel = (res.get("valores_por_modelo") or {}).get(_modelo_sel, {})
-        res = {
-            **res,
-            "modelo": _modelo_sel,
-            **{k: v for k, v in _vals_sel.items() if v is not None},
-        }
+        _guardado_bloqueado = debe_bloquear_guardado(_modelos_det, _modelo_sel)
+        if _guardado_bloqueado:
+            with _slot_multi:
+                st.warning(f"⚠️ {mensaje_bloqueo(_modelos_det)}", icon="⚠️")
+        elif es_seleccion_valida(_modelo_sel):
+            # Sobrescribir con los valores específicos del modelo elegido y
+            # fijar su nombre en el campo Modelo antes de guardar.
+            _vals_sel = (res.get("valores_por_modelo") or {}).get(_modelo_sel, {})
+            res = {
+                **res,
+                "modelo": _modelo_sel,
+                **{k: v for k, v in _vals_sel.items() if v is not None},
+            }
 
     # Contar campos extraídos automáticamente
     _campos_num = [
@@ -267,11 +304,17 @@ with tab1:
                 height=80,
             )
 
-        submitted = st.form_submit_button("💾 Guardar en catálogo", type="primary")
+        submitted = st.form_submit_button(
+            "💾 Guardar en catálogo",
+            type="primary",
+            disabled=_guardado_bloqueado,
+        )
 
     # ── Procesamiento del formulario ──────────────────────────────────────────
     if submitted:
-        if not modelo_val.strip():
+        if _guardado_bloqueado:
+            st.error(f"❌ {mensaje_bloqueo(_modelos_det)}")
+        elif not modelo_val.strip():
             st.error("❌ El campo **Modelo** es obligatorio.")
         elif Vdc_max_val <= 0:
             st.error("❌ La **Tensión DC Máxima** debe ser mayor que 0.")
