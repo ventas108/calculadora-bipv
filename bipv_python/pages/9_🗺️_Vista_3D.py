@@ -887,6 +887,26 @@ with tab_solar:
                     _act_e  = _c1.checkbox(
                         "Activa", value=bool(_sup.get("activa", True)), key=f"sact_{_i}"
                     )
+
+                    # #156: montaje bifacial por fachada (solo superficies verticales)
+                    _MONTAJES = [
+                        "Heredar de ☀️ Recurso Solar",
+                        "Adosada al muro (sellada)",
+                        "Ventilada con superficie reflejante",
+                    ]
+                    _montaje_e = _sup.get("montaje_fachada", _MONTAJES[0])
+                    if float(_tilt_e) >= 80:
+                        _montaje_e = st.selectbox(
+                            "🔄 Montaje de la fachada (modelo bifacial)",
+                            _MONTAJES,
+                            index=_MONTAJES.index(_montaje_e) if _montaje_e in _MONTAJES else 0,
+                            key=f"smont_{_i}",
+                            help="Adosada: la cara trasera no recibe luz — la ganancia bifacial "
+                                 "se anula para ESTA fachada. Ventilada: hay cámara de aire con "
+                                 "superficie reflejante detrás — la ganancia sí aplica. "
+                                 "Heredar: usa el montaje elegido en ☀️ Recurso Solar.",
+                        )
+
                     if _c_del.button("🗑️", key=f"sdel_{_i}", help="Eliminar"):
                         _idx_eliminar = _i
 
@@ -897,6 +917,7 @@ with tab_solar:
                         "azimuth_deg": _az_e,
                         "area_m2":     _area_e,
                         "activa":      _act_e,
+                        "montaje_fachada": _montaje_e,
                     })
 
             if _idx_eliminar is not None:
@@ -933,10 +954,12 @@ with tab_solar:
             if _btn_poa and _tmy_sup is not None:
                 _sups_act = [s for s in _sups_actualizado if s.get("activa", True)]
                 _albedo_ms = float(st.session_state.get("albedo_suelo", 0.20))
-                # #154: el factor_vista_trasera de página 2 aplica al montaje de
-                # ESA fachada — no debe anular la trasera de techos/pérgolas.
-                # Por superficie: tilt < 80° ⇒ factor 1.0; tilt ≥ 80° hereda el
-                # factor elegido en Recurso Solar (0 = adosada, 1 = ventilada).
+                # #154/#156: factor de vista trasero POR superficie.
+                # tilt < 80° (techos/pérgolas) ⇒ factor 1.0 siempre.
+                # tilt ≥ 80° (fachadas) ⇒ según su selector de montaje:
+                #   Adosada ⇒ factor 0 y albedo trasero mínimo;
+                #   Ventilada ⇒ factor 1;
+                #   Heredar ⇒ lo que se eligió en ☀️ Recurso Solar.
                 _sups_calc = _sups_act
                 if _usar_bif_ms and _bif_cfg_ms:
                     _sups_calc = []
@@ -944,6 +967,14 @@ with tab_solar:
                         _cfg_s = dict(_bif_cfg_ms)
                         if float(_s.get("tilt_deg", 0)) < 80:
                             _cfg_s["factor_vista_trasera"] = 1.0
+                        else:
+                            _mont = _s.get("montaje_fachada", "Heredar de ☀️ Recurso Solar")
+                            if _mont.startswith("Adosada"):
+                                _cfg_s["factor_vista_trasera"] = 0.0
+                                _cfg_s["albedo_trasero"] = 0.05
+                            elif _mont.startswith("Ventilada"):
+                                _cfg_s["factor_vista_trasera"] = 1.0
+                            # "Heredar" ⇒ conserva el factor de bifacial_cfg
                         _sups_calc.append({**_s, "bifacial": _cfg_s})
                 with st.spinner(f"Calculando POA para {len(_sups_act)} superficies..."):
                     _poa_m = calcular_poa_todas(

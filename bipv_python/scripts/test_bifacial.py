@@ -161,6 +161,20 @@ _g_tech = (r_mix["Techo2"]["poa_global"] - r_mix["Techo2"]["poa_front"]).sum()
 check(_g_fach <= 1e-6, "fachada adosada: aporte trasero efectivo ≈ 0")
 check(_g_tech > 0, "techo en el mismo cálculo conserva su ganancia trasera")
 
+print("6c. #156: dos fachadas en el mismo cálculo — una adosada y una ventilada")
+sup_2f = [
+    {"nombre": "F_ados", "tilt_deg": 90, "azimuth_deg": 180, "area_m2": 50,
+     "activa": True, "bifacial": dict(cfg, factor_vista_trasera=0.0, albedo_trasero=0.05)},
+    {"nombre": "F_vent", "tilt_deg": 90, "azimuth_deg": 180, "area_m2": 50,
+     "activa": True, "bifacial": dict(cfg, factor_vista_trasera=1.0, albedo_trasero=0.50)},
+]
+r_2f = calcular_poa_todas(sup_2f, tmy, LAT, LON, ALT, bifacial=cfg)
+_g_ados = (r_2f["F_ados"]["poa_global"] - r_2f["F_ados"]["poa_front"]).sum()
+_g_vent = (r_2f["F_vent"]["poa_global"] - r_2f["F_vent"]["poa_front"]).sum()
+check(_g_ados <= 1e-6, "fachada adosada: ganancia trasera ≈ 0")
+check(_g_vent > 0, "fachada ventilada en el mismo cálculo: ganancia trasera > 0")
+check(_g_vent > _g_ados, "la ventilada gana estrictamente más que la adosada")
+
 print()
 if fallos:
     print(f"🔴 {len(fallos)} verificación(es) fallaron")
