@@ -3,5 +3,6 @@
 - [BIPV - jerarquía POA y Motor Óptico](bipv-poa-hierarchy.md) — poa_efectiva_df tiene prioridad sobre poa_df en Producción; session_state keys del Motor Óptico
 - [BIPV - catálogo baterías loader](bipv-catalogo-baterias-loader.md) — fixes críticos: normalizar \n en headers Excel, detección automática de fila header, defaults seguros
 - [BIPV - modelo bifacial en POA](bipv-bifacial-poa.md) — poa_global sale íntegro de infinite_sheds (no mezclar con haydavies frontal); caché guarda POA monofacial
+- [BIPV - extractor de fichas de baterías](bipv-extractor-baterias.md) — tabla módulo vs rack con mismos labels; mapeo por posición de columnas; peso descartado a propósito
 - [BIPV - extractor de fichas de paneles](bipv-extractor-paneles.md) — banco de regresión obligatorio + validador físico sensible a tecnología; None antes que valor falso
 - [BIPV - Calculadora de Sombreado](bipv-shading-calculator.md) — app React/TS en bipv.innovacionquimica.com.co exporta CSV con FS horario por punto de análisis -> es el p_shade directo para modelo bypass diodes
