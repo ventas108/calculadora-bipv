@@ -104,10 +104,16 @@ def calcular_poa_superficie(
     lon: float,
     alt_m: float,
     superficie: dict,
+    albedo: float = 0.20,
+    bifacial: dict | None = None,
 ) -> pd.DataFrame:
     """
     Calcula POA horaria para UNA superficie.
     Retorna DataFrame con columnas pvlib estándar (poa_global, ...).
+
+    Si `bifacial` viene (o la superficie trae su propio dict en la clave
+    "bifacial"), la POA incluye la ganancia de la cara trasera vía
+    pvlib infinite_sheds. La clave de la superficie tiene prioridad.
     """
     return calcular_poa(
         tmy_df,
@@ -116,6 +122,8 @@ def calcular_poa_superficie(
         alt_m,
         tilt=float(superficie["tilt_deg"]),
         azimuth=float(superficie["azimuth_deg"]),
+        albedo=float(superficie.get("albedo", albedo)),
+        bifacial=superficie.get("bifacial", bifacial),
     )
 
 
@@ -125,10 +133,14 @@ def calcular_poa_todas(
     lat: float,
     lon: float,
     alt_m: float,
+    albedo: float = 0.20,
+    bifacial: dict | None = None,
 ) -> dict[str, pd.DataFrame]:
     """
     Calcula POA para todas las superficies activas.
     Retorna dict {nombre_superficie: poa_df}.
+    `albedo` y `bifacial` aplican a todas las superficies, salvo que una
+    superficie traiga sus propios valores ("albedo" / "bifacial").
     """
     resultado: dict[str, pd.DataFrame] = {}
     for sup in superficies:
@@ -136,7 +148,7 @@ def calcular_poa_todas(
             continue
         try:
             resultado[sup["nombre"]] = calcular_poa_superficie(
-                tmy_df, lat, lon, alt_m, sup
+                tmy_df, lat, lon, alt_m, sup, albedo=albedo, bifacial=bifacial
             )
         except Exception:
             resultado[sup["nombre"]] = pd.DataFrame()

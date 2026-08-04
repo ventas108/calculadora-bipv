@@ -74,6 +74,8 @@ def calcular_poa(
     alt_m: float,
     tilt: float,
     azimuth: float,
+    albedo: float = 0.20,
+    bifacial: dict | None = None,
 ) -> pd.DataFrame:
     """
     Calcula irradiancia POA (Plane of Array) para la orientación dada.
@@ -85,14 +87,27 @@ def calcular_poa(
     alt_m    : altitud en metros
     tilt     : inclinación del plano (0=horizontal, 90=vertical fachada)
     azimuth  : azimuth del plano — pvlib convention (0=N, 90=E, 180=S, 270=O)
+    albedo   : reflectividad del suelo frente al array (0.05–0.50)
+    bifacial : None → panel monofacial (comportamiento clásico).
+               dict → activa el modelo bifacial pvlib infinite_sheds:
+                 {
+                   "bifacialidad":   0.80,  # fracción (Isc trasero / frontal)
+                   "altura_m":       1.0,   # altura del centro del panel sobre el suelo
+                   "albedo_trasero": 0.20,  # reflectividad detrás del array
+                   "gcr":            0.25,  # ground coverage ratio (fila aislada ≈ 0.2–0.3)
+                   "ancho_colector_m": 2.0, # ancho inclinado de la fila (m)
+                 }
 
     Retorna DataFrame con columnas:
         poa_global, poa_direct, poa_diffuse, poa_sky_diffuse, poa_ground_diffuse
+    y, si bifacial está activo, además:
+        poa_front, poa_rear  (poa_global = poa_front + bifacialidad × poa_rear)
     """
     loc = pvlib.location.Location(
         latitude=lat, longitude=lon, altitude=alt_m, tz="UTC"
     )
     solar_pos = loc.get_solarposition(tmy.index)
+    dni_extra = pvlib.irradiance.get_extra_radiation(tmy.index)
 
     poa = pvlib.irradiance.get_total_irradiance(
         surface_tilt=tilt,
@@ -102,10 +117,52 @@ def calcular_poa(
         dni=tmy["Gb_n"],
         ghi=tmy["G_h"],
         dhi=tmy["Gd_h"],
+        albedo=albedo,
         model="haydavies",
-        dni_extra=pvlib.irradiance.get_extra_radiation(tmy.index),
-    )
-    return poa.fillna(0.0)
+        dni_extra=dni_extra,
+    ).fillna(0.0)
+
+    if not bifacial:
+        return poa
+
+    # ── Modelo bifacial: pvlib infinite_sheds (estándar de la industria) ──────
+    # poa_global bifacial = poa frontal + bifacialidad × poa trasera, con
+    # sombreado fila-a-fila y vista del suelo resueltos geométricamente.
+    from pvlib.bifacial import infinite_sheds
+
+    bifacialidad = float(bifacial.get("bifacialidad", 0.80))
+    altura_m     = float(bifacial.get("altura_m", 1.0))
+    alb_rear     = float(bifacial.get("albedo_trasero", albedo))
+    gcr          = min(max(float(bifacial.get("gcr", 0.25)), 0.05), 0.95)
+    ancho        = float(bifacial.get("ancho_colector_m", 2.0))
+    pitch        = ancho / gcr
+
+    poa_bif = infinite_sheds.get_irradiance(
+        surface_tilt=tilt,
+        surface_azimuth=azimuth,
+        solar_zenith=solar_pos["apparent_zenith"],
+        solar_azimuth=solar_pos["azimuth"],
+        gcr=gcr,
+        height=altura_m,
+        pitch=pitch,
+        ghi=tmy["G_h"],
+        dhi=tmy["Gd_h"],
+        dni=tmy["Gb_n"],
+        albedo=alb_rear,
+        model="haydavies",
+        dni_extra=dni_extra,
+        bifaciality=bifacialidad,
+    ).fillna(0.0)
+
+    # Conservar el POA frontal clásico (haydavies sin sombreado fila-fila) como
+    # base y sumar SOLO la ganancia trasera del modelo bifacial. Así el caso
+    # bifacialidad→0 converge exactamente al resultado monofacial histórico.
+    out = poa.copy()
+    poa_rear = poa_bif["poa_back"].clip(lower=0.0)
+    out["poa_front"] = poa["poa_global"]
+    out["poa_rear"] = poa_rear
+    out["poa_global"] = poa["poa_global"] + bifacialidad * poa_rear
+    return out.fillna(0.0)
 
 
 def resumen_mensual(tmy: pd.DataFrame, poa: pd.DataFrame) -> pd.DataFrame:

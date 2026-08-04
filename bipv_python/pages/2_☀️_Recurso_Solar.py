@@ -8,16 +8,19 @@ import pandas as pd
 # ── Caché de disco para TMY+POA — sobrevive reinicios de PM2 ─────────────────
 _SOLAR_CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "datos", "solar_cache")
 
-def _cache_path(lat, lon, tilt, azimuth, alt_m):
+def _cache_path(lat, lon, tilt, azimuth, alt_m, albedo=0.20):
     os.makedirs(_SOLAR_CACHE_DIR, exist_ok=True)
+    # El sufijo de albedo solo aparece si difiere del default histórico (0.20),
+    # para no invalidar los cachés existentes en el servidor.
+    _alb = "" if abs(float(albedo) - 0.20) < 1e-9 else f"_alb{float(albedo):.2f}"
     return os.path.join(
         _SOLAR_CACHE_DIR,
-        f"solar_{lat:.4f}_{lon:.4f}_t{tilt}_a{int(azimuth)}_h{alt_m}.pkl",
+        f"solar_{lat:.4f}_{lon:.4f}_t{tilt}_a{int(azimuth)}_h{alt_m}{_alb}.pkl",
     )
 
-def _leer_cache(lat, lon, tilt, azimuth, alt_m):
+def _leer_cache(lat, lon, tilt, azimuth, alt_m, albedo=0.20):
     try:
-        p = _cache_path(lat, lon, tilt, azimuth, alt_m)
+        p = _cache_path(lat, lon, tilt, azimuth, alt_m, albedo)
         if os.path.exists(p):
             with open(p, "rb") as f:
                 return pickle.load(f)
@@ -25,9 +28,9 @@ def _leer_cache(lat, lon, tilt, azimuth, alt_m):
         pass
     return None
 
-def _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa):
+def _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa, albedo=0.20):
     try:
-        with open(_cache_path(lat, lon, tilt, azimuth, alt_m), "wb") as f:
+        with open(_cache_path(lat, lon, tilt, azimuth, alt_m, albedo), "wb") as f:
             pickle.dump({"tmy": tmy, "poa": poa}, f, protocol=4)
     except Exception:
         pass
@@ -142,9 +145,85 @@ with col_or2:
 with col_or3:
     albedo = st.slider(
         "Albedo del suelo",
-        min_value=0.05, max_value=0.50, value=0.20, step=0.05,
-        help="0.20 = suelo urbano típico. 0.30 = concreto. 0.05 = asfalto.",
+        min_value=0.05, max_value=0.50,
+        value=float(st.session_state.get("albedo_suelo", 0.20)), step=0.05,
+        help="0.20 = suelo urbano típico. 0.30 = concreto. 0.05 = asfalto. "
+             "Afecta la componente reflejada del POA frontal y, si activas el "
+             "modelo bifacial, la luz que capta la cara trasera.",
     )
+
+# ── Simulación bifacial (pvlib infinite_sheds) ────────────────────────────────
+_panel_bif   = st.session_state.get("panel_dict") or {}
+_bif_catalogo = float(_panel_bif.get("bifacialidad_pct") or 0)
+_texto_panel  = (str(_panel_bif.get("tecnologia", "")) + " " +
+                 str(_panel_bif.get("notas", ""))).lower()
+_panel_es_bif = _bif_catalogo > 0 or "bifacial" in _texto_panel
+
+with st.expander("🔄 Simulación bifacial (ganancia de la cara trasera)",
+                 expanded=_panel_es_bif or st.session_state.get("bifacial_activo", False)):
+    if _panel_es_bif:
+        st.info(
+            f"🔎 El panel del proyecto (`{_panel_bif.get('nombre', '—')}`) es **bifacial**"
+            + (f" con bifacialidad {_bif_catalogo:.0f}% según el catálogo."
+               if _bif_catalogo > 0 else
+               " según su ficha, pero el catálogo no trae el % de bifacialidad — usa 70% como valor típico o consulta el datasheet."),
+            icon="🔄",
+        )
+    elif _panel_bif:
+        st.caption(f"El panel del proyecto (`{_panel_bif.get('nombre', '—')}`) no registra "
+                   "bifacialidad en el catálogo. Puedes activar el modelo igualmente si sabes que es bifacial.")
+
+    bifacial_on = st.checkbox(
+        "Activar modelo bifacial — pvlib `infinite_sheds` (estándar de la industria)",
+        value=bool(st.session_state.get("bifacial_activo", _panel_es_bif)),
+        help="Suma a la POA la irradiancia que capta la cara trasera "
+             "(reflejo del suelo + difusa), ponderada por la bifacialidad del panel. "
+             "poa_global = POA frontal + bifacialidad × POA trasera.",
+    )
+
+    bifacial_cfg = None
+    if bifacial_on:
+        cb1, cb2, cb3, cb4 = st.columns(4)
+        _bif_def = st.session_state.get("bifacial_cfg", {})
+        bif_pct = cb1.number_input(
+            "Bifacialidad (%)", min_value=5.0, max_value=100.0,
+            value=float(_bif_def.get("bifacialidad", (_bif_catalogo or 70.0) / 100) * 100),
+            step=5.0,
+            help="Relación entre la respuesta de la cara trasera y la frontal. "
+                 "TOPCon/HJT: 75–90%. PERC: 65–75%. Viene de la ficha del panel.",
+        )
+        altura_m = cb2.number_input(
+            "Altura sobre el suelo (m)", min_value=0.1, max_value=30.0,
+            value=float(_bif_def.get("altura_m", 1.0)), step=0.1,
+            help="Altura del centro del panel sobre el suelo. Más altura = la cara "
+                 "trasera 've' más suelo reflejante = más ganancia.",
+        )
+        albedo_rear = cb3.slider(
+            "Albedo trasero", min_value=0.05, max_value=0.80,
+            value=float(_bif_def.get("albedo_trasero", albedo)), step=0.05,
+            help="Reflectividad de la superficie DETRÁS del array. Grava blanca: 0.5. "
+                 "Concreto: 0.30. Pasto: 0.20. Membrana blanca de techo: 0.6–0.8.",
+        )
+        gcr = cb4.slider(
+            "GCR (cobertura del suelo)", min_value=0.10, max_value=0.90,
+            value=float(_bif_def.get("gcr", 0.25)), step=0.05,
+            help="Ancho del panel ÷ separación entre filas. Fila única o aislada: 0.20–0.30. "
+                 "Filas juntas (menos luz trasera): 0.5+.",
+        )
+        bifacial_cfg = {
+            "bifacialidad":   bif_pct / 100.0,
+            "altura_m":       altura_m,
+            "albedo_trasero": albedo_rear,
+            "gcr":            gcr,
+        }
+        if tilt >= 80:
+            st.warning(
+                "⚠️ **Fachada vertical:** la cara trasera queda contra el muro y casi no "
+                "recibe luz. La ganancia bifacial real será mínima salvo que exista "
+                "separación ventilada con superficie reflejante detrás. Usa un albedo "
+                "trasero bajo (≤ 0.15) si el panel está adosado al muro.",
+                icon="🏢",
+            )
 
 st.markdown("---")
 
@@ -155,7 +234,7 @@ _SOLAR_SS_KEYS = (
     "recurso_solar_ok", "tmy_df", "poa_df", "tmy_ciudad",
     "tilt_fachada", "tilt_default", "azimuth_fachada", "orientacion_label",
     "poa_anual_kWh_m2", "ghi_anual_kWh_m2", "t_media_anual",
-    "zona_geo_coords", "poa_efectiva_df",
+    "zona_geo_coords", "poa_efectiva_df", "ganancia_bifacial_pct",
 )
 _s_lat = st.session_state.get("_solar_lat_guardada")
 _s_lon = st.session_state.get("_solar_lon_guardada")
@@ -183,10 +262,15 @@ if st.session_state.get("recurso_solar_ok") and _s_lat is not None:
 # Si los parámetros actuales coinciden con un caché en disco y la sesión aún no
 # tiene datos, restaurar silenciosamente para evitar la descarga de PVGIS.
 if not st.session_state.get("recurso_solar_ok"):
-    _auto_cached = _leer_cache(lat, lon, tilt, azimuth, alt_m)
+    _auto_cached = _leer_cache(lat, lon, tilt, azimuth, alt_m, albedo)
     if _auto_cached is not None:
         _tmy_r = _auto_cached["tmy"]
         _poa_r = _auto_cached["poa"]
+        # El caché guarda la POA monofacial — si el modelo bifacial está activo,
+        # recalcular localmente la ganancia trasera (sin ir a PVGIS).
+        if bifacial_cfg:
+            _poa_r = calcular_poa(_tmy_r, lat, lon, alt_m, tilt, azimuth,
+                                  albedo=albedo, bifacial=bifacial_cfg)
         _poa_anual_r = _poa_r["poa_global"].sum() / 1000.0
         _ghi_anual_r = _tmy_r["G_h"].sum() / 1000.0
         _t_media_r   = _tmy_r["T2m"].mean()
@@ -256,11 +340,10 @@ if _descarga_btn:
         if _coord_personalizada else f"{ciudad} ({lat}°, {lon}°)"
     )
     # Intentar caché de disco antes de ir a PVGIS
-    _disco = _leer_cache(lat, lon, tilt, azimuth, alt_m)
+    _disco = _leer_cache(lat, lon, tilt, azimuth, alt_m, albedo)
     if _disco is not None:
         tmy = _disco["tmy"]
         poa = _disco["poa"]
-        monthly = resumen_mensual(tmy, poa)
         st.info("📂 Datos recuperados de caché local — sin conexión a PVGIS.")
     else:
         with st.spinner(f"Conectando a PVGIS para {_sitio_label}..."):
@@ -272,9 +355,18 @@ if _descarga_btn:
                 st.stop()
 
         with st.spinner(f"Calculando irradiancia POA para {icono_tipo} {tipo_instalacion} ({tilt}°)..."):
-            poa = calcular_poa(tmy, lat, lon, alt_m, tilt, azimuth)
-            monthly = resumen_mensual(tmy, poa)
-            _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa)
+            poa = calcular_poa(tmy, lat, lon, alt_m, tilt, azimuth, albedo=albedo)
+            # El caché de disco guarda SIEMPRE la POA monofacial; la ganancia
+            # bifacial se recalcula localmente (es barata y depende de la config).
+            _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa, albedo)
+
+    # ── Modelo bifacial: recalcular POA con ganancia trasera ─────────────────
+    poa_anual_mono = poa["poa_global"].sum() / 1000.0
+    if bifacial_cfg:
+        with st.spinner("🔄 Calculando ganancia bifacial (pvlib infinite_sheds)..."):
+            poa = calcular_poa(tmy, lat, lon, alt_m, tilt, azimuth,
+                               albedo=albedo, bifacial=bifacial_cfg)
+    monthly = resumen_mensual(tmy, poa)
     # ── Métricas anuales ─────────────────────────────────────────────────────
     ghi_anual  = tmy["G_h"].sum() / 1000.0
     poa_anual  = poa["poa_global"].sum() / 1000.0
@@ -291,6 +383,20 @@ if _descarga_btn:
                help="<1 es normal para fachadas verticales. ~1 en techos optimizados. >1 posible con tracking.")
     mc4.metric("T° media anual", f"{t_media:.1f} °C", help="Temperatura media ambiente del TMY")
     mc5.metric("HSP equivalentes", f"{poa_anual:.0f} h/año", help="Horas Sol Pico — energía base para cálculo")
+
+    ganancia_bif_pct = 0.0
+    if bifacial_cfg and poa_anual_mono > 0:
+        ganancia_bif_pct = (poa_anual / poa_anual_mono - 1.0) * 100.0
+        st.success(
+            f"🔄 **Ganancia bifacial: +{ganancia_bif_pct:.1f}%** — "
+            f"POA frontal: {poa_anual_mono:,.0f} kWh/m²/año → POA bifacial: "
+            f"{poa_anual:,.0f} kWh/m²/año "
+            f"(bifacialidad {bifacial_cfg['bifacialidad']*100:.0f}% · "
+            f"altura {bifacial_cfg['altura_m']:.1f} m · "
+            f"albedo trasero {bifacial_cfg['albedo_trasero']:.2f}). "
+            "Esta POA alimenta el Motor Óptico, Producción, Financiero y el Reporte.",
+            icon="🔄",
+        )
 
     # ── Gráfica mensual ──────────────────────────────────────────────────────
     st.subheader("📅 Irradiancia mensual")
@@ -375,6 +481,11 @@ if _descarga_btn:
     st.session_state["ghi_anual_kWh_m2"]  = round(ghi_anual, 1)
     st.session_state["t_media_anual"]     = round(t_media, 1)
     st.session_state["recurso_solar_ok"]  = True
+    # ── Bifacial: persistir configuración y ganancia ─────────────────────────
+    st.session_state["albedo_suelo"]          = albedo
+    st.session_state["bifacial_activo"]       = bool(bifacial_cfg)
+    st.session_state["bifacial_cfg"]          = bifacial_cfg or {}
+    st.session_state["ganancia_bifacial_pct"] = round(ganancia_bif_pct, 2)
     # ── #64 — Guardar coords usadas para detectar drift futuro ───────────────
     st.session_state["_solar_lat_guardada"] = lat
     st.session_state["_solar_lon_guardada"] = lon

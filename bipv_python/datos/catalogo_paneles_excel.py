@@ -3,7 +3,12 @@ import re
 import pandas as pd
 import streamlit as st
 
-_EXCEL = "/var/www/bipv/calculadora-bipv/bipv_python/datos/paneles_catalogo.xlsx"
+import os as _os
+# Ruta relativa al propio módulo (funciona en el servidor y en desarrollo);
+# fallback a la ruta histórica del servidor por si el archivo se movió.
+_EXCEL = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "paneles_catalogo.xlsx")
+if not _os.path.exists(_EXCEL):
+    _EXCEL = "/var/www/bipv/calculadora-bipv/bipv_python/datos/paneles_catalogo.xlsx"
 _SHEET = "Catalogo_Paneles_FV"
 
 def _f(val, default=None):
@@ -46,6 +51,7 @@ def cargar_catalogo_paneles() -> dict:
             "beta_mp":           _f(r.get("CoefT_C")),
             "CoefVoc_C":         _f(r.get("CoefVoc_C")),
             "transparencia_pct": _f(r.get("TransparenciaPct"), 0),
+            "bifacialidad_pct":  _f(r.get("BifacialidadPct"), 0),
             "Voc": Voc, "Vmp": Vmp,
             "Isc": Isc, "Imp": Imp,
             "N_s":         _f(r.get("Ns (Celdas Serie)")),

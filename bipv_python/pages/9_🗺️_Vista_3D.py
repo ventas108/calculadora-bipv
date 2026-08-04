@@ -915,13 +915,36 @@ with tab_solar:
             if _tmy_sup is None:
                 _cb2.info("ℹ️ Primero calcula el Recurso Solar en ☀️.")
 
+            # ── Bifacial: heredar la configuración de ☀️ Recurso Solar ─────────
+            _bif_cfg_ms  = st.session_state.get("bifacial_cfg") or None
+            _bif_on_ms   = bool(st.session_state.get("bifacial_activo")) and bool(_bif_cfg_ms)
+            _usar_bif_ms = False
+            if _bif_on_ms:
+                _usar_bif_ms = st.checkbox(
+                    f"🔄 Aplicar modelo bifacial a todas las superficies "
+                    f"(bifacialidad {_bif_cfg_ms.get('bifacialidad', 0) * 100:.0f}% · "
+                    f"altura {_bif_cfg_ms.get('altura_m', 1.0):.1f} m · "
+                    f"albedo trasero {_bif_cfg_ms.get('albedo_trasero', 0.2):.2f})",
+                    value=True, key="ms_bifacial_on",
+                    help="Usa la configuración bifacial de ☀️ Recurso Solar. En fachadas "
+                         "verticales adosadas al muro la ganancia real es mínima.",
+                )
+
             if _btn_poa and _tmy_sup is not None:
                 _sups_act = [s for s in _sups_actualizado if s.get("activa", True)]
+                _albedo_ms = float(st.session_state.get("albedo_suelo", 0.20))
                 with st.spinner(f"Calculando POA para {len(_sups_act)} superficies..."):
-                    _poa_m = calcular_poa_todas(_sups_act, _tmy_sup, lat, lon, alt_m)
+                    _poa_m = calcular_poa_todas(
+                        _sups_act, _tmy_sup, lat, lon, alt_m,
+                        albedo=_albedo_ms,
+                        bifacial=_bif_cfg_ms if _usar_bif_ms else None,
+                    )
                     st.session_state["poa_superficies"]    = _poa_m
                     st.session_state["poa_superficies_ok"] = True
-                st.success(f"✅ POA calculada para {len(_poa_m)} superficie(s).")
+                st.success(
+                    f"✅ POA calculada para {len(_poa_m)} superficie(s)"
+                    + (" — incluye ganancia bifacial 🔄." if _usar_bif_ms else ".")
+                )
 
             # Resumen POA
             _poa_ss = st.session_state.get("poa_superficies", {})
