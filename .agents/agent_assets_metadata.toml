@@ -153,5 +153,5 @@ description = "Comparación completa con puntajes actualizados, estado de cada b
 id = "zbcQHT3BsLhNApHrv6VAk"
 uri = "file://entregables/MANUAL_CALCULADORA_BIPV_v3_agosto2026.docx"
 type = "word_document"
-title = "Manual Calculadora BIPV — v3 Agosto 2026 (Word)"
-description = "Manual actualizado con las últimas funciones: Catálogo de Inversores por PDF, verificación τ↔Isc en Motor Óptico, catálogo de baterías robusto y más."
+title = "Manual Calculadora BIPV — actualizado agosto 2026"
+description = "Incluye simulación bifacial (con fachadas adosadas), aporte trasero en Producción y Reporte, selector multi-modelo y alertas del catálogo de inversores, y bifacialidad en el catálogo de paneles PDF."
