@@ -308,6 +308,25 @@ def generar_html_reporte() -> str:
         nota="POA (Plane Of Array): irradiación sobre el plano inclinado del panel. "
              "Para fachadas verticales, POA es menor que GHI porque los rayos llegan con mayor ángulo. "
              "Esta es la energía disponible ANTES de descontar reflexión, suciedad y temperatura.")
+
+        # ── Ganancia bifacial (solo si el modelo está activo) ─────────────────
+        if st.session_state.get("bifacial_activo", False):
+            _bif_cfg   = st.session_state.get("bifacial_cfg", {}) or {}
+            _bif_gan   = st.session_state.get("ganancia_bifacial_pct", 0.0)
+            _bif_bfrac = _bif_cfg.get("bifacialidad", None)
+            _bif_alt   = _bif_cfg.get("altura_m", None)
+            _bif_alb   = _bif_cfg.get("albedo_trasero", None)
+            html += tabla_kv([
+                ("Modelo bifacial",        "Activo (pvlib infinite_sheds)", "",  "Captura irradiación en la cara trasera"),
+                ("Bifacialidad",           _fmt(_bif_bfrac * 100 if _bif_bfrac is not None else None, 0),
+                                           "%",          "Fracción de la eficiencia frontal aprovechada por la cara trasera"),
+                ("Altura de montaje",      _fmt(_bif_alt, 2),   "m",   "Separación al plano del suelo/fachada"),
+                ("Albedo trasero (suelo)", _fmt(_bif_alb, 2),   "",    "Reflectividad de la superficie tras el módulo"),
+                ("Ganancia bifacial anual", _fmt(_bif_gan, 1),  "%",   "Incremento de POA por el aporte de la cara trasera"),
+            ],
+            nota="Con el modelo bifacial activo, la POA global ya integra el aporte de la cara trasera "
+                 "calculado por pvlib (infinite_sheds). La ganancia anual mostrada indica cuánta "
+                 "irradiación adicional aporta la cara posterior respecto a un módulo monofacial.")
         html += cierre()
 
     # ── 3. Motor Óptico ───────────────────────────────────────────────────────

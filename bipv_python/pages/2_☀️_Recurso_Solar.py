@@ -198,12 +198,42 @@ with st.expander("🔄 Simulación bifacial (ganancia de la cara trasera)",
             help="Altura del centro del panel sobre el suelo. Más altura = la cara "
                  "trasera 've' más suelo reflejante = más ganancia.",
         )
+        # ── #154 — Fachadas verticales: la trasera puede estar sellada al muro ─
+        # Con tilt >= 80 se ofrece un selector de montaje. "Adosada al muro"
+        # anula prácticamente la trasera (factor_vista_trasera=0, albedo 0.05 y
+        # slider deshabilitado) para evitar ganancias bifaciales irreales;
+        # "ventilada" mantiene el comportamiento normal.
+        _es_fachada = tilt >= 80
+        factor_vista_trasera = 1.0
+        _albedo_rear_forzado = None
+        if _es_fachada:
+            _montaje = st.radio(
+                "🏢 Montaje de la fachada vertical (tilt ≥ 80°)",
+                ["Adosada al muro (sellada)",
+                 "Separación ventilada con superficie reflejante"],
+                index=0,
+                horizontal=True,
+                help="Adosada: la cara trasera queda contra el muro y no capta luz "
+                     "reflejada — la ganancia bifacial real es nula. Ventilada: hay "
+                     "cámara de aire con una superficie reflejante detrás del panel.",
+            )
+            if _montaje.startswith("Adosada"):
+                factor_vista_trasera = 0.0
+                _albedo_rear_forzado = 0.05
+
+        _rear_disabled = _albedo_rear_forzado is not None
         albedo_rear = cb3.slider(
             "Albedo trasero", min_value=0.05, max_value=0.80,
-            value=float(_bif_def.get("albedo_trasero", albedo)), step=0.05,
+            value=(_albedo_rear_forzado if _rear_disabled
+                   else float(_bif_def.get("albedo_trasero", albedo))),
+            step=0.05,
+            disabled=_rear_disabled,
             help="Reflectividad de la superficie DETRÁS del array. Grava blanca: 0.5. "
                  "Concreto: 0.30. Pasto: 0.20. Membrana blanca de techo: 0.6–0.8.",
         )
+        if _rear_disabled:
+            cb3.caption("🔒 Fijado en 0.05 y sin efecto: con la fachada adosada al muro "
+                        "la cara trasera está sellada y no aporta ganancia bifacial.")
         gcr = cb4.slider(
             "GCR (cobertura del suelo)", min_value=0.10, max_value=0.90,
             value=float(_bif_def.get("gcr", 0.25)), step=0.05,
@@ -211,17 +241,19 @@ with st.expander("🔄 Simulación bifacial (ganancia de la cara trasera)",
                  "Filas juntas (menos luz trasera): 0.5+.",
         )
         bifacial_cfg = {
-            "bifacialidad":   bif_pct / 100.0,
-            "altura_m":       altura_m,
-            "albedo_trasero": albedo_rear,
-            "gcr":            gcr,
+            "bifacialidad":          bif_pct / 100.0,
+            "altura_m":              altura_m,
+            "albedo_trasero":        albedo_rear,
+            "gcr":                   gcr,
+            "factor_vista_trasera":  factor_vista_trasera,
         }
-        if tilt >= 80:
+        if _es_fachada:
             st.warning(
                 "⚠️ **Fachada vertical:** la cara trasera queda contra el muro y casi no "
-                "recibe luz. La ganancia bifacial real será mínima salvo que exista "
-                "separación ventilada con superficie reflejante detrás. Usa un albedo "
-                "trasero bajo (≤ 0.15) si el panel está adosado al muro.",
+                "recibe luz. Con montaje **adosado** la ganancia bifacial se anula "
+                "automáticamente (albedo trasero 0.05, sin aporte trasero). Elige "
+                "**separación ventilada** solo si existe una cámara de aire con superficie "
+                "reflejante detrás del panel.",
                 icon="🏢",
             )
 

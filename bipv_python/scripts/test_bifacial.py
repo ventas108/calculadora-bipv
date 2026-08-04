@@ -90,6 +90,40 @@ g_hi = calcular_poa(tmy, LAT, LON, ALT, 10, 180, 0.20,
                     dict(cfg, albedo_trasero=0.60))["poa_global"].sum()
 check(g_hi > g_lo, f"albedo trasero 0.60 ({g_hi/1000:.0f} kWh/m²) > 0.10 ({g_lo/1000:.0f} kWh/m²)")
 
+print("4b. #154 — Fachada vertical adosada: factor_vista_trasera=0 anula la ganancia")
+# tilt=90 con factor_vista_trasera=0 (fachada sellada al muro): la ganancia
+# bifacial debe ser ~nula y poa_rear ≈ 0. El test FALLA si una fachada sellada
+# gana >5% (montaje adosado nunca debería sobreestimar producción).
+cfg_fachada = {"bifacialidad": 0.80, "altura_m": 3.0, "albedo_trasero": 0.05,
+               "gcr": 0.25, "factor_vista_trasera": 0.0}
+poa_fach_sellada = calcular_poa(tmy, LAT, LON, ALT, tilt=90, azimuth=180,
+                                albedo=0.20, bifacial=cfg_fachada)
+_front_f = poa_fach_sellada["poa_front"].sum()
+_glob_f  = poa_fach_sellada["poa_global"].sum()
+_gan_f   = (_glob_f - _front_f) / _front_f if _front_f > 0 else 0.0
+check(_gan_f < 0.001,
+      f"fachada sellada (factor=0): ganancia {_gan_f*100:.3f}% < 0.1%")
+check(_gan_f <= 0.05,
+      f"GUARDIA: fachada sellada NO gana >5% (ganancia real {_gan_f*100:.3f}%)")
+check(abs(poa_fach_sellada["poa_rear"].sum()) < 1.0,
+      f"poa_rear ≈ 0 con factor de vista 0 (suma={poa_fach_sellada['poa_rear'].sum():.3f})")
+
+print("4c. #154 — Fachada ventilada: factor_vista_trasera=1 sigue funcionando (sin crash)")
+cfg_fachada_v = dict(cfg_fachada, albedo_trasero=0.50, factor_vista_trasera=1.0)
+poa_fach_vent = calcular_poa(tmy, LAT, LON, ALT, tilt=90, azimuth=180,
+                             albedo=0.20, bifacial=cfg_fachada_v)
+check({"poa_front", "poa_rear", "poa_global"} <= set(poa_fach_vent.columns),
+      "columnas presentes con factor=1 en tilt=90")
+check(poa_fach_vent["poa_global"].sum() >= poa_fach_vent["poa_front"].sum(),
+      "con factor=1, poa_global ≥ poa_front (aporte trasero admitido)")
+
+print("4d. #154 — Retro-compatibilidad: sin la clave, comportamiento idéntico a factor=1")
+cfg_sin_clave = {k: v for k, v in cfg_fachada_v.items() if k != "factor_vista_trasera"}
+poa_sin_clave = calcular_poa(tmy, LAT, LON, ALT, tilt=90, azimuth=180,
+                             albedo=0.20, bifacial=cfg_sin_clave)
+check(np.allclose(poa_sin_clave["poa_global"], poa_fach_vent["poa_global"], atol=1e-6),
+      "sin factor_vista_trasera == con factor_vista_trasera=1.0 (retro-compatible)")
+
 print("5. Catálogo: bifacialidad_pct expuesta por el loader")
 try:
     from datos.catalogo_paneles_excel import cargar_catalogo_paneles

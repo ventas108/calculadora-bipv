@@ -96,6 +96,9 @@ def calcular_poa(
                    "albedo_trasero": 0.20,  # reflectividad detrás del array
                    "gcr":            0.25,  # ground coverage ratio (fila aislada ≈ 0.2–0.3)
                    "ancho_colector_m": 2.0, # ancho inclinado de la fila (m)
+                   "factor_vista_trasera": 1.0, # 0–1: fracción del aporte trasero que
+                                                # llega al panel. 0 = fachada adosada al
+                                                # muro (trasera sellada, sin ganancia).
                  }
 
     Retorna DataFrame con columnas:
@@ -136,6 +139,11 @@ def calcular_poa(
     gcr          = min(max(float(bifacial.get("gcr", 0.25)), 0.05), 0.95)
     ancho        = float(bifacial.get("ancho_colector_m", 2.0))
     pitch        = ancho / gcr
+    # Factor de vista trasera (0–1): atenúa el aporte de la cara trasera antes
+    # de componer poa_global. 0 = fachada adosada al muro (trasera sellada, sin
+    # ganancia bifacial); 1 = trasera plenamente expuesta. Retro-compatible:
+    # sin la clave, el factor es 1.0 y el comportamiento es idéntico.
+    factor_vista = min(max(float(bifacial.get("factor_vista_trasera", 1.0)), 0.0), 1.0)
 
     poa_bif = infinite_sheds.get_irradiance(
         surface_tilt=tilt,
@@ -160,9 +168,14 @@ def calcular_poa(
     # clásicas (poa_direct, poa_diffuse, ...) se conservan solo como
     # descomposición informativa del frente sin sombreado fila-fila.
     out = poa.copy()
-    out["poa_front"] = poa_bif["poa_front"].clip(lower=0.0)
-    out["poa_rear"] = poa_bif["poa_back"].clip(lower=0.0)
-    out["poa_global"] = poa_bif["poa_global"].clip(lower=0.0)
+    _front = poa_bif["poa_front"].clip(lower=0.0)
+    _rear  = poa_bif["poa_back"].clip(lower=0.0)
+    # Atenuar el aporte trasero por el factor de vista antes de componer.
+    # poa_global = poa_front + bifacialidad × factor × poa_back
+    # poa_rear se reporta YA multiplicada por el factor de vista.
+    out["poa_front"] = _front
+    out["poa_rear"] = (_rear * factor_vista).clip(lower=0.0)
+    out["poa_global"] = (_front + bifacialidad * factor_vista * _rear).clip(lower=0.0)
     return out.fillna(0.0)
 
 
