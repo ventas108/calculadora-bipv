@@ -36,6 +36,7 @@ _MIN_TEXT_CHARS = 120
 # ── Patrones de extracción ────────────────────────────────────────────────────
 _PATTERNS = {
     "Pmax": [
+        r'\(\s*Pmax\s*\)\s*\[?W?\]?\s*[:\|]?\s*([0-9]+(?:\.[0-9]+)?)',
         r'(?:Pmax|P_max|Pmpp|Potencia\s+M[aá]xima?|Maximum\s+Power|Rated\s+Power|STC\s+Power|Peak\s+Power)\s*[:\(]?\s*([0-9]+(?:\.[0-9]+)?)\s*W',
         r'([0-9]{2,3}(?:\.[0-9]+)?)\s*Wp\b',
         r'P\s*[=:]\s*([0-9]+(?:\.[0-9]+)?)\s*W',
@@ -43,6 +44,7 @@ _PATTERNS = {
         r'Potencia\s+M[aá]xima\s*\([^)\n]{1,12}\)\s*[:\|]?\s*([0-9]{2,4}(?:\.[0-9]+)?)\b',
     ],
     "Voc": [
+        r'\(\s*Voc\s*\)\s*\[?V?\]?\s*[:\|]?\s*([0-9]+(?:\.[0-9]+)?)',
         r'(?:Voc|V_oc|VOC|Open[- ]?[Cc]ircuit\s+[Vv]oltage|Tensi[oó]n\s+(?:de\s+)?[Cc]ircuito\s+[Aa]bierto)\s*[:\(°]?\s*([0-9]+(?:\.[0-9]+)?)\s*V',
         r'VOC?\s*\(V\)\s*[:\|]?\s*([0-9]+(?:\.[0-9]+)?)',
         r'Voc\s*=\s*([0-9]+(?:\.[0-9]+)?)',
@@ -50,6 +52,7 @@ _PATTERNS = {
         r'(?:Voltaje|Tensi[oó]n)\s+(?:de\s+)?[Cc]ircuito\s+[Aa]bierto\s*\([^)\n]{1,10}\)\s*([0-9]+(?:\.[0-9]+)?)',
     ],
     "Isc": [
+        r'\(\s*Isc\s*\)\s*\[?A?\]?\s*[:\|]?\s*([0-9]+(?:\.[0-9]+)?)',
         r'(?:Isc|I_sc|ISC|Short[- ]?[Cc]ircuit\s+[Cc]urrent|Corriente\s+(?:de\s+)?[Cc]ortocircuito)\s*[:\(°]?\s*([0-9]+(?:\.[0-9]+)?)\s*A',
         r'ISC?\s*\(A\)\s*[:\|]?\s*([0-9]+(?:\.[0-9]+)?)',
         r'Isc\s*=\s*([0-9]+(?:\.[0-9]+)?)',
@@ -57,6 +60,7 @@ _PATTERNS = {
         r'Corriente\s+(?:de\s+)?[Cc]orto\s*[Cc]ircuito\s*\([^)\n]{1,10}\)\s*([0-9]+(?:\.[0-9]+)?)',
     ],
     "Vmp": [
+        r'\(\s*V(?:mp|mpp)\s*\)\s*\[?V?\]?\s*[:\|]?\s*([0-9]+(?:\.[0-9]+)?)',
         r'(?:Vmpp|Vmp|V_mp|VMPP|Maximum\s+Power\s+Voltage|Tensi[oó]n\s+(?:de\s+)?[Mm][aá]xima?\s+[Pp]otencia)\s*[:\(]?\s*([0-9]+(?:\.[0-9]+)?)\s*V',
         r'VMPP?\s*\(V\)\s*[:\|]?\s*([0-9]+(?:\.[0-9]+)?)',
         r'Vmp\s*=\s*([0-9]+(?:\.[0-9]+)?)',
@@ -64,6 +68,7 @@ _PATTERNS = {
         r'Voltaje\s+M[aá]ximo\s*\([^)\n]{1,10}\)\s*([0-9]+(?:\.[0-9]+)?)',
     ],
     "Imp": [
+        r'\(\s*I(?:mp|mpp)\s*\)\s*\[?A?\]?\s*[:\|]?\s*([0-9]+(?:\.[0-9]+)?)',
         r'(?:Impp|Imp|I_mp|IMPP|Maximum\s+Power\s+Current|Corriente\s+(?:de\s+)?[Mm][aá]xima?\s+[Pp]otencia)\s*[:\(]?\s*([0-9]+(?:\.[0-9]+)?)\s*A',
         r'IMPP?\s*\(A\)\s*[:\|]?\s*([0-9]+(?:\.[0-9]+)?)',
         r'Imp\s*=\s*([0-9]+(?:\.[0-9]+)?)',
@@ -72,7 +77,12 @@ _PATTERNS = {
     ],
     "N_s": [
         r'(?:N[oú]mero\s+de\s+c[eé]lulas?|Number\s+of\s+cells?|Cell\s+Number|Cells?\s+[Ss]eries?|Celdas?\s+en\s+[Ss]erie)\s*[:\|]?\s*([0-9]+)',
-        r'(?:N_s|Ns|NSA)\s*[:\|=]?\s*([0-9]+)',
+        # "No. of cells 132(6×22)" — JA Solar y similares. El número debe venir
+        # INMEDIATAMENTE tras la etiqueta: si el OCR degradó el valor (p.ej.
+        # "EG 22)") es mejor devolver None que un Ns falso.
+        r'No\.?\s*(?:of|de|el)?\s*cells?\s*[:\|]?\s*([0-9]{2,3})\b',
+        # \b obligatorio: sin él, "Dimensio ns 2384" hacía match y Ns quedaba en 2384
+        r'\b(?:N_s|Ns|NSA)\b\s*[:\|=]?\s*([0-9]+)',
         r'\b([0-9]{2,3})\s+(?:cells?|c[eé]lulas?)\b',
         # SolTech OCR: "N De Celdas 144 (12 x 12)"
         r'N[°º]?\s*[Dd]e\s+[Cc]eldas\s*[:\|]?\s*([0-9]{1,3})\b',
@@ -86,12 +96,20 @@ _PATTERNS = {
         # SolTech: "Coeficientes de temperatura de Voc TKβ(%/℃) -0.321"
         # (el % viene ANTES del número, dentro de la unidad entre paréntesis)
         r'temp(?:eratura)?\s+de\s+Voc\b[^\n0-9+-]*([+-]?[0-9]+\.[0-9]+)',
+        # JA Solar/Trina inglés: "Temperature Coefficient of Voc (β_Voc) -0.250%/°C"
+        # (OCR degrada β a "B"; se exige signo y % para no capturar ruido)
+        r'Coefficient\s+of\s+Voc[^\n]{0,40}?([+-][0-9]+\.[0-9]+)\s*%',
+        r'\(\s*[βB]_?Voc\s*\)[^\n0-9]{0,20}([+-]?[0-9]+\.[0-9]+)\s*%',
     ],
     "CoefIsc": [
         r'(?:α|alpha|α_Isc|Coef(?:icient)?\s+(?:of\s+)?(?:Temp(?:erature)?\s+(?:of\s+)?)?Isc|Temperatura\s+Isc|TK\s*Isc)\s*[:\(]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
         r'(?:α|alpha)I?[Ss][Cc]?\s*=?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
         # SolTech: "Coeficientes de temperatura de Isc TKα(%/℃) +0.06"
         r'temp(?:eratura)?\s+de\s+Isc\b[^\n0-9+-]*([+-]?[0-9]+\.[0-9]+)',
+        # JA Solar/Trina inglés: "Temperature Coefficient of Isc (α_Isc) +0.045%/°C"
+        # (OCR degrada α a "a")
+        r'Coefficient\s+of\s+Isc[^\n]{0,40}?([+-][0-9]+\.[0-9]+)\s*%',
+        r'\(\s*[αa]_?Isc\s*\)[^\n0-9]{0,20}([+-]?[0-9]+\.[0-9]+)\s*%',
     ],
     "CoefPmax": [
         r'(?:γ|gamma|γ_Pmax|Coef(?:icient)?\s+(?:of\s+)?(?:Temp(?:erature)?\s+(?:of\s+)?)?P(?:max|mpp)|Temperatura\s+P(?:max|mpp)|TK\s*P(?:max|mpp))\s*[:\(]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
@@ -99,12 +117,18 @@ _PATTERNS = {
         r'Pmax\s+coeff?\.?\s*[:\|]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
         # SolTech: "Coeficientes de temperatura de Pm TKγ(%/℃) -0.214"
         r'temp(?:eratura)?\s+de\s+Pm(?:ax|pp)?\b[^\n0-9+-]*([+-]?[0-9]+\.[0-9]+)',
+        # JA Solar/Trina inglés: "Temperature Coefficient of Pmax (γ_Pmp) -0.290%/°C"
+        # (OCR degrada γ a "y")
+        r'Coefficient\s+of\s+Pmax[^\n]{0,40}?([+-][0-9]+\.[0-9]+)\s*%',
+        r'\(\s*[γy]_?Pm(?:p|ax|pp)?\s*\)[^\n0-9]{0,20}([+-]?[0-9]+\.[0-9]+)\s*%',
     ],
     "NOCT": [
         r'(?:NOCT|NMOT|Normal(?:ized)?\s+(?:Operating)?\s+Cell\s+Temp(?:erature)?|Temperatura\s+(?:de\s+)?[Oo]peraci[oó]n\s+Normal)\s*[:\(]?\s*([0-9]+(?:\.[0-9]+)?)\s*°?C',
         r'NOCT\s*=\s*([0-9]+(?:\.[0-9]+)?)',
         # SolTech OCR: "Temperatura Operativa Nominal Del Módulo 41 +/-2°C"
         r'Temperatura\s+Operativa\s+Nominal[^\n0-9]*([0-9]{2}(?:\.[0-9]+)?)',
+        # "NOCT 45±2°C" — tolerancia pegada al valor (OCR: "45+2°C")
+        r'NOCT[^\n0-9]{0,10}([0-9]{2})\b',
     ],
     "Bifacialidad": [
         # "Bifaciality: 80%±5%" / "Bifacialidad 70 ± 5 %" / "Bifacial factor 0.8"(→%)
@@ -117,7 +141,11 @@ _PATTERNS = {
     ],
     "dimensiones": [
         r'([0-9]{3,4})\s*[×xX*]\s*([0-9]{3,4})\s*[×xX*]\s*([0-9]+)\s*mm',
+        # Con tolerancia ±N mm entre números: "2384±2mm×1303±2mm×33±1mm"
+        # (el OCR degrada ± a ":t", "+", "-+", etc.)
+        r'([0-9]{3,4})[^\n×xX*]{0,6}?mm\s*[×xX*]\s*([0-9]{3,4})[^\n×xX*]{0,6}?mm\s*[×xX*]\s*([0-9]{2,3})',
         r'Dimensions?\s*[:\(]?\s*([0-9]{3,4})\s*[×xX*]\s*([0-9]{3,4})',
+        r'Dimensione?s?\b[^\n0-9]{0,15}([0-9]{3,4})\s*[^0-9×xX*\n]{0,8}(?:mm)?\s*[×xX*]\s*([0-9]{3,4})',
     ],
 }
 
@@ -670,13 +698,29 @@ def _extract_model_name(text: str) -> str:
     )
     if m:
         return m.group(1).strip()
+    # Prioridad 2: código de familia tipo "JAM66D46 LB", "LR5-72HTH", "TSM-DE21"
+    # en las primeras líneas (título de la ficha). Se filtran líneas de pie de
+    # página ("Version No.", "Global-EN", e-mail, web) que contienen códigos
+    # basura tipo "EN-20250709C".
+    _JUNK_LINE = re.compile(r'version\s*no|global[-_]|e-?mail|www\.|http|@', re.I)
     for line in text.splitlines()[:30]:
         line = line.strip()
+        if _JUNK_LINE.search(line):
+            continue
+        # "JAM 66D46 LB" (OCR mete espacios) o "JAM66D46-LB"
+        m = re.match(r'^([A-Z]{2,5}\s?[0-9]{2}[A-Z][0-9]{2}[\s\-][A-Z]{1,3})\b', line)
+        if m:
+            return m.group(1).replace(" ", "")
         m = re.match(r'^([A-Z]{2,8}[-_][A-Z0-9\-\.]{4,25})$', line)
         if m:
             return m.group(1)
-    m = re.search(r'\b([A-Z]{2,6}[-_][A-Z0-9\-\.]{4,25})\b', text)
-    return m.group(1) if m else ""
+    for line in text.splitlines():
+        if _JUNK_LINE.search(line):
+            continue
+        m = re.search(r'\b([A-Z]{2,6}[-_][A-Z0-9\-\.]{4,25})\b', line)
+        if m:
+            return m.group(1)
+    return ""
 
 
 def _extract_brand(text: str) -> str:
@@ -874,6 +918,9 @@ def extraer_parametros_panel(pdf_bytes: bytes) -> dict:
         result["Isc"] = None
     if result.get("Pmax") and result["Pmax"] > 2000:
         result["Pmax"] = None
+    # Ns plausible: 10–300 celdas en serie (2384 era la dimensión del panel)
+    if result.get("N_s") and not (10 <= result["N_s"] <= 300):
+        result["N_s"] = None
     # Bifacialidad: aceptar fracción (0.80 → 80%) y descartar valores implausibles
     _bif = result.get("Bifacialidad")
     if _bif is not None:
