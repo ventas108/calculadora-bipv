@@ -139,6 +139,8 @@ if _panel_detectado:
         )
     elif _chk_tau["estado"] == "sospechoso_bajo":
         st.warning(f"⚠️ **Revisión de τ en `{_panel_nombre_actual}`:** {_chk_tau['mensaje']}", icon="⚠️")
+    elif _chk_tau["estado"] == "sin_datos" and (_panel_dict.get("transparencia_pct") or 0) > 0:
+        st.caption(f"🧪 Coherencia τ vs ficha: no verificable — {_chk_tau['mensaje']}")
     elif _chk_tau["estado"] == "ok":
         st.caption(
             f"🧪 Coherencia τ vs ficha: η módulo {_chk_tau['eta_modulo_pct']:.1f}% → "

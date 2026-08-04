@@ -116,6 +116,20 @@ panel_opaco = {"Pmax_stc": 550, "area_m2": 2.58, "transparencia_pct": 0,
 check(verificar_isc_transparencia(panel_opaco)["estado"] == "ok",
       "Panel opaco Mono-Si estándar (550 W / 2.58 m²) → ok")
 
+# Bordes de τ: nunca debe dividir por cero ni crashear
+for tau_pct, esp in ((95, None), (96, "sin_datos"), (100, "sin_datos")):
+    r = verificar_isc_transparencia({**ASP_ST1_T40, "transparencia_pct": tau_pct})
+    cond = r["estado"] == esp if esp else r["estado"] in (
+        "ok", "sospechoso_alto", "sospechoso_bajo")
+    check(cond, f"τ={tau_pct}% no crashea (estado: {r['estado']})")
+
+# Alias de tecnología: "MonoSi" debe usar el techo Mono-Si, no el default
+r_alias = verificar_isc_transparencia({"Pmax_stc": 550, "area_m2": 2.58,
+                                       "transparencia_pct": 0,
+                                       "tecnologia": "MonoSi N-Type"})
+check(r_alias["eta_max_pct"] == 24.5 and r_alias["estado"] == "ok",
+      "Alias 'MonoSi N-Type' se normaliza a Mono-Si")
+
 if fallos:
     print(f"\n🔴 {len(fallos)} verificación(es) fallaron — riesgo de doble conteo de τ")
     sys.exit(1)

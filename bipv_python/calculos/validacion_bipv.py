@@ -56,7 +56,21 @@ def verificar_isc_transparencia(panel: dict) -> dict:
         }
     """
     tecno = str(panel.get("tecnologia") or "").strip()
-    eta_max = ETA_ACTIVA_MAX_PCT.get(tecno, _ETA_MAX_DEFAULT)
+    # Normalizar alias comunes del catálogo ("MonoSi", "mono-si", "N-Type Mono…")
+    _t = tecno.lower().replace(" ", "").replace("_", "").replace("-", "")
+    if "cdte" in _t:
+        tecno_norm = "CdTe"
+    elif "cigs" in _t or "cis" == _t:
+        tecno_norm = "CIGS"
+    elif "asi" == _t or "amorf" in _t or "amorph" in _t:
+        tecno_norm = "a-Si"
+    elif "poli" in _t or "poly" in _t or "multi" in _t:
+        tecno_norm = "Poli-Si"
+    elif "mono" in _t or "ntype" in _t or "topcon" in _t or "hjt" in _t or "perc" in _t:
+        tecno_norm = "Mono-Si"
+    else:
+        tecno_norm = tecno
+    eta_max = ETA_ACTIVA_MAX_PCT.get(tecno_norm, _ETA_MAX_DEFAULT)
 
     try:
         pmax = float(panel.get("Pmax_stc") or 0)
