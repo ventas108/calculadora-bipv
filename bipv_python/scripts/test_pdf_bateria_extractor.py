@@ -131,7 +131,35 @@ check("Ciclos = 6000", approx(r2["ciclos"], 6000))
 check("C-rate nominal = 0.5", approx(r2["c_rate"], 0.5))
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 3. Robustez: entradas que no son fichas de baterías
+# 3. Ficha de UN solo modelo con tabla de MÓDULO antes que la del rack:
+#    el extractor debe quedarse con el rack (valor más grande), nunca el módulo
+#    (regresión detectada en auditoría: _mejor_fila empataba 1-1 y ganaba la
+#    primera línea = módulo)
+# ═════════════════════════════════════════════════════════════════════════════
+print("── Ficha sintética single-model (módulo antes que rack) ──")
+from calculos.pdf_bateria_extractor import _max_todas_filas, _ROW_SPECS
+
+_TXT_SM = """BR215R
+Especificaciones del módulo de batería
+Capacidad nominal          280Ah
+Energía nominal            14.336kWh
+Voltaje nominal            51.2V
+Rango de voltaje           44.8~57.6V
+Especificaciones del rack de baterías
+Capacidad nominal          280Ah
+Energía nominal            215.04kWh
+Voltaje nominal            768V
+Rango de voltaje           672~864V
+""".splitlines()
+
+_esp_sm = {"capacidad_kWh": 215.04, "voltaje_V": 768.0, "capacidad_Ah": 280.0}
+for campo, lbl_re, val_re, (lo, hi) in _ROW_SPECS:
+    v = _max_todas_filas(_TXT_SM, lbl_re, val_re, lo, hi)
+    check(f"single-model {campo} = {_esp_sm[campo]} (rack, no módulo)",
+          approx(v, _esp_sm[campo]), f"(obtuvo {v})")
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 4. Robustez: entradas que no son fichas de baterías
 # ═════════════════════════════════════════════════════════════════════════════
 print("── Robustez ──")
 r3 = extraer_parametros_bateria(b"esto no es un pdf")

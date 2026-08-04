@@ -131,6 +131,27 @@ def _mejor_fila(lines: list, lbl_re, val_re, lo: float, hi: float) -> list:
     return best
 
 
+def _max_todas_filas(lines: list, lbl_re, val_re, lo: float, hi: float):
+    """
+    Para fichas de UN solo modelo: recorre TODAS las líneas cuyo label
+    coincide (módulo Y rack pueden compartir label con 1 valor cada una)
+    y retorna el valor plausible MÁS GRANDE — el rack siempre supera al
+    módulo en kWh/V/Ah, así que el máximo global es el del banco completo.
+    """
+    mejor = None
+    for linea in lines:
+        if _ROW_EXCLUDE.search(linea) or not lbl_re.search(linea):
+            continue
+        for m in val_re.finditer(linea):
+            try:
+                v = float(m.group(1))
+            except ValueError:
+                continue
+            if lo <= v <= hi and (mejor is None or v > mejor):
+                mejor = v
+    return mejor
+
+
 # Distancia máxima (en caracteres) entre el código del modelo y su columna
 _MAX_DIST_COL = 45
 
@@ -278,11 +299,19 @@ def extraer_parametros_bateria(pdf_bytes: bytes) -> dict:
             valores[m] = {campo: por_campo.get(campo, {}).get(m) for campo, *_ in _ROW_SPECS}
     else:
         # ── Ficha de UN modelo: valor más grande por campo (rack > módulo) ──
+        # OJO: se recorren TODAS las líneas del label (no solo la "mejor"):
+        # módulo y rack suelen compartir label con 1 valor cada uno, y
+        # _mejor_fila se quedaría con la primera (podía ser la del módulo).
         unico: dict = {}
         for campo, lbl_re, val_re, (lo, hi) in _ROW_SPECS:
-            vals = _mejor_fila(lines, lbl_re, val_re, lo, hi)
-            unico[campo] = max((v for _, v in vals), default=None)
-        nombre = modelos[0][1] if modelos else ""
+            unico[campo] = _max_todas_filas(lines, lbl_re, val_re, lo, hi)
+        # Nombre: primer código de modelo válido en las primeras líneas
+        nombre = ""
+        for linea in lines[:40]:
+            codes = _codigos_en_linea(linea)
+            if codes:
+                nombre = codes[0][1]
+                break
         if any(v is not None for v in unico.values()):
             valores[nombre or "(modelo sin nombre)"] = unico
         modelos = [(0, k) for k in valores.keys()]
