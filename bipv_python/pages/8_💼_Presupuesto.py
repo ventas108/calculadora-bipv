@@ -1359,27 +1359,36 @@ def _recolectar_items_cotizacion(trm_cop):
 
 _items_cot = _recolectar_items_cotizacion(tc)
 
-# ── Totales en COP desde los valores ya publicados por el Resumen ─────────────
-_capex_usd_pub   = float(st.session_state.get("presupuesto_capex_usd", 0.0))
-_capex_dir_usd   = float(st.session_state.get("presupuesto_capex_directo", 0.0))
+# ── Totales en COP compuestos SIEMPRE desde los mismos ítems exportados ──────
+# (revisión: no usar presupuesto_capex_usd — puede quedar rezagado del Resumen
+# cuando la Estimación Rápida fue aplicada y luego se ingresaron cotizaciones
+# reales; el total exportado DEBE cuadrar con la tabla exportada.)
 _blando_usd      = float(st.session_state.get("presupuesto_capex_blando", 0.0))
 _indirect_usd    = float(st.session_state.get("presupuesto_capex_indirectos", 0.0))
 _cont_usd        = float(st.session_state.get("presupuesto_capex_cont", 0.0))
 
-_subtotal_cop    = _capex_dir_usd * tc
+_subtotal_cop    = sum(i["total_cop"] for i in _items_cot)
 _blando_cop      = _blando_usd * tc
 _indirect_cop    = _indirect_usd * tc
 _cont_cop        = _cont_usd * tc
-_total_cop       = _capex_usd_pub * tc
-# Fallback: si no hay total publicado (p.ej. tabs sin Resumen calculado), suma ítems.
-if _total_cop <= 0 and _items_cot:
-    _subtotal_cop = sum(i["total_cop"] for i in _items_cot)
-    _total_cop    = _subtotal_cop + _blando_cop + _indirect_cop + _cont_cop
-# Fallback subtotal: si el directo publicado es 0 pero hay ítems, usar la suma real.
-if _subtotal_cop <= 0 and _items_cot:
-    _subtotal_cop = sum(i["total_cop"] for i in _items_cot)
+_total_cop       = _subtotal_cop + _blando_cop + _indirect_cop + _cont_cop
 
-_hay_items = len(_items_cot) > 0 and _total_cop > 0
+# Guardia de consistencia: el total debe ser exactamente la suma de sus partes.
+_descuadre = abs(_total_cop - (_subtotal_cop + _blando_cop + _indirect_cop + _cont_cop))
+_hay_items = len(_items_cot) > 0 and _total_cop > 0 and _descuadre < 1.0
+
+# Aviso si el CAPEX publicado por el Resumen difiere de lo que se exporta
+_capex_usd_pub = float(st.session_state.get("presupuesto_capex_usd", 0.0))
+if _items_cot and _capex_usd_pub > 0:
+    _total_pub_cop = _capex_usd_pub * tc
+    if abs(_total_pub_cop - _total_cop) / _total_pub_cop > 0.01:
+        st.info(
+            "ℹ️ El total de la cotización se calcula desde los ítems activos de las "
+            "pestañas y difiere del CAPEX del Resumen "
+            f"({'%.1f' % (abs(_total_pub_cop - _total_cop) / _total_pub_cop * 100)} %). "
+            "Esto suele pasar cuando la Estimación Rápida sigue aplicada o hay ítems "
+            "desactivados — recalcula el Resumen si quieres que coincidan."
+        )
 
 if not _hay_items:
     st.warning(
