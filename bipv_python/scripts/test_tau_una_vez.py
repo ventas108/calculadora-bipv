@@ -86,6 +86,36 @@ except ImportError as e:  # pvlib u otra dependencia ausente en el entorno
            / "calculos" / "produccion.py").read_text(encoding="utf-8")
     check("transparencia" not in src, "produccion.py no menciona transparencia")
 
+print("3. Validación #151: detectar fichas cuyo Isc/Pmax NO incluyen τ")
+from calculos.validacion_bipv import verificar_isc_transparencia  # noqa: E402
+from datos.tecnologias_bipv import ASP_ST1_T40  # noqa: E402
+
+chk_ok = verificar_isc_transparencia(ASP_ST1_T40)
+check(chk_ok["estado"] == "ok",
+      f"ASP-ST1-T40 real (τ=40%) pasa como coherente ({chk_ok['eta_activa_pct']}% activa)")
+
+# Panel trucho: mismo vidrio pero con Pmax de celda pura (sin descontar τ=40%)
+panel_celda_pura = {**ASP_ST1_T40, "Pmax_stc": 63.0 / 0.60}   # 105 W "opacos"
+chk_alto = verificar_isc_transparencia(panel_celda_pura)
+check(chk_alto["estado"] == "sospechoso_alto",
+      "Panel con Pmax de celda pura (τ no descontada) → alerta de sobreestimación")
+
+# Panel con τ descontada dos veces en los datos
+panel_doble_tau = {**ASP_ST1_T40, "Pmax_stc": 63.0 * 0.25}
+chk_bajo = verificar_isc_transparencia(panel_doble_tau)
+check(chk_bajo["estado"] == "sospechoso_bajo",
+      "Panel con Pmax anormalmente bajo → alerta de posible doble descuento de τ")
+
+# Ficha incompleta → no inventa veredicto
+chk_nd = verificar_isc_transparencia({"transparencia_pct": 40})
+check(chk_nd["estado"] == "sin_datos", "Ficha sin Pmax/área → 'sin_datos' (no alerta falsa)")
+
+# Panel opaco normal (τ=0) no debe alertar
+panel_opaco = {"Pmax_stc": 550, "area_m2": 2.58, "transparencia_pct": 0,
+               "tecnologia": "Mono-Si"}
+check(verificar_isc_transparencia(panel_opaco)["estado"] == "ok",
+      "Panel opaco Mono-Si estándar (550 W / 2.58 m²) → ok")
+
 if fallos:
     print(f"\n🔴 {len(fallos)} verificación(es) fallaron — riesgo de doble conteo de τ")
     sys.exit(1)

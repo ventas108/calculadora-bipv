@@ -122,6 +122,29 @@ if _panel_detectado:
         f"NOCT = {_noct_disp}°C  ·  γ = {_gamma_disp} %/°C  "
         "— Puedes ajustar cualquier valor manualmente."
     )
+
+    # ── Verificación #151: ¿el Isc/Pmax del panel realmente incluye τ? ─────
+    # El modelo asume que la ficha ya descuenta la transparencia
+    # (Isc_real = Isc_celda × (1−τ)); si no, la producción se sobreestima
+    # en silencio. Chequeo por eficiencia implícita del área activa.
+    from calculos.validacion_bipv import verificar_isc_transparencia
+    _chk_tau = verificar_isc_transparencia(_panel_dict)
+    if _chk_tau["estado"] == "sospechoso_alto":
+        st.error(
+            f"🚨 **τ sin efecto real en `{_panel_nombre_actual}`:** {_chk_tau['mensaje']}  \n"
+            "Corrige el Pmax/Isc de la ficha (deben ser los del panel "
+            "semitransparente real) o revisa el área y la τ declaradas antes "
+            "de confiar en la energía calculada.",
+            icon="🚨",
+        )
+    elif _chk_tau["estado"] == "sospechoso_bajo":
+        st.warning(f"⚠️ **Revisión de τ en `{_panel_nombre_actual}`:** {_chk_tau['mensaje']}", icon="⚠️")
+    elif _chk_tau["estado"] == "ok":
+        st.caption(
+            f"🧪 Coherencia τ vs ficha: η módulo {_chk_tau['eta_modulo_pct']:.1f}% → "
+            f"η área activa {_chk_tau['eta_activa_pct']:.1f}% "
+            f"(≤ {_chk_tau['eta_max_pct']:.1f}% plausible) — el Isc/Pmax ya incorporan τ. ✅"
+        )
 else:
     st.info(
         "ℹ️ No se detectó un panel configurado en 🏠 Proyecto. "
