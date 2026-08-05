@@ -153,5 +153,5 @@ description = "Comparación completa con puntajes actualizados, estado de cada b
 id = "zbcQHT3BsLhNApHrv6VAk"
 uri = "file://entregables/MANUAL_CALCULADORA_BIPV_v3_agosto2026.docx"
 type = "word_document"
-title = "Manual Calculadora BIPV v3 — actualizado 5-ago-2026"
-description = "Manual con nuevo anexo: modo agrivoltaico (factor de ocupación, GCR sincronizado, Vista 3D de granja), Motor IV automático, precio real del inversor y defensa Ns half-cut, con recomendaciones para evitar errores."
+title = "Manual Calculadora BIPV v3 — reorganizado (5-ago-2026)"
+description = "Cada actualización integrada en su capítulo correspondiente, siguiendo el orden del procedimiento: Flujo → Proyecto → Recurso Solar → Motor IV → Vista 3D → Financiero. Sin anexo; tabla de contenido coherente."
