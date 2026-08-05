@@ -236,12 +236,35 @@ with st.expander("🔄 Simulación bifacial (ganancia de la cara trasera)",
         if _rear_disabled:
             cb3.caption("🔒 Fijado en 0.05 y sin efecto: con la fachada adosada al muro "
                         "la cara trasera está sellada y no aporta ganancia bifacial.")
+        # ── #168 — GCR sincronizado con el factor de ocupación del Proyecto ──
+        # El GCR (ancho colector ÷ pitch) y el factor de ocupación representan
+        # la misma fracción de suelo cubierta por paneles. Si el usuario definió
+        # un factor en 🏠 Proyecto, ese valor inicializa el slider.
+        _f_ocup_rs = float(st.session_state.get("factor_ocupacion_pct", 0.0) or 0.0)
+        if _bif_def.get("gcr") is not None:
+            _gcr_ini = float(_bif_def["gcr"])
+        elif _f_ocup_rs > 0:
+            _gcr_ini = round((_f_ocup_rs / 100.0) / 0.05) * 0.05
+        else:
+            _gcr_ini = 0.25
+        _gcr_ini = min(max(_gcr_ini, 0.10), 0.90)
         gcr = cb4.slider(
             "GCR (cobertura del suelo)", min_value=0.10, max_value=0.90,
-            value=float(_bif_def.get("gcr", 0.25)), step=0.05,
+            value=_gcr_ini, step=0.05,
             help="Ancho del panel ÷ separación entre filas. Fila única o aislada: 0.20–0.30. "
-                 "Filas juntas (menos luz trasera): 0.5+.",
+                 "Filas juntas (menos luz trasera): 0.5+. "
+                 "🌱 Agrivoltaica: usa el mismo valor que el factor de ocupación de 🏠 Proyecto.",
         )
+        if _f_ocup_rs > 0 and abs(gcr * 100.0 - _f_ocup_rs) > 15.0:
+            st.warning(
+                f"⚠️ **GCR y factor de ocupación inconsistentes:** el GCR es "
+                f"**{gcr:.2f}** ({gcr*100:.0f}% del suelo cubierto) pero en 🏠 Proyecto "
+                f"definiste un factor de ocupación de **{_f_ocup_rs:.0f}%**. Ambos "
+                f"representan la fracción de terreno con paneles — el sombreado entre "
+                f"filas y el conteo de paneles usarán supuestos distintos. "
+                f"Sugerido: GCR ≈ **{min(max(_f_ocup_rs/100.0, 0.10), 0.90):.2f}**.",
+                icon="🌱",
+            )
         bifacial_cfg = {
             "bifacialidad":          bif_pct / 100.0,
             "altura_m":              altura_m,

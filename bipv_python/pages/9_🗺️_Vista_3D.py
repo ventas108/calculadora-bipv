@@ -330,10 +330,17 @@ with tab_modelo:
     N_paneles = int(st.session_state.get("N_paneles_final",
                     st.session_state.get("N_paneles_dim", 0)))
 
-    # Estimación desde área si no hay datos de producción
+    # ── #167 — Agrivoltaica: el área útil de paneles manda sobre el terreno ──
+    _tipo_inst_3d = st.session_state.get("tipo_instalacion", "")
+    _f_ocup_3d = min(max(float(st.session_state.get("factor_ocupacion_pct", 100.0) or 100.0), 5.0), 100.0)
+    _es_granja_3d = (_tipo_inst_3d == "Granja fotovoltaica")
+    _area_util_3d = float(st.session_state.get("area_util_m2") or (area_m2 * _f_ocup_3d / 100.0))
+
+    # Estimación desde área si no hay datos de producción (usa el área ÚTIL,
+    # no el terreno bruto — con factor 30% solo cabe ~1/3 de los paneles)
     if N_paneles == 0:
         _area_panel_est = 0.72  # m² típico panel CdTe BIPV
-        N_paneles = max(1, int(area_m2 / _area_panel_est))
+        N_paneles = max(1, int(_area_util_3d / _area_panel_est))
 
     panel_dict = st.session_state.get("panel_dict")
     area_panel = 0.72   # m² default (CdTe BIPV típico)
@@ -651,14 +658,65 @@ with tab_modelo:
     poa_max_m = max(poa_mensual)
     poa_mes   = poa_mensual[mes_idx]
 
-    mesh_ed, wire_ed = building_box_traces(ancho_m, profundidad_m, altura_m, opac_ed)
-    mesh_pan, frame_pan, n_shown, n_rows, n_cols = panel_grid_traces(
-        ancho_m, altura_m, pw, ph, gap, poa_mes, poa_min_m, poa_max_m, N_paneles
-    )
+    # ── #167 — Vista de granja agrivoltaica: filas espaciadas sobre el cultivo ─
+    if _es_granja_3d:
+        _L_ter = math.sqrt(max(area_m2, 1.0))          # terreno cuadrado L×L (m)
+        _gcr3d = max(_f_ocup_3d / 100.0, 0.05)
+        _cw    = ph                                     # ancho del colector en la pendiente
+        _pitch = _cw / _gcr3d                           # separación entre ejes de filas
+        _tilt_g = float(st.session_state.get("tilt_fachada",
+                        st.session_state.get("tilt_default", 20)) or 20)
+        _tilt_g = min(max(_tilt_g, 5.0), 45.0)          # granja: 5–45°
+        _h0    = 3.0 if _f_ocup_3d < 100.0 else 0.8     # agrivoltaica: paneles a 3 m
+        _dy    = _cw * math.cos(math.radians(_tilt_g))
+        _dz    = _cw * math.sin(math.radians(_tilt_g))
+        n_rows = max(1, int(_L_ter // _pitch))
+        n_cols = max(1, int(_L_ter // (pw + gap)))
+        _n_cap = n_rows * n_cols
+        n_shown = min(N_paneles, _n_cap) if N_paneles > 0 else _n_cap
 
-    traces = [mesh_ed, wire_ed, mesh_pan, frame_pan]
+        # Suelo verde = cultivo
+        _suelo = go.Mesh3d(
+            x=[0, _L_ter, _L_ter, 0], y=[0, 0, _L_ter, _L_ter], z=[0, 0, 0, 0],
+            i=[0, 0], j=[1, 2], k=[2, 3],
+            color='rgb(46,125,50)', opacity=0.95, name='Cultivo',
+            hovertext=f'🌱 Cultivo — {100 - _f_ocup_3d:.0f}% del terreno libre',
+            hoverinfo='text', showlegend=True,
+        )
+        # Filas de paneles inclinadas, espaciadas por el pitch
+        _xs, _ys, _zs, _fi, _fj, _fk = [], [], [], [], [], []
+        _margen = max((_L_ter - ((n_rows - 1) * _pitch + _dy)) / 2.0, 0.0)
+        for _r in range(n_rows):
+            _y0 = _margen + _r * _pitch
+            _b  = len(_xs)
+            _xs += [0, _L_ter, _L_ter, 0]
+            _ys += [_y0, _y0, _y0 + _dy, _y0 + _dy]
+            _zs += [_h0, _h0, _h0 + _dz, _h0 + _dz]
+            _fi += [_b, _b]; _fj += [_b + 1, _b + 2]; _fk += [_b + 2, _b + 3]
+        _filas_mesh = go.Mesh3d(
+            x=_xs, y=_ys, z=_zs, i=_fi, j=_fj, k=_fk,
+            color=_color_poa(poa_mes, poa_min_m, poa_max_m), opacity=1.0,
+            name='Filas de paneles',
+            hovertext=(f'☀️ {n_rows} filas · pitch {_pitch:.1f} m · '
+                       f'tilt {_tilt_g:.0f}° · altura {_h0:.1f} m'),
+            hoverinfo='text', showlegend=True,
+        )
+        traces = [_suelo, _filas_mesh]
+        st.info(
+            f"🌱 **Granja agrivoltaica** — terreno {_L_ter:.0f}×{_L_ter:.0f} m: "
+            f"**{n_rows} filas** de paneles a **{_h0:.1f} m** de altura, "
+            f"separadas **{_pitch:.1f} m** entre ejes (GCR {_gcr3d:.2f} = factor de "
+            f"ocupación {_f_ocup_3d:.0f}%). El **{100 - _f_ocup_3d:.0f}%** del suelo "
+            f"queda libre para el cultivo entre filas."
+        )
+    else:
+        mesh_ed, wire_ed = building_box_traces(ancho_m, profundidad_m, altura_m, opac_ed)
+        mesh_pan, frame_pan, n_shown, n_rows, n_cols = panel_grid_traces(
+            ancho_m, altura_m, pw, ph, gap, poa_mes, poa_min_m, poa_max_m, N_paneles
+        )
+        traces = [mesh_ed, wire_ed, mesh_pan, frame_pan]
 
-    if show_sun:
+    if show_sun and not _es_granja_3d:
         ray_tr, sol_vis = sun_ray_trace(azimuth, az_solar_mes, el_solar_mes,
                                          ancho_m, altura_m)
         if ray_tr is not None:
@@ -674,14 +732,14 @@ with tab_modelo:
         "Planta":      dict(x=0, y=0, z=3),
     }
     eye = cam_presets.get(vista, cam_presets["Perspectiva"])
-    max_dim = max(ancho_m, profundidad_m, altura_m)
+    max_dim = _L_ter if _es_granja_3d else max(ancho_m, profundidad_m, altura_m)
     eye_scaled = dict(x=eye["x"] * max_dim / 10,
                       y=eye["y"] * max_dim / 10,
                       z=eye["z"] * max_dim / 10)
 
     layout_3d = go.Layout(
         scene=dict(
-            xaxis=dict(title="← Ancho fachada (m) →", showgrid=True,
+            xaxis=dict(title="← Ancho terreno (m) →" if _es_granja_3d else "← Ancho fachada (m) →", showgrid=True,
                        zeroline=False, gridcolor='rgba(150,150,150,0.3)'),
             yaxis=dict(title="Profundidad (m)", showgrid=True,
                        zeroline=False, gridcolor='rgba(150,150,150,0.3)'),
