@@ -1,0 +1,41 @@
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# cd /var/www/bipv/calculadora-bipv
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# # 1. Verificar que el fix está en el servidor
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# grep -n "tipo_cambio = float" bipv_python/pages/7_💰_Financiero.py
+45:tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# nano bipv_python/pages/7_💰_Financiero.py
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# cd /var/www/bipv/calculadora-bipv
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git add bipv_python/pages/7_💰_Financiero.py
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git commit -m "fix: tipo_cambio definido al inicio antes de CAPEX"
+[main 7dca2bf4] fix: tipo_cambio definido al inicio antes de CAPEX
+ 1 file changed, 1 insertion(+)
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git push origin main
+remote: Invalid username or token. Password authentication is not supported for Git operations.
+fatal: Authentication failed for 'https://github.com/ventas108/calculadora-bipv.git/'
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# pm2 restart bipv-streamlitcd /var/www/bipv/calculadora-bipv
+dora-bipv.git
+
+git push origin mainUse --update-env to update environment variables
+[PM2][ERROR] Process or Namespace bipv-streamlitcd not found
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# # Reemplaza TU_TOKEN con el token copiado
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git remote set-url origin https://TU_TOKEN@github.com/ventas108/calculadora-bipv.git
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git push origin main^C
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git remote set-url origin https://TOKEN_REDACTADO@github.com/ventas108/calculadora-bipv.git
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git push origin main
+Enumerating objects: 14, done.
+Counting objects: 100% (14/14), done.
+Delta compression using up to 2 threads
+Compressing objects: 100% (10/10), done.
+Writing objects: 100% (10/10), 963 bytes | 963.00 KiB/s, done.
+Total 10 (delta 8), reused 0 (delta 0), pack-reused 0
+remote: Resolving deltas: 100% (8/8), completed with 4 local objects.
+To https://github.com/ventas108/calculadora-bipv.git
+   77112e3f..7dca2bf4  main -> main
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git log --oneline -3
+7dca2bf4 (HEAD -> main, origin/main, origin/HEAD) fix: tipo_cambio definido al inicio antes de CAPEX
+289ac5c3 fix: tipo_cambio definido al inicio antes de CAPEX
+77112e3f feat: Financiero — TRM default 3400, panel conversor USD→COP, COP en todas las cifras
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#

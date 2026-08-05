@@ -20,6 +20,12 @@ def cargar_catalogo_inversores() -> dict:
             continue
         completo = str(r.get("Datos completos (Si/No)", "")).strip().lower() == "si"
         costo = _f(r.get("Costo Inversor"))
+        _p_ac_nom_kW = _f(r.get("Potencia AC nominal (kW)"))
+        _p_dc_max_W  = _f(r.get("Potencia FV Max Recomendada (W)"))
+        # P_ac_nom_W: columna directa > derivada de P_dc con factor 0.96 como fallback
+        _p_ac_nom_W  = (_p_ac_nom_kW * 1000) if _p_ac_nom_kW else (
+            _p_dc_max_W * 0.96 if _p_dc_max_W else None
+        )
         inversores[modelo] = {
             "nombre":            modelo,
             "datos_completos":   completo,
@@ -33,7 +39,10 @@ def cargar_catalogo_inversores() -> dict:
             "n_strings_tracker": _f(r.get("N Strings/Tracker")),
             "I_max_tracker":     _f(r.get("Corriente Maxima Tracker (A)")),
             "Isc_max_tracker":   _f(r.get("Corriente Cortocircuito Max Tracker (A)")),
-            "P_dc_max_W":        _f(r.get("Potencia FV Max Recomendada (W)")),
+            "P_dc_max_W":        _p_dc_max_W,
+            # ── Potencia AC nominal ───────────────────────────────────────────
+            "P_ac_nom_kW":       _p_ac_nom_kW,   # desde columna "Potencia AC nominal (kW)"
+            "P_ac_nom_W":        _p_ac_nom_W,    # alias en Watts (para Dimensionamiento.py)
             # ── Aliases para dimensionamiento.py y Dimensionamiento.py ───
             "Vmppt_activo_min":  _f(r.get("Tension Minima MPPT Activo (V)")),  # = V_mppt_activo
             "N_mppt":            _f(r.get("N Trackers")),                       # = n_trackers

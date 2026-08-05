@@ -149,6 +149,9 @@ tipo_cambio = float(st.session_state.get("tipo_cambio", 4200.0))
 # TRM disponible desde el inicio (se actualiza en Sección 2)
 tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))
 
+# TRM disponible desde el inicio (se actualiza en Sección 2)
+tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # PANEL PREVIO — Consumo vs Producción estimada
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -234,15 +237,45 @@ with col_cx1:
     costo_modulo_usd = st.number_input(
         "Costo módulos BIPV (USD/módulo)",
         min_value=10.0, max_value=500.0,
-        value=65.0, step=5.0,
-        help="ASP-ST1-T40 SolTech ~ USD 60–80 / módulo (precio mercado Colombia 2024)",
+        value=float(st.session_state.get("costo_modulo_usd") or 65.0), step=5.0,
+        help="Pre-llenado desde catálogo si se seleccionó panel en Dimensionamiento.",
     )
+
+    # ── Pre-llenar costo inversor desde catálogo ──────────────────────────────
+    _costo_inv_usd  = float(st.session_state.get("costo_inversor_usd") or 0.0)
+    _inversor_dim   = st.session_state.get("inversor_dict_dim", {})
+    _p_ac_nom_kW    = (
+        _inversor_dim.get("P_ac_nom_kW")
+        or ((_inversor_dim.get("P_ac_nom_W") or _inversor_dim.get("P_dc_max_W") or 0) / 1000)
+    )
+    if _costo_inv_usd > 0 and _p_ac_nom_kW and _p_ac_nom_kW > 0:
+        _default_inv_kw = round(_costo_inv_usd / _p_ac_nom_kW, 1)
+        _default_inv_kw = max(50.0, min(400.0, _default_inv_kw))
+        _inv_nombre     = _inversor_dim.get("nombre", "")
+        _help_inv = (
+            f"📋 Catálogo: USD {_costo_inv_usd:,.0f}/unidad ÷ {_p_ac_nom_kW:.2f} kW = "
+            f"USD {_default_inv_kw:.1f}/kWp"
+            + (f" ({_inv_nombre})" if _inv_nombre else "")
+            + " — editable."
+        )
+    else:
+        _default_inv_kw = 120.0
+        _help_inv = (
+            "Growatt MID15KTL3-X ~ USD 100–150/kWp en Colombia 2024. "
+            "Selecciona un inversor en Dimensionamiento para pre-llenar automáticamente."
+        )
+
     costo_inversor_usd_kw = st.number_input(
         "Costo inversor (USD/kWp)",
         min_value=50.0, max_value=400.0,
-        value=120.0, step=10.0,
-        help="Growatt MID15KTL3-X ~ USD 100–150/kWp en Colombia 2024",
+        value=_default_inv_kw, step=10.0,
+        help=_help_inv,
     )
+    if _costo_inv_usd > 0 and _p_ac_nom_kW and _p_ac_nom_kW > 0:
+        st.caption(
+            f"💡 Valor pre-llenado desde catálogo · "
+            f"USD {_costo_inv_usd:,.0f} / unidad · {_p_ac_nom_kW:.2f} kW AC"
+        )
     costo_estructura_usd_kw = st.number_input(
         "Estructura, cableado, protecciones (USD/kWp)",
         min_value=50.0, max_value=500.0,
