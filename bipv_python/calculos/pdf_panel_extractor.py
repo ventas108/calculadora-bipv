@@ -100,6 +100,8 @@ _PATTERNS = {
         # (OCR degrada β a "B"; se exige signo y % para no capturar ruido)
         r'Coefficient\s+of\s+Voc[^\n]{0,40}?([+-][0-9]+\.[0-9]+)\s*%',
         r'\(\s*[βB]_?Voc\s*\)[^\n0-9]{0,20}([+-]?[0-9]+\.[0-9]+)\s*%',
+        # Hiitio CdTe: "Open circuit voltage temperature coefficient -0.28%°C"
+        r'Open\s+circuit\s+voltage\s+temperature\s+coefficient[^\n0-9+-]{0,15}([+-]?[0-9]+\.[0-9]+)\s*%',
     ],
     "CoefIsc": [
         r'(?:α|alpha|α_Isc|Coef(?:icient)?\s+(?:of\s+)?(?:Temp(?:erature)?\s+(?:of\s+)?)?Isc|Temperatura\s+Isc|TK\s*Isc)\s*[:\(]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
@@ -110,6 +112,8 @@ _PATTERNS = {
         # (OCR degrada α a "a")
         r'Coefficient\s+of\s+Isc[^\n]{0,40}?([+-][0-9]+\.[0-9]+)\s*%',
         r'\(\s*[αa]_?Isc\s*\)[^\n0-9]{0,20}([+-]?[0-9]+\.[0-9]+)\s*%',
+        # Hiitio CdTe: "Short circuit current temperature coefficient +0.04%°C"
+        r'Short\s+circuit\s+current\s+temperature\s+coefficient[^\n0-9+-]{0,15}([+-]?[0-9]+\.[0-9]+)\s*%',
     ],
     "CoefPmax": [
         r'(?:γ|gamma|γ_Pmax|Coef(?:icient)?\s+(?:of\s+)?(?:Temp(?:erature)?\s+(?:of\s+)?)?P(?:max|mpp)|Temperatura\s+P(?:max|mpp)|TK\s*P(?:max|mpp))\s*[:\(]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
@@ -121,6 +125,9 @@ _PATTERNS = {
         # (OCR degrada γ a "y")
         r'Coefficient\s+of\s+Pmax[^\n]{0,40}?([+-][0-9]+\.[0-9]+)\s*%',
         r'\(\s*[γy]_?Pm(?:p|ax|pp)?\s*\)[^\n0-9]{0,20}([+-]?[0-9]+\.[0-9]+)\s*%',
+        # Hiitio CdTe: "Maximum power temperature coefficient -0.29%°C"
+        # (se exige "power temperature" pegados para no capturar la fila de Voc)
+        r'(?:Maximum\s+)?power\s+temperature\s+coefficient[^\n0-9+-]{0,15}([+-]?[0-9]+\.[0-9]+)\s*%',
     ],
     "NOCT": [
         r'(?:NOCT|NMOT|Normal(?:ized)?\s+(?:Operating)?\s+Cell\s+Temp(?:erature)?|Temperatura\s+(?:de\s+)?[Oo]peraci[oó]n\s+Normal)\s*[:\(]?\s*([0-9]+(?:\.[0-9]+)?)\s*°?C',
@@ -140,7 +147,8 @@ _PATTERNS = {
         r'(?:Bifacialidad|Bifaciality|Bifacial\s+factor)[^0-9\n]{0,25}(0\.[0-9]{1,2})\b',
     ],
     "dimensiones": [
-        r'([0-9]{3,4})\s*[×xX*]\s*([0-9]{3,4})\s*[×xX*]\s*([0-9]+)\s*mm',
+        # Espesor puede traer decimales: "1200*600*16.2mm" (vidrio BIPV)
+        r'([0-9]{3,4})\s*[×xX*]\s*([0-9]{3,4})\s*[×xX*]\s*([0-9]+(?:\.[0-9]+)?)\s*mm',
         # Con tolerancia ±N mm entre números: "2384±2mm×1303±2mm×33±1mm"
         # (el OCR degrada ± a ":t", "+", "-+", etc.)
         r'([0-9]{3,4})[^\n×xX*]{0,6}?mm\s*[×xX*]\s*([0-9]{3,4})[^\n×xX*]{0,6}?mm\s*[×xX*]\s*([0-9]{2,3})',
@@ -951,6 +959,34 @@ def extraer_parametros_panel(pdf_bytes: bytes) -> dict:
     for _k, _v in mm.get("shared_values", {}).items():
         if result.get(_k) is None:
             result[_k] = _v
+
+    # ── Complemento OCR para PDFs "mixtos" ────────────────────────────────────
+    # Algunas fichas (p. ej. Hiitio CdTe) tienen una capa de texto digital escasa
+    # (superan _MIN_TEXT_CHARS) pero las tablas de coeficientes/dimensiones son
+    # imágenes. Si faltan campos clave y hay OCR, se complementa SIN sobrescribir
+    # lo ya extraído del texto digital.
+    _CAMPOS_COMPLEMENTO = ("CoefVoc", "CoefIsc", "CoefPmax", "NOCT", "N_s",
+                           "dimensiones", "Bifacialidad")
+    if not uso_ocr and _HAS_OCR:
+        faltan = [k for k in _CAMPOS_COMPLEMENTO if result.get(k) is None]
+        if faltan or not result.get("tecnologia"):
+            texto_ocr = _ocr_pdf(pdf_bytes)
+            if len(texto_ocr.strip()) >= _MIN_TEXT_CHARS:
+                vals_ocr = _apply_patterns(texto_ocr)
+                for k in faltan:
+                    if vals_ocr.get(k) is not None:
+                        result[k] = vals_ocr[k]
+                        result["uso_ocr"] = True  # se usó OCR como complemento
+                if not result.get("tecnologia"):
+                    result["tecnologia"] = _detect_technology(texto_ocr)
+                # Sanity checks sobre lo complementado (mismos límites del paso 3)
+                if result.get("N_s") and not (10 <= result["N_s"] <= 300):
+                    result["N_s"] = None
+                _bif = result.get("Bifacialidad")
+                if _bif is not None:
+                    if 0 < _bif <= 1.0:
+                        _bif *= 100.0
+                    result["Bifacialidad"] = _bif if 30.0 <= _bif <= 100.0 else None
 
     # Volcado de tablas pdfplumber para diagnóstico (se muestra en el expander de debug)
     result["_debug_tables"] = _dump_tables_pdfplumber(pdf_bytes)

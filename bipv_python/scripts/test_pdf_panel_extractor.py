@@ -197,5 +197,44 @@ check("Sin abreviaturas → Voc None (no captura basura)", v6.get("Voc") is None
       f"(obtuvo {v6.get('Voc')})")
 
 # ═════════════════════════════════════════════════════════════════════════════
+# 6. Hiitio CdTe (BIPV): labels descriptivos y espesor decimal
+# ═════════════════════════════════════════════════════════════════════════════
+print("── Ficha 6: Hiitio CdTe (labels descriptivos + complemento OCR) ──")
+
+v7 = ex._apply_patterns("""
+Size 1200*600*16.2mm
+Maximum power temperature coefficient -0.29%°C
+Open circuit voltage temperature coefficient -0.28%°C
+Short circuit current temperature coefficient +0.04%°C
+""")
+check("Hiitio CoefPmax = -0.29", approx(v7.get("CoefPmax"), -0.29), f"(obtuvo {v7.get('CoefPmax')})")
+check("Hiitio CoefVoc = -0.28", approx(v7.get("CoefVoc"), -0.28), f"(obtuvo {v7.get('CoefVoc')})")
+check("Hiitio CoefIsc = +0.04", approx(v7.get("CoefIsc"), 0.04), f"(obtuvo {v7.get('CoefIsc')})")
+check("Hiitio dims 1200x600x16.2", v7.get("dimensiones") == "1200x600x16.2",
+      f"(obtuvo {v7.get('dimensiones')})")
+
+# E2E con la ficha real: PDF "mixto" (texto digital escaso, tablas en imagen).
+# Requiere OCR; si no está disponible se omite sin fallar.
+_hiitio_pdf = os.path.join(_FIXTURES, "panel_hiitio_cdte.pdf")
+if ex._HAS_OCR and os.path.exists(_hiitio_pdf):
+    with open(_hiitio_pdf, "rb") as f:
+        r7 = ex.extraer_parametros_panel(f.read())
+    check("Hiitio e2e: 3 modelos detectados",
+          set(r7["modelos_detectados"]) == {"HC-JL-B5", "HC-JL-B6", "HC-JL-B8"},
+          f"(obtuvo {r7['modelos_detectados']})")
+    vpm = r7["valores_por_modelo"].get("HC-JL-B5", {})
+    check("Hiitio e2e: HC-JL-B5 Pmax = 115", approx(vpm.get("Pmax"), 115.0),
+          f"(obtuvo {vpm.get('Pmax')})")
+    check("Hiitio e2e: tecnologia CdTe (via OCR)", r7.get("tecnologia") == "CdTe",
+          f"(obtuvo {r7.get('tecnologia')!r})")
+    check("Hiitio e2e: CoefPmax complementado = -0.29", approx(r7.get("CoefPmax"), -0.29),
+          f"(obtuvo {r7.get('CoefPmax')})")
+    check("Hiitio e2e: dims complementadas 1200x600x16.2",
+          r7.get("dimensiones") == "1200x600x16.2", f"(obtuvo {r7.get('dimensiones')})")
+    check("Hiitio e2e: uso_ocr marcado como complemento", r7.get("uso_ocr") is True)
+else:
+    print("  (OCR no disponible o fixture ausente — e2e Hiitio omitido)")
+
+# ═════════════════════════════════════════════════════════════════════════════
 print(f"\n{'='*60}\nRESULTADO: {PASS} OK · {FAIL} FALLOS")
 sys.exit(1 if FAIL else 0)
