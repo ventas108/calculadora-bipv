@@ -66,9 +66,18 @@ _ROW_SPECS = [
      re.compile(r'([0-9]+(?:\.[0-9]+)?)\s*Ah\b', re.I),
      (5.0, 20000.0)),
     ("voltaje_V",
-     re.compile(r'(?:Voltaje|Tensi[oó]n)\s+nominal|Nominal\s+Voltage', re.I),
-     re.compile(r'([0-9]+(?:\.[0-9]+)?)\s*V\b'),
+     # \s* (no \s+): el OCR pega el label ("NominalVoltage")
+     re.compile(r'(?:Voltaje|Tensi[oó]n)\s*nominal|Nominal\s*Voltage', re.I),
+     # [Vv]: el OCR a veces devuelve "51.2v"
+     re.compile(r'([0-9]+(?:\.[0-9]+)?)\s*[Vv]\b'),
      (10.0, 1500.0)),
+    # Corriente continua máx: solo para estimar potencia (A × V) cuando la
+    # ficha no trae C-rate. El label exige "Continuous"/"continua" para NO
+    # confundirse con la fila de corriente pico ("Peak ... Current(15s)").
+    ("corriente_A",
+     re.compile(r'Continuous\s+Charge/?Discharge\s+Current|Corriente\s+(?:continua|nominal)', re.I),
+     re.compile(r'([0-9]+(?:\.[0-9]+)?)\s*A\b'),
+     (1.0, 5000.0)),
 ]
 # NOTA: el peso (kg) se descartó a propósito — en fichas multi-modelo la fila
 # de pesos queda desalineada respecto a las columnas de modelos (números más
@@ -395,6 +404,14 @@ def extraer_parametros_bateria(pdf_bytes: bytes) -> dict:
                 # Un solo valor para varios modelos: solo aceptarlo si NO hay
                 # tabla de módulo que lo contradiga — mejor None que el módulo.
                 continue
+            elif len(modelos) == 2 and len(vals) > 2:
+                # Cabecera tipo RANGO ("FLA48100-EU~FLA48250-EU"): el OCR solo
+                # deja legibles los modelos extremos del título, pero la fila
+                # trae un valor por columna. Los extremos del rango se mapean
+                # a la primera y última columna (el mapeo por posición aquí
+                # asignaría la columna equivocada a ambos).
+                por_campo[campo] = {modelos[0][1]: vals[0][1],
+                                    modelos[1][1]: vals[-1][1]}
             else:
                 por_campo[campo] = _asignar_por_columna(modelos, vals)
         for _, m in modelos:
@@ -433,11 +450,17 @@ def extraer_parametros_bateria(pdf_bytes: bytes) -> dict:
 
     # ── 4. Potencia continua = C-rate nominal × capacidad ────────────────────
     for m, campos in valores.items():
+        amp = campos.pop("corriente_A", None)  # interno: solo para estimar potencia
         if campos.get("potencia_kW") is not None:
             continue  # ya calculada (p. ej. corriente × voltaje en bloques verticales)
         cap = campos.get("capacidad_kWh")
+        volt = campos.get("voltaje_V")
         if cap and c_rate:
             campos["potencia_kW"] = round(c_rate * cap, 2)
+            campos["potencia_estimada"] = True
+        elif amp and volt:
+            # Sin C-rate en la ficha: potencia continua = corriente máx × V
+            campos["potencia_kW"] = round(amp * volt / 1000.0, 2)
             campos["potencia_estimada"] = True
         else:
             campos["potencia_kW"] = None

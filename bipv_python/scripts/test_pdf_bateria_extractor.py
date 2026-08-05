@@ -154,6 +154,8 @@ Rango de voltaje           672~864V
 
 _esp_sm = {"capacidad_kWh": 215.04, "voltaje_V": 768.0, "capacidad_Ah": 280.0}
 for campo, lbl_re, val_re, (lo, hi) in _ROW_SPECS:
+    if campo not in _esp_sm:
+        continue  # corriente_A: interno, solo para estimar potencia
     v = _max_todas_filas(_TXT_SM, lbl_re, val_re, lo, hi)
     check(f"single-model {campo} = {_esp_sm[campo]} (rack, no módulo)",
           approx(v, _esp_sm[campo]), f"(obtuvo {v})")
@@ -225,6 +227,40 @@ if _HAS_OCR and os.path.exists(_F_FLA):
     check("Felicity: RTE ausente → None (no inventar)", rf.get("rte_pct") is None, f"(obtuvo {rf.get('rte_pct')})")
 else:
     print("── Ficha Felicity: OCR no disponible en este entorno — test omitido ──")
+
+# ── OCR "tipo servidor": tabla HORIZONTAL con cabecera de modelos ilegible ────
+# Otros motores/versiones de tesseract devuelven la tabla en formato horizontal
+# ("Nominal Energy 5.12kWh 8.75kWh 11.8kWh 12.5kWh") con la fila de modelos
+# garbled — solo quedan legibles los extremos del título "FLA48100-EU~FLA48250-EU".
+_F_ENG = os.path.join(_FIXTURES, "bateria_felicity_ocr_eng.txt")
+if os.path.exists(_F_ENG):
+    print("── OCR horizontal (cabecera de modelos ilegible) ──")
+    import calculos.pdf_bateria_extractor as _X
+    _texto_eng = open(_F_ENG, encoding="utf-8").read()
+    _orig_fn = _X._extract_text_pdftotext
+    try:
+        _X._extract_text_pdftotext = lambda b: _texto_eng
+        rh = extraer_parametros_bateria(b"%PDF fake")
+    finally:
+        _X._extract_text_pdftotext = _orig_fn
+    vh = rh.get("valores_por_modelo", {})
+    check("Horizontal: modelos extremos del rango del título",
+          sorted(vh) == ["FLA48100-EU", "FLA48250-EU"], f"(obtuvo {sorted(vh)})")
+    if len(vh) == 2:
+        check("Horizontal FLA48100-EU: 5.12 kWh (primera columna, no la del vecino)",
+              approx(vh["FLA48100-EU"].get("capacidad_kWh"), 5.12), f"(obtuvo {vh['FLA48100-EU']})")
+        check("Horizontal FLA48250-EU: 12.5 kWh (última columna)",
+              approx(vh["FLA48250-EU"].get("capacidad_kWh"), 12.5), f"(obtuvo {vh['FLA48250-EU']})")
+        check("Horizontal: voltaje 51.2 V (label pegado 'NominalVoltage' + '51.2v')",
+              approx(vh["FLA48100-EU"].get("voltaje_V"), 51.2) and approx(vh["FLA48250-EU"].get("voltaje_V"), 51.2))
+        check("Horizontal: potencia por corriente continua × V (100A→5.12 kW, 150A→7.68 kW)",
+              approx(vh["FLA48100-EU"].get("potencia_kW"), 5.12) and approx(vh["FLA48250-EU"].get("potencia_kW"), 7.68),
+              f"(obtuvo {vh['FLA48100-EU'].get('potencia_kW')}, {vh['FLA48250-EU'].get('potencia_kW')})")
+        check("Horizontal: corriente_A no queda en la salida",
+              "corriente_A" not in vh["FLA48100-EU"])
+    check("Horizontal: DoD 95 / garantía 10 / LFP / 6000 ciclos",
+          approx(rh.get("dod_pct"), 95) and approx(rh.get("garantia_anos"), 10)
+          and rh.get("quimica") == "LFP" and approx(rh.get("ciclos"), 6000))
 
 # ═════════════════════════════════════════════════════════════════════════════
 # 4. Robustez: entradas que no son fichas de baterías
