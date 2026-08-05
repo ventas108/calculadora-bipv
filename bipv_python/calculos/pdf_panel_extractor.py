@@ -926,6 +926,47 @@ _COEF_PLAUSIBLE = {
 _COEF_VALUE_RE = re.compile(r'(±\s*)?([+-]?[0-9]+(?:\.[0-9]+)?)\s*%')
 
 
+# ── Ns desde conteo de semiceldas (#67) ─────────────────────────────────────
+# Fichas half-cut suelen decir "28 half-piece", "144 half cells", "132 semiceldas".
+# El Motor IV necesita las celdas EN SERIE: normalmente la mitad del conteo
+# (dos cadenas en paralelo). Se usa el Voc para decidir entre total y mitad.
+_NS_HALFCELL_RES = [
+    re.compile(r'([0-9]{1,3})\s*half[\s-]?(?:piece|cell|cut)', re.IGNORECASE),
+    re.compile(r'([0-9]{1,3})\s*(?:medias?\s+celdas|semi[\s-]?celdas)', re.IGNORECASE),
+]
+
+
+def _ns_desde_semiceldas(texto: str, result: dict) -> None:
+    """
+    Rellena N_s cuando la ficha declara el conteo de semiceldas (half-cut).
+    Por defecto usa la mitad (dos strings en paralelo); si el Voc extraído
+    indica que TODAS van en serie (Voc/total plausible), usa el total.
+    Marca `_ns_de_semiceldas` para que el guard de plausibilidad 10–300 no
+    descarte valores legítimamente bajos (tejas/BIPV: Ns=14).
+    """
+    if result.get("N_s") is not None:
+        return
+    for pat in _NS_HALFCELL_RES:
+        m = pat.search(texto)
+        if not m:
+            continue
+        total = int(m.group(1))
+        if total < 4:
+            return
+        mitad = total // 2 if total % 2 == 0 else total
+        ns = mitad
+        voc = result.get("Voc")
+        if voc:
+            # Voc/celda plausible para silicio: 0.4–1.0 V
+            ok_total = 0.4 <= voc / total <= 1.0
+            ok_mitad = 0.4 <= voc / mitad <= 1.0
+            if ok_total and not ok_mitad:
+                ns = total          # todas las semiceldas en serie
+        result["N_s"] = float(ns)
+        result["_ns_de_semiceldas"] = True
+        return
+
+
 def _coef_fallback(texto: str, result: dict) -> None:
     """
     Rellena CoefVoc/CoefIsc/CoefPmax aún None analizando línea por línea,
@@ -977,6 +1018,8 @@ def _apply_patterns(texto: str) -> dict:
     # Fallback genérico: coeficientes con redacciones no vistas antes (#166).
     # Los patrones específicos de _PATTERNS siempre tienen prioridad.
     _coef_fallback(texto, result)
+    # Ns desde conteo de semiceldas en fichas half-cut (#67)
+    _ns_desde_semiceldas(texto, result)
     return result
 
 
@@ -1038,8 +1081,11 @@ def extraer_parametros_panel(pdf_bytes: bytes) -> dict:
         result["Isc"] = None
     if result.get("Pmax") and result["Pmax"] > 2000:
         result["Pmax"] = None
-    # Ns plausible: 10–300 celdas en serie (2384 era la dimensión del panel)
-    if result.get("N_s") and not (10 <= result["N_s"] <= 300):
+    # Ns plausible: 10–300 celdas en serie (2384 era la dimensión del panel).
+    # Excepción: Ns derivado de conteo de semiceldas (#67) puede ser bajo
+    # legítimamente (tejas/BIPV: 28 half-piece → Ns=14).
+    if (result.get("N_s") and not result.get("_ns_de_semiceldas")
+            and not (10 <= result["N_s"] <= 300)):
         result["N_s"] = None
     # Bifacialidad: aceptar fracción (0.80 → 80%) y descartar valores implausibles
     _bif = result.get("Bifacialidad")

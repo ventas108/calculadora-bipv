@@ -341,6 +341,28 @@ v16 = ex._apply_patterns("Voc temp. coefficient 0.30%")
 check("Genérico: Voc positivo → None", v16.get("CoefVoc") is None,
       f"(obtuvo {v16.get('CoefVoc')})")
 
+# 7.d Ns desde conteo de semiceldas (#67)
+print("── Ns desde semiceldas (#67) ──")
+v17 = ex._apply_patterns("28 half-piece/Double-glass Non-transparent\nOpen-circuit voltage (Voc) 10.44V")
+check("28 half-piece + Voc 10.44 → Ns = 14", v17.get("N_s") == 14.0,
+      f"(obtuvo {v17.get('N_s')})")
+v18 = ex._apply_patterns("Module with 144 half cells\nVoc 49.5V")
+check("144 half cells + Voc 49.5 → Ns = 72", v18.get("N_s") == 72.0,
+      f"(obtuvo {v18.get('N_s')})")
+# Sin Voc: usa la mitad por defecto
+v19 = ex._apply_patterns("132 semiceldas half-cut")
+check("132 semiceldas sin Voc → Ns = 66", v19.get("N_s") == 66.0,
+      f"(obtuvo {v19.get('N_s')})")
+# Ns explícito tiene prioridad sobre el conteo de semiceldas
+v20 = ex._apply_patterns("Number of cells 72\nModule of 144 half cells")
+check("Ns explícito 72 no se pisa", v20.get("N_s") == 72.0,
+      f"(obtuvo {v20.get('N_s')})")
+if os.path.exists(_xwb_pdf):
+    with open(_xwb_pdf, "rb") as f:
+        r11 = ex.extraer_parametros_panel(f.read())
+    check("HL-XWB13 e2e: Ns inferido = 14 (28 half-piece)", r11.get("N_s") == 14.0,
+          f"(obtuvo {r11.get('N_s')})")
+
 # Dedupe sintético: sin Pmax cae a numeración de variante
 _nombres = ex._dedupe_model_names(["AA-1", "AA-1"], [{}, {}])
 check("Dedupe sin Pmax → numeración", _nombres == ["AA-1 (var. 1)", "AA-1 (var. 2)"],
