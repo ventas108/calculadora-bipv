@@ -2,7 +2,9 @@
 import math
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
 from calculos.dimensionamiento import optimizar_n_serie, dimensionar_sistema
+from calculos.modelo_iv import preparar_panel_iv, resolver_curva_iv
 from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
 from datos.catalogo_inversores_excel import cargar_catalogo_inversores, obtener_inversor_excel
@@ -136,6 +138,73 @@ else:
     st.error(f"🔴 Ficha incompleta — faltan: {', '.join(_faltantes)} | solo cálculo energético")
 if panel.get("notas"):
     st.caption(f"📋 {panel['notas'][:120]}")
+
+# ── Motor IV automático — curva IV real para paneles 🟢 ───────────────────────
+if not _faltantes:  # panel 🟢: tiene Voc, Vmp, Isc, Imp, N_s, NsA
+    _panel_iv = preparar_panel_iv(panel)
+    if _panel_iv is not None:
+        with st.expander("📈 Curva I-V real (Motor IV activado automáticamente)", expanded=False):
+            _col_iv1, _col_iv2 = st.columns(2)
+            with _col_iv1:
+                _G_iv = st.slider("Irradiancia (W/m²)", 100, 1200, 1000, 100, key="iv_G")
+                _T_iv = st.slider("T celda (°C)", 15, 75, 25, 5, key="iv_T")
+            try:
+                _res = resolver_curva_iv(float(_G_iv), float(_T_iv), _panel_iv, n_puntos=200)
+                if _res["V"] is not None:
+                    _V = _res["V"]
+                    _I = _res["I"]
+                    _P = _V * _I
+
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=list(_V), y=list(_I),
+                        name="I-V", line=dict(color="#1f77b4", width=2),
+                        yaxis="y1",
+                    ))
+                    fig.add_trace(go.Scatter(
+                        x=list(_V), y=list(_P),
+                        name="P-V", line=dict(color="#ff7f0e", width=2, dash="dash"),
+                        yaxis="y2",
+                    ))
+                    # Punto MPP
+                    fig.add_trace(go.Scatter(
+                        x=[_res["Vmp"]], y=[_res["Pmax"]],
+                        name=f"MPP ({_res['Pmax']:.1f} W)",
+                        mode="markers",
+                        marker=dict(size=10, color="red", symbol="star"),
+                        yaxis="y2",
+                    ))
+                    fig.update_layout(
+                        xaxis_title="Voltaje (V)",
+                        yaxis=dict(title="Corriente (A)", side="left"),
+                        yaxis2=dict(title="Potencia (W)", side="right", overlaying="y"),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                        height=340,
+                        margin=dict(l=10, r=10, t=30, b=10),
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # Métricas STC
+                    _mc1, _mc2, _mc3, _mc4, _mc5 = st.columns(5)
+                    _mc1.metric("Voc", f"{_res['Voc']:.2f} V")
+                    _mc2.metric("Isc", f"{_res['Isc']:.3f} A")
+                    _mc3.metric("Vmp", f"{_res['Vmp']:.2f} V")
+                    _mc4.metric("Imp", f"{_res['Imp']:.3f} A")
+                    _mc5.metric("FF", f"{_res['FF']*100:.1f} %")
+
+                    if _panel_iv.get("_estimado"):
+                        _metodo = _panel_iv.get("_metodo", "fit_desoto")
+                        st.caption(
+                            f"⚠️ Parámetros SDM estimados vía **{_metodo}** desde ficha técnica "
+                            f"(NsA={panel.get('NsA', '?')}, n={panel.get('n_idealidad', '?')}). "
+                            "Resultado orientativo — para calibración exacta se requieren mediciones de laboratorio."
+                        )
+                    else:
+                        st.caption("✅ Parámetros SDM calibrados directamente del catálogo.")
+                else:
+                    st.info("G=0 — introduce irradiancia > 0 para ver la curva.")
+            except Exception as _e_iv:
+                st.warning(f"Motor IV: no se pudo calcular la curva ({_e_iv})")
 
 # ── Guardar panel en session_state para Motor IV automático (#7) ─────────────
 st.session_state["panel_dict"]        = panel

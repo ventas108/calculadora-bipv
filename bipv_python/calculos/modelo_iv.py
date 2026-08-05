@@ -421,7 +421,38 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
         "_ns_halfcut_info":  _ns_halfcut_info,
     }
 
+def preparar_panel_iv(panel: dict) -> "dict | None":
+    """
+    Auto-activa el Motor IV para paneles del catálogo Excel.
 
+    Lógica de cascada:
+    1. Si el panel ya tiene SDM calibrado (I_L_ref, I_o_ref, R_s, R_sh_ref válidos)
+       → devuelve el panel tal cual para usar directamente.
+    2. Si el panel tiene NsA (o N_s) y datos básicos de ficha (Voc, Isc, Vmp, Imp)
+       → llama estimar_sdm_desde_ficha() con fit_desoto() on-demand.
+    3. Si faltan datos mínimos → devuelve None (solo cálculo energético).
+
+    Retorna un dict compatible con resolver_curva_iv() o None.
+    Los paneles del catálogo Excel con NsA disponible activan automáticamente
+    el Motor IV sin necesidad de parámetros SDM precalibrados.
+    """
+    # Caso 1: SDM ya calibrado en catálogo (ruta rápida)
+    if tiene_sdm_completo(panel):
+        return panel
+
+    # Caso 2: tiene ficha básica + NsA/N_s → fit_desoto on-demand
+    tiene_ficha = all([
+        panel.get("Voc_stc") or panel.get("Voc"),
+        panel.get("Isc_stc") or panel.get("Isc"),
+        panel.get("Vmp_stc") or panel.get("Vmp"),
+        (panel.get("Imp_stc") or panel.get("Imp")),
+    ])
+    tiene_ns = bool(panel.get("NsA") or panel.get("N_s"))
+
+    if not (tiene_ficha and tiene_ns):
+        return None  # Datos insuficientes → solo cálculo energético
+
+    return estimar_sdm_desde_ficha(panel)
 def validar_sdm_vs_ficha(panel: dict, tolerancia_pct=5.0) -> dict:
     """
     Compara el SDM calibrado contra los valores STC de la ficha.
