@@ -24,3 +24,8 @@ Cualquier fix al extractor de fichas de paneles (`bipv_python/calculos/pdf_panel
 - Bifacialidad faltante NO debe disparar el OCR (falta legítimamente en monofaciales); sí se rellena si el OCR corre por otro motivo.
 - `uso_ocr=True` siempre que el OCR aporte algo (incluida solo la tecnología) — la UI usa el flag para banners/confianza.
 - Labels descriptivos ingleses ("Open circuit voltage temperature coefficient -0.28%°C") y espesores decimales ("1200*600*16.2mm") requieren patrones propios.
+
+## Fichas que repiten el MISMO código de modelo en varias columnas (p.ej. HL-XWB13)
+- Nunca acumular valores multi-modelo en dict keyed por nombre: columnas con código repetido se pisan en silencio. Usar lista posicional por columna y deduplicar nombres al final con sufijo de Pmax ("(135W)") o "var. N".
+- La UI de catálogo debe reemplazar el nombre prellenado también cuando el extraído es la BASE de una variante deduplicada, o se guardan variantes distintas bajo el mismo nombre.
+- Alias "Optimum operating voltage/current" → Vmp/Imp (fichas PV wall/tile).
