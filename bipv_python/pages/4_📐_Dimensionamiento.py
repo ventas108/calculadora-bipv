@@ -239,13 +239,17 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
             total_area   = N_inv * dim["area_ocupada_m2"]
             cobert_total = min(round(total_area / area * 100, 1), 100.0) if area > 0 else 0
             P_ac_inv_kW  = (inversor.get("P_ac_nom_W") or inversor.get("P_dc_max_W") or 0) / 1000
-            st.markdown("### 🏭 Proyecto completo (toda el área)")
+            _tit_area = ("área útil para paneles" if _f_ocup < 100.0 else "toda el área")
+            st.markdown(f"### 🏭 Proyecto completo ({_tit_area})")
             g1, g2, g3, g4, g5 = st.columns(5)
             g1.metric("Inversores",       N_inv)
             g2.metric("Paneles totales",  f"{total_panels:,}")
             g3.metric("kWp instalados",   f"{total_kWp:,.1f} kWp")
             g4.metric("Área cubierta",    f"{total_area:,.0f} m²")
-            g5.metric("Cobertura total",  f"{cobert_total} %")
+            g5.metric("Cobertura del área útil" if _f_ocup < 100.0 else "Cobertura total",
+                      f"{cobert_total} %",
+                      help=(f"Sobre los {area:,.0f} m² útiles para paneles "
+                            f"({_f_ocup:.0f}% del terreno)") if _f_ocup < 100.0 else None)
             st.session_state["N_inv_total"]      = N_inv
             st.session_state["P_dc_total_kWp"]  = round(total_kWp, 2)
             st.session_state["N_paneles_granja"] = total_panels

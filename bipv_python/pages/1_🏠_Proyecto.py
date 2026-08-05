@@ -289,7 +289,8 @@ with col1:
     # ── Factor de ocupación con paneles (#agrivoltaica) ──────────────────────
     # En granjas agrivoltaicas los paneles NO pueden cubrir el 100% del terreno:
     # el cultivo necesita luz directa. Típico agrivoltaica: 25–35%.
-    _f_ocup_def = float(st.session_state.get("factor_ocupacion_pct", 100.0))
+    # Clamp defensivo: un JSON corrupto fuera de [5, 100] rompería el widget
+    _f_ocup_def = min(max(float(st.session_state.get("factor_ocupacion_pct", 100.0) or 100.0), 5.0), 100.0)
     factor_ocupacion = st.number_input(
         "Factor de ocupación con paneles (%)",
         min_value=5.0, max_value=100.0, value=_f_ocup_def, step=5.0,

@@ -775,7 +775,9 @@ def generar_html_reporte() -> str:
     _frac_eq_ppto = float(st.session_state.get("presupuesto_fraccion_equipos", 0.65))
 
     if _inc_ppto and _capex_ppto > 0:
-        _area_pp       = float(st.session_state.get("area_fachada_m2", 0) or 0)
+        # USD/m² sobre el área útil de paneles (agrivoltaica), no el terreno bruto
+        _area_pp       = float(st.session_state.get("area_util_m2")
+                               or st.session_state.get("area_fachada_m2", 0) or 0)
         _potencia_pp   = float(st.session_state.get("P_stc_kW_sistema", 0) or 0)
         _tc_pp         = tipo_cambio_rep
         # Per-section subtotals (saved by Presupuesto page in cotización-real mode)

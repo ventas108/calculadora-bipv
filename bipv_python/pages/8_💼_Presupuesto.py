@@ -34,13 +34,16 @@ n_pan   = int(st.session_state.get("N_paneles_final", 0))
 p_stc   = float(st.session_state.get("P_stc_kW_sistema", 0.0))
 c_pan   = float(st.session_state.get("costo_modulo_usd", 0.0))
 c_inv   = float(st.session_state.get("costo_inversor_usd", 0.0))
-area_m2 = float(st.session_state.get("area_fachada_m2", 0.0))
+# Área útil de paneles (agrivoltaica: factor de ocupación < 100%);
+# si no existe, cae al área bruta histórica.
+area_m2 = float(st.session_state.get("area_util_m2")
+                or st.session_state.get("area_fachada_m2", 0.0))
 
 if n_pan > 0:
     st.info(
         f"📐 Dimensionamiento: **{n_pan} módulos** · **{p_stc:.2f} kWp** · "
         f"Panel **${c_pan:.0f}/un** · Inversor **${c_inv:.0f}/un**"
-        + (f" · Área fachada **{area_m2:.1f} m²**" if area_m2 > 0 else "")
+        + (f" · Área de paneles **{area_m2:.1f} m²**" if area_m2 > 0 else "")
     )
 else:
     st.warning("⚠️ Ejecuta 📐 Dimensionamiento primero para vincular equipos automáticamente.")
