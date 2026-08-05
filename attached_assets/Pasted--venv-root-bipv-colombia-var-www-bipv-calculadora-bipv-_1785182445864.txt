@@ -22,7 +22,7 @@ git push origin mainUse --update-env to update environment variables
 (venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git remote set-url origin https://TU_TOKEN@github.com/ventas108/calculadora-bipv.git
 (venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
 (venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git push origin main^C
-(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git remote set-url origin https://ghp_REDACTED@github.com/ventas108/calculadora-bipv.git
+(venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git remote set-url origin https://TOKEN_REDACTADO@github.com/ventas108/calculadora-bipv.git
 (venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv#
 (venv) root@bipv-colombia:/var/www/bipv/calculadora-bipv# git push origin main
 Enumerating objects: 14, done.

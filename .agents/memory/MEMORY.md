@@ -5,4 +5,5 @@
 - [BIPV - modelo bifacial en POA](bipv-bifacial-poa.md) — poa_global sale íntegro de infinite_sheds (no mezclar con haydavies frontal); caché guarda POA monofacial
 - [BIPV - extractor de fichas de baterías](bipv-extractor-baterias.md) — tabla módulo vs rack con mismos labels; mapeo por posición de columnas; peso descartado a propósito
 - [BIPV - extractor de fichas de paneles](bipv-extractor-paneles.md) — banco de regresión obligatorio + validador físico sensible a tecnología; None antes que valor falso
+- [BIPV - factor de ocupación agrivoltaica](bipv-agrivoltaica.md) — cálculos de paneles/producción/USD-m² usan area_util_m2, no area_fachada_m2 (terreno bruto)
 - [BIPV - Calculadora de Sombreado](bipv-shading-calculator.md) — app React/TS en bipv.innovacionquimica.com.co exporta CSV con FS horario por punto de análisis -> es el p_shade directo para modelo bypass diodes
