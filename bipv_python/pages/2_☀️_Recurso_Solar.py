@@ -255,6 +255,9 @@ with st.expander("🔄 Simulación bifacial (ganancia de la cara trasera)",
                  "Filas juntas (menos luz trasera): 0.5+. "
                  "🌱 Agrivoltaica: usa el mismo valor que el factor de ocupación de 🏠 Proyecto.",
         )
+        if _f_ocup_rs > 0 and _bif_def.get("gcr") is None:
+            cb4.caption("↖️ Inicializado desde el factor de ocupación de 🏠 Proyecto; "
+                        "al guardar, conserva el valor que elijas aquí.")
         if _f_ocup_rs > 0 and abs(gcr * 100.0 - _f_ocup_rs) > 15.0:
             st.warning(
                 f"⚠️ **GCR y factor de ocupación inconsistentes:** el GCR es "

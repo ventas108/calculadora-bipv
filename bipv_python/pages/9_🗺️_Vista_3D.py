@@ -707,7 +707,9 @@ with tab_modelo:
             f"**{n_rows} filas** de paneles a **{_h0:.1f} m** de altura, "
             f"separadas **{_pitch:.1f} m** entre ejes (GCR {_gcr3d:.2f} = factor de "
             f"ocupación {_f_ocup_3d:.0f}%). El **{100 - _f_ocup_3d:.0f}%** del suelo "
-            f"queda libre para el cultivo entre filas."
+            f"queda libre para el cultivo entre filas. "
+            f"*(La vista muestra las filas como bandas continuas, no módulos "
+            f"individuales — el conteo de paneles es el de Dimensionamiento.)*"
         )
     else:
         mesh_ed, wire_ed = building_box_traces(ancho_m, profundidad_m, altura_m, opac_ed)
