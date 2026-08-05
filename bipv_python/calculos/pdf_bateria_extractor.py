@@ -155,6 +155,89 @@ def _max_todas_filas(lines: list, lbl_re, val_re, lo: float, hi: float):
 # Distancia máxima (en caracteres) entre el código del modelo y su columna
 _MAX_DIST_COL = 45
 
+# ── Formato "bloques verticales" (típico de OCR en fichas escaneadas) ────────
+# El OCR de fichas tipo Felicity lista los labels en un bloque y luego CADA
+# modelo con sus valores debajo:
+#   FLA48100-EU        ← línea con SOLO el código del modelo
+#   5.12kWh            ← energía nominal
+#   51.2V              ← voltaje nominal
+#   44.8-57.6V         ← rango (se ignora: trae '-')
+#   100A               ← corriente continua máx (la primera A del bloque)
+#   ...
+_VB_KWH_RE = re.compile(r'^\W*([0-9]+(?:[.,][0-9]+)?)\s*kWh\W*$', re.I)
+_VB_VOLT_RE = re.compile(r'^\W*([0-9]+(?:[.,][0-9]+)?)\s*V\W*$', re.I)
+_VB_AMP_RE = re.compile(r'^\W*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]+)?)\s*A\W*$', re.I)
+
+
+def _linea_solo_modelo(linea: str):
+    """Si la línea contiene ÚNICAMENTE un código de modelo (± puntuación OCR
+    tipo '|'), retorna el código; si no, None."""
+    limpio = linea.strip().strip('|').strip()
+    codes = _codigos_en_linea(limpio)
+    if len(codes) == 1 and codes[0][1] == limpio:
+        return limpio
+    return None
+
+
+def _parse_bloques_verticales(lines: list) -> dict:
+    """
+    Fallback para texto OCR en bloques verticales: detecta líneas que son
+    SOLO un código de modelo y lee kWh / V / A en las líneas siguientes
+    hasta el próximo modelo. Retorna {modelo: {campo: valor}} o {} si la
+    ficha no tiene ≥2 bloques de modelo.
+    """
+    idx_modelos = []
+    for i, linea in enumerate(lines):
+        c = _linea_solo_modelo(linea)
+        if c:
+            idx_modelos.append((i, c))
+    if len(idx_modelos) < 2:
+        return {}
+
+    out: dict = {}
+    for n, (i, modelo) in enumerate(idx_modelos):
+        fin = idx_modelos[n + 1][0] if n + 1 < len(idx_modelos) else min(len(lines), i + 20)
+        cap = volt = amp = None
+        for linea in lines[i + 1:fin]:
+            # "Parallel(76.8kWh)" es escalabilidad, no capacidad del modelo
+            if re.search(r'[Pp]arallel|[Ss]calab|[Ee]scalab', linea):
+                continue
+            if cap is None:
+                m = _VB_KWH_RE.match(linea)
+                if m:
+                    v = float(m.group(1).replace(",", "."))
+                    if 0.5 <= v <= 5000:
+                        cap = v
+                        continue
+            # Voltaje nominal: línea de UN solo valor en V (los rangos traen '-')
+            if volt is None and '-' not in linea:
+                m = _VB_VOLT_RE.match(linea)
+                if m:
+                    v = float(m.group(1).replace(",", "."))
+                    if 10 <= v <= 1500:
+                        volt = v
+                        continue
+            # Primera corriente del bloque = continua máx (la pico viene después)
+            if amp is None:
+                m = _VB_AMP_RE.match(linea)
+                if m:
+                    v = float(m.group(1).replace(",", ""))
+                    if 1 <= v <= 5000:
+                        amp = v
+        # Exigir capacidad Y voltaje: un bloque con solo uno de los dos suele
+        # ser ruido de OCR — mejor omitir el modelo que inventarle datos.
+        if cap is None or volt is None:
+            continue
+        out[modelo] = {
+            "capacidad_kWh": cap,
+            "capacidad_Ah": round(cap * 1000 / volt, 1) if (cap and volt) else None,
+            "voltaje_V": volt,
+            # Potencia continua real = corriente continua máx × voltaje nominal
+            "potencia_kW": round(amp * volt / 1000.0, 2) if (amp and volt) else None,
+            "potencia_estimada": bool(amp and volt),
+        }
+    return out if len(out) >= 2 else {}
+
 
 def _asignar_por_columna(modelos: list, vals: list) -> dict:
     """
@@ -262,6 +345,15 @@ def extraer_parametros_bateria(pdf_bytes: bytes) -> dict:
         r'[Pp]rofundidad\s+de\s+descarga[^0-9\n]{0,15}([0-9]{1,3})\s*%',
         r'[Dd]epth\s+of\s+[Dd]ischarge[^0-9\n]{0,15}([0-9]{1,3})\s*%',
     ], 10, 100)
+    # OCR deja el valor en línea suelta (">95%") lejos del label DOD —
+    # solo confiable si hay label DOD y UN único porcentaje suelto en la ficha.
+    if dod is None and re.search(r'\bDOD\b|[Dd]epth\s+of\s+[Dd]ischarge|[Pp]rofundidad\s+de\s+descarga', texto):
+        sueltos = {m.group(1) for m in re.finditer(
+            r'^\W*[>≥=~]?\s*([0-9]{2,3})\s*%\W*$', texto, re.MULTILINE)}
+        if len(sueltos) == 1:
+            v = float(sueltos.pop())
+            if 10 <= v <= 100:
+                dod = v
     rte = _find_num(texto, [
         r'(?:RTE|round[- ]?trip)[^0-9\n%]{0,25}([0-9]{2,3}(?:\.[0-9]+)?)\s*%',
         r'[Ee]ficiencia[^0-9\n%]{0,25}([0-9]{2,3}(?:\.[0-9]+)?)\s*%',
@@ -271,7 +363,17 @@ def extraer_parametros_bateria(pdf_bytes: bytes) -> dict:
         r'[Gg]arant[ií]a[^0-9\n]{0,20}([0-9]{1,2})\s*a[ñn]os',
         r'([0-9]{1,2})[- ][Yy]ear\s+[Ww]arranty',
         r'[Ww]arranty[^0-9\n]{0,20}([0-9]{1,2})\s*[Yy]ears',
+        # "Up to 10-year long warranty" (Felicity)
+        r'([0-9]{1,2})-[Yy]ear\b[^\n]{0,30}[Ww]arranty',
     ], 1, 30)
+    # OCR pega el valor en línea suelta ("10Years") lejos del label
+    # "Warranty Period" — solo confiable si la ficha menciona garantía.
+    if garantia is None and re.search(r'[Ww]arranty|[Gg]arant[ií]a', texto):
+        m = re.search(r'^\W*([0-9]{1,2})\s*Years?\W*$', texto, re.MULTILINE)
+        if m:
+            v = float(m.group(1))
+            if 1 <= v <= 30:
+                garantia = v
     c_rate = _c_rate_nominal(texto)
     quimica = _detectar_quimica(texto)
     fabricante = _detectar_fabricante(texto)
@@ -316,8 +418,23 @@ def extraer_parametros_bateria(pdf_bytes: bytes) -> dict:
             valores[nombre or "(modelo sin nombre)"] = unico
         modelos = [(0, k) for k in valores.keys()]
 
+    # ── 3b. Fallback: bloques verticales (OCR de fichas escaneadas) ──────────
+    # Si el mapeo por columnas no logró llenar ningún campo per-modelo,
+    # intentar el formato "modelo en una línea, valores debajo".
+    sin_datos = not valores or all(
+        all(v in (None, False) for v in campos.values())
+        for campos in valores.values()
+    )
+    if sin_datos:
+        vb = _parse_bloques_verticales(lines)
+        if vb:
+            valores = vb
+            modelos = [(0, m) for m in vb.keys()]
+
     # ── 4. Potencia continua = C-rate nominal × capacidad ────────────────────
     for m, campos in valores.items():
+        if campos.get("potencia_kW") is not None:
+            continue  # ya calculada (p. ej. corriente × voltaje en bloques verticales)
         cap = campos.get("capacidad_kWh")
         if cap and c_rate:
             campos["potencia_kW"] = round(c_rate * cap, 2)

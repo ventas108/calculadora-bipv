@@ -159,6 +159,74 @@ for campo, lbl_re, val_re, (lo, hi) in _ROW_SPECS:
           approx(v, _esp_sm[campo]), f"(obtuvo {v})")
 
 # ═════════════════════════════════════════════════════════════════════════════
+# 3b. Ficha ESCANEADA multi-modelo (Felicity FLA-EU) — OCR + bloques verticales
+# ═════════════════════════════════════════════════════════════════════════════
+from calculos.pdf_bateria_extractor import _parse_bloques_verticales
+
+# Unitario del parser de bloques (no requiere OCR): formato típico del OCR
+_TXT_VB = """Model
+Nominal Energy
+NominalVoltage
+FLA48100-EU
+
+5.12kWh
+51.2V
+44.8-57.6V
+100A
+150A
+7,500W
+Max. 15 pcsin
+Parallel(76.8kWh)
+| FLA48250-EU
+
+12.5kWh
+51.2v
+44.8-57.6V
+150A
+200A
+10,000W
+Parallel(187.5kWh)
+""".splitlines()
+_vb = _parse_bloques_verticales(_TXT_VB)
+print("── Bloques verticales (formato OCR Felicity) ──")
+check("VB detecta 2 modelos", sorted(_vb) == ["FLA48100-EU", "FLA48250-EU"], f"(obtuvo {sorted(_vb)})")
+if _vb:
+    check("VB FLA48100-EU 5.12 kWh / 51.2 V",
+          approx(_vb["FLA48100-EU"]["capacidad_kWh"], 5.12) and approx(_vb["FLA48100-EU"]["voltaje_V"], 51.2))
+    check("VB potencia = corriente continua × V (100A → 5.12 kW)",
+          approx(_vb["FLA48100-EU"]["potencia_kW"], 5.12) and _vb["FLA48100-EU"]["potencia_estimada"])
+    check("VB ignora Parallel(...) como capacidad",
+          approx(_vb["FLA48250-EU"]["capacidad_kWh"], 12.5), f"(obtuvo {_vb['FLA48250-EU']['capacidad_kWh']})")
+    check("VB voltaje minúscula '51.2v' y corriente 150A → 7.68 kW",
+          approx(_vb["FLA48250-EU"]["potencia_kW"], 7.68))
+
+# End-to-end con la ficha real escaneada (requiere OCR: pytesseract + poppler)
+from calculos.pdf_panel_extractor import _HAS_OCR
+_F_FLA = os.path.join(_FIXTURES, "bateria_felicity_fla_eu.pdf")
+if _HAS_OCR and os.path.exists(_F_FLA):
+    print("── Ficha escaneada Felicity FLA-EU (OCR) ──")
+    rf = extraer_parametros_bateria(open(_F_FLA, "rb").read())
+    vf = rf.get("valores_por_modelo", {})
+    check("Felicity: usa OCR (ficha escaneada)", rf.get("es_escaneado") and rf.get("uso_ocr"))
+    check("Felicity: 4 modelos FLA", sorted(vf) ==
+          ["FLA48100-EU", "FLA48171-EU", "FLA48230-EU", "FLA48250-EU"], f"(obtuvo {sorted(vf)})")
+    _esp_fla = {"FLA48100-EU": (5.12, 51.2, 5.12), "FLA48171-EU": (8.75, 51.2, 6.14),
+                "FLA48230-EU": (11.8, 51.2, 7.68), "FLA48250-EU": (12.5, 51.2, 7.68)}
+    for mod, (kwh, v, kw) in _esp_fla.items():
+        c = vf.get(mod, {})
+        check(f"Felicity {mod}: {kwh} kWh / {v} V / {kw} kW",
+              approx(c.get("capacidad_kWh"), kwh) and approx(c.get("voltaje_V"), v)
+              and approx(c.get("potencia_kW"), kw), f"(obtuvo {c})")
+    check("Felicity: DoD 95% (línea suelta '>95%')", approx(rf.get("dod_pct"), 95.0), f"(obtuvo {rf.get('dod_pct')})")
+    check("Felicity: garantía 10 años ('10-year long warranty')",
+          approx(rf.get("garantia_anos"), 10.0), f"(obtuvo {rf.get('garantia_anos')})")
+    check("Felicity: LFP / 6000 ciclos / fabricante Felicity",
+          rf.get("quimica") == "LFP" and approx(rf.get("ciclos"), 6000) and rf.get("fabricante") == "Felicity")
+    check("Felicity: RTE ausente → None (no inventar)", rf.get("rte_pct") is None, f"(obtuvo {rf.get('rte_pct')})")
+else:
+    print("── Ficha Felicity: OCR no disponible en este entorno — test omitido ──")
+
+# ═════════════════════════════════════════════════════════════════════════════
 # 4. Robustez: entradas que no son fichas de baterías
 # ═════════════════════════════════════════════════════════════════════════════
 print("── Robustez ──")

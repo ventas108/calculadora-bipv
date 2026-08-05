@@ -320,7 +320,7 @@ with st.expander("🛠️ Agregar / Editar / Eliminar batería del catálogo"):
                 f"| {_fmt(_v_pdf.get('capacidad_kWh'), ' kWh')} "
                 f"| {_fmt(_v_pdf.get('voltaje_V'), ' V')} "
                 f"| {_fmt(_v_pdf.get('potencia_kW'), ' kW')}"
-                f"{' (estimada a ' + str(_extr['c_rate']) + 'C)' if _v_pdf.get('potencia_estimada') else ''} "
+                f"{' (estimada a ' + str(_extr['c_rate']) + 'C)' if _v_pdf.get('potencia_estimada') and _extr.get('c_rate') else (' (calculada por corriente×voltaje)' if _v_pdf.get('potencia_estimada') else '')} "
                 f"| {_extr.get('quimica') or '—'} "
                 f"| {_fmt(_extr.get('ciclos'))} "
                 f"| {_fmt(_extr.get('c_rate'), 'C')} |"
@@ -334,7 +334,10 @@ with st.expander("🛠️ Agregar / Editar / Eliminar batería del catálogo"):
                          type="primary"):
                 _notas_pdf = "Extraída de ficha PDF"
                 if _v_pdf.get("potencia_estimada"):
-                    _notas_pdf += f"; potencia estimada a {_extr['c_rate']:g}C nominal"
+                    if _extr.get("c_rate") is not None:
+                        _notas_pdf += f"; potencia estimada a {_extr['c_rate']:g}C nominal"
+                    else:
+                        _notas_pdf += "; potencia calculada por corriente continua × voltaje"
                 st.session_state["bat_pdf_prefill"] = {
                     "nombre": _mod_pdf if _mod_pdf != "(modelo sin nombre)" else "",
                     "fabricante": _extr.get("fabricante") or None,
