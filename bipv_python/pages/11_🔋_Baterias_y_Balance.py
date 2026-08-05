@@ -475,8 +475,22 @@ with col_b1:
         else:
             _falt = [k for k in ["capacidad_kWh", "potencia_kW", "dod_pct", "ciclos_vida"]
                      if not bat.get(k)]
-            st.warning(f"🟡 Datos incompletos — faltan: {', '.join(_falt)}" if _falt
-                       else "🟡 Ficha marcada como incompleta en catálogo")
+            # Campos que el loader rellenó con defaults conservadores porque
+            # no venían en la ficha (DoD 80%, RTE 95%, 3000 ciclos)
+            _DEF_TXT = {"dod_pct": "DoD 80%", "eta_rte_pct": "RTE 95%",
+                        "ciclos_vida": "3000 ciclos"}
+            _defs = [_DEF_TXT[d] for d in bat.get("_defaults_aplicados", []) if d in _DEF_TXT]
+            if _falt:
+                st.warning(f"🟡 Datos incompletos — faltan: {', '.join(_falt)}")
+            elif _defs:
+                st.warning(
+                    "🟡 La ficha no traía todos los datos — se usan valores por "
+                    f"defecto conservadores: {', '.join(_defs)}. Si conoces los "
+                    "reales, edítalos arriba en '🛠️ Agregar / Editar' para "
+                    "afinar el dimensionamiento."
+                )
+            else:
+                st.warning("🟡 Ficha marcada como incompleta en catálogo")
 
         # ── #25 — Compatibilidad batería ↔ inversor ───────────────────────────
         _inv_dim    = st.session_state.get("inversor_dict_dim", {})
