@@ -18,3 +18,9 @@ Cualquier fix al extractor de fichas de paneles (`bipv_python/calculos/pdf_panel
 - Validador: `calculos/validador_inversor.py`; bloquea solo invariantes universales (Vdc_max>0, MPPT mín<máx≤Vdc_max, Isc≥I_max por tracker, batería mín<máx); microinversores 60 V y off-grid sin Isc/arranque NO se bloquean.
 - Runner consola: `scripts/test_pdf_inversor_extractor.py` — ejecuta el banco `CASOS` de `scripts/casos_test_inversores.py` (mismo de la página 16) en modo estricto: campo con esperado None (N/D) que aparezca con valor extraído en la salida SIN merge = fallo (atrapa basura). Los valores por modelo legítimos (Deye P_dc) viven en `valores_por_modelo` y no cuentan como basura.
 - Convención de la página 16: esperado None = N/D informativo (🔵), no penaliza — no cambiarla; la estrictez vive solo en el runner.
+
+## PDFs "mixtos" (texto digital escaso + tablas en imagen, p.ej. Hiitio CdTe)
+- Algunas fichas superan el umbral de texto digital pero los coeficientes/dimensiones están solo en imágenes → complemento OCR al final de `extraer_parametros_panel`: rellena SOLO campos faltantes sin sobrescribir lo digital.
+- Bifacialidad faltante NO debe disparar el OCR (falta legítimamente en monofaciales); sí se rellena si el OCR corre por otro motivo.
+- `uso_ocr=True` siempre que el OCR aporte algo (incluida solo la tecnología) — la UI usa el flag para banners/confianza.
+- Labels descriptivos ingleses ("Open circuit voltage temperature coefficient -0.28%°C") y espesores decimales ("1200*600*16.2mm") requieren patrones propios.
