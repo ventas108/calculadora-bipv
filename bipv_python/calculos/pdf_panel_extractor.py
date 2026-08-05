@@ -965,20 +965,26 @@ def extraer_parametros_panel(pdf_bytes: bytes) -> dict:
     # (superan _MIN_TEXT_CHARS) pero las tablas de coeficientes/dimensiones son
     # imágenes. Si faltan campos clave y hay OCR, se complementa SIN sobrescribir
     # lo ya extraído del texto digital.
-    _CAMPOS_COMPLEMENTO = ("CoefVoc", "CoefIsc", "CoefPmax", "NOCT", "N_s",
-                           "dimensiones", "Bifacialidad")
+    # Bifacialidad NO dispara el OCR por sí sola (falta legítimamente en paneles
+    # monofaciales), pero sí se rellena si el OCR corre por otros faltantes.
+    _CAMPOS_GATILLO = ("CoefVoc", "CoefIsc", "CoefPmax", "NOCT", "N_s",
+                       "dimensiones")
+    _CAMPOS_COMPLEMENTO = _CAMPOS_GATILLO + ("Bifacialidad",)
     if not uso_ocr and _HAS_OCR:
-        faltan = [k for k in _CAMPOS_COMPLEMENTO if result.get(k) is None]
-        if faltan or not result.get("tecnologia"):
+        gatillo = [k for k in _CAMPOS_GATILLO if result.get(k) is None]
+        if gatillo or not result.get("tecnologia"):
             texto_ocr = _ocr_pdf(pdf_bytes)
             if len(texto_ocr.strip()) >= _MIN_TEXT_CHARS:
                 vals_ocr = _apply_patterns(texto_ocr)
-                for k in faltan:
-                    if vals_ocr.get(k) is not None:
+                for k in _CAMPOS_COMPLEMENTO:
+                    if result.get(k) is None and vals_ocr.get(k) is not None:
                         result[k] = vals_ocr[k]
                         result["uso_ocr"] = True  # se usó OCR como complemento
                 if not result.get("tecnologia"):
-                    result["tecnologia"] = _detect_technology(texto_ocr)
+                    tec_ocr = _detect_technology(texto_ocr)
+                    if tec_ocr:
+                        result["tecnologia"] = tec_ocr
+                        result["uso_ocr"] = True
                 # Sanity checks sobre lo complementado (mismos límites del paso 3)
                 if result.get("N_s") and not (10 <= result["N_s"] <= 300):
                     result["N_s"] = None

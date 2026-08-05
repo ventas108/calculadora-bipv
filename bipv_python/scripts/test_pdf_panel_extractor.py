@@ -235,6 +235,52 @@ if ex._HAS_OCR and os.path.exists(_hiitio_pdf):
 else:
     print("  (OCR no disponible o fixture ausente — e2e Hiitio omitido)")
 
+# 6.b El complemento OCR NO debe dispararse cuando solo falta Bifacialidad
+# (paneles monofaciales completos). Se monkeypatchea _ocr_pdf para detectarlo.
+_ocr_llamado = {"n": 0}
+_orig_ocr = ex._ocr_pdf
+def _ocr_spy(pdf_bytes):
+    _ocr_llamado["n"] += 1
+    return ""
+ex._ocr_pdf = _ocr_spy
+_orig_plumber = ex._extract_text_pdfplumber
+_texto_completo = """
+Monocrystalline Silicon module TEST-MOD-400
+Maximum Power (Pmax) [W] 400
+Open Circuit Voltage (Voc) [V] 41.10
+Short Circuit Current (Isc) [A] 12.16
+Maximum Power Voltage (Vmp) [V] 34.10
+Maximum Power Current (Imp) [A] 11.74
+Temperature Coefficient of Pmax -0.34%/°C
+Temperature Coefficient of Voc -0.25%/°C
+Temperature Coefficient of Isc +0.04%/°C
+NOCT 45°C
+Number of cells 144
+Dimensions 1754×1096×30 mm
+""" + "x" * 200
+ex._extract_text_pdfplumber = lambda b: _texto_completo
+try:
+    r8 = ex.extraer_parametros_panel(b"%PDF-fake")
+    check("Ficha completa sin bifacialidad → OCR NO se dispara",
+          _ocr_llamado["n"] == 0, f"(llamadas OCR: {_ocr_llamado['n']})")
+    check("Ficha completa → uso_ocr False", r8.get("uso_ocr") is False)
+finally:
+    ex._ocr_pdf = _orig_ocr
+    ex._extract_text_pdfplumber = _orig_plumber
+
+# 6.c Si el OCR solo aporta la tecnología, uso_ocr debe quedar True
+_texto_sin_tec = _texto_completo.replace("Monocrystalline Silicon module", "Module")
+ex._extract_text_pdfplumber = lambda b: _texto_sin_tec
+ex._ocr_pdf = lambda b: ("CdTe thin film technology datasheet " + "y" * 200)
+try:
+    r9 = ex.extraer_parametros_panel(b"%PDF-fake")
+    check("Solo tecnología por OCR → tecnologia = CdTe", r9.get("tecnologia") == "CdTe",
+          f"(obtuvo {r9.get('tecnologia')!r})")
+    check("Solo tecnología por OCR → uso_ocr True", r9.get("uso_ocr") is True)
+finally:
+    ex._ocr_pdf = _orig_ocr
+    ex._extract_text_pdfplumber = _orig_plumber
+
 # ═════════════════════════════════════════════════════════════════════════════
 print(f"\n{'='*60}\nRESULTADO: {PASS} OK · {FAIL} FALLOS")
 sys.exit(1 if FAIL else 0)
