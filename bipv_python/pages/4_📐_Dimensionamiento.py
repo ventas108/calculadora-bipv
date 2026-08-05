@@ -208,8 +208,19 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
         )
         st.session_state["N_serie"] = mejor.N_serie
 
-        # Dimensionamiento del sistema
-        area = st.session_state.get("area_fachada_m2", 97.34)
+        # Dimensionamiento del sistema — respeta el factor de ocupación
+        # (agrivoltaica: los paneles solo cubren un % del terreno; el resto
+        # queda libre para el cultivo)
+        _area_bruta = float(st.session_state.get("area_fachada_m2", 97.34))
+        _f_ocup     = float(st.session_state.get("factor_ocupacion_pct", 100.0))
+        area        = _area_bruta * _f_ocup / 100.0
+        if _f_ocup < 100.0:
+            st.info(
+                f"🌱 **Factor de ocupación {_f_ocup:.0f}%** — de los "
+                f"{_area_bruta:,.0f} m² del terreno solo se dimensionan paneles "
+                f"sobre **{area:,.0f} m²**; el resto queda libre para el cultivo. "
+                f"(Se ajusta en 🏠 Proyecto.)"
+            )
         dim  = dimensionar_sistema(panel, area, mejor.N_serie,
                                     int(N_str_tr), inversor["N_mppt"])
 

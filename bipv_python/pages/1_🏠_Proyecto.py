@@ -283,8 +283,33 @@ with col1:
         min_value=10.0, max_value=500_000.0,
         value=float(st.session_state.get("area_fachada_m2", 97.34)),
         step=1.0,
-        help=f"{cfg['icono']} {tipo_instalacion} — ingresa la superficie neta de paneles."
+        help=f"{cfg['icono']} {tipo_instalacion} — ingresa la superficie total del predio o superficie."
     )
+
+    # ── Factor de ocupación con paneles (#agrivoltaica) ──────────────────────
+    # En granjas agrivoltaicas los paneles NO pueden cubrir el 100% del terreno:
+    # el cultivo necesita luz directa. Típico agrivoltaica: 25–35%.
+    _f_ocup_def = float(st.session_state.get("factor_ocupacion_pct", 100.0))
+    factor_ocupacion = st.number_input(
+        "Factor de ocupación con paneles (%)",
+        min_value=5.0, max_value=100.0, value=_f_ocup_def, step=5.0,
+        help=(
+            "Porcentaje del área disponible que realmente se cubre con paneles. "
+            "🌱 **Agrivoltaica** (cultivo bajo los paneles): usa 25–35% para que "
+            "el cultivo reciba sol directo. "
+            "☀️ Granja FV convencional: 40–60% (separación entre filas). "
+            "🏠 Techo/fachada dedicados: 100%."
+        ),
+    )
+    st.session_state["factor_ocupacion_pct"] = factor_ocupacion
+    area_util = area * factor_ocupacion / 100.0
+    st.session_state["area_util_m2"] = area_util
+    if factor_ocupacion < 100.0:
+        st.caption(
+            f"🌱 Área efectiva de paneles: **{area_util:,.0f} m²** "
+            f"({factor_ocupacion:.0f}% de {area:,.0f} m²) — "
+            f"el {100 - factor_ocupacion:.0f}% restante queda libre para el cultivo."
+        )
 
     # ── Inputs adicionales Modo Consumo ──────────────────────────────────────
     consumo_mes   = 0.0
@@ -500,7 +525,7 @@ with col2:
 
         st.divider()
         if modo_key == "area":
-            E_anual = area * eta * GHI_anual * PR
+            E_anual = area_util * eta * GHI_anual * PR
             ahorro_mes = E_anual / 12.0 * tarifa_kwh
             st.subheader("📊 Estimación de producción")
 
@@ -527,7 +552,7 @@ with col2:
             E_objetivo  = consumo_mes * (cobertura_pct / 100.0) * 12.0
             denominador = eta * GHI_anual * PR
             area_nec    = E_objetivo / denominador if denominador > 0 else 0.0
-            E_con_area  = area * eta * GHI_anual * PR
+            E_con_area  = area_util * eta * GHI_anual * PR
             cob_real    = min(E_con_area / (consumo_mes * 12) * 100, 100) if consumo_mes > 0 else 0.0
 
             # N paneles estimados — usar panel activo si está disponible
@@ -552,7 +577,7 @@ with col2:
                 )
 
             st.subheader("📊 Resultados del diseño")
-            delta_m2 = area - area_nec
+            delta_m2 = area_util - area_nec
             m1, m2, m3 = st.columns(3)
             m1.metric("Área necesaria", f"{area_nec:.1f} m²",
                       delta=f"{delta_m2:+.1f} m² vs disponible",
@@ -566,7 +591,7 @@ with col2:
                 help=_n_help,
             )
 
-            semaforo = "🟢" if area >= area_nec else "🔴"
+            semaforo = "🟢" if area_util >= area_nec else "🔴"
             st.info(
                 f"{semaforo} Energía objetivo: **{E_objetivo:,.0f} kWh/año**  |  "
                 f"Producción con área disponible: **{E_con_area:,.0f} kWh/año**"
@@ -602,6 +627,8 @@ if st.button("💾 Guardar configuración", type="primary"):
     st.session_state["ciudad"]             = ciudad
     st.session_state["tipo_instalacion"]   = tipo_instalacion
     st.session_state["area_fachada_m2"]    = area   # clave histórica — no renombrar
+    st.session_state["factor_ocupacion_pct"] = factor_ocupacion
+    st.session_state["area_util_m2"]       = area_util
     st.session_state["modo_calculo"]       = modo_key
     st.session_state["PR"]                 = PR
     st.session_state["densidad_Wm2"]       = _dens_val
@@ -631,6 +658,8 @@ if st.button("💾 Guardar configuración", type="primary"):
         "ciudad":           ciudad,
         "tipo_instalacion": tipo_instalacion,
         "area_fachada_m2":  area,
+        "factor_ocupacion_pct": factor_ocupacion,
+        "area_util_m2":     area_util,
         "modo_calculo":     modo_key,
         "PR":               PR,
         "densidad_Wm2":     _dens_val,
