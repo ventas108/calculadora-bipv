@@ -931,7 +931,11 @@ _COEF_VALUE_RE = re.compile(r'(±\s*)?([+-]?[0-9]+(?:\.[0-9]+)?)\s*%')
 # El Motor IV necesita las celdas EN SERIE: normalmente la mitad del conteo
 # (dos cadenas en paralelo). Se usa el Voc para decidir entre total y mitad.
 _NS_HALFCELL_RES = [
-    re.compile(r'([0-9]{1,3})\s*half[\s-]?(?:piece|cell|cut)', re.IGNORECASE),
+    # Exigir contexto de CONTEO de celdas: "28 half-piece", "144 half cells",
+    # "120 half-cut cells". 'half-cut' solo cuenta si le sigue 'cells' para no
+    # capturar marketing tipo "5 half-cut technology".
+    re.compile(r'([0-9]{1,3})\s*half[\s-]?(?:pieces?|cells?)\b', re.IGNORECASE),
+    re.compile(r'([0-9]{1,3})\s*half[\s-]?cut\s+(?:solar\s+)?cells?\b', re.IGNORECASE),
     re.compile(r'([0-9]{1,3})\s*(?:medias?\s+celdas|semi[\s-]?celdas)', re.IGNORECASE),
 ]
 
@@ -951,7 +955,7 @@ def _ns_desde_semiceldas(texto: str, result: dict) -> None:
         if not m:
             continue
         total = int(m.group(1))
-        if total < 4:
+        if total < 8:      # conteos reales van de 28 (tejas BIPV) a 156; <8 es ruido
             return
         mitad = total // 2 if total % 2 == 0 else total
         ns = mitad
@@ -1138,13 +1142,18 @@ def extraer_parametros_panel(pdf_bytes: bytes) -> dict:
                     if result.get(k) is None and vals_ocr.get(k) is not None:
                         result[k] = vals_ocr[k]
                         result["uso_ocr"] = True  # se usó OCR como complemento
+                        # Propagar el origen del Ns para que el sanity check
+                        # de abajo no anule valores bajos legítimos (#67)
+                        if k == "N_s" and vals_ocr.get("_ns_de_semiceldas"):
+                            result["_ns_de_semiceldas"] = True
                 if not result.get("tecnologia"):
                     tec_ocr = _detect_technology(texto_ocr)
                     if tec_ocr:
                         result["tecnologia"] = tec_ocr
                         result["uso_ocr"] = True
                 # Sanity checks sobre lo complementado (mismos límites del paso 3)
-                if result.get("N_s") and not (10 <= result["N_s"] <= 300):
+                if (result.get("N_s") and not result.get("_ns_de_semiceldas")
+                        and not (10 <= result["N_s"] <= 300)):
                     result["N_s"] = None
                 _bif = result.get("Bifacialidad")
                 if _bif is not None:
@@ -1154,6 +1163,9 @@ def extraer_parametros_panel(pdf_bytes: bytes) -> dict:
 
     # Volcado de tablas pdfplumber para diagnóstico (se muestra en el expander de debug)
     result["_debug_tables"] = _dump_tables_pdfplumber(pdf_bytes)
+
+    # Limpiar flags internos: la UI/catálogo solo deben ver campos de dominio
+    result.pop("_ns_de_semiceldas", None)
 
     return result
 
