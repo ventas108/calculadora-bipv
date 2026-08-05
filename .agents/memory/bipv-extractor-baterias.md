@@ -11,3 +11,9 @@ description: Decisiones del extractor PDF de baterías (multi-modelo por columna
 - Siglas técnicas que parecen modelos y hay que filtrar: IP20/IP54, UN38, RS485, IEC62619, 16S1P, CE, CB, BMS, BPU, SOC, LCD, CAN, ROHS, MSDS.
 - Prefill del form CRUD: guardar en session_state y forzar `bat_mm_sel = "➕ Nueva batería…"` ANTES del rerun, o Guardar renombraría el modelo seleccionado.
 - Banco: `scripts/test_pdf_bateria_extractor.py` (fixtures PDF reales en scripts/fixtures_fichas/).
+
+## Fichas escaneadas (OCR) — formato bloques verticales (Felicity FLA-EU)
+- PDFs escaneados sin texto → OCR (pytesseract, disponible en el servidor). El texto OCR NO conserva columnas: labels en un bloque y luego CADA modelo en línea sola con sus valores debajo (kWh, V, rango V, A continua, A pico, W pico).
+- `_parse_bloques_verticales` es el fallback cuando el mapeo por columnas no llena ningún campo per-modelo. Exige capacidad Y voltaje por modelo (solo uno = ruido OCR → omitir). Ignora líneas `Parallel(...)` (escalabilidad, no capacidad).
+- Potencia continua = primera corriente A del bloque × voltaje nominal (la pico viene después). `potencia_estimada=True` puede darse con `c_rate=None` — la UI no debe formatear c_rate sin chequear None (ya causó un TypeError).
+- DoD/garantía en OCR quedan en líneas sueltas lejos del label (">95%", "10Years"): solo aceptarlas si el label existe y el valor suelto es único en la ficha.
