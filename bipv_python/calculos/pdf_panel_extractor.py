@@ -896,6 +896,65 @@ def _ocr_pdf(pdf_bytes: bytes) -> str:
         return ""
 
 
+# ── Fallback genérico de coeficientes de temperatura (#166) ─────────────────
+# Cada fabricante redacta el label en otro orden ("X temperature coefficient",
+# "Temperature coefficient of X", "Coeficiente de temperatura de X", …). En vez
+# de una regex por redacción, se detecta la LÍNEA que menciona "coeficiente de
+# temperatura" + la magnitud (en cualquier orden) y se toma el valor en %.
+_COEF_LINE_RE = re.compile(
+    r'temp(?:erature|eratura)?\.?\s+coefficient'      # "temperature coefficient"
+    r'|coeficientes?\s+de\s+temp(?:eratura)?'         # "coeficiente de temperatura"
+    r'|temperature\s+coeff?',                         # "temperature coeff."
+    re.IGNORECASE,
+)
+# Orden importa: Voc/Isc antes que Pmax (cuyo keyword "power" es más genérico)
+_COEF_FIELD_KEYWORDS = [
+    ("CoefVoc",  re.compile(r'\bVoc\b|open[\s-]?circuit\s+voltage'
+                            r'|circuito\s+abierto|tensi[oó]n\s+de\s+vac[ií]o', re.IGNORECASE)),
+    ("CoefIsc",  re.compile(r'\bIsc\b|short[\s-]?circuit\s+current'
+                            r'|corto[\s-]?circuito', re.IGNORECASE)),
+    ("CoefPmax", re.compile(r'\bP\s*max\b|\bPmpp?\b|maximum\s+power|\bpower\b'
+                            r'|potencia', re.IGNORECASE)),
+]
+# Rango físico plausible de coeficientes (%/°C). Voc/Pmax son negativos
+# (~-0.2 a -0.5); Isc es pequeño y puede ser positivo.
+_COEF_PLAUSIBLE = {
+    "CoefVoc":  (-1.0, 0.0),
+    "CoefPmax": (-1.0, 0.0),
+    "CoefIsc":  (-0.2, 0.2),
+}
+_COEF_VALUE_RE = re.compile(r'(±\s*)?([+-]?[0-9]+(?:\.[0-9]+)?)\s*%')
+
+
+def _coef_fallback(texto: str, result: dict) -> None:
+    """
+    Rellena CoefVoc/CoefIsc/CoefPmax aún None analizando línea por línea,
+    sin depender del orden de redacción del fabricante. Solo acepta valores
+    dentro del rango físico plausible y descarta tolerancias (±).
+    """
+    faltan = {k for k in ("CoefVoc", "CoefIsc", "CoefPmax") if result.get(k) is None}
+    if not faltan:
+        return
+    for line in texto.splitlines():
+        if not _COEF_LINE_RE.search(line):
+            continue
+        campo = next((c for c, pat in _COEF_FIELD_KEYWORDS
+                      if c in faltan and pat.search(line)), None)
+        if campo is None:
+            continue
+        lo, hi = _COEF_PLAUSIBLE[campo]
+        for m in _COEF_VALUE_RE.finditer(line):
+            if m.group(1):          # "±0.05%" es tolerancia, no el coeficiente
+                continue
+            v = float(m.group(2))
+            if lo <= v <= hi and v != 0.0:
+                result[campo] = v
+                faltan.discard(campo)
+                break
+        if not faltan:
+            return
+
+
 def _apply_patterns(texto: str) -> dict:
     """Aplica todos los patrones de extracción al texto y retorna dict de resultados."""
     result = {}
@@ -915,6 +974,9 @@ def _apply_patterns(texto: str) -> dict:
             result["dimensiones"] = val
         else:
             result[campo] = _find_first(texto, patrones)
+    # Fallback genérico: coeficientes con redacciones no vistas antes (#166).
+    # Los patrones específicos de _PATTERNS siempre tienen prioridad.
+    _coef_fallback(texto, result)
     return result
 
 

@@ -319,6 +319,27 @@ for campo, esperado in [("CoefPmax", -0.26), ("CoefVoc", -0.24),
     check(f"HJT-wall {campo} = {esperado}", approx(v11.get(campo), esperado),
           f"(obtuvo {v11.get(campo)})")
 
+# 7.c Fallback genérico de coeficientes (#166): redacciones nunca vistas,
+# en cualquier orden, con/sin signo, español o inglés
+print("── Fallback genérico de coeficientes (#166) ──")
+v12 = ex._apply_patterns("Pmax temp. coefficient : -0.35 %/K")
+check("Genérico: 'Pmax temp. coefficient' = -0.35", approx(v12.get("CoefPmax"), -0.35),
+      f"(obtuvo {v12.get('CoefPmax')})")
+v13 = ex._apply_patterns("Coeficiente de temperatura de la tensión de vacío -0.27 %")
+check("Genérico: español 'tensión de vacío' = -0.27", approx(v13.get("CoefVoc"), -0.27),
+      f"(obtuvo {v13.get('CoefVoc')})")
+v14 = ex._apply_patterns("temperature coeff (short-circuit current) 0.05%/C tolerancia ±0.01%")
+check("Genérico: Isc sin signo ignora tolerancia ±", approx(v14.get("CoefIsc"), 0.05),
+      f"(obtuvo {v14.get('CoefIsc')})")
+# Valores fuera de rango físico NO se aceptan (evita capturar ruido)
+v15 = ex._apply_patterns("temperature coefficient of maximum power 45%")
+check("Genérico: 45% fuera de rango → None", v15.get("CoefPmax") is None,
+      f"(obtuvo {v15.get('CoefPmax')})")
+# Voc positivo es implausible → rechazado
+v16 = ex._apply_patterns("temperature coefficient of open circuit voltage 0.30%")
+check("Genérico: Voc positivo → None", v16.get("CoefVoc") is None,
+      f"(obtuvo {v16.get('CoefVoc')})")
+
 # Dedupe sintético: sin Pmax cae a numeración de variante
 _nombres = ex._dedupe_model_names(["AA-1", "AA-1"], [{}, {}])
 check("Dedupe sin Pmax → numeración", _nombres == ["AA-1 (var. 1)", "AA-1 (var. 2)"],
