@@ -155,3 +155,10 @@ uri = "file://entregables/MANUAL_CALCULADORA_BIPV_v3_agosto2026.docx"
 type = "word_document"
 title = "Manual Calculadora BIPV v3 — reorganizado (5-ago-2026)"
 description = "Cada actualización integrada en su capítulo correspondiente, siguiendo el orden del procedimiento: Flujo → Proyecto → Recurso Solar → Motor IV → Vista 3D → Financiero. Sin anexo; tabla de contenido coherente."
+
+[[outputs]]
+id = "ER7R76-qqKbzpPkMYPXtS"
+uri = "file://entregables/FICHA_TECNICA_CALCULADORA_BIPV_agosto2026.docx"
+type = "word_document"
+title = "Ficha Técnica — Calculadora BIPV (agosto 2026)"
+description = "Ficha comercial con los motores de cálculo como argumento de venta: 8 760 h de simulación, curva IV real, sombras con diodos de bypass, modo agrivoltaico y financiero bancable en COP con TRM en línea."
