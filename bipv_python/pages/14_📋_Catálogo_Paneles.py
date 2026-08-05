@@ -117,8 +117,14 @@ with tab_agregar:
         for _campo in ("Pmax", "Voc", "Isc", "Vmp", "Imp", "Transparencia"):
             if _v.get(_campo) is not None:
                 data[_campo] = _v[_campo]
-        # Pre-llenar nombre del modelo con el código seleccionado
-        if not data.get("modelo") or data["modelo"] in _modelos_det:
+        # Pre-llenar nombre del modelo con el código seleccionado. También cuando
+        # el nombre extraído es la BASE de una variante deduplicada (fichas que
+        # repiten el mismo código: 'HL-XWB13' vs opción 'HL-XWB13 (135W)'), para
+        # que el nombre guardado siempre coincida con la variante elegida.
+        _mod_actual = (data.get("modelo") or "").strip()
+        if (not _mod_actual
+                or _mod_actual in _modelos_det
+                or any(m.startswith(_mod_actual + " (") for m in _modelos_det)):
             data["modelo"] = _modelo_elegido
 
     # ── Aviso de actualización con merge conservador (ANTES del form) ─────────
