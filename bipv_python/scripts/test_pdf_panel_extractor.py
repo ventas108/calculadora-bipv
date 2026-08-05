@@ -304,6 +304,21 @@ if os.path.exists(_xwb_pdf):
 else:
     print("  (fixture panel_hl_xwb13.pdf ausente — omitido)")
 
+# 7.b HJT curtain wall: coeficientes con orden invertido ("Temperature
+# coefficient of open circuit voltage (Voc)-0.24%/℃"), Isc sin signo y
+# NOCT como "Rated operating temperature of battery (NOCT) 44±2℃"
+v11 = ex._apply_patterns("""
+Temperature coefficient
+Rated operating temperature of battery (NOCT) 44±2℃
+Maximum power temperature coefficient (Pmax) -0.26%/℃
+Temperature coefficient of open circuit voltage (Voc)-0.24%/℃
+Temperature coefficient of short-circuit current (Isc)0.04%/℃
+""")
+for campo, esperado in [("CoefPmax", -0.26), ("CoefVoc", -0.24),
+                        ("CoefIsc", 0.04), ("NOCT", 44.0)]:
+    check(f"HJT-wall {campo} = {esperado}", approx(v11.get(campo), esperado),
+          f"(obtuvo {v11.get(campo)})")
+
 # Dedupe sintético: sin Pmax cae a numeración de variante
 _nombres = ex._dedupe_model_names(["AA-1", "AA-1"], [{}, {}])
 check("Dedupe sin Pmax → numeración", _nombres == ["AA-1 (var. 1)", "AA-1 (var. 2)"],

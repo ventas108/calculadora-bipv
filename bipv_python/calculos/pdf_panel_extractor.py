@@ -102,6 +102,9 @@ _PATTERNS = {
         r'\(\s*[βB]_?Voc\s*\)[^\n0-9]{0,20}([+-]?[0-9]+\.[0-9]+)\s*%',
         # Hiitio CdTe: "Open circuit voltage temperature coefficient -0.28%°C"
         r'Open\s+circuit\s+voltage\s+temperature\s+coefficient[^\n0-9+-]{0,15}([+-]?[0-9]+\.[0-9]+)\s*%',
+        # HJT curtain wall (orden invertido): "Temperature coefficient of open
+        # circuit voltage (Voc)-0.24%/℃" (valor pegado al paréntesis, sin espacio)
+        r'Temperature\s+coefficient\s+of\s+open[\s-]?circuit\s+voltage[^\n0-9+-]{0,15}([+-]?[0-9]+\.[0-9]+)\s*%',
     ],
     "CoefIsc": [
         r'(?:α|alpha|α_Isc|Coef(?:icient)?\s+(?:of\s+)?(?:Temp(?:erature)?\s+(?:of\s+)?)?Isc|Temperatura\s+Isc|TK\s*Isc)\s*[:\(]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
@@ -114,6 +117,9 @@ _PATTERNS = {
         r'\(\s*[αa]_?Isc\s*\)[^\n0-9]{0,20}([+-]?[0-9]+\.[0-9]+)\s*%',
         # Hiitio CdTe: "Short circuit current temperature coefficient +0.04%°C"
         r'Short\s+circuit\s+current\s+temperature\s+coefficient[^\n0-9+-]{0,15}([+-]?[0-9]+\.[0-9]+)\s*%',
+        # HJT curtain wall (orden invertido, valor puede venir sin signo):
+        # "Temperature coefficient of short-circuit current (Isc)0.04%/℃"
+        r'Temperature\s+coefficient\s+of\s+short[\s-]?circuit\s+current[^\n0-9+-]{0,15}([+-]?[0-9]+\.[0-9]+)\s*%',
     ],
     "CoefPmax": [
         r'(?:γ|gamma|γ_Pmax|Coef(?:icient)?\s+(?:of\s+)?(?:Temp(?:erature)?\s+(?:of\s+)?)?P(?:max|mpp)|Temperatura\s+P(?:max|mpp)|TK\s*P(?:max|mpp))\s*[:\(]?\s*([+-]?[0-9]*\.?[0-9]+)\s*%',
@@ -136,6 +142,9 @@ _PATTERNS = {
         r'Temperatura\s+Operativa\s+Nominal[^\n0-9]*([0-9]{2}(?:\.[0-9]+)?)',
         # "NOCT 45±2°C" — tolerancia pegada al valor (OCR: "45+2°C")
         r'NOCT[^\n0-9]{0,10}([0-9]{2})\b',
+        # "Rated operating temperature of battery (NOCT) 44±2℃" (traducción china
+        # de NOCT; 'battery' aquí es el módulo, no una batería)
+        r'Rated\s+operating\s+temperature[^\n0-9]{0,30}([0-9]{2})\b',
     ],
     "Bifacialidad": [
         # "Bifaciality: 80%±5%" / "Bifacialidad 70 ± 5 %" / "Bifacial factor 0.8"(→%)
