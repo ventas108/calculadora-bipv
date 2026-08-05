@@ -192,12 +192,14 @@ _MULTIMODEL_VAR_PATTERNS = {
     "Vmp": [
         r'(?:Vmpp|Vmp\b|V[\s_]?mp\b'
         r'|Voltaje\s+en\s+m[aá]xima\s+potencia'
-        r'|Maximum\s+Power\s+Volt)',
+        r'|Maximum\s+Power\s+Volt'
+        r'|Optimum\s+operating\s+voltage)',
     ],
     "Imp": [
         r'(?:Impp|Imp\b|I[\s_]?mp\b'
         r'|Corriente\s+m[aá]xima\s+potencia'
-        r'|Maximum\s+Power\s+Curr)',
+        r'|Maximum\s+Power\s+Curr'
+        r'|Optimum\s+operating\s+current)',
     ],
 }
 
@@ -416,6 +418,36 @@ def _extract_aux_table_shared(pdf_bytes: bytes) -> dict:
     return shared
 
 
+def _dedupe_model_names(model_names: list, por_columna: list) -> list:
+    """
+    Algunas fichas repiten el MISMO código de modelo para varias variantes de
+    potencia (p.ej. HL-XWB13 en 3 columnas: 125 W / 130 W / 135 W). Si hay
+    nombres duplicados, se distinguen con la Pmax de su columna:
+    'HL-XWB13 (135W)'. Si tampoco hay Pmax, se numera la variante.
+    """
+    if len(set(model_names)) == len(model_names):
+        return model_names
+    counts: dict = {}
+    for m in model_names:
+        counts[m] = counts.get(m, 0) + 1
+    nuevos: list = []
+    vistos: set = set()
+    for i, m in enumerate(model_names):
+        nombre = m
+        if counts[m] > 1:
+            pm = por_columna[i].get("Pmax") if i < len(por_columna) else None
+            if pm is not None:
+                pot = int(pm) if float(pm).is_integer() else pm
+                nombre = f"{m} ({pot}W)"
+            else:
+                nombre = f"{m} (var. {i + 1})"
+        if nombre in vistos:  # colisión residual (misma Pmax duplicada)
+            nombre = f"{nombre} #{i + 1}"
+        vistos.add(nombre)
+        nuevos.append(nombre)
+    return nuevos
+
+
 def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
     """
     Extrae modelos y parámetros directamente de tablas estructuradas con pdfplumber.
@@ -460,7 +492,8 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
                         continue
 
                     n = len(model_names)
-                    por_modelo: dict = {m: {} for m in model_names}
+                    # Lista posicional: soporta códigos de modelo duplicados
+                    por_columna: list = [{} for _ in range(n)]
 
                     # _EMPTY_FOLLOWS es constante — definida a nivel de módulo arriba.
                     last_field_hit: str | None = None
@@ -549,13 +582,16 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
                                 hits_by_idx = {mi: plausible_vals[0] for mi in range(n)}
 
                         for mi, v in hits_by_idx.items():
-                            por_modelo[model_names[mi]][field_hit] = v
+                            por_columna[mi][field_hit] = v
 
                     # Considerar exitoso si al menos Pmax fue extraído
-                    if any("Pmax" in v for v in por_modelo.values()):
+                    if any("Pmax" in v for v in por_columna):
+                        model_names = _dedupe_model_names(model_names, por_columna)
                         return {
                             "modelos_detectados": model_names,
-                            "valores_por_modelo": por_modelo,
+                            "valores_por_modelo": {
+                                m: por_columna[i] for i, m in enumerate(model_names)
+                            },
                             "shared_values": _extract_aux_table_shared(pdf_bytes),
                         }
     except Exception:
@@ -634,7 +670,8 @@ def _extract_multimodel_panel(text: str) -> dict:
         return EMPTY
 
     n = len(model_names)
-    por_modelo: dict = {m: {} for m in model_names}
+    # Lista posicional: soporta códigos de modelo duplicados (variantes de potencia)
+    por_columna: list = [{} for _ in range(n)]
 
     # ── Paso 2: extraer campos variables de las filas de especificaciones ─────
     for field, pats in _MULTIMODEL_VAR_PATTERNS.items():
@@ -662,19 +699,23 @@ def _extract_multimodel_panel(text: str) -> dict:
                     ]
 
                 if len(vals) >= n:
-                    for model, val in zip(model_names, vals[:n]):
-                        por_modelo[model][field] = val
+                    for i, val in enumerate(vals[:n]):
+                        por_columna[i][field] = val
                     break
                 elif len(vals) >= 2:
                     # Asignación parcial (menos valores que modelos)
                     for i, val in enumerate(vals[:n]):
-                        por_modelo[model_names[i]][field] = val
+                        por_columna[i][field] = val
                     break
             else:
                 continue
             break  # campo asignado; pasar al siguiente
 
-    return {"modelos_detectados": model_names, "valores_por_modelo": por_modelo}
+    model_names = _dedupe_model_names(model_names, por_columna)
+    return {
+        "modelos_detectados": model_names,
+        "valores_por_modelo": {m: por_columna[i] for i, m in enumerate(model_names)},
+    }
 
 
 def _find_first(text: str, patterns: list) -> Optional[float]:

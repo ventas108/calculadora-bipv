@@ -282,5 +282,33 @@ finally:
     ex._extract_text_pdfplumber = _orig_plumber
 
 # ═════════════════════════════════════════════════════════════════════════════
+# 7. HL-XWB13 (PV wall): mismo código de modelo repetido en 3 variantes
+# ═════════════════════════════════════════════════════════════════════════════
+print("── Ficha 7: HL-XWB13 (código duplicado en variantes de potencia) ──")
+
+_xwb_pdf = os.path.join(_FIXTURES, "panel_hl_xwb13.pdf")
+if os.path.exists(_xwb_pdf):
+    with open(_xwb_pdf, "rb") as f:
+        r10 = ex.extraer_parametros_panel(f.read())
+    check("HL-XWB13: 3 variantes con nombre único",
+          r10["modelos_detectados"] == ["HL-XWB13 (125W)", "HL-XWB13 (130W)", "HL-XWB13 (135W)"],
+          f"(obtuvo {r10['modelos_detectados']})")
+    v135 = r10["valores_por_modelo"].get("HL-XWB13 (135W)", {})
+    for campo, esperado in [("Pmax", 135.0), ("Voc", 10.44), ("Isc", 16.19),
+                            ("Vmp", 8.8), ("Imp", 15.35)]:
+        check(f"HL-XWB13 135W {campo} = {esperado}", approx(v135.get(campo), esperado),
+              f"(obtuvo {v135.get(campo)})")
+    v125 = r10["valores_por_modelo"].get("HL-XWB13 (125W)", {})
+    check("HL-XWB13 125W Pmax = 125 (no pisado por otras columnas)",
+          approx(v125.get("Pmax"), 125.0), f"(obtuvo {v125.get('Pmax')})")
+else:
+    print("  (fixture panel_hl_xwb13.pdf ausente — omitido)")
+
+# Dedupe sintético: sin Pmax cae a numeración de variante
+_nombres = ex._dedupe_model_names(["AA-1", "AA-1"], [{}, {}])
+check("Dedupe sin Pmax → numeración", _nombres == ["AA-1 (var. 1)", "AA-1 (var. 2)"],
+      f"(obtuvo {_nombres})")
+
+# ═════════════════════════════════════════════════════════════════════════════
 print(f"\n{'='*60}\nRESULTADO: {PASS} OK · {FAIL} FALLOS")
 sys.exit(1 if FAIL else 0)
