@@ -335,8 +335,9 @@ check("Genérico: Isc sin signo ignora tolerancia ±", approx(v14.get("CoefIsc")
 v15 = ex._apply_patterns("temperature coefficient of maximum power 45%")
 check("Genérico: 45% fuera de rango → None", v15.get("CoefPmax") is None,
       f"(obtuvo {v15.get('CoefPmax')})")
-# Voc positivo es implausible → rechazado
-v16 = ex._apply_patterns("temperature coefficient of open circuit voltage 0.30%")
+# Voc positivo es implausible → rechazado por el fallback (redacción que
+# NO coincide con ningún patrón específico, para probar el rango del genérico)
+v16 = ex._apply_patterns("Voc temp. coefficient 0.30%")
 check("Genérico: Voc positivo → None", v16.get("CoefVoc") is None,
       f"(obtuvo {v16.get('CoefVoc')})")
 
