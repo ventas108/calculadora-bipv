@@ -29,3 +29,8 @@ Cualquier fix al extractor de fichas de paneles (`bipv_python/calculos/pdf_panel
 - Nunca acumular valores multi-modelo en dict keyed por nombre: columnas con código repetido se pisan en silencio. Usar lista posicional por columna y deduplicar nombres al final con sufijo de Pmax ("(135W)") o "var. N".
 - La UI de catálogo debe reemplazar el nombre prellenado también cuando el extraído es la BASE de una variante deduplicada, o se guardan variantes distintas bajo el mismo nombre.
 - Alias "Optimum operating voltage/current" → Vmp/Imp (fichas PV wall/tile).
+
+## Fallback genérico de coeficientes de temperatura
+- En vez de una regex por fabricante, hay fallback por línea: "temperature coefficient"/"coeficiente de temperatura" + magnitud (Voc/Isc/Pmax) en cualquier orden e idioma; solo rellena lo que los patrones específicos dejaron None.
+- Rango físico obligatorio (Voc/Pmax negativos en (-1,0); Isc en (-0.2,0.2)) y descartar "±" (tolerancias) — sin esto captura ruido.
+- Los patrones específicos tienen prioridad y NO validan rango: los casos negativos de test deben usar redacciones que solo alcance el fallback.
