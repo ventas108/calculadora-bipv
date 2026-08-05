@@ -34,3 +34,9 @@ Cualquier fix al extractor de fichas de paneles (`bipv_python/calculos/pdf_panel
 - En vez de una regex por fabricante, hay fallback por línea: "temperature coefficient"/"coeficiente de temperatura" + magnitud (Voc/Isc/Pmax) en cualquier orden e idioma; solo rellena lo que los patrones específicos dejaron None.
 - Rango físico obligatorio (Voc/Pmax negativos en (-1,0); Isc en (-0.2,0.2)) y descartar "±" (tolerancias) — sin esto captura ruido.
 - Los patrones específicos tienen prioridad y NO validan rango: los casos negativos de test deben usar redacciones que solo alcance el fallback.
+
+## Ns en fichas half-cut (#67)
+- Fichas half-cut declaran SEMICELDAS ("28 half-piece"); el Motor IV necesita celdas en serie = mitad (dos strings paralelos). Decidir mitad vs total con Voc/celda 0.4–1.0 V.
+- El guard de plausibilidad Ns 10–300 mata valores legítimos de tejas BIPV (Ns=14): eximir cuando el Ns viene del conteo de semiceldas, y propagar ese origen a través del complemento OCR.
+- Exigir contexto de conteo en el regex ("half cells", no "half-cut technology") y limpiar flags internos antes de devolver a la UI.
+- Motor IV ya corrige Ns al vuelo (verificar_ns_halfcut en modelo_iv.py) y el validador sugiere la mitad al guardar — las tres capas se complementan.
