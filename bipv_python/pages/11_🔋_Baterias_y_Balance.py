@@ -707,13 +707,29 @@ with col_b2:
              "24 h = autonomía completa 1 día.",
     )
 
+# #25 — la incompatibilidad batería↔inversor también bloquea el dimensionamiento
+# (antes solo se mostraba el error rojo pero el botón seguía habilitado).
+_bloqueo_compat = _compat_estado == "error" if tiene_catalogo else False
+if tiene_catalogo and _bloqueo_compat:
+    _help_dim = ("Batería incompatible con el inversor del proyecto (ver 🔴 arriba). "
+                 "Selecciona otra batería o cambia el inversor en Página 4.")
+elif tiene_catalogo and not _val_bat["ok"]:
+    _help_dim = "Corrige los datos marcados en 🔴 en la hoja Catalogo_Baterias del Excel."
+else:
+    _help_dim = None
+
 if tiene_catalogo and st.button(
     "▶️ Dimensionar batería", type="primary",
-    disabled=not _val_bat["ok"],
-    help="Corrige los datos marcados en 🔴 en la hoja Catalogo_Baterias del Excel."
-         if not _val_bat["ok"] else None,
+    disabled=(not _val_bat["ok"]) or _bloqueo_compat,
+    help=_help_dim,
 ):
-    if not _val_bat["ok"]:
+    if _bloqueo_compat:
+        st.error(
+            "🔴 **No se dimensionó** — la batería seleccionada es incompatible con el "
+            "inversor del proyecto (ver detalle arriba). Un banco de baterías con "
+            "voltaje fuera del rango del inversor es un error de diseño costoso en campo."
+        )
+    elif not _val_bat["ok"]:
         st.error(
             "🔴 **No se dimensionó** — la batería tiene datos físicamente imposibles "
             "en la hoja Catalogo_Baterias del Excel. Corrige y recarga:\n\n"
