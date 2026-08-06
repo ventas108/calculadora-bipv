@@ -277,15 +277,24 @@ def responder(pregunta: str, estado: Mapping[str, Any],
                 contents.append({"role": "user" if h["rol"] == "usuario" else "model",
                                  "parts": [{"text": h["texto"]}]})
             contents.append({"role": "user", "parts": [{"text": contenido_usuario}]})
-            r = requests.post(
-                "https://generativelanguage.googleapis.com/v1beta/models/"
-                "gemini-2.0-flash:generateContent",
-                headers={"x-goog-api-key": gem},  # header, nunca en la URL
-                json={"systemInstruction": {"parts": [{"text": PROMPT_SISTEMA}]},
-                      "contents": contents,
-                      "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1024}},
-                timeout=timeout,
-            )
+            # Modelos en orden de preferencia: si uno no existe (404) o su cuota
+            # está agotada (429), se intenta el siguiente automáticamente.
+            modelos = ("gemini-flash-latest", "gemini-flash-lite-latest",
+                       "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash")
+            r = None
+            for modelo in modelos:
+                r = requests.post(
+                    "https://generativelanguage.googleapis.com/v1beta/models/"
+                    f"{modelo}:generateContent",
+                    headers={"x-goog-api-key": gem},  # header, nunca en la URL
+                    json={"systemInstruction": {"parts": [{"text": PROMPT_SISTEMA}]},
+                          "contents": contents,
+                          "generationConfig": {"temperature": 0.2,
+                                               "maxOutputTokens": 1024}},
+                    timeout=timeout,
+                )
+                if r.status_code not in (404, 429):
+                    break
         elif oai:
             prov = "OpenAI"
             msgs = [{"role": "system", "content": PROMPT_SISTEMA}]
