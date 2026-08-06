@@ -502,8 +502,15 @@ with t0:
         if _kwp_prev_er > 0 and abs(p_stc - _kwp_prev_er) / _kwp_prev_er > 0.05:
             _tipo_auto = _er_cfg_prev.get("tipo", list(_BENCH.keys())[0])
             _esc_auto  = _er_cfg_prev.get("escenario", "Base")
-            # #79 — zona fresca desde coords/predio/TMY; stale-config solo como fallback
-            _zona_auto = _zona_opts[_zona_idx] if _zona_fuente else _er_cfg_prev.get("zona", _zona_opts[0])
+            # #79 — prioridad: zona vigente del dropdown (respeta override manual),
+            # luego zona fresca detectada, luego config previa como último recurso
+            _zona_ss_er = st.session_state.get("est_zona")
+            if _zona_ss_er in _zona_opts:
+                _zona_auto = _zona_ss_er
+            elif _zona_fuente:
+                _zona_auto = _zona_opts[_zona_idx]
+            else:
+                _zona_auto = _er_cfg_prev.get("zona", _zona_opts[0])
             _r_auto    = _calc_parametrico(p_stc, _tipo_auto, _esc_auto, _zona_auto)
             st.session_state["presupuesto_capex_usd"]        = _r_auto["capex_total"]
             st.session_state["presupuesto_opex_anual_usd"]   = _r_auto["opex_total"]
@@ -568,16 +575,37 @@ with t0:
     # FIX: pre-poblar session_state para TODAS las fuentes automáticas.
     # Sin esto, Streamlit ignora `index=` en renders sucesivos porque el key
     # ya existe en session_state con el valor anterior.
+    # #79 (refinado): sincronizar SOLO cuando la zona auto-detectada cambia.
+    # Antes se forzaba en cada rerun, lo que revertía silenciosamente cualquier
+    # selección manual del usuario — el dropdown era de facto de solo lectura.
     if _zona_fuente:
-        st.session_state["est_zona"] = _zona_opts[_zona_idx]
+        _zona_auto_val = _zona_opts[_zona_idx]
+        if st.session_state.get("_est_zona_auto_prev") != _zona_auto_val:
+            st.session_state["est_zona"] = _zona_auto_val
+            st.session_state["_est_zona_auto_prev"] = _zona_auto_val
 
     zona_est = col_s3.selectbox(
         "Zona geográfica", _zona_opts, index=_zona_idx, key="est_zona",
-        help="Se auto-detecta desde las coordenadas del predio (prioridad) o la ciudad de referencia climática."
+        help="Se auto-detecta desde las coordenadas del predio (prioridad) o la ciudad de referencia climática. "
+             "Puedes elegir otra manualmente; si la detección cambia (nuevas coordenadas), se vuelve a sincronizar."
     )
 
-    # Caption explicativo según la fuente de detección
-    if _zona_fuente == "predio":
+    # Aviso de divergencia: el usuario eligió una zona distinta a la detectada.
+    # El cálculo usa SIEMPRE la del dropdown (zona_est) — nunca hay inconsistencia
+    # silenciosa entre lo mostrado y lo calculado.
+    if _zona_fuente and zona_est != _zona_opts[_zona_idx]:
+        st.warning(
+            f"⚠️ Zona seleccionada manualmente (**{zona_est}**, factor "
+            f"×{_ZONA_FACTOR[zona_est]:.2f}) difiere de la auto-detectada "
+            f"(**{_zona_opts[_zona_idx]}**, ×{_ZONA_FACTOR[_zona_opts[_zona_idx]]:.2f}). "
+            f"El cálculo usa la seleccionada."
+        )
+
+    # Caption explicativo según la fuente de detección (solo si el dropdown
+    # coincide con la detección — si difiere, ya se mostró el aviso de arriba)
+    if _zona_fuente and zona_est != _zona_opts[_zona_idx]:
+        pass
+    elif _zona_fuente == "predio":
         st.caption(
             f"📍 Zona detectada desde las **coordenadas del predio** "
             f"({st.session_state.get('municipio_predio', '—')}) → "
