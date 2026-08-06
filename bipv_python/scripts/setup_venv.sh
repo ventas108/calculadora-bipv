@@ -11,7 +11,8 @@
 # toca el venv (está en .gitignore).
 #
 # USO (desde la raíz del repo en el servidor):
-#   bash bipv_python/scripts/setup_venv.sh
+#   bash bipv_python/scripts/setup_venv.sh              # instala/actualiza
+#   bash bipv_python/scripts/setup_venv.sh --rebuild    # borra y recrea desde cero
 #   pm2 restart streamlit-bipv
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
@@ -21,12 +22,23 @@ cd "$DIR"
 
 echo "→ Directorio de la app: $DIR"
 
-if [ ! -d venv ] || [ ! -x venv/bin/python3 ]; then
-    echo "→ Creando venv nuevo..."
+# python3-venv es requisito en Ubuntu (sale un error críptico si falta)
+if ! python3 -m venv --help >/dev/null 2>&1; then
+    echo "❌ Falta el módulo venv de Python. Instálalo con:"
+    echo "   sudo apt-get install -y python3-venv"
+    exit 1
+fi
+
+REBUILD="${1:-}"
+# Reconstruir si: se pidió --rebuild, no existe, falta python3 o pip está dañado
+if [ "$REBUILD" = "--rebuild" ] || [ ! -x venv/bin/python3 ] || \
+   ! venv/bin/python3 -m pip --version >/dev/null 2>&1; then
+    echo "→ Recreando venv desde cero..."
     rm -rf venv
     python3 -m venv venv
 else
-    echo "→ venv existente detectado; se actualizarán los paquetes."
+    echo "→ venv existente y sano; se actualizarán los paquetes."
+    echo "  (usa '--rebuild' si quieres recrearlo desde cero)"
 fi
 
 echo "→ Instalando dependencias de requirements.txt..."

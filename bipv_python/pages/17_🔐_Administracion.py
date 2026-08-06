@@ -133,7 +133,8 @@ with c3:
 # ── Configuración de pagos (Fase 2) ─────────────────────────────────────────
 st.markdown("---")
 st.subheader("💳 Configuración de pagos")
-from calculos.pagos import cargar_config_pagos, guardar_config_pagos
+from calculos.pagos import (cargar_config_pagos, guardar_config_pagos,
+                            validar_link_wompi)
 
 cfg = cargar_config_pagos()
 with st.form("form_pagos"):
@@ -159,8 +160,9 @@ with st.form("form_pagos"):
                                      type="primary")
 if ok_pagos:
     for nombre, link in (("Mensual", link_m), ("Anual", link_a)):
-        if link.strip() and not link.strip().lower().startswith("https://"):
-            st.error(f"El link {nombre} debe empezar por https://")
+        motivo = validar_link_wompi(link)
+        if motivo:
+            st.error(f"Link {nombre}: {motivo}")
             st.stop()
     guardar_config_pagos({
         "precio_mensual_cop": int(precio_m), "precio_anual_cop": int(precio_a),

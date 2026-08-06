@@ -10,9 +10,33 @@ from __future__ import annotations
 
 import json
 import os
+from urllib.parse import urlsplit
 
 _DIR_BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RUTA_CONFIG_PAGOS = os.path.join(_DIR_BASE, "datos", "config_pagos.json")
+
+# Dominios oficiales de links de pago Wompi (hostname EXACTO, sin subdominios
+# comodín): evita phishing tipo https://checkout.wompi.co@malicioso.com/...
+DOMINIOS_WOMPI = {"checkout.wompi.co", "pago.wompi.co"}
+
+
+def validar_link_wompi(url: str) -> str:
+    """Devuelve '' si el link es válido, o el motivo del rechazo."""
+    url = (url or "").strip()
+    if not url:
+        return ""                          # vacío = no configurado, permitido
+    try:
+        p = urlsplit(url)
+    except ValueError:
+        return "URL malformada."
+    if p.scheme != "https":
+        return "El link debe empezar por https://"
+    if p.username is not None or p.password is not None or "@" in p.netloc:
+        return "El link no puede contener credenciales (símbolo @)."
+    if p.hostname not in DOMINIOS_WOMPI:
+        return ("Solo se aceptan links oficiales de Wompi "
+                f"({', '.join(sorted(DOMINIOS_WOMPI))}).")
+    return ""
 
 DEFAULTS = {
     "precio_mensual_cop": 150_000,
@@ -33,11 +57,20 @@ def cargar_config_pagos() -> dict:
             cfg.update({k: datos[k] for k in DEFAULTS if k in datos})
     except (OSError, json.JSONDecodeError):
         pass
+    # Defensa en profundidad: aunque el JSON haya sido alterado a mano,
+    # jamás renderizar un botón de pago hacia un dominio no oficial.
+    for k in ("link_wompi_mensual", "link_wompi_anual"):
+        if validar_link_wompi(cfg.get(k, "")):
+            cfg[k] = ""
     return cfg
 
 
 def guardar_config_pagos(cfg: dict) -> None:
     limpio = {k: cfg.get(k, DEFAULTS[k]) for k in DEFAULTS}
+    for k in ("link_wompi_mensual", "link_wompi_anual"):
+        motivo = validar_link_wompi(limpio.get(k, ""))
+        if motivo:
+            raise ValueError(f"Link de pago inválido: {motivo}")
     os.makedirs(os.path.dirname(RUTA_CONFIG_PAGOS), exist_ok=True)
     tmp = RUTA_CONFIG_PAGOS + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
