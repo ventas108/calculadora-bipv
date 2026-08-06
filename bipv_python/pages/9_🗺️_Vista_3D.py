@@ -2204,6 +2204,89 @@ with tab_solar:
                         "| **Ponderación** | Cada hora vale igual | Ponderada por POA |\n"
                         "| **Diferencia típica** | < 2 pp | n/a |"
                     )
+
+                # ── Sección 4: AOI promedio mensual ──────────────────────────
+                st.divider()
+                st.subheader("\U0001f4d0 4. Ángulo de incidencia (AOI) promedio mensual")
+                st.caption(
+                    "Solo se promedian las **horas productivas** (sol visible, sin sombra, "
+                    "AOI < 90°). Un AOI bajo significa que el sol golpea casi perpendicularmente "
+                    "la fachada — mejor captación. Referencia: AOI < 40° excelente, < 60° aceptable."
+                )
+
+                _aoi_mensual = (
+                    _spw[_prod_hm]
+                    .groupby("mes")["aoi"]
+                    .mean()
+                    .reindex(range(1, 13), fill_value=_np.nan)
+                )
+
+                _bar_colors = []
+                for _v in _aoi_mensual.values:
+                    if _np.isnan(_v):
+                        _bar_colors.append("lightgray")
+                    elif _v < 40:
+                        _bar_colors.append("#2ecc71")   # verde
+                    elif _v < 60:
+                        _bar_colors.append("#f39c12")   # naranja
+                    else:
+                        _bar_colors.append("#e74c3c")   # rojo
+
+                _fig_aoi = go.Figure(go.Bar(
+                    x=_MESES_SOL,
+                    y=_aoi_mensual.values,
+                    marker_color=_bar_colors,
+                    text=[f"{_v:.1f}°" if not _np.isnan(_v) else "–" for _v in _aoi_mensual.values],
+                    textposition="outside",
+                    hovertemplate="<b>%{x}</b><br>AOI promedio: <b>%{y:.1f}°</b><extra></extra>",
+                ))
+                _fig_aoi.add_hline(
+                    y=60, line_dash="dot", line_color="#e74c3c", line_width=1.5,
+                    annotation_text="60° — límite aceptable",
+                    annotation_position="top right",
+                    annotation_font_color="#e74c3c",
+                )
+                _fig_aoi.add_hline(
+                    y=40, line_dash="dot", line_color="#2ecc71", line_width=1.5,
+                    annotation_text="40° — umbral excelente",
+                    annotation_position="top right",
+                    annotation_font_color="#2ecc71",
+                )
+                _fig_aoi.update_layout(
+                    height=380,
+                    yaxis=dict(title="AOI promedio (°)", range=[0, 95], dtick=15),
+                    xaxis_title="Mes",
+                    plot_bgcolor="white",
+                    paper_bgcolor="white",
+                    bargap=0.3,
+                    title=dict(
+                        text=(
+                            f"<b>AOI mensual — "
+                            f"{TIPOS_SUPERFICIE.get(_sup_hm.get('tipo','Fachada'),{}).get('icon','')} "
+                            f"{_sup_hm.get('nombre','—')} "
+                            f"(az={_az_hm:.0f}°, tilt={_tilt_hm:.0f}°)</b>"
+                        ),
+                        x=0.5, xanchor="center",
+                    ),
+                )
+                st.plotly_chart(_fig_aoi, use_container_width=True)
+
+                _aoi_validos = _aoi_mensual.dropna()
+                if not _aoi_validos.empty:
+                    _aoi_anual   = float(_aoi_validos.mean())
+                    _mes_mejor   = _MESES_SOL[int(_aoi_validos.idxmin()) - 1]
+                    _mes_peor    = _MESES_SOL[int(_aoi_validos.idxmax()) - 1]
+                    _c1, _c2, _c3 = st.columns(3)
+                    _c1.metric("AOI promedio anual",    f"{_aoi_anual:.1f}°")
+                    _c2.metric("Mejor mes (AOI mín.)",  _mes_mejor, f"{_aoi_validos.min():.1f}°")
+                    _c3.metric("Peor mes (AOI máx.)",   _mes_peor,  f"{_aoi_validos.max():.1f}°", delta_color="inverse")
+                    if _aoi_anual < 40:
+                        st.success(f"✅ Orientación excelente — AOI anual promedio **{_aoi_anual:.1f}°** (< 40°). La fachada recibe el sol casi perpendicularmente.")
+                    elif _aoi_anual < 60:
+                        st.info(f"ℹ️ Orientación aceptable — AOI anual promedio **{_aoi_anual:.1f}°**. Ajustar el azimuth hacia el ecuador podría mejorar la captación.")
+                    else:
+                        st.warning(f"⚠️ AOI alto — **{_aoi_anual:.1f}°** promedio anual. La fachada no está bien orientada respecto al sol; considera girarla hacia el ecuador.")
+
             else:
                 st.info("\u26a0\ufe0f No se pudo calcular posición solar anual. Verifica pvlib.")
 
