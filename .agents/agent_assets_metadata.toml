@@ -211,3 +211,10 @@ uri = "file://entregables/FICHA_TECNICA_CALCULADORA_BIPV_agosto2026_complementad
 type = "word_document"
 title = "Ficha Técnica Calculadora BIPV — complementada (agosto 2026)"
 description = "Ficha original completa + 4 secciones nuevas: flujo de trabajo con invalidación en cadena, baterías, impacto CO₂ y calidad continua."
+
+[[outputs]]
+id = "Qu36dvfRPt9GR3Vawux1Y"
+uri = "file://entregables/Alternativas_Inversores_Uraba.docx"
+type = "word_document"
+title = "Alternativas de configuración eléctrica — Urabá 220,32 kWp"
+description = "5 alternativas de inversores y arreglos de strings (A–E), criterios de decisión y plan de simulación paso a paso en la Calculadora BIPV."
