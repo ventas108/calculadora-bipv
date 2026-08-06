@@ -8,3 +8,4 @@
 - [BIPV - factor de ocupación agrivoltaica](bipv-agrivoltaica.md) — cálculos de paneles/producción/USD-m² usan area_util_m2, no area_fachada_m2 (terreno bruto)
 - [BIPV - sincronización de widgets keyed](bipv-streamlit-widgets.md) — auto-poblar session_state solo cuando la detección cambia, y ANTES de los bloques que consumen el valor; si no, se pisa el override manual
 - [BIPV - Calculadora de Sombreado](bipv-shading-calculator.md) — app React/TS en bipv.innovacionquimica.com.co exporta CSV con FS horario por punto de análisis -> es el p_shade directo para modelo bypass diodes
+- [BIPV - Sombras desde SketchUp](bipv-sombras-sketchup.md) — ray-casting trimesh alineado al TMY UTC de la sesión (obligatorio); mismo CSV FS_geometrico que la calculadora web
