@@ -6,6 +6,7 @@ from datetime import date
 from datos.ciudades_colombia import CIUDADES, LISTA_CIUDADES, FECHA_VALIDACION_TARIFAS
 from calculos.tz_utils import utc_offset_latam, tz_label
 from calculos.tarifa_utils import init_tarifa, set_tarifa_from_ciudad, tarifa_widget
+from calculos.invalidacion import KEYS_RECURSO_SOLAR, KEYS_DERIVADOS_POA
 from calculos.proyectos_manager import (
     listar_proyectos, guardar_proyecto_actual,
     cargar_proyecto, eliminar_proyecto,
@@ -624,6 +625,10 @@ with col2:
 if st.button("💾 Guardar configuración", type="primary"):
     _dens_val = dens_Wm2 if "dens_Wm2" in dir() else cfg["dens_def"]
 
+    # ── #172 — Capturar valores ANTERIORES antes de sobreescribirlos ─────────
+    _area_util_prev = st.session_state.get("area_util_m2")
+    _tipo_prev_save = st.session_state.get("tipo_instalacion")
+
     st.session_state["nombre_proyecto"]    = nombre
     st.session_state["ciudad"]             = ciudad
     st.session_state["tipo_instalacion"]   = tipo_instalacion
@@ -664,33 +669,10 @@ if st.button("💾 Guardar configuración", type="primary"):
         abs(st.session_state["lon_proyecto"] - float(_s_lon64)) > 0.0001
     ):
         _CADENA_SOLAR_KEYS = (
-            # Recurso solar (Página 2)
-            "tmy_df", "poa_df", "tmy_ciudad", "poa_anual_kWh_m2",
-            "ghi_anual_kWh_m2", "t_media_anual", "zona_geo_coords",
-            "ganancia_bifacial_pct",
-            "_solar_lat_guardada", "_solar_lon_guardada", "_solar_alt_guardada",
-            # Motor Óptico (Página 5b)
-            "poa_efectiva_df",
-            # Producción (Página 6)
-            "produccion_ok", "produccion_modo_iv", "E_ac_anual_kWh",
-            "PR_sistema",
-            # Bypass (Página 5)
-            "E_ac_anual_kWh_bypass",
-            # Multi-superficie (Página 9)
-            "E_ac_anual_kWh_multisup", "poa_df_multisup",
-            "area_total_multisup", "multisup_desglose", "multisup_activo",
-            # Bypass — resultados y flags (Página 5); si quedan vivos,
-            # Producción re-aplica sombras viejas a la producción nueva
-            "bypass_ok", "bypass_result", "bypass_p_shade", "bypass_n_series",
-            "bypass_n_parallel", "bypass_panel", "kwh_bypass_anual",
-            "bypass_modo_usado", "bypass_multisup_ok", "bypass_multisup_resultados",
-            # Financiero cacheado (Página 7)
-            "financiero_ok", "comp_financiero", "comp_financiero_p90",
-            "metricas_financiero", "metricas_financiero_p90",
-            # Impacto CO₂ (Página 12)
-            "impacto_co2_ok", "co2_anual_t", "co2_total_t", "co2_total_prom_t",
-            "co2_total_marg_t", "co2_arboles_equiv", "co2_hogares_equiv",
-            "co2_km_vehiculo_equiv", "co2_valor_bonos_usd",
+            KEYS_RECURSO_SOLAR
+            + KEYS_DERIVADOS_POA
+            + ("_solar_lat_guardada", "_solar_lon_guardada", "_solar_alt_guardada",
+               "_solar_tilt_guardado", "_solar_az_guardado", "_solar_albedo_guardado")
         )
         for _k64 in _CADENA_SOLAR_KEYS:
             st.session_state.pop(_k64, None)
@@ -700,6 +682,27 @@ if st.button("💾 Guardar configuración", type="primary"):
             "Vuelve a ejecutar **☀️ Recurso Solar** y las páginas siguientes para que toda "
             "la cadena use el sol de la ubicación nueva.",
             icon="🌍",
+        )
+    # ── #172 — Si cambió el área útil o el tipo de instalación, invalidar los
+    # derivados: el recurso solar del sitio sigue válido, pero el nº de paneles,
+    # la producción, el bypass, el financiero y el CO₂ ya no corresponden.
+    elif (
+        (_area_util_prev is not None and abs(area_util - float(_area_util_prev)) > 0.01)
+        or (_tipo_prev_save is not None and tipo_instalacion != _tipo_prev_save)
+    ):
+        for _k172 in KEYS_DERIVADOS_POA:
+            st.session_state.pop(_k172, None)
+        _que_cambio = []
+        if _tipo_prev_save is not None and tipo_instalacion != _tipo_prev_save:
+            _que_cambio.append(f"tipo de instalación (**{_tipo_prev_save}** → **{tipo_instalacion}**)")
+        if _area_util_prev is not None and abs(area_util - float(_area_util_prev)) > 0.01:
+            _que_cambio.append(f"área útil (**{float(_area_util_prev):,.1f} m²** → **{area_util:,.1f} m²**)")
+        st.warning(
+            f"⚠️ Cambió el {' y el '.join(_que_cambio)} — se invalidaron los resultados "
+            "derivados (producción, bypass, financiero, CO₂). El recurso solar del sitio "
+            "sigue válido; vuelve a ejecutar **📐 Dimensionamiento → 📊 Producción** y las "
+            "páginas siguientes.",
+            icon="📐",
         )
 
     # ── Persistir a disco — sobrevive recargas y reinicios de PM2 ────────────

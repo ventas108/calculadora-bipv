@@ -75,6 +75,7 @@ from calculos.solar import (
     ORIENTACIONES,
 )
 from calculos.tz_utils import utc_offset_latam, tz_label
+from calculos.invalidacion import KEYS_DERIVADOS_POA
 
 st.set_page_config(page_title="Recurso Solar — BIPV", page_icon="☀️", layout="wide")
 from utils.ui import bloquear_traduccion
@@ -318,28 +319,47 @@ with st.expander("🔄 Simulación bifacial (ganancia de la cara trasera)",
 
 st.markdown("---")
 
-# ── #64 — Invalidar recurso solar si las coordenadas cambiaron ───────────────
-# Compara las coords actuales del proyecto con las que se usaron para calcular
-# el recurso solar almacenado. Si difieren, limpia los resultados y avisa.
+# ── #64 / #172 — Invalidar si cambiaron coordenadas o geometría ──────────────
+# Compara las entradas actuales con las que se usaron para calcular el recurso
+# solar almacenado. Coordenadas distintas → caduca todo (TMY incluido).
+# Geometría distinta (tilt/azimuth/albedo) → el TMY del sitio sigue válido,
+# pero caducan la POA y TODOS los derivados (producción, bypass, financiero...).
 _SOLAR_SS_KEYS = (
     "recurso_solar_ok", "tmy_df", "poa_df", "tmy_ciudad",
     "tilt_fachada", "tilt_default", "azimuth_fachada", "orientacion_label",
     "poa_anual_kWh_m2", "ghi_anual_kWh_m2", "t_media_anual",
     "zona_geo_coords", "poa_efectiva_df", "ganancia_bifacial_pct",
 )
+_GUARD_KEYS = (
+    "_solar_lat_guardada", "_solar_lon_guardada", "_solar_alt_guardada",
+    "_solar_tilt_guardado", "_solar_az_guardado", "_solar_albedo_guardado",
+)
+
+# Aviso pendiente de un drift detectado en el run anterior (el auto-restore
+# hace st.rerun() y se llevaría el warning por delante).
+_msg_drift_pend = st.session_state.pop("_solar_drift_msg", None)
+if _msg_drift_pend:
+    st.warning(_msg_drift_pend, icon="📐")
+
 _s_lat = st.session_state.get("_solar_lat_guardada")
 _s_lon = st.session_state.get("_solar_lon_guardada")
 _s_alt = st.session_state.get("_solar_alt_guardada")
+_s_tilt = st.session_state.get("_solar_tilt_guardado")
+_s_az   = st.session_state.get("_solar_az_guardado")
+_s_alb  = st.session_state.get("_solar_albedo_guardado")
 if st.session_state.get("recurso_solar_ok") and _s_lat is not None:
     _drift = (
         abs(lat - float(_s_lat)) > 0.0001 or
         abs(lon - float(_s_lon)) > 0.0001 or
         abs(alt_m - int(_s_alt))  > 10
     )
+    _drift_geom = (not _drift) and _s_tilt is not None and (
+        abs(tilt - float(_s_tilt))      > 0.5 or
+        abs(azimuth - float(_s_az))     > 0.5 or
+        abs(albedo - float(_s_alb))     > 0.005
+    )
     if _drift:
-        for _k in _SOLAR_SS_KEYS:
-            st.session_state.pop(_k, None)
-        for _k in ("_solar_lat_guardada", "_solar_lon_guardada", "_solar_alt_guardada"):
+        for _k in _SOLAR_SS_KEYS + KEYS_DERIVADOS_POA + _GUARD_KEYS:
             st.session_state.pop(_k, None)
         st.warning(
             f"⚠️ **Recurso solar invalidado** — las coordenadas del proyecto cambiaron.  \n"
@@ -347,6 +367,21 @@ if st.session_state.get("recurso_solar_ok") and _s_lat is not None:
             f"**{int(_s_alt)} m**  \n"
             f"Coordenadas actuales: **{lat:.5f}°**, **{lon:.5f}°**, **{alt_m} m**  \n"
             "Presiona **🌐 Descargar TMY de PVGIS** para recalcular con las coordenadas actuales."
+        )
+    elif _drift_geom:
+        # #172: conservar tmy_df (el TMY solo depende del sitio); caduca la POA
+        # y todo lo derivado. El auto-restore de abajo recalculará la POA local
+        # para la geometría nueva sin volver a PVGIS.
+        for _k in _SOLAR_SS_KEYS + KEYS_DERIVADOS_POA + _GUARD_KEYS:
+            if _k not in ("tmy_df", "tmy_ciudad", "ghi_anual_kWh_m2", "t_media_anual",
+                          "zona_geo_coords"):
+                st.session_state.pop(_k, None)
+        st.session_state["_solar_drift_msg"] = (
+            f"⚠️ **La geometría cambió** (antes: {float(_s_tilt):.0f}°/"
+            f"{float(_s_az):.0f}° az/albedo {float(_s_alb):.2f} — ahora: {tilt}°/"
+            f"{azimuth}° az/albedo {albedo:.2f}). La POA y los resultados derivados "
+            "(producción, bypass, financiero, CO₂) se invalidaron y deben recalcularse. "
+            "El TMY del sitio sigue válido."
         )
 
 # ── Auto-restaurar desde caché de disco (sobrevive reinicios de PM2) ─────────
@@ -396,10 +431,13 @@ if not st.session_state.get("recurso_solar_ok"):
             "t_media_anual":       round(_t_media_r, 1),
             "zona_geo_coords":     _zona_por_coords_rs(lat, lon),
             "recurso_solar_ok":    True,
-            # ── #64 — Guardar coords para detectar cambios futuros ───────────
+            # ── #64/#172 — Guardar coords y geometría para detectar drift ────
             "_solar_lat_guardada": lat,
             "_solar_lon_guardada": lon,
             "_solar_alt_guardada": alt_m,
+            "_solar_tilt_guardado":   tilt,
+            "_solar_az_guardado":     azimuth,
+            "_solar_albedo_guardado": albedo,
         })
         st.info(
             f"📂 **Recurso solar restaurado desde caché local** — "
@@ -437,8 +475,8 @@ if _recalc_btn:
     except Exception:
         pass
     st.session_state["recurso_solar_ok"] = False
-    # ── #64 — Limpiar coords guardadas para que la próxima ejecución las reescriba
-    for _k in ("_solar_lat_guardada", "_solar_lon_guardada", "_solar_alt_guardada"):
+    # ── #64/#172 — Limpiar guardas para que la próxima ejecución las reescriba
+    for _k in _GUARD_KEYS:
         st.session_state.pop(_k, None)
     st.success("✅ Caché limpiada — presiona **Descargar TMY** para obtener datos frescos.")
 
@@ -612,10 +650,13 @@ if _descarga_btn:
     st.session_state["bifacial_activo"]       = bool(bifacial_cfg)
     st.session_state["bifacial_cfg"]          = bifacial_cfg or {}
     st.session_state["ganancia_bifacial_pct"] = round(ganancia_bif_pct, 2)
-    # ── #64 — Guardar coords usadas para detectar drift futuro ───────────────
+    # ── #64/#172 — Guardar coords y geometría usadas para detectar drift ─────
     st.session_state["_solar_lat_guardada"] = lat
     st.session_state["_solar_lon_guardada"] = lon
     st.session_state["_solar_alt_guardada"] = alt_m
+    st.session_state["_solar_tilt_guardado"]   = tilt
+    st.session_state["_solar_az_guardado"]     = azimuth
+    st.session_state["_solar_albedo_guardado"] = albedo
 
     st.success(
         f"✅ Recurso solar calculado para **{ciudad}**  |  "
