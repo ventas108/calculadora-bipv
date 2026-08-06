@@ -150,10 +150,19 @@ with tab1:
             # Sobrescribir con los valores específicos del modelo elegido y
             # fijar su nombre en el campo Modelo antes de guardar.
             _vals_sel = (res.get("valores_por_modelo") or {}).get(_modelo_sel, {})
+            # Campos que varían por modelo = unión de claves extraídas para
+            # CUALQUIER modelo de la ficha. Para esos campos NO hay fallback al
+            # valor global: si la columna del modelo elegido vino vacía, el
+            # campo queda en None (y la alerta #139 de abajo lo denuncia).
+            # Antes se hacía `if v is not None`, lo que heredaba silenciosamente
+            # el valor de otra columna/modelo (enmascaraba el caso Deye #146).
+            _campos_por_modelo = set()
+            for _vals_m in (res.get("valores_por_modelo") or {}).values():
+                _campos_por_modelo.update(_vals_m.keys())
             res = {
                 **res,
                 "modelo": _modelo_sel,
-                **{k: v for k, v in _vals_sel.items() if v is not None},
+                **{k: _vals_sel.get(k) for k in _campos_por_modelo},
             }
             # ── #139 (2ª capa): re-verificar campos críticos DEL MODELO ELEGIDO.
             # La alerta global de arriba corre antes de la selección y exime a
