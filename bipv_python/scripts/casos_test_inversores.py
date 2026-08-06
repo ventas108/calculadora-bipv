@@ -1143,6 +1143,48 @@ Nominal output voltage 400V
         },
     },
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # #146 — Deye SUN-*K-SG01LP1 (ficha real, 4 modelos en columnas): potencia,
+    # trackers y corrientes VARÍAN por modelo. Etiquetas propias de Deye:
+    # "Max. DC Input Power (W)", "PV Input Current (A) 13+13",
+    # "Max. PV ISC (A) 17+17", "Number of MPPT / Strings per MPPT 2/1+1".
+    # El harness fusiona valores_por_modelo[modelo] → se valida la columna 7.6K.
+    # Nota: Vdc_max se omite a propósito — la ficha solo publica el rango
+    # "370 (125~500)" y el global aún no lo resuelve (pendiente aparte).
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "Deye",
+        "modelo":     "SUN-7.6K-SG01LP1",
+        "arquitectura": "Híbrido / Off-grid",
+        "texto": """\
+Deye Hybrid Inverter
+                SUN-5K-SG01LP1   SUN-6K-SG01LP1   SUN-7.6K-SG01LP1   SUN-8K-SG01LP1
+Model
+                     -US              -US             -US/EU            -US/EU
+Battery Voltage Range (V) 40~60
+PV String Input Data
+Max. DC Input Power (W)          6500       7800       9880       10400
+Rated PV Input Voltage (V) 370 (125~500)
+Start-up Voltage (V) 125
+MPPT Range (V) 150-425
+PV Input Current (A)             13+13      26+13      26+26      26+26
+Max. PV ISC (A)                  17+17      34+17      34+34      34+34
+Number of MPPT / Strings per MPPT 2/1+1     2/2+1      2/2+2      2/2+2
+""",
+        "esperado": {
+            "Vmppt_min":          150,
+            "Vmppt_max":          425,
+            "V_arranque":         125,
+            "n_trackers":           2,
+            "n_strings_tracker":    2,
+            "I_max_tracker":       26,
+            "Isc_max_tracker":     34,
+            "P_dc_max_W":        9880,
+            "bat_voltaje_min":     40,
+            "bat_voltaje_max":     60,
+        },
+    },
+
 ]
 
 # Campos que se comparan (ordenados para la tabla de cobertura)

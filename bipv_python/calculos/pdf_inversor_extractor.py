@@ -857,9 +857,14 @@ def _extract_multimodel_values(text: str) -> dict:
         if not re.search(r'MPP\s+tracker|Number\s+of\s+MPPT\s*/\s*Strings\s+per\s+MPPT',
                          line, re.IGNORECASE):
             continue
+        # "N/S" clásico o "N/S1+S2" (Deye: strings por tracker desiguales) —
+        # para strings se toma el MÁXIMO de los sumandos (criterio del catálogo:
+        # "si hay trackers con corrientes/strings desiguales, usa el más alto")
         found = [
-            (int(m.group(1)), int(m.group(2)), m.start())
-            for m in re.finditer(r'(\d+)\s*/\s*(\d+)', line)
+            (int(m.group(1)),
+             max(int(s) for s in m.group(2).split('+')),
+             m.start())
+            for m in re.finditer(r'(\d+)\s*/\s*(\d+(?:\+\d+)*)', line)
         ]
         if not found:
             continue   # línea de feature bullet sin N/M — seguir buscando
