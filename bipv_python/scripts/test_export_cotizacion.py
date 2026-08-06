@@ -46,7 +46,7 @@ def _datos_sinteticos() -> dict:
     conting  = 4_000_000.0
     total_cop = subtotal + blandos + indirect + conting      # 66_000_000
     return {
-        "empresa": "SolTech Energy S.A.S.",
+        "empresa": "Cliente Ejemplo S.A.S.",
         "proyecto": "Fachada BIPV Torre Empresarial",
         "cliente": "Inmobiliaria Andina",
         "fecha": "15/08/2026",

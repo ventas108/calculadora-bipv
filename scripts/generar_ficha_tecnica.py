@@ -80,7 +80,7 @@ para("FICHA TÉCNICA", size=22, bold=True, color=C_VERDE_OSC,
      align=WD_ALIGN_PARAGRAPH.CENTER, space_after=0)
 para("Calculadora BIPV — Simulación fotovoltaica integrada en edificios y agrivoltaica",
      size=13, bold=True, color=C_GRIS, align=WD_ALIGN_PARAGRAPH.CENTER, space_after=0)
-para("Innovación Química / SolTech Energy  ·  calc.innovacionquimica.com.co  ·  Versión agosto 2026",
+para("Innovación Química  ·  calc.innovacionquimica.com.co  ·  Versión agosto 2026",
      size=9.5, color=C_GRIS, align=WD_ALIGN_PARAGRAPH.CENTER, space_after=10)
 
 box("La única herramienta en Colombia que simula fachadas BIPV, cubiertas, pérgolas y "
@@ -170,7 +170,7 @@ box("Ideal para: desarrolladores inmobiliarios, arquitectos, EPCs, evaluadores d
     "verde y proyectos agrivoltaicos que necesitan cifras defendibles — no promesas.",
     C_GRIS_CLR, C_GRIS, "👥")
 
-para("Ficha técnica — agosto de 2026 · Innovación Química / SolTech Energy",
+para("Ficha técnica — agosto de 2026 · Innovación Química",
      size=8.5, color=C_GRIS, align=WD_ALIGN_PARAGRAPH.CENTER, space_after=0)
 
 doc.save(OUT)

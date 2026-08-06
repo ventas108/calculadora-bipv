@@ -1,5 +1,5 @@
 """
-Calculadora BIPV — SolTech Energy LaTam / Colombia
+Calculadora BIPV — Innovación Química / Colombia
 Streamlit app principal.
 """
 import streamlit as st

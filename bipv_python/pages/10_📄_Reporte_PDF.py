@@ -44,7 +44,7 @@ col_op1, col_op2 = st.columns(2)
 with col_op1:
     nombre_empresa = st.text_input(
         "Nombre de la empresa",
-        value=st.session_state.get("nombre_empresa", "Innovación Química / SolTech Energy"),
+        value=st.session_state.get("nombre_empresa", "Innovación Química"),
         key="rep_empresa",
     )
     nombre_proyecto = st.text_input(

@@ -21,7 +21,7 @@ with st.expander("📋 Encabezado del presupuesto", expanded=False):
     hc1, hc2, hc3 = st.columns(3)
     ppto_nombre   = hc1.text_input("Nombre del proyecto", value=st.session_state.get("nombre_proyecto","BIPV Proyecto"))
     ppto_vigencia = hc2.date_input("Vigencia del presupuesto", value=date.today())
-    ppto_elaboro  = hc3.text_input("Elaboró", value="Innovación Química / SolTech Energy")
+    ppto_elaboro  = hc3.text_input("Elaboró", value="Innovación Química")
     st.caption(
         f"Presupuesto válido hasta **{ppto_vigencia}** · "
         "Los precios deben actualizarse si la TRM varía >5% o los insumos tienen nueva cotización."
