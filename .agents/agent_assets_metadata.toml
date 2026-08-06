@@ -202,8 +202,8 @@ description = "Versión PDF para adjuntar al formulario de Mibet."
 id = "7bc2PXLlhoEIKKQqx9MNO"
 uri = "file://entregables/Ficha_Tecnica_Preliminar_Agrivoltaico_Uraba.pdf"
 type = "pdf"
-title = "Ficha Técnica Preliminar — Agrivoltaico Urabá 220,3 kWp"
-description = "3 páginas: sitio y sistema, producción estimada (368 MWh/año) y estimación financiera preliminar con costos duros/blandos, CAPEX, payback y beneficios Ley 1715."
+title = "Ficha Técnica Preliminar Urabá — v2 (config. optimizada)"
+description = "Actualizada con 2×80–90 kW ratio 1,22–1,38, E_ac 278.600 kWh/año de simulación horaria PVGIS y financieros recalculados (TIR 35,8%, LCOE 0,080 USD/kWh)."
 
 [[outputs]]
 id = "X-0Ytr62_S2V9RWWgwxJe"
