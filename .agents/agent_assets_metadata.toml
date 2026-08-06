@@ -167,8 +167,8 @@ description = "Versión informativa y persuasiva con datos del manual: 6 tecnolo
 id = "JL9yyINEr7YzO-BJhHLHS"
 uri = "file://entregables/Mibet_Lista_Verificacion_Uraba_Agrivoltaico.xlsx"
 type = "table"
-title = "Formulario Mibet — Agrivoltaico Urabá (diligenciado)"
-description = "Lista de verificación de proyecto terrestre con los datos del proyecto agrivoltaico de Apartadó: 306 paneles JA Solar JAM66D46-720/LB bifaciales, 220.3 kWp, estructura elevada 2.5 m."
+title = "Formulario Mibet actualizado — altura 3,0 m"
+description = "Lista de verificación con la altura libre corregida a 3,0 m y terreno 32×100 m."
 
 [[outputs]]
 id = "Plv9d3Z0bXjP31Us3pvUX"
@@ -188,12 +188,12 @@ description = "Versión PDF para adjuntar al formulario de Mibet."
 id = "F9Ue-HXQM3EgUOv4ha95v"
 uri = "file://entregables/Plano_Disposicion_Uraba_32x100.png"
 type = "image"
-title = "Plano recalculado — Terreno 32 × 100 m (PNG)"
-description = "Vista en planta: 17 matrices de 2×9 paneles (306 en total, 220,3 kWp) sobre terreno de 100×32 m con 4 corredores de cultivo de ~4 m."
+title = "Plano actualizado — altura libre 3,0 m (PNG)"
+description = "17 matrices, 306 paneles, 220,3 kWp, terreno 32×100 m, borde inferior del panel a 3,0 m."
 
 [[outputs]]
 id = "FT3KNLPbboLoIyAmgOhBo"
 uri = "file://entregables/Plano_Disposicion_Uraba_32x100.pdf"
 type = "pdf"
-title = "Plano recalculado — Terreno 32 × 100 m (PDF)"
+title = "Plano actualizado — altura libre 3,0 m (PDF)"
 description = "Versión PDF para adjuntar al formulario de Mibet."
