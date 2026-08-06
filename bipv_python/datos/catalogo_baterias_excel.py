@@ -158,6 +158,33 @@ def _normalizar_col(nombre: str) -> str:
     return " ".join(str(nombre).strip().split())
 
 
+# ── #24 — Matching de columnas insensible a mayúsculas/tildes/espacios ────────
+def _clave_col(nombre: str) -> str:
+    """Clave canónica para comparar encabezados: minúsculas, sin tildes,
+    espacios colapsados. Así 'CAPACIDAD (KWH)', 'Capacidad  (kWh)' y
+    'Capacidad (kwh)' mapean a la misma columna interna."""
+    import unicodedata
+    s = _normalizar_col(nombre).lower()
+    return "".join(c for c in unicodedata.normalize("NFD", s)
+                   if unicodedata.category(c) != "Mn")
+
+
+# _COL_MAP con claves normalizadas — la búsqueda real usa esta versión
+_COL_MAP_NORM = {_clave_col(k): v for k, v in _COL_MAP.items()}
+
+
+def _mapear_columnas_df(columnas) -> dict:
+    """{nombre_columna_df: clave_interna} para las columnas reconocidas.
+    Primer alias gana si dos columnas del Excel mapean a la misma interna."""
+    mapa, usadas = {}, set()
+    for col in columnas:
+        interna = _COL_MAP_NORM.get(_clave_col(col))
+        if interna and interna not in usadas:
+            mapa[col] = interna
+            usadas.add(interna)
+    return mapa
+
+
 def _detectar_header(df_raw: pd.DataFrame) -> pd.DataFrame | None:
     """
     Recibe el DataFrame leído con header=0 (fila 0 = títulos del archivo).
@@ -217,15 +244,17 @@ def cargar_catalogo_baterias(_mtime: float = 0.0) -> dict:
 
     # ── Parsear filas ──────────────────────────────────────────────────────
     baterias = {}
+    # #24 — mapeo por clave normalizada (insensible a mayúsculas/tildes)
+    _mapa_df = _mapear_columnas_df(df.columns)
+    _col_nombre_df    = next((c for c, i in _mapa_df.items() if i == "nombre"), None)
+    _col_completos_df = next((c for c, i in _mapa_df.items() if i == "_completos"), None)
     for _, r in df.iterrows():
         # Buscar nombre del modelo
         nombre = None
-        for col_excel, col_int in _COL_MAP.items():
-            if col_int == "nombre" and col_excel in df.columns:
-                val = str(r.get(col_excel, "")).strip()
-                if val and val.lower() not in ("nan", ""):
-                    nombre = val
-                    break
+        if _col_nombre_df is not None:
+            val = str(r.get(_col_nombre_df, "")).strip()
+            if val and val.lower() not in ("nan", ""):
+                nombre = val
         if not nombre:
             continue
         # Ignorar filas que parezcan ser encabezados o notas
@@ -237,10 +266,8 @@ def cargar_catalogo_baterias(_mtime: float = 0.0) -> dict:
         entry = {"nombre": nombre}
 
         # Mapear todas las columnas reconocidas
-        for col_excel, col_int in _COL_MAP.items():
+        for col_excel, col_int in _mapa_df.items():
             if col_int in ("nombre", "_completos"):
-                continue
-            if col_excel not in df.columns:
                 continue
             raw = r.get(col_excel)
             if col_int in _NUM_KEYS:
@@ -254,10 +281,8 @@ def cargar_catalogo_baterias(_mtime: float = 0.0) -> dict:
 
         # Completitud
         completo_raw = ""
-        for col_excel, col_int in _COL_MAP.items():
-            if col_int == "_completos" and col_excel in df.columns:
-                completo_raw = str(r.get(col_excel, "")).strip().lower()
-                break
+        if _col_completos_df is not None:
+            completo_raw = str(r.get(_col_completos_df, "")).strip().lower()
         entry["datos_completos"] = (completo_raw == "si")
 
         # ── Defaults seguros para cálculo ─────────────────────────────────
@@ -332,20 +357,21 @@ def diagnostico_catalogo(_mtime: float = 0.0) -> dict:
                                     header=h, engine="openpyxl")
             cols = [_normalizar_col(c) for c in df_cand.columns]
             if any(c.lower() in _MODELO_ALIASES for c in cols):
-                mapeadas    = set(_COL_MAP.keys())
-                no_mapeadas = [c for c in cols if c not in mapeadas
+                # #24 — comparación normalizada (mayúsculas/tildes no cuentan)
+                no_mapeadas = [c for c in cols
+                               if _clave_col(c) not in _COL_MAP_NORM
                                and c.lower() not in _MODELO_ALIASES
                                and "unnamed" not in c.lower()]
                 info["columnas_no_mapeadas"] = no_mapeadas
 
                 # ── #24 — Campos internos cuyo alias NO aparece en el Excel ──────────
                 # Distingue "columna existe pero celda vacía" de "columna ausente en total"
-                cols_excel_set = set(cols)
+                cols_norm_set = {_clave_col(c) for c in cols}
                 campos_sin_columna = []
                 for campo_int, aliases_sug in _CAMPO_ALIASES_SUGERIDOS.items():
-                    # Todos los alias de este campo interno en _COL_MAP
-                    aliases_del_campo = [k for k, v in _COL_MAP.items() if v == campo_int]
-                    if not any(a in cols_excel_set for a in aliases_del_campo):
+                    # Todos los alias de este campo interno en _COL_MAP (normalizados)
+                    aliases_del_campo = [k for k, v in _COL_MAP_NORM.items() if v == campo_int]
+                    if not any(a in cols_norm_set for a in aliases_del_campo):
                         campos_sin_columna.append({
                             "campo":              campo_int,
                             "critico":            campo_int in _CAMPOS_CRITICOS,
@@ -437,7 +463,7 @@ def _mapa_columnas(ws, header_row: int) -> dict:
         nombre = _normalizar_col(celda.value or "")
         if not nombre:
             continue
-        interna = _COL_MAP.get(nombre)
+        interna = _COL_MAP_NORM.get(_clave_col(nombre))
         if interna and interna not in mapa:
             mapa[interna] = celda.column
     return mapa
