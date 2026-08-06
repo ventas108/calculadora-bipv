@@ -478,7 +478,7 @@ if _descarga_btn:
                 # en cada recarga sin saber por qué.
                 st.warning(
                     "⚠️ No se pudo guardar el recurso solar en el caché de disco "
-                    f"(`{_SOLAR_CACHE_DIR}`) — revisa permisos/espacio del servidor. "
+                    f"(`{os.path.abspath(_SOLAR_CACHE_DIR)}`) — revisa permisos/espacio del servidor. "
                     "Los datos funcionan en esta sesión, pero se volverán a "
                     "descargar tras recargar o reiniciar."
                 )
