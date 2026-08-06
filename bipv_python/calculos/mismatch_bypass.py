@@ -390,7 +390,27 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
     df = df.rename(columns=rename)
 
     df = df.dropna(subset=["mes", "dia", "hora"])
-    df["mes"] = df["mes"].astype(int)
+
+    # La calculadora web exporta el mes como texto ("Mar", "Dic", "Ene"…):
+    # aceptar nombres/abreviaturas en español e inglés además de números.
+    _MESES = {
+        "ene": 1, "jan": 1, "feb": 2, "mar": 3, "abr": 4, "apr": 4,
+        "may": 5, "jun": 6, "jul": 7, "ago": 8, "aug": 8,
+        "sep": 9, "set": 9, "oct": 10, "nov": 11, "dic": 12, "dec": 12,
+    }
+
+    def _parse_mes(v: object) -> int:
+        s = str(v).strip().lower()
+        try:
+            return int(float(s))
+        except (ValueError, TypeError):
+            pass
+        m = _MESES.get(s[:3])
+        if m is None:
+            raise ValueError(f"Mes no reconocido en el CSV: '{v}'")
+        return m
+
+    df["mes"] = df["mes"].apply(_parse_mes)
     df["dia"] = df["dia"].astype(int)
 
     def _parse_hora(v: object) -> int:
