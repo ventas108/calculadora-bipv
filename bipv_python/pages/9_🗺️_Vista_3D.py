@@ -2000,7 +2000,18 @@ with tab_solar:
                 try:
                     if _tmy_s is not None:
                         _loc_s = _pv.location.Location(lat, lon, altitude=alt_m, tz="UTC")
-                        _sp_a  = _loc_s.get_solarposition(_tmy_s.index)
+                        # ── Coerce TMY index a UTC para evitar heatmap silenciosamente incorrecto
+                        _tmy_idx = _tmy_s.index
+                        if _tmy_idx.tz is None:
+                            _tmy_idx = _tmy_idx.tz_localize("UTC")
+                        elif str(_tmy_idx.tz) != "UTC":
+                            st.warning(
+                                f"⚠️ El índice del TMY tiene zona horaria `{_tmy_idx.tz}` "
+                                "(se esperaba UTC). Se convierte automáticamente a UTC "
+                                "para el cálculo de posición solar."
+                            )
+                            _tmy_idx = _tmy_idx.tz_convert("UTC")
+                        _sp_a  = _loc_s.get_solarposition(_tmy_idx)
                     else:
                         _sp_a  = _solar_anual_std(lat, lon, alt_m)
                     _sp_a_ok = True
