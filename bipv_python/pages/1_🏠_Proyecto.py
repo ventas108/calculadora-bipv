@@ -653,6 +653,43 @@ if st.button("💾 Guardar configuración", type="primary"):
         )
     st.session_state["recurso_solar_ok"] = False
 
+    # ── #64 — Si las coordenadas cambiaron, invalidar TODA la cadena solar ───
+    # No basta con recurso_solar_ok=False: Financiero, Baterías, CO₂ y el
+    # Reporte leen E_ac_anual_kWh directamente, así que una producción vieja
+    # calculada con el sol de otro lugar sobreviviría al cambio de predio.
+    _s_lat64 = st.session_state.get("_solar_lat_guardada")
+    _s_lon64 = st.session_state.get("_solar_lon_guardada")
+    if _s_lat64 is not None and (
+        abs(st.session_state["lat_proyecto"] - float(_s_lat64)) > 0.0001 or
+        abs(st.session_state["lon_proyecto"] - float(_s_lon64)) > 0.0001
+    ):
+        _CADENA_SOLAR_KEYS = (
+            # Recurso solar (Página 2)
+            "tmy_df", "poa_df", "tmy_ciudad", "poa_anual_kWh_m2",
+            "ghi_anual_kWh_m2", "t_media_anual", "zona_geo_coords",
+            "ganancia_bifacial_pct",
+            "_solar_lat_guardada", "_solar_lon_guardada", "_solar_alt_guardada",
+            # Motor Óptico (Página 5b)
+            "poa_efectiva_df",
+            # Producción (Página 6)
+            "produccion_ok", "produccion_modo_iv", "E_ac_anual_kWh",
+            "PR_sistema",
+            # Bypass (Página 5)
+            "E_ac_anual_kWh_bypass",
+            # Multi-superficie (Página 9)
+            "E_ac_anual_kWh_multisup", "poa_df_multisup",
+            "area_total_multisup", "multisup_desglose", "multisup_activo",
+        )
+        for _k64 in _CADENA_SOLAR_KEYS:
+            st.session_state.pop(_k64, None)
+        st.warning(
+            "⚠️ **Las coordenadas del proyecto cambiaron** — se invalidaron el recurso "
+            "solar y todos los resultados derivados (producción, bypass, multi-superficie). "
+            "Vuelve a ejecutar **☀️ Recurso Solar** y las páginas siguientes para que toda "
+            "la cadena use el sol de la ubicación nueva.",
+            icon="🌍",
+        )
+
     # ── Persistir a disco — sobrevive recargas y reinicios de PM2 ────────────
     _datos_json = {
         "nombre_proyecto":  nombre,
