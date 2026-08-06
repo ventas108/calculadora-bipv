@@ -232,3 +232,10 @@ uri = "file://entregables/Barrido_DCAC_Uraba.xlsx"
 type = "table"
 title = "Barrido de ratio DC/AC — Urabá 220,32 kWp"
 description = "Alternativa E: clipping, CAPEX, TIR y LCOE para capacidades AC de 100 a 220 kW con simulación horaria TMY Apartadó."
+
+[[outputs]]
+id = "N7dPaMXrW7gNezatImhMt"
+uri = "file://entregables/Ficha_Tecnica_Preliminar_Agrivoltaico_Uraba_v2.docx"
+type = "word_document"
+title = "Ficha Técnica Preliminar Urabá v2 — Word editable"
+description = "Versión corregida sin texto solapado, en formato Word editable con tablas: sitio, configuración eléctrica optimizada, producción simulada y financieros."
