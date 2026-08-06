@@ -1328,6 +1328,7 @@ if st.button("📄 Generar Reporte", type="primary", use_container_width=True,
                   if not _trm_ok_rep else None):
     with st.spinner("Generando reporte…"):
         html_bytes = generar_html_reporte().encode("utf-8")
+    st.session_state["reporte_generado"] = True  # lo lee el 🧭 Asistente
 
     st.download_button(
         label="⬇️ Descargar reporte (.html → imprimir como PDF)",

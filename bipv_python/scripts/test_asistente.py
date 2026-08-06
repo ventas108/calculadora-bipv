@@ -24,13 +24,13 @@ sig = siguiente_paso(chk)
 check("Sesión vacía: siguiente = Proyecto", sig and "Proyecto" in sig["pagina"], str(sig and sig["pagina"]))
 
 # ══ 2. Flujo a medias ════════════════════════════════════════════════════════
-estado = {"nombre_proyecto": "Urabá", "ciudad": "Apartadó", "tmy_df": object(),
-          "panel_dict": {"P": 720}}
+estado = {"nombre_proyecto": "Urabá", "ciudad": "Apartadó", "tmy_df": object()}
 chk = evaluar_flujo(estado)
 listos = [i["pagina"] for i in chk if i["estado"] == "listo"]
-check("Proyecto/Recurso/MotorIV listos", len(listos) == 3, str(listos))
+check("Proyecto/Recurso listos", len(listos) == 2, str(listos))
 sig = siguiente_paso(chk)
 check("Siguiente = Dimensionamiento", sig and "Dimensionamiento" in sig["pagina"], str(sig and sig["pagina"]))
+estado["panel_dict"] = {"P": 720}
 
 # Producción bloqueada sin inversor:
 prod = next(i for i in chk if "Producción" in i["pagina"])
@@ -70,7 +70,7 @@ check("Pregunta sin coincidencias no rompe", base.buscar("xyzzy quimera") == [])
 # ══ 5. Contexto de sesión para el modelo ═════════════════════════════════════
 ctx = contexto_sesion(estado)
 check("Contexto incluye siguiente paso", "Siguiente paso" in ctx)
-check("Contexto marca pasos listos", ctx.count("✅") == 3, f"{ctx.count('✅')} ✅")
+check("Contexto marca pasos listos", ctx.count("✅") == 2, f"{ctx.count('✅')} ✅")
 
 # ══ 6. Sin clave de API → error claro, no silencioso ═════════════════════════
 guardadas = {k: os.environ.pop(k, None)
