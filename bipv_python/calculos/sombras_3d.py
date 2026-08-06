@@ -66,6 +66,16 @@ def cargar_malla(archivo, tipo: str, escala: float = 1.0,
         obj = obj.to_mesh()
     if obj.vertices.shape[0] == 0 or obj.faces.shape[0] == 0:
         raise ValueError("El modelo no contiene geometría (¿exportaste solo aristas?)")
+    if not np.isfinite(obj.vertices).all():
+        obj.update_vertices(np.isfinite(obj.vertices).all(axis=1))
+        if obj.faces.shape[0] == 0:
+            raise ValueError("El modelo solo contiene geometría inválida (vértices no finitos)")
+    if obj.faces.shape[0] > MAX_TRIANGULOS:
+        raise ValueError(
+            f"El modelo tiene {obj.faces.shape[0]:,} triángulos (máx. {MAX_TRIANGULOS:,}). "
+            "Simplifícalo en SketchUp: borra mobiliario/detalle, deja solo los volúmenes "
+            "que producen sombra."
+        )
 
     if escala and escala != 1.0:
         obj.apply_scale(float(escala))
@@ -74,6 +84,45 @@ def cargar_malla(archivo, tipo: str, escala: float = 1.0,
         ang = -np.deg2rad(float(rotacion_norte_deg))
         obj.apply_transform(trimesh.transformations.rotation_matrix(ang, [0, 0, 1]))
     return obj
+
+
+MAX_TRIANGULOS = 300_000     # más allá, el ray-casting puro-Python se vuelve inviable
+MAX_RAYOS = 6_000_000        # presupuesto puntos × horas con sol
+
+
+def estimar_rayos(n_puntos: int, n_horas_sol: int = 4400) -> int:
+    return int(n_puntos) * int(n_horas_sol)
+
+
+def validar_puntos(malla, puntos: list[dict], offset: float = OFFSET_RAYO_M) -> list[str]:
+    """
+    Devuelve lista de advertencias/errores por punto:
+    - punto DENTRO de un sólido cerrado (reportaría sombra total falsa),
+    - punto pegado (< offset×2) a la malla (el rayo puede nacer dentro del obstáculo).
+    """
+    avisos = []
+    coords = np.array([[float(p["x"]), float(p["y"]), float(p["z"])] for p in puntos])
+    if not np.isfinite(coords).all():
+        return ["Hay coordenadas no numéricas en los puntos."]
+    try:
+        if malla.is_watertight:
+            dentro = malla.contains(coords)
+            for p, d in zip(puntos, dentro):
+                if d:
+                    avisos.append(
+                        f"El punto «{p.get('nombre', '?')}» está DENTRO del modelo — "
+                        "daría sombra total falsa. Revisa sus coordenadas."
+                    )
+        cercania = trimesh.proximity.signed_distance(malla, coords)
+        for p, dist in zip(puntos, np.abs(cercania)):
+            if np.isfinite(dist) and dist < offset * 2:
+                avisos.append(
+                    f"El punto «{p.get('nombre', '?')}» está a {dist*100:.0f} cm de la malla — "
+                    "muy pegado al obstáculo, el resultado puede ser ambiguo."
+                )
+    except Exception:
+        pass  # validación best-effort: nunca debe tumbar el cálculo
+    return avisos
 
 
 def resumen_malla(malla) -> dict:

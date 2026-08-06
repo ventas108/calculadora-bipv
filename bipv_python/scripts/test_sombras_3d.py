@@ -102,7 +102,24 @@ check("Parser usa FS_geometrico (sombra física)",
       "informativo")
 check("FS parseado en [0,1]", df_parse["FS"].between(0, 1).all())
 
-# ══ 8. Estadísticas ══════════════════════════════════════════════════════════
+# ══ 8. Validaciones geométricas y bordes ═════════════════════════════════════
+from calculos.sombras_3d import validar_puntos, estimar_rayos, MAX_RAYOS
+
+p_dentro = [{"nombre": "Adentro", "fachada": "F", "x": 10.0, "y": 0.0, "z": 10.0}]
+avisos = validar_puntos(muro, p_dentro)
+check("Detecta punto DENTRO del sólido", any("DENTRO" in a for a in avisos), str(avisos[:1]))
+avisos_ok = validar_puntos(muro, punto)
+check("Punto normal sin aviso de interior", not any("DENTRO" in a for a in avisos_ok))
+check("Presupuesto de rayos: 2000 puntos exceden el máximo",
+      estimar_rayos(2000) > MAX_RAYOS)
+
+# Año bisiesto (8784 h) — no debe romper la alineación
+idx_bis = pd.date_range("2020-01-01", periods=8784, freq="h", tz="America/Bogota")
+sol_bis = posiciones_solares(LAT, LON, idx_bis)
+check("Índice bisiesto de 8784 h soportado", len(sol_bis) == 8784
+      and ((sol_bis["mes"] == 2) & (sol_bis["dia"] == 29)).any())
+
+# ══ 9. Estadísticas ══════════════════════════════════════════════════════════
 s = resumen_fs(df)
 check("Resumen: 1 punto y % de sombra > 0", s["puntos"] == 1 and s["pct_horas_con_sombra"] > 0)
 

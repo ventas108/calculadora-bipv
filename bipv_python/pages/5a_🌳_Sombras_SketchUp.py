@@ -17,12 +17,15 @@ import streamlit as st
 st.set_page_config(page_title="Sombras desde SketchUp", page_icon="🌳", layout="wide")
 
 from calculos.sombras_3d import (
+    MAX_RAYOS,
     TRIMESH_OK,
     calcular_fs_horario,
     cargar_malla,
+    estimar_rayos,
     exportar_csv_fs,
     resumen_fs,
     resumen_malla,
+    validar_puntos,
 )
 
 st.title("🌳 Sombras desde tu modelo de SketchUp")
@@ -116,7 +119,9 @@ df_pts = st.data_editor(
 st.session_state["sk_puntos_df"] = df_pts
 st.caption(
     "Coordenadas en el sistema del modelo (X=Este/rojo, Y=Norte/verde, Z=altura), en metros. "
-    "La **Fachada** permite filtrar en la Página 5 (igual que en la Calculadora web)."
+    "La **Fachada** permite filtrar en la Página 5 (igual que en la Calculadora web). "
+    "⚠️ Importante: la Página 5 PROMEDIA los puntos de cada hora con igual peso — usa un punto "
+    "por fila de módulos y procura que cada fila tenga un número similar de módulos."
 )
 
 transparencia = st.slider(
@@ -148,11 +153,28 @@ if _tmy is not None:
         "del CSV coinciden 1:1 con las que usa 📊 Producción."
     )
 else:
-    st.warning(
-        "⚠️ No hay TMY cargado en la sesión: se usará un año típico en hora local. "
-        "Recomendado: corre antes ☀️ Recurso Solar para alineación perfecta con Producción.",
-        icon="⚠️",
+    st.error(
+        "⛔ No hay TMY cargado en la sesión. Sin el TMY del proyecto las horas del CSV "
+        "NO coinciden con las de Producción (el TMY de PVGIS viene en UTC) y la sombra "
+        "quedaría corrida ~5 horas. **Corre primero ☀️ Recurso Solar** y vuelve."
     )
+    st.stop()
+
+# ── Firma de entradas: si algo cambia, el resultado anterior se invalida ─────
+_firma = None
+if archivo is not None:
+    import hashlib
+    _firma = hashlib.sha256(
+        archivo.getvalue()
+        + repr((escala, rot_norte, transparencia, round(lat, 4), round(lon, 4),
+                len(_tmy) if _tmy is not None else 0,
+                df_pts.to_json())).encode()
+    ).hexdigest()
+if st.session_state.get("sk_firma") not in (None, _firma):
+    # cambió el modelo o algún parámetro → el cálculo viejo ya no es válido
+    st.session_state.pop("sk_df_fs", None)
+    st.session_state.pop("csv_fs_sketchup_bytes", None)
+    st.session_state.pop("csv_fs_sketchup_nombre", None)
 
 if st.button("▶️ Calcular sombras (ray-casting)", type="primary",
              disabled=(malla is None)):
@@ -167,15 +189,23 @@ if st.button("▶️ Calcular sombras (ray-casting)", type="primary",
             continue
     if not puntos:
         st.error("Define al menos un punto de análisis válido.")
+    elif estimar_rayos(len(puntos)) > MAX_RAYOS:
+        st.error(
+            f"Demasiados puntos ({len(puntos)}): serían más de {MAX_RAYOS:,} rayos. "
+            "Reduce a un punto por FILA de módulos (no por módulo)."
+        )
     else:
+        for _aviso in validar_puntos(malla, puntos):
+            st.warning(_aviso, icon="⚠️")
         with st.spinner(f"Lanzando rayos para {len(puntos)} punto(s) × horas con sol…"):
             try:
                 df_fs = calcular_fs_horario(
                     malla, puntos, lat, lon,
-                    indice_tmy=_tmy.index if _tmy is not None else None,
+                    indice_tmy=_tmy.index,
                     transparencia=transparencia,
                 )
                 st.session_state["sk_df_fs"] = df_fs
+                st.session_state["sk_firma"] = _firma
             except Exception as e:
                 st.error(f"❌ Error en el cálculo: {e}")
 
