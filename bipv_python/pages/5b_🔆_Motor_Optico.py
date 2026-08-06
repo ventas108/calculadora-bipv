@@ -4,9 +4,6 @@ Cascada de correcciones reales: IAM · Soiling · Modelo Térmico Confinado
 Auto-llenado desde el panel configurado en Proyecto.
 """
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
@@ -19,6 +16,10 @@ from calculos.motor_optico import (
 )
 
 st.set_page_config(page_title="Motor Óptico — BIPV", page_icon="🔆", layout="wide")
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 st.title("🔆 Motor Óptico BIPV")

@@ -4,12 +4,13 @@ Genera un reporte descargable con todos los resultados del proyecto.
 Incluye notas explicativas en cada sección para comprensión del usuario.
 """
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 import datetime
 
 st.set_page_config(page_title="Reporte PDF — BIPV", page_icon="📄", layout="wide")
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 st.title("📄 Reporte Técnico del Proyecto")

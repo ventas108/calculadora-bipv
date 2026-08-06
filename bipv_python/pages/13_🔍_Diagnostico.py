@@ -1,9 +1,6 @@
 """Página 13 — Diagnóstico de sistema solar instalado (BIPV y Convencional)."""
 
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
@@ -22,6 +19,10 @@ st.set_page_config(
     page_icon="🔍",
     layout="wide",
 )
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 

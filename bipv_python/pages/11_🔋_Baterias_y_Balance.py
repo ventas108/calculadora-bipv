@@ -4,9 +4,6 @@ B-6: Dimensionado eléctrico strings + baterías
 B-7: Balance energético mensual + Clasificación A+/A/B/C/D
 """
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -35,6 +32,10 @@ st.set_page_config(
     page_icon="🔋",
     layout="wide",
 )
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 st.title("🔋 Baterías y Balance Energético")

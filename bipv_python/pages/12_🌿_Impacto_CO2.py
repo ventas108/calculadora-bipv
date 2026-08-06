@@ -13,9 +13,6 @@ Estándares aplicados:
 """
 
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
@@ -25,6 +22,10 @@ import datetime
 from datos.ciudades_colombia import FACTOR_CO2_COLOMBIA_KG_KWH
 
 st.set_page_config(page_title="Huella CO₂ — BIPV", page_icon="🌿", layout="wide")
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 st.title("🌿 Huella de Carbono Evitada")

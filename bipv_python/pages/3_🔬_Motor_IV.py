@@ -5,9 +5,6 @@ suficiente (Voc, Isc, Vmp, Imp, N_s/NsA), el motor carga y ejecuta
 automáticamente sin que el usuario tenga que hacer nada.
 """
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 import numpy as np
 import plotly.graph_objects as go
 
@@ -24,6 +21,10 @@ from datos.tecnologias_bipv import ASP_ST1_T40, MODULOS_BIPV
 from datos.catalogo_paneles_excel import cargar_catalogo_paneles
 
 st.set_page_config(page_title="Motor IV — BIPV", page_icon="🔬", layout="wide")
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 st.title("🔬 Motor I-V — Modelo De Soto 2006")

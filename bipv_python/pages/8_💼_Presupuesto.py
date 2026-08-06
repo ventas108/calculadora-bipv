@@ -1,13 +1,14 @@
 """Página 8 — Presupuesto Bancable BIPV — CAPEX + Costos Blandos + OPEX Anual."""
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 import pandas as pd
 from datetime import date
 from calculos.trm_utils import init_trm, trm_widget
 
 st.set_page_config(page_title="Presupuesto BIPV", page_icon="💼", layout="wide")
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 init_trm()   # fetch TRM del API en primera carga; garantiza session_state["tipo_cambio"]

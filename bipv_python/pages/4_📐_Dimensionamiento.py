@@ -1,9 +1,6 @@
 """Página 4 — Dimensionamiento de strings."""
 import math
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 import pandas as pd
 import plotly.graph_objects as go
 from calculos.dimensionamiento import optimizar_n_serie, dimensionar_sistema
@@ -15,6 +12,10 @@ from datos.catalogo_inversores import INVERSORES, seleccionar_inversor
 from calculos.panel_iv_check import analizar_panel_motiv as _check_iv_dim
 
 st.set_page_config(page_title="Dimensionamiento — BIPV", page_icon="📐", layout="wide")
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 st.title("📐 Dimensionamiento de Strings")

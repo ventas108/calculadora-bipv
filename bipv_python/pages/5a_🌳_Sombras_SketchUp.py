@@ -14,10 +14,11 @@ Las dos rutas (web y SketchUp) conviven — nada de lo existente cambia.
 import pandas as pd
 import streamlit as st
 
+st.set_page_config(page_title="Sombras desde SketchUp", page_icon="🌳", layout="wide")
+
 from calculos.auth import requerir_login
 requerir_login()
 
-st.set_page_config(page_title="Sombras desde SketchUp", page_icon="🌳", layout="wide")
 
 from calculos.sombras_3d import (
     MAX_RAYOS,

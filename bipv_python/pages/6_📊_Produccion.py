@@ -1,8 +1,5 @@
 """Página 6 — Producción anual BIPV (IEC 61724)."""
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
@@ -16,6 +13,10 @@ from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_ex
 from datos.catalogo_inversores_excel import cargar_catalogo_inversores
 
 st.set_page_config(page_title="Producción — BIPV", page_icon="📊", layout="wide")
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 st.title("📊 Producción Anual — IEC 61724")

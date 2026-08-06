@@ -11,9 +11,6 @@ Flujo:
 """
 
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 from calculos.pdf_inversor_extractor import (
     extraer_parametros_inversor,
     pdf_disponible,
@@ -34,6 +31,10 @@ from calculos.seleccion_modelo_inversor import (
 )
 
 st.set_page_config(page_title="Catálogo Inversores PDF", page_icon="🔌", layout="wide")
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 st.title("🔌 Catálogo de Inversores — Agregar / Editar desde PDF")

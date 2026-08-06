@@ -7,9 +7,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
 
-from calculos.auth import requerir_login
-requerir_login()
-
 from calculos.asistente import (
     BaseConocimiento,
     RUTA_BASE_CONOCIMIENTO,
@@ -20,6 +17,10 @@ from calculos.asistente import (
 )
 
 st.set_page_config(page_title="Asistente", page_icon="🧭", layout="wide")
+
+from calculos.auth import requerir_login
+requerir_login()
+
 st.title("🧭 Asistente de la Calculadora")
 st.caption(
     "El asistente **orienta, no modifica**: la guía lee el estado real de tu sesión y "

@@ -2,9 +2,6 @@
 import os
 import pickle
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 import plotly.graph_objects as go
 import pandas as pd
 
@@ -81,6 +78,10 @@ from calculos.tz_utils import utc_offset_latam, tz_label
 from calculos.invalidacion import KEYS_DERIVADOS_POA
 
 st.set_page_config(page_title="Recurso Solar — BIPV", page_icon="☀️", layout="wide")
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 st.title("☀️ Recurso Solar")

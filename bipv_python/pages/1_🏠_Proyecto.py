@@ -2,9 +2,6 @@
 import json
 import os
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 from datetime import date
 from datos.ciudades_colombia import CIUDADES, LISTA_CIUDADES, FECHA_VALIDACION_TARIFAS
 from calculos.tz_utils import utc_offset_latam, tz_label
@@ -81,6 +78,10 @@ if "proyecto_cargado_desde_disco" not in st.session_state:
     st.session_state["proyecto_cargado_desde_disco"] = True
 
 st.set_page_config(page_title="Proyecto — BIPV", page_icon="🏠", layout="wide")
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 st.title("🏠 Datos del Proyecto")

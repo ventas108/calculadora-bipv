@@ -1,8 +1,5 @@
 """Página 5 — Mismatch y pérdidas de sombreado."""
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
@@ -28,6 +25,10 @@ from calculos.tz_utils import utc_offset_latam, tz_label
 from datos.tecnologias_bipv import MODULOS_BIPV
 
 st.set_page_config(page_title="Mismatch — BIPV", page_icon="🔀", layout="wide")
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 st.title("🔀 Mismatch y Pérdidas de Sombreado")

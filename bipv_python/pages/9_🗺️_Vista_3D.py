@@ -1,9 +1,6 @@
 """Página 9 — Vista 3D del sitio: mapa geolocalizado y modelo volumétrico BIPV."""
 import math
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 import plotly.graph_objects as go
 
 from datos.ciudades_colombia import CIUDADES
@@ -48,6 +45,10 @@ def _interp_horizonte(puntos_az_el: list, az_array) -> "np.ndarray":
     return np.interp(np.asarray(az_array, dtype=float), azs_e, els_e)
 
 st.set_page_config(page_title="Vista 3D — BIPV", page_icon="🗺️", layout="wide")
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 st.title("🗺️ Vista 3D del Sitio")

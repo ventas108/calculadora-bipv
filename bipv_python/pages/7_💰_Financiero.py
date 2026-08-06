@@ -1,9 +1,6 @@
 
 """Página 7 — Análisis financiero BIPV — Ley 1715 de 2014 (Colombia)."""
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
@@ -20,6 +17,10 @@ from calculos.trm_utils import init_trm, trm_widget
 from calculos.tarifa_utils import init_tarifa, tarifa_widget
 
 st.set_page_config(page_title="Financiero — BIPV", page_icon="💰", layout="wide")
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 init_trm()   # fetch TRM del API en primera carga; session_state["tipo_cambio"] listo antes de línea 126

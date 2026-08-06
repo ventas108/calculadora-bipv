@@ -1,8 +1,5 @@
 """Página 14 — Agregar, editar y eliminar paneles del catálogo (#65 + #129 + #130)."""
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 import pandas as pd
 
 from calculos.pdf_panel_extractor import (
@@ -15,6 +12,10 @@ from datos.catalogo_paneles_excel import (
 )
 
 st.set_page_config(page_title="Catálogo Paneles — BIPV", page_icon="📋", layout="wide")
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 st.title("📋 Catálogo de Paneles — Agregar / Editar desde PDF")

@@ -12,9 +12,6 @@ del mismo fabricante, o para añadirlo como nuevo caso de prueba.
 """
 
 import streamlit as st
-
-from calculos.auth import requerir_login
-requerir_login()
 import pandas as pd
 import sys, os
 
@@ -34,6 +31,10 @@ from scripts.casos_test_inversores import CASOS
 from calculos.campos_inversor import CAMPOS_CRITICOS, CAMPO_LABELS
 
 st.set_page_config(page_title="Test Extractor Inversores", page_icon="🧪", layout="wide")
+
+from calculos.auth import requerir_login
+requerir_login()
+
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 st.title("🧪 Harness — Cobertura del Extractor de Inversores")
