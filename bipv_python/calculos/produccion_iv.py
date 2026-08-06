@@ -42,6 +42,11 @@ def preparar_para_iv(panel: dict) -> tuple:
     pero sin SDM precalibrado caían al modelo lineal simplificado aunque el
     Motor IV sí sabía estimar sus parámetros.
     """
+    # Un panel ya preparado por esta función conserva su procedencia (el dict
+    # estimado pasa tiene_sdm_completo y sin esta marca se re-clasificaría
+    # como "calibrado" al re-entrar, perdiendo la trazabilidad).
+    if panel.get("_sdm_estimado"):
+        return panel, "estimado_ficha"
     if tiene_sdm_completo(panel):
         return panel, "calibrado"
     try:
@@ -49,7 +54,11 @@ def preparar_para_iv(panel: dict) -> tuple:
     except Exception:
         _prep = None
     if _prep is not None and tiene_sdm_completo(_prep):
-        return _prep, "estimado_ficha"
+        # Merge sobre el panel original: estimar_sdm_desde_ficha devuelve un
+        # dict nuevo SIN metadatos del catálogo (NOCT, área, N_s...). Sin el
+        # merge, la simulación caería al NOCT default 45°C aunque la ficha
+        # tenga otro valor.
+        return {**panel, **_prep, "_sdm_estimado": True}, "estimado_ficha"
     return None, None
 
 

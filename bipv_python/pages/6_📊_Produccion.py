@@ -197,6 +197,12 @@ if _panel_apto_iv:
                 "verifica en 🔬 **Motor IV** que la curva reproduce la ficha (error < 5%)."
             )
 else:
+    # #105: si el panel cambió a uno NO apto, limpiar el estado IV anterior —
+    # sin esto quedaría el toggle en True y una comparación IV de OTRO panel.
+    if st.session_state.get("produccion_usar_iv") or st.session_state.get("res_produccion_iv") is not None:
+        st.session_state["produccion_usar_iv"] = False
+        st.session_state["res_produccion_iv"]  = None
+        st.session_state["produccion_modo_iv"] = False
     st.caption(
         "ℹ️ El modo **curva IV real (Motor IV)** no está disponible: este panel no tiene "
         "ni parámetros SDM calibrados ni ficha completa (Voc, Isc, Vmp, Imp y N_s) para "
@@ -269,12 +275,21 @@ if btn_sim or st.session_state.get("produccion_ok"):
                    delta=f"{e_iv - e_base:+,.0f} kWh")
 
         if abs(dif_pct) > 10.0:
-            st.error(
-                f"🔴 **La curva IV difiere {dif_pct:+.1f}% del modelo base (> ±10%).**  \n"
-                "Es una señal de **datos de ficha inconsistentes** (Voc/Isc/Vmp/Imp, "
-                "N_s half-cut, o parámetros SDM mal calibrados). Revisa la ficha en "
-                "🔬 **Motor IV** antes de usar este resultado en el análisis financiero."
-            )
+            if res_iv.get("sdm_origen") == "estimado_ficha":
+                st.error(
+                    f"🔴 **La curva IV difiere {dif_pct:+.1f}% del modelo base (> ±10%).**  \n"
+                    "El SDM de este panel fue **estimado desde la ficha** y aquí se compara "
+                    "contra el modelo lineal: una divergencia así sugiere que la estimación "
+                    "no reproduce bien la ficha (Voc/Isc/Vmp/Imp o N_s half-cut). Valida la "
+                    "curva en 🔬 **Motor IV** antes de usar este resultado en Financiero."
+                )
+            else:
+                st.error(
+                    f"🔴 **La curva IV difiere {dif_pct:+.1f}% del modelo base (> ±10%).**  \n"
+                    "Es una señal de **datos de ficha inconsistentes** (Voc/Isc/Vmp/Imp, "
+                    "N_s half-cut, o parámetros SDM mal calibrados). Revisa la ficha en "
+                    "🔬 **Motor IV** antes de usar este resultado en el análisis financiero."
+                )
         else:
             st.success(
                 f"🟢 Ambos modelos coinciden dentro de ±10% (diferencia {dif_pct:+.1f}%). "
