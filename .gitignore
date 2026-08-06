@@ -123,3 +123,4 @@ attached_assets/Pasted--venv-root-bipv-colombia-var-www-bipv-calculadora-bipv-_1
 
 # Base de datos de usuarios (solo servidor)
 bipv_python/datos/usuarios.db*
+bipv_python/datos/codigo_configuracion.txt

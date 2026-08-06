@@ -26,7 +26,8 @@ _DIR_BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RUTA_DB = os.path.join(_DIR_BASE, "datos", "usuarios.db")
 
 _PBKDF2_ITERS = 200_000
-DIAS_TOKEN_SESION = 30          # vigencia del "recuérdame" en el navegador
+DIAS_TOKEN_SESION = 7           # vigencia del "recuérdame"; se rota en cada restauración
+RUTA_CODIGO_SETUP = os.path.join(_DIR_BASE, "datos", "codigo_configuracion.txt")
 PLANES = ("prueba", "mensual", "anual", "ilimitado")
 
 CONTACTO_RENOVACION = (
@@ -163,20 +164,34 @@ def esta_vigente(usuario: dict) -> bool:
 
 
 def extender_vencimiento(email: str, dias: int, ruta: str | None = None) -> str:
-    """Suma días desde hoy o desde el vencimiento futuro (lo que sea mayor)."""
-    u = obtener_usuario(email, ruta)
-    if not u:
-        raise ValueError("Usuario no encontrado.")
-    base = date.today()
-    if u["fecha_vencimiento"]:
-        v = date.fromisoformat(u["fecha_vencimiento"])
-        if v > base:
-            base = v
-    nuevo = (base + timedelta(days=dias)).isoformat()
-    with _conn(ruta) as con:
+    """Suma días desde hoy o desde el vencimiento futuro (lo que sea mayor).
+
+    Transacción BEGIN IMMEDIATE: dos renovaciones concurrentes no pierden días.
+    """
+    email = _norm_email(email)
+    con = _conn(ruta)
+    try:
+        con.execute("BEGIN IMMEDIATE")
+        row = con.execute(
+            "SELECT fecha_vencimiento FROM usuarios WHERE email=?",
+            (email,)).fetchone()
+        if not row:
+            raise ValueError("Usuario no encontrado.")
+        base = date.today()
+        if row["fecha_vencimiento"]:
+            v = date.fromisoformat(row["fecha_vencimiento"])
+            if v > base:
+                base = v
+        nuevo = (base + timedelta(days=dias)).isoformat()
         con.execute("UPDATE usuarios SET fecha_vencimiento=? WHERE email=?",
-                    (nuevo, _norm_email(email)))
-    return nuevo
+                    (nuevo, email))
+        con.commit()
+        return nuevo
+    except BaseException:
+        con.rollback()
+        raise
+    finally:
+        con.close()
 
 
 def actualizar_usuario(email: str, *, plan: str | None = None,
@@ -284,23 +299,55 @@ def _login_form(st) -> None:
     st.info("¿No tienes cuenta o venció tu acceso? " + CONTACTO_RENOVACION)
 
 
+def _codigo_setup(ruta: str | None = None) -> str:
+    """Código de un solo uso para el bootstrap del primer admin.
+
+    Se genera aleatorio en datos/codigo_configuracion.txt (solo legible por
+    quien tiene acceso SSH al servidor). Evita que un visitante cualquiera
+    se cree la cuenta de administrador en el primer arranque.
+    """
+    path = ruta or RUTA_CODIGO_SETUP
+    if not os.path.exists(path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(secrets.token_hex(4).upper())
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass
+    with open(path, encoding="utf-8") as f:
+        return f.read().strip()
+
+
 def _form_primer_admin(st) -> None:
     st.title("⚙️ Configuración inicial")
+    codigo_real = _codigo_setup()
     st.warning("No existe ningún usuario todavía. Crea la cuenta del "
                "**administrador** (tú). Esto solo se hace una vez.")
+    st.info("Por seguridad necesitas el **código de configuración**. "
+            "Léelo en el servidor con:\n\n"
+            "`cat /var/www/bipv/calculadora-bipv/bipv_python/datos/codigo_configuracion.txt`")
     with st.form("form_admin_inicial"):
+        codigo = st.text_input("Código de configuración")
         nombre = st.text_input("Tu nombre")
         email = st.text_input("Correo del administrador")
         p1 = st.text_input("Contraseña", type="password")
         p2 = st.text_input("Repite la contraseña", type="password")
         ok = st.form_submit_button("Crear administrador", type="primary")
     if ok:
+        if not hmac.compare_digest(codigo.strip().upper(), codigo_real):
+            st.error("Código de configuración incorrecto.")
+            return
         if p1 != p2:
             st.error("Las contraseñas no coinciden.")
             return
         try:
             crear_usuario(email, p1, nombre or "Administrador",
                           rol="admin", plan="ilimitado", dias_vigencia=None)
+            try:
+                os.remove(RUTA_CODIGO_SETUP)   # código de un solo uso
+            except OSError:
+                pass
             st.success("Administrador creado. Ingresa con tu correo y contraseña.")
             st.rerun()
         except ValueError as e:
@@ -343,16 +390,27 @@ def requerir_login(solo_admin: bool = False):
         _form_primer_admin(st)
         st.stop()
 
-    # Restaurar sesión por token en URL (sobrevive al refresco del navegador)
+    # Restaurar sesión por token en URL (sobrevive al refresco del navegador).
+    # El token se ROTA en cada restauración: el que quedó en historial/logs
+    # muere de inmediato y se emite uno nuevo.
     if "auth_email" not in st.session_state:
         token = st.query_params.get("s", "")
         u = usuario_por_token(token)
         if u and u["activo"]:
+            borrar_token(token)
+            nuevo = crear_token_sesion(u["email"])
             st.session_state["auth_email"] = u["email"]
-            st.session_state["auth_token"] = token
+            st.session_state["auth_token"] = nuevo
+            st.query_params["s"] = nuevo
 
     if "auth_email" not in st.session_state:
         _login_form(st)
+        st.stop()
+
+    # Revocación efectiva: si el token de esta sesión ya no existe en la DB
+    # (cambio de contraseña, desactivación, logout remoto), se cierra aquí.
+    if usuario_por_token(st.session_state.get("auth_token", "")) is None:
+        cerrar_sesion(st)
         st.stop()
 
     usuario = usuario_actual(st)
