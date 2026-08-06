@@ -560,6 +560,22 @@ csv_file = st.file_uploader(
     help="CSV exportado por la Calculadora de Factor de Sombreado BIPV",
 )
 
+# ── CSV generado en 🌳 Sombras SketchUp (misma sesión) ──────────────────────
+_csv_sk = st.session_state.get("csv_fs_sketchup_bytes")
+if _csv_sk is not None and csv_file is None:
+    _nom_sk = st.session_state.get("csv_fs_sketchup_nombre", "sombras_sketchup.csv")
+    if st.button(f"🌳 Usar el CSV generado en Sombras SketchUp ({_nom_sk})"):
+        try:
+            import io as _io
+            df_fs_raw, _meta_fs = cargar_csv_fs(_io.BytesIO(_csv_sk))
+            st.session_state["df_fs_raw"] = df_fs_raw
+            st.session_state["meta_fs"]   = _meta_fs
+            st.session_state["csv_fs_ok"] = True
+            st.success("CSV de SketchUp cargado — continúa igual que con un CSV subido.")
+        except Exception as e:
+            st.error(f"❌ Error al leer el CSV de SketchUp: {e}")
+            st.session_state["csv_fs_ok"] = False
+
 # Mantener CSV cargado entre reruns
 if csv_file is not None:
     try:

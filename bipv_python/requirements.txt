@@ -13,3 +13,4 @@ fpdf2==2.7.9
 pdfplumber==0.11.4
 pdf2image==1.17.0
 pytesseract==0.3.13
+trimesh>=4.0
