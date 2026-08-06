@@ -1310,7 +1310,20 @@ def generar_html_reporte() -> str:
 
 
 # ── Botón de generación ────────────────────────────────────────────────────────
-if st.button("📄 Generar Reporte", type="primary", use_container_width=True, key="btn_generar"):
+# #174 — misma guardia TRM que la cotización (#171): no generar un reporte al
+# cliente con TRM en cero o sin confirmar (API caída → "valor por defecto").
+from calculos.trm_utils import trm_confirmada as _trm_confirmada, trm_error_msg as _trm_error_msg
+_trm_ok_rep, _tc_rep, _ = _trm_confirmada()
+if not _trm_ok_rep:
+    st.error(
+        _trm_error_msg(_tc_rep)
+        + "  \nEl campo TRM está en **💼 Presupuesto** o **💰 Financiero**."
+    )
+
+if st.button("📄 Generar Reporte", type="primary", use_container_width=True,
+             key="btn_generar", disabled=not _trm_ok_rep,
+             help="La TRM debe estar confirmada antes de generar el reporte."
+                  if not _trm_ok_rep else None):
     with st.spinner("Generando reporte…"):
         html_bytes = generar_html_reporte().encode("utf-8")
 

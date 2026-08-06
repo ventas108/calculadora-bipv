@@ -1149,8 +1149,8 @@ Nominal output voltage 400V
     # "Max. DC Input Power (W)", "PV Input Current (A) 13+13",
     # "Max. PV ISC (A) 17+17", "Number of MPPT / Strings per MPPT 2/1+1".
     # El harness fusiona valores_por_modelo[modelo] → se valida la columna 7.6K.
-    # Nota: Vdc_max se omite a propósito — la ficha solo publica el rango
-    # "370 (125~500)" y el global aún no lo resuelve (pendiente aparte).
+    # #175: Vdc_max = 500 — límite superior del paréntesis de
+    # "Rated PV Input Voltage (V) 370 (125~500)" (no el tope MPPT 425).
     # ─────────────────────────────────────────────────────────────────────────
     {
         "fabricante": "Deye",
@@ -1172,6 +1172,7 @@ Max. PV ISC (A)                  17+17      34+17      34+34      34+34
 Number of MPPT / Strings per MPPT 2/1+1     2/2+1      2/2+2      2/2+2
 """,
         "esperado": {
+            "Vdc_max":            500,
             "Vmppt_min":          150,
             "Vmppt_max":          425,
             "V_arranque":         125,

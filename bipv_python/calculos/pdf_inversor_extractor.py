@@ -1170,6 +1170,23 @@ def _extraer_campos(texto: str) -> dict:
     # ── Vdc_max ───────────────────────────────────────────────────────────────
     Vdc_max = _find(_PAT_VDCMAX, texto)
 
+    # #175 — Deye SUN-*K-SG01LP1: no publican "Max. PV input voltage" explícito;
+    # solo "Rated PV Input Voltage (V) 370 (125~500)". El límite físico real es
+    # el tope del rango entre paréntesis (500), no el tope del rango MPPT a
+    # plena carga (425). Solo aplica si no hubo etiqueta Max explícita.
+    if Vdc_max is None:
+        m_rated_rng = re.search(
+            r"Rated\s+PV\s+Input\s+Voltage\s*(?:\(\s*V\s*\))?"
+            # pdftotext -layout puede dejar ~100 espacios entre etiqueta, valor
+            # nominal y el paréntesis: "Rated PV Input Voltage (V)   370 (125~500)"
+            r"[^\n(]{0,120}\(\s*([0-9]{2,4})\s*[~\-–]\s*([0-9]{2,4})\s*\)",
+            texto, re.IGNORECASE,
+        )
+        if m_rated_rng:
+            _lo_r, _hi_r = _num(m_rated_rng.group(1)), _num(m_rated_rng.group(2))
+            if _lo_r and _hi_r and _lo_r < _hi_r and _hi_r > 100:
+                Vdc_max = _hi_r
+
     # ── Rango MPPT (Vmppt_min, Vmppt_max) ────────────────────────────────────
     Vmppt_min, Vmppt_max = _find_range(_LABEL_MPPT_RANGE, texto)
 

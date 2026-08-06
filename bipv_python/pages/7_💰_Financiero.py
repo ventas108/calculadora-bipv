@@ -1278,7 +1278,15 @@ if btn_fin or st.session_state.get("financiero_ok"):
         "Genera un PDF técnico completo con datos del proyecto, producción anual, "
         "indicadores financieros TIR · VPN · Payback · LCOE y beneficios Ley 1715."
     )
-    if st.button("📄 Exportar reporte PDF", use_container_width=True):
+    # #174 — misma guardia TRM que la cotización (#171): el PDF financiero al
+    # cliente no debe salir con TRM en cero ni con el valor por defecto sin confirmar.
+    from calculos.trm_utils import trm_confirmada as _trm_confirmada, trm_error_msg as _trm_error_msg
+    _trm_ok_fin, _tc_fin, _ = _trm_confirmada()
+    if not _trm_ok_fin:
+        st.error(_trm_error_msg(_tc_fin) + "  \nEl campo TRM está en la **Sección 2** de esta página.")
+    if st.button("📄 Exportar reporte PDF", use_container_width=True,
+                 disabled=not _trm_ok_fin,
+                 help="Confirma la TRM (Sección 2) antes de exportar." if not _trm_ok_fin else None):
         try:
             from utils.generador_reporte import generar_pdf, nombre_archivo
             with st.spinner("Generando PDF..."):

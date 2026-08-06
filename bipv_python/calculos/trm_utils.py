@@ -90,6 +90,38 @@ def init_trm(default: float = TRM_DEFAULT) -> None:
             st.session_state[_KEY_FUENTE] = "valor por defecto"
 
 
+# ── Guardia compartida (#171/#174) ────────────────────────────────────────────
+def trm_confirmada() -> tuple[bool, float, str]:
+    """(ok, tc, fuente) — política única de TRM confirmada para exportaciones.
+
+    ok=False si la TRM es <= 0 o si la fuente sigue en "valor por defecto"
+    (la API falló y nadie confirmó/editó el valor). La TRM de API o manual
+    (editada o confirmada con el botón ✔️ del widget) SÍ habilita.
+    Usada por: 💼 Presupuesto (cotización), 💰 Financiero (reporte PDF),
+    📄 Reporte PDF (generación).
+    """
+    tc     = float(st.session_state.get(_KEY_VALOR, 0.0) or 0.0)
+    fuente = str(st.session_state.get(_KEY_FUENTE, "valor por defecto"))
+    return (tc > 0 and fuente != "valor por defecto"), tc, fuente
+
+
+def trm_error_msg(tc: float) -> str:
+    """Mensaje estándar cuando la TRM no está confirmada (para st.error)."""
+    if tc <= 0:
+        return (
+            "❌ TRM no disponible — la tasa de cambio es cero. Actualiza la TRM "
+            "(botón 🔄 del campo TRM) o ingrésala manualmente: el documento "
+            "saldría con todos los valores COP en cero."
+        )
+    return (
+        f"❌ TRM sin confirmar — la API del Banco de la República no respondió "
+        f"y se está usando el valor por defecto ({tc:,.0f} COP/USD). Clica 🔄 "
+        "junto al campo TRM para obtener la tasa oficial, edita el valor "
+        "manualmente, o usa el botón **✔️ Confirmar esta TRM** si estás de "
+        "acuerdo con el valor mostrado."
+    )
+
+
 # ── Widget reutilizable ───────────────────────────────────────────────────────
 def trm_widget(page_key: str = "default") -> float:
     """Widget TRM sincronizado entre páginas.
@@ -153,6 +185,23 @@ def trm_widget(page_key: str = "default") -> float:
                     f"⚠️ No se pudo obtener TRM del API ({exc}). "
                     "Usando el valor ingresado manualmente."
                 )
+
+    # ── #176 — Confirmar la TRM por defecto sin cambiar el número ────────────
+    # Si la API falló, la fuente queda en "valor por defecto" y las
+    # exportaciones se bloquean (#171/#174). Antes el usuario debía editar el
+    # número (aunque fuera 1 peso) para confirmarlo; este botón lo hace directo.
+    if _fuente == "valor por defecto":
+        if st.button(
+            f"✔️ Confirmar esta TRM ({nuevo:,.0f} COP/USD)",
+            key=f"_trm_confirm_{page_key}",
+            help="La API de TRM no respondió. Si estás de acuerdo con este valor, "
+                 "confírmalo para habilitar las exportaciones (queda como valor manual).",
+        ):
+            st.session_state[_KEY_VALOR]  = nuevo
+            st.session_state[_KEY_FUENTE] = "valor manual"
+            st.session_state[_KEY_FECHA]  = ""
+            _fuente = "valor manual"
+            st.toast(f"✅ TRM confirmada: **{nuevo:,.0f} COP/USD** (valor manual)", icon="✅")
 
     # ── Fuente activa y fecha ─────────────────────────────────────────────────
     if _fuente and _fuente != "valor por defecto":

@@ -1442,23 +1442,11 @@ if not _hay_items:
 # cero o sin confirmar. Si la API falló, la app queda con el "valor por
 # defecto" (4.200) — una cotización al cliente con TRM inventada es tan grave
 # como una en cero. La TRM manual (editada por el usuario) SÍ habilita.
-_trm_fuente = str(st.session_state.get("tipo_cambio_fuente", ""))
-_trm_ok = bool(tc) and tc > 0 and _trm_fuente != "valor por defecto"
+# #174: política unificada en calculos/trm_utils.trm_confirmada()
+from calculos.trm_utils import trm_confirmada as _trm_confirmada, trm_error_msg as _trm_error_msg
+_trm_ok, _tc_g, _ = _trm_confirmada()
 if _hay_items and not _trm_ok:
-    if not tc or tc <= 0:
-        st.error(
-            "❌ TRM no disponible — la tasa de cambio es cero. Actualiza la TRM "
-            "(botón 🔄 arriba) o ingrésala manualmente antes de exportar: la "
-            "cotización saldría con todos los valores COP en cero."
-        )
-    else:
-        st.error(
-            f"❌ TRM sin confirmar — la API del Banco de la República no respondió "
-            f"y se está usando el valor por defecto ({tc:,.0f} COP/USD). Clica 🔄 "
-            "junto al campo TRM (arriba) para obtener la tasa oficial, o edita el "
-            "valor manualmente (debe cambiar el número, aunque sea en 1 peso, para "
-            "quedar confirmado como manual) antes de descargar la cotización."
-        )
+    st.error(_trm_error_msg(_tc_g))
 _export_ok = _hay_items and _trm_ok
 
 # ── Campos editables de la cotización ─────────────────────────────────────────
