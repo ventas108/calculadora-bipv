@@ -853,7 +853,9 @@ def _extract_multimodel_values(text: str) -> dict:
     # Buscar la fila de la TABLA (ej: "No. of MPP trackers / strings per MPP tracker   9/2   12/2")
     # No parar en filas de features que también contienen "MPP tracker" sin valores N/M
     for line in lines:
-        if not re.search(r'MPP\s+tracker', line, re.IGNORECASE):
+        # #146 — Deye SG01LP1: "Number of MPPT / Strings per MPPT  2/1+1  2/2+1 ..."
+        if not re.search(r'MPP\s+tracker|Number\s+of\s+MPPT\s*/\s*Strings\s+per\s+MPPT',
+                         line, re.IGNORECASE):
             continue
         found = [
             (int(m.group(1)), int(m.group(2)), m.start())
@@ -882,9 +884,12 @@ def _extract_multimodel_values(text: str) -> dict:
     # ── 3b. Corrientes por columna ──────────────────────────────────────────────
     # "Max. PV input current per MPPT (A) 26 / 26 35 / 35" — cada columna trae
     # "I1 / I2" (una corriente por MPPT); tomamos el máximo del par.
+    # #146 — Deye SG01LP1: "PV Input Current (A) 13+13 26+13 ..." y
+    # "Max. PV ISC (A) 17+17 34+17 ..." — cada columna trae "I1+I2" (una
+    # corriente por MPPT); igual que con "/", se toma el máximo del par.
     for campo, patron in (
-        ('I_max_tracker',   r'Max\.?\s*PV\s+input\s+current'),
-        ('Isc_max_tracker', r'Max\.?\s*PV\s+short[-\s]?circuit\s+current'),
+        ('I_max_tracker',   r'Max\.?\s*PV\s+input\s+current|PV\s+Input\s+Current\s*\(A\)'),
+        ('Isc_max_tracker', r'Max\.?\s*PV\s+short[-\s]?circuit\s+current|Max\.?\s*PV\s+ISC\b'),
     ):
         for line in lines:
             m_lab = re.search(patron, line, re.IGNORECASE)
@@ -895,7 +900,7 @@ def _extract_multimodel_values(text: str) -> dict:
                 (max(float(m.group(1).replace(',', '.')),
                      float(m.group(2).replace(',', '.'))), m.start())
                 for m in re.finditer(
-                    r'([0-9]+(?:[.,][0-9]+)?)\s*/\s*([0-9]+(?:[.,][0-9]+)?)', line)
+                    r'([0-9]+(?:[.,][0-9]+)?)\s*[/+]\s*([0-9]+(?:[.,][0-9]+)?)', line)
                 if m.start() >= resto_ini
             ]
             if not found:

@@ -156,9 +156,13 @@ with tab1:
             # campo queda en None (y la alerta #139 de abajo lo denuncia).
             # Antes se hacía `if v is not None`, lo que heredaba silenciosamente
             # el valor de otra columna/modelo (enmascaraba el caso Deye #146).
+            # Solo cuentan como "por modelo" los campos donde AL MENOS un modelo
+            # tiene valor extraído. Si el campo está en None para TODOS los
+            # modelos (spec compartida, ej. n_trackers "3/(1:1:1)" de Deye),
+            # el valor global aplica y no debe pisarse con None.
             _campos_por_modelo = set()
             for _vals_m in (res.get("valores_por_modelo") or {}).values():
-                _campos_por_modelo.update(_vals_m.keys())
+                _campos_por_modelo.update(k for k, v in _vals_m.items() if v is not None)
             res = {
                 **res,
                 "modelo": _modelo_sel,
