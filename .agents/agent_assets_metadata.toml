@@ -197,3 +197,10 @@ uri = "file://entregables/Plano_Disposicion_Uraba_32x100.pdf"
 type = "pdf"
 title = "Plano actualizado — altura libre 3,0 m (PDF)"
 description = "Versión PDF para adjuntar al formulario de Mibet."
+
+[[outputs]]
+id = "7bc2PXLlhoEIKKQqx9MNO"
+uri = "file://entregables/Ficha_Tecnica_Preliminar_Agrivoltaico_Uraba.pdf"
+type = "pdf"
+title = "Ficha Técnica Preliminar — Agrivoltaico Urabá 220,3 kWp"
+description = "3 páginas: sitio y sistema, producción estimada (368 MWh/año) y estimación financiera preliminar con costos duros/blandos, CAPEX, payback y beneficios Ley 1715."
