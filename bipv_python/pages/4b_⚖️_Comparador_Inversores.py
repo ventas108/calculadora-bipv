@@ -22,6 +22,7 @@ from calculos.comparador_inversores import (
     filtrar_inversores_compatibles,
     unidades_necesarias,
 )
+from calculos.invalidacion import KEYS_DERIVADOS_POA
 
 try:
     from datos.catalogo_inversores_excel import cargar_catalogo_inversores
@@ -62,12 +63,41 @@ if res_prod is None or "df_horario" not in res_prod:
     st.stop()
 
 df_h = res_prod["df_horario"]
-if "P_ac" not in df_h.columns:
-    st.error("La simulación guardada no tiene la columna horaria P_ac — vuelve a correr 📊 Producción.")
+# Producción publica la serie horaria como P_ac_kW (ver calculos/produccion.py)
+_col_ac = "P_ac_kW" if "P_ac_kW" in df_h.columns else ("P_ac" if "P_ac" in df_h.columns else None)
+if _col_ac is None:
+    st.error("La simulación guardada no tiene la columna horaria P_ac_kW — vuelve a correr 📊 Producción.")
+    st.stop()
+
+# ── Modos donde la serie base NO es la energía oficial del proyecto ──────────
+if st.session_state.get("multisup_activo"):
+    st.error(
+        "🏢 Este proyecto usa **multi-superficie**: la simulación horaria guardada "
+        "corresponde a UNA sola superficie, no al total del edificio. El comparador "
+        "quedaría con energía incompleta. Usa el desglose de 🏢 Multi-superficie para "
+        "dimensionar inversores por superficie."
+    )
     st.stop()
 
 # Serie AC horaria SIN límite (W) — el clipping se aplica aquí por configuración
-p_ac_W = df_h["P_ac"].to_numpy(dtype=float)
+_factor_kW = 1000.0 if _col_ac == "P_ac_kW" else 1.0
+p_ac_W = df_h[_col_ac].to_numpy(dtype=float) * _factor_kW
+
+# Corrección bypass: si Producción registró pérdida por diodos de bypass, la
+# energía oficial es E_ac_anual_kWh_bypass — se aplica el mismo derating uniforme
+# a la serie horaria (aproximación declarada) para que E_ac/LCOE sean coherentes.
+_e_base = float(res_prod.get("E_ac_anual_kWh") or 0)
+_e_bypass = st.session_state.get("E_ac_anual_kWh_bypass")
+if _e_bypass and _e_base > 0 and float(_e_bypass) < _e_base:
+    _f_bp = float(_e_bypass) / _e_base
+    p_ac_W = p_ac_W * _f_bp
+    st.warning(
+        f"🌗 Corrección por diodos de bypass aplicada: la serie horaria se escaló por "
+        f"×{_f_bp:.4f} para que el total coincida con la E_ac oficial corregida "
+        f"({float(_e_bypass):,.0f} kWh/año). Aproximación uniforme — el clipping real "
+        "en horas sombreadas puede diferir levemente.",
+        icon="⚠️",
+    )
 p_dc_stc_kW = float(res_prod.get("P_stc_kW") or st.session_state.get("P_dc_stc_kW_dim") or 0)
 n_paneles = int(st.session_state.get("N_paneles_dim") or st.session_state.get("N_paneles_granja") or 0)
 
@@ -145,6 +175,14 @@ st.subheader("2️⃣ Configuraciones candidatas (E_ac, clipping y financiero)")
 
 n_strings_total = max(1, math.ceil(n_paneles / int(N_serie))) if n_paneles else 1
 st.caption(f"Strings totales del proyecto: **{n_strings_total}** ({n_paneles} módulos / {int(N_serie)} en serie).")
+if n_paneles and n_paneles % int(N_serie) != 0:
+    st.warning(
+        f"⚠️ {n_paneles} módulos NO es múltiplo de {int(N_serie)} en serie: quedaría un string "
+        f"parcial de {n_paneles % int(N_serie)} módulos (eléctricamente inválido — distinta tensión). "
+        f"Ajusta N o el número de módulos (p. ej. {(n_paneles // int(N_serie)) * int(N_serie)} módulos = "
+        f"{n_paneles // int(N_serie)} strings completos).",
+        icon="⚠️",
+    )
 
 _compatibles = df_comp[df_comp["compatible"]]
 if _compatibles.empty:
@@ -161,10 +199,12 @@ _sel = st.multiselect(
 with st.expander("⚙️ Supuestos financieros del comparador", expanded=False):
     f1, f2, f3 = st.columns(3)
     with f1:
+        # Inicializar ANTES del widget y usar solo key= (evita el conflicto
+        # value+key de Streamlit tras la primera ejecución).
+        st.session_state.setdefault("comp_capex_sin_inv", 150_000.0)
         capex_sin_inv = st.number_input(
             "CAPEX sin inversores (USD)",
-            min_value=0.0, value=float(st.session_state.get("comp_capex_sin_inv", 150_000.0)),
-            step=1000.0, key="comp_capex_sin_inv",
+            min_value=0.0, step=1000.0, key="comp_capex_sin_inv",
             help="Todo el proyecto menos los inversores (módulos, estructura, BOS, montaje, blandos).",
         )
         tarifa = st.number_input(
@@ -236,9 +276,21 @@ if _sel:
             st.session_state["inversor_nombre_dim"] = _modelo_full
             st.session_state["inversor_dict_dim"] = _cat.get(_modelo_full, {})
             st.session_state["N_inv_total"] = configs[_idx]["n_unidades"]
+            st.session_state["N_serie"] = int(N_serie)
+            # Adopción atómica: la producción/bypass/financiero/CO₂ guardados
+            # corresponden al inversor ANTERIOR → se invalidan (misma filosofía
+            # de calculos/invalidacion.py; POA no depende del inversor).
+            _KEYS_DERIVADOS_INVERSOR = tuple(
+                k for k in KEYS_DERIVADOS_POA if k != "poa_efectiva_df"
+            )
+            _limpiadas = [k for k in _KEYS_DERIVADOS_INVERSOR if k in st.session_state]
+            for k in _limpiadas:
+                st.session_state.pop(k, None)
             st.success(
-                f"Adoptado: **{_elegida}** → se usará como inversor del proyecto en "
-                "📐 Dimensionamiento, 📊 Producción y 💼 Presupuesto."
+                f"Adoptado: **{_elegida}** (N={int(N_serie)} en serie, "
+                f"{configs[_idx]['n_unidades']} unidades). Se invalidaron "
+                f"{len(_limpiadas)} resultados derivados: vuelve a correr "
+                "📊 Producción y 💰 Financiero con la nueva configuración."
             )
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -260,15 +312,16 @@ with b2:
         "los kW AC; el resto del CAPEX es el mismo de arriba. ⭐ marca el LCOE mínimo."
     )
 
+# Los supuestos financieros del expander aplican también aquí (siempre definidos).
 df_sweep = barrido_dc_ac(
     p_ac_W, p_dc_stc_kW,
-    capex_sin_inversores_usd=capex_sin_inv if _sel else float(st.session_state.get("comp_capex_sin_inv", 150_000.0)),
+    capex_sin_inversores_usd=capex_sin_inv,
     costo_usd_por_kw_ac=costo_kw_ac,
-    tarifa_cop_kwh=tarifa if _sel else float(st.session_state.get("tarifa_cop_kwh", 950.0)),
-    tipo_cambio=trm if _sel else float(st.session_state.get("tipo_cambio", 4000.0)),
-    tasa_descuento=(tasa_desc / 100.0) if _sel else 0.10,
-    tasa_degradacion_pct=degradacion if _sel else 0.4,
-    opex_pct_capex=opex_pct if _sel else 1.5,
+    tarifa_cop_kwh=tarifa,
+    tipo_cambio=trm,
+    tasa_descuento=tasa_desc / 100.0,
+    tasa_degradacion_pct=degradacion,
+    opex_pct_capex=opex_pct,
 )
 st.dataframe(
     df_sweep.style.format({
