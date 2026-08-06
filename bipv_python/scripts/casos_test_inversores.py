@@ -1186,6 +1186,82 @@ Number of MPPT / Strings per MPPT 2/1+1     2/2+1      2/2+2      2/2+2
         },
     },
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # #175 adversarial — "Rated PV Input Voltage" con paréntesis que usa GUION
+    # (no '~') y nominal FUERA del rango: el patrón Deye NO debe activarse y
+    # Vdc_max debe conservar el fallback conservador al tope MPPT (600).
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "Genérico #175a (rango con guion, no Deye)",
+        "modelo":     "RatedDash 20K",
+        "arquitectura": "String",
+        "texto": """\
+RatedDash 20K Grid-Tie Inverter
+
+PV Input
+Rated PV Input Voltage (V) 620 (300-800)
+MPPT Voltage Range: 200 ~ 600V
+Start-up Voltage (V): 160
+Number of MPPT inputs: 2
+Strings per MPP tracker: 1
+Max. input current per MPPT: 26A
+Max. short-circuit current per MPPT: 40A
+Max. DC Input Power (W): 20000
+
+AC Output
+Rated AC output power: 20000W
+""",
+        "esperado": {
+            "Vdc_max":            600,   # tope MPPT — el paréntesis con '-' no aplica
+            "Vmppt_min":          200,
+            "Vmppt_max":          600,
+            "V_arranque":         160,
+            "n_trackers":           2,
+            "n_strings_tracker":    1,
+            "I_max_tracker":       26,
+            "Isc_max_tracker":     40,
+            "P_dc_max_W":       20000,
+        },
+    },
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # #175 adversarial — "Max. PV input voltage" EXPLÍCITO junto con un rated
+    # parentético estilo Deye: el explícito (1000) debe ganar siempre.
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "Genérico #175b (Max explícito gana al rated)",
+        "modelo":     "MaxWins 30K",
+        "arquitectura": "String",
+        "texto": """\
+MaxWins 30K Inverter
+
+PV Input
+Max. PV input voltage: 1000V
+Rated PV Input Voltage (V) 620 (300~800)
+MPPT Voltage Range: 200 ~ 850V
+Start-up Voltage (V): 180
+Number of MPPT inputs: 3
+Strings per MPP tracker: 2
+Max. input current per MPPT: 30A
+Max. short-circuit current per MPPT: 45A
+Max. DC Input Power (W): 30000
+
+AC Output
+Rated AC output power: 30000W
+""",
+        "esperado": {
+            "Vdc_max":           1000,
+            "Vmppt_min":          200,
+            "Vmppt_max":          850,
+            "V_arranque":         180,
+            "n_trackers":           3,
+            "n_strings_tracker":    2,
+            "I_max_tracker":       30,
+            "Isc_max_tracker":     45,
+            "P_dc_max_W":       30000,
+        },
+    },
+
 ]
 
 # Campos que se comparan (ordenados para la tabla de cobertura)

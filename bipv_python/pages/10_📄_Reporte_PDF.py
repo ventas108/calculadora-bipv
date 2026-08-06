@@ -1312,13 +1312,15 @@ def generar_html_reporte() -> str:
 # ── Botón de generación ────────────────────────────────────────────────────────
 # #174 — misma guardia TRM que la cotización (#171): no generar un reporte al
 # cliente con TRM en cero o sin confirmar (API caída → "valor por defecto").
-from calculos.trm_utils import trm_confirmada as _trm_confirmada, trm_error_msg as _trm_error_msg
+# La página ofrece su propio widget TRM cuando está sin confirmar, para no
+# obligar a navegar a Presupuesto/Financiero solo para desbloquear (auditoría).
+from calculos.trm_utils import init_trm, trm_widget, trm_confirmada as _trm_confirmada, trm_error_msg as _trm_error_msg
+init_trm()   # garantiza tipo_cambio en session_state aunque sea la primera página visitada
 _trm_ok_rep, _tc_rep, _ = _trm_confirmada()
 if not _trm_ok_rep:
-    st.error(
-        _trm_error_msg(_tc_rep)
-        + "  \nEl campo TRM está en **💼 Presupuesto** o **💰 Financiero**."
-    )
+    st.error(_trm_error_msg(_tc_rep))
+    trm_widget("rep")   # 🔄 refrescar, editar o ✔️ confirmar aquí mismo
+    _trm_ok_rep, _tc_rep, _ = _trm_confirmada()   # re-evaluar en el mismo rerun
 
 if st.button("📄 Generar Reporte", type="primary", use_container_width=True,
              key="btn_generar", disabled=not _trm_ok_rep,

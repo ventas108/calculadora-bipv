@@ -1174,17 +1174,23 @@ def _extraer_campos(texto: str) -> dict:
     # solo "Rated PV Input Voltage (V) 370 (125~500)". El límite físico real es
     # el tope del rango entre paréntesis (500), no el tope del rango MPPT a
     # plena carga (425). Solo aplica si no hubo etiqueta Max explícita.
+    # Firma acotada (auditoría): exige valor NOMINAL inmediatamente antes del
+    # paréntesis y separador '~' (formato Deye "370 (125~500)"), y que el
+    # nominal caiga DENTRO del rango — evidencia de que el paréntesis es el
+    # rango operativo absoluto y no otro dato. Un guion como separador o un
+    # paréntesis sin nominal delante NO activan el patrón.
     if Vdc_max is None:
         m_rated_rng = re.search(
+            # pdftotext -layout puede dejar ~100 espacios entre etiqueta y valor
             r"Rated\s+PV\s+Input\s+Voltage\s*(?:\(\s*V\s*\))?"
-            # pdftotext -layout puede dejar ~100 espacios entre etiqueta, valor
-            # nominal y el paréntesis: "Rated PV Input Voltage (V)   370 (125~500)"
-            r"[^\n(]{0,120}\(\s*([0-9]{2,4})\s*[~\-–]\s*([0-9]{2,4})\s*\)",
+            r"[^\n(0-9]{0,120}([0-9]{2,4})\s*\(\s*([0-9]{2,4})\s*~\s*([0-9]{2,4})\s*\)",
             texto, re.IGNORECASE,
         )
         if m_rated_rng:
-            _lo_r, _hi_r = _num(m_rated_rng.group(1)), _num(m_rated_rng.group(2))
-            if _lo_r and _hi_r and _lo_r < _hi_r and _hi_r > 100:
+            _nom_r = _num(m_rated_rng.group(1))
+            _lo_r, _hi_r = _num(m_rated_rng.group(2)), _num(m_rated_rng.group(3))
+            if (_nom_r and _lo_r and _hi_r and _lo_r < _hi_r and _hi_r > 100
+                    and _lo_r <= _nom_r <= _hi_r):
                 Vdc_max = _hi_r
 
     # ── Rango MPPT (Vmppt_min, Vmppt_max) ────────────────────────────────────
