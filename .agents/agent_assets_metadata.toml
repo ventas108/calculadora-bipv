@@ -246,3 +246,10 @@ uri = "file://entregables/MANUAL_CALCULADORA_BIPV_v3.1_agosto2026.docx"
 type = "word_document"
 title = "Manual de Usuario v3.1 — con Comparador de Inversores"
 description = "Manual complementado con la nueva sección 6b (Página 4b — Comparador de Inversores): prerrequisitos, las 3 secciones, pautas de elección antes de Adoptar y qué pasa al adoptar."
+
+[[outputs]]
+id = "cXYeWtJpC-RDNC_H5mPyY"
+uri = "file://entregables/MANUAL_CALCULADORA_BIPV_v3.2_agosto2026.docx"
+type = "word_document"
+title = "Manual de Usuario v3.2 — con Sombras desde SketchUp"
+description = "Nueva sección 8a (Página 5a — Sombras desde SketchUp): preparación del modelo, flujo de 3 pasos, requisito de TMY, conexión con Mismatch/Producción/Financiero y validaciones automáticas."
