@@ -11,3 +11,7 @@ description: Cómo auto-sincronizar selectbox/number_input con detección autom�
 - La re-sincronización debe ocurrir ANTES de cualquier bloque que consuma el valor en el mismo rerun (ej. auto-update de CAPEX corre antes de renderizar el widget; si se sincroniza junto al widget, el auto-update calcula con el valor viejo mientras el dropdown muestra el nuevo).
 - Si el usuario diverge de la detección, mostrar warning explícito indicando cuál valor usa el cálculo; el cálculo siempre debe usar el valor del widget.
 - Patrón similar: fuente de TRM "valor por defecto" vs "valor manual" (trm_utils) — la edición manual solo se detecta si el número cambia.
+
+## Patrón sombra para widgets keyed compartidos (tarifa/TRM)
+Un number_input con key ignora `value=` en reruns: cambios externos al global (otra página, set_tarifa_from_ciudad, 🔄 fetch) quedaban revertidos por la escritura final del widget.
+**Fix:** clave sombra `_<x>_sync_<page>` = lo que el widget mostró este run; al inicio, si la key del widget existe y global ≠ sombra, re-sembrar `st.session_state[widget_key] = global` (con clamp a los límites del input). La sombra se escribe ANTES de mutaciones posteriores de `nuevo` (ej. fetch TRM). Implementado en calculos/tarifa_utils.py y trm_utils.py.
