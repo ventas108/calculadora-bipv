@@ -493,6 +493,28 @@ with t0:
             if kw in _ciudad_tmy:
                 _zona_idx = idx; _zona_fuente = "TMY"; break
 
+    # ── #79: re-sincronizar la zona ANTES del auto-update ────────────────────
+    # La zona auto-detectada solo re-escribe el dropdown (est_zona) cuando
+    # CAMBIA respecto a la última detección; el override manual del usuario
+    # persiste mientras la detección no varíe. Hacerlo aquí (y no junto al
+    # widget) garantiza que el bloque de auto-actualización de abajo calcule
+    # con la MISMA zona que el dropdown terminará mostrando en este rerun.
+    if _zona_fuente:
+        _zona_auto_val = _zona_opts[_zona_idx]
+        if st.session_state.get("_est_zona_auto_prev") != _zona_auto_val:
+            st.session_state["est_zona"] = _zona_auto_val
+            st.session_state["_est_zona_auto_prev"] = _zona_auto_val
+
+    # Zona efectiva del rerun: la vigente del dropdown (ya re-sincronizada),
+    # con la detectada o la config previa como respaldo.
+    def _zona_vigente(cfg_prev: dict) -> str:
+        _z = st.session_state.get("est_zona")
+        if _z in _zona_opts:
+            return _z
+        if _zona_fuente:
+            return _zona_opts[_zona_idx]
+        return cfg_prev.get("zona", _zona_opts[0])
+
     # ── Auto-actualización silenciosa cuando el kWp del sistema cambió ────────
     # Si la estimación ya fue aplicada y el sistema cambió >5% de potencia,
     # recalcula y re-aplica automáticamente con el mismo tipo/escenario/zona.
@@ -502,15 +524,8 @@ with t0:
         if _kwp_prev_er > 0 and abs(p_stc - _kwp_prev_er) / _kwp_prev_er > 0.05:
             _tipo_auto = _er_cfg_prev.get("tipo", list(_BENCH.keys())[0])
             _esc_auto  = _er_cfg_prev.get("escenario", "Base")
-            # #79 — prioridad: zona vigente del dropdown (respeta override manual),
-            # luego zona fresca detectada, luego config previa como último recurso
-            _zona_ss_er = st.session_state.get("est_zona")
-            if _zona_ss_er in _zona_opts:
-                _zona_auto = _zona_ss_er
-            elif _zona_fuente:
-                _zona_auto = _zona_opts[_zona_idx]
-            else:
-                _zona_auto = _er_cfg_prev.get("zona", _zona_opts[0])
+            # #79 — zona efectiva ya re-sincronizada arriba (respeta override manual)
+            _zona_auto = _zona_vigente(_er_cfg_prev)
             _r_auto    = _calc_parametrico(p_stc, _tipo_auto, _esc_auto, _zona_auto)
             st.session_state["presupuesto_capex_usd"]        = _r_auto["capex_total"]
             st.session_state["presupuesto_opex_anual_usd"]   = _r_auto["opex_total"]
@@ -575,15 +590,8 @@ with t0:
     # FIX: pre-poblar session_state para TODAS las fuentes automáticas.
     # Sin esto, Streamlit ignora `index=` en renders sucesivos porque el key
     # ya existe en session_state con el valor anterior.
-    # #79 (refinado): sincronizar SOLO cuando la zona auto-detectada cambia.
-    # Antes se forzaba en cada rerun, lo que revertía silenciosamente cualquier
-    # selección manual del usuario — el dropdown era de facto de solo lectura.
-    if _zona_fuente:
-        _zona_auto_val = _zona_opts[_zona_idx]
-        if st.session_state.get("_est_zona_auto_prev") != _zona_auto_val:
-            st.session_state["est_zona"] = _zona_auto_val
-            st.session_state["_est_zona_auto_prev"] = _zona_auto_val
-
+    # #79: la re-sincronización de est_zona ocurre ANTES del auto-update
+    # (ver bloque "_zona_vigente" arriba) — aquí solo se renderiza el widget.
     zona_est = col_s3.selectbox(
         "Zona geográfica", _zona_opts, index=_zona_idx, key="est_zona",
         help="Se auto-detecta desde las coordenadas del predio (prioridad) o la ciudad de referencia climática. "
