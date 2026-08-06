@@ -158,13 +158,15 @@ else:
             "Abre el diagnóstico ↓ para ver qué encabezados agregar."
         )
 
-    if _ausentes or _incompletos or _no_mapeadas or _duplicados:
+    _ambiguas = _diag.get("columnas_ambiguas", [])
+    if _ausentes or _incompletos or _no_mapeadas or _duplicados or _ambiguas:
         st.warning(
             f"🟡 **Catálogo parcial** — hoja `{_hoja_usada}` · **{_n_modelos} modelos** cargados"
             + (f" · {len(_ausentes)} columnas ausentes en Excel" if _ausentes else "")
             + (f" · {len(_incompletos)} modelos con valores vacíos" if _incompletos else "")
             + (f" · {len(_no_mapeadas)} columnas no reconocidas" if _no_mapeadas else "")
             + (f" · {len(_duplicados)} modelos duplicados" if _duplicados else "")
+            + (f" · {len(_ambiguas)} campos con columnas repetidas" if _ambiguas else "")
         )
     else:
         st.success(
@@ -178,8 +180,25 @@ if tiene_catalogo:
     _no_mapeadas = _diag.get("columnas_no_mapeadas", [])
     _ausentes    = _diag.get("campos_sin_columna_excel", [])
     _duplicados  = _diag.get("modelos_duplicados", [])
-    if _ausentes or _incompletos or _no_mapeadas or _duplicados:
+    _ambiguas    = _diag.get("columnas_ambiguas", [])
+    if _ausentes or _incompletos or _no_mapeadas or _duplicados or _ambiguas:
         with st.expander("🔍 Diagnóstico detallado del catálogo"):
+
+            # ⓪ #24 — Dos o más columnas del Excel mapean al mismo campo
+            if _ambiguas:
+                st.markdown("**⓪ Campos con columnas repetidas en el Excel:**")
+                _rows_amb = [{
+                    "Campo interno":      _a["campo"],
+                    "Columnas en Excel":  ", ".join(f"`{c}`" for c in _a["columnas"]),
+                    "Columna usada":      f"`{_a['usada']}`",
+                } for _a in _ambiguas]
+                st.dataframe(pd.DataFrame(_rows_amb), use_container_width=True, hide_index=True)
+                st.warning(
+                    "⚠️ Cuando dos columnas mapean al mismo campo, se usa **la primera "
+                    "de izquierda a derecha** y las demás se ignoran. Elimina o renombra "
+                    "las repetidas para evitar leer el valor equivocado.",
+                    icon="⚠️",
+                )
 
             # ① Columnas completamente ausentes del Excel (#24)
             if _ausentes:

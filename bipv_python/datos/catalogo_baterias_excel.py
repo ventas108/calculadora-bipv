@@ -191,16 +191,16 @@ def _detectar_header(df_raw: pd.DataFrame) -> pd.DataFrame | None:
     Busca entre las primeras 5 filas cuál contiene 'Modelo' (o alias) en alguna celda.
     Devuelve el DataFrame releyendo con el header correcto, o None si no lo encuentra.
     """
-    # Intentar primero con header=0 ya normalizado
+    # Intentar primero con header=0 ya normalizado (#24: sin tildes/mayúsculas)
     cols0 = [_normalizar_col(c) for c in df_raw.columns]
-    if any(c.lower() in _MODELO_ALIASES for c in cols0):
+    if any(_clave_col(c) in _MODELO_ALIASES for c in cols0):
         df_raw.columns = cols0
         return df_raw
 
     # Buscar en filas de datos (el header real está en fila 1, 2, 3…)
     for i, row in df_raw.head(5).iterrows():
         for val in row.values:
-            if str(val).strip().lower() in _MODELO_ALIASES:
+            if _clave_col(val) in _MODELO_ALIASES:
                 return None  # señal para releer con header=i+1
     return None
 
@@ -232,7 +232,7 @@ def cargar_catalogo_baterias(_mtime: float = 0.0) -> dict:
             df_cand = pd.read_excel(_EXCEL, sheet_name=sheet_found,
                                     header=h, engine="openpyxl")
             cols = [_normalizar_col(c) for c in df_cand.columns]
-            if any(c.lower() in _MODELO_ALIASES for c in cols):
+            if any(_clave_col(c) in _MODELO_ALIASES for c in cols):
                 df_cand.columns = cols
                 df = df_cand
                 break
@@ -258,7 +258,7 @@ def cargar_catalogo_baterias(_mtime: float = 0.0) -> dict:
         if not nombre:
             continue
         # Ignorar filas que parezcan ser encabezados o notas
-        if nombre.lower() in _MODELO_ALIASES:
+        if _clave_col(nombre) in _MODELO_ALIASES:
             continue
         if nombre.startswith("⚠") or nombre.startswith("*") or len(nombre) > 60:
             continue
@@ -356,13 +356,26 @@ def diagnostico_catalogo(_mtime: float = 0.0) -> dict:
             df_cand = pd.read_excel(_EXCEL, sheet_name=sheet_found,
                                     header=h, engine="openpyxl")
             cols = [_normalizar_col(c) for c in df_cand.columns]
-            if any(c.lower() in _MODELO_ALIASES for c in cols):
+            if any(_clave_col(c) in _MODELO_ALIASES for c in cols):
                 # #24 — comparación normalizada (mayúsculas/tildes no cuentan)
                 no_mapeadas = [c for c in cols
                                if _clave_col(c) not in _COL_MAP_NORM
-                               and c.lower() not in _MODELO_ALIASES
+                               and _clave_col(c) not in _MODELO_ALIASES
                                and "unnamed" not in c.lower()]
                 info["columnas_no_mapeadas"] = no_mapeadas
+
+                # ── #24 — Varias columnas del Excel mapean al mismo campo ────
+                # El loader toma la primera (orden de columnas del Excel) y las
+                # demás se ignoran en silencio → avisar cuál se está usando.
+                _por_interna: dict[str, list] = {}
+                for c in cols:
+                    _i = _COL_MAP_NORM.get(_clave_col(c))
+                    if _i and _i not in ("nombre", "_completos"):
+                        _por_interna.setdefault(_i, []).append(c)
+                info["columnas_ambiguas"] = [
+                    {"campo": k, "columnas": v, "usada": v[0]}
+                    for k, v in _por_interna.items() if len(v) > 1
+                ]
 
                 # ── #24 — Campos internos cuyo alias NO aparece en el Excel ──────────
                 # Distingue "columna existe pero celda vacía" de "columna ausente en total"
@@ -385,12 +398,12 @@ def diagnostico_catalogo(_mtime: float = 0.0) -> dict:
                 # dos veces (exacto o con espacios de más), solo sobrevive la última
                 # fila y el resto se pierde en silencio.
                 col_nombre = next((c for c in df_cand.columns
-                                   if _normalizar_col(c).lower() in _MODELO_ALIASES), None)
+                                   if _clave_col(c) in _MODELO_ALIASES), None)
                 ocurrencias = {}   # nombre_normalizado → {"nombre": ..., "filas": [...]}
                 if col_nombre is not None:
                     for idx, raw in df_cand[col_nombre].items():
                         val = str(raw).strip()
-                        if not val or val.lower() in ("nan", "") or val.lower() in _MODELO_ALIASES:
+                        if not val or val.lower() in ("nan", "") or _clave_col(val) in _MODELO_ALIASES:
                             continue
                         if val.startswith("⚠") or val.startswith("*") or len(val) > 60:
                             continue
@@ -448,7 +461,7 @@ def _abrir_hoja(wb):
     ws = wb[nombre_hoja]
     for fila in range(1, 6):
         for celda in ws[fila]:
-            if _normalizar_col(celda.value or "").lower() in _MODELO_ALIASES:
+            if _clave_col(celda.value or "") in _MODELO_ALIASES:
                 return ws, fila
     raise ValueError(
         f"La hoja '{nombre_hoja}' existe pero no se encontró la fila de "
