@@ -19,3 +19,6 @@ description: Decisiones del extractor PDF de baterías (multi-modelo por columna
 - DoD/garantía en OCR quedan en líneas sueltas lejos del label (">95%", "10Years"): solo aceptarlas si el label existe y el valor suelto es único en la ficha.
 - Segundo formato OCR (según motor/versión de tesseract): tabla HORIZONTAL con la cabecera de modelos ilegible — solo quedan legibles los extremos del rango del título ("FLA48100-EU~FLA48250-EU"). Regla: con 2 modelos y >2 valores en la fila, mapear primera y última columna a los extremos (el mapeo por posición asignaría la misma columna a ambos). Limitación conocida: los modelos intermedios del rango se pierden en ese formato.
 - Labels OCR vienen pegados ("NominalVoltage") y unidades en minúscula ("51.2v"): los regex de label deben usar \s* y los de unidad aceptar mayúscula/minúscula.
+
+## Multi-modelo inversores (#139/#146)
+- En fichas multi-modelo, al fusionar la columna del modelo elegido NO usar fallback al valor global (`if v is not None` heredaba la columna de otro modelo y enmascaraba vacíos). Campos por-modelo = unión de claves de valores_por_modelo; si vienen vacíos deben quedar None y disparar la alerta de contar_campos_vacios (2ª capa, tras la selección — la alerta global corre antes y exime campos presentes en cualquier modelo).
