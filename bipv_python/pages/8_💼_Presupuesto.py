@@ -1402,6 +1402,28 @@ if not _hay_items:
         "cotizaciones reales) para habilitar la descarga."
     )
 
+# ── #171 — Guardia TRM: nunca exportar una cotización con tasa de cambio en
+# cero o sin confirmar. Si la API falló, la app queda con el "valor por
+# defecto" (4.200) — una cotización al cliente con TRM inventada es tan grave
+# como una en cero. La TRM manual (editada por el usuario) SÍ habilita.
+_trm_fuente = str(st.session_state.get("tipo_cambio_fuente", ""))
+_trm_ok = bool(tc) and tc > 0 and _trm_fuente != "valor por defecto"
+if _hay_items and not _trm_ok:
+    if not tc or tc <= 0:
+        st.error(
+            "❌ TRM no disponible — la tasa de cambio es cero. Actualiza la TRM "
+            "(botón 🔄 arriba) o ingrésala manualmente antes de exportar: la "
+            "cotización saldría con todos los valores COP en cero."
+        )
+    else:
+        st.error(
+            f"❌ TRM sin confirmar — la API del Banco de la República no respondió "
+            f"y se está usando el valor por defecto ({tc:,.0f} COP/USD). Clica 🔄 "
+            "junto al campo TRM (arriba) para obtener la tasa oficial, o edítala "
+            "manualmente, antes de descargar la cotización para el cliente."
+        )
+_export_ok = _hay_items and _trm_ok
+
 # ── Campos editables de la cotización ─────────────────────────────────────────
 ce1, ce2 = st.columns([3, 1])
 _cot_cliente = ce1.text_input(
@@ -1450,16 +1472,16 @@ from calculos.export_cotizacion import (
 )
 
 _xlsx_bytes, _pdf_bytes, _err_cot = None, None, None
-if _hay_items:
+if _export_ok:
     try:
         _xlsx_bytes = _gen_cot_xlsx(_datos_cot)
         _pdf_bytes  = _gen_cot_pdf(_datos_cot)
     except ValueError as _e:
         _err_cot = str(_e)
-        _hay_items = False
+        _export_ok = False
     except Exception as _e:  # noqa: BLE001
         _err_cot = f"Error al generar la cotización: {_e}"
-        _hay_items = False
+        _export_ok = False
 
 if _err_cot:
     st.error(f"❌ {_err_cot}")
@@ -1470,17 +1492,17 @@ cb1.download_button(
     data=_xlsx_bytes if _xlsx_bytes else b"",
     file_name=_nombre_cot(ppto_nombre, _fecha_iso, "xlsx"),
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    use_container_width=True, disabled=not _hay_items, key="dl_cot_xlsx",
+    use_container_width=True, disabled=not _export_ok, key="dl_cot_xlsx",
 )
 cb2.download_button(
     "⬇️ Descargar cotización (PDF)",
     data=_pdf_bytes if _pdf_bytes else b"",
     file_name=_nombre_cot(ppto_nombre, _fecha_iso, "pdf"),
     mime="application/pdf",
-    use_container_width=True, disabled=not _hay_items, key="dl_cot_pdf",
+    use_container_width=True, disabled=not _export_ok, key="dl_cot_pdf",
 )
 
-if _hay_items:
+if _export_ok:
     st.caption(
         f"📄 Cotización lista — {len(_items_cot)} ítems activos · "
         f"TOTAL $ {round(_total_cop):,.0f}".replace(",", ".") + " COP"
