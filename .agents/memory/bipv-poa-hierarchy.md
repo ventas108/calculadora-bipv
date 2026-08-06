@@ -40,3 +40,7 @@ Fuente de cada parámetro auto-llenado:
 
 **How to apply:** Siempre verificar `motor_optico_ok` antes de usar `poa_efectiva_df`.
 Si no está, usar `poa_df` como fallback. Nunca asumir que existe.
+
+## Invalidación por cambio de coordenadas (#64)
+- `recurso_solar_ok=False` NO basta: Financiero, Baterías, CO₂ y Reporte leen `E_ac_anual_kWh*` y resultados cacheados (`financiero_ok`, `bypass_ok/bypass_result`, `impacto_co2_ok`) directamente de session_state.
+- Al cambiar lat/lon del proyecto hay que limpiar TODA la cadena (lista `_CADENA_SOLAR_KEYS` en Página 1); la Página 2 tiene su propio guard con `_solar_lat_guardada`.
