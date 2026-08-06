@@ -204,3 +204,10 @@ uri = "file://entregables/Ficha_Tecnica_Preliminar_Agrivoltaico_Uraba.pdf"
 type = "pdf"
 title = "Ficha Técnica Preliminar — Agrivoltaico Urabá 220,3 kWp"
 description = "3 páginas: sitio y sistema, producción estimada (368 MWh/año) y estimación financiera preliminar con costos duros/blandos, CAPEX, payback y beneficios Ley 1715."
+
+[[outputs]]
+id = "X-0Ytr62_S2V9RWWgwxJe"
+uri = "file://entregables/FICHA_TECNICA_CALCULADORA_BIPV_agosto2026_complementada.docx"
+type = "word_document"
+title = "Ficha Técnica Calculadora BIPV — complementada (agosto 2026)"
+description = "Ficha original completa + 4 secciones nuevas: flujo de trabajo con invalidación en cadena, baterías, impacto CO₂ y calidad continua."
