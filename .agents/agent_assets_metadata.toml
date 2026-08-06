@@ -225,3 +225,10 @@ uri = "file://entregables/Comparativa_Alt_B_Inversores_Uraba.xlsx"
 type = "table"
 title = "Comparativa Alternativa B — 2 × ~100 kW (Urabá 220,32 kWp)"
 description = "Simulación horaria TMY Apartadó: E_ac, clipping, CAPEX, TIR, VPN, Payback y LCOE para Huawei, Sungrow y Growatt."
+
+[[outputs]]
+id = "Ql1dxk04WAnjajj0whDJX"
+uri = "file://entregables/Barrido_DCAC_Uraba.xlsx"
+type = "table"
+title = "Barrido de ratio DC/AC — Urabá 220,32 kWp"
+description = "Alternativa E: clipping, CAPEX, TIR y LCOE para capacidades AC de 100 a 220 kW con simulación horaria TMY Apartadó."
