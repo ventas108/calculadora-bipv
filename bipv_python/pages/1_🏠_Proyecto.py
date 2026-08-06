@@ -625,9 +625,11 @@ with col2:
 if st.button("💾 Guardar configuración", type="primary"):
     _dens_val = dens_Wm2 if "dens_Wm2" in dir() else cfg["dens_def"]
 
-    # ── #172 — Capturar valores ANTERIORES antes de sobreescribirlos ─────────
-    _area_util_prev = st.session_state.get("area_util_m2")
-    _tipo_prev_save = st.session_state.get("tipo_instalacion")
+    # ── #172 — Última configuración CONFIRMADA (guardas dedicadas) ───────────
+    # No sirve leer area_util_m2/tipo_instalacion del session_state: el render
+    # ya los sobreescribe con los valores nuevos ANTES del click en Guardar.
+    _area_util_prev = st.session_state.get("_area_util_guardada")
+    _tipo_prev_save = st.session_state.get("_tipo_inst_guardado")
 
     st.session_state["nombre_proyecto"]    = nombre
     st.session_state["ciudad"]             = ciudad
@@ -704,6 +706,9 @@ if st.button("💾 Guardar configuración", type="primary"):
             "páginas siguientes.",
             icon="📐",
         )
+    # ── #172 — Actualizar las guardas con la configuración recién guardada ───
+    st.session_state["_area_util_guardada"] = area_util
+    st.session_state["_tipo_inst_guardado"] = tipo_instalacion
 
     # ── Persistir a disco — sobrevive recargas y reinicios de PM2 ────────────
     _datos_json = {

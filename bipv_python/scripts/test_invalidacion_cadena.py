@@ -130,6 +130,27 @@ for pagina, patron in {
     check(f"{pagina} importa calculos.invalidacion", re.search(patron, src) is not None)
     check(f"{pagina} usa KEYS_DERIVADOS_POA", "KEYS_DERIVADOS_POA" in src)
 
+# ═══ 6. Página 1: la guarda de área/tipo usa valores CONFIRMADOS ═════════════
+# Regresión de auditoría: leer area_util_m2/tipo_instalacion del session_state
+# en el handler de Guardar NO detecta el cambio (el render ya los pisó con los
+# valores nuevos). Deben usarse guardas dedicadas escritas solo al guardar.
+print("\n[6] Página 1 compara contra la última configuración GUARDADA")
+_src_p1 = open(os.path.join(_PAGES_DIR, "1_🏠_Proyecto.py"), encoding="utf-8").read()
+check("lee _area_util_guardada", '"_area_util_guardada"' in _src_p1)
+check("lee _tipo_inst_guardado", '"_tipo_inst_guardado"' in _src_p1)
+check("NO captura el previo desde area_util_m2 (pisado por el render)",
+      'st.session_state.get("area_util_m2")' not in
+      _src_p1.split("💾 Guardar configuración")[1].split("#172 — Actualizar")[0])
+# Simulación del orden real: render pisa los valores → la guarda dedicada
+# conserva el confirmado y sí detecta el cambio.
+ss = {"_area_util_guardada": 100.0, "_tipo_inst_guardado": "Fachada",
+      "area_util_m2": 100.0, "tipo_instalacion": "Fachada"}
+ss["area_util_m2"] = 250.0          # render con el valor nuevo (antes del click)
+ss["tipo_instalacion"] = "Cubierta"
+_cambio = (abs(ss["area_util_m2"] - ss["_area_util_guardada"]) > 0.01
+           or ss["tipo_instalacion"] != ss["_tipo_inst_guardado"])
+check("la guarda dedicada detecta el cambio pese al render previo", _cambio)
+
 print("\n" + "=" * 64)
 if FALLOS:
     print(f"RESULTADO: {len(FALLOS)} verificación(es) FALLARON:")
