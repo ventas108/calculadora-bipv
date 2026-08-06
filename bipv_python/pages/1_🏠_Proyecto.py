@@ -679,6 +679,18 @@ if st.button("💾 Guardar configuración", type="primary"):
             # Multi-superficie (Página 9)
             "E_ac_anual_kWh_multisup", "poa_df_multisup",
             "area_total_multisup", "multisup_desglose", "multisup_activo",
+            # Bypass — resultados y flags (Página 5); si quedan vivos,
+            # Producción re-aplica sombras viejas a la producción nueva
+            "bypass_ok", "bypass_result", "bypass_p_shade", "bypass_n_series",
+            "bypass_n_parallel", "bypass_panel", "kwh_bypass_anual",
+            "bypass_modo_usado", "bypass_multisup_ok", "bypass_multisup_resultados",
+            # Financiero cacheado (Página 7)
+            "financiero_ok", "comp_financiero", "comp_financiero_p90",
+            "metricas_financiero", "metricas_financiero_p90",
+            # Impacto CO₂ (Página 12)
+            "impacto_co2_ok", "co2_anual_t", "co2_total_t", "co2_total_prom_t",
+            "co2_total_marg_t", "co2_arboles_equiv", "co2_hogares_equiv",
+            "co2_km_vehiculo_equiv", "co2_valor_bonos_usd",
         )
         for _k64 in _CADENA_SOLAR_KEYS:
             st.session_state.pop(_k64, None)
