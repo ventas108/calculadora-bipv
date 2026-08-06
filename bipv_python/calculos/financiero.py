@@ -18,6 +18,26 @@ import numpy as np
 from scipy.optimize import brentq
 
 
+# ─── Piso de O&M por tamaño (#72) ────────────────────────────────────────────
+
+def opex_minimo_anual_usd(kwp: float) -> float:
+    """Costo mínimo realista de O&M anual (USD) según el tamaño del sistema.
+
+    Misma política del Presupuesto paramétrico: un contrato de mantenimiento
+    preventivo tiene un costo fijo mínimo (visitas + mano de obra) que la
+    tarifa lineal USD/kWp subestima en proyectos medianos/grandes.
+    Referencia: contrato básico BIPV/FV Colombia = USD 6.000–10.000/año.
+
+    Returns:
+        0.0 si kwp < 50; 5000.0 si 50 ≤ kwp < 300; 8000.0 si kwp ≥ 300.
+    """
+    if kwp >= 300:
+        return 8_000.0
+    if kwp >= 50:
+        return 5_000.0
+    return 0.0
+
+
 # ─── Beneficios Ley 1715 ─────────────────────────────────────────────────────
 
 def calcular_beneficios_ley_1715(

@@ -141,15 +141,29 @@ def tarifa_widget(page_key: str = "default") -> float:
         "Edita el valor aquí y se propagará automáticamente a la otra sección."
     )
 
+    # ── #93: re-sembrar el widget si el global cambió FUERA de este widget ──
+    # Streamlit ignora `value=` cuando la key del widget ya existe, así que un
+    # cambio externo (ciudad en Proyecto, edición en la otra página) dejaría el
+    # número viejo en pantalla y la línea final lo re-escribiría sobre el
+    # global, revirtiendo la sincronización. La clave sombra guarda el último
+    # valor que ESTE widget mostró: si el global difiere de ella, el cambio
+    # vino de afuera y hay que re-sembrar la key del widget antes de renderizar.
+    _wkey = f"_tarifa_num_{page_key}"
+    _skey = f"_tarifa_sync_{page_key}"
+    if _wkey in st.session_state and st.session_state.get(_skey) != _val:
+        st.session_state[_wkey] = min(max(_val, 100.0), 2_000.0)
+
     nuevo = st.number_input(
         "Tarifa electricidad (COP/kWh)",
         min_value=100.0,
         max_value=2_000.0,
         value=_val,
         step=25.0,
-        key=f"_tarifa_num_{page_key}",
+        key=_wkey,
         help=_help,
     )
+    # Sombra: lo que este widget mostró en este run (para detectar cambios externos)
+    st.session_state[_skey] = nuevo
 
     # ── Caption de provenance ─────────────────────────────────────────────────
     if _ciudad and _ciudad not in ("", "—"):

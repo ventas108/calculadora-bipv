@@ -11,6 +11,7 @@ from calculos.financiero import (
     calcular_flujo_caja,
     calcular_metricas,
     comparativo_ley_1715,
+    opex_minimo_anual_usd,
 )
 from calculos.trm_utils import init_trm, trm_widget
 from calculos.tarifa_utils import init_tarifa, tarifa_widget
@@ -669,6 +670,12 @@ with col_t3:
                     "Con contrato O&M local: 9–11 USD/kWp·año. "
                     "IRENA 2023 utility-scale: 9–15 USD/kWp·año zona tropical."
                 )
+            # ── #72: piso por tamaño — el default lineal USD/kWp subestima el
+            # costo fijo mínimo de un contrato O&M en proyectos medianos/grandes
+            # (misma política del Presupuesto paramétrico), inflando la TIR.
+            _opex_min_usd = opex_minimo_anual_usd(p_stc)
+            if _opex_min_usd > 0 and p_stc > 0:
+                _opex_kw_default = max(_opex_kw_default, min(35.0, _opex_min_usd / p_stc))
             _opex_kw = st.slider(
                 "O&M anual (USD/kWp·año)",
                 min_value=3.0, max_value=35.0,
@@ -690,6 +697,21 @@ with col_t3:
                      "Incluye limpieza, revisión y seguros. "
                      "Completa 📅 OPEX Anual en Presupuesto para usar valores reales.",
             )
+    # ── #72: guardia final — aplica a TODAS las rutas de O&M (presupuesto,
+    # %CAPEX o USD/kWp). Si el OPEX efectivo queda por debajo del costo mínimo
+    # de un contrato O&M para este tamaño, la TIR y el payback salen mejores
+    # de lo que se puede cumplir. No bloquea: avisa con el número concreto.
+    _opex_piso_usd = opex_minimo_anual_usd(p_stc)
+    _opex_efectivo_usd = capex_total * opex_pct / 100 if capex_total > 0 else 0.0
+    if _opex_piso_usd > 0 and _opex_efectivo_usd < _opex_piso_usd:
+        st.warning(
+            f"⚠️ **O&M posiblemente subestimado para {p_stc:,.0f} kWp**: el OPEX "
+            f"efectivo es **USD {_opex_efectivo_usd:,.0f}/año**, por debajo del costo "
+            f"mínimo realista de un contrato de mantenimiento en Colombia "
+            f"(**USD {_opex_piso_usd:,.0f}/año** para este tamaño). Con este valor, "
+            "la TIR y el payback quedan mejores de lo que podrás cumplir. "
+            "Sube el O&M o completa la pestaña 📅 OPEX Anual del 💼 Presupuesto."
+        )
     tasa_desc = st.slider(
         "Tasa de descuento WACC (%)",
         min_value=5.0, max_value=20.0, value=10.0, step=0.5,

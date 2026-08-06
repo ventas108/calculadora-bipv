@@ -144,6 +144,15 @@ def trm_widget(page_key: str = "default") -> float:
     # ── Layout: input numérico + botón de refresco ────────────────────────────
     col_inp, col_btn = st.columns([5, 1])
 
+    # ── #93 (mismo patrón que tarifa): re-sembrar si el global cambió FUERA
+    # de este widget. Sin esto, tras un 🔄 (fetch API) o una edición en otra
+    # página, el number_input conserva el número viejo y la escritura final
+    # lo re-escribe sobre el global, revirtiendo el refresco/sincronización.
+    _wkey = f"_trm_num_{page_key}"
+    _skey = f"_trm_sync_{page_key}"
+    if _wkey in st.session_state and st.session_state.get(_skey) != _val:
+        st.session_state[_wkey] = min(max(_val, 1_000.0), 15_000.0)
+
     with col_inp:
         nuevo = st.number_input(
             "💱 TRM (COP/USD)",
@@ -151,7 +160,7 @@ def trm_widget(page_key: str = "default") -> float:
             max_value=15_000.0,
             value=_val,
             step=50.0,
-            key=f"_trm_num_{page_key}",
+            key=_wkey,
             help=(
                 f"**Fuente:** {_fuente}"
                 + (f"  \n**Fecha:** {_fecha}" if _fecha else "")
@@ -159,6 +168,10 @@ def trm_widget(page_key: str = "default") -> float:
                   "actualizar desde la API del Banco de la República."
             ),
         )
+        # Sombra ANTES del posible fetch: guarda lo que el widget muestra.
+        # Si el 🔄 trae otro valor, el próximo run detecta la divergencia
+        # global≠sombra y re-siembra el widget con la TRM refrescada.
+        st.session_state[_skey] = nuevo
 
     with col_btn:
         # Botón alineado verticalmente con el input
