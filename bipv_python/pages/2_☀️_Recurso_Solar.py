@@ -28,12 +28,43 @@ def _leer_cache(lat, lon, tilt, azimuth, alt_m, albedo=0.20):
         pass
     return None
 
+# ── #61: caché de TMY por coordenadas (independiente de tilt/azimuth/albedo) ──
+# El TMY solo depende de lat/lon; la POA es un cálculo local barato. Antes la
+# clave del pickle incluía la orientación, así que cambiar la inclinación
+# forzaba una nueva descarga de PVGIS aunque el TMY ya estuviera en disco.
+def _tmy_cache_path(lat, lon):
+    os.makedirs(_SOLAR_CACHE_DIR, exist_ok=True)
+    return os.path.join(_SOLAR_CACHE_DIR, f"tmy_{lat:.4f}_{lon:.4f}.pkl")
+
+def _leer_tmy_cache(lat, lon):
+    try:
+        p = _tmy_cache_path(lat, lon)
+        if os.path.exists(p):
+            with open(p, "rb") as f:
+                return pickle.load(f)["tmy"]
+    except Exception:
+        pass
+    return None
+
 def _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa, albedo=0.20):
+    """Persiste TMY+POA de la variante Y el TMY solo (por coordenadas).
+
+    Returns:
+        bool: False si algún guardado falló (disco lleno, permisos) — el
+        caller debe avisar en vez de fallar en silencio (#61).
+    """
+    ok = True
     try:
         with open(_cache_path(lat, lon, tilt, azimuth, alt_m, albedo), "wb") as f:
             pickle.dump({"tmy": tmy, "poa": poa}, f, protocol=4)
     except Exception:
-        pass
+        ok = False
+    try:
+        with open(_tmy_cache_path(lat, lon), "wb") as f:
+            pickle.dump({"tmy": tmy}, f, protocol=4)
+    except Exception:
+        ok = False
+    return ok
 
 from datos.ciudades_colombia import CIUDADES
 from calculos.solar import (
@@ -323,6 +354,17 @@ if st.session_state.get("recurso_solar_ok") and _s_lat is not None:
 # tiene datos, restaurar silenciosamente para evitar la descarga de PVGIS.
 if not st.session_state.get("recurso_solar_ok"):
     _auto_cached = _leer_cache(lat, lon, tilt, azimuth, alt_m, albedo)
+    if _auto_cached is None:
+        # ── #61: no hay caché de esta variante, pero puede haber TMY del predio
+        # (descargado con otra inclinación/orientación) → recalcular POA local
+        # en vez de volver a PVGIS.
+        _tmy_solo = _leer_tmy_cache(lat, lon)
+        if _tmy_solo is not None:
+            with st.spinner("📂 TMY en caché — recalculando POA para esta orientación..."):
+                _poa_var = calcular_poa(_tmy_solo, lat, lon, alt_m, tilt, azimuth,
+                                        albedo=albedo)
+                _guardar_cache(lat, lon, tilt, azimuth, alt_m, _tmy_solo, _poa_var, albedo)
+            _auto_cached = {"tmy": _tmy_solo, "poa": _poa_var}
     if _auto_cached is not None:
         _tmy_r = _auto_cached["tmy"]
         _poa_r = _auto_cached["poa"]
@@ -387,6 +429,11 @@ if _recalc_btn:
         _base = _cache_path(lat, lon, tilt, azimuth, alt_m)     # sin sufijo
         for _p in _glob.glob(_base.replace(".pkl", "*.pkl")):
             os.remove(_p)
+        # #61: borrar también el TMY por coordenadas — "datos frescos" implica
+        # nueva descarga de PVGIS, no reutilizar el TMY viejo del predio.
+        _p_tmy = _tmy_cache_path(lat, lon)
+        if os.path.exists(_p_tmy):
+            os.remove(_p_tmy)
     except Exception:
         pass
     st.session_state["recurso_solar_ok"] = False
@@ -408,19 +455,33 @@ if _descarga_btn:
         poa = _disco["poa"]
         st.info("📂 Datos recuperados de caché local — sin conexión a PVGIS.")
     else:
-        with st.spinner(f"Conectando a PVGIS para {_sitio_label}..."):
-            try:
-                tmy = cargar_tmy(lat, lon)
-            except Exception as e:
-                st.error(f"❌ Error conectando a PVGIS: {e}")
-                st.info("Verifica la conexión a internet del servidor. PVGIS requiere acceso a re.jrc.ec.europa.eu")
-                st.stop()
+        # ── #61: TMY del predio en disco (otra orientación) → sin PVGIS ──────
+        tmy = _leer_tmy_cache(lat, lon)
+        if tmy is not None:
+            st.info("📂 TMY recuperado de caché local — POA recalculada para esta "
+                    "orientación, sin conexión a PVGIS.")
+        else:
+            with st.spinner(f"Conectando a PVGIS para {_sitio_label}..."):
+                try:
+                    tmy = cargar_tmy(lat, lon)
+                except Exception as e:
+                    st.error(f"❌ Error conectando a PVGIS: {e}")
+                    st.info("Verifica la conexión a internet del servidor. PVGIS requiere acceso a re.jrc.ec.europa.eu")
+                    st.stop()
 
         with st.spinner(f"Calculando irradiancia POA para {icono_tipo} {tipo_instalacion} ({tilt}°)..."):
             poa = calcular_poa(tmy, lat, lon, alt_m, tilt, azimuth, albedo=albedo)
             # El caché de disco guarda SIEMPRE la POA monofacial; la ganancia
             # bifacial se recalcula localmente (es barata y depende de la config).
-            _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa, albedo)
+            if not _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa, albedo):
+                # #61: antes fallaba en silencio → el usuario repetía la descarga
+                # en cada recarga sin saber por qué.
+                st.warning(
+                    "⚠️ No se pudo guardar el recurso solar en el caché de disco "
+                    f"(`{_SOLAR_CACHE_DIR}`) — revisa permisos/espacio del servidor. "
+                    "Los datos funcionan en esta sesión, pero se volverán a "
+                    "descargar tras recargar o reiniciar."
+                )
 
     # ── Modelo bifacial: recalcular POA con ganancia trasera ─────────────────
     poa_anual_mono = poa["poa_global"].sum() / 1000.0
