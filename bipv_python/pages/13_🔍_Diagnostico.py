@@ -725,7 +725,7 @@ with col_hg1:
     if st.button("💾 Guardar este diagnóstico en el histórico", type="secondary",
                  use_container_width=True):
         _registro = {
-            "fecha":              datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "fecha":              datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "tipo_sistema":       tipo_sistema,
             "potencia_kWp":       round(potencia_kWp, 2),
             "ciudad":             ciudad_diag,
@@ -824,8 +824,14 @@ else:
         _sel_borrar = st.selectbox("Registro a eliminar", _opciones, key="diag_hist_borrar")
         if st.button("Eliminar registro seleccionado", key="diag_hist_borrar_btn"):
             _idx = _opciones.index(_sel_borrar)
-            eliminar_registro(_nombre_proy_hist, _idx)
-            st.rerun()
+            _ok_borrar, _ = eliminar_registro(_nombre_proy_hist, _idx)
+            if not _ok_borrar:
+                st.warning(
+                    "⚠️ No se pudo reescribir el histórico a disco (permisos/espacio "
+                    "en `datos/diagnosticos/`). El registro NO se eliminó."
+                )
+            else:
+                st.rerun()
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.divider()

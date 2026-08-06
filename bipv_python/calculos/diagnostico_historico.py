@@ -12,6 +12,7 @@ Cada registro es un dict plano (solo tipos JSON-seguros).
 
 import json
 import os
+import tempfile
 
 from calculos.proyectos_manager import nombre_a_slug
 
@@ -44,25 +45,40 @@ def guardar_registro(nombre_proyecto: str, registro: dict) -> tuple:
     """
     historico = cargar_historico(nombre_proyecto)
     historico.append(registro)
-    ruta = _ruta_historico(nombre_proyecto)
+    ok = _escribir_atomico(_ruta_historico(nombre_proyecto), historico)
+    return ok, historico
+
+
+def _escribir_atomico(ruta: str, historico: list) -> bool:
+    """
+    Escribe el JSON vía archivo temporal + os.replace: un corte a mitad de
+    escritura nunca deja el histórico truncado (que cargar_historico trataría
+    como vacío y el siguiente guardado sobrescribiría todo).
+    """
     try:
         os.makedirs(_HIST_DIR, exist_ok=True)
-        with open(ruta, "w", encoding="utf-8") as f:
-            json.dump(historico, f, ensure_ascii=False, indent=1)
-        return True, historico
-    except OSError:
-        return False, historico
-
-
-def eliminar_registro(nombre_proyecto: str, indice: int) -> list:
-    """Elimina el registro `indice` (0-based) y reescribe el archivo."""
-    historico = cargar_historico(nombre_proyecto)
-    if 0 <= indice < len(historico):
-        historico.pop(indice)
+        fd, tmp = tempfile.mkstemp(dir=_HIST_DIR, suffix=".tmp")
         try:
-            os.makedirs(_HIST_DIR, exist_ok=True)
-            with open(_ruta_historico(nombre_proyecto), "w", encoding="utf-8") as f:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(historico, f, ensure_ascii=False, indent=1)
-        except OSError:
-            pass
-    return historico
+            os.replace(tmp, ruta)
+        finally:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        return True
+    except OSError:
+        return False
+
+
+def eliminar_registro(nombre_proyecto: str, indice: int) -> tuple:
+    """
+    Elimina el registro `indice` (0-based) y reescribe el archivo.
+
+    Retorna (ok: bool, historico: list). ok=False si el disco falló.
+    """
+    historico = cargar_historico(nombre_proyecto)
+    if not (0 <= indice < len(historico)):
+        return True, historico
+    historico.pop(indice)
+    ok = _escribir_atomico(_ruta_historico(nombre_proyecto), historico)
+    return ok, historico
