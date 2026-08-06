@@ -23,7 +23,13 @@ with col1:
     _cat_excel = cargar_catalogo_excel()
     _lista_paneles = list(_cat_excel.keys()) if _cat_excel else list(MODULOS_BIPV.keys())
     _idx_default = _lista_paneles.index("ASP-ST1-T40") if "ASP-ST1-T40" in _lista_paneles else 0
-    panel_nombre   = st.selectbox("Panel", _lista_paneles, index=_idx_default)
+    # #118 — badge ✅/⚠️ en la lista (mismo criterio que Motor IV: faltan Voc/Isc/Vmp/Imp)
+    def _fmt_panel_dim(name: str) -> str:
+        _p = (_cat_excel.get(name) if _cat_excel else None) or MODULOS_BIPV.get(name) or {}
+        _err, _ = _check_iv_dim(_p)
+        return f"{'⚠️' if _err else '✅'} {name}"
+    panel_nombre   = st.selectbox("Panel", _lista_paneles, index=_idx_default,
+                                  format_func=_fmt_panel_dim)
     _cat_inv = cargar_catalogo_inversores()
     _lista_inv = list(_cat_inv.keys()) if _cat_inv else list(INVERSORES.keys())
     _idx_inv = next((i for i,k in enumerate(_lista_inv) if "MID15KTL3" in k or "MID 15KTL3" in k), 0)
