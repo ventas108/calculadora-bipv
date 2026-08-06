@@ -169,3 +169,17 @@ uri = "file://entregables/Mibet_Lista_Verificacion_Uraba_Agrivoltaico.xlsx"
 type = "table"
 title = "Formulario Mibet — Agrivoltaico Urabá (diligenciado)"
 description = "Lista de verificación de proyecto terrestre con los datos del proyecto agrivoltaico de Apartadó: 306 paneles JA Solar JAM66D46-720/LB bifaciales, 220.3 kWp, estructura elevada 2.5 m."
+
+[[outputs]]
+id = "Plv9d3Z0bXjP31Us3pvUX"
+uri = "file://entregables/Plano_Disposicion_Agrivoltaico_Uraba.png"
+type = "image"
+title = "Plano de disposición — Agrivoltaico Urabá (PNG)"
+description = "Vista en planta: 17 matrices de 2×9 paneles (306 en total, 220,3 kWp) sobre terreno de 80×40 m con corredores de cultivo de ~4 m."
+
+[[outputs]]
+id = "VbJm8wOMMEDkAYc2P7hAz"
+uri = "file://entregables/Plano_Disposicion_Agrivoltaico_Uraba.pdf"
+type = "pdf"
+title = "Plano de disposición — Agrivoltaico Urabá (PDF)"
+description = "Versión PDF para adjuntar al formulario de Mibet."
