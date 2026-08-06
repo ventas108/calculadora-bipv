@@ -705,8 +705,10 @@ with tab_modelo:
 
         _pan_mat = _filas_m * _cols_m                    # paneles por matriz
         _n_mat_nec = max(1, math.ceil(N_paneles / _pan_mat)) if N_paneles > 0 else 1
-        _n_mat_x = max(1, int((_W_ter + _pas_x) // (_mat_w + _pas_x)))
-        _n_row_y = max(1, int((_L_ter - _dy) // _pitch) + 1)
+        # Capacidad real: una matriz que no cabe en el terreno NO cuenta
+        _cabe_matriz = (_mat_w <= _W_ter) and (_dy <= _L_ter)
+        _n_mat_x = int((_W_ter + _pas_x) // (_mat_w + _pas_x)) if _cabe_matriz else 0
+        _n_row_y = (int((_L_ter - _dy) // _pitch) + 1) if _cabe_matriz else 0
         _n_mat_cap = _n_mat_x * _n_row_y
         _n_mat = min(_n_mat_nec, _n_mat_cap)
         n_shown = min(N_paneles, _n_mat * _pan_mat) if N_paneles > 0 else _n_mat * _pan_mat
@@ -722,25 +724,32 @@ with tab_modelo:
             hovertext=f'🌱 Cultivo — {_pct_libre:.0f}% del terreno libre bajo y entre paneles',
             hoverinfo='text', showlegend=True,
         )
-        # Matrices de paneles elevadas, con pasillos y corredores de cultivo
+        # Matrices de paneles elevadas, con pasillos y corredores de cultivo.
+        # La última matriz se dibuja PARCIAL (solo las columnas con paneles reales)
+        # para que la malla coincida con n_shown.
         _xs, _ys, _zs, _fi, _fj, _fk = [], [], [], [], [], []
-        _usadas = 0
-        _filas_reales = min(_n_row_y, math.ceil(_n_mat / _n_mat_x))
-        _marg_y = max((_L_ter - ((_filas_reales - 1) * _pitch + _dy)) / 2.0, 0.0)
+        _usadas, _pan_rest = 0, n_shown
+        _filas_reales = min(_n_row_y, math.ceil(_n_mat / _n_mat_x)) if _n_mat_x else 0
+        _marg_y = max((_L_ter - (max(_filas_reales - 1, 0) * _pitch + _dy)) / 2.0, 0.0)
         for _r in range(_filas_reales):
             _en_fila = min(_n_mat - _usadas, _n_mat_x)
-            if _en_fila <= 0:
+            if _en_fila <= 0 or _pan_rest <= 0:
                 break
             _ancho_fila = _en_fila * _mat_w + (_en_fila - 1) * _pas_x
             _marg_x = max((_W_ter - _ancho_fila) / 2.0, 0.0)
             _y0 = _marg_y + _r * _pitch
             for _c in range(_en_fila):
+                if _pan_rest <= 0:
+                    break
+                _pan_este = min(_pan_mat, _pan_rest)
+                _w_este = min(_mat_w, math.ceil(_pan_este / _filas_m) * ph)
                 _x0 = _marg_x + _c * (_mat_w + _pas_x)
                 _b  = len(_xs)
-                _xs += [_x0, _x0 + _mat_w, _x0 + _mat_w, _x0]
+                _xs += [_x0, _x0 + _w_este, _x0 + _w_este, _x0]
                 _ys += [_y0, _y0, _y0 + _dy, _y0 + _dy]
                 _zs += [_h0, _h0, _h0 + _dz, _h0 + _dz]
                 _fi += [_b, _b]; _fj += [_b + 1, _b + 2]; _fk += [_b + 2, _b + 3]
+                _pan_rest -= _pan_este
             _usadas += _en_fila
         _filas_mesh = go.Mesh3d(
             x=_xs, y=_ys, z=_zs, i=_fi, j=_fj, k=_fk,
@@ -753,6 +762,13 @@ with tab_modelo:
         )
         traces = [_suelo, _filas_mesh]
         _corr = _pitch - _dy
+        if not _cabe_matriz:
+            st.error(
+                f"❌ Una matriz de {_filas_m}×{_cols_m} paneles ocupa "
+                f"**{_mat_w:.1f} × {_dy:.1f} m** y no cabe en el terreno de "
+                f"{_W_ter:.0f} × {_L_ter:.0f} m. Reduce los paneles por matriz "
+                f"o amplía el terreno."
+            )
         st.info(
             f"🌱 **Granja agrivoltaica** — terreno **{_W_ter:.0f} × {_L_ter:.0f} m**: "
             f"**{_n_mat} matrices** de {_filas_m}×{_cols_m} paneles "
