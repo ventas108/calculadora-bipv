@@ -111,8 +111,11 @@ def _validar_datos(datos: dict) -> list[dict]:
             items_norm.append({
                 "categoria":    str(it.get("categoria", "General")).strip() or "General",
                 "descripcion":  str(it.get("descripcion", "")).strip(),
+                "ref":          str(it.get("ref", "") or "").strip(),
                 "cantidad":     cant,
                 "unidad":       str(it.get("unidad", "")).strip(),
+                "unitario_usd": _num(it.get("unitario_usd")),
+                "total_usd_item": _num(it.get("total_usd")),
                 "unitario_cop": _num(it.get("unitario_cop")),
                 "total_cop":    total,
             })
@@ -181,13 +184,29 @@ def generar_cotizacion_excel(datos: dict) -> bytes:
     left_wrap = Alignment(horizontal="left", wrap_text=True, vertical="top")
     borde     = Border(bottom=Side(style="thin", color="D5D8DC"))
 
-    ancho = 6  # columnas A..F
-    ws.column_dimensions["A"].width = 44
-    ws.column_dimensions["B"].width = 10
-    ws.column_dimensions["C"].width = 8
-    ws.column_dimensions["D"].width = 18
-    ws.column_dimensions["E"].width = 20
-    ws.column_dimensions["F"].width = 4
+    # Determinar si algún ítem tiene precios en USD (para mostrar columnas USD)
+    _tiene_usd = any(_num(it.get("unitario_usd")) > 0 for it in items)
+
+    if _tiene_usd and trm > 0:
+        # 8 columnas: Descripción, Ref, Cantidad, Unidad, USD/un, Total USD, $ unitario (COP), Total COP
+        ancho = 8
+        ws.column_dimensions["A"].width = 38
+        ws.column_dimensions["B"].width = 10
+        ws.column_dimensions["C"].width = 9
+        ws.column_dimensions["D"].width = 7
+        ws.column_dimensions["E"].width = 13
+        ws.column_dimensions["F"].width = 14
+        ws.column_dimensions["G"].width = 16
+        ws.column_dimensions["H"].width = 16
+    else:
+        # 6 columnas: Descripción, Ref, Cantidad, Unidad, $ unitario (COP), Total COP
+        ancho = 6
+        ws.column_dimensions["A"].width = 40
+        ws.column_dimensions["B"].width = 10
+        ws.column_dimensions["C"].width = 9
+        ws.column_dimensions["D"].width = 7
+        ws.column_dimensions["E"].width = 18
+        ws.column_dimensions["F"].width = 18
 
     r = 1
     # ── Encabezado ────────────────────────────────────────────────────────────
@@ -217,12 +236,16 @@ def generar_cotizacion_excel(datos: dict) -> bytes:
     r += 1
 
     # ── Cabecera de tabla ───────────────────────────────────────────────────────
-    headers = ["Descripción", "Cantidad", "Unidad", "Valor unitario (COP)", "Valor total (COP)"]
+    if _tiene_usd and trm > 0:
+        headers = ["Descripción", "Ref.", "Cantidad", "Unidad",
+                   "USD/un", "Total USD", "$ unitario (COP)", "Total COP"]
+    else:
+        headers = ["Descripción", "Ref.", "Cantidad", "Unidad",
+                   "$ unitario (COP)", "Total COP"]
     for j, h in enumerate(headers, start=1):
         c = ws.cell(r, j, h)
         c.font = f_hdr; c.fill = fill_hdr
         c.alignment = center if j > 1 else Alignment(horizontal="left")
-    ws.cell(r, ancho).fill = fill_hdr
     r += 1
 
     # ── Ítems por categoría ─────────────────────────────────────────────────────
@@ -234,12 +257,23 @@ def generar_cotizacion_excel(datos: dict) -> bytes:
         for it in filas:
             ws.cell(r, 1, it["descripcion"]).font = f_norm
             ws.cell(r, 1).alignment = left_wrap
-            cn = ws.cell(r, 2, round(it["cantidad"], 2)); cn.font = f_norm; cn.alignment = right
-            cu = ws.cell(r, 3, it["unidad"]); cu.font = f_norm; cu.alignment = center
-            cvu = ws.cell(r, 4, round(it["unitario_cop"])); cvu.font = f_norm
-            cvu.number_format = '"$" #,##0'; cvu.alignment = right
-            cvt = ws.cell(r, 5, round(it["total_cop"])); cvt.font = f_norm
-            cvt.number_format = '"$" #,##0'; cvt.alignment = right
+            cr = ws.cell(r, 2, it.get("ref", "")); cr.font = f_norm; cr.alignment = center
+            cn = ws.cell(r, 3, round(it["cantidad"], 2)); cn.font = f_norm; cn.alignment = right
+            cu = ws.cell(r, 4, it["unidad"]); cu.font = f_norm; cu.alignment = center
+            if _tiene_usd and trm > 0:
+                c_uusd = ws.cell(r, 5, round(it.get("unitario_usd", 0), 2))
+                c_uusd.font = f_norm; c_uusd.number_format = '"USD" #,##0.00'; c_uusd.alignment = right
+                c_tusd = ws.cell(r, 6, round(it.get("total_usd_item", 0), 2))
+                c_tusd.font = f_norm; c_tusd.number_format = '"USD" #,##0.00'; c_tusd.alignment = right
+                cvu = ws.cell(r, 7, round(it["unitario_cop"])); cvu.font = f_norm
+                cvu.number_format = '"$" #,##0'; cvu.alignment = right
+                cvt = ws.cell(r, 8, round(it["total_cop"])); cvt.font = f_norm
+                cvt.number_format = '"$" #,##0'; cvt.alignment = right
+            else:
+                cvu = ws.cell(r, 5, round(it["unitario_cop"])); cvu.font = f_norm
+                cvu.number_format = '"$" #,##0'; cvu.alignment = right
+                cvt = ws.cell(r, 6, round(it["total_cop"])); cvt.font = f_norm
+                cvt.number_format = '"$" #,##0'; cvt.alignment = right
             for col in range(1, ancho + 1):
                 ws.cell(r, col).border = borde
             r += 1
@@ -247,34 +281,49 @@ def generar_cotizacion_excel(datos: dict) -> bytes:
     r += 1
 
     # ── Totales ──────────────────────────────────────────────────────────────
-    def _fila_total(label, valor, negrita=False, resaltar=False):
+    _col_total_cop = ancho  # última columna = Total COP
+    _col_total_usd = ancho - 2 if (_tiene_usd and trm > 0) else None
+
+    def _fila_total(label, valor_cop, valor_usd=None, negrita=False, resaltar=False):
         nonlocal r
-        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=4)
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=_col_total_cop - 1)
         a = ws.cell(r, 1, label)
         a.font = f_bold if (negrita or resaltar) else f_norm
         a.alignment = right
-        v = ws.cell(r, 5, round(valor))
+        v = ws.cell(r, _col_total_cop, round(valor_cop))
         v.number_format = '"$" #,##0'
         v.font = f_bold if (negrita or resaltar) else f_norm
         v.alignment = right
+        if _col_total_usd and valor_usd is not None:
+            vu = ws.cell(r, _col_total_usd, round(valor_usd, 2))
+            vu.number_format = '"USD" #,##0.00'
+            vu.font = f_bold if (negrita or resaltar) else f_norm
+            vu.alignment = right
         if resaltar:
             for col in range(1, ancho + 1):
                 ws.cell(r, col).fill = fill_tot
         r += 1
 
-    _fila_total("Subtotal", subtotal)
+    _sub_usd = total_usd * (subtotal / total_cop) if total_cop > 0 else 0
+    _fila_total("Subtotal", subtotal, _sub_usd if trm > 0 else None)
     if blandos > 0:
-        _fila_total("Costos blandos (ingeniería, trámites, gestión)", blandos)
+        _bl_usd = blandos / trm if trm > 0 else 0
+        _fila_total("Costos blandos (ingeniería, trámites, gestión)", blandos,
+                    _bl_usd if trm > 0 else None)
     if indirect > 0:
-        _fila_total("Costos indirectos (administración y utilidad)", indirect)
+        _ind_usd = indirect / trm if trm > 0 else 0
+        _fila_total("Costos indirectos (administración y utilidad)", indirect,
+                    _ind_usd if trm > 0 else None)
     if conting > 0:
-        _fila_total("Contingencia", conting)
-    _fila_total("TOTAL (COP)", total_cop, resaltar=True)
+        _cont_usd = conting / trm if trm > 0 else 0
+        _fila_total("Contingencia", conting, _cont_usd if trm > 0 else None)
+    _fila_total("TOTAL", total_cop, total_usd if trm > 0 else None, resaltar=True)
 
-    if trm > 0 and total_usd > 0:
-        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=4)
+    if trm > 0 and total_usd > 0 and not (_tiene_usd and trm > 0):
+        # Solo si las columnas USD no están visibles, mostrar total USD como fila aparte
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=_col_total_cop - 1)
         a = ws.cell(r, 1, "Equivalente aproximado (USD)"); a.font = f_norm; a.alignment = right
-        v = ws.cell(r, 5, round(total_usd)); v.number_format = '"USD" #,##0'
+        v = ws.cell(r, _col_total_cop, round(total_usd)); v.number_format = '"USD" #,##0'
         v.font = f_norm; v.alignment = right
         r += 1
 

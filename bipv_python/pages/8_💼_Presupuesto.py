@@ -1368,7 +1368,7 @@ _SEC_LABELS = {
 }
 
 def _recolectar_items_cotizacion(trm_cop):
-    """Extrae ítems activos de los DataFrames de sesión → filas de cotización en COP.
+    """Extrae ítems activos de los DataFrames de sesión → filas de cotización.
     NO incluye la columna 'Costos Blandos' aquí: se muestra como línea de total aparte
     para mantener el subtotal = CAPEX directo (materiales + equipos + mano de obra)."""
     filas = []
@@ -1391,8 +1391,11 @@ def _recolectar_items_cotizacion(trm_cop):
             filas.append({
                 "categoria":    _SEC_LABELS.get(_key, _key),
                 "descripcion":  _desc,
+                "ref":          str(_r.get("Ref", "") or ""),
                 "cantidad":     _cant,
                 "unidad":       str(_r.get("Unidad", "") or ""),
+                "unitario_usd": _uni_usd,
+                "total_usd":    _tot_usd,
                 "unitario_cop": _uni_usd * trm_cop,
                 "total_cop":    _tot_usd * trm_cop,
             })
