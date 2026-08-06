@@ -163,6 +163,19 @@ with tab1:
             _campos_por_modelo = set()
             for _vals_m in (res.get("valores_por_modelo") or {}).values():
                 _campos_por_modelo.update(k for k, v in _vals_m.items() if v is not None)
+            # ── #146 (3ª capa): ficha multi-modelo donde el extractor de tablas
+            # no logró leer NINGUNA columna por modelo. Sin este aviso, los
+            # valores globales (que pueden pertenecer a otra columna/modelo)
+            # pasarían al catálogo en silencio.
+            if not _campos_por_modelo:
+                with _slot_multi:
+                    st.error(
+                        f"🚨 **La ficha cubre {len(_modelos_det)} modelos pero el extractor "
+                        "no logró leer ninguna columna por modelo.** Los valores mostrados "
+                        "abajo son los globales del documento y **pueden pertenecer a otro "
+                        f"modelo distinto de {_modelo_sel}**. Verifica CADA campo contra la "
+                        "columna correcta de la ficha técnica antes de guardar."
+                    )
             res = {
                 **res,
                 "modelo": _modelo_sel,
