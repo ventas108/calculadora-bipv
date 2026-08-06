@@ -162,3 +162,10 @@ uri = "file://entregables/FICHA_TECNICA_CALCULADORA_BIPV_agosto2026.docx"
 type = "word_document"
 title = "Ficha Técnica extendida — Calculadora BIPV (agosto 2026)"
 description = "Versión informativa y persuasiva con datos del manual: 6 tecnologías con rangos de densidad y PR, ejemplo contundente de bypass (sombra 25% ≠ pérdida 25%), semáforos de TIR/VPN/Payback/LCOE, benchmarks CAPEX/OPEX Colombia, Ley 1715 y trazabilidad de cifras."
+
+[[outputs]]
+id = "JL9yyINEr7YzO-BJhHLHS"
+uri = "file://entregables/Mibet_Lista_Verificacion_Uraba_Agrivoltaico.xlsx"
+type = "table"
+title = "Formulario Mibet — Agrivoltaico Urabá (diligenciado)"
+description = "Lista de verificación de proyecto terrestre con los datos del proyecto agrivoltaico de Apartadó: 306 paneles JA Solar JAM66D46-720/LB bifaciales, 220.3 kWp, estructura elevada 2.5 m."
