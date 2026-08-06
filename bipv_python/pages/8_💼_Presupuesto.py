@@ -1419,8 +1419,9 @@ if _hay_items and not _trm_ok:
         st.error(
             f"❌ TRM sin confirmar — la API del Banco de la República no respondió "
             f"y se está usando el valor por defecto ({tc:,.0f} COP/USD). Clica 🔄 "
-            "junto al campo TRM (arriba) para obtener la tasa oficial, o edítala "
-            "manualmente, antes de descargar la cotización para el cliente."
+            "junto al campo TRM (arriba) para obtener la tasa oficial, o edita el "
+            "valor manualmente (debe cambiar el número, aunque sea en 1 peso, para "
+            "quedar confirmado como manual) antes de descargar la cotización."
         )
 _export_ok = _hay_items and _trm_ok
 
