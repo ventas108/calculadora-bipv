@@ -183,3 +183,17 @@ uri = "file://entregables/Plano_Disposicion_Agrivoltaico_Uraba.pdf"
 type = "pdf"
 title = "Plano de disposición — Agrivoltaico Urabá (PDF)"
 description = "Versión PDF para adjuntar al formulario de Mibet."
+
+[[outputs]]
+id = "F9Ue-HXQM3EgUOv4ha95v"
+uri = "file://entregables/Plano_Disposicion_Uraba_32x100.png"
+type = "image"
+title = "Plano recalculado — Terreno 32 × 100 m (PNG)"
+description = "Vista en planta: 17 matrices de 2×9 paneles (306 en total, 220,3 kWp) sobre terreno de 100×32 m con 4 corredores de cultivo de ~4 m."
+
+[[outputs]]
+id = "FT3KNLPbboLoIyAmgOhBo"
+uri = "file://entregables/Plano_Disposicion_Uraba_32x100.pdf"
+type = "pdf"
+title = "Plano recalculado — Terreno 32 × 100 m (PDF)"
+description = "Versión PDF para adjuntar al formulario de Mibet."
