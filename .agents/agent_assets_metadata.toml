@@ -239,3 +239,10 @@ uri = "file://entregables/Ficha_Tecnica_Preliminar_Agrivoltaico_Uraba_v2.docx"
 type = "word_document"
 title = "Ficha Técnica Preliminar Urabá v2 — Word editable"
 description = "Versión corregida sin texto solapado, en formato Word editable con tablas: sitio, configuración eléctrica optimizada, producción simulada y financieros."
+
+[[outputs]]
+id = "bwsRWFhtd33kT1IkyiUol"
+uri = "file://entregables/MANUAL_CALCULADORA_BIPV_v3.1_agosto2026.docx"
+type = "word_document"
+title = "Manual de Usuario v3.1 — con Comparador de Inversores"
+description = "Manual complementado con la nueva sección 6b (Página 4b — Comparador de Inversores): prerrequisitos, las 3 secciones, pautas de elección antes de Adoptar y qué pasa al adoptar."
