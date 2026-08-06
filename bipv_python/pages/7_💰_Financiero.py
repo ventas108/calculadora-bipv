@@ -446,6 +446,15 @@ with col_t2:
         help="Colombia: inflación energética histórica ~5–8%/año. "
              "Escenario base: 5%.",
     )
+    # ── #177: el O&M también sube con la inflación. Antes era constante en
+    # USD los 25-30 años → subestimaba costos tardíos e inflaba TIR/payback.
+    esc_opex = st.slider(
+        "Escalación anual O&M (%)",
+        min_value=0.0, max_value=10.0, value=3.0, step=0.5,
+        help="Inflación esperada del mantenimiento en USD (mano de obra, "
+             "repuestos, seguros). Referencia Colombia: 3–5%/año. "
+             "Con 0% se reproduce el modelo anterior (O&M constante).",
+    )
     # ── Label dinámico según tecnología del panel ─────────────────────────────
     # panel_dict es la fuente limpia (tecnologia directa del catálogo).
     # panel_seleccionado se excluye: es un dict serializado que puede contener
@@ -875,6 +884,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
             opex_pct          = opex_pct,
             n_anos            = n_anos,
             beneficios_1715   = ben,
+            tasa_escalacion_opex = esc_opex,
         )
         # Escenario P90 (conservador — mismo CAPEX, menos producción)
         comp_p90 = comparativo_ley_1715(
@@ -888,6 +898,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
             opex_pct          = opex_pct,
             n_anos            = n_anos,
             beneficios_1715   = ben,
+            tasa_escalacion_opex = esc_opex,
         )
         st.session_state["comp_financiero"]    = comp
         st.session_state["comp_financiero_p90"] = comp_p90
@@ -1185,6 +1196,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
                     opex_pct         = opex_pct,
                     n_anos           = n_anos,
                     beneficios_1715  = ben,
+                    tasa_escalacion_opex = esc_opex,
                 )
                 return _c["con"]["metricas"]
             except Exception:

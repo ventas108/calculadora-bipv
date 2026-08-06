@@ -119,9 +119,10 @@ def calcular_flujo_caja(
     tipo_cambio: float,
     tasa_escalacion_tarifa: float,   # % anual de aumento de la tarifa
     tasa_degradacion_pct: float,     # % anual de degradación del panel
-    opex_pct_capex: float,           # % del CAPEX como O&M anual
+    opex_pct_capex: float,           # % del CAPEX como O&M anual (año 1)
     n_anos: int = 25,
     beneficio_renta_ano: int = 1,    # año en que se aplica el beneficio art. 11
+    tasa_escalacion_opex: float = 0.0,  # % anual de aumento del O&M (#177)
 ) -> list[dict]:
     """
     Genera el flujo de caja anual del proyecto (USD).
@@ -160,15 +161,18 @@ def calcular_flujo_caja(
         ingreso_cop  = prod_kWh * tarifa_t_cop
         ingreso_usd  = ingreso_cop / tipo_cambio
 
-        # O&M (constante en USD)
-        flujo = ingreso_usd - opex_anual_usd
+        # O&M escalado (#177): el mantenimiento sube con la inflación en USD.
+        # Con tasa_escalacion_opex=0 se reproduce el comportamiento anterior
+        # (O&M constante), que subestimaba costos tardíos e inflaba la TIR.
+        opex_t_usd = opex_anual_usd * (1 + tasa_escalacion_opex / 100) ** (t - 1)
+        flujo = ingreso_usd - opex_t_usd
         flujo_acum += flujo
 
         flujos.append({
             "año":               t,
             "produccion_kWh":    round(prod_kWh, 0),
             "ingreso_energia_usd": round(ingreso_usd, 0),
-            "opex_usd":          round(opex_anual_usd, 0),
+            "opex_usd":          round(opex_t_usd, 0),
             "flujo_usd":         round(flujo, 0),
             "flujo_acum_usd":    round(flujo_acum, 0),
         })
@@ -273,6 +277,7 @@ def comparativo_ley_1715(
     opex_pct: float,
     n_anos: int,
     beneficios_1715: dict,
+    tasa_escalacion_opex: float = 0.0,  # % anual de aumento del O&M (#177)
 ) -> dict:
     """
     Calcula métricas SIN y CON beneficios Ley 1715 para comparación.
@@ -288,6 +293,7 @@ def comparativo_ley_1715(
         tasa_degradacion_pct   = tasa_degradacion,
         opex_pct_capex     = opex_pct,
         n_anos             = n_anos,
+        tasa_escalacion_opex = tasa_escalacion_opex,
     )
     met_sin = calcular_metricas(flujos_sin, tasa_descuento, capex_usd,
                                 e_ac_kWh_anual, tipo_cambio)
@@ -303,6 +309,7 @@ def comparativo_ley_1715(
         tasa_degradacion_pct   = tasa_degradacion,
         opex_pct_capex     = opex_pct,
         n_anos             = n_anos,
+        tasa_escalacion_opex = tasa_escalacion_opex,
     )
     met_con = calcular_metricas(flujos_con, tasa_descuento, capex_usd,
                                 e_ac_kWh_anual, tipo_cambio)
