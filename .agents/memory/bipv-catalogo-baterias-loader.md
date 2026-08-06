@@ -81,3 +81,7 @@ El loader busca la hoja por nombre; si no existe, retorna `{}` sin error.
 - Encabezado multi-modelo "Model TriP2-LB- TriP2-LB- ..." + línea siguiente "3P 5K 3P 6K ...": si los nombres detectados están duplicados, completar con la línea de continuación. La continuación NO está alineada por columnas → si len(tokens) % n == 0, repartir en n grupos iguales en orden; solo usar posición como fallback.
 - "Rated PV input voltage (V) 690": la unidad va en la etiqueta, no tras el número — la V final debe ser opcional en el fallback de tensión nominal.
 - Títulos de gama ("HYBRID SERIES") no son modelo: rechazar líneas con SERIES en _extract_model.
+
+## Matching normalizado (#24)
+- El matching de columnas usa `_clave_col` (minúsculas, sin tildes, espacios colapsados) vía `_COL_MAP_NORM` y `_mapear_columnas_df`; primer alias gana por orden de columnas del Excel.
+- El diagnóstico reporta `columnas_ambiguas` (dos columnas → mismo campo interno; se usa la de más a la izquierda) y la página 11 lo muestra en el expander ⓪.
