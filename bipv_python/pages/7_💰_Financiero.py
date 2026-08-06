@@ -611,6 +611,7 @@ with col_t2:
 
 with col_t3:
     # ── OPEX: desde Presupuesto detallado o slider paramétrico ───────────────
+    _opex_usd_guardia = None  # monto absoluto para la guardia #72 (ruta Presupuesto)
     _ppto_opex_anual = float(st.session_state.get("presupuesto_opex_anual_usd", 0.0))
     _capex_para_opex = float(st.session_state.get("presupuesto_capex_usd", capex_total))
     if _ppto_opex_anual > 0 and _capex_para_opex > 0:
@@ -623,6 +624,9 @@ with col_t3:
         )
         if usar_opex_ppto:
             opex_pct = _opex_pct_ppto
+            # Guardia #72: comparar el monto ABSOLUTO del Presupuesto, no el
+            # % re-derivado sobre capex_total (puede ser un CAPEX distinto).
+            _opex_usd_guardia = _ppto_opex_anual
             st.caption(f"✅ OPEX activo: USD {_ppto_opex_anual:,.0f}/año ({_opex_pct_ppto:.2f}% CAPEX) — desde 💼 Presupuesto")
         else:
             opex_pct = st.slider(
@@ -702,7 +706,11 @@ with col_t3:
     # de un contrato O&M para este tamaño, la TIR y el payback salen mejores
     # de lo que se puede cumplir. No bloquea: avisa con el número concreto.
     _opex_piso_usd = opex_minimo_anual_usd(p_stc)
-    _opex_efectivo_usd = capex_total * opex_pct / 100 if capex_total > 0 else 0.0
+    _opex_efectivo_usd = (
+        _opex_usd_guardia
+        if _opex_usd_guardia is not None
+        else (capex_total * opex_pct / 100 if capex_total > 0 else 0.0)
+    )
     if _opex_piso_usd > 0 and _opex_efectivo_usd < _opex_piso_usd:
         st.warning(
             f"⚠️ **O&M posiblemente subestimado para {p_stc:,.0f} kWp**: el OPEX "
