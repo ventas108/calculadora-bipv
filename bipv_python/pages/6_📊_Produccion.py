@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 
 from calculos.produccion import simular_produccion_anual, perdidas_desglosadas, panel_tiene_sdm_completo
-from calculos.produccion_iv import simular_produccion_iv, panel_apto_para_iv
+from calculos.produccion_iv import simular_produccion_iv, panel_apto_para_iv, preparar_para_iv
 from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_inversores import INVERSORES
 from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
@@ -165,31 +165,42 @@ with col_c3:
 # ═══════════════════════════════════════════════════════════════════════════════
 st.markdown("---")
 
-# ── Modo Motor IV (opt-in): solo si el panel tiene ficha completa ─────────────
-_panel_apto_iv = panel_apto_para_iv(panel)
+# ── Modo Motor IV (opt-in) — #105: SDM calibrado O estimado desde ficha ──────
+_panel_iv_prep, _sdm_origen = preparar_para_iv(panel)
+_panel_apto_iv = _panel_iv_prep is not None
 usar_iv = False
 if _panel_apto_iv:
+    _origen_txt = (
+        "parámetros SDM **calibrados** del catálogo"
+        if _sdm_origen == "calibrado"
+        else "SDM **estimado desde la ficha** (Voc/Isc/Vmp/Imp + Ns, fit De Soto)"
+    )
     usar_iv = st.toggle(
         "🔬 Usar curva IV real del panel (Motor IV)",
         value=st.session_state.get("produccion_usar_iv", False),
         key="produccion_usar_iv",
         help=(
-            "Deriva la potencia Pmp(G, Tcell) de la curva I-V single-diode calibrada "
-            "de la ficha (De Soto 2006 + Rsh CdTe), en lugar del modelo lineal genérico. "
-            "Solo disponible con ficha SDM completa. Modo opt-in: por defecto se usa el "
+            "Deriva la potencia Pmp(G, Tcell) de la curva I-V single-diode "
+            "(De Soto 2006 + Rsh CdTe), en lugar del modelo lineal genérico. "
+            f"Este panel usa {_origen_txt}. Modo opt-in: por defecto se usa el "
             "modelo base."
         ),
     )
     if usar_iv:
         st.caption(
-            "🟢 Modo **curva IV real** activo — se comparará contra el modelo base y "
-            "la E_ac oficial (aguas abajo) usará el resultado del Motor IV."
+            f"🟢 Modo **curva IV real** activo ({_origen_txt}) — se comparará contra "
+            "el modelo base y la E_ac oficial (aguas abajo) usará el resultado del Motor IV."
         )
+        if _sdm_origen == "estimado_ficha":
+            st.caption(
+                "ℹ️ Los parámetros SDM se estimaron a partir de los 4 puntos de la ficha; "
+                "verifica en 🔬 **Motor IV** que la curva reproduce la ficha (error < 5%)."
+            )
 else:
     st.caption(
         "ℹ️ El modo **curva IV real (Motor IV)** no está disponible: este panel no tiene "
-        "ficha SDM completa (`I_L_ref`, `I_o_ref`, `R_s`, `R_sh_ref`, `a_ref`, `Tk_alfa`). "
-        "Se usa el modelo base. Completa la ficha en 🔬 Motor IV o 📋 Catálogo Paneles."
+        "ni parámetros SDM calibrados ni ficha completa (Voc, Isc, Vmp, Imp y N_s) para "
+        "estimarlos. Se usa el modelo base. Completa la ficha en 🔬 Motor IV o 📋 Catálogo Paneles."
     )
 
 btn_sim = st.button(
@@ -216,7 +227,9 @@ if btn_sim or st.session_state.get("produccion_ok"):
             res_base = simular_produccion_anual(**_sim_kwargs)
             res_iv   = None
             if usar_iv and _panel_apto_iv:
-                res_iv = simular_produccion_iv(**_sim_kwargs)
+                # #105: pasar el panel YA preparado (evita repetir el fit_desoto
+                # y garantiza que se simula con el mismo SDM mostrado arriba).
+                res_iv = simular_produccion_iv(**{**_sim_kwargs, "panel": _panel_iv_prep})
 
         # El modo IV es opt-in: si está activo y disponible, queda como oficial.
         res = res_iv if (usar_iv and res_iv is not None) else res_base

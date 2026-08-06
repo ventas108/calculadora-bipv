@@ -20,6 +20,7 @@ import pvlib
 from calculos.modelo_iv import (
     obtener_constantes_tecnologia,
     tiene_sdm_completo,
+    preparar_panel_iv,
     K_BOLTZMANN,
     Q_ELECTRON,
     T_REF_K,
@@ -27,14 +28,37 @@ from calculos.modelo_iv import (
 )
 
 
+def preparar_para_iv(panel: dict) -> tuple:
+    """
+    Resuelve el panel utilizable por la curva IV y su procedencia (#105).
+
+    Cascada (misma que el Motor IV, calculos.modelo_iv.preparar_panel_iv):
+      1. SDM calibrado en catálogo         → (panel, "calibrado")
+      2. Ficha completa (Voc/Isc/Vmp/Imp + Ns) → fit_desoto on-demand
+                                           → (panel_estimado, "estimado_ficha")
+      3. Datos insuficientes o fit fallido → (None, None)
+
+    Antes, Producción solo aceptaba el caso 1: los paneles con ficha completa
+    pero sin SDM precalibrado caían al modelo lineal simplificado aunque el
+    Motor IV sí sabía estimar sus parámetros.
+    """
+    if tiene_sdm_completo(panel):
+        return panel, "calibrado"
+    try:
+        _prep = preparar_panel_iv(panel)
+    except Exception:
+        _prep = None
+    if _prep is not None and tiene_sdm_completo(_prep):
+        return _prep, "estimado_ficha"
+    return None, None
+
+
 def panel_apto_para_iv(panel: dict) -> bool:
     """
-    True si el panel tiene ficha completa para el Motor IV (SDM De Soto).
-
-    Reutiliza la validación existente del Motor IV (modelo_iv.tiene_sdm_completo),
-    que exige: I_L_ref, I_o_ref, R_s, R_sh_ref, a_ref, Tk_alfa y tecnologia.
+    True si el panel puede simularse con la curva IV real: SDM calibrado
+    o ficha completa de la que estimar el SDM (fit_desoto on-demand).
     """
-    return tiene_sdm_completo(panel)
+    return preparar_para_iv(panel)[0] is not None
 
 
 def _pmp_iv_vectorizado(
@@ -133,10 +157,13 @@ def simular_produccion_iv(
 
     Lanza ValueError si el panel no tiene ficha completa para el Motor IV.
     """
-    if not panel_apto_para_iv(panel):
+    # #105: acepta SDM calibrado o estimado on-demand desde la ficha completa.
+    panel, _sdm_origen = preparar_para_iv(panel)
+    if panel is None:
         raise ValueError(
             "El panel no tiene ficha completa para el Motor IV (SDM De Soto). "
-            "Se requieren I_L_ref, I_o_ref, R_s, R_sh_ref, a_ref, Tk_alfa y tecnologia."
+            "Se requieren parámetros SDM calibrados, o al menos "
+            "Voc/Isc/Vmp/Imp + Ns para estimarlos con fit_desoto."
         )
 
     if P_dc_stc_kW is None:
@@ -226,4 +253,5 @@ def simular_produccion_iv(
         "df_mensual":              df_m,
         "uso_modelo_simplificado": False,
         "metodo":                  "curva_iv",
+        "sdm_origen":              _sdm_origen,   # "calibrado" | "estimado_ficha" (#105)
     }
