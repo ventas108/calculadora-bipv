@@ -359,7 +359,9 @@ def _bloqueo_vencido(st, usuario: dict) -> None:
     venc = usuario.get("fecha_vencimiento", "")
     st.error(f"Tu plan **{_ETIQUETA_PLAN.get(usuario['plan'], usuario['plan'])}** "
              f"venció el **{venc}**. Tus proyectos están guardados y no se pierden.")
-    st.info(CONTACTO_RENOVACION)
+    from calculos.pagos import mostrar_opciones_pago
+    if not mostrar_opciones_pago(st):
+        st.info(CONTACTO_RENOVACION)
     if st.button("Cerrar sesión"):
         cerrar_sesion(st)
 
@@ -439,8 +441,10 @@ def _sidebar_estado(st, usuario: dict) -> None:
         if d is None:
             st.caption(plan_txt)
         elif d <= 3:
-            st.warning(f"{plan_txt} — ⚠️ te quedan **{d} día(s)**. "
-                       "Contacta al administrador para renovar.")
+            st.warning(f"{plan_txt} — ⚠️ te quedan **{d} día(s)**.")
+            from calculos.pagos import mostrar_opciones_pago
+            if not mostrar_opciones_pago(st, compacto=True):
+                st.caption("Contacta al administrador para renovar.")
         elif d <= 7:
             st.caption(f"{plan_txt} — te quedan {d} días")
         else:

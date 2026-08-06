@@ -130,10 +130,51 @@ with c3:
         eliminar_usuario(sel)
         st.rerun()
 
+# ── Configuración de pagos (Fase 2) ─────────────────────────────────────────
+st.markdown("---")
+st.subheader("💳 Configuración de pagos")
+from calculos.pagos import cargar_config_pagos, guardar_config_pagos
+
+cfg = cargar_config_pagos()
+with st.form("form_pagos"):
+    c1, c2 = st.columns(2)
+    precio_m = c1.number_input("Precio Plan Mensual (COP)", 0, 100_000_000,
+                               int(cfg["precio_mensual_cop"]), step=10_000)
+    precio_a = c2.number_input("Precio Plan Anual (COP)", 0, 1_000_000_000,
+                               int(cfg["precio_anual_cop"]), step=50_000)
+    link_m = c1.text_input("Link de pago Wompi — Mensual",
+                           value=cfg["link_wompi_mensual"],
+                           placeholder="https://checkout.wompi.co/l/...")
+    link_a = c2.text_input("Link de pago Wompi — Anual",
+                           value=cfg["link_wompi_anual"],
+                           placeholder="https://checkout.wompi.co/l/...")
+    transf = st.text_area("Datos para transferencia bancaria (opcional)",
+                          value=cfg["datos_transferencia"],
+                          placeholder="Bancolombia Ahorros 123-456789-00 — "
+                                      "INNOVACION QUIMICA SAS, NIT 900.xxx.xxx")
+    contacto = st.text_input("Contacto para enviar comprobante",
+                             value=cfg["contacto"],
+                             placeholder="WhatsApp +57 3xx xxx xxxx · correo@empresa.com")
+    ok_pagos = st.form_submit_button("💾 Guardar configuración de pagos",
+                                     type="primary")
+if ok_pagos:
+    for nombre, link in (("Mensual", link_m), ("Anual", link_a)):
+        if link.strip() and not link.strip().lower().startswith("https://"):
+            st.error(f"El link {nombre} debe empezar por https://")
+            st.stop()
+    guardar_config_pagos({
+        "precio_mensual_cop": int(precio_m), "precio_anual_cop": int(precio_a),
+        "link_wompi_mensual": link_m.strip(), "link_wompi_anual": link_a.strip(),
+        "datos_transferencia": transf.strip(), "contacto": contacto.strip(),
+    })
+    st.success("✅ Configuración guardada. Los clientes con plan vencido o por "
+               "vencer verán estos botones de pago.")
+
 st.markdown("---")
 st.caption(
-    "💡 Flujo de venta: crea la cuenta de **prueba (14 días)** → el cliente paga "
-    "por link de Wompi o transferencia → aquí extiendes 30 días (mensual) o "
-    "365 (anual). Los datos de usuarios viven en `datos/usuarios.db` en el "
-    "servidor (no se sube a git)."
+    "💡 Flujo de venta: crea la cuenta de **prueba (14 días)** → al vencer, el "
+    "cliente ve los botones de pago Wompi/transferencia configurados arriba → "
+    "paga y te envía el comprobante → aquí extiendes 30 días (mensual) o 365 "
+    "(anual). Los datos de usuarios (`datos/usuarios.db`) y esta configuración "
+    "(`datos/config_pagos.json`) viven solo en el servidor (no se suben a git)."
 )
