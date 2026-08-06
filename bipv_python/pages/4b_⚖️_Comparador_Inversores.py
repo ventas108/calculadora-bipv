@@ -14,6 +14,9 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from calculos.auth import requerir_login
+requerir_login()
+
 st.set_page_config(page_title="Comparador de Inversores", page_icon="⚖️", layout="wide")
 
 from calculos.comparador_inversores import (

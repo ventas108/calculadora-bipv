@@ -120,3 +120,6 @@ temp/
 client/public/__manus__/version.json
 .project-config.json
 attached_assets/Pasted--venv-root-bipv-colombia-var-www-bipv-calculadora-bipv-_1785182445864.txt
+
+# Base de datos de usuarios (solo servidor)
+bipv_python/datos/usuarios.db*

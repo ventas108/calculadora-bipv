@@ -13,6 +13,9 @@ st.set_page_config(
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
 
+from calculos.auth import requerir_login
+requerir_login()
+
 # ── Inicialización de session_state global ─────────────────────────────────
 defaults = {
     # Proyecto

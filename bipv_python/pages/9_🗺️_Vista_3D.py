@@ -1,6 +1,9 @@
 """Página 9 — Vista 3D del sitio: mapa geolocalizado y modelo volumétrico BIPV."""
 import math
 import streamlit as st
+
+from calculos.auth import requerir_login
+requerir_login()
 import plotly.graph_objects as go
 
 from datos.ciudades_colombia import CIUDADES

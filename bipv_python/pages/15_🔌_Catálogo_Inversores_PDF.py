@@ -11,6 +11,9 @@ Flujo:
 """
 
 import streamlit as st
+
+from calculos.auth import requerir_login
+requerir_login()
 from calculos.pdf_inversor_extractor import (
     extraer_parametros_inversor,
     pdf_disponible,

@@ -5,6 +5,9 @@ suficiente (Voc, Isc, Vmp, Imp, N_s/NsA), el motor carga y ejecuta
 automáticamente sin que el usuario tenga que hacer nada.
 """
 import streamlit as st
+
+from calculos.auth import requerir_login
+requerir_login()
 import numpy as np
 import plotly.graph_objects as go
 

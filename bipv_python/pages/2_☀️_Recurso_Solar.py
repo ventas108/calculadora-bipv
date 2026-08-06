@@ -2,6 +2,9 @@
 import os
 import pickle
 import streamlit as st
+
+from calculos.auth import requerir_login
+requerir_login()
 import plotly.graph_objects as go
 import pandas as pd
 

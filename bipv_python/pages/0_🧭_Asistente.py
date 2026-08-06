@@ -7,6 +7,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
 
+from calculos.auth import requerir_login
+requerir_login()
+
 from calculos.asistente import (
     BaseConocimiento,
     RUTA_BASE_CONOCIMIENTO,

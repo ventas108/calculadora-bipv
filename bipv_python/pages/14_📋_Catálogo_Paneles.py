@@ -1,5 +1,8 @@
 """Página 14 — Agregar, editar y eliminar paneles del catálogo (#65 + #129 + #130)."""
 import streamlit as st
+
+from calculos.auth import requerir_login
+requerir_login()
 import pandas as pd
 
 from calculos.pdf_panel_extractor import (

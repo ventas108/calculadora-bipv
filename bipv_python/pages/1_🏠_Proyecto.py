@@ -2,6 +2,9 @@
 import json
 import os
 import streamlit as st
+
+from calculos.auth import requerir_login
+requerir_login()
 from datetime import date
 from datos.ciudades_colombia import CIUDADES, LISTA_CIUDADES, FECHA_VALIDACION_TARIFAS
 from calculos.tz_utils import utc_offset_latam, tz_label

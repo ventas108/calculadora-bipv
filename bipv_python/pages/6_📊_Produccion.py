@@ -1,5 +1,8 @@
 """Página 6 — Producción anual BIPV (IEC 61724)."""
 import streamlit as st
+
+from calculos.auth import requerir_login
+requerir_login()
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd

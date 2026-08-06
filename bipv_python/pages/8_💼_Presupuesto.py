@@ -1,5 +1,8 @@
 """Página 8 — Presupuesto Bancable BIPV — CAPEX + Costos Blandos + OPEX Anual."""
 import streamlit as st
+
+from calculos.auth import requerir_login
+requerir_login()
 import pandas as pd
 from datetime import date
 from calculos.trm_utils import init_trm, trm_widget

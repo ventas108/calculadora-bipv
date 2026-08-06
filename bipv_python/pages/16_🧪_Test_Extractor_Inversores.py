@@ -12,6 +12,9 @@ del mismo fabricante, o para añadirlo como nuevo caso de prueba.
 """
 
 import streamlit as st
+
+from calculos.auth import requerir_login
+requerir_login()
 import pandas as pd
 import sys, os
 

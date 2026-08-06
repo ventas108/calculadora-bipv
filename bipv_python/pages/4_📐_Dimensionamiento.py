@@ -1,6 +1,9 @@
 """Página 4 — Dimensionamiento de strings."""
 import math
 import streamlit as st
+
+from calculos.auth import requerir_login
+requerir_login()
 import pandas as pd
 import plotly.graph_objects as go
 from calculos.dimensionamiento import optimizar_n_serie, dimensionar_sistema
