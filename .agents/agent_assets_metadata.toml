@@ -218,3 +218,10 @@ uri = "file://entregables/Alternativas_Inversores_Uraba.docx"
 type = "word_document"
 title = "Alternativas de configuración eléctrica — Urabá 220,32 kWp"
 description = "5 alternativas de inversores y arreglos de strings (A–E), criterios de decisión y plan de simulación paso a paso en la Calculadora BIPV."
+
+[[outputs]]
+id = "-tSa58OyU60x6czwkYEnM"
+uri = "file://entregables/Comparativa_Alt_B_Inversores_Uraba.xlsx"
+type = "table"
+title = "Comparativa Alternativa B — 2 × ~100 kW (Urabá 220,32 kWp)"
+description = "Simulación horaria TMY Apartadó: E_ac, clipping, CAPEX, TIR, VPN, Payback y LCOE para Huawei, Sungrow y Growatt."
