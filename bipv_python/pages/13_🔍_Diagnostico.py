@@ -8,6 +8,11 @@ import numpy as np
 from datetime import date, datetime
 
 from datos.ciudades_colombia import CIUDADES, LISTA_CIUDADES
+from calculos.diagnostico_historico import (
+    cargar_historico,
+    guardar_registro,
+    eliminar_registro,
+)
 
 st.set_page_config(
     page_title="Diagnóstico — Sistema Instalado",
@@ -700,6 +705,127 @@ with tab_referencia:
 - RETIE 2013 (Colombia) — Reglamento Técnico de Instalaciones Eléctricas
 """
         )
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# HISTÓRICO DE DIAGNÓSTICOS (#98) — ¿el sistema mejora o empeora con el tiempo?
+# ═══════════════════════════════════════════════════════════════════════════════
+st.divider()
+st.subheader("📈 Histórico de diagnósticos")
+
+_nombre_proy_hist = st.session_state.get("nombre_proyecto") or "Diagnóstico general"
+st.caption(
+    f"Cada diagnóstico guardado queda asociado al proyecto **{_nombre_proy_hist}** "
+    "y permite ver si el sistema mejora o empeora entre visitas."
+)
+
+_historico = cargar_historico(_nombre_proy_hist)
+
+col_hg1, col_hg2 = st.columns([1, 3])
+with col_hg1:
+    if st.button("💾 Guardar este diagnóstico en el histórico", type="secondary",
+                 use_container_width=True):
+        _registro = {
+            "fecha":              datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "tipo_sistema":       tipo_sistema,
+            "potencia_kWp":       round(potencia_kWp, 2),
+            "ciudad":             ciudad_diag,
+            "ghi_anual_kWh_m2":   round(ghi_anual, 1),
+            "num_meses":          int(num_meses),
+            "prod_anual_kWh":     round(prod_anual_kwh, 0),
+            "yield_kWh_kWp":      round(yield_especifico, 0),
+            "pr_real":            round(pr_real, 4),
+            "pr_ref_nominal":     pr_ref_nom,
+            "pi_pct":             round(pi_pct, 1),
+            "deg_pct_año":        round(deg_pct_año, 2),
+            "pct_autoconsumo":    round(pct_autoconsumo, 1),
+            "lcoe_cop_kwh":       round(lcoe_cop_kwh, 1),
+            "semaforo":           semaforo_emoji,
+            "estado":             semaforo_estado,
+            "años_operacion":     round(años_operacion, 1),
+        }
+        _ok_hist, _historico = guardar_registro(_nombre_proy_hist, _registro)
+        if _ok_hist:
+            st.success("✅ Diagnóstico guardado en el histórico.")
+        else:
+            st.warning(
+                "⚠️ No se pudo escribir el histórico a disco (revisa permisos/espacio "
+                "del servidor en `datos/diagnosticos/`). El registro se muestra abajo "
+                "pero se perderá al recargar."
+            )
+
+if not _historico:
+    st.info(
+        "ℹ️ Aún no hay diagnósticos guardados para este proyecto. Pulsa "
+        "**💾 Guardar este diagnóstico** cada vez que audites el sistema (por ejemplo, "
+        "cada 6–12 meses) para construir la tendencia."
+    )
+else:
+    # ── Comparación contra el diagnóstico anterior ────────────────────────────
+    if len(_historico) >= 2:
+        _prev, _ult = _historico[-2], _historico[-1]
+        _d_pi  = _ult.get("pi_pct", 0) - _prev.get("pi_pct", 0)
+        _d_pr  = _ult.get("pr_real", 0) - _prev.get("pr_real", 0)
+        _d_deg = _ult.get("deg_pct_año", 0) - _prev.get("deg_pct_año", 0)
+        _tendencia = "mejoró" if _d_pi > 1 else ("empeoró" if _d_pi < -1 else "se mantiene estable")
+        _icono = "🟢" if _d_pi > 1 else ("🔴" if _d_pi < -1 else "🟡")
+        st.markdown(
+            f"{_icono} Entre **{_prev.get('fecha','?')}** y **{_ult.get('fecha','?')}** "
+            f"el sistema **{_tendencia}**: PI {_d_pi:+.1f} puntos · "
+            f"PR {_d_pr:+.3f} · degradación estimada {_d_deg:+.2f} %/año."
+        )
+
+    _df_hist = pd.DataFrame(_historico)
+
+    # ── Gráfica de tendencia PR / PI ──────────────────────────────────────────
+    if len(_historico) >= 2 and "fecha" in _df_hist.columns:
+        fig_hist = go.Figure()
+        fig_hist.add_trace(go.Scatter(
+            x=_df_hist["fecha"], y=_df_hist["pi_pct"],
+            mode="lines+markers", name="PI (%)", line=dict(color="#1976d2", width=3),
+        ))
+        fig_hist.add_trace(go.Scatter(
+            x=_df_hist["fecha"], y=_df_hist["pr_real"] * 100,
+            mode="lines+markers", name="PR real (×100)",
+            line=dict(color="#43a047", width=2, dash="dot"),
+        ))
+        fig_hist.add_hline(y=90, line_dash="dash", line_color="#43a047",
+                           annotation_text="PI 90% (🟢)")
+        fig_hist.add_hline(y=75, line_dash="dash", line_color="#fbc02d",
+                           annotation_text="PI 75% (🟡)")
+        fig_hist.update_layout(
+            height=340, margin=dict(l=10, r=10, t=30, b=10),
+            yaxis_title="%", xaxis_title="Fecha del diagnóstico",
+            legend=dict(orientation="h", y=1.12),
+        )
+        st.plotly_chart(fig_hist, use_container_width=True)
+
+    # ── Tabla del histórico ───────────────────────────────────────────────────
+    _cols_tabla = [c for c in [
+        "fecha", "semaforo", "estado", "pi_pct", "pr_real", "deg_pct_año",
+        "yield_kWh_kWp", "prod_anual_kWh", "pct_autoconsumo", "potencia_kWp",
+        "num_meses",
+    ] if c in _df_hist.columns]
+    st.dataframe(
+        _df_hist[_cols_tabla].rename(columns={
+            "fecha": "Fecha", "semaforo": "", "estado": "Estado",
+            "pi_pct": "PI (%)", "pr_real": "PR real", "deg_pct_año": "Deg (%/año)",
+            "yield_kWh_kWp": "Yield (kWh/kWp)", "prod_anual_kWh": "E_ac anual (kWh)",
+            "pct_autoconsumo": "Autoconsumo (%)", "potencia_kWp": "kWp",
+            "num_meses": "Meses de datos",
+        }),
+        use_container_width=True, hide_index=True,
+    )
+
+    with st.expander("🗑️ Eliminar un registro del histórico"):
+        _opciones = [
+            f"{i+1}. {r.get('fecha','?')} — {r.get('semaforo','')} PI {r.get('pi_pct','?')}%"
+            for i, r in enumerate(_historico)
+        ]
+        _sel_borrar = st.selectbox("Registro a eliminar", _opciones, key="diag_hist_borrar")
+        if st.button("Eliminar registro seleccionado", key="diag_hist_borrar_btn"):
+            _idx = _opciones.index(_sel_borrar)
+            eliminar_registro(_nombre_proy_hist, _idx)
+            st.rerun()
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.divider()
