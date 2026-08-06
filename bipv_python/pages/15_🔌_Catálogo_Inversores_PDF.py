@@ -155,6 +155,30 @@ with tab1:
                 "modelo": _modelo_sel,
                 **{k: v for k, v in _vals_sel.items() if v is not None},
             }
+            # ── #139 (2ª capa): re-verificar campos críticos DEL MODELO ELEGIDO.
+            # La alerta global de arriba corre antes de la selección y exime a
+            # los campos que existen en `valores_por_modelo` de CUALQUIER modelo;
+            # aquí se valida el modelo concreto que va a entrar al catálogo
+            # (caso Deye: la ficha se procesa bien pero la columna del modelo
+            # elegido puede venir vacía → tarea #146).
+            _vacios_sel = contar_campos_vacios({**res, "valores_por_modelo": None})
+            if len(_vacios_sel) > 3:
+                with _slot_multi:
+                    st.error(
+                        f"🚨 **El modelo {_modelo_sel} quedó con {len(_vacios_sel)} campos "
+                        f"críticos vacíos**: "
+                        f"{', '.join(_CAMPO_LABELS_139.get(c, c) for c in _vacios_sel)}.  \n"
+                        "El extractor no logró leer la columna de este modelo en la tabla "
+                        "del PDF. Completa los campos manualmente y verifica contra la "
+                        "ficha antes de guardar."
+                    )
+            elif _vacios_sel:
+                with _slot_multi:
+                    st.warning(
+                        f"⚠️ El modelo **{_modelo_sel}** quedó sin: "
+                        + ", ".join(_CAMPO_LABELS_139.get(c, c) for c in _vacios_sel)
+                        + ". Verifícalos manualmente antes de guardar."
+                    )
 
     # Contar campos extraídos automáticamente
     _campos_num = [
