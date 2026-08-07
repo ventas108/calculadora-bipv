@@ -235,69 +235,144 @@ tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))
 st.markdown("---")
 st.subheader("🏗️ 1. Inversión (CAPEX)")
 
+# ══════════════════════════════════════════════════════════════════════════════
+# #110 + #115 — Coordinación de CAPEX con 💼 Presupuesto
+# ------------------------------------------------------------------------------
+# Si el usuario llenó el Presupuesto (presupuesto_capex_usd > 0), Financiero NO
+# debe mostrar controles manuales de CAPEX que contradigan ese valor. En su lugar
+# muestra el CAPEX del Presupuesto como valor fijo, indica su FUENTE
+# ("Estimación Rápida" / "Presupuesto detallado") y la hora de última
+# actualización, y ofrece un toggle explícito para desvincular y volver al
+# CAPEX manual/paramétrico. El estado del toggle persiste en session_state.
+# ══════════════════════════════════════════════════════════════════════════════
+_ppto_capex = float(st.session_state.get("presupuesto_capex_usd", 0.0))
+_ppto_frac  = float(st.session_state.get("presupuesto_fraccion_equipos", 0.0))
+_tc0        = float(st.session_state.get("tipo_cambio", 4200.0))
+_ppto_fuente = str(st.session_state.get("presupuesto_fuente", "")) or "Presupuesto detallado"
+_ppto_ts     = str(st.session_state.get("presupuesto_capex_ts", ""))
+
+# Decisión del toggle ANTES de instanciar los widgets manuales: así podemos
+# ocultar los controles de CAPEX manual cuando el Presupuesto está vinculado.
+usar_ppto = False
+if _ppto_capex > 0:
+    usar_ppto = st.toggle(
+        f"🔗 Usar el CAPEX del 💼 Presupuesto ({_ppto_fuente}) "
+        f"— **USD {_ppto_capex:,.0f}** ($ {_ppto_capex*_tc0/1e6:.2f} M COP)",
+        value=True,
+        key="toggle_usar_ppto",
+        help=(
+            "Cuando está activo, TODOS los cálculos financieros usan el CAPEX del "
+            "Presupuesto y se ocultan los controles manuales para evitar cifras "
+            "contradictorias. Desactívalo para desvincular y volver al CAPEX manual."
+        ),
+    )
+
+# La fuente efectiva del CAPEX que usa Financiero en este rerun.
+if usar_ppto:
+    _capex_fuente = _ppto_fuente        # "Estimación Rápida" o "Presupuesto detallado"
+else:
+    _capex_fuente = "Manual"
+
 col_cx1, col_cx2 = st.columns(2)
 
 with col_cx1:
-    st.markdown("**Costos del sistema**")
-    costo_modulo_usd = st.number_input(
-        "Costo módulos BIPV (USD/módulo)",
-        min_value=10.0, max_value=500.0,
-        value=float(st.session_state.get("costo_modulo_usd") or 65.0), step=5.0,
-        help="Pre-llenado desde catálogo si se seleccionó panel en Dimensionamiento.",
-    )
-
-    # ── Pre-llenar costo inversor desde catálogo ──────────────────────────────
-    _costo_inv_usd  = float(st.session_state.get("costo_inversor_usd") or 0.0)
-    _inversor_dim   = st.session_state.get("inversor_dict_dim", {})
-    _p_ac_nom_kW    = (
-        _inversor_dim.get("P_ac_nom_kW")
-        or ((_inversor_dim.get("P_ac_nom_W") or _inversor_dim.get("P_dc_max_W") or 0) / 1000)
-    )
-    if _costo_inv_usd > 0 and _p_ac_nom_kW and _p_ac_nom_kW > 0:
-        _default_inv_kw = round(_costo_inv_usd / _p_ac_nom_kW, 1)
-        _default_inv_kw = max(50.0, min(400.0, _default_inv_kw))
-        _inv_nombre     = _inversor_dim.get("nombre", "")
-        _help_inv = (
-            f"📋 Catálogo: USD {_costo_inv_usd:,.0f}/unidad ÷ {_p_ac_nom_kW:.2f} kW = "
-            f"USD {_default_inv_kw:.1f}/kWp"
-            + (f" ({_inv_nombre})" if _inv_nombre else "")
-            + " — editable."
+    if usar_ppto:
+        # ── Presupuesto vinculado: mostrar CAPEX fijo, sin controles manuales ──
+        st.markdown("**Origen del CAPEX**")
+        st.metric(
+            "CAPEX del Presupuesto",
+            f"USD {_ppto_capex:,.0f}",
+            delta=f"$ {_ppto_capex*_tc0/1e6:.2f} M COP",
+            delta_color="off",
         )
-    else:
-        _default_inv_kw = 120.0
-        _help_inv = (
-            "Growatt MID15KTL3-X ~ USD 100–150/kWp en Colombia 2024. "
-            "Selecciona un inversor en Dimensionamiento para pre-llenar automáticamente."
-        )
-
-    costo_inversor_usd_kw = st.number_input(
-        "Costo inversor (USD/kWp)",
-        min_value=50.0, max_value=400.0,
-        value=_default_inv_kw, step=10.0,
-        help=_help_inv,
-    )
-    if _costo_inv_usd > 0 and _p_ac_nom_kW and _p_ac_nom_kW > 0:
+        st.info(f"📎 Desde 💼 Presupuesto ({_ppto_fuente}): **USD {_ppto_capex:,.0f}**")
+        if _ppto_ts:
+            st.caption(f"🕒 Última actualización del Presupuesto: **{_ppto_ts}**")
         st.caption(
-            f"💡 Valor pre-llenado desde catálogo · "
-            f"USD {_costo_inv_usd:,.0f} / unidad · {_p_ac_nom_kW:.2f} kW AC"
+            "🔒 Controles manuales de CAPEX ocultos mientras el Presupuesto está "
+            "vinculado. Desactiva el toggle de arriba para editarlos manualmente."
         )
-    costo_estructura_usd_kw = st.number_input(
-        "Estructura, cableado, protecciones (USD/kWp)",
-        min_value=50.0, max_value=500.0,
-        value=200.0, step=25.0,
-        help="BIPV de fachada requiere subestructura especializada. Típico: USD 150–300/kWp",
-    )
-    costo_instalacion_pct = st.number_input(
-        "Ingeniería + instalación + puesta en marcha (%CAPEX equipos)",
-        min_value=5.0, max_value=40.0,
-        value=18.0, step=1.0,
-        help="Para Colombia: 15–25% del costo de equipos",
-    )
-    imprevistos_pct = st.number_input(
-        "Imprevistos y contingencia (%)",
-        min_value=0.0, max_value=20.0,
-        value=5.0, step=1.0,
-    )
+        # Valores de referencia (no editables aquí) para el desglose informativo.
+        costo_modulo_usd      = float(st.session_state.get("costo_modulo_usd") or 65.0)
+        _costo_inv_usd        = float(st.session_state.get("costo_inversor_usd") or 0.0)
+        _inversor_dim         = st.session_state.get("inversor_dict_dim", {})
+        _p_ac_nom_kW          = (
+            _inversor_dim.get("P_ac_nom_kW")
+            or ((_inversor_dim.get("P_ac_nom_W") or _inversor_dim.get("P_dc_max_W") or 0) / 1000)
+        )
+        if _costo_inv_usd > 0 and _p_ac_nom_kW and _p_ac_nom_kW > 0:
+            costo_inversor_usd_kw = max(50.0, min(400.0, round(_costo_inv_usd / _p_ac_nom_kW, 1)))
+        else:
+            costo_inversor_usd_kw = 120.0
+        costo_estructura_usd_kw = 200.0
+        costo_instalacion_pct   = 18.0
+        imprevistos_pct         = 5.0
+    else:
+        st.markdown("**Costos del sistema**")
+        if _ppto_capex > 0:
+            st.caption(
+                "🔓 Presupuesto desvinculado — usando CAPEX **Manual** paramétrico. "
+                "Activa el toggle de arriba para volver a usar el Presupuesto."
+            )
+        costo_modulo_usd = st.number_input(
+            "Costo módulos BIPV (USD/módulo)",
+            min_value=10.0, max_value=500.0,
+            value=float(st.session_state.get("costo_modulo_usd") or 65.0), step=5.0,
+            help="Pre-llenado desde catálogo si se seleccionó panel en Dimensionamiento.",
+        )
+
+        # ── Pre-llenar costo inversor desde catálogo ──────────────────────────
+        _costo_inv_usd  = float(st.session_state.get("costo_inversor_usd") or 0.0)
+        _inversor_dim   = st.session_state.get("inversor_dict_dim", {})
+        _p_ac_nom_kW    = (
+            _inversor_dim.get("P_ac_nom_kW")
+            or ((_inversor_dim.get("P_ac_nom_W") or _inversor_dim.get("P_dc_max_W") or 0) / 1000)
+        )
+        if _costo_inv_usd > 0 and _p_ac_nom_kW and _p_ac_nom_kW > 0:
+            _default_inv_kw = round(_costo_inv_usd / _p_ac_nom_kW, 1)
+            _default_inv_kw = max(50.0, min(400.0, _default_inv_kw))
+            _inv_nombre     = _inversor_dim.get("nombre", "")
+            _help_inv = (
+                f"📋 Catálogo: USD {_costo_inv_usd:,.0f}/unidad ÷ {_p_ac_nom_kW:.2f} kW = "
+                f"USD {_default_inv_kw:.1f}/kWp"
+                + (f" ({_inv_nombre})" if _inv_nombre else "")
+                + " — editable."
+            )
+        else:
+            _default_inv_kw = 120.0
+            _help_inv = (
+                "Growatt MID15KTL3-X ~ USD 100–150/kWp en Colombia 2024. "
+                "Selecciona un inversor en Dimensionamiento para pre-llenar automáticamente."
+            )
+
+        costo_inversor_usd_kw = st.number_input(
+            "Costo inversor (USD/kWp)",
+            min_value=50.0, max_value=400.0,
+            value=_default_inv_kw, step=10.0,
+            help=_help_inv,
+        )
+        if _costo_inv_usd > 0 and _p_ac_nom_kW and _p_ac_nom_kW > 0:
+            st.caption(
+                f"💡 Valor pre-llenado desde catálogo · "
+                f"USD {_costo_inv_usd:,.0f} / unidad · {_p_ac_nom_kW:.2f} kW AC"
+            )
+        costo_estructura_usd_kw = st.number_input(
+            "Estructura, cableado, protecciones (USD/kWp)",
+            min_value=50.0, max_value=500.0,
+            value=200.0, step=25.0,
+            help="BIPV de fachada requiere subestructura especializada. Típico: USD 150–300/kWp",
+        )
+        costo_instalacion_pct = st.number_input(
+            "Ingeniería + instalación + puesta en marcha (%CAPEX equipos)",
+            min_value=5.0, max_value=40.0,
+            value=18.0, step=1.0,
+            help="Para Colombia: 15–25% del costo de equipos",
+        )
+        imprevistos_pct = st.number_input(
+            "Imprevistos y contingencia (%)",
+            min_value=0.0, max_value=20.0,
+            value=5.0, step=1.0,
+        )
 
 with col_cx2:
     # ── Cálculo automático de CAPEX paramétrico ───────────────────────────────
@@ -312,44 +387,37 @@ with col_cx2:
     capex_total       = capex_parametrico
     fraccion_equipos  = capex_equipos / capex_total if capex_total > 0 else 0.65
 
-    # ── Toggle Presupuesto (aparece antes de la tabla para decidir qué mostrar) ─
-    _ppto_capex = float(st.session_state.get("presupuesto_capex_usd", 0.0))
-    _ppto_frac  = float(st.session_state.get("presupuesto_fraccion_equipos", fraccion_equipos))
-    _tc0        = float(st.session_state.get("tipo_cambio", 4200.0))
-
-    usar_ppto = False
-    if _ppto_capex > 0:
+    # ── FUENTE activa del CAPEX (siempre visible) ─────────────────────────────
+    st.markdown(f"**Fuente del CAPEX: `{_capex_fuente}`**")
+    if usar_ppto:
         _diff_pct = abs(_ppto_capex - capex_parametrico) / max(capex_parametrico, 1) * 100
         _color    = "🟢" if _diff_pct < 20 else "🟡" if _diff_pct < 60 else "🔴"
-        usar_ppto = st.toggle(
-            f"{_color} Usar CAPEX del 💼 Presupuesto detallado "
-            f"— **USD {_ppto_capex:,.0f}** ($ {_ppto_capex*_tc0/1e6:.2f} M COP)",
-            value=True,
-            key="toggle_usar_ppto",
-            help=(
-                f"Presupuesto detallado: USD {_ppto_capex:,.0f}  |  "
-                f"Modelo paramétrico: USD {capex_parametrico:,.0f}  |  "
-                f"Diferencia: {_diff_pct:.0f}%. "
-                f"Cuando está activo, todos los cálculos financieros usan el total "
-                f"del Presupuesto. Los costos unitarios de la izquierda son solo referencia."
-            ),
+        capex_total      = _ppto_capex
+        fraccion_equipos = _ppto_frac if _ppto_frac > 0 else fraccion_equipos
+        st.caption(
+            f"{_color} Presupuesto USD {_ppto_capex:,.0f} vs paramétrico de "
+            f"referencia USD {capex_parametrico:,.0f} (dif. {_diff_pct:.0f}%)."
         )
-        if usar_ppto:
-            capex_total      = _ppto_capex
-            fraccion_equipos = _ppto_frac if _ppto_frac > 0 else fraccion_equipos
-        else:
-            st.info(
-                f"ℹ️ Usando CAPEX paramétrico: USD {capex_parametrico:,.0f}. "
-                f"Activa el toggle para usar el Presupuesto detallado."
-            )
+    elif _ppto_capex > 0:
+        st.info(
+            f"ℹ️ CAPEX **Manual** paramétrico: USD {capex_parametrico:,.0f}. "
+            f"Hay un Presupuesto disponible (USD {_ppto_capex:,.0f}, {_ppto_fuente})"
+            + (f", actualizado {_ppto_ts}" if _ppto_ts else "")
+            + " — activa el toggle de arriba para usarlo."
+        )
+    else:
+        st.caption(
+            "CAPEX **Manual** paramétrico. Completa la página 💼 Presupuesto "
+            "para vincular un CAPEX detallado aquí."
+        )
 
     # ── Desglose condicional ──────────────────────────────────────────────────
     if usar_ppto:
         # Resumen de las secciones del Presupuesto
-        st.markdown("**Resumen del Presupuesto detallado**")
+        st.markdown(f"**Resumen del Presupuesto ({_ppto_fuente})**")
         st.caption(
             "⚠️ Los cálculos financieros usan el **total del Presupuesto**. "
-            "Los costos unitarios de la izquierda son solo referencia y no aplican."
+            "Los controles manuales de CAPEX están ocultos mientras esté vinculado."
         )
         _ppto_directo = float(st.session_state.get("presupuesto_capex_directo",
                               st.session_state.get("presupuesto_sub_directo", 0.0)))
@@ -384,7 +452,8 @@ with col_cx2:
         )
         st.success(
             f"✅ CAPEX activo: **USD {capex_total:,.0f}** "
-            f"($ {capex_total * _tc0 / 1e6:.2f} M COP) — desde 💼 Presupuesto detallado"
+            f"($ {capex_total * _tc0 / 1e6:.2f} M COP) — desde 💼 Presupuesto ({_ppto_fuente})"
+            + (f" · 🕒 {_ppto_ts}" if _ppto_ts else "")
         )
         # ── #81 — Avisar si Costos Blandos están vacíos en el Presupuesto ─────
         if _ppto_blando == 0 and _ppto_directo > 0:
@@ -626,21 +695,46 @@ with col_t3:
     # ── OPEX: desde Presupuesto detallado o slider paramétrico ───────────────
     _opex_usd_guardia = None  # monto absoluto para la guardia #72 (ruta Presupuesto)
     _ppto_opex_anual = float(st.session_state.get("presupuesto_opex_anual_usd", 0.0))
-    _capex_para_opex = float(st.session_state.get("presupuesto_capex_usd", capex_total))
-    if _ppto_opex_anual > 0 and _capex_para_opex > 0:
-        _opex_pct_ppto = _ppto_opex_anual / _capex_para_opex * 100
+    if _ppto_opex_anual > 0:
+        # El OPEX del Presupuesto es un MONTO ABSOLUTO anual (USD/año). El flujo de
+        # caja lo aplica como opex_pct sobre el CAPEX ACTIVO (capex_total), que puede
+        # NO ser presupuesto_capex_usd si el usuario desvinculó el CAPEX. Para que el
+        # monto que entra a VPN/TIR/payback/LCOE sea EXACTAMENTE el del Presupuesto en
+        # ambos modos (vinculado y desvinculado), derivamos el % contra capex_total.
+        _opex_pct_ppto = _ppto_opex_anual / capex_total * 100 if capex_total > 0 else 0.0
+        # Referencia informativa: % respecto al CAPEX propio del Presupuesto.
+        _capex_ppto_ref = float(st.session_state.get("presupuesto_capex_usd", 0.0))
+        _opex_pct_sobre_ppto = _ppto_opex_anual / _capex_ppto_ref * 100 if _capex_ppto_ref > 0 else 0.0
         usar_opex_ppto = st.toggle(
-            f"Usar OPEX del 💼 Presupuesto — **USD {_ppto_opex_anual:,.0f}/año** ({_opex_pct_ppto:.2f}% CAPEX)",
+            f"Usar OPEX del 💼 Presupuesto — **USD {_ppto_opex_anual:,.0f}/año** ({_opex_pct_sobre_ppto:.2f}% CAPEX Presupuesto)",
             value=True, key="usar_opex_ppto",
             help=f"OPEX detallado ingresado en pestaña 📅 OPEX Anual del Presupuesto. "
+                 f"Se aplica como MONTO ABSOLUTO (USD {_ppto_opex_anual:,.0f}/año) al flujo de caja, "
+                 f"sin importar si el CAPEX activo es el del Presupuesto o el manual. "
                  f"Desactiva para usar el slider paramétrico."
         )
         if usar_opex_ppto:
+            # opex_pct re-derivado contra el CAPEX ACTIVO → capex_total * opex_pct/100
+            # == _ppto_opex_anual, garantizando el monto absoluto en el flujo.
             opex_pct = _opex_pct_ppto
-            # Guardia #72: comparar el monto ABSOLUTO del Presupuesto, no el
-            # % re-derivado sobre capex_total (puede ser un CAPEX distinto).
+            # Guardia #72: comparar el monto ABSOLUTO del Presupuesto.
             _opex_usd_guardia = _ppto_opex_anual
-            st.caption(f"✅ OPEX activo: USD {_ppto_opex_anual:,.0f}/año ({_opex_pct_ppto:.2f}% CAPEX) — desde 💼 Presupuesto")
+            # Monto real que entra al flujo (== _ppto_opex_anual por construcción).
+            _opex_flujo_real = capex_total * opex_pct / 100 if capex_total > 0 else 0.0
+            _capex_manual_activo = (
+                _capex_ppto_ref > 0 and abs(capex_total - _capex_ppto_ref) > 1.0
+            )
+            st.caption(
+                f"✅ OPEX activo: **USD {_opex_flujo_real:,.0f}/año** "
+                f"({opex_pct:.2f}% del CAPEX activo USD {capex_total:,.0f}) — "
+                f"monto absoluto desde 💼 Presupuesto"
+                + (
+                    f"  \n🔓 CAPEX manual desvinculado (USD {capex_total:,.0f} ≠ "
+                    f"Presupuesto USD {_capex_ppto_ref:,.0f}): el OPEX se mantiene en "
+                    f"su monto absoluto, no se re-escala."
+                    if _capex_manual_activo else ""
+                )
+            )
         else:
             opex_pct = st.slider(
                 "O&M anual (%CAPEX) — paramétrico",

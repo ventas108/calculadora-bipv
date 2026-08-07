@@ -1,8 +1,21 @@
 """Página 8 — Presupuesto Bancable BIPV — CAPEX + Costos Blandos + OPEX Anual."""
 import streamlit as st
 import pandas as pd
-from datetime import date
+from datetime import date, datetime
 from calculos.trm_utils import init_trm, trm_widget
+
+
+def _marcar_fuente_capex(fuente: str) -> None:
+    """Registra la FUENTE activa del CAPEX y la marca de tiempo de la última
+    escritura de ``presupuesto_capex_usd`` en session_state.
+
+    Esto permite que 💰 Financiero muestre explícitamente el origen del CAPEX
+    ("Estimación Rápida", "Presupuesto detallado" o "Manual") y la hora de la
+    última actualización. La marca de tiempo se escribe en el MISMO rerun en
+    que cambia el CAPEX, para que ambas páginas queden siempre coherentes.
+    """
+    st.session_state["presupuesto_fuente"] = fuente
+    st.session_state["presupuesto_capex_ts"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 st.set_page_config(page_title="Presupuesto BIPV", page_icon="💼", layout="wide")
 
@@ -532,6 +545,7 @@ with t0:
             _zona_auto = _zona_vigente(_er_cfg_prev)
             _r_auto    = _calc_parametrico(p_stc, _tipo_auto, _esc_auto, _zona_auto)
             st.session_state["presupuesto_capex_usd"]        = _r_auto["capex_total"]
+            _marcar_fuente_capex("Estimación Rápida")
             st.session_state["presupuesto_opex_anual_usd"]   = _r_auto["opex_total"]
             st.session_state["presupuesto_fraccion_equipos"] = (
                 _r_auto["equip_total"] / _r_auto["capex_total"]
@@ -796,6 +810,7 @@ with t0:
     col_ap1, col_ap2, col_ap3 = st.columns([2, 2, 4])
     if col_ap1.button("✅ Aplicar a 💰 Financiero", type="primary", key="btn_aplicar_est"):
         st.session_state["presupuesto_capex_usd"]       = r["capex_total"]
+        _marcar_fuente_capex("Estimación Rápida")
         st.session_state["presupuesto_opex_anual_usd"]  = r["opex_total"]
         st.session_state["presupuesto_fraccion_equipos"] = (
             r["equip_total"] / r["capex_total"] if r["capex_total"] > 0 else 0.65
@@ -814,7 +829,8 @@ with t0:
         for _k in ["est_rapida_aplicada", "est_rapida_config",
                    "presupuesto_capex_usd", "presupuesto_opex_anual_usd",
                    "presupuesto_fraccion_equipos", "presupuesto_capex_directo",
-                   "presupuesto_sub_directo", "presupuesto_capex_blando"]:
+                   "presupuesto_sub_directo", "presupuesto_capex_blando",
+                   "presupuesto_fuente", "presupuesto_capex_ts"]:
             st.session_state.pop(_k, None)
         st.rerun()
 
@@ -1312,8 +1328,17 @@ else:
     # La Estimación Rápida tiene autoridad hasta que el usuario presione "Limpiar".
     # Los tabs incompletos no deben silenciosamente reemplazar el CAPEX paramétrico.
     if not _est_activa:
+        # #115 — La cotización real (subtotal de los tabs) fluye al CAPEX en el
+        # MISMO rerun en que cambia el subtotal (no requiere pulsar botón), de
+        # modo que 💰 Financiero refleja los precios actualizados de inmediato.
+        _capex_prev = st.session_state.get("presupuesto_capex_usd", None)
         st.session_state["presupuesto_capex_usd"]       = capex_total
         st.session_state["presupuesto_opex_anual_usd"]  = sub7
+        # Actualizar la marca de tiempo solo cuando el valor CAMBIA (comparación
+        # EXACTA para que "última actualización" sea veraz incluso ante cambios
+        # pequeños de precio) o cuando cambia la fuente activa.
+        if _capex_prev != capex_total or st.session_state.get("presupuesto_fuente") != "Presupuesto detallado":
+            _marcar_fuente_capex("Presupuesto detallado")
     st.session_state["presupuesto_capex_directo"]   = capex_directo
     st.session_state["presupuesto_capex_blando"]    = sub6
     st.session_state["presupuesto_sub_directo"]     = capex_directo
