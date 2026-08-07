@@ -14,6 +14,9 @@ from calculos.auth import (
     dias_restantes, requerir_login,
 )
 
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
+
 admin = requerir_login(solo_admin=True)
 
 st.title("🔐 Administración de usuarios")

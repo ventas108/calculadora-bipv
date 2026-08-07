@@ -17,6 +17,9 @@ import streamlit as st
 st.set_page_config(page_title="Comparador de Inversores", page_icon="⚖️", layout="wide")
 
 from calculos.auth import requerir_login
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
+
 requerir_login()
 
 

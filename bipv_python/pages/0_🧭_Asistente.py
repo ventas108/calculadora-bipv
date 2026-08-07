@@ -18,6 +18,11 @@ from calculos.asistente import (
 
 st.set_page_config(page_title="Asistente", page_icon="🧭", layout="wide")
 
+# Bloquear Google Translate ANTES del login: el traductor de Chrome modifica el
+# DOM y provoca 'NotFoundError: removeChild' en la pantalla de acceso.
+from utils.ui import bloquear_traduccion
+bloquear_traduccion()
+
 from calculos.auth import requerir_login
 requerir_login()
 
