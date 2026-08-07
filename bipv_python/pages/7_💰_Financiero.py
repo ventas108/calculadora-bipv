@@ -654,6 +654,14 @@ with col_t2:
             st.caption(
                 f"✅ Degradación activa: **{_tasa_calc:.2f}%/año** — desde historial PR real"
             )
+    # ── #52 — Trazabilidad para el Reporte PDF: qué degradación se usó ────────
+    st.session_state["tasa_degradacion_usada"] = float(tasa_deg)
+    st.session_state["fuente_degradacion"] = (
+        "historial PR real — regresión lineal"
+        if (_tasa_calc is not None and _tasa_calc > 0
+            and st.session_state.get("usar_deg_historico", False))
+        else "valor paramétrico del slider"
+    )
     # ── Modelo P90 basado en zona climática y correcciones aplicadas ─────────
     # Metodología: incertidumbre combinada cuadrática EPRI TR-107348 / IEC 61724-3
     # σ_irr: variabilidad interanual del TMY calibrada por zona climática Colombia

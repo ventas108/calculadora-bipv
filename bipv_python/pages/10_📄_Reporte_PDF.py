@@ -57,6 +57,37 @@ with col_op1:
         value=st.session_state.get("nombre_proyecto", "Proyecto BIPV"),
         key="rep_proyecto",
     )
+    # ── #5 — Logo y datos de contacto de la empresa ──────────────────────────
+    contacto_empresa = st.text_input(
+        "Datos de contacto (opcional)",
+        value=st.session_state.get("empresa_contacto", ""),
+        key="rep_contacto",
+        placeholder="Ej: contacto@miempresa.com · +57 300 000 0000 · NIT 900.000.000",
+        help="Aparece bajo el nombre de la empresa en el encabezado del reporte.",
+    )
+    st.session_state["empresa_contacto"] = contacto_empresa
+    _logo_up = st.file_uploader(
+        "Logo de la empresa (PNG/JPG, opcional)", type=["png", "jpg", "jpeg"],
+        key="rep_logo_up",
+        help="Se muestra en el encabezado del reporte en lugar del ícono ☀️. "
+             "Recomendado: fondo transparente, máx. ~1 MB.",
+    )
+    if _logo_up is not None:
+        _logo_bytes = _logo_up.getvalue()
+        if len(_logo_bytes) > 2_000_000:
+            st.warning("⚠️ El logo pesa más de 2 MB — usa una versión más liviana "
+                       "para que el PDF no quede gigante.")
+        else:
+            import base64 as _b64
+            _mime = "image/png" if _logo_up.name.lower().endswith(".png") else "image/jpeg"
+            st.session_state["empresa_logo_b64"] = (
+                f"data:{_mime};base64,{_b64.b64encode(_logo_bytes).decode()}"
+            )
+            st.caption(f"✅ Logo cargado: {_logo_up.name}")
+    if st.session_state.get("empresa_logo_b64"):
+        if st.button("🗑️ Quitar logo", key="rep_logo_clear"):
+            st.session_state.pop("empresa_logo_b64", None)
+            st.rerun()
 with col_op2:
     balance_ok_ui   = st.session_state.get("balance_ok", False)
     incluir_motor   = st.checkbox("Incluir sección Motor Óptico",    value=motor_optico,   key="rep_inc_motor")
@@ -224,6 +255,95 @@ def _waterfall_cascada_svg(bruta, p_iam, p_soil, p_term, efectiva,
     return ''.join(parts)
 
 
+def _esc_html(s) -> str:
+    """Escapa texto libre del usuario antes de interpolarlo en el HTML del reporte."""
+    import html as _html_mod
+    return _html_mod.escape(str(s or ""))
+
+
+def _barras_mensuales_svg(vals, titulo="Producción mensual E_ac (kWh)",
+                          color="#1f77b4", W=680, H=240):
+    """#4/#108 — Barras mensuales en SVG puro (imprime perfecto en PDF)."""
+    _MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun",
+              "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    vals = [max(float(v or 0), 0.0) for v in vals][:12]
+    if not vals or max(vals) <= 0:
+        return ""
+    ml, mr, mt, mb = 52, 10, 26, 30
+    cw, ch = W - ml - mr, H - mt - mb
+    y_max = max(vals) * 1.12
+    n = len(vals)
+    slot = cw / n
+    bw = slot * 0.62
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" '
+         f'style="max-width:100%;height:auto;font-family:Arial,sans-serif;">',
+         f'<text x="{ml}" y="15" font-size="12" font-weight="bold" fill="#333">{titulo}</text>']
+    # Grid horizontal (4 líneas) con etiqueta
+    for gi in range(1, 5):
+        gy = mt + ch * (1 - gi / 4)
+        gv = y_max * gi / 4
+        p.append(f'<line x1="{ml}" y1="{gy:.1f}" x2="{W-mr}" y2="{gy:.1f}" '
+                 f'stroke="#eee" stroke-width="1"/>')
+        p.append(f'<text x="{ml-4}" y="{gy+3:.1f}" font-size="9" fill="#999" '
+                 f'text-anchor="end">{gv:,.0f}</text>')
+    for i, v in enumerate(vals):
+        x = ml + i * slot + (slot - bw) / 2
+        h = ch * v / y_max
+        y = mt + ch - h
+        p.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{bw:.1f}" height="{h:.1f}" '
+                 f'fill="{color}" rx="2"/>')
+        p.append(f'<text x="{x + bw/2:.1f}" y="{mt + ch + 13}" font-size="9" '
+                 f'fill="#666" text-anchor="middle">{_MESES[i] if i < 12 else i+1}</text>')
+    p.append(f'<line x1="{ml}" y1="{mt+ch}" x2="{W-mr}" y2="{mt+ch}" '
+             f'stroke="#ccc" stroke-width="1"/>')
+    p.append('</svg>')
+    return "".join(p)
+
+
+def _flujo_caja_svg(acum, payback=None, titulo="Flujo de caja acumulado (USD)",
+                    W=680, H=260):
+    """#4/#108 — Curva del flujo acumulado con el cruce de payback marcado."""
+    acum = [float(v) for v in acum]
+    if len(acum) < 2:
+        return ""
+    ml, mr, mt, mb = 64, 12, 26, 30
+    cw, ch = W - ml - mr, H - mt - mb
+    v_min, v_max = min(acum), max(acum)
+    if v_max <= v_min:
+        return ""
+    _rng = (v_max - v_min) * 1.08 or 1.0
+    def _x(i): return ml + cw * i / (len(acum) - 1)
+    def _y(v): return mt + ch * (1 - (v - v_min * 1.04) / _rng)
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" '
+         f'style="max-width:100%;height:auto;font-family:Arial,sans-serif;">',
+         f'<text x="{ml}" y="15" font-size="12" font-weight="bold" fill="#333">{titulo}</text>']
+    # Eje cero
+    if v_min < 0 < v_max:
+        y0 = _y(0)
+        p.append(f'<line x1="{ml}" y1="{y0:.1f}" x2="{W-mr}" y2="{y0:.1f}" '
+                 f'stroke="#999" stroke-width="1" stroke-dasharray="4,3"/>')
+        p.append(f'<text x="{ml-4}" y="{y0+3:.1f}" font-size="9" fill="#999" text-anchor="end">0</text>')
+    pts = " ".join(f"{_x(i):.1f},{_y(v):.1f}" for i, v in enumerate(acum))
+    p.append(f'<polyline points="{pts}" fill="none" stroke="#1E8449" stroke-width="2.5"/>')
+    # Marcas de año cada 5
+    for i in range(0, len(acum), 5):
+        p.append(f'<text x="{_x(i):.1f}" y="{mt+ch+14}" font-size="9" fill="#666" '
+                 f'text-anchor="middle">{i}</text>')
+    p.append(f'<text x="{W/2:.0f}" y="{H-2}" font-size="9" fill="#999" '
+             f'text-anchor="middle">Año</text>')
+    # Punto de payback: primer cruce a positivo (o el valor entregado)
+    _pb_idx = next((i for i, v in enumerate(acum) if v >= 0), None)
+    if _pb_idx and v_min < 0:
+        _px, _py = _x(_pb_idx), _y(acum[_pb_idx])
+        _lbl = f"Payback ≈ año {payback:.1f}" if payback else f"Payback ≈ año {_pb_idx}"
+        p.append(f'<circle cx="{_px:.1f}" cy="{_py:.1f}" r="5" fill="#F57F17"/>')
+        p.append(f'<text x="{min(_px + 8, W - 150):.1f}" y="{_py - 8:.1f}" font-size="10" '
+                 f'font-weight="bold" fill="#F57F17">{_lbl}</text>')
+    p.append(f'<line x1="{ml}" y1="{mt+ch}" x2="{W-mr}" y2="{mt+ch}" stroke="#ccc" stroke-width="1"/>')
+    p.append('</svg>')
+    return "".join(p)
+
+
 def generar_html_reporte() -> str:
     # Colectar datos de session_state
     ciudad          = st.session_state.get("tmy_ciudad", st.session_state.get("ciudad", "—"))
@@ -381,7 +501,9 @@ def generar_html_reporte() -> str:
   <div style="display:flex;justify-content:space-between;align-items:flex-start;
               border-bottom:3px solid {COLOR_PRIMARIO};padding-bottom:16px;margin-bottom:16px;">
     <div>
-      <h1>{nombre_empresa}</h1>
+      <h1>{_esc_html(nombre_empresa)}</h1>
+      {f'<div style="color:#555;font-size:0.95em;margin-top:2px;">{_esc_html(st.session_state.get("empresa_contacto", ""))}</div>'
+       if st.session_state.get("empresa_contacto") else ''}
       <div style="font-size:1.15em;font-weight:bold;color:{COLOR_TEXTO};">
         REPORTE TÉCNICO — SISTEMA BIPV
         <span class="badge badge-borrador">BORRADOR</span>
@@ -390,7 +512,10 @@ def generar_html_reporte() -> str:
         Versión 2026 · Generado el {fecha_hoy} · Calculadora BIPV Colombia
       </div>
     </div>
-    <div style="text-align:right;color:{COLOR_PRIMARIO};font-size:1.8em;line-height:1;">☀️</div>
+    {f'<img src="{st.session_state.get("empresa_logo_b64")}" alt="logo" '
+     f'style="max-height:72px;max-width:220px;object-fit:contain;"/>'
+     if st.session_state.get("empresa_logo_b64")
+     else f'<div style="text-align:right;color:{COLOR_PRIMARIO};font-size:1.8em;line-height:1;">☀️</div>'}
   </div>
 
   <div class="aviso-borrador">
@@ -400,6 +525,19 @@ def generar_html_reporte() -> str:
 """
 
     # ── 1. Resumen del Proyecto ───────────────────────────────────────────────
+    # ── #54 — Zona horaria del análisis (auditabilidad de gráficos horarios) ──
+    try:
+        from calculos.tz_utils import utc_offset_latam, tz_label
+        _off_pdf = st.session_state.get("utc_offset_local")
+        if _off_pdf is None and _lat_pdf is not None and _lon_pdf is not None:
+            _off_pdf = utc_offset_latam(float(_lat_pdf), float(_lon_pdf))
+        if _off_pdf is None:
+            _c_tz = _c_ref_data or {}
+            _off_pdf = utc_offset_latam(_c_tz.get("lat", 4.6), _c_tz.get("lon", -74.1))
+        _tz_label_pdf = f"{tz_label(int(_off_pdf))} (hora local del sitio)"
+    except Exception:
+        _tz_label_pdf = "UTC-5 (hora local de Colombia)"
+
     html += seccion("Información General del Proyecto", "🏠")
     html += tabla_kv([
         ("Nombre del proyecto",  nombre_proyecto,          "",         ""),
@@ -410,6 +548,9 @@ def generar_html_reporte() -> str:
         ("Panel seleccionado",   panel_nombre,              "",         "Módulo BIPV"),
         ("N° de módulos",        str(n_paneles),            "módulos",  "Resultado de Dimensionamiento"),
         ("Potencia instalada",   _fmt(p_stc_kw, 2),        "kWp",      "Potencia pico DC en STC"),
+        # #54 — zona horaria explícita para auditabilidad de gráficos horarios
+        ("Zona horaria del análisis", _tz_label_pdf, "",
+         "Todas las horas de los gráficos y tablas horarias del informe están en hora local del sitio"),
     ],
     nota="STC: condiciones estándar de prueba (1000 W/m², 25°C, AM 1.5G). "
          "kWp = kilovatios pico instalados.")
@@ -597,6 +738,14 @@ def generar_html_reporte() -> str:
         nota="Performance Ratio > 100%: posible en climas fríos de alta altitud (Bogotá, Medellín) "
              "donde los módulos CdTe operan por debajo de 25°C muchas horas, ganando eficiencia "
              "respecto a las condiciones STC. IEC 61724 permite PR > 100% — es un resultado físicamente correcto.")
+        # ── #4/#108 — Gráfica de barras de producción mensual ────────────────
+        _df_m_pdf = st.session_state.get("df_mensual_produccion")
+        if _df_m_pdf is not None and "E_ac (kWh)" in getattr(_df_m_pdf, "columns", []):
+            _svg_mes = _barras_mensuales_svg(list(_df_m_pdf["E_ac (kWh)"]))
+            if _svg_mes:
+                html += (f'<div style="margin:14px 0 4px 0;">{_svg_mes}</div>'
+                         f'<div style="color:#888;font-size:0.85em;">Energía AC neta '
+                         f'entregada por mes (kWh).</div>')
         html += cierre()
 
     # ── 4b. Diagnóstico PR real vs esperado ──────────────────────────────────
@@ -894,11 +1043,31 @@ def generar_html_reporte() -> str:
             ("TIR",                   _fmt(tir,      1) if tir else "N/A",   "%", "Tasa Interna de Retorno"),
             ("Payback simple",        _fmt(payback,  1) if payback else "> horizonte", "años", "Período de recuperación de la inversión"),
             ("LCOE",                  _fmt(lcoe_cop, 0),  "COP/kWh",  "Costo nivelado de la energía generada"),
+            # #52 — trazabilidad de la degradación usada en el flujo de caja
+            *([(
+                "Tasa de degradación",
+                f"{float(st.session_state.get('tasa_degradacion_usada', 0)):.2f} %/año "
+                f"({st.session_state.get('fuente_degradacion', '')})",
+                "",
+                "Con degradación medida del historial PR real, la TIR refleja el "
+                "comportamiento verificado del sistema — mayor rigor para banca/UPME"
+            )] if st.session_state.get("tasa_degradacion_usada") else []),
         ],
         nota="VPN > 0 y TIR > WACC (costo del capital) indican proyecto viable. "
              "LCOE < tarifa de red indica que generar es más barato que comprar. "
              "Los beneficios de la Ley 1715/2014 incluyen: deducción del 50% del IVA en equipos, "
              "exención de aranceles, y depreciación acelerada.")
+        # ── #4/#108 — Curva del flujo de caja acumulado con payback ──────────
+        _comp_pdf = st.session_state.get("comp_financiero") or {}
+        _flujos_pdf = (_comp_pdf.get("con") or {}).get("flujos") or []
+        _acum_pdf = [f.get("flujo_acum_usd", 0) for f in _flujos_pdf]
+        if len(_acum_pdf) >= 2:
+            _svg_fc = _flujo_caja_svg(_acum_pdf, payback=payback)
+            if _svg_fc:
+                html += (f'<div style="margin:14px 0 4px 0;">{_svg_fc}</div>'
+                         f'<div style="color:#888;font-size:0.85em;">Flujo de caja '
+                         f'acumulado con beneficios Ley 1715 (escenario P50). El punto '
+                         f'naranja marca el año en que la inversión se recupera.</div>')
         html += cierre()
 
     # ── 5b. Resumen de Costos del Presupuesto (#8) ────────────────────────────
