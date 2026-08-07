@@ -19,11 +19,13 @@ from datos.catalogo_baterias_excel import (
 from calculos.baterias_balance import (
     dimensionar_bateria,
     balance_mensual,
+    balance_horario,
     metricas_balance,
     clasificar_energia,
     distribuir_consumo_anual,
     tabla_clasificaciones,
     PERFILES_TIPICOS,
+    PERFILES_HORARIOS,
     MESES,
 )
 
@@ -757,10 +759,16 @@ st.subheader("1️⃣ Perfil de consumo del edificio")
 
 modo_consumo = st.radio(
     "¿Cómo desea ingresar el consumo?",
-    ["Consumo anual + perfil típico", "Ingresar 12 valores mensuales manualmente"],
+    [
+        "Consumo anual + perfil típico",
+        "Ingresar 12 valores mensuales manualmente",
+        "⏱️ Resolución horaria (más preciso)",
+    ],
     horizontal=True,
     key="modo_consumo_b7",
 )
+
+_modo_horario = (modo_consumo == "⏱️ Resolución horaria (más preciso)")
 
 if modo_consumo == "Consumo anual + perfil típico":
     col_c1, col_c2 = st.columns([1, 1])
@@ -784,6 +792,70 @@ if modo_consumo == "Consumo anual + perfil típico":
         )
     consumo_mensual_list = distribuir_consumo_anual(consumo_anual_input, perfil_sel)
 
+elif _modo_horario:
+    # ── Resolución horaria ────────────────────────────────────────────────────
+    st.info(
+        "⏱️ **Resolución horaria:** el balance se calcula hora a hora (8 760 puntos), "
+        "cruzando la producción real de la fachada BIPV con el perfil de consumo típico "
+        "del edificio. Los resultados son más conservadores y honestos que el balance mensual "
+        "porque capturan el desfase temporal entre generación solar (9–16 h) y consumo nocturno."
+    )
+    col_h1, col_h2 = st.columns([1, 1])
+    with col_h1:
+        consumo_anual_input = st.number_input(
+            "Consumo anual total (kWh/año)",
+            min_value=100.0,
+            max_value=10_000_000.0,
+            value=float(st.session_state.get("consumo_anual_edificio_kWh",
+                        max(e_ac_anual * 1.2, 10000.0))),
+            step=500.0,
+            key="consumo_anual_edificio_kWh",
+            help="Puede obtenerlo sumando 12 meses de facturas de energía.",
+        )
+    with col_h2:
+        perfil_horario_sel = st.selectbox(
+            "Arquetipo de consumo horario",
+            list(PERFILES_HORARIOS.keys()),
+            key="perfil_horario_sel",
+            help=(
+                "Distribución típica del consumo a lo largo del día.\n\n"
+                "• Oficina/Comercio: pico 9–18 h, casi nulo de noche.\n"
+                "• Residencial: pico mañana y noche, bajo en horas de trabajo.\n"
+                "• Industrial: turno diurno 6–18 h, mínimo nocturno.\n"
+                "• Hospital/Institucional: carga relativamente plana las 24 h."
+            ),
+        )
+    # Mostrar el perfil 24 h seleccionado
+    with st.expander("👁️ Perfil horario seleccionado"):
+        _p24 = PERFILES_HORARIOS[perfil_horario_sel]
+        _diario_ref = float(st.session_state.get("consumo_anual_edificio_kWh",
+                            max(e_ac_anual * 1.2, 10000.0))) / 365.0
+        _fig_h = go.Figure()
+        _fig_h.add_trace(go.Bar(
+            x=list(range(24)),
+            y=[v * _diario_ref for v in _p24],
+            marker_color="#3498db",
+            name="Consumo promedio (kWh/h)",
+        ))
+        _fig_h.update_layout(
+            title=f"Perfil horario — {perfil_horario_sel}",
+            xaxis_title="Hora del día",
+            yaxis_title="Consumo promedio (kWh/h)",
+            height=260, margin=dict(t=40, b=20),
+            plot_bgcolor="white",
+            xaxis=dict(tickmode="linear", dtick=2),
+        )
+        st.plotly_chart(_fig_h, use_container_width=True)
+        st.caption(
+            f"Consumo diario de referencia: **{_diario_ref:,.1f} kWh/día** "
+            f"({_diario_ref * 365:,.0f} kWh/año ÷ 365)."
+        )
+    # Para que el flujo de abajo siga funcionando con consumo_anual_input definido
+    consumo_anual_input = float(st.session_state.get(
+        "consumo_anual_edificio_kWh", max(e_ac_anual * 1.2, 10000.0)
+    ))
+    consumo_mensual_list = distribuir_consumo_anual(consumo_anual_input)
+
 else:
     st.info("Ingrese el consumo de cada mes (kWh). Puede basarse en facturas históricas.")
     cols_mes = st.columns(6)
@@ -802,45 +874,109 @@ else:
         consumo_mensual_list.append(val)
     st.session_state["consumo_mensual_manual"] = consumo_mensual_list
 
-# Vista previa del consumo
-with st.expander("👁️ Vista previa del perfil de consumo"):
-    df_cons_prev = pd.DataFrame({
-        "Mes": MESES,
-        "Consumo (kWh)": [round(v, 0) for v in consumo_mensual_list],
-    })
-    fig_cons = px.bar(df_cons_prev, x="Mes", y="Consumo (kWh)",
-                      title="Perfil de consumo mensual",
-                      color_discrete_sequence=["#3498db"])
-    fig_cons.update_layout(height=280, margin=dict(t=40, b=20))
-    st.plotly_chart(fig_cons, use_container_width=True)
-    st.caption(f"Total anual: **{sum(consumo_mensual_list):,.0f} kWh/año**")
+# Vista previa del consumo (solo para modos mensuales)
+if not _modo_horario:
+    with st.expander("👁️ Vista previa del perfil de consumo"):
+        df_cons_prev = pd.DataFrame({
+            "Mes": MESES,
+            "Consumo (kWh)": [round(v, 0) for v in consumo_mensual_list],
+        })
+        fig_cons = px.bar(df_cons_prev, x="Mes", y="Consumo (kWh)",
+                          title="Perfil de consumo mensual",
+                          color_discrete_sequence=["#3498db"])
+        fig_cons.update_layout(height=280, margin=dict(t=40, b=20))
+        st.plotly_chart(fig_cons, use_container_width=True)
+        st.caption(f"Total anual: **{sum(consumo_mensual_list):,.0f} kWh/año**")
 
 # ── Calcular balance ─────────────────────────────────────────────────────────
 st.subheader("2️⃣ Calcular balance")
 
-if st.button("▶️ Calcular balance energético mensual", type="primary",
-             disabled=(df_m_prod is None)):
-    if df_m_prod is None:
-        st.error("❌ No hay datos de producción mensual. Complete primero la Página 6.")
-    else:
-        _bat_dim_activo = (st.session_state.get("bateria_dim")
-                           if (usa_bateria if tiene_catalogo else False)
-                              and st.session_state.get("bateria_ok")
-                           else None)
+# Acceso a datos horarios de producción (para modo resolución horaria)
+_res_prod_dict  = st.session_state.get("res_produccion", {})
+_df_horario_prod = _res_prod_dict.get("df_horario") if _res_prod_dict else None
+
+_btn_label = (
+    "▶️ Calcular balance horario (resolución hora a hora)"
+    if _modo_horario else
+    "▶️ Calcular balance energético mensual"
+)
+_btn_disabled = (
+    (_df_horario_prod is None) if _modo_horario else (df_m_prod is None)
+)
+if _modo_horario and _df_horario_prod is None:
+    st.warning(
+        "⚠️ El balance horario requiere los datos de producción hora a hora. "
+        "Complete la Página 6 — Producción Anual y vuelva aquí."
+    )
+
+if st.button(_btn_label, type="primary", disabled=_btn_disabled):
+    _bat_dim_activo = (st.session_state.get("bateria_dim")
+                       if (usa_bateria if tiene_catalogo else False)
+                          and st.session_state.get("bateria_ok")
+                       else None)
+
+    if _modo_horario:
+        # ── Balance horario ───────────────────────────────────────────────────
         try:
-            df_bal = balance_mensual(df_m_prod, consumo_mensual_list, _bat_dim_activo)
-            metr   = metricas_balance(df_bal)
+            _consumo_anual_h = float(st.session_state.get(
+                "consumo_anual_edificio_kWh", max(e_ac_anual * 1.2, 10000.0)
+            ))
+            _perfil_h = st.session_state.get("perfil_horario_sel", "Residencial")
+            res_h = balance_horario(
+                _df_horario_prod,
+                _consumo_anual_h,
+                _perfil_h,
+                _bat_dim_activo,
+            )
+            metr  = res_h["metricas"]
+            df_bal = res_h["df_balance_mensual"]
             clase  = clasificar_energia(metr["fraccion_solar_pct"])
 
-            st.session_state["balance_mensual_df"]       = df_bal
-            st.session_state["balance_metricas"]         = metr
-            st.session_state["clasificacion_energetica"] = clase
-            st.session_state["fraccion_solar_pct"]       = metr["fraccion_solar_pct"]
+            st.session_state["balance_mensual_df"]         = df_bal
+            st.session_state["balance_horario_res"]        = res_h
+            st.session_state["balance_metricas"]           = metr
+            st.session_state["clasificacion_energetica"]   = clase
+            st.session_state["fraccion_solar_pct"]         = metr["fraccion_solar_pct"]
             st.session_state["consumo_anual_edificio_kWh_calc"] = metr["E_consumo_anual_kWh"]
-            st.session_state["balance_ok"]               = True
-            st.success("✅ Balance calculado correctamente")
+            st.session_state["balance_ok"]                 = True
+            st.session_state["balance_modo"]               = "horario"
+            st.success("✅ Balance horario calculado (8 760 horas simuladas)")
+
+            # Mostrar comparación si también existe el balance mensual previo
+            _metr_prev = st.session_state.get("_balance_mensual_metr_ref")
+            if _metr_prev:
+                _delta = metr["fraccion_solar_pct"] - _metr_prev["fraccion_solar_pct"]
+                st.info(
+                    f"📊 **Comparación mensual → horario:** "
+                    f"Fracción solar mensual = {_metr_prev['fraccion_solar_pct']:.1f}% "
+                    f"→ horario = {metr['fraccion_solar_pct']:.1f}% "
+                    f"({'−' if _delta < 0 else '+'}{abs(_delta):.1f} pp). "
+                    "El balance horario captura el desfase solar-nocturno y es más conservador."
+                )
         except Exception as e:
-            st.error(f"❌ Error en el cálculo: {e}")
+            st.error(f"❌ Error en el cálculo horario: {e}")
+    else:
+        # ── Balance mensual (modo original) ───────────────────────────────────
+        if df_m_prod is None:
+            st.error("❌ No hay datos de producción mensual. Complete primero la Página 6.")
+        else:
+            try:
+                df_bal = balance_mensual(df_m_prod, consumo_mensual_list, _bat_dim_activo)
+                metr   = metricas_balance(df_bal)
+                clase  = clasificar_energia(metr["fraccion_solar_pct"])
+
+                st.session_state["balance_mensual_df"]       = df_bal
+                st.session_state["balance_metricas"]         = metr
+                st.session_state["clasificacion_energetica"] = clase
+                st.session_state["fraccion_solar_pct"]       = metr["fraccion_solar_pct"]
+                st.session_state["consumo_anual_edificio_kWh_calc"] = metr["E_consumo_anual_kWh"]
+                st.session_state["balance_ok"]               = True
+                st.session_state["balance_modo"]             = "mensual"
+                # Guardar referencia para comparar con horario después
+                st.session_state["_balance_mensual_metr_ref"] = metr
+                st.success("✅ Balance calculado correctamente")
+            except Exception as e:
+                st.error(f"❌ Error en el cálculo: {e}")
 
 # ── Mostrar resultados ───────────────────────────────────────────────────────
 df_bal  = st.session_state.get("balance_mensual_df")
@@ -987,6 +1123,82 @@ if df_bal is not None and metr and clase:
     fig.update_xaxes(gridcolor="#f0f0f0")
     fig.update_yaxes(gridcolor="#f0f0f0")
     st.plotly_chart(fig, use_container_width=True)
+
+    # ── Gráfico perfil diario promedio (solo en modo horario) ───────────────
+    _res_h_disp = st.session_state.get("balance_horario_res")
+    _balance_modo_disp = st.session_state.get("balance_modo", "mensual")
+    if _balance_modo_disp == "horario" and _res_h_disp:
+        st.divider()
+        st.subheader("5b️⃣ Perfil energético diario promedio (hora a hora)")
+        st.caption(
+            "Promedio de las 8 760 horas simuladas, agrupadas por hora del día. "
+            "Muestra el desfase entre la generación solar (pico 10–15 h) y el consumo del edificio."
+        )
+        _df_pd = _res_h_disp["df_perfil_diario"]
+        _fig_pd = go.Figure()
+        _fig_pd.add_trace(go.Scatter(
+            x=_df_pd["hora"], y=_df_pd["solar_prom_kWh"],
+            name="Producción solar promedio",
+            fill="tozeroy", fillcolor="rgba(230,126,34,0.15)",
+            line=dict(color="#e67e22", width=2.5),
+            hovertemplate="%{y:.3f} kWh<extra>Solar</extra>",
+        ))
+        _fig_pd.add_trace(go.Scatter(
+            x=_df_pd["hora"], y=_df_pd["consumo_prom_kWh"],
+            name="Consumo promedio",
+            line=dict(color="#2c3e50", width=2.5, dash="dot"),
+            hovertemplate="%{y:.3f} kWh<extra>Consumo</extra>",
+        ))
+        _fig_pd.add_trace(go.Bar(
+            x=_df_pd["hora"], y=_df_pd["autoconsumo_prom_kWh"],
+            name="Autoconsumo horario promedio",
+            marker_color="#27ae60", opacity=0.7,
+            hovertemplate="%{y:.3f} kWh<extra>Autoconsumo</extra>",
+        ))
+        _fig_pd.add_trace(go.Bar(
+            x=_df_pd["hora"], y=_df_pd["deficit_prom_kWh"],
+            name="Déficit horario promedio (de la red)",
+            marker_color="#e74c3c", opacity=0.6,
+            hovertemplate="%{y:.3f} kWh<extra>Déficit</extra>",
+        ))
+        _fig_pd.update_layout(
+            barmode="overlay",
+            title=f"Perfil diario promedio — {_res_h_disp.get('perfil_tipo', '')}",
+            xaxis=dict(title="Hora del día", tickmode="linear", dtick=2),
+            yaxis_title="Energía promedio (kWh/h)",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            height=400, margin=dict(t=80, b=40),
+            plot_bgcolor="white",
+        )
+        _fig_pd.update_xaxes(gridcolor="#f0f0f0")
+        _fig_pd.update_yaxes(gridcolor="#f0f0f0")
+        st.plotly_chart(_fig_pd, use_container_width=True)
+
+        # Indicadores de desfase
+        _h_solar_peak = int(_df_pd.loc[_df_pd["solar_prom_kWh"].idxmax(), "hora"])
+        _h_consumo_peak = int(_df_pd.loc[_df_pd["consumo_prom_kWh"].idxmax(), "hora"])
+        _frac_solar_dia = (
+            _df_pd[(_df_pd["hora"] >= 7) & (_df_pd["hora"] <= 18)]["solar_prom_kWh"].sum() /
+            max(_df_pd["solar_prom_kWh"].sum(), 0.001) * 100
+        )
+        _frac_consumo_noche = (
+            _df_pd[(_df_pd["hora"] < 7) | (_df_pd["hora"] > 18)]["consumo_prom_kWh"].sum() /
+            max(_df_pd["consumo_prom_kWh"].sum(), 0.001) * 100
+        )
+        _c_des1, _c_des2, _c_des3 = st.columns(3)
+        _c_des1.metric("Hora pico de generación", f"{_h_solar_peak:02d}:00 h")
+        _c_des2.metric("Hora pico de consumo", f"{_h_consumo_peak:02d}:00 h")
+        _c_des3.metric(
+            "Desfase temporal",
+            f"{abs(_h_consumo_peak - _h_solar_peak)} h",
+            delta="Energía que necesita batería para cubrirse",
+            delta_color="off",
+        )
+        st.caption(
+            f"☀️ El **{_frac_solar_dia:.0f}%** de la generación solar ocurre entre 7–18 h. "
+            f"El **{_frac_consumo_noche:.0f}%** del consumo ocurre fuera de ese rango (noche/madrugada). "
+            "Sin batería, ese consumo nocturno proviene íntegramente de la red."
+        )
 
     # ── Gráfico fracción solar mensual ──────────────────────────────────────
     fig2 = go.Figure()
