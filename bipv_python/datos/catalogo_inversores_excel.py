@@ -1,4 +1,6 @@
 """Loader Catalogo_Inversores con costos y semáforo de completitud."""
+import os as _os
+
 import pandas as pd
 import streamlit as st
 
@@ -9,8 +11,25 @@ def _f(val, default=None):
     try:    return float(val)
     except: return default
 
-@st.cache_data(ttl=3600)
+
+def excel_mtime_inv() -> float:
+    """mtime del Excel — entra como parte de la clave de caché para que
+    cualquier edición directa al archivo invalide la caché sola (patrón #26)."""
+    try:
+        return _os.path.getmtime(_EXCEL)
+    except OSError:
+        return 0.0
+
+
 def cargar_catalogo_inversores() -> dict:
+    """API pública sin argumentos (7 llamadores). #205: inyecta el mtime del
+    Excel en la clave de caché — editar el archivo en el servidor se refleja
+    al siguiente rerun, sin esperar el TTL de 1 hora ni reiniciar PM2."""
+    return _cargar_catalogo_inversores_cached(excel_mtime_inv())
+
+
+@st.cache_data(ttl=3600)
+def _cargar_catalogo_inversores_cached(_mtime: float) -> dict:
     df = pd.read_excel(_EXCEL, sheet_name=_SHEET, header=2)
     df.columns = [str(c).strip() for c in df.columns]
     inversores = {}
@@ -53,13 +72,14 @@ def cargar_catalogo_inversores() -> dict:
         }
     return inversores
 
+# Compatibilidad: guardar/eliminar y la página 4 llaman .clear() sobre la pública
+cargar_catalogo_inversores.clear = _cargar_catalogo_inversores_cached.clear
 cargar_catalogo_inv_excel = cargar_catalogo_inversores
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # #122 — Diagnóstico del catálogo de inversores (mismo patrón que baterías #24)
 # ══════════════════════════════════════════════════════════════════════════════
-import os as _os
 
 # Columnas del Excel según su impacto en el dimensionamiento de strings:
 # críticas → sin ellas el dimensionamiento produce resultados incorrectos.
@@ -75,15 +95,6 @@ _COLS_IMPORTANTES = [
 # Campos internos críticos por modelo (para reportar modelos incompletos)
 _CAMPOS_CRITICOS_MODELO = ["Vdc_max", "Vmppt_min", "Vmppt_max",
                            "n_trackers", "I_max_tracker"]
-
-
-def excel_mtime_inv() -> float:
-    """mtime del Excel — pásalo a diagnostico_catalogo_inversores() para que
-    la caché se invalide sola cuando el archivo cambia (patrón #26)."""
-    try:
-        return _os.path.getmtime(_EXCEL)
-    except OSError:
-        return 0.0
 
 
 @st.cache_data(ttl=3600)
