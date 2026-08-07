@@ -2438,10 +2438,30 @@ with tab_solar:
                     # A diferencia del bloque geométrico (AOI), aquí se pondera con la
                     # irradiancia real del sitio (nubes, difusa) y se recomienda la
                     # orientación por ENERGÍA anual (kWh/m²), no por geometría.
-                    if _tmy_s is not None and len(_tmy_s) == len(_spw):
+                    # Guardia de alineación (auditoría): además de la longitud, el índice
+                    # de _spw debe ser exactamente el del TMY (coercido a UTC) para que
+                    # el emparejamiento posicional .values sea válido.
+                    _tmy_alineado = (
+                        _tmy_s is not None and len(_tmy_s) == len(_spw)
+                        and "_tmy_idx" in dir() and _spw.index.equals(_tmy_idx)
+                    )
+                    if _tmy_alineado:
                         st.markdown("**⚡ Orientación de máxima energía real — POA anual con TMY**")
+                        # Huella real de los insumos (auditoría): detecta cambio de TMY
+                        # (aunque tenga la misma longitud), edición de los puntos del
+                        # horizonte (aunque no cambie su número) y altitud del sitio.
+                        _hz_fp206 = tuple(
+                            (round(float(_p[0]), 2), round(float(_p[1]), 2)) for _p in _pts_hz
+                        ) if _hay_hz else ()
+                        _tmy_fp206 = (
+                            len(_tmy_s),
+                            str(_tmy_s.index[0]), str(_tmy_s.index[-1]),
+                            round(float(_tmy_s["G_h"].sum()), 1),
+                            round(float(_tmy_s["Gb_n"].sum()), 1),
+                            round(float(_tmy_s["Gd_h"].sum()), 1),
+                        )
                         _k206 = (round(_tilt_hm, 2), round(float(lat), 4), round(float(lon), 4),
-                                 len(_spw), len(_pts_hz) if _hay_hz else 0)
+                                 float(alt_m), _tmy_fp206, hash(_hz_fp206))
                         _cache206 = st.session_state.setdefault("_poa_sweep_cache", {})
                         if _cache206.get("key") == _k206:
                             _poa_azs = _cache206["poa"]
