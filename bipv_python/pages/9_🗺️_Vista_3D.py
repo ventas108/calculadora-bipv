@@ -2379,40 +2379,60 @@ with tab_solar:
                     _somb_o = _dia_o & (_spw["apparent_elevation"] <= _spw["el_hz"])
                     _base_o = _dia_o & (~_somb_o)
                     _azs_o  = _np.arange(0, 360, 5)
-                    _aoi_barrido = []
+                    _aoi_barrido, _horas_barrido = [], []
                     for _az_o in _azs_o:
                         _aoi_o = _pv_hm.irradiance.aoi(
                             surface_tilt=_tilt_hm, surface_azimuth=float(_az_o),
                             solar_zenith=_spw["apparent_zenith"],
                             solar_azimuth=_spw["azimuth"])
                         _m_o = _base_o & (_aoi_o < 90.0)
-                        _aoi_barrido.append(float(_aoi_o[_m_o].mean())
-                                            if bool(_m_o.any()) else _np.nan)
-                    _aoi_barrido = _np.array(_aoi_barrido)
-                    if _np.isfinite(_aoi_barrido).any():
-                        _i_opt   = int(_np.nanargmin(_aoi_barrido))
+                        _n_o = int(_m_o.sum())
+                        _horas_barrido.append(_n_o)
+                        _aoi_barrido.append(float(_aoi_o[_m_o].mean()) if _n_o else _np.nan)
+                    _aoi_barrido   = _np.array(_aoi_barrido)
+                    _horas_barrido = _np.array(_horas_barrido, dtype=float)
+                    # Auditoría: sin este umbral, una orientación con POCAS horas de
+                    # incidencia (pero casi perpendiculares) daría una media baja
+                    # engañosa. Solo compiten azimuths con ≥85% de las horas del mejor.
+                    _h_max = float(_horas_barrido.max()) if len(_horas_barrido) else 0.0
+                    _elegibles = _horas_barrido >= 0.85 * _h_max
+                    _cand = _np.where(_elegibles, _aoi_barrido, _np.nan)
+                    if _np.isfinite(_cand).any() and _h_max > 0:
+                        _i_opt   = int(_np.nanargmin(_cand))
                         _az_opt  = float(_azs_o[_i_opt])
-                        _aoi_opt = float(_aoi_barrido[_i_opt])
+                        _aoi_opt = float(_cand[_i_opt])
+                        _h_opt   = int(_horas_barrido[_i_opt])
+                        _i_act   = int(_np.argmin(_np.abs(((_azs_o - _az_hm + 180) % 360) - 180)))
+                        _h_act   = int(_horas_barrido[_i_act])
                         _giro    = (_az_opt - _az_hm + 540.0) % 360.0 - 180.0
-                        st.markdown("**🧭 Azimuth óptimo sugerido para esta superficie (tilt actual)**")
-                        _o1, _o2, _o3 = st.columns(3)
-                        _o1.metric("Azimuth óptimo", f"{_az_opt:.0f}°",
-                                   help="Orientación que minimiza el AOI anual promedio "
-                                        "en este sitio, con el mismo tilt y horizonte.")
-                        _o2.metric("AOI mínimo alcanzable", f"{_aoi_opt:.1f}°",
+                        st.markdown("**🧭 Orientación de mejor incidencia solar (mismo tilt y horizonte)**")
+                        _o1, _o2, _o3, _o4 = st.columns(4)
+                        _o1.metric("Azimuth de mejor incidencia", f"{_az_opt:.0f}°",
+                                   help="Minimiza el AOI anual promedio entre las orientaciones "
+                                        "con horas de sol comparables (≥85% del máximo del sitio). "
+                                        "Es una métrica de incidencia geométrica — la producción "
+                                        "definitiva se evalúa con POA en ☀️ Recurso Solar.")
+                        _o2.metric("AOI alcanzable", f"{_aoi_opt:.1f}°",
                                    delta=f"{_aoi_opt - _aoi_anual:+.1f}° vs actual",
                                    delta_color="inverse")
-                        _o3.metric("Giro sugerido", f"{_giro:+.0f}°",
+                        _o3.metric("Horas de sol directo/año", f"{_h_opt:,}",
+                                   delta=f"{_h_opt - _h_act:+,} vs actual ({_h_act:,})",
+                                   help="Horas anuales con sol visible incidiendo sobre el plano "
+                                        "(AOI < 90°, sin sombra del horizonte).")
+                        _o4.metric("Giro sugerido", f"{_giro:+.0f}°",
                                    help="Positivo = girar hacia el Este del azimuth actual; "
                                         "negativo = hacia el Oeste. 0° = ya estás en el óptimo.")
                         if abs(_giro) < 5:
-                            st.caption("✅ El azimuth actual ya está en el óptimo (±5°).")
+                            st.caption("✅ El azimuth actual ya está entre los de mejor incidencia (±5°).")
                         else:
                             st.caption(
-                                f"Girando la fachada de {_az_hm:.0f}° a {_az_opt:.0f}° el AOI anual "
-                                f"promedio bajaría de {_aoi_anual:.1f}° a {_aoi_opt:.1f}°. "
-                                "En edificios existentes el azimuth suele ser fijo — usa este dato "
-                                "para priorizar entre fachadas o para pérgolas/marquesinas nuevas.")
+                                f"Girando de {_az_hm:.0f}° a {_az_opt:.0f}° el AOI anual promedio "
+                                f"bajaría de {_aoi_anual:.1f}° a {_aoi_opt:.1f}° con "
+                                f"{_h_opt:,} h de sol directo al año. Es un indicador geométrico "
+                                "de incidencia (no de energía): para comparar producción real entre "
+                                "orientaciones usa la POA de ☀️ Recurso Solar. En edificios existentes "
+                                "el azimuth suele ser fijo — útil para priorizar fachadas o para "
+                                "pérgolas/marquesinas nuevas.")
 
             else:
                 st.info("\u26a0\ufe0f No se pudo calcular posición solar anual. Verifica pvlib.")
