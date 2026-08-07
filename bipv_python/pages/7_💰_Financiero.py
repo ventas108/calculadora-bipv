@@ -38,7 +38,8 @@ prod_ok = st.session_state.get("produccion_ok", False)
 # desde disco para NO caer al modo manual con defaults de prueba.
 if not prod_ok:
     from calculos.persistencia_resultados import restaurar_resultados_produccion
-    if restaurar_resultados_produccion(st.session_state):
+    if restaurar_resultados_produccion(st.session_state,
+                                       st.session_state.get("auth_email", "")):
         st.info(
             "📂 **Datos restaurados del proyecto guardado** — esta pestaña no tenía "
             "los resultados de Producción en memoria, así que se recuperaron del "

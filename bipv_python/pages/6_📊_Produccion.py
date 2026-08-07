@@ -667,7 +667,8 @@ if btn_sim or st.session_state.get("produccion_ok"):
     # nuevas y reinicios de PM2 para que Financiero/Presupuesto no caigan al
     # modo manual con defaults falsos.
     from calculos.persistencia_resultados import guardar_resultados_produccion
-    if not guardar_resultados_produccion(st.session_state):
+    if not guardar_resultados_produccion(st.session_state,
+                                         st.session_state.get("auth_email", "")):
         st.caption("⚠️ No se pudieron persistir los resultados a disco — "
                    "otra pestaña podría no verlos tras recargar.")
 

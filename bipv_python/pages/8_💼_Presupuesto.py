@@ -54,7 +54,8 @@ tc = trm_widget("ppto")
 # para que la Estimación Rápida no arranque con defaults falsos.
 if not st.session_state.get("produccion_ok"):
     from calculos.persistencia_resultados import restaurar_resultados_produccion
-    if restaurar_resultados_produccion(st.session_state):
+    if restaurar_resultados_produccion(st.session_state,
+                                       st.session_state.get("auth_email", "")):
         st.info("📂 **Datos restaurados del proyecto guardado** (kWp y n.º de paneles "
                 "de la última simulación de Producción).", icon="📂")
 
@@ -197,19 +198,20 @@ def _plantilla_con_activo(key, inyectar=None):
 # ── Editor genérico con persistencia + fuente de precios ─────────────────────
 def _editar_seccion(key, label, inyectar=None, referencia_mercado=""):
     ss_key = f"df_sec_{key}"
-    _persistible = key in pstore.SECCIONES_PERSISTIBLES
+    _usr = st.session_state.get("auth_email", "")
+    _persistible = key in pstore.SECCIONES_PERSISTIBLES and bool(_usr)
 
     col_r, col_f = st.columns([2, 4])
     if col_r.button(f"↺ Resetear '{label}'", key=f"reset_{key}",
                     help="Vuelve a la plantilla original y descarta lo guardado en disco."):
         st.session_state.pop(ss_key, None)
         if _persistible:
-            pstore.borrar_seccion(key)   # #114 — descartar también lo guardado
+            pstore.borrar_seccion(key, _usr)   # #114 — descartar también lo guardado
         st.rerun()
 
     # ── #114 — Restaurar fuente guardada en disco (antes del widget) ─────────
     if _persistible and f"fuente_{key}" not in st.session_state:
-        _filas_g, _fuente_g = pstore.cargar_seccion(key)
+        _filas_g, _fuente_g = pstore.cargar_seccion(key, _usr)
         if _fuente_g:
             st.session_state[f"fuente_inp_{key}"] = _fuente_g
 
@@ -228,7 +230,7 @@ def _editar_seccion(key, label, inyectar=None, referencia_mercado=""):
         # ── #114 — Preferir la versión guardada en disco sobre la plantilla ──
         _restaurado = False
         if _persistible:
-            _filas_g, _fuente_g = pstore.cargar_seccion(key)
+            _filas_g, _fuente_g = pstore.cargar_seccion(key, _usr)
             if _filas_g:
                 try:
                     _df_g = pd.DataFrame(_filas_g)
@@ -270,11 +272,11 @@ def _editar_seccion(key, label, inyectar=None, referencia_mercado=""):
         st.session_state[ss_key] = edited
         # ── #114 — Persistir a disco en el mismo rerun del cambio ────────────
         if _persistible and not pstore.guardar_seccion(
-                key, edited.to_dict("records"), fuente):
+                key, edited.to_dict("records"), _usr, fuente):
             st.caption("⚠️ No se pudo guardar la tabla en disco (permisos/espacio).")
     elif _persistible and fuente != st.session_state.get(f"_fuente_persistida_{key}"):
         # La fuente cambió sin cambiar filas → persistirla también
-        pstore.guardar_seccion(key, edited.to_dict("records"), fuente)
+        pstore.guardar_seccion(key, edited.to_dict("records"), _usr, fuente)
         st.session_state[f"_fuente_persistida_{key}"] = fuente
 
     activos  = edited["Activo"].fillna(False).astype(bool)

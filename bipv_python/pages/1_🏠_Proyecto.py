@@ -41,46 +41,53 @@ def _geocodificar_inverso(lat: float, lon: float) -> str:
     except Exception:
         return ""
 
-# ── Ruta del archivo de proyecto (persiste entre recargas) ───────────────────
+# ── Rutas de persistencia POR USUARIO (auditoría: sin archivos compartidos) ──
+# Cada cuenta guarda su configuración en su propio archivo dentro de
+# datos/persistencia/ — dos usuarios del mismo servidor nunca se ven ni se
+# pisan el proyecto. Requiere login, por eso la carga va DESPUÉS de
+# requerir_login() (más abajo).
 _DIR_DATOS = os.path.join(os.path.dirname(__file__), "..", "datos")
-PROJECT_FILE = os.path.join(_DIR_DATOS, "proyecto_actual.json")
+
+from calculos.persistencia_resultados import ruta_datos_usuario
+
+def _ruta_proyecto_usuario():
+    return ruta_datos_usuario("proyecto_actual.json",
+                              st.session_state.get("auth_email", ""))
+
+def _ruta_consumo_usuario():
+    return ruta_datos_usuario("consumo_cache.json",
+                              st.session_state.get("auth_email", ""))
 
 def _cargar_proyecto():
-    """Lee proyecto_actual.json y consumo_cache.json — vuelca en session_state."""
-    if os.path.exists(PROJECT_FILE):
-        try:
-            with open(PROJECT_FILE, "r", encoding="utf-8") as f:
-                saved = json.load(f)
-            for k, v in saved.items():
-                st.session_state.setdefault(k, v)
-        except Exception:
-            pass
-    # También cargar consumo auto-guardado (no requiere click en Guardar)
-    _consumo_path = os.path.join(_DIR_DATOS, "consumo_cache.json")
-    if os.path.exists(_consumo_path):
-        try:
-            with open(_consumo_path, "r", encoding="utf-8") as _fc:
-                consumo_saved = json.load(_fc)
-            for k, v in consumo_saved.items():
-                st.session_state.setdefault(k, v)
-        except Exception:
-            pass
+    """Lee el proyecto y el consumo guardados DEL USUARIO — vuelca en session_state."""
+    for _ruta in (_ruta_proyecto_usuario(), _ruta_consumo_usuario()):
+        if os.path.exists(_ruta):
+            try:
+                with open(_ruta, "r", encoding="utf-8") as f:
+                    saved = json.load(f)
+                for k, v in saved.items():
+                    st.session_state.setdefault(k, v)
+            except Exception:
+                pass
 
 def _guardar_proyecto(datos: dict):
-    """Persiste datos del proyecto en JSON a disco."""
-    os.makedirs(_DIR_DATOS, exist_ok=True)
-    with open(PROJECT_FILE, "w", encoding="utf-8") as f:
+    """Persiste datos del proyecto en el JSON privado del usuario."""
+    _ruta = _ruta_proyecto_usuario()
+    os.makedirs(os.path.dirname(_ruta), exist_ok=True)
+    _tmp = f"{_ruta}.{os.getpid()}.tmp"
+    with open(_tmp, "w", encoding="utf-8") as f:
         json.dump(datos, f, ensure_ascii=False, indent=2)
-
-# ── Cargar al inicio de cada sesión (solo la primera vez) ───────────────────
-if "proyecto_cargado_desde_disco" not in st.session_state:
-    _cargar_proyecto()
-    st.session_state["proyecto_cargado_desde_disco"] = True
+    os.replace(_tmp, _ruta)
 
 st.set_page_config(page_title="Proyecto — BIPV", page_icon="🏠", layout="wide")
 
 from calculos.auth import requerir_login
 requerir_login()
+
+# ── Cargar al inicio de cada sesión (solo la primera vez, ya logueado) ──────
+if "proyecto_cargado_desde_disco" not in st.session_state:
+    _cargar_proyecto()
+    st.session_state["proyecto_cargado_desde_disco"] = True
 
 from utils.ui import bloquear_traduccion
 bloquear_traduccion()
@@ -257,7 +264,7 @@ with col1:
         # #89 — borrar también los resultados de Producción persistidos a disco:
         # si sobreviven, Financiero los "restauraría" con el sol de otra ciudad.
         from calculos.persistencia_resultados import limpiar_resultados_produccion
-        limpiar_resultados_produccion()
+        limpiar_resultados_produccion(st.session_state.get("auth_email", ""))
         st.rerun()  # Re-render limpio para evitar DOM error al cambiar ciudad
 
     # ── Tipo de instalación — key= para que Streamlit maneje el estado ────────
@@ -631,14 +638,17 @@ with col2:
                     # #94 — recordar si el usuario entra por factura o por kWh
                     "entrada_consumo": entrada,
                 }
-                _consumo_path = os.path.join(_DIR_DATOS, "consumo_cache.json")
+                _consumo_path = _ruta_consumo_usuario()
                 _prev_c: dict = {}
                 if os.path.exists(_consumo_path):
                     with open(_consumo_path, "r", encoding="utf-8") as _fcc:
                         _prev_c = json.load(_fcc)
                 if _consumo_cache != _prev_c:
-                    with open(_consumo_path, "w", encoding="utf-8") as _fcc:
+                    os.makedirs(os.path.dirname(_consumo_path), exist_ok=True)
+                    _tmp_c = f"{_consumo_path}.{os.getpid()}.tmp"
+                    with open(_tmp_c, "w", encoding="utf-8") as _fcc:
                         json.dump(_consumo_cache, _fcc, ensure_ascii=False)
+                    os.replace(_tmp_c, _consumo_path)
             except Exception:
                 pass
 
@@ -701,7 +711,7 @@ if st.button("💾 Guardar configuración", type="primary"):
             st.session_state.pop(_k64, None)
         # #89 — invalidar también los resultados persistidos a disco
         from calculos.persistencia_resultados import limpiar_resultados_produccion
-        limpiar_resultados_produccion()
+        limpiar_resultados_produccion(st.session_state.get("auth_email", ""))
         st.warning(
             "⚠️ **Las coordenadas del proyecto cambiaron** — se invalidaron el recurso "
             "solar y todos los resultados derivados (producción, bypass, multi-superficie). "

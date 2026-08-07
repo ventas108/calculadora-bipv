@@ -233,6 +233,14 @@ def cargar_proyecto(slug: str) -> str:
     # Marcar para que _cargar_proyecto() no sobreescriba al navegar de regreso
     st.session_state["proyecto_cargado_desde_disco"] = True
 
+    # #89 — invalidar los resultados de Producción persistidos a disco: son del
+    # proyecto ANTERIOR; si sobreviven, otra pestaña los "restauraría" aquí.
+    try:
+        from calculos.persistencia_resultados import limpiar_resultados_produccion
+        limpiar_resultados_produccion(st.session_state.get("auth_email", ""))
+    except Exception:
+        pass
+
     # Cargar estado guardado (sobrescribe valores actuales)
     for k, v in estado.items():
         st.session_state[k] = v
