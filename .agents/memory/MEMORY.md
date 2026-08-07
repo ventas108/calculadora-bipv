@@ -10,3 +10,4 @@
 - [BIPV - Calculadora de Sombreado](bipv-shading-calculator.md) — app React/TS en bipv.innovacionquimica.com.co exporta CSV con FS horario por punto de análisis -> es el p_shade directo para modelo bypass diodes
 - [BIPV - login y monetización](bipv-auth-monetizacion.md) — requerir_login() obligatorio en toda página nueva; usuarios.db y código setup solo en servidor; precios y fases Wompi acordados
 - [BIPV - Sombras desde SketchUp](bipv-sombras-sketchup.md) — ray-casting trimesh alineado al TMY UTC de la sesión (obligatorio); mismo CSV FS_geometrico que la calculadora web
+- [BIPV - persistencia por usuario](bipv-persistencia-usuario.md) — todo estado a disco va a datos/persistencia/<hash>__*.json vía ruta_datos_usuario(), cargar tras login; nunca archivos globales
