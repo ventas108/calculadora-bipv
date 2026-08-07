@@ -332,7 +332,7 @@ _SOLAR_SS_KEYS = (
     "recurso_solar_ok", "tmy_df", "poa_df", "tmy_ciudad",
     "tilt_fachada", "tilt_default", "azimuth_fachada", "orientacion_label",
     "poa_anual_kWh_m2", "ghi_anual_kWh_m2", "t_media_anual",
-    "zona_geo_coords", "poa_efectiva_df", "ganancia_bifacial_pct",
+    "zona_geo_coords", "poa_efectiva_df", "poa_sin_termico_df", "ganancia_bifacial_pct",
 )
 _GUARD_KEYS = (
     "_solar_lat_guardada", "_solar_lon_guardada", "_solar_alt_guardada",

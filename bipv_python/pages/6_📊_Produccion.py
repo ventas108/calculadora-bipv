@@ -47,15 +47,32 @@ factor_pr = st.session_state.get("factor_global_mismatch", 1.0)
 poa_ef    = st.session_state.get("poa_efectiva_kWh_m2", poa_bruta_anual)
 
 if _motor_ok:
-    # Motor Óptico disponible — usar POA corregida hora a hora (IAM + Soiling + Térmico)
-    poa_base          = st.session_state.get("poa_efectiva_df") or st.session_state.get("poa_df")
-    poa_base_label    = "POA efectiva — Motor Óptico"
+    # Motor Óptico disponible:
+    # • poa_sin_termico_df → G_eff para el SDM (IAM + soiling, sin f_term).
+    #   La corrección térmica la aplica el SDM internamente vía T_cell(k_bipv).
+    #   Usar poa_efectiva_df (con f_term) causaría doble conteo térmico.
+    # • poa_efectiva_df → visualización waterfall, Financiero y resúmenes.
+    # NOTA: no usar 'or' con DataFrames — pandas lanza ValueError en bool context.
+    def _get_poa_df(*keys):
+        for k in keys:
+            v = st.session_state.get(k)
+            if v is not None:
+                return v
+        return None
+    poa_base = _get_poa_df("poa_sin_termico_df", "poa_efectiva_df", "poa_df")
+    poa_base_label    = "POA IAM+soiling — Motor Óptico (sin térmico, para SDM)"
     poa_display_anual = st.session_state.get("poa_efectiva_anual_kWh_m2", poa_bruta_anual)
     _factor_global_mo = _mo_summary.get("factor_global", 1.0)
+    # k_bipv del Motor Óptico → única fuente de corrección térmica (en T_cell del SDM)
+    _k_bipv_sim  = float(st.session_state.get("motor_optico_k_bipv",
+                          _mo_summary.get("k_bipv", 1.3)))
+    # NOCT del Motor Óptico → misma fuente de verdad que usó cascada_optica()
+    _noct_mo     = float(st.session_state.get("motor_optico_noct",
+                          _mo_summary.get("noct", 45.0)))
     st.success(
-        f"🔆 **Motor Óptico activo** — POA corregida: **{poa_display_anual:,.0f} kWh/m²/año** "
+        f"🔆 **Motor Óptico activo** — POA efectiva: **{poa_display_anual:,.0f} kWh/m²/año** "
         f"(factor global **{_factor_global_mo*100:.1f}%** = IAM + Soiling + Térmico). "
-        "La simulación usa la irradiancia real hora a hora, no un factor promedio."
+        f"SDM usa POA sin térmico + k_BIPV={_k_bipv_sim} + NOCT={_noct_mo}°C."
     )
     if _mismatch_ok:
         st.info(
@@ -66,6 +83,8 @@ else:
     poa_base          = st.session_state["poa_df"]
     poa_base_label    = "POA bruta"
     poa_display_anual = poa_bruta_anual
+    _k_bipv_sim  = 1.0   # sin Motor Óptico → temperatura estándar (sin confinamiento)
+    _noct_mo     = None  # usar NOCT de la ficha del panel
     if _mismatch_ok:
         st.success(
             f"✅ Cascada Mismatch cargada — POA efectiva: **{poa_ef:.0f} kWh/m²/año** | "
@@ -225,21 +244,35 @@ if btn_sim or st.session_state.get("produccion_ok"):
         with st.spinner(
             f"Simulando 8.760 horas para {N_paneles} módulos {panel_nombre} en {ciudad}..."
         ):
+            # Cuando Motor Óptico está activo, el NOCT usado en cascada_optica()
+            # es la fuente de verdad. Se inyecta en el panel para garantizar que
+            # el SDM calcula T_cell con los mismos parámetros térmicos.
+            _panel_sdm = panel
+            if _motor_ok and _noct_mo is not None:
+                _panel_sdm = dict(panel)          # copia superficial; no muta original
+                _panel_sdm["NOCT"] = _noct_mo
+
             _sim_kwargs = dict(
                 tmy               = tmy,
                 poa_base          = poa_base,
-                panel             = panel,
+                panel             = _panel_sdm,
                 N_paneles         = N_paneles,
                 eta_inversor      = eta_inv_frac,
                 factor_pr_mismatch= factor_pr,
                 P_dc_stc_kW       = P_stc_kW,
+                k_bipv            = _k_bipv_sim,
             )
             res_base = simular_produccion_anual(**_sim_kwargs)
             res_iv   = None
             if usar_iv and _panel_apto_iv:
                 # #105: pasar el panel YA preparado (evita repetir el fit_desoto
                 # y garantiza que se simula con el mismo SDM mostrado arriba).
-                res_iv = simular_produccion_iv(**{**_sim_kwargs, "panel": _panel_iv_prep})
+                # Propagar el NOCT del Motor Óptico (misma fuente de verdad que el SDM base).
+                _panel_iv_sdm = _panel_iv_prep
+                if _motor_ok and _noct_mo is not None:
+                    _panel_iv_sdm = dict(_panel_iv_prep)
+                    _panel_iv_sdm["NOCT"] = _noct_mo
+                res_iv = simular_produccion_iv(**{**_sim_kwargs, "panel": _panel_iv_sdm})
 
         # El modo IV es opt-in: si está activo y disponible, queda como oficial.
         res = res_iv if (usar_iv and res_iv is not None) else res_base

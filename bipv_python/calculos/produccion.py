@@ -114,6 +114,7 @@ def simular_produccion_anual(
     eta_inversor: float,
     factor_pr_mismatch: float,
     P_dc_stc_kW: float | None = None,
+    k_bipv: float = 1.0,
 ) -> dict:
     """
     Simulación de producción anual hora a hora — IEC 61724.
@@ -128,6 +129,9 @@ def simular_produccion_anual(
     factor_pr_mismatch  : factor de pérdidas cascada (0–1)
                           = poa_efectiva / poa_bruta  (de página Mismatch)
     P_dc_stc_kW         : potencia pico instalada kWp; si None → N_paneles × Pmax_stc
+    k_bipv              : factor de confinamiento térmico BIPV (IEA-PVPS T15).
+                          1.0 = ventilado libre, 1.3 = fachada confinada (defecto BIPV),
+                          1.5 = sellado total. Aumenta T_celda y reduce eficiencia.
 
     Retorna dict
     ────────────
@@ -155,14 +159,16 @@ def simular_produccion_anual(
     # ── Irradiancia efectiva (cascada mismatch aplicada) ──────────────────────
     G_eff = np.clip(G_raw * factor_pr_mismatch, 0, None)
 
-    # ── Temperatura de celda hora a hora (modelo NOCT) ────────────────────────
+    # ── Temperatura de celda hora a hora (modelo NOCT + k_BIPV confinamiento) ──
     try:
         NOCT = float(panel.get("NOCT") or 45.0)
         if not (20.0 < NOCT < 100.0):
             NOCT = 45.0
     except (TypeError, ValueError):
         NOCT = 45.0
-    T_cel = T_amb + (NOCT - 20.0) / 800.0 * G_eff
+    # k_bipv eleva la temperatura de celda en fachadas con ventilación restringida.
+    # IEA-PVPS T15: 1.0=ventilado libre, 1.3=confinado típico, 1.5=sellado total.
+    T_cel = temperatura_celda_noct(G_eff, T_amb, NOCT=NOCT, k_bipv=k_bipv)
 
     # ── SDM vectorizado — Pmax por módulo ─────────────────────────────────────
     pmax_mod = _calcular_pmax_vectorizado(G_eff, T_cel, panel)

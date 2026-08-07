@@ -16,8 +16,24 @@ entregarían TIR/payback calculados con el sol o la geometría de otro escenario
 
 # ── Derivados de la POA: producción y todo lo que cuelga de ella ─────────────
 KEYS_DERIVADOS_POA = (
-    # Motor Óptico (Página 5b)
+    # Motor Óptico (Página 5b) — estado, parámetros y POA corregidas
+    # poa_efectiva_df    : POA tras IAM + soiling + térmico (visualización / Financiero)
+    # poa_sin_termico_df : POA tras IAM + soiling SIN térmico (G_eff del SDM)
+    # Ambas deben invalidarse juntas para evitar que Producción use la POA
+    # antigua cuando cambian coordenadas o geometría.
+    "motor_optico_ok",
+    "motor_optico_result_df",
+    "motor_optico_summary",
     "poa_efectiva_df",
+    "poa_sin_termico_df",
+    "poa_efectiva_anual_kWh_m2",
+    "motor_optico_b0",
+    "motor_optico_tau",
+    "motor_optico_k_bipv",
+    "motor_optico_noct",
+    "motor_optico_coef_temp",
+    "motor_optico_f_iam_dif",
+    "motor_optico_k_soil_vert",
     # Producción (Página 6)
     "produccion_ok", "produccion_modo_iv", "E_ac_anual_kWh", "PR_sistema",
     "res_produccion", "res_produccion_base", "res_produccion_iv",

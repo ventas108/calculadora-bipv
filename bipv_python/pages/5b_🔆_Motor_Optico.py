@@ -363,19 +363,28 @@ if run_btn:
                 k_soiling_vert=k_soiling_vert,
             )
             # ── Guardar en session_state ──────────────────────────────────────
+            # poa_efectiva_df: POA tras IAM + Soiling + Térmico (cascada completa).
+            # Usada para visualización del waterfall, Financiero y resúmenes.
             poa_ef_df = poa_df.copy()
-            # reindex garantiza alineación por índice (no posicional con .values)
             poa_ef_df["poa_global"] = result_df["poa_efectiva"].reindex(poa_ef_df.index).fillna(0.0)
+
+            # poa_sin_termico_df: POA tras IAM + Soiling ÚNICAMENTE, SIN f_term.
+            # Es la irradiancia física real para el SDM de Producción.
+            # La corrección térmica la aplica el SDM internamente vía T_cell(k_bipv).
+            # Usar poa_efectiva (con f_term) en el SDM daría doble conteo térmico.
+            poa_st_df = poa_df.copy()
+            poa_st_df["poa_global"] = result_df["poa_post_soil"].reindex(poa_st_df.index).fillna(0.0)
 
             st.session_state["motor_optico_ok"]            = True
             st.session_state["motor_optico_result_df"]     = result_df
             st.session_state["motor_optico_summary"]       = summary
             st.session_state["poa_efectiva_df"]            = poa_ef_df
+            st.session_state["poa_sin_termico_df"]         = poa_st_df  # para SDM
             st.session_state["poa_efectiva_anual_kWh_m2"] = summary["poa_efectiva_anual_kWh_m2"]
             st.session_state["motor_optico_b0"]            = b0
             st.session_state["motor_optico_tau"]           = transparencia
             st.session_state["motor_optico_k_bipv"]        = k_bipv
-            st.session_state["motor_optico_noct"]          = noct
+            st.session_state["motor_optico_noct"]          = noct   # fuente de verdad para T_cell
             st.session_state["motor_optico_coef_temp"]     = coef_temp
             st.session_state["motor_optico_f_iam_dif"]     = f_iam_dif
             st.session_state["motor_optico_k_soil_vert"]   = k_soiling_vert

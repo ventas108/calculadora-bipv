@@ -26,6 +26,7 @@ from calculos.modelo_iv import (
     T_REF_K,
     G_REF,
 )
+from calculos.temperatura import temperatura_celda_noct
 
 
 def preparar_para_iv(panel: dict) -> tuple:
@@ -143,6 +144,7 @@ def simular_produccion_iv(
     eta_inversor: float,
     factor_pr_mismatch: float,
     P_dc_stc_kW: float | None = None,
+    k_bipv: float = 1.0,
 ) -> dict:
     """
     Simulación de producción anual hora a hora usando la curva IV real (Motor IV).
@@ -186,14 +188,15 @@ def simular_produccion_iv(
     # ── Irradiancia efectiva (cascada mismatch aplicada) ──────────────────────
     G_eff = np.clip(G_raw * factor_pr_mismatch, 0, None)
 
-    # ── Temperatura de celda hora a hora (modelo NOCT — igual que modelo simple) ─
+    # ── Temperatura de celda hora a hora (modelo NOCT + k_BIPV confinamiento) ──
     try:
         NOCT = float(panel.get("NOCT") or 45.0)
         if not (20.0 < NOCT < 100.0):
             NOCT = 45.0
     except (TypeError, ValueError):
         NOCT = 45.0
-    T_cel = T_amb + (NOCT - 20.0) / 800.0 * G_eff
+    # k_bipv eleva la temperatura de celda en fachadas con ventilación restringida
+    T_cel = temperatura_celda_noct(G_eff, T_amb, NOCT=NOCT, k_bipv=k_bipv)
 
     # ── Pmp por módulo desde la curva IV real (vectorizado) ───────────────────
     pmp_mod = _pmp_iv_vectorizado(G_eff, T_cel, panel)

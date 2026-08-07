@@ -244,7 +244,12 @@ with col1:
             "recurso_solar_ok", "tmy_df", "poa_df", "tmy_ciudad",
             "tilt_fachada", "azimuth_fachada", "orientacion_label",
             "poa_anual_kWh_m2", "ghi_anual_kWh_m2", "t_media_anual",
-            "zona_geo_coords", "poa_efectiva_df",
+            "zona_geo_coords", "poa_efectiva_df", "poa_sin_termico_df",
+            "motor_optico_ok", "motor_optico_result_df", "motor_optico_summary",
+            "poa_efectiva_anual_kWh_m2",
+            "motor_optico_b0", "motor_optico_tau", "motor_optico_k_bipv",
+            "motor_optico_noct", "motor_optico_coef_temp", "motor_optico_f_iam_dif",
+            "motor_optico_k_soil_vert",
             "_solar_lat_guardada", "_solar_lon_guardada", "_solar_alt_guardada",
         )
         for _k in _KEYS_LIMPIAR_CIUDAD:
