@@ -157,6 +157,18 @@ tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))
 # TRM disponible desde el inicio (se actualiza en Sección 2)
 tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))
 
+# ── Balance energético con batería (Página 11) ─────────────────────────────
+_balance_metricas = st.session_state.get("balance_metricas", {}) or {}
+_bateria_dim      = st.session_state.get("bateria_dim", {}) or {}
+_e_autoconsumo    = float(_balance_metricas.get("E_autoconsumo_anual_kWh", 0.0))
+_capex_bat_usd    = float(_bateria_dim.get("costo_total_usd", 0.0))
+_balance_activo   = _e_autoconsumo > 0
+
+# Energía usada en el análisis financiero: autoconsumo total (solar directo +
+# descarga batería) cuando el Balance Energético fue calculado en Página 11;
+# de lo contrario se usa E_ac solar puro (sin storage).
+e_financiero = _e_autoconsumo if _balance_activo else e_ac
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # PANEL PREVIO — Consumo vs Producción estimada
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -496,6 +508,26 @@ with col_cx2:
     c3.metric("Costo módulo",   f"USD {capex_total/n_pan:,.0f}/módulo" if n_pan > 0 else "—",
               delta=f"$ {capex_total*tipo_cambio/n_pan:,.0f} COP/módulo" if n_pan > 0 else None,
               delta_color="off")
+
+# ── Sumar CAPEX de baterías dimensionadas en Página 11 ───────────────────────
+_capex_solar_usd = capex_total          # guardar para la comparativa con/sin batería
+if _capex_bat_usd > 0:
+    capex_total += _capex_bat_usd
+    st.info(
+        f"🔋 **Batería incluida en el CAPEX financiero:** "
+        f"sistema solar **USD {_capex_solar_usd:,.0f}** + baterías "
+        f"**USD {_capex_bat_usd:,.0f}** = **USD {capex_total:,.0f}** total. "
+        f"El flujo de caja usa el autoconsumo total (solar directo + descarga batería): "
+        f"**{_e_autoconsumo:,.0f} kWh/año** vs E_ac solar puro {e_ac:,.0f} kWh/año. "
+        f"Completa la Página 11 (🔋 Baterías y Balance) para actualizar estos valores."
+    )
+elif _balance_activo:
+    st.info(
+        f"🔋 **Balance energético activo (sin CAPEX de batería):** "
+        f"usando autoconsumo total **{_e_autoconsumo:,.0f} kWh/año** "
+        f"(directo + batería) como base del flujo de caja. "
+        f"Dimensiona la batería en Página 11 para incluir su CAPEX aquí."
+    )
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 2 — TARIFA Y PARÁMETROS OPERATIVOS
@@ -967,13 +999,13 @@ btn_fin = st.button(
 if btn_fin or st.session_state.get("financiero_ok"):
 
     # ── E_ac P90 ──────────────────────────────────────────────────────────────
-    e_ac_p90 = e_ac * (1.0 - factor_p90 / 100.0)
+    e_ac_p90 = e_financiero * (1.0 - factor_p90 / 100.0)
 
     if btn_fin:
-        # Escenario P50 (base)
+        # Escenario P50 (base) — usa e_financiero (autoconsumo total si hay batería)
         comp = comparativo_ley_1715(
             capex_usd         = capex_total,
-            e_ac_kWh_anual    = e_ac,
+            e_ac_kWh_anual    = e_financiero,
             tarifa_cop_kWh    = tarifa_cop,
             tipo_cambio       = tipo_cambio,
             tasa_descuento    = tasa_desc / 100,
@@ -1022,8 +1054,13 @@ if btn_fin or st.session_state.get("financiero_ok"):
 
     # ── Tabla comparativa: Sin Ley 1715 | Con Ley 1715 (P50) | Con Ley 1715 (P90) ──
     st.subheader("⚖️ Comparativo sin / con Ley 1715  ·  P50 vs P90")
+    _e_label = (
+        f"autoconsumo total {e_financiero:,.0f} kWh/año (solar + batería)"
+        if _balance_activo
+        else f"E_ac solar {e_financiero:,.0f} kWh/año"
+    )
     st.caption(
-        f"**P50** = producción esperada ({e_ac:,.0f} kWh/año) · "
+        f"**P50** = producción esperada ({_e_label}) · "
         f"**P90** = escenario conservador banco ({e_ac_p90:,.0f} kWh/año, "
         f"−{factor_p90:.1f}%) · "
         f"CAPEX igual en ambos escenarios"
@@ -1138,6 +1175,92 @@ if btn_fin or st.session_state.get("financiero_ok"):
         c6.metric("LCOE P50", f"{m_con['lcoe_cop_kWh']:.0f} COP/kWh  ·  USD {m_con['lcoe_usd_kWh']:.4f}",
                   delta=f"Tarifa: {tarifa_cop:.0f} COP/kWh", delta_color="off")
 
+    # ── Delta Con batería vs Sin batería ──────────────────────────────────────
+    if _balance_activo and (_capex_bat_usd > 0 or _e_autoconsumo != e_ac):
+        # Escenario de referencia: solo solar, sin batería
+        from calculos.financiero import calcular_beneficios_ley_1715 as _cbl1715, comparativo_ley_1715 as _comp1715
+        _ben_sinbat = _cbl1715(
+            capex_usd       = _capex_solar_usd,
+            fraccion_equipo = fraccion_equipos,
+            tasa_renta      = tasa_renta / 100,
+            tipo_cambio     = tipo_cambio,
+            tasa_descuento  = tasa_desc / 100,
+        )
+        _comp_sinbat = _comp1715(
+            capex_usd        = _capex_solar_usd,
+            e_ac_kWh_anual   = e_ac,
+            tarifa_cop_kWh   = tarifa_cop,
+            tipo_cambio      = tipo_cambio,
+            tasa_descuento   = tasa_desc / 100,
+            tasa_escalacion  = esc_tarifa,
+            tasa_degradacion = tasa_deg,
+            opex_pct         = opex_pct,
+            n_anos           = n_anos,
+            beneficios_1715  = _ben_sinbat,
+            tasa_escalacion_opex = esc_opex,
+        )
+        _m_sinbat = _comp_sinbat["con"]["metricas"]
+
+        st.divider()
+        st.subheader("🔋 Impacto de la batería en la rentabilidad")
+        st.caption(
+            "Comparativo entre el sistema **sin batería** (solo solar, E_ac pura) "
+            "y **con batería** (autoconsumo total = solar directo + descarga nocturna). "
+            f"Batería: CAPEX **USD {_capex_bat_usd:,.0f}** · "
+            f"Energía adicional: **{_e_autoconsumo - e_ac:+,.0f} kWh/año**."
+        )
+        _cb1, _cb2, _cb3 = st.columns(3)
+        _pb_sinbat = _m_sinbat.get("payback_simple")
+        _pb_conbat = m_con.get("payback_simple")
+        _tir_sinbat = _m_sinbat.get("tir_pct")
+        _tir_conbat = m_con.get("tir_pct")
+        _vpn_sinbat = _m_sinbat.get("vpn_usd", 0)
+        _vpn_conbat = m_con.get("vpn_usd", 0)
+
+        _cb1.metric(
+            "Payback — Sin batería",
+            f"{_pb_sinbat:.1f} años" if _pb_sinbat else "> horizonte",
+            delta=None,
+            delta_color="off",
+        )
+        _cb2.metric(
+            "Payback — Con batería",
+            f"{_pb_conbat:.1f} años" if _pb_conbat else "> horizonte",
+            delta=(
+                f"{(_pb_conbat or n_anos) - (_pb_sinbat or n_anos):+.1f} años vs sin batería"
+                if _pb_conbat and _pb_sinbat else ""
+            ),
+            delta_color="inverse" if (_pb_conbat and _pb_sinbat and _pb_conbat > _pb_sinbat) else "normal",
+        )
+        _cb3.metric(
+            "Δ TIR (con − sin batería)",
+            f"{(_tir_conbat or 0) - (_tir_sinbat or 0):+.1f} pp",
+            delta=(
+                f"Con bat.: {_tir_conbat:.1f}%  ·  Sin bat.: {_tir_sinbat:.1f}%"
+                if _tir_conbat and _tir_sinbat else "—"
+            ),
+            delta_color="normal" if (_tir_conbat and _tir_sinbat and _tir_conbat >= _tir_sinbat) else "inverse",
+        )
+        _cb4, _cb5, _cb6 = st.columns(3)
+        _cb4.metric(
+            "VPN — Sin batería (USD)",
+            f"{_vpn_sinbat:,.0f}",
+            delta="✅ Positivo" if _vpn_sinbat > 0 else "❌ Negativo",
+            delta_color="normal" if _vpn_sinbat > 0 else "inverse",
+        )
+        _cb5.metric(
+            "VPN — Con batería (USD)",
+            f"{_vpn_conbat:,.0f}",
+            delta=f"Δ {_vpn_conbat - _vpn_sinbat:+,.0f} USD vs sin batería",
+            delta_color="normal" if _vpn_conbat >= _vpn_sinbat else "inverse",
+        )
+        _cb6.metric(
+            "Autoconsumo extra (batería)",
+            f"{max(_e_autoconsumo - e_ac, 0):,.0f} kWh/año",
+            delta=f"CAPEX batería: USD {_capex_bat_usd:,.0f}",
+            delta_color="off",
+        )
+
     # ── Gráfica flujo de caja acumulado con banda P50–P90 ────────────────────
     st.subheader("💵 Flujo de caja acumulado (USD)  —  banda P50 / P90")
 
@@ -1251,13 +1374,19 @@ if btn_fin or st.session_state.get("financiero_ok"):
 
     # ── Tabla de beneficios Ley 1715 ─────────────────────────────────────────
     with st.expander("📜 Detalle Ley 1715 — base de cálculo"):
+        _bat_row = (
+            f"| **Baterías** (Art. 14) | Dep. acelerada 5 años | CAPEX bat. {_capex_bat_usd:,.0f} USD | "
+            f"**{_capex_bat_usd * 0.50 * (tasa_renta/100):,.0f}*** | "
+            f"**$ {_capex_bat_usd * 0.50 * (tasa_renta/100) * tipo_cambio/1e6:.2f} M*** |\n"
+            if _capex_bat_usd > 0 else ""
+        )
         st.markdown(f"""
 | Beneficio | Base | Cálculo | USD | COP |
 |---|---|---|---|---|
 | **Art. 11** Deducción renta | 50% × CAPEX × tasa_renta | 0.50 × {capex_total:,.0f} × {tasa_renta/100:.2f} | **{ben['ahorro_renta_usd']:,.0f}** | **$ {ben['ahorro_renta_usd']*tipo_cambio/1e6:.2f} M** |
 | **Art. 12** Exclusión IVA | 19% × CAPEX_equipos | 0.19 × {capex_total*fraccion_equipos:,.0f} | **{ben['ahorro_iva_usd']:,.0f}** | **$ {ben['ahorro_iva_usd']*tipo_cambio/1e6:.2f} M** |
 | **Art. 14** Dep. acelerada | VPN diferencial 5yr vs 10yr | — | **{ben['ahorro_dep_vpn_usd']:,.0f}** | **$ {ben['ahorro_dep_vpn_usd']*tipo_cambio/1e6:.2f} M** |
-| **Total Ley 1715** | — | — | **{ben['total_usd']:,.0f}** | **$ {ben['total_usd']*tipo_cambio/1e6:.2f} M** |
+{_bat_row}| **Total Ley 1715** | — | — | **{ben['total_usd']:,.0f}** | **$ {ben['total_usd']*tipo_cambio/1e6:.2f} M** |
 | **CAPEX neto** | CAPEX − Ley 1715 | {capex_total:,.0f} − {ben['total_usd']:,.0f} | **{ben['capex_neto_usd']:,.0f}** | **$ {ben['capex_neto_usd']*tipo_cambio/1e6:.2f} M** |
         """)
         st.caption(
@@ -1285,7 +1414,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
             try:
                 _c = comparativo_ley_1715(
                     capex_usd        = capex_total,
-                    e_ac_kWh_anual   = e_ac,
+                    e_ac_kWh_anual   = e_financiero,
                     tarifa_cop_kWh   = float(t_cop),
                     tipo_cambio      = tipo_cambio,
                     tasa_descuento   = tasa_desc / 100,
@@ -1319,7 +1448,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
                     "Escenario":             _nm,
                     "COP/kWh":               _tc,
                     "USD/kWh":               round(_tc / tipo_cambio, 4),
-                    "Ingreso año 1 (USD)":   int(e_ac * _tc / tipo_cambio),
+                    "Ingreso año 1 (USD)":   int(e_financiero * _tc / tipo_cambio),
                     "Payback":               f"{_m2['payback_simple']:.1f} a" if _m2.get("payback_simple") else f">{n_anos}a",
                     "TIR":                   f"{_m2['tir_pct']:.1f}%" if _m2.get("tir_pct") else "—",
                     "VPN a WACC (USD)":      f"{_m2['vpn_usd']:,.0f}",
@@ -1331,7 +1460,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
             "Escenario":             f"⛔ Umbral mínimo (VPN ≈ 0)",
             "COP/kWh":               _t_umbral,
             "USD/kWh":               round(_t_umbral / tipo_cambio, 4),
-            "Ingreso año 1 (USD)":   int(e_ac * _t_umbral / tipo_cambio),
+            "Ingreso año 1 (USD)":   int(e_financiero * _t_umbral / tipo_cambio),
             "Payback":               f"≈{n_anos}a",
             "TIR":                   f"≈{tasa_desc:.0f}% (WACC)",
             "VPN a WACC (USD)":      "≈ 0",
@@ -1402,10 +1531,14 @@ if btn_fin or st.session_state.get("financiero_ok"):
 
     # Guardar para Reporte
     st.session_state["capex_total_usd"]         = capex_total
+    st.session_state["capex_solar_usd"]         = _capex_solar_usd  # sin batería
+    st.session_state["capex_bat_usd_fin"]       = _capex_bat_usd    # batería (0 si no hay)
     st.session_state["ben_1715"]                = ben
     st.session_state["metricas_financiero"]     = m_con
     st.session_state["metricas_financiero_p90"] = m_p90   # para Reporte PDF
     st.session_state["e_ac_p90_kWh"]            = e_ac_p90
+    st.session_state["e_financiero_kWh"]        = e_financiero   # autoconsumo o e_ac puro
+    st.session_state["balance_activo_fin"]      = _balance_activo
     st.session_state["factor_p90_pct"]          = factor_p90
     st.session_state["tarifa_cop_kWh"]          = tarifa_cop   # clave legacy
     st.session_state["tarifa_cop_kwh"]          = tarifa_cop   # clave canónica
