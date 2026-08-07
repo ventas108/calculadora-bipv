@@ -29,7 +29,9 @@ def cargar_catalogo_inversores() -> dict:
 
 
 @st.cache_data(ttl=3600)
-def _cargar_catalogo_inversores_cached(_mtime: float) -> dict:
+def _cargar_catalogo_inversores_cached(mtime: float) -> dict:
+    # OJO: el parámetro NO debe llevar guion bajo inicial — st.cache_data
+    # excluye los args "_x" del hashing y el mtime no invalidaría nada.
     df = pd.read_excel(_EXCEL, sheet_name=_SHEET, header=2)
     df.columns = [str(c).strip() for c in df.columns]
     inversores = {}
@@ -98,7 +100,7 @@ _CAMPOS_CRITICOS_MODELO = ["Vdc_max", "Vmppt_min", "Vmppt_max",
 
 
 @st.cache_data(ttl=3600)
-def diagnostico_catalogo_inversores(_mtime: float = 0.0) -> dict:
+def diagnostico_catalogo_inversores(mtime: float = 0.0) -> dict:
     """Diagnóstico del catálogo de inversores: hojas, columnas, duplicados.
 
     Nunca lanza — siempre devuelve un dict con 'estado' ("ok"/"parcial"/"error")

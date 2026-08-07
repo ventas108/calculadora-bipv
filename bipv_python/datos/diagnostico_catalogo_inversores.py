@@ -21,7 +21,7 @@ from datos.catalogo_inversores_excel import (   # noqa: E402
 
 
 def main() -> int:
-    d = diagnostico_catalogo_inversores(_mtime=excel_mtime_inv())
+    d = diagnostico_catalogo_inversores(mtime=excel_mtime_inv())
 
     print("═" * 70)
     print("DIAGNÓSTICO — CATÁLOGO DE INVERSORES")

@@ -69,7 +69,7 @@ from datos.catalogo_inversores_excel import (
     excel_mtime_inv as _mtime_inv,
     cargar_catalogo_inversores as _cargar_cat_inv,
 )
-_diag_inv = _diag_inv_fn(_mtime=_mtime_inv())
+_diag_inv = _diag_inv_fn(mtime=_mtime_inv())
 if _diag_inv["estado"] == "error":
     st.error(
         f"🔴 **Catálogo de inversores con problemas** — "
