@@ -5,6 +5,9 @@ from datetime import date, datetime
 from calculos.trm_utils import init_trm, trm_widget
 
 
+from calculos import presupuesto_store as pstore
+
+
 def _marcar_fuente_capex(fuente: str) -> None:
     """Registra la FUENTE activa del CAPEX y la marca de tiempo de la última
     escritura de ``presupuesto_capex_usd`` en session_state.
@@ -46,6 +49,14 @@ with st.expander("📋 Encabezado del presupuesto", expanded=False):
 
 # ── TRM sincronizada — widget compartido con Financiero ──────────────────────
 tc = trm_widget("ppto")
+
+# ── #89 — Pestaña nueva / recarga: restaurar kWp y N_paneles desde disco ─────
+# para que la Estimación Rápida no arranque con defaults falsos.
+if not st.session_state.get("produccion_ok"):
+    from calculos.persistencia_resultados import restaurar_resultados_produccion
+    if restaurar_resultados_produccion(st.session_state):
+        st.info("📂 **Datos restaurados del proyecto guardado** (kWp y n.º de paneles "
+                "de la última simulación de Producción).", icon="📂")
 
 n_pan   = int(st.session_state.get("N_paneles_final", 0))
 p_stc   = float(st.session_state.get("P_stc_kW_sistema", 0.0))
@@ -186,11 +197,22 @@ def _plantilla_con_activo(key, inyectar=None):
 # ── Editor genérico con persistencia + fuente de precios ─────────────────────
 def _editar_seccion(key, label, inyectar=None, referencia_mercado=""):
     ss_key = f"df_sec_{key}"
+    _persistible = key in pstore.SECCIONES_PERSISTIBLES
 
     col_r, col_f = st.columns([2, 4])
-    if col_r.button(f"↺ Resetear '{label}'", key=f"reset_{key}"):
+    if col_r.button(f"↺ Resetear '{label}'", key=f"reset_{key}",
+                    help="Vuelve a la plantilla original y descarta lo guardado en disco."):
         st.session_state.pop(ss_key, None)
+        if _persistible:
+            pstore.borrar_seccion(key)   # #114 — descartar también lo guardado
         st.rerun()
+
+    # ── #114 — Restaurar fuente guardada en disco (antes del widget) ─────────
+    if _persistible and f"fuente_{key}" not in st.session_state:
+        _filas_g, _fuente_g = pstore.cargar_seccion(key)
+        if _fuente_g:
+            st.session_state[f"fuente_inp_{key}"] = _fuente_g
+
     fuente = col_f.text_input(
         "Fuente de precios / cotización",
         value=st.session_state.get(f"fuente_{key}", ""),
@@ -203,7 +225,22 @@ def _editar_seccion(key, label, inyectar=None, referencia_mercado=""):
         st.caption(f"📎 Fuente: {fuente}")
 
     if ss_key not in st.session_state:
-        st.session_state[ss_key] = _plantilla_con_activo(key, inyectar)
+        # ── #114 — Preferir la versión guardada en disco sobre la plantilla ──
+        _restaurado = False
+        if _persistible:
+            _filas_g, _fuente_g = pstore.cargar_seccion(key)
+            if _filas_g:
+                try:
+                    _df_g = pd.DataFrame(_filas_g)
+                    if "Descripcion" in _df_g.columns:
+                        st.session_state[ss_key] = _df_g
+                        _restaurado = True
+                        st.caption("📂 Tabla restaurada de la última edición guardada "
+                                   "— usa ↺ Resetear para volver a la plantilla.")
+                except Exception:
+                    pass   # archivo raro → caer a la plantilla
+        if not _restaurado:
+            st.session_state[ss_key] = _plantilla_con_activo(key, inyectar)
 
     df_actual = st.session_state[ss_key].copy()
     if "Activo" not in df_actual.columns:
@@ -231,6 +268,14 @@ def _editar_seccion(key, label, inyectar=None, referencia_mercado=""):
     edited["Total USD"] = (edited["Cantidad"] * edited["USD_un"]).round(2)
     if not edited.equals(st.session_state[ss_key]):
         st.session_state[ss_key] = edited
+        # ── #114 — Persistir a disco en el mismo rerun del cambio ────────────
+        if _persistible and not pstore.guardar_seccion(
+                key, edited.to_dict("records"), fuente):
+            st.caption("⚠️ No se pudo guardar la tabla en disco (permisos/espacio).")
+    elif _persistible and fuente != st.session_state.get(f"_fuente_persistida_{key}"):
+        # La fuente cambió sin cambiar filas → persistirla también
+        pstore.guardar_seccion(key, edited.to_dict("records"), fuente)
+        st.session_state[f"_fuente_persistida_{key}"] = fuente
 
     activos  = edited["Activo"].fillna(False).astype(bool)
     total    = float((edited.loc[activos,  "Cantidad"] * edited.loc[activos,  "USD_un"]).sum())

@@ -125,3 +125,4 @@ attached_assets/Pasted--venv-root-bipv-colombia-var-www-bipv-calculadora-bipv-_1
 bipv_python/datos/usuarios.db*
 bipv_python/datos/codigo_configuracion.txt
 bipv_python/datos/config_pagos.json
+bipv_python/datos/presupuesto_guardado.json

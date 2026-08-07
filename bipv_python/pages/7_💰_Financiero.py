@@ -33,6 +33,18 @@ st.caption(
 
 # ── Prerequisitos ─────────────────────────────────────────────────────────────
 prod_ok = st.session_state.get("produccion_ok", False)
+
+# ── #89 — Pestaña nueva / recarga: restaurar resultados de Producción ────────
+# desde disco para NO caer al modo manual con defaults de prueba.
+if not prod_ok:
+    from calculos.persistencia_resultados import restaurar_resultados_produccion
+    if restaurar_resultados_produccion(st.session_state):
+        st.info(
+            "📂 **Datos restaurados del proyecto guardado** — esta pestaña no tenía "
+            "los resultados de Producción en memoria, así que se recuperaron del "
+            "disco. Si cambiaste el proyecto, re-ejecuta 📊 Producción.",
+            icon="📂",
+        )
 # Fallback: Producción > Dimensionamiento > 0  (nunca usar defaults de prueba hardcodeados)
 p_stc   = (st.session_state.get("P_stc_kW_sistema")
            or st.session_state.get("P_dc_stc_kW_dim", 0.0))

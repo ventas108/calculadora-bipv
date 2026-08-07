@@ -254,6 +254,10 @@ with col1:
         )
         for _k in _KEYS_LIMPIAR_CIUDAD:
             st.session_state.pop(_k, None)
+        # #89 — borrar también los resultados de Producción persistidos a disco:
+        # si sobreviven, Financiero los "restauraría" con el sol de otra ciudad.
+        from calculos.persistencia_resultados import limpiar_resultados_produccion
+        limpiar_resultados_produccion()
         st.rerun()  # Re-render limpio para evitar DOM error al cambiar ciudad
 
     # ── Tipo de instalación — key= para que Streamlit maneje el estado ────────
@@ -351,7 +355,13 @@ with col1:
 
     if modo_key == "consumo":
         st.subheader("Consumo / Factura")
-        entrada = st.radio("Ingresar por:", ["Factura COP", "Consumo kWh/mes"], horizontal=True)
+        # ── #94 — Recordar también el modo de entrada entre sesiones ─────────
+        # (el valor guardado en consumo_cache.json ya llegó a session_state vía
+        # _cargar_proyecto; sanear por si el archivo trae un valor inválido)
+        if st.session_state.get("entrada_consumo") not in ("Factura COP", "Consumo kWh/mes"):
+            st.session_state.pop("entrada_consumo", None)
+        entrada = st.radio("Ingresar por:", ["Factura COP", "Consumo kWh/mes"],
+                           horizontal=True, key="entrada_consumo")
         if entrada == "Factura COP":
             factura_cop = st.number_input("Factura mensual (COP)",
                                           min_value=0.0,
@@ -618,6 +628,8 @@ with col2:
                     "cobertura_pct":   cobertura_pct,
                     "modo_calculo":    "consumo",
                     "tarifa_cop_kwh":  tarifa_kwh,
+                    # #94 — recordar si el usuario entra por factura o por kWh
+                    "entrada_consumo": entrada,
                 }
                 _consumo_path = os.path.join(_DIR_DATOS, "consumo_cache.json")
                 _prev_c: dict = {}
@@ -687,6 +699,9 @@ if st.button("💾 Guardar configuración", type="primary"):
         )
         for _k64 in _CADENA_SOLAR_KEYS:
             st.session_state.pop(_k64, None)
+        # #89 — invalidar también los resultados persistidos a disco
+        from calculos.persistencia_resultados import limpiar_resultados_produccion
+        limpiar_resultados_produccion()
         st.warning(
             "⚠️ **Las coordenadas del proyecto cambiaron** — se invalidaron el recurso "
             "solar y todos los resultados derivados (producción, bypass, multi-superficie). "

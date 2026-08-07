@@ -663,6 +663,14 @@ if btn_sim or st.session_state.get("produccion_ok"):
     st.session_state["df_mensual_produccion"] = df_m   # para Página 11 Balance
     st.session_state["produccion_ok"]       = True
 
+    # ── #89 — Persistir resultados clave a disco: sobreviven a pestañas ──────
+    # nuevas y reinicios de PM2 para que Financiero/Presupuesto no caigan al
+    # modo manual con defaults falsos.
+    from calculos.persistencia_resultados import guardar_resultados_produccion
+    if not guardar_resultados_produccion(st.session_state):
+        st.caption("⚠️ No se pudieron persistir los resultados a disco — "
+                   "otra pestaña podría no verlos tras recargar.")
+
     # ══════════════════════════════════════════════════════════════════════════
     # SECCIÓN — DIAGNÓSTICO IEC 61724: PR CONVENCIONAL Y PR CORREGIDO POR T°
     # ══════════════════════════════════════════════════════════════════════════
