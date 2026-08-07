@@ -482,8 +482,9 @@ with tab1:
             # ── #133 — Diff antes de sobreescribir un modelo existente ────────
             # Subir el PDF de un modelo ya catalogado no debe pisar datos buenos
             # en silencio: primera pulsación muestra el diff campo a campo;
-            # la segunda (mismo modelo) confirma y guarda.
-            _existente = obtener_inversor_excel(modelo_val.strip())
+            # la segunda (con el MISMO payload) confirma y guarda.
+            from datos.catalogo_inversores_excel import obtener_inversor_excel as _obt_inv
+            _existente = _obt_inv(modelo_val.strip())
             _mapa_diff = {
                 "Vdc_max": Vdc_max_val, "V_arranque": V_arranque_val,
                 "Vmppt_min": Vmppt_min_val, "Vmppt_max": Vmppt_max_val,
@@ -492,6 +493,13 @@ with tab1:
                 "Isc_max_tracker": Isc_max_val, "P_dc_max_W": P_dc_val,
                 "bat_voltaje_min": bat_min_val, "bat_voltaje_max": bat_max_val,
                 "costo_usd": costo_val,
+            }
+            # Auditoría: también los campos NO numéricos que el guardado pisa
+            _mapa_diff_txt = {
+                "marca":        ("Marca",        marca_val.strip()),
+                "arquitectura": ("Arquitectura", arch_val),
+                "es_hibrido":   ("Inversor híbrido", "Si" if es_hibrido_val else "No"),
+                "notas":        ("Notas",        notas_val.strip()),
             }
             _cambios = []
             if _existente:
@@ -505,9 +513,26 @@ with tab1:
                             "Valor actual (catálogo)": "—" if not _va_n else f"{_va_n:g}",
                             "Valor nuevo (este PDF)":  "—" if not _nv_n else f"{_nv_n:g}",
                         })
-            _confirm_key = st.session_state.get("_inv_confirm_overwrite")
-            if _existente and _cambios and _confirm_key != modelo_val.strip():
-                st.session_state["_inv_confirm_overwrite"] = modelo_val.strip()
+                for _c, (_lbl_t, _nv_t) in _mapa_diff_txt.items():
+                    _va_t = _existente.get(_c)
+                    if _c == "es_hibrido":
+                        _va_t = "Si" if _va_t else "No"
+                    _va_t = str(_va_t or "").strip()
+                    if _va_t != str(_nv_t or "").strip():
+                        _cambios.append({
+                            "Campo": _lbl_t,
+                            "Valor actual (catálogo)": _va_t or "—",
+                            "Valor nuevo (este PDF)":  str(_nv_t or "").strip() or "—",
+                        })
+            # Auditoría: la confirmación se liga a una huella del payload
+            # completo (modelo + todos los valores). Si CUALQUIER dato cambia
+            # entre la primera y la segunda pulsación, se vuelve a pedir
+            # confirmación con el diff nuevo — el flag nunca queda "pegado".
+            import hashlib as _hl
+            _huella = _hl.sha256(repr(sorted(_row.items())).encode()).hexdigest()
+            _confirm_key = st.session_state.pop("_inv_confirm_overwrite", None)
+            if _existente and _cambios and _confirm_key != _huella:
+                st.session_state["_inv_confirm_overwrite"] = _huella
                 st.warning(
                     f"⚠️ **{modelo_val.strip()}** ya existe en el catálogo y "
                     f"{len(_cambios)} campo(s) cambiarían. Revisa el diff: "
