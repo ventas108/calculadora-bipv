@@ -67,8 +67,12 @@ elif _iv_adv:
 # El catálogo Excel trae Confianza="Media" cuando las dimensiones físicas del
 # panel son aproximadas (no confirmadas con ficha del fabricante). El área y el
 # número de paneles calculados heredan ese margen de error.
-_confianza_panel = str(panel.get("confianza", "")).strip().lower()
-if _confianza_panel and _confianza_panel != "alta":
+# Auditoría: el catálogo mezcla 'Alta'/'high'/'Alta — ficha oficial…' con
+# 'Media'/'medium'. Solo se avisa cuando la confianza declarada es media/baja;
+# valores vacíos, 'nan' (celda vacía de pandas) o desconocidos NO disparan.
+_confianza_panel = str(panel.get("confianza", "") or "").strip().lower()
+_es_estimado = _confianza_panel.startswith(("media", "medium", "baja", "low"))
+if _es_estimado:
     st.warning(
         f"ℹ️ **Datos estimados** — la confianza del catálogo para "
         f"**{panel_nombre}** es *{panel.get('confianza')}*: sus dimensiones "
