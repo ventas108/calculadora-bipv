@@ -123,6 +123,19 @@ with col2:
     with col_nm2:
         N_max_scan = st.number_input("N máximo a explorar", value=int(st.session_state.get("N_max_scan", 20)), min_value=2, max_value=40, key="N_max_scan")
 
+# ── Banner Motor Óptico ───────────────────────────────────────────────────────
+_motor_ok_dim   = st.session_state.get("motor_optico_ok", False)
+_mo_summary_dim = st.session_state.get("motor_optico_summary", {})
+if _motor_ok_dim:
+    _poa_ef_anual = st.session_state.get("poa_efectiva_anual_kWh_m2", 0.0)
+    _factor_mo    = _mo_summary_dim.get("factor_global", 1.0)
+    st.info(
+        f"🔆 **Motor Óptico activo** — POA efectiva: **{_poa_ef_anual:,.0f} kWh/m²/año** "
+        f"(factor global **{_factor_mo*100:.1f}%** = IAM + Soiling + Térmico).  \n"
+        "El dimensionamiento eléctrico no depende de la POA; la corrección óptica se aplica "
+        "automáticamente en 📊 **Producción** al simular."
+    )
+
 # Caption estable de temperaturas (siempre presente → evita removeChild de React)
 _tmy_applied = st.session_state.get("_dim_tmy_ciudad_ref", "")
 if _tmy_applied:
