@@ -2095,6 +2095,33 @@ with tab_solar:
                         hovertemplate=f"<b>{lbl}</b><br>Az:%{{x:.1f}}° El:%{{y:.1f}}°<extra></extra>",
                     ))
 
+            # ── #183 — Horas locales visibles sobre las curvas (líneas iso-hora) ──
+            # El diagrama queda autoexplicativo sin necesidad de hacer hover: cada
+            # línea punteada gris conecta la misma hora local a través de los meses.
+            if not _sp_m.empty:
+                _sp_h = _sp_m.copy()
+                _sp_h["hora_loc"] = (_sp_h.index.hour + _utc_off) % 24
+                for _hl in range(7, 18):
+                    _gh = _sp_h[(_sp_h["hora_loc"] == _hl)
+                                & (_sp_h["apparent_elevation"] > 0)]
+                    if len(_gh) < 2:
+                        continue
+                    _gh = _gh.sort_values("mes")
+                    _fig_sp.add_trace(go.Scatter(
+                        x=_gh["azimuth"], y=_gh["apparent_elevation"],
+                        mode="lines",
+                        line=dict(color="rgba(90,90,90,0.30)", width=1, dash="dot"),
+                        showlegend=False, hoverinfo="skip",
+                    ))
+                    _top_h = _gh.loc[_gh["apparent_elevation"].idxmax()]
+                    _fig_sp.add_annotation(
+                        x=float(_top_h["azimuth"]),
+                        y=min(float(_top_h["apparent_elevation"]) + 3.5, 89.0),
+                        text=f"<b>{_hl:02d}:00</b>", showarrow=False,
+                        font=dict(size=9, color="#555"),
+                        bgcolor="rgba(255,255,255,0.6)",
+                    )
+
             _fig_sp.update_layout(
                 height=460,
                 xaxis=dict(
@@ -2234,25 +2261,70 @@ with tab_solar:
                     .reindex(range(1, 13), fill_value=_np.nan)
                 )
 
-                _bar_colors = []
-                for _v in _aoi_mensual.values:
-                    if _np.isnan(_v):
-                        _bar_colors.append("lightgray")
-                    elif _v < 40:
-                        _bar_colors.append("#2ecc71")   # verde
-                    elif _v < 60:
-                        _bar_colors.append("#f39c12")   # naranja
-                    else:
-                        _bar_colors.append("#e74c3c")   # rojo
+                def _colores_aoi(_vals):
+                    _cs = []
+                    for _v in _vals:
+                        if _np.isnan(_v):   _cs.append("lightgray")
+                        elif _v < 40:       _cs.append("#2ecc71")   # verde
+                        elif _v < 60:       _cs.append("#f39c12")   # naranja
+                        else:               _cs.append("#e74c3c")   # rojo
+                    return _cs
 
-                _fig_aoi = go.Figure(go.Bar(
-                    x=_MESES_SOL,
-                    y=_aoi_mensual.values,
-                    marker_color=_bar_colors,
-                    text=[f"{_v:.1f}°" if not _np.isnan(_v) else "–" for _v in _aoi_mensual.values],
-                    textposition="outside",
-                    hovertemplate="<b>%{x}</b><br>AOI promedio: <b>%{y:.1f}°</b><extra></extra>",
-                ))
+                _bar_colors = _colores_aoi(_aoi_mensual.values)
+
+                # ── #184 — Comparar el AOI mensual entre superficies del proyecto ──
+                def _aoi_mensual_de(_tilt_c, _az_c):
+                    _aoi_c  = _pv_hm.irradiance.aoi(
+                        surface_tilt=float(_tilt_c), surface_azimuth=float(_az_c),
+                        solar_zenith=_spw["apparent_zenith"], solar_azimuth=_spw["azimuth"])
+                    _dia_c  = _spw["apparent_elevation"] > 0.5
+                    _somb_c = _dia_c & (_spw["apparent_elevation"] <= _spw["el_hz"])
+                    _prod_c = _dia_c & (~_somb_c) & (_aoi_c < 90.0)
+                    return (_aoi_c[_prod_c].groupby(_spw.loc[_prod_c, "mes"]).mean()
+                            .reindex(range(1, 13), fill_value=_np.nan))
+
+                _sups_aoi = [s for s in st.session_state.get("superficies_bipv", [])
+                             if s.get("activa", True)]
+                _cmp_sel = []
+                if len(_sups_aoi) > 1:
+                    _cmp_sel = st.multiselect(
+                        "Comparar superficies (AOI mensual en la misma gráfica)",
+                        [s["nombre"] for s in _sups_aoi],
+                        default=[_sup_hm.get("nombre")]
+                        if _sup_hm.get("nombre") in [s["nombre"] for s in _sups_aoi] else [],
+                        key="aoi_cmp_sups",
+                        help="Elige 2+ superficies para decidir qué orientación priorizar. "
+                             "El color de cada barra mantiene el semáforo verde/naranja/rojo por valor.",
+                    )
+
+                if len(_cmp_sel) > 1:
+                    _fig_aoi = go.Figure()
+                    for _sc in _sups_aoi:
+                        if _sc["nombre"] not in _cmp_sel:
+                            continue
+                        _serie_c = _aoi_mensual_de(_sc.get("tilt_deg", tilt),
+                                                   _sc.get("azimuth_deg", azimuth))
+                        _fig_aoi.add_trace(go.Bar(
+                            x=_MESES_SOL, y=_serie_c.values,
+                            name=(f"{TIPOS_SUPERFICIE.get(_sc.get('tipo','Fachada'),{}).get('icon','')} "
+                                  f"{_sc['nombre']} (az={float(_sc.get('azimuth_deg',0)):.0f}°)"),
+                            marker_color=_colores_aoi(_serie_c.values),
+                            marker_line=dict(color=color_tipo(_sc.get("tipo", "Fachada")), width=1.5),
+                            hovertemplate=(f"<b>{_sc['nombre']}</b> · %{{x}}<br>"
+                                           "AOI promedio: <b>%{y:.1f}°</b><extra></extra>"),
+                        ))
+                    _fig_aoi.update_layout(barmode="group")
+                    st.caption("El borde de cada barra identifica la superficie; el relleno "
+                               "mantiene el semáforo por valor (verde < 40°, naranja < 60°, rojo ≥ 60°).")
+                else:
+                    _fig_aoi = go.Figure(go.Bar(
+                        x=_MESES_SOL,
+                        y=_aoi_mensual.values,
+                        marker_color=_bar_colors,
+                        text=[f"{_v:.1f}°" if not _np.isnan(_v) else "–" for _v in _aoi_mensual.values],
+                        textposition="outside",
+                        hovertemplate="<b>%{x}</b><br>AOI promedio: <b>%{y:.1f}°</b><extra></extra>",
+                    ))
                 _fig_aoi.add_hline(
                     y=60, line_dash="dot", line_color="#e74c3c", line_width=1.5,
                     annotation_text="60° — límite aceptable",
@@ -2299,6 +2371,48 @@ with tab_solar:
                         st.info(f"ℹ️ Orientación aceptable — AOI anual promedio **{_aoi_anual:.1f}°**. Ajustar el azimuth hacia el ecuador podría mejorar la captación.")
                     else:
                         st.warning(f"⚠️ AOI alto — **{_aoi_anual:.1f}°** promedio anual. La fachada no está bien orientada respecto al sol; considera girarla hacia el ecuador.")
+
+                    # ── #185 — Azimuth óptimo sugerido según latitud ──────────
+                    # Barrido 0–355° en pasos de 5° con la misma posición solar
+                    # ya calculada: cuánto girar la fachada y cuánto mejoraría.
+                    _dia_o  = _spw["apparent_elevation"] > 0.5
+                    _somb_o = _dia_o & (_spw["apparent_elevation"] <= _spw["el_hz"])
+                    _base_o = _dia_o & (~_somb_o)
+                    _azs_o  = _np.arange(0, 360, 5)
+                    _aoi_barrido = []
+                    for _az_o in _azs_o:
+                        _aoi_o = _pv_hm.irradiance.aoi(
+                            surface_tilt=_tilt_hm, surface_azimuth=float(_az_o),
+                            solar_zenith=_spw["apparent_zenith"],
+                            solar_azimuth=_spw["azimuth"])
+                        _m_o = _base_o & (_aoi_o < 90.0)
+                        _aoi_barrido.append(float(_aoi_o[_m_o].mean())
+                                            if bool(_m_o.any()) else _np.nan)
+                    _aoi_barrido = _np.array(_aoi_barrido)
+                    if _np.isfinite(_aoi_barrido).any():
+                        _i_opt   = int(_np.nanargmin(_aoi_barrido))
+                        _az_opt  = float(_azs_o[_i_opt])
+                        _aoi_opt = float(_aoi_barrido[_i_opt])
+                        _giro    = (_az_opt - _az_hm + 540.0) % 360.0 - 180.0
+                        st.markdown("**🧭 Azimuth óptimo sugerido para esta superficie (tilt actual)**")
+                        _o1, _o2, _o3 = st.columns(3)
+                        _o1.metric("Azimuth óptimo", f"{_az_opt:.0f}°",
+                                   help="Orientación que minimiza el AOI anual promedio "
+                                        "en este sitio, con el mismo tilt y horizonte.")
+                        _o2.metric("AOI mínimo alcanzable", f"{_aoi_opt:.1f}°",
+                                   delta=f"{_aoi_opt - _aoi_anual:+.1f}° vs actual",
+                                   delta_color="inverse")
+                        _o3.metric("Giro sugerido", f"{_giro:+.0f}°",
+                                   help="Positivo = girar hacia el Este del azimuth actual; "
+                                        "negativo = hacia el Oeste. 0° = ya estás en el óptimo.")
+                        if abs(_giro) < 5:
+                            st.caption("✅ El azimuth actual ya está en el óptimo (±5°).")
+                        else:
+                            st.caption(
+                                f"Girando la fachada de {_az_hm:.0f}° a {_az_opt:.0f}° el AOI anual "
+                                f"promedio bajaría de {_aoi_anual:.1f}° a {_aoi_opt:.1f}°. "
+                                "En edificios existentes el azimuth suele ser fijo — usa este dato "
+                                "para priorizar entre fachadas o para pérgolas/marquesinas nuevas.")
 
             else:
                 st.info("\u26a0\ufe0f No se pudo calcular posición solar anual. Verifica pvlib.")
