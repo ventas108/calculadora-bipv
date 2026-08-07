@@ -63,6 +63,21 @@ elif _iv_adv:
             f"— se usarán defaults por tecnología."
         )
 
+# ── #58 — Aviso cuando las especificaciones del panel son estimadas ──────────
+# El catálogo Excel trae Confianza="Media" cuando las dimensiones físicas del
+# panel son aproximadas (no confirmadas con ficha del fabricante). El área y el
+# número de paneles calculados heredan ese margen de error.
+_confianza_panel = str(panel.get("confianza", "")).strip().lower()
+if _confianza_panel and _confianza_panel != "alta":
+    st.warning(
+        f"ℹ️ **Datos estimados** — la confianza del catálogo para "
+        f"**{panel_nombre}** es *{panel.get('confianza')}*: sus dimensiones "
+        f"físicas son aproximadas.  \n"
+        f"Los cálculos de **área y número de paneles** pueden tener margen de "
+        f"error. Confirma las dimensiones exactas con el fabricante antes de "
+        f"cotizar."
+    )
+
 # ── Auto-población de temperaturas desde TMY ──────────────────────────────────
 # Se recalcula SOLO cuando cambia el origen de datos climáticos (nueva ciudad/TMY).
 # Una vez aplicado para una ciudad, el usuario puede editar libremente los campos.
