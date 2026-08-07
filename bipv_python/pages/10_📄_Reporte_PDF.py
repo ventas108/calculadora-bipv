@@ -106,6 +106,123 @@ def _fmt(val, decimals=1, suffix="", fallback="—"):
         return fallback
 
 
+def _waterfall_cascada_svg(bruta, p_iam, p_soil, p_term, efectiva,
+                            color_verde="#1e8449", color_prim="#1a5276"):
+    """
+    Genera un gráfico SVG de cascada óptico-térmica (waterfall).
+    No requiere librerías externas — solo string formatting.
+    """
+    W, H = 680, 300
+    ml, mr, mt, mb = 62, 14, 46, 54
+    chart_w = W - ml - mr
+    chart_h = H - mt - mb
+
+    y_max = bruta * 1.14
+
+    def ypx(v):
+        return mt + chart_h * (1.0 - max(float(v), 0) / y_max)
+
+    n_bars = 5
+    spacing = chart_w / n_bars
+    bw = spacing * 0.52
+
+    def cxi(i):
+        return ml + spacing * i + spacing / 2
+
+    level_after_iam  = bruta - p_iam
+    level_after_soil = level_after_iam - p_soil
+
+    # (bottom, height, color, [label lines], value_str)
+    bars = [
+        (0,               bruta,   color_prim,   ["POA bruta"],          f"{bruta:,.0f}"),
+        (level_after_iam, p_iam,   "#e74c3c",    ["① IAM", "(dir+dif)"], f"−{p_iam:,.0f}"),
+        (level_after_soil, p_soil, "#e74c3c",    ["② Soiling", "(suci.)"], f"−{p_soil:,.0f}"),
+        (efectiva,        p_term,  "#c0392b",    ["③ Térmico", "(BIPV)"],  f"−{p_term:,.1f}"),
+        (0,               efectiva, color_verde, ["POA efectiva", "→ Prod."], f"{efectiva:,.0f}"),
+    ]
+    # Connector landing levels (end of each bar, going left → right)
+    conn_levels = [bruta, level_after_iam, level_after_soil, efectiva]
+
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" '
+        f'width="{W}" height="{H}" style="font-family:Arial,sans-serif;">',
+        f'<rect width="{W}" height="{H}" fill="white" rx="6"/>',
+        f'<text x="{W//2}" y="24" text-anchor="middle" font-size="13" '
+        f'font-weight="bold" fill="{color_prim}">'
+        f'Cascada óptico-térmica BIPV (kWh/m²/año)</text>',
+    ]
+
+    # Grid lines + Y-axis labels
+    for gi in range(6):
+        gv = y_max / 5 * gi
+        gy = ypx(gv)
+        parts.append(
+            f'<line x1="{ml}" y1="{gy:.0f}" x2="{W - mr}" y2="{gy:.0f}" '
+            f'stroke="#ebebeb" stroke-width="1"/>'
+        )
+        parts.append(
+            f'<text x="{ml - 4}" y="{gy + 4:.0f}" text-anchor="end" '
+            f'font-size="9" fill="#888">{gv:,.0f}</text>'
+        )
+
+    # Axis lines
+    parts.append(
+        f'<line x1="{ml}" y1="{mt}" x2="{ml}" y2="{mt + chart_h}" stroke="#ccc" stroke-width="1"/>'
+    )
+    parts.append(
+        f'<line x1="{ml}" y1="{mt + chart_h}" x2="{W - mr}" y2="{mt + chart_h}" '
+        f'stroke="#ccc" stroke-width="1"/>'
+    )
+
+    # Bars
+    for i, (bot, ht, color, label_lines, vstr) in enumerate(bars):
+        x1    = cxi(i) - bw / 2
+        top_y = ypx(bot + ht)
+        bot_y = ypx(bot)
+        bar_h = bot_y - top_y
+
+        # Drop shadow
+        parts.append(
+            f'<rect x="{x1 + 2:.0f}" y="{top_y + 2:.0f}" width="{bw:.0f}" '
+            f'height="{bar_h:.0f}" fill="rgba(0,0,0,0.07)" rx="3"/>'
+        )
+        # Bar body
+        parts.append(
+            f'<rect x="{x1:.0f}" y="{top_y:.0f}" width="{bw:.0f}" '
+            f'height="{bar_h:.0f}" fill="{color}" rx="3"/>'
+        )
+
+        # Value label (above bar; fall inside if too close to top)
+        lbl_y = top_y - 7
+        if lbl_y < mt + 12:
+            lbl_y = top_y + 14
+        parts.append(
+            f'<text x="{cxi(i):.0f}" y="{lbl_y:.0f}" text-anchor="middle" '
+            f'font-size="10" font-weight="bold" fill="{color}">{vstr}</text>'
+        )
+
+        # X-axis labels (multi-line)
+        for li, line in enumerate(label_lines):
+            ly = mt + chart_h + 16 + li * 13
+            parts.append(
+                f'<text x="{cxi(i):.0f}" y="{ly:.0f}" text-anchor="middle" '
+                f'font-size="10" fill="#333">{line}</text>'
+            )
+
+    # Dashed connectors between bars
+    for i, lv in enumerate(conn_levels):
+        x_from = cxi(i) + bw / 2
+        x_to   = cxi(i + 1) - bw / 2
+        ly = ypx(lv)
+        parts.append(
+            f'<line x1="{x_from:.0f}" y1="{ly:.0f}" x2="{x_to:.0f}" y2="{ly:.0f}" '
+            f'stroke="#aaa" stroke-width="1" stroke-dasharray="5,3"/>'
+        )
+
+    parts.append('</svg>')
+    return ''.join(parts)
+
+
 def generar_html_reporte() -> str:
     # Colectar datos de session_state
     ciudad          = st.session_state.get("tmy_ciudad", st.session_state.get("ciudad", "—"))
@@ -341,6 +458,7 @@ def generar_html_reporte() -> str:
         k_bipv   = mo_sum.get("k_bipv","—")
         noct     = mo_sum.get("noct",  "—")
         coef_t   = mo_sum.get("coef_temp", 0) * 100
+        tau_pct  = mo_sum.get("transparencia", 0.0) * 100
         f_global = mo_sum.get("factor_global", 1.0)
         p_iam    = mo_sum.get("perdida_iam_kWh_m2",  0)
         p_soil   = mo_sum.get("perdida_soil_kWh_m2", 0)
@@ -357,13 +475,16 @@ def generar_html_reporte() -> str:
             para el semiconductor BIPV.
         </p>"""
 
+        _tau_row = [("— Transparencia τ", _fmt(tau_pct, 0), "%",
+                     "Fracción de luz que atraviesa el vidrio; 0% = panel opaco. "
+                     "Informacional: ya está incluida en el Isc_stc del catálogo.")]
         html += tabla_kv([
             ("Parámetros usados", "", "", ""),
-            ("— Tipo de vidrio (b₀ ASHRAE)",  _fmt(b0, 3),   "",       "Reflexión del vidrio a ángulos oblicuos"),
-            ("— Montaje / confinamiento (k_BIPV)", str(k_bipv),       "",  "1.0 ventilado · 1.3 confinado · 1.5 sellado"),
-            ("— NOCT",            _fmt(noct, 0),  "°C",      "Temperatura nominal de operación"),
-            ("— Coef. temperatura γ",  _fmt(coef_t, 2), "%/°C",  "Caída de eficiencia por temperatura"),
-        ])
+            ("— Tipo de vidrio (b₀ ASHRAE)",      _fmt(b0, 3),      "",      "Reflexión del vidrio a ángulos oblicuos"),
+            ("— Montaje / confinamiento (k_BIPV)", str(k_bipv),      "",      "1.0 ventilado · 1.3 confinado · 1.5 sellado"),
+            ("— NOCT",                             _fmt(noct, 0),   "°C",    "Temperatura nominal de operación"),
+            ("— Coef. temperatura γ",              _fmt(coef_t, 2), "%/°C",  "Caída de eficiencia por temperatura"),
+        ] + (_tau_row if tau_pct > 0 else []))
 
         html += f"""
         <div style="margin:16px 0;overflow:auto;">
@@ -427,6 +548,15 @@ def generar_html_reporte() -> str:
             </tr>
           </tbody>
         </table>
+        </div>"""
+
+        # ── Gráfico waterfall de la cascada (SVG inline, sin librerías externas) ──
+        html += f"""
+        <div style="margin:20px 0 8px;text-align:center;">
+        {_waterfall_cascada_svg(
+            poa_bruta, p_iam, p_soil, p_term, poa_efectiva,
+            COLOR_VERDE, COLOR_PRIMARIO
+        )}
         </div>"""
 
         html += caja_nota(
