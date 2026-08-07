@@ -2434,6 +2434,108 @@ with tab_solar:
                                 "el azimuth suele ser fijo — útil para priorizar fachadas o para "
                                 "pérgolas/marquesinas nuevas.")
 
+                    # ── #206 — Modo "por energía real": barrido de POA anual con el TMY ──
+                    # A diferencia del bloque geométrico (AOI), aquí se pondera con la
+                    # irradiancia real del sitio (nubes, difusa) y se recomienda la
+                    # orientación por ENERGÍA anual (kWh/m²), no por geometría.
+                    if _tmy_s is not None and len(_tmy_s) == len(_spw):
+                        st.markdown("**⚡ Orientación de máxima energía real — POA anual con TMY**")
+                        _k206 = (round(_tilt_hm, 2), round(float(lat), 4), round(float(lon), 4),
+                                 len(_spw), len(_pts_hz) if _hay_hz else 0)
+                        _cache206 = st.session_state.setdefault("_poa_sweep_cache", {})
+                        if _cache206.get("key") == _k206:
+                            _poa_azs = _cache206["poa"]
+                        else:
+                            with st.spinner("Barriendo 72 orientaciones con el TMY real…"):
+                                _dni_e206 = _pv_hm.irradiance.get_extra_radiation(_spw.index)
+                                # El horizonte bloquea el sol directo: DNI=0 cuando el sol
+                                # queda detrás de un obstáculo (la difusa se conserva).
+                                _vis206 = (_dia_o & (~_somb_o)).values.astype(float)
+                                _dni206 = _tmy_s["Gb_n"].values * _vis206
+                                _ghi206 = _tmy_s["G_h"].values
+                                _dhi206 = _tmy_s["Gd_h"].values
+                                _poa_azs = []
+                                for _az_e in _azs_o:
+                                    _p206 = _pv_hm.irradiance.get_total_irradiance(
+                                        surface_tilt=_tilt_hm, surface_azimuth=float(_az_e),
+                                        solar_zenith=_spw["apparent_zenith"],
+                                        solar_azimuth=_spw["azimuth"],
+                                        dni=_dni206, ghi=_ghi206, dhi=_dhi206,
+                                        model="haydavies", dni_extra=_dni_e206,
+                                    )["poa_global"]
+                                    _poa_azs.append(float(_np.nansum(
+                                        _np.clip(_np.asarray(_p206, dtype=float), 0, None)) / 1000.0))
+                                _poa_azs = _np.array(_poa_azs)
+                                st.session_state["_poa_sweep_cache"] = {"key": _k206, "poa": _poa_azs}
+
+                        _i_act_e  = int(_np.argmin(_np.abs(((_azs_o - _az_hm + 180) % 360) - 180)))
+                        _poa_act  = float(_poa_azs[_i_act_e])
+                        _i_opt_e  = int(_np.nanargmax(_poa_azs))
+                        _az_opt_e = float(_azs_o[_i_opt_e])
+                        _poa_opt  = float(_poa_azs[_i_opt_e])
+                        _mej_pct  = (_poa_opt / _poa_act - 1.0) * 100.0 if _poa_act > 0 else float("nan")
+                        _giro_e   = (_az_opt_e - _az_hm + 540.0) % 360.0 - 180.0
+
+                        _e1, _e2, _e3, _e4 = st.columns(4)
+                        _e1.metric("Azimuth de máxima energía", f"{_az_opt_e:.0f}°",
+                                   help="Orientación que maximiza la POA anual (kWh/m²) calculada "
+                                        "con el TMY real del sitio, mismo tilt y horizonte.")
+                        _e2.metric("POA anual alcanzable", f"{_poa_opt:,.0f} kWh/m²",
+                                   delta=f"{_poa_opt - _poa_act:+,.0f} vs actual")
+                        _e3.metric("Mejora vs orientación actual",
+                                   f"{_mej_pct:+.1f}%" if _np.isfinite(_mej_pct) else "–",
+                                   help=f"POA actual ({_az_hm:.0f}°): {_poa_act:,.0f} kWh/m²·año.")
+                        _e4.metric("Giro sugerido", f"{_giro_e:+.0f}°",
+                                   help="Positivo = girar hacia el Este; negativo = hacia el Oeste.")
+
+                        _fig_poa_az = go.Figure()
+                        _fig_poa_az.add_trace(go.Scatter(
+                            x=_azs_o, y=_poa_azs, mode="lines",
+                            line=dict(color="#f39c12", width=2.5), name="POA anual",
+                            hovertemplate="Az %{x}° → <b>%{y:,.0f} kWh/m²·año</b><extra></extra>",
+                        ))
+                        _fig_poa_az.add_trace(go.Scatter(
+                            x=[_az_hm], y=[_poa_act], mode="markers+text",
+                            marker=dict(size=12, color="#3498db", symbol="diamond",
+                                        line=dict(color="white", width=1)),
+                            text=["Actual"], textposition="top center",
+                            textfont=dict(size=10, color="#3498db"), name="Actual",
+                            hovertemplate=f"<b>Actual</b> Az {_az_hm:.0f}° → {_poa_act:,.0f} kWh/m²·año<extra></extra>",
+                        ))
+                        _fig_poa_az.add_trace(go.Scatter(
+                            x=[_az_opt_e], y=[_poa_opt], mode="markers+text",
+                            marker=dict(size=13, color="#2ecc71", symbol="star",
+                                        line=dict(color="white", width=1)),
+                            text=["Óptimo"], textposition="top center",
+                            textfont=dict(size=10, color="#2ecc71"), name="Óptimo",
+                            hovertemplate=f"<b>Óptimo</b> Az {_az_opt_e:.0f}° → {_poa_opt:,.0f} kWh/m²·año<extra></extra>",
+                        ))
+                        _fig_poa_az.update_layout(
+                            height=340, showlegend=False,
+                            xaxis=dict(
+                                title="Azimuth de la superficie (°)",
+                                tickvals=[0, 45, 90, 135, 180, 225, 270, 315, 355],
+                                ticktext=["N", "NE", "E", "SE", "S", "SO", "O", "NO", "N"],
+                                range=[0, 355],
+                            ),
+                            yaxis=dict(title="POA anual (kWh/m²)"),
+                            plot_bgcolor="white", paper_bgcolor="white",
+                            margin=dict(t=30, b=40),
+                        )
+                        st.plotly_chart(_fig_poa_az, use_container_width=True)
+                        if abs(_giro_e) < 5:
+                            st.caption("✅ Por energía real, el azimuth actual ya está en el óptimo (±5°).")
+                        else:
+                            st.caption(
+                                f"Con el TMY real del sitio, girar de {_az_hm:.0f}° a {_az_opt_e:.0f}° "
+                                f"subiría la energía incidente de {_poa_act:,.0f} a {_poa_opt:,.0f} "
+                                f"kWh/m²·año ({_mej_pct:+.1f}%). Esta es la recomendación definitiva "
+                                "por captación — el bloque 🧭 de arriba es solo geométrico. "
+                                "Nota: el horizonte bloquea el sol directo; la difusa se asume visible.")
+                    elif _tmy_s is None:
+                        st.info("💡 Descarga el TMY en ☀️ Recurso Solar para ver también la "
+                                "comparación de orientaciones **por energía real** (POA anual).")
+
             else:
                 st.info("\u26a0\ufe0f No se pudo calcular posición solar anual. Verifica pvlib.")
 
