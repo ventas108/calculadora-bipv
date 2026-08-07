@@ -10,8 +10,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-from utils.ui import bloquear_traduccion
+from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
+mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 
 from calculos.auth import requerir_login
 requerir_login()

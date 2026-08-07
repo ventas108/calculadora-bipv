@@ -219,6 +219,10 @@ def cargar_proyecto(slug: str) -> str:
     # Limpiar claves computadas que podrían estar desactualizadas tras la carga
     _claves_reset = {
         # Resultados de cómputo pesado — se invalidan para forzar re-ejecución
+        # #127: recurso_solar_ok TAMBIÉN se resetea — tmy_df/poa_df nunca se
+        # guardan en el JSON (DataFrames pesados); si el flag revive en True,
+        # Producción intenta leer un tmy_df que no existe y falla en silencio.
+        "recurso_solar_ok",
         "produccion_ok", "financiero_ok", "bypass_ok",
         "motor_optico_ok", "mismatch_ok", "balance_ok", "bateria_ok",
         # DataFrames — se limpian para evitar KeyError en páginas
@@ -245,10 +249,17 @@ def cargar_proyecto(slug: str) -> str:
     for k, v in estado.items():
         st.session_state[k] = v
 
-    # Forzar re-ejecución del recurso solar si hay coords guardadas
-    # (recurso_solar_ok se preserva del estado guardado; si era True, las
-    #  páginas siguientes lo verán aunque tmy_df no esté — se recargará al
-    #  visitar ☀️ Recurso Solar)
+    # #127 — CRÍTICO: volver a limpiar DESPUÉS de volcar el estado. El JSON
+    # guardado contiene los flags *_ok (p.ej. recurso_solar_ok=True) y el bucle
+    # anterior los revive, pero los DataFrames de los que dependen NO se
+    # guardan. Sin esta segunda pasada, el banner de pasos pendientes no avisa
+    # y Producción falla con un tmy_df inexistente.
+    for k in _claves_reset:
+        st.session_state.pop(k, None)
+
+    # Nota: ☀️ Recurso Solar tiene auto-restore desde el caché de disco (#61) —
+    # si las coordenadas del proyecto coinciden, se revalida al abrir la página
+    # sin volver a descargar de PVGIS.
 
     return meta.get("nombre", slug)
 

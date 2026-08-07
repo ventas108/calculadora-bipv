@@ -89,8 +89,9 @@ if "proyecto_cargado_desde_disco" not in st.session_state:
     _cargar_proyecto()
     st.session_state["proyecto_cargado_desde_disco"] = True
 
-from utils.ui import bloquear_traduccion
+from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
+mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 st.title("🏠 Datos del Proyecto")
 
 # ── 📁 Gestión de múltiples proyectos (tarea #63) ────────────────────────────
@@ -179,7 +180,9 @@ if st.session_state.get("_proyecto_recien_cargado"):
         _col_banner, _col_x = st.columns([10, 1])
         _col_banner.info(
             f"📂 **Proyecto cargado.** Para activar todos los módulos, "
-            f"re-ejecuta en orden: {' → '.join(_pasos)}"
+            f"re-ejecuta en orden: {' → '.join(_pasos)}  \n"
+            f"💡 Si las coordenadas no cambiaron, ☀️ Recurso Solar se revalida "
+            f"solo al abrir la página (usa el caché de disco, sin descarga)."
         )
         if _col_x.button("✕", key="_pm_dismiss_banner", help="Descartar aviso"):
             st.session_state.pop("_proyecto_recien_cargado", None)

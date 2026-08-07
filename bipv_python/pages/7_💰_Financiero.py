@@ -21,8 +21,9 @@ st.set_page_config(page_title="Financiero — BIPV", page_icon="💰", layout="w
 from calculos.auth import requerir_login
 requerir_login()
 
-from utils.ui import bloquear_traduccion
+from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
+mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 init_trm()   # fetch TRM del API en primera carga; session_state["tipo_cambio"] listo antes de línea 126
 init_tarifa()   # garantiza tarifa_cop_kwh en session_state antes del panel preview
 st.title("💰 Análisis Financiero — Ley 1715 de 2014")

@@ -35,8 +35,9 @@ st.set_page_config(page_title="Test Extractor Inversores", page_icon="🧪", lay
 from calculos.auth import requerir_login
 requerir_login()
 
-from utils.ui import bloquear_traduccion
+from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
+mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 st.title("🧪 Harness — Cobertura del Extractor de Inversores")
 st.caption(
     "Valida los patrones regex del extractor contra casos sintéticos reales "

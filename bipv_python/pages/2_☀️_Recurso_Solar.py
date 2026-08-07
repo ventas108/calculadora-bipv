@@ -82,8 +82,9 @@ st.set_page_config(page_title="Recurso Solar — BIPV", page_icon="☀️", layo
 from calculos.auth import requerir_login
 requerir_login()
 
-from utils.ui import bloquear_traduccion
+from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
+mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 st.title("☀️ Recurso Solar")
 st.caption("Datos TMY (Typical Meteorological Year) desde PVGIS v5.2 — JRC European Commission")
 

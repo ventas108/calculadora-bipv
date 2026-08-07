@@ -20,8 +20,9 @@ st.set_page_config(page_title="Asistente", page_icon="🧭", layout="wide")
 
 # Bloquear Google Translate ANTES del login: el traductor de Chrome modifica el
 # DOM y provoca 'NotFoundError: removeChild' en la pantalla de acceso.
-from utils.ui import bloquear_traduccion
+from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
+mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 
 from calculos.auth import requerir_login
 requerir_login()

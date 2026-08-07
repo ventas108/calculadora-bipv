@@ -16,8 +16,9 @@ st.set_page_config(page_title="Dimensionamiento — BIPV", page_icon="📐", lay
 from calculos.auth import requerir_login
 requerir_login()
 
-from utils.ui import bloquear_traduccion
+from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
+mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 st.title("📐 Dimensionamiento de Strings")
 st.caption("Equivalente de Mod_OptimizarStringSizing + Mod_CalculoStringSizing (VBA)")
 

@@ -17,8 +17,9 @@ st.set_page_config(page_title="Producción — BIPV", page_icon="📊", layout="
 from calculos.auth import requerir_login
 requerir_login()
 
-from utils.ui import bloquear_traduccion
+from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
+mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 st.title("📊 Producción Anual — IEC 61724")
 st.caption(
     "Simulación hora a hora · Motor SDM De Soto 2006 · "

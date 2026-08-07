@@ -17,8 +17,9 @@ import streamlit as st
 st.set_page_config(page_title="Sombras desde SketchUp", page_icon="🌳", layout="wide")
 
 from calculos.auth import requerir_login
-from utils.ui import bloquear_traduccion
+from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
+mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 
 requerir_login()
 

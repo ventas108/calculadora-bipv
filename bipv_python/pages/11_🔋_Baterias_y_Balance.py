@@ -38,8 +38,9 @@ st.set_page_config(
 from calculos.auth import requerir_login
 requerir_login()
 
-from utils.ui import bloquear_traduccion
+from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
+mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 st.title("🔋 Baterías y Balance Energético")
 st.caption(
     "B-6: Dimensionado de baterías · "

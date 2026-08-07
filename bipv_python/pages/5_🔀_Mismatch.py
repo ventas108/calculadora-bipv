@@ -29,8 +29,9 @@ st.set_page_config(page_title="Mismatch — BIPV", page_icon="🔀", layout="wid
 from calculos.auth import requerir_login
 requerir_login()
 
-from utils.ui import bloquear_traduccion
+from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
+mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 st.title("🔀 Mismatch y Pérdidas de Sombreado")
 st.caption(
     "Sombreado de horizonte · Mismatch por orientación múltiple · "

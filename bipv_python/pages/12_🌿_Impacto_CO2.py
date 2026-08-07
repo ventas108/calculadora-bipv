@@ -26,8 +26,9 @@ st.set_page_config(page_title="Huella CO₂ — BIPV", page_icon="🌿", layout=
 from calculos.auth import requerir_login
 requerir_login()
 
-from utils.ui import bloquear_traduccion
+from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
+mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 st.title("🌿 Huella de Carbono Evitada")
 st.caption(
     "GHG Protocol Scope 2 · ISO 14064-1 · CDM AMS-I.D · "

@@ -14,8 +14,9 @@ from calculos.auth import (
     dias_restantes, requerir_login,
 )
 
-from utils.ui import bloquear_traduccion
+from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
+mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 
 admin = requerir_login(solo_admin=True)
 

@@ -35,8 +35,9 @@ st.set_page_config(page_title="Catálogo Inversores PDF", page_icon="🔌", layo
 from calculos.auth import requerir_login
 requerir_login()
 
-from utils.ui import bloquear_traduccion
+from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
+mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 st.title("🔌 Catálogo de Inversores — Agregar / Editar desde PDF")
 
 tab1, tab2 = st.tabs(["➕ Agregar desde PDF", "✏️ Editar / Eliminar"])

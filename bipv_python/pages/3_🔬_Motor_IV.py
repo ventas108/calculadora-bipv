@@ -25,8 +25,9 @@ st.set_page_config(page_title="Motor IV — BIPV", page_icon="🔬", layout="wid
 from calculos.auth import requerir_login
 requerir_login()
 
-from utils.ui import bloquear_traduccion
+from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
+mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 st.title("🔬 Motor I-V — Modelo De Soto 2006")
 st.caption("Equivalente Python de SimuladorIV_CdTe_v2 + Mod_ModeloDiodo (VBA auditado)")
 

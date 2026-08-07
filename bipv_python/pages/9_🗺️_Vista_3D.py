@@ -49,8 +49,9 @@ st.set_page_config(page_title="Vista 3D — BIPV", page_icon="🗺️", layout="
 from calculos.auth import requerir_login
 requerir_login()
 
-from utils.ui import bloquear_traduccion
+from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
+mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 st.title("🗺️ Vista 3D del Sitio")
 st.caption(
     "Mapa geolocalizado del edificio · Modelo volumétrico 3D con paneles BIPV · "
