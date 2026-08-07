@@ -47,7 +47,8 @@ def ruta_datos_usuario(nombre_base: str, usuario: str) -> str:
 def _escribir_json_atomico(ruta: str, data: dict) -> bool:
     try:
         os.makedirs(os.path.dirname(ruta), exist_ok=True)
-        tmp = f"{ruta}.{os.getpid()}.tmp"          # tmp único por proceso
+        import uuid
+        tmp = f"{ruta}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"  # único por escritura
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         os.replace(tmp, ruta)

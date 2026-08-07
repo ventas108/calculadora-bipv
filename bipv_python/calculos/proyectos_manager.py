@@ -11,9 +11,11 @@ Uso:
     )
 """
 from __future__ import annotations
+import hashlib
 import json
 import os
 import re
+import uuid
 import datetime
 from typing import Any
 
@@ -117,6 +119,43 @@ def nombre_a_slug(nombre: str) -> str:
     return s or "proyecto"
 
 
+# ── Propiedad por usuario ─────────────────────────────────────────────────────
+# Cada proyecto pertenece a la cuenta que lo guardó: el archivo se llama
+# <hash12_del_correo>__<slug>.json (mismo esquema que datos/persistencia/).
+# Los archivos "legacy" sin prefijo (anteriores al multiusuario) solo son
+# visibles para administradores y se migran a su cuenta al volver a guardarlos.
+
+def _hash_usuario(usuario: str) -> str:
+    return hashlib.sha256((usuario or "").strip().lower().encode()).hexdigest()[:12]
+
+
+def _usuario_sesion() -> str:
+    return str(st.session_state.get("auth_email", "") or "")
+
+
+def _es_admin() -> bool:
+    try:
+        from calculos.auth import usuario_actual
+        u = usuario_actual(st)
+        return bool(u and u.get("rol") == "admin")
+    except Exception:
+        return False
+
+
+def _slug_valido(slug: str) -> bool:
+    """Solo nombres de archivo planos — nunca rutas."""
+    return bool(slug) and re.fullmatch(r"[a-z0-9_]+(?:__[a-z0-9_]+)?", slug) is not None
+
+
+def _slug_autorizado(slug: str) -> bool:
+    """El usuario solo toca sus propios archivos; legacy solo para admin."""
+    if not _slug_valido(slug):
+        return False
+    if "__" in slug:
+        return slug.split("__", 1)[0] == _hash_usuario(_usuario_sesion())
+    return _es_admin()   # legacy sin prefijo
+
+
 def _ruta_proyecto(slug: str) -> str:
     return os.path.join(DIR_PROYECTOS, f"{slug}.json")
 
@@ -131,8 +170,17 @@ def listar_proyectos() -> list[dict]:
     """
     os.makedirs(DIR_PROYECTOS, exist_ok=True)
     proyectos: list[dict] = []
+    _mi_hash  = _hash_usuario(_usuario_sesion())
+    _admin    = _es_admin()
     for fname in os.listdir(DIR_PROYECTOS):
         if not fname.endswith(".json"):
+            continue
+        _slug_f = fname[:-5]
+        # Aislamiento por usuario: solo mis proyectos; legacy solo para admin
+        if "__" in _slug_f:
+            if _slug_f.split("__", 1)[0] != _mi_hash:
+                continue
+        elif not _admin:
             continue
         ruta = os.path.join(DIR_PROYECTOS, fname)
         try:
@@ -147,6 +195,7 @@ def listar_proyectos() -> list[dict]:
                 "area_m2":  meta.get("area_m2", 0.0),
                 "e_ac_kWh": meta.get("e_ac_kWh", 0.0),
                 "archivo":  ruta,
+                "legacy":   "__" not in _slug_f,
             })
         except Exception:
             pass
@@ -160,7 +209,8 @@ def guardar_proyecto_actual(nombre: str | None = None) -> str:
     Devuelve el slug del archivo guardado.
     """
     nombre = nombre or st.session_state.get("nombre_proyecto", "Proyecto BIPV")
-    slug   = nombre_a_slug(nombre)
+    # Siempre con prefijo del propietario: nadie más lo verá ni podrá borrarlo
+    slug   = f"{_hash_usuario(_usuario_sesion())}__{nombre_a_slug(nombre)}"
     os.makedirs(DIR_PROYECTOS, exist_ok=True)
 
     estado: dict = {}
@@ -184,6 +234,7 @@ def guardar_proyecto_actual(nombre: str | None = None) -> str:
 
     meta = {
         "nombre":   nombre,
+        "propietario": _hash_usuario(_usuario_sesion()),
         "guardado": datetime.datetime.now().isoformat(timespec="seconds"),
         "ciudad":   st.session_state.get("tmy_ciudad",
                         st.session_state.get("ciudad", "—")),
@@ -193,8 +244,11 @@ def guardar_proyecto_actual(nombre: str | None = None) -> str:
 
     payload = {"_meta": meta, "estado": estado_limpio}
     ruta = _ruta_proyecto(slug)
-    with open(ruta, "w", encoding="utf-8") as f:
+    # Escritura atómica: nunca dejar un JSON a medias si el proceso muere
+    tmp = f"{ruta}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, ruta)
 
     return slug
 
@@ -206,6 +260,8 @@ def cargar_proyecto(slug: str) -> str:
     forzando al usuario a re-ejecutar esos pasos.
     Devuelve el nombre del proyecto cargado.
     """
+    if not _slug_autorizado(slug):
+        raise PermissionError("Este proyecto no pertenece a tu cuenta.")
     ruta = _ruta_proyecto(slug)
     if not os.path.exists(ruta):
         raise FileNotFoundError(f"Proyecto no encontrado: {ruta}")
@@ -265,7 +321,12 @@ def cargar_proyecto(slug: str) -> str:
 
 
 def eliminar_proyecto(slug: str) -> bool:
-    """Elimina el archivo de proyecto. Devuelve True si lo eliminó."""
+    """Elimina el archivo de proyecto. Devuelve True si lo eliminó.
+
+    Solo el propietario (o un admin, para archivos legacy) puede borrar.
+    """
+    if not _slug_autorizado(slug):
+        return False
     ruta = _ruta_proyecto(slug)
     if os.path.exists(ruta):
         os.remove(ruta)

@@ -44,7 +44,8 @@ def _escribir(usuario: str, data: dict) -> bool:
     try:
         ruta = _ruta(usuario)
         os.makedirs(os.path.dirname(ruta), exist_ok=True)
-        tmp = f"{ruta}.{os.getpid()}.tmp"
+        import uuid
+        tmp = f"{ruta}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         os.replace(tmp, ruta)

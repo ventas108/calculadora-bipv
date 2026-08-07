@@ -38,6 +38,17 @@ import io
 from typing import Any
 
 # ── Notas / condiciones por defecto ───────────────────────────────────────────
+def _txt_xlsx(s) -> str:
+    """Neutraliza inyección de fórmulas en Excel (OWASP CSV/Formula injection).
+
+    Cualquier texto controlado por el usuario que empiece por '=', '+', '-',
+    '@', TAB o CR se prefija con apóstrofo para que Excel lo trate como texto
+    literal y nunca lo ejecute como fórmula.
+    """
+    s = str(s or "")
+    return "'" + s if s[:1] in ("=", "+", "-", "@", "\t", "\r") else s
+
+
 NOTAS_DEFAULT = (
     "• Los valores están expresados en pesos colombianos (COP) e incluyen los "
     "conceptos detallados en esta cotización.\n"
@@ -160,6 +171,9 @@ def generar_cotizacion_excel(datos: dict) -> bytes:
     total_usd = _num(datos.get("total_usd"))
     notas     = str(datos.get("notas") or NOTAS_DEFAULT)
 
+    # Seguridad: texto libre del usuario nunca debe interpretarse como fórmula
+    empresa, proyecto, cliente = _txt_xlsx(empresa), _txt_xlsx(proyecto), _txt_xlsx(cliente)
+
     wb = Workbook()
     ws = wb.active
     ws.title = "Cotización"
@@ -251,15 +265,15 @@ def generar_cotizacion_excel(datos: dict) -> bytes:
     # ── Ítems por categoría ─────────────────────────────────────────────────────
     for categoria, filas in grupos.items():
         ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=ancho)
-        c = ws.cell(r, 1, categoria)
+        c = ws.cell(r, 1, _txt_xlsx(categoria))
         c.font = f_cat; c.fill = fill_cat
         r += 1
         for it in filas:
-            ws.cell(r, 1, it["descripcion"]).font = f_norm
+            ws.cell(r, 1, _txt_xlsx(it["descripcion"])).font = f_norm
             ws.cell(r, 1).alignment = left_wrap
-            cr = ws.cell(r, 2, it.get("ref", "")); cr.font = f_norm; cr.alignment = center
+            cr = ws.cell(r, 2, _txt_xlsx(it.get("ref", ""))); cr.font = f_norm; cr.alignment = center
             cn = ws.cell(r, 3, round(it["cantidad"], 2)); cn.font = f_norm; cn.alignment = right
-            cu = ws.cell(r, 4, it["unidad"]); cu.font = f_norm; cu.alignment = center
+            cu = ws.cell(r, 4, _txt_xlsx(it["unidad"])); cu.font = f_norm; cu.alignment = center
             if _tiene_usd and trm > 0:
                 c_uusd = ws.cell(r, 5, round(it.get("unitario_usd", 0), 2))
                 c_uusd.font = f_norm; c_uusd.number_format = '"USD" #,##0.00'; c_uusd.alignment = right
@@ -335,7 +349,7 @@ def generar_cotizacion_excel(datos: dict) -> bytes:
     r += 1
     for linea in notas.split("\n"):
         ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=ancho)
-        c = ws.cell(r, 1, linea); c.font = f_nota; c.alignment = left_wrap
+        c = ws.cell(r, 1, _txt_xlsx(linea)); c.font = f_nota; c.alignment = left_wrap
         r += 1
 
     buf = io.BytesIO()

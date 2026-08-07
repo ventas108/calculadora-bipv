@@ -1565,7 +1565,9 @@ _datos_cot = {
     "indirectos_cop":     _indirect_cop,
     "contingencia_cop":   _cont_cop,
     "total_cop":          _total_cop,
-    "total_usd":          _capex_usd_pub if _capex_usd_pub > 0 else (_total_cop / tc if tc > 0 else 0.0),
+    # Auditoría: el USD del documento SIEMPRE se deriva del mismo total COP de
+    # los ítems exportados (no del CAPEX publicado, que puede tener otra base).
+    "total_usd":          (_total_cop / tc) if tc > 0 else 0.0,
     "notas":              _cot_notas,
 }
 

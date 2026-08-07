@@ -648,7 +648,8 @@ with col2:
                         _prev_c = json.load(_fcc)
                 if _consumo_cache != _prev_c:
                     os.makedirs(os.path.dirname(_consumo_path), exist_ok=True)
-                    _tmp_c = f"{_consumo_path}.{os.getpid()}.tmp"
+                    import uuid as _uuid_c
+                    _tmp_c = f"{_consumo_path}.{os.getpid()}.{_uuid_c.uuid4().hex[:8]}.tmp"
                     with open(_tmp_c, "w", encoding="utf-8") as _fcc:
                         json.dump(_consumo_cache, _fcc, ensure_ascii=False)
                     os.replace(_tmp_c, _consumo_path)
