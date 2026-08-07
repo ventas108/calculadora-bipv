@@ -255,6 +255,16 @@ def _waterfall_cascada_svg(bruta, p_iam, p_soil, p_term, efectiva,
     return ''.join(parts)
 
 
+def _bloque_grafica(svg: str, pie: str) -> str:
+    """Envuelve una gráfica SVG + pie en un bloque no divisible al imprimir."""
+    return (
+        '<div style="margin:14px 0 4px 0;break-inside:avoid;page-break-inside:avoid;">'
+        f'{svg}'
+        f'<div style="color:#888;font-size:0.85em;">{pie}</div>'
+        '</div>'
+    )
+
+
 def _esc_html(s) -> str:
     """Escapa texto libre del usuario antes de interpolarlo en el HTML del reporte."""
     import html as _html_mod
@@ -311,9 +321,12 @@ def _flujo_caja_svg(acum, payback=None, titulo="Flujo de caja acumulado (USD)",
     v_min, v_max = min(acum), max(acum)
     if v_max <= v_min:
         return ""
-    _rng = (v_max - v_min) * 1.08 or 1.0
+    # Dominio vertical con acolchado simétrico — válido para series negativas,
+    # mixtas o enteramente positivas (auditoría: v_min*1.04 fallaba con v_min>0)
+    _pad = (v_max - v_min) * 0.04
+    _lo, _hi = v_min - _pad, v_max + _pad
     def _x(i): return ml + cw * i / (len(acum) - 1)
-    def _y(v): return mt + ch * (1 - (v - v_min * 1.04) / _rng)
+    def _y(v): return mt + ch * (1 - (v - _lo) / (_hi - _lo))
     p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" '
          f'style="max-width:100%;height:auto;font-family:Arial,sans-serif;">',
          f'<text x="{ml}" y="15" font-size="12" font-weight="bold" fill="#333">{titulo}</text>']
@@ -743,9 +756,8 @@ def generar_html_reporte() -> str:
         if _df_m_pdf is not None and "E_ac (kWh)" in getattr(_df_m_pdf, "columns", []):
             _svg_mes = _barras_mensuales_svg(list(_df_m_pdf["E_ac (kWh)"]))
             if _svg_mes:
-                html += (f'<div style="margin:14px 0 4px 0;">{_svg_mes}</div>'
-                         f'<div style="color:#888;font-size:0.85em;">Energía AC neta '
-                         f'entregada por mes (kWh).</div>')
+                html += _bloque_grafica(
+                    _svg_mes, "Energía AC neta entregada por mes (kWh).")
         html += cierre()
 
     # ── 4b. Diagnóstico PR real vs esperado ──────────────────────────────────
@@ -1064,10 +1076,10 @@ def generar_html_reporte() -> str:
         if len(_acum_pdf) >= 2:
             _svg_fc = _flujo_caja_svg(_acum_pdf, payback=payback)
             if _svg_fc:
-                html += (f'<div style="margin:14px 0 4px 0;">{_svg_fc}</div>'
-                         f'<div style="color:#888;font-size:0.85em;">Flujo de caja '
-                         f'acumulado con beneficios Ley 1715 (escenario P50). El punto '
-                         f'naranja marca el año en que la inversión se recupera.</div>')
+                html += _bloque_grafica(
+                    _svg_fc,
+                    "Flujo de caja acumulado con beneficios Ley 1715 (escenario P50). "
+                    "El punto naranja marca el año en que la inversión se recupera.")
         html += cierre()
 
     # ── 5b. Resumen de Costos del Presupuesto (#8) ────────────────────────────
