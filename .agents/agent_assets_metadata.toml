@@ -253,3 +253,10 @@ uri = "file://entregables/MANUAL_CALCULADORA_BIPV_v3.2_agosto2026.docx"
 type = "word_document"
 title = "Manual de Usuario v3.2 — con Sombras desde SketchUp"
 description = "Nueva sección 8a (Página 5a — Sombras desde SketchUp): preparación del modelo, flujo de 3 pasos, requisito de TMY, conexión con Mismatch/Producción/Financiero y validaciones automáticas."
+
+[[outputs]]
+id = "DPPkgYFtqy-F_iiJGcMI-"
+uri = "file://entregables/MANUAL_CALCULADORA_BIPV_v3.3_agosto2026.docx"
+type = "word_document"
+title = "Manual de Usuario — Calculadora BIPV v3.3 (agosto 2026)"
+description = "Manual actualizado con el anexo del 6-7 de agosto: Asistente, cuentas y pagos, multi-proyectos privados, persistencia, Vista 3D solar y más."
