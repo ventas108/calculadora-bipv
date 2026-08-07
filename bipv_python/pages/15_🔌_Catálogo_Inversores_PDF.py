@@ -248,6 +248,11 @@ with tab1:
         st.warning(f"🟠 {_n_warn} campo(s) para revisar — puedes guardar, pero verifícalos.")
     else:
         st.success("🟢 Todos los campos extraídos pasan las verificaciones físicas.")
+    # ── #133 — Confianza por campo: 🟢 extraído · 🟡 inferido · 🔴 no encontrado ─
+    from calculos.pdf_inversor_extractor import confianza_por_campo as _conf_fn
+    _conf_map = _conf_fn(res)
+    _CONF_ICONO = {"exact": "🟢 extraído", "inferred": "🟡 inferido",
+                   "missing": "🔴 no encontrado"}
     _filas_val = []
     for _campo, _lbl in _ETIQ_VAL.items():
         _info = _val_ext["campos"].get(_campo)
@@ -258,6 +263,7 @@ with tab1:
             "": icono_estado(_info["estado"]),
             "Campo": _lbl,
             "Valor extraído": "—" if _v in (None, 0, "") else str(_v),
+            "Confianza": _CONF_ICONO.get(_conf_map.get(_campo, "missing"), "—"),
             "Observación": _info["detalle"] or "OK",
         })
     st.dataframe(
@@ -266,9 +272,14 @@ with tab1:
             "": st.column_config.TextColumn(width="small"),
             "Campo": st.column_config.TextColumn(width="medium"),
             "Valor extraído": st.column_config.TextColumn(width="small"),
+            "Confianza": st.column_config.TextColumn(width="small"),
             "Observación": st.column_config.TextColumn(width="large"),
         },
     )
+    _n_missing = sum(1 for v in _conf_map.values() if v == "missing")
+    if _n_missing:
+        st.caption(f"🔴 {_n_missing} campo(s) no encontrados en la ficha — "
+                   f"rellénalos manualmente en el formulario antes de guardar.")
 
     st.markdown("---")
     st.subheader("📝 Revisar y completar los datos")
@@ -467,6 +478,47 @@ with tab1:
                 "Marca":                              marca_val.strip() or None,
                 "Arquitectura":                       arch_val,
             }
+
+            # ── #133 — Diff antes de sobreescribir un modelo existente ────────
+            # Subir el PDF de un modelo ya catalogado no debe pisar datos buenos
+            # en silencio: primera pulsación muestra el diff campo a campo;
+            # la segunda (mismo modelo) confirma y guarda.
+            _existente = obtener_inversor_excel(modelo_val.strip())
+            _mapa_diff = {
+                "Vdc_max": Vdc_max_val, "V_arranque": V_arranque_val,
+                "Vmppt_min": Vmppt_min_val, "Vmppt_max": Vmppt_max_val,
+                "V_mppt_activo": V_mppt_activo_val, "n_trackers": n_trackers_val,
+                "n_strings_tracker": n_strings_val, "I_max_tracker": I_max_val,
+                "Isc_max_tracker": Isc_max_val, "P_dc_max_W": P_dc_val,
+                "bat_voltaje_min": bat_min_val, "bat_voltaje_max": bat_max_val,
+                "costo_usd": costo_val,
+            }
+            _cambios = []
+            if _existente:
+                for _c, _nv in _mapa_diff.items():
+                    _va = _existente.get(_c)
+                    _va_n = float(_va) if _va not in (None, "") else 0.0
+                    _nv_n = float(_nv or 0.0)
+                    if abs(_va_n - _nv_n) > 1e-6:
+                        _cambios.append({
+                            "Campo": _ETIQ_VAL.get(_c, _c),
+                            "Valor actual (catálogo)": "—" if not _va_n else f"{_va_n:g}",
+                            "Valor nuevo (este PDF)":  "—" if not _nv_n else f"{_nv_n:g}",
+                        })
+            _confirm_key = st.session_state.get("_inv_confirm_overwrite")
+            if _existente and _cambios and _confirm_key != modelo_val.strip():
+                st.session_state["_inv_confirm_overwrite"] = modelo_val.strip()
+                st.warning(
+                    f"⚠️ **{modelo_val.strip()}** ya existe en el catálogo y "
+                    f"{len(_cambios)} campo(s) cambiarían. Revisa el diff: "
+                    f"si estás de acuerdo, presiona **💾 Guardar** otra vez para "
+                    f"confirmar la sobrescritura. Si prefieres conservar un valor "
+                    f"actual, edítalo en el formulario antes de reintentar."
+                )
+                st.dataframe(_pd.DataFrame(_cambios), use_container_width=True,
+                             hide_index=True)
+                st.stop()
+            st.session_state.pop("_inv_confirm_overwrite", None)
 
             try:
                 nombre_guardado = guardar_inversor_excel(_row)

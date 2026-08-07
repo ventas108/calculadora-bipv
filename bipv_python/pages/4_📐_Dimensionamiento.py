@@ -63,6 +63,54 @@ elif _iv_adv:
             f"— se usarán defaults por tecnología."
         )
 
+# ── #122 — Diagnóstico del catálogo de inversores (patrón #24 de baterías) ───
+from datos.catalogo_inversores_excel import (
+    diagnostico_catalogo_inversores as _diag_inv_fn,
+    excel_mtime_inv as _mtime_inv,
+    cargar_catalogo_inversores as _cargar_cat_inv,
+)
+_diag_inv = _diag_inv_fn(_mtime=_mtime_inv())
+if _diag_inv["estado"] == "error":
+    st.error(
+        f"🔴 **Catálogo de inversores con problemas** — "
+        f"{_diag_inv.get('detalle', 'faltan columnas críticas')}.  \n"
+        f"Columnas críticas ausentes: "
+        f"{', '.join(_diag_inv['columnas_criticas_faltantes']) or '—'}. "
+        f"El dimensionamiento de strings puede salir incorrecto."
+    )
+elif _diag_inv["estado"] == "parcial":
+    _resumen_p = []
+    if _diag_inv["columnas_importantes_faltantes"]:
+        _resumen_p.append(f"{len(_diag_inv['columnas_importantes_faltantes'])} columnas importantes ausentes")
+    if _diag_inv["modelos_duplicados"]:
+        _resumen_p.append(f"{len(_diag_inv['modelos_duplicados'])} modelos duplicados")
+    if _diag_inv["modelos_incompletos"]:
+        _resumen_p.append(f"{len(_diag_inv['modelos_incompletos'])} modelos incompletos")
+    st.warning(f"🟡 Catálogo de inversores parcial: {' · '.join(_resumen_p)} — detalles abajo.")
+
+with st.expander("🔍 Diagnóstico del catálogo de inversores", expanded=False):
+    st.caption(f"Hoja usada: `{_diag_inv.get('hoja_usada', '—')}` · "
+               f"Modelos cargados: **{_diag_inv.get('modelos_cargados', 0)}** · "
+               f"Hojas en el Excel: {', '.join(_diag_inv.get('hojas_disponibles', []))}")
+    if _diag_inv["columnas_criticas_faltantes"]:
+        st.error("🔴 Columnas críticas ausentes: "
+                 + ", ".join(f"`{c}`" for c in _diag_inv["columnas_criticas_faltantes"]))
+    if _diag_inv["columnas_importantes_faltantes"]:
+        st.warning("🟡 Columnas importantes ausentes: "
+                   + ", ".join(f"`{c}`" for c in _diag_inv["columnas_importantes_faltantes"]))
+    for _d in _diag_inv["modelos_duplicados"]:
+        st.warning(f"🟡 **{_d['modelo']}** aparece {len(_d['filas_excel'])} veces "
+                   f"(filas Excel {_d['filas_excel']}) — solo la última fila se usa.")
+    for _m in _diag_inv["modelos_incompletos"]:
+        st.info(f"ℹ️ **{_m['modelo']}**: faltan {', '.join(_m['campos_faltantes'])}")
+    if _diag_inv["estado"] == "ok":
+        st.success("🟢 Catálogo OK — columnas completas, sin duplicados ni modelos incompletos.")
+    if st.button("🔄 Recargar catálogo de inversores", key="_reload_cat_inv",
+                 help="Vuelve a leer el Excel del servidor (limpia la caché)."):
+        _cargar_cat_inv.clear()
+        _diag_inv_fn.clear()
+        st.rerun()
+
 # ── #58 — Aviso cuando las especificaciones del panel son estimadas ──────────
 # El catálogo Excel trae Confianza="Media" cuando las dimensiones físicas del
 # panel son aproximadas (no confirmadas con ficha del fabricante). El área y el

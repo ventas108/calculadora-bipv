@@ -55,6 +55,110 @@ def cargar_catalogo_inversores() -> dict:
 
 cargar_catalogo_inv_excel = cargar_catalogo_inversores
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #122 — Diagnóstico del catálogo de inversores (mismo patrón que baterías #24)
+# ══════════════════════════════════════════════════════════════════════════════
+import os as _os
+
+# Columnas del Excel según su impacto en el dimensionamiento de strings:
+# críticas → sin ellas el dimensionamiento produce resultados incorrectos.
+_COLS_CRITICAS = [
+    "Modelo", "Tension DC Maxima (V)", "Rango MPPT Min (V)",
+    "Rango MPPT Max (V)", "N Trackers", "Corriente Maxima Tracker (A)",
+]
+_COLS_IMPORTANTES = [
+    "N Strings/Tracker", "Potencia FV Max Recomendada (W)",
+    "Potencia AC nominal (kW)", "Tension Arranque (V)",
+    "Tension Minima MPPT Activo (V)", "Corriente Cortocircuito Max Tracker (A)",
+]
+# Campos internos críticos por modelo (para reportar modelos incompletos)
+_CAMPOS_CRITICOS_MODELO = ["Vdc_max", "Vmppt_min", "Vmppt_max",
+                           "n_trackers", "I_max_tracker"]
+
+
+def excel_mtime_inv() -> float:
+    """mtime del Excel — pásalo a diagnostico_catalogo_inversores() para que
+    la caché se invalide sola cuando el archivo cambia (patrón #26)."""
+    try:
+        return _os.path.getmtime(_EXCEL)
+    except OSError:
+        return 0.0
+
+
+@st.cache_data(ttl=3600)
+def diagnostico_catalogo_inversores(_mtime: float = 0.0) -> dict:
+    """Diagnóstico del catálogo de inversores: hojas, columnas, duplicados.
+
+    Nunca lanza — siempre devuelve un dict con 'estado' ("ok"/"parcial"/"error")
+    para que la UI pinte el semáforo sin try/except propio.
+    """
+    info: dict = {"estado": "error", "hojas_disponibles": [],
+                  "columnas_criticas_faltantes": [],
+                  "columnas_importantes_faltantes": [],
+                  "modelos_duplicados": [], "modelos_incompletos": [],
+                  "modelos_cargados": 0}
+    try:
+        xl = pd.ExcelFile(_EXCEL, engine="openpyxl")
+    except Exception as e:
+        info["detalle"] = f"No se pudo abrir el Excel: {e}"
+        return info
+
+    info["hojas_disponibles"] = xl.sheet_names
+    if _SHEET not in xl.sheet_names:
+        info["detalle"] = (f"La hoja '{_SHEET}' no existe en el Excel. "
+                           f"Hojas encontradas: {xl.sheet_names}")
+        return info
+    info["hoja_usada"] = _SHEET
+
+    try:
+        df = pd.read_excel(_EXCEL, sheet_name=_SHEET, header=2, engine="openpyxl")
+        df.columns = [str(c).strip() for c in df.columns]
+    except Exception as e:
+        info["detalle"] = f"La hoja existe pero no se pudo leer (header fila 3): {e}"
+        return info
+
+    cols = set(df.columns)
+    info["columnas_detectadas"] = [c for c in df.columns if "unnamed" not in c.lower()]
+    info["columnas_criticas_faltantes"]    = [c for c in _COLS_CRITICAS if c not in cols]
+    info["columnas_importantes_faltantes"] = [c for c in _COLS_IMPORTANTES if c not in cols]
+
+    # ── Modelos duplicados (el dict se queda con el ÚLTIMO en silencio) ──────
+    if "Modelo" in cols:
+        _vistos: dict[str, list] = {}
+        for _i, _v in df["Modelo"].items():
+            _m = str(_v).strip()
+            if _m and _m.lower() != "nan":
+                # +4: fila real en Excel (2 filas de título + encabezado + base 1)
+                _vistos.setdefault(_m, []).append(int(_i) + 4)
+        info["modelos_duplicados"] = [
+            {"modelo": m, "filas_excel": filas}
+            for m, filas in _vistos.items() if len(filas) > 1
+        ]
+
+    # ── Modelos con campos críticos vacíos ────────────────────────────────────
+    try:
+        cat = cargar_catalogo_inversores()
+        info["modelos_cargados"] = len(cat)
+        for _n, _inv in cat.items():
+            _falt = [c for c in _CAMPOS_CRITICOS_MODELO if not _inv.get(c)]
+            if _falt:
+                info["modelos_incompletos"].append({"modelo": _n, "campos_faltantes": _falt})
+    except Exception as e:
+        info["detalle"] = f"Las columnas existen pero el loader falló: {e}"
+        return info
+
+    if info["columnas_criticas_faltantes"] or info["modelos_cargados"] == 0:
+        info["estado"] = "error"
+        info.setdefault("detalle",
+                        "Faltan columnas críticas o no se cargó ningún modelo.")
+    elif (info["columnas_importantes_faltantes"] or info["modelos_duplicados"]
+          or info["modelos_incompletos"]):
+        info["estado"] = "parcial"
+    else:
+        info["estado"] = "ok"
+    return info
+
 def obtener_inversor_excel(nombre: str) -> dict:
     return cargar_catalogo_inversores().get(nombre, {})
 

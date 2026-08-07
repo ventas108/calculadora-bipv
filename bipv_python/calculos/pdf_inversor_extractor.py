@@ -1443,6 +1443,32 @@ def _extraer_campos(texto: str) -> dict:
     }
 
 
+# ── #133 — Confianza por campo extraído ──────────────────────────────────────
+def confianza_por_campo(resultado: dict) -> dict:
+    """Clasifica cada campo numérico del resultado de extracción.
+
+    Devuelve {campo: "exact" | "inferred" | "missing"}:
+      - "exact": el patrón encontró el valor en la ficha
+      - "inferred": el valor fue derivado (hoy: P_dc_max_W estimado = P_ac × 1.5)
+      - "missing": no se encontró (None/0) → rellenar manualmente
+    Pura (sin streamlit) para poder probarse en consola.
+    """
+    _campos = ["Vdc_max", "Vmppt_min", "Vmppt_max", "V_mppt_activo",
+               "V_arranque", "n_trackers", "n_strings_tracker",
+               "I_max_tracker", "Isc_max_tracker", "P_dc_max_W",
+               "bat_voltaje_min", "bat_voltaje_max"]
+    conf = {}
+    for c in _campos:
+        v = resultado.get(c)
+        if v in (None, 0, ""):
+            conf[c] = "missing"
+        elif c == "P_dc_max_W" and resultado.get("P_dc_estimado"):
+            conf[c] = "inferred"
+        else:
+            conf[c] = "exact"
+    return conf
+
+
 def pdf_disponible() -> bool:
     return _HAS_PDF
 
