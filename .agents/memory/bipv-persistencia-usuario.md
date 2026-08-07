@@ -17,3 +17,9 @@ description: Cómo persistir estado a disco en la app multiusuario sin mezclar d
 - Tablas del Presupuesto: validar esquema (`presupuesto_store.cargar_seccion`) — esquema viejo → plantilla, no KeyError.
 - OJO: `datos/proyectos/` (Mis Proyectos) sigue global — tarea pendiente #203.
 - Se eliminó `calculos/persistencia.py` (módulo global duplicado de un merge previo, sin consumidores): no revivirlo.
+
+## Proyectos multiusuario (auditoría ago-2026)
+- Los proyectos guardados (datos/proyectos/) también van con prefijo `<hash12>__slug.json`; legacy sin prefijo solo visible/borrable por admin. `_slug_autorizado` valida nombre plano (sin rutas) antes de cargar/eliminar.
+- **Regla general:** cualquier almacén de archivos compartido entre cuentas debe namespacearse por hash del propietario, o hay exposición/borrado cruzado.
+- Toda escritura JSON usa tmp `pid.uuid8.tmp` + os.replace (el tmp solo-PID colisiona entre pestañas del mismo usuario).
+- Excel exportado: todo texto de usuario pasa por `_txt_xlsx` (apóstrofo si empieza con = + - @ TAB CR) contra inyección de fórmulas; los USD del documento se derivan del mismo COP de los ítems.
