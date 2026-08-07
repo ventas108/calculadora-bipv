@@ -13,9 +13,15 @@ def mostrar_proyecto_activo():
     if not _nombre:
         return
     _ciudad = st.session_state.get("ciudad", "")
+    # Auditoría: el nombre lo escribe el usuario y se persiste en JSON —
+    # escapar SIEMPRE antes de interpolar en Markdown con HTML permitido,
+    # para que un nombre con etiquetas no pueda inyectar HTML en la UI.
+    import html as _html
+    _nombre_seguro = _html.escape(str(_nombre))
+    _ciudad_segura = _html.escape(str(_ciudad))
     st.sidebar.markdown(
-        f"📁 **{_nombre}**"
-        + (f"  \n<span style='color:#888;font-size:0.85em'>📍 {_ciudad}</span>"
+        f"📁 **{_nombre_seguro}**"
+        + (f"  \n<span style='color:#888;font-size:0.85em'>📍 {_ciudad_segura}</span>"
            if _ciudad else ""),
         unsafe_allow_html=True,
     )
