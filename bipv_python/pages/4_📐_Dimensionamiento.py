@@ -57,7 +57,22 @@ with col1:
             0,
         )
     )
-    inversor_nombre = st.selectbox("Inversor", _lista_inv, index=_idx_inv)
+    # El botón del mapeo puede solicitar un cambio de modelo antes del rerun.
+    # Se usa una clave explícita para que el selector visible se sincronice
+    # realmente, sin pisar una selección manual del usuario.
+    _inv_pendiente = st.session_state.pop("_inversor_nombre_dim_pendiente", None)
+    if _inv_pendiente in _lista_inv:
+        st.session_state["inversor_selector_dim"] = _inv_pendiente
+    elif (
+        "inversor_selector_dim" not in st.session_state
+        or st.session_state["inversor_selector_dim"] not in _lista_inv
+    ):
+        st.session_state["inversor_selector_dim"] = _lista_inv[_idx_inv]
+    inversor_nombre = st.selectbox(
+        "Inversor",
+        _lista_inv,
+        key="inversor_selector_dim",
+    )
 
 # Cargar dicts antes de col2 para que estén disponibles al calcular N_min_scan
 _panel_catalogo = obtener_panel_excel(panel_nombre) if _cat_excel else MODULOS_BIPV[panel_nombre]
@@ -287,9 +302,9 @@ else:
 st.markdown("---")
 st.subheader("🧭 Mapeo de inversores opcionales para este panel")
 st.caption(
-    "Esta es una regla eléctrica informativa: el inversor seleccionado arriba "
-    "no se cambia automáticamente. Se evalúa todo el catálogo contra el rango "
-    "de N/string indicado y se reportan los límites usados."
+    "Esta es una regla eléctrica informativa: se evalúa todo el catálogo contra "
+    "el rango de N/string indicado. Puedes cargar un modelo compatible para "
+    "actualizar la selección y obtener un prorrateo preliminar."
 )
 with st.container(border=True):
     st.caption(
@@ -297,7 +312,7 @@ with st.container(border=True):
         "**N/string** del rango explorado cumple simultáneamente Voc en frío, "
         "MPPT mínimo y máximo, y corriente máxima por tracker. "
         "El rango de este mapeo es independiente del inversor seleccionado. "
-        "El resultado no cambia la selección del proyecto."
+        "La selección del proyecto solo cambia cuando confirmas el botón de carga."
     )
     _map_c1, _map_c2 = st.columns(2)
     with _map_c1:
@@ -357,12 +372,160 @@ with st.container(border=True):
             use_container_width=True,
             hide_index=True,
         )
+        _compatibles_mapeo = [
+            fila for fila in _mapeo_inv
+            if fila.get("compatible") and fila.get("N_string_recomendado")
+        ]
+        if _compatibles_mapeo:
+            st.markdown("#### ⚡ Cargar un inversor compatible")
+            st.caption(
+                "Selecciona un modelo compatible para cargar su ficha en el selector "
+                "principal y recalcular automáticamente un prorrateo preliminar."
+            )
+            _compatibles_por_nombre = {
+                fila["modelo"]: fila for fila in _compatibles_mapeo
+            }
+            _opciones_compatibles = list(_compatibles_por_nombre)
+            _modelo_prelim_default = st.session_state.get(
+                "prorrateo_preliminar_modelo", ""
+            )
+            _idx_compatible = (
+                _opciones_compatibles.index(_modelo_prelim_default)
+                if _modelo_prelim_default in _opciones_compatibles
+                else 0
+            )
+            _modelo_compatible = st.selectbox(
+                "Inversor compatible",
+                _opciones_compatibles,
+                index=_idx_compatible,
+                format_func=lambda modelo: (
+                    f"{modelo} · N/string recomendado: "
+                    f"{_compatibles_por_nombre[modelo]['N_string_recomendado']}"
+                ),
+                key="selector_inversor_compatible_mapeo",
+            )
+            _fila_compatible = _compatibles_por_nombre[_modelo_compatible]
+            if st.button(
+                "⚡ Cargar y recalcular prorrateo preliminar",
+                type="primary",
+                key="cargar_inversor_compatible_mapeo",
+            ):
+                st.session_state["_inversor_nombre_dim_pendiente"] = _modelo_compatible
+                st.session_state["inversor_nombre_dim"] = _modelo_compatible
+                st.session_state["N_serie"] = int(
+                    _fila_compatible["N_string_recomendado"]
+                )
+                st.session_state["prorrateo_preliminar_modelo"] = _modelo_compatible
+                st.session_state["prorrateo_preliminar_N"] = int(
+                    _fila_compatible["N_string_recomendado"]
+                )
+                st.session_state["prorrateo_preliminar_panel"] = panel_nombre
+                st.rerun()
+        else:
+            st.info(
+                "No hay inversores compatibles con el rango N/string seleccionado. "
+                "Amplía el rango o revisa los datos eléctricos del catálogo."
+            )
         st.download_button(
             "⬇️ Descargar mapeo de inversores (CSV)",
             _df_mapeo.to_csv(index=False).encode("utf-8-sig"),
             "mapeo_inversores_panel.csv",
             "text/csv",
             key="descargar_mapeo_inversores_panel",
+        )
+
+# ── Prorrateo preliminar desde un inversor compatible del mapeo ───────────────
+_prelim_modelo = st.session_state.get("prorrateo_preliminar_modelo")
+_prelim_n = st.session_state.get("prorrateo_preliminar_N")
+if (
+    _prelim_modelo
+    and _prelim_modelo != inversor_nombre
+) or (
+    _prelim_modelo
+    and st.session_state.get("prorrateo_preliminar_panel") != panel_nombre
+):
+    # Evita presentar un cálculo anterior después de una selección manual o
+    # al cambiar de panel, donde el N recomendado podría ya no aplicar.
+    st.session_state.pop("prorrateo_preliminar_modelo", None)
+    st.session_state.pop("prorrateo_preliminar_N", None)
+    st.session_state.pop("prorrateo_preliminar_panel", None)
+    _prelim_modelo = None
+    _prelim_n = None
+if _prelim_modelo and _prelim_n:
+    _prelim_inversor = obtener_inversor_excel(_prelim_modelo) if _cat_inv else (
+        seleccionar_inversor(_prelim_modelo)
+    )
+    try:
+        _prelim_n = int(_prelim_n)
+        _prelim_n_mppt = int(
+            float(
+                _prelim_inversor.get("N_mppt")
+                or _prelim_inversor.get("n_trackers")
+                or 0
+            )
+        )
+    except (TypeError, ValueError):
+        _prelim_n_mppt = 0
+    if _prelim_n_mppt > 0:
+        _prelim_area_bruta = float(
+            st.session_state.get("area_fachada_m2", 97.34)
+        )
+        _prelim_f_ocup = float(
+            st.session_state.get("factor_ocupacion_pct", 100.0)
+        )
+        _prelim_area = _prelim_area_bruta * _prelim_f_ocup / 100.0
+        _prelim_dim = dimensionar_sistema(
+            panel,
+            _prelim_area,
+            _prelim_n,
+            int(N_str_tr),
+            _prelim_n_mppt,
+        )
+        st.markdown("### ⚡ Prorrateo preliminar del inversor cargado")
+        st.success(
+            f"✅ **{_prelim_modelo}** cargado desde el mapeo · "
+            f"**{_prelim_n} módulos/string** · "
+            f"{_prelim_n_mppt} tracker(s)"
+        )
+        _pc1, _pc2, _pc3, _pc4 = st.columns(4)
+        _pc1.metric("Paneles / inversor", _prelim_dim["N_paneles"])
+        _pc2.metric("P_DC / inversor", f"{_prelim_dim['P_dc_stc_kW']:.2f} kW")
+        _pc3.metric("Área / inversor", f"{_prelim_dim['area_ocupada_m2']} m²")
+        _pc4.metric("Cobertura unitaria", f"{_prelim_dim['cobertura_pct']}%")
+
+        if _prelim_dim["area_ocupada_m2"] > 0:
+            _prelim_n_inv = math.ceil(_prelim_area / _prelim_dim["area_ocupada_m2"])
+            _prelim_total_panels = _prelim_n_inv * _prelim_dim["N_paneles"]
+            _prelim_total_kwp = _prelim_n_inv * _prelim_dim["P_dc_stc_kW"]
+            _prelim_total_area = _prelim_n_inv * _prelim_dim["area_ocupada_m2"]
+            _prelim_cobertura = (
+                min(round(_prelim_total_area / _prelim_area * 100, 1), 100.0)
+                if _prelim_area > 0 else 0
+            )
+            _prelim_titulo_area = (
+                "área útil para paneles"
+                if _prelim_f_ocup < 100.0 else "toda el área"
+            )
+            st.markdown(
+                f"#### 🏭 Proyecto completo ({_prelim_titulo_area})"
+            )
+            _pg1, _pg2, _pg3, _pg4, _pg5 = st.columns(5)
+            _pg1.metric("Inversores", _prelim_n_inv)
+            _pg2.metric("Paneles totales", f"{_prelim_total_panels:,}")
+            _pg3.metric("kWp instalados", f"{_prelim_total_kwp:,.1f} kWp")
+            _pg4.metric("Área cubierta", f"{_prelim_total_area:,.0f} m²")
+            _pg5.metric(
+                "Cobertura del área útil"
+                if _prelim_f_ocup < 100.0 else "Cobertura total",
+                f"{_prelim_cobertura} %",
+            )
+            st.session_state["N_inv_total"] = _prelim_n_inv
+            st.session_state["P_dc_total_kWp"] = round(_prelim_total_kwp, 2)
+            st.session_state["N_paneles_granja"] = _prelim_total_panels
+    else:
+        st.warning(
+            f"El inversor **{_prelim_modelo}** no tiene un número válido de "
+            "trackers para calcular el prorrateo preliminar."
         )
 
 # ── #122 — Diagnóstico del catálogo de inversores (patrón #24 de baterías) ───
