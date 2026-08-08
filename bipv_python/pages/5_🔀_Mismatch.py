@@ -580,7 +580,7 @@ with st.container(border=True):
         (
             f"{_metricas_electricas_m['perdida_bypass_ac_kWh']:,.0f} kWh AC/año"
             if _metricas_electricas_m["perdida_bypass_ac_kWh"] is not None
-            else "No aplica",
+            else "No aplica"
         ),
     )
     _em5, _em6, _em7, _em8 = st.columns(4)
