@@ -166,6 +166,43 @@ def tiene_sdm_completo(panel: dict) -> bool:
     return all(panel.get(k) not in (None, 0, "", "nan") for k in _SDM_KEYS)
 
 
+def resolver_panel_calibrado(panel: dict) -> dict:
+    """
+    Devuelve la versión calibrada canónica cuando el nombre del panel existe
+    también en el catálogo interno auditado.
+
+    El catálogo Excel puede contener la ficha comercial del mismo modelo sin
+    los parámetros SDM calibrados, o con Ns/NsA curados de otra fuente. En ese
+    caso no se deben mezclar silenciosamente ambas parametrizaciones: el SDM
+    calibrado es la fuente eléctrica común para Motor IV y Producción.
+    """
+    nombre = str(panel.get("nombre", "")).strip()
+    if not nombre:
+        return panel
+
+    # Import local para evitar acoplar la carga del catálogo interno al módulo.
+    from datos.tecnologias_bipv import MODULOS_BIPV
+
+    calibrado = MODULOS_BIPV.get(nombre)
+    if not calibrado or not tiene_sdm_completo(calibrado):
+        return panel
+
+    # Preservar metadatos comerciales/térmicos del catálogo seleccionado, pero
+    # nunca sobrescribir los parámetros eléctricos del SDM auditado.
+    metadatos = (
+        "marca", "fabricante", "costo_usd", "area_m2", "dimensiones_mm",
+        "NOCT", "transparencia_pct", "bifacialidad_pct", "notas",
+        "confianza", "fuente_NsA",
+    )
+    resultado = dict(calibrado)
+    for clave in metadatos:
+        valor = panel.get(clave)
+        if valor not in (None, "", "nan"):
+            resultado[clave] = valor
+    resultado["_sdm_calibrado_canonico"] = True
+    return resultado
+
+
 # ── Rangos Voc/celda @ STC esperados por tecnología (V/celda) ─────────────────
 _VOC_POR_CELDA_RANGO = {
     "Mono-Si":  (0.55, 0.76),
@@ -436,6 +473,13 @@ def preparar_panel_iv(panel: dict) -> "dict | None":
     Los paneles del catálogo Excel con NsA disponible activan automáticamente
     el Motor IV sin necesidad de parámetros SDM precalibrados.
     """
+    # Caso 0: el mismo modelo tiene una parametrización SDM calibrada auditada.
+    # Debe resolverse antes de mirar la ficha básica del Excel para que todas
+    # las páginas usen exactamente la misma curva IV.
+    panel_canonico = resolver_panel_calibrado(panel)
+    if panel_canonico is not panel:
+        return panel_canonico
+
     # Caso 1: SDM ya calibrado en catálogo (ruta rápida)
     if tiene_sdm_completo(panel):
         return panel
@@ -452,7 +496,21 @@ def preparar_panel_iv(panel: dict) -> "dict | None":
     if not (tiene_ficha and tiene_ns):
         return None  # Datos insuficientes → solo cálculo energético
 
-    return estimar_sdm_desde_ficha(panel)
+    estimado = estimar_sdm_desde_ficha(panel)
+    if estimado is None:
+        return None
+
+    # Nunca activar un SDM estimado que no reproduzca los puntos STC de ficha.
+    # Esto evita que un Ns/NsA incompatible produzca una curva con escala de
+    # tensión incorrecta y una energía anual aparentemente válida.
+    prueba = {**panel, **estimado}
+    try:
+        validacion = validar_sdm_vs_ficha(prueba, tolerancia_pct=5.0)
+    except (KeyError, TypeError, ValueError, FloatingPointError):
+        return None
+    if not validacion.get("validacion_ok", False):
+        return None
+    return estimado
 def validar_sdm_vs_ficha(panel: dict, tolerancia_pct=5.0) -> dict:
     """
     Compara el SDM calibrado contra los valores STC de la ficha.

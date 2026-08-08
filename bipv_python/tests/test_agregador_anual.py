@@ -124,6 +124,25 @@ def test_motor_base_expone_el_mismo_contrato_anual_oficial() -> None:
     assert res_base["critical_dates"] is None
 
 
+def test_panel_excel_con_mismo_nombre_usa_sdm_calibrado_canonico() -> None:
+    from calculos.modelo_iv import preparar_panel_iv
+
+    resuelto = preparar_panel_iv({
+        "nombre": "ASP-ST1-T40",
+        "tecnologia": "CdTe",
+        "Voc_stc": 116.0,
+        "Isc_stc": 0.80,
+        "Vmp_stc": 86.4,
+        "Imp_stc": 0.70,
+        "N_s": 223.0,
+        "NsA": 196.1,
+        "NOCT": 51.1,
+    })
+
+    assert resuelto is not None
+    assert resuelto["_sdm_calibrado_canonico"] is True
+
+
 def test_critical_dates_queda_separado_y_no_cambia_el_anual() -> None:
     resultado, poa = _serie_anual()
     critical_dates = {"modo": "critical_dates", "dias": ["21-03", "21-06"]}

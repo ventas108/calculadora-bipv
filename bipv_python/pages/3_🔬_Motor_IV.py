@@ -14,6 +14,7 @@ from calculos.modelo_iv import (
     tiene_sdm_completo,
     estimar_sdm_desde_ficha,
     verificar_ns_halfcut,
+    preparar_panel_iv,
 )
 from calculos.panel_iv_check import analizar_panel_motiv as _analizar_panel_motiv
 from calculos.temperatura import temperatura_celda_noct
@@ -44,7 +45,15 @@ _estimado       = False   # True si se usaron parámetros estimados
 _metodo_est     = ""
 
 if _panel_ss and _panel_nom_ss:
-    if tiene_sdm_completo(_panel_ss):
+    # Resolver primero el modelo calibrado canónico. El catálogo Excel puede
+    # tener la ficha del mismo panel con Ns/NsA distintos del SDM auditado.
+    _panel_resuelto = preparar_panel_iv(_panel_ss)
+    if (
+        _panel_resuelto is not None
+        and tiene_sdm_completo(_panel_resuelto)
+        and not _panel_resuelto.get("_estimado")
+    ):
+        _panel_ss = _panel_resuelto
         # ── Ficha SDM calibrada (ej. ASP-ST1-T40 de MODULOS_BIPV) ─────────────
         _modo_auto   = True
         _panel_activo = _panel_ss
