@@ -2,6 +2,8 @@
  * Tests unitarios para los parsers de Sun Path 3D y OBJ
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 // ── Sun Path 3D Parser Tests ────────────────────────────────────────
 
@@ -197,6 +199,31 @@ describe('Sun Path 3D Parser', () => {
       expect(result.dateTime.year).toBe(2026);
       expect(result.dateTime.day).toBe(6);
       expect(result.dateTime.hour).toBe(9);
+      expect(result.dateTime.minute).toBe(0);
+    });
+
+    it('lee la configuración adjunta de Bogotá y conserva sus convenciones', () => {
+      const fixture = JSON.parse(
+        readFileSync(resolve(process.cwd(), 'attached_assets/sunpath3d-2026-07-14-1516-30_1786198708895.json'), 'utf8'),
+      ) as SunPath3DJSON;
+      expect(validateSunPath3DJSON(fixture)).toBe(true);
+
+      const result = parseSunPath3D(fixture);
+      expect(result.location).toEqual({
+        latitude: 4.622,
+        longitude: -74.071,
+        timezone: -5,
+        northOffset: 7,
+      });
+      expect(result.dateTime).toMatchObject({
+        year: 2026,
+        month: 12,
+        day: 9,
+        hour: 6.5,
+        minute: 30,
+        monthName: 'Dic',
+      });
+      expect(getSunPath3DSummary(fixture).dateTime).toContain('06:30h');
     });
 
     it('extrae la configuración del domo solar', () => {
@@ -252,7 +279,7 @@ describe('Sun Path 3D Parser', () => {
       const summary = getSunPath3DSummary(validSunPath3D);
       expect(summary.location).toBe('6.3390°, -75.5422°');
       expect(summary.timezone).toBe('UTC-5');
-      expect(summary.dateTime).toBe('Mar 6, 2026 — 9:00h');
+      expect(summary.dateTime).toBe('Mar 6, 2026 — 09:00h');
       expect(summary.shadowsEnabled).toBe(true);
     });
 

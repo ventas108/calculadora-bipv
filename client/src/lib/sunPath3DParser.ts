@@ -77,6 +77,7 @@ export interface SunPath3DParseResult {
     month: number; // 1-indexed (1=Jan, 2=Feb, ...)
     day: number;
     hour: number;
+    minute: number;
     monthName: string;
   };
   sunPathConfig: {
@@ -89,6 +90,14 @@ export interface SunPath3DParseResult {
 
 const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
+export function formatSunPath3DTime(hour: number): string {
+  const totalMinutes = Math.round(hour * 60);
+  const normalizedMinutes = ((totalMinutes % 1440) + 1440) % 1440;
+  const hours = Math.floor(normalizedMinutes / 60);
+  const minutes = normalizedMinutes % 60;
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+}
+
 /**
  * Valida que un objeto sea un JSON válido de Sun Path 3D
  */
@@ -99,14 +108,50 @@ export function validateSunPath3DJSON(data: unknown): boolean {
   // Must have Location
   if (!obj.Location || typeof obj.Location !== 'object') return false;
   const loc = obj.Location as Record<string, unknown>;
-  if (typeof loc.latitude !== 'number' || typeof loc.longitude !== 'number') return false;
-  if (typeof loc.timezone !== 'number') return false;
+  if (
+    typeof loc.latitude !== 'number' ||
+    typeof loc.longitude !== 'number' ||
+    !Number.isFinite(loc.latitude) ||
+    !Number.isFinite(loc.longitude) ||
+    loc.latitude < -90 ||
+    loc.latitude > 90 ||
+    loc.longitude < -180 ||
+    loc.longitude > 180
+  ) return false;
+  if (
+    typeof loc.timezone !== 'number' ||
+    !Number.isFinite(loc.timezone) ||
+    loc.timezone < -14 ||
+    loc.timezone > 14
+  ) return false;
+  if (
+    loc.northOffset !== undefined &&
+    (typeof loc.northOffset !== 'number' ||
+      !Number.isFinite(loc.northOffset) ||
+      loc.northOffset < -180 ||
+      loc.northOffset > 180)
+  ) return false;
 
   // Must have DateTime
   if (!obj.DateTime || typeof obj.DateTime !== 'object') return false;
   const dt = obj.DateTime as Record<string, unknown>;
-  if (typeof dt.clockTime !== 'number' || typeof dt.dayOfMonth !== 'number') return false;
-  if (typeof dt.monthOfYear !== 'number') return false;
+  if (
+    typeof dt.clockTime !== 'number' ||
+    !Number.isFinite(dt.clockTime) ||
+    dt.clockTime < 0 ||
+    dt.clockTime >= 24 ||
+    typeof dt.dayOfMonth !== 'number' ||
+    !Number.isInteger(dt.dayOfMonth) ||
+    dt.dayOfMonth < 1 ||
+    dt.dayOfMonth > 31 ||
+    typeof dt.monthOfYear !== 'number' ||
+    !Number.isInteger(dt.monthOfYear) ||
+    dt.monthOfYear < 0 ||
+    dt.monthOfYear > 11 ||
+    typeof dt.year !== 'number' ||
+    !Number.isInteger(dt.year) ||
+    dt.year < 1
+  ) return false;
 
   // Must have SunPath
   if (!obj.SunPath || typeof obj.SunPath !== 'object') return false;
@@ -147,6 +192,7 @@ export function parseSunPath3D(data: SunPath3DJSON): SunPath3DParseResult {
       month: month1Indexed,
       day: data.DateTime.dayOfMonth,
       hour: data.DateTime.clockTime,
+      minute: Math.round((data.DateTime.clockTime % 1) * 60),
       monthName: MONTH_NAMES[monthIndex] || 'Ene',
     },
     sunPathConfig: {
@@ -172,7 +218,7 @@ export function getSunPath3DSummary(data: SunPath3DJSON): {
   return {
     location: `${result.location.latitude.toFixed(4)}°, ${result.location.longitude.toFixed(4)}°`,
     timezone: `UTC${result.location.timezone >= 0 ? '+' : ''}${result.location.timezone}`,
-    dateTime: `${result.dateTime.monthName} ${result.dateTime.day}, ${result.dateTime.year} — ${result.dateTime.hour}:00h`,
+    dateTime: `${result.dateTime.monthName} ${result.dateTime.day}, ${result.dateTime.year} — ${formatSunPath3DTime(result.dateTime.hour)}h`,
     center: `(${result.sunPathConfig.center[0]}, ${result.sunPathConfig.center[1]}, ${result.sunPathConfig.center[2]})`,
     shadowsEnabled: result.shadowsEnabled,
   };

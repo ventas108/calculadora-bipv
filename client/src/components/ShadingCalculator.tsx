@@ -21,6 +21,7 @@ import {
   validateSunPath3DJSON,
   isSunPath3DJSON,
   parseSunPath3D,
+  formatSunPath3DTime,
   getSunPath3DSummary,
 } from '@/lib/sunPath3DParser';
 import {
@@ -1075,12 +1076,10 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
         setSunPath3DPreview(result);
 
         // If the JSON also has northOffset, save it for OBJ imports
-        if (result.location.northOffset !== 0) {
-          setObjNorthOffset(result.location.northOffset);
-        }
+        setObjNorthOffset(result.location.northOffset);
 
         toast.info(
-          `Sun Path 3D cargado: ${result.location.latitude.toFixed(2)}°, ${result.location.longitude.toFixed(2)}° — ${result.dateTime.monthName} ${result.dateTime.day}, ${result.dateTime.hour}:00h`
+          `Sun Path 3D cargado: ${result.location.latitude.toFixed(2)}°, ${result.location.longitude.toFixed(2)}° — ${result.dateTime.monthName} ${result.dateTime.day}, ${formatSunPath3DTime(result.dateTime.hour)}h`
         );
       } catch (error) {
         toast.error('Error al leer el archivo JSON de Sun Path 3D');
@@ -1115,7 +1114,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
         let dhiClear = 0;
         let ghiClear = 0;
         try {
-          const pos = calculateSolarPosition(location.latitude, location.longitude, location.timezone, month, day, hourDecimal);
+          const pos = calculateSolarPosition(location.latitude, location.longitude, location.timezone, month, day, hourDecimal, dateTime.year);
           if (pos.altitude > 0) {
             const sinAlt = Math.sin(pos.altitude * Math.PI / 180);
             const A = 0; // sea level
@@ -1129,7 +1128,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
           }
         } catch { /* skip */ }
         syntheticWeatherRecords.push({
-          year: 2024, month, day, hour: h, minute: 0,
+          year: dateTime.year, month, day, hour: h, minute: 0,
           temperature: 20, dewPoint: 10, relativeHumidity: 60,
           atmosphericPressure: 101325,
           directNormalIrradiance: Math.round(dniClear),
@@ -1164,7 +1163,8 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
       location.timezone,
       dateTime.month,
       dateTime.day,
-      dateTime.hour
+      dateTime.hour,
+      dateTime.year
     );
 
     if (pos.altitude > 0) {
@@ -1188,7 +1188,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
 
     toast.success(
       `Ubicación aplicada: ${location.latitude.toFixed(4)}°, ${location.longitude.toFixed(4)}° (UTC${location.timezone >= 0 ? '+' : ''}${location.timezone}). ` +
-      `Punto de análisis agregado: ${dateTime.monthName} ${dateTime.day}, ${dateTime.hour}:00h`
+      `Punto de análisis agregado: ${dateTime.monthName} ${dateTime.day}, ${formatSunPath3DTime(dateTime.hour)}h`
     );
 
     setSunPath3DPreview(null);
@@ -1238,7 +1238,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
             const { result: parsed, formatName } = await parseMultiFormat(file.name, rawResult);
             setObjRawParse(parsed);
 
-            const northOff = sunPath3DPreview?.location.northOffset || objNorthOffset;
+            const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
             const result = convertOBJToObstacles(parsed, undefined, northOff, objSwapYZ, objScale);
             setObjPreview(result);
 
@@ -1276,7 +1276,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
           const parsed = gltfResult.objResult;
           setObjRawParse(parsed);
 
-          const northOff = sunPath3DPreview?.location.northOffset || objNorthOffset;
+          const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
           const result = convertOBJToObstacles(parsed, undefined, northOff, objSwapYZ, objScale);
           setObjPreview(result);
 
@@ -1297,7 +1297,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
           const parsed = parseOBJText(text);
           setObjRawParse(parsed);
 
-          const northOff = sunPath3DPreview?.location.northOffset || objNorthOffset;
+          const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
           const result = convertOBJToObstacles(parsed, undefined, northOff, objSwapYZ, objScale);
           setObjPreview(result);
 
@@ -1328,7 +1328,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
   // Reconvert OBJ when settings change
   const reconvertOBJ = useCallback(() => {
     if (!objRawParse) return;
-    const northOff = sunPath3DPreview?.location.northOffset || objNorthOffset;
+    const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
     const result = convertOBJToObstacles(objRawParse, undefined, northOff, objSwapYZ, objScale);
     setObjPreview(result);
   }, [objRawParse, objSwapYZ, objScale, objNorthOffset, sunPath3DPreview]);
@@ -1688,7 +1688,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
               <div className="bg-teal-50 rounded-lg p-3">
                 <p className="text-[10px] text-gray-500 uppercase tracking-wide">Fecha / Hora</p>
                 <p className="text-sm font-mono font-semibold text-teal-800">
-                  {sunPath3DPreview.dateTime.monthName} {sunPath3DPreview.dateTime.day}, {sunPath3DPreview.dateTime.year} — {sunPath3DPreview.dateTime.hour}:00h
+                  {sunPath3DPreview.dateTime.monthName} {sunPath3DPreview.dateTime.day}, {sunPath3DPreview.dateTime.year} — {formatSunPath3DTime(sunPath3DPreview.dateTime.hour)}h
                 </p>
               </div>
               <div className="bg-teal-50 rounded-lg p-3">
@@ -1700,7 +1700,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
             </div>
 
             <div className="text-xs text-gray-500 bg-gray-50 rounded p-2 space-y-1">
-              <p><strong>Al confirmar:</strong> Se aplicará la ubicación ({sunPath3DPreview.location.latitude.toFixed(2)}°, {sunPath3DPreview.location.longitude.toFixed(2)}°) y se agregará un punto de análisis para {sunPath3DPreview.dateTime.monthName} {sunPath3DPreview.dateTime.day} a las {sunPath3DPreview.dateTime.hour}:00h.</p>
+              <p><strong>Al confirmar:</strong> Se aplicará la ubicación ({sunPath3DPreview.location.latitude.toFixed(2)}°, {sunPath3DPreview.location.longitude.toFixed(2)}°) y se agregará un punto de análisis para {sunPath3DPreview.dateTime.monthName} {sunPath3DPreview.dateTime.day} a las {formatSunPath3DTime(sunPath3DPreview.dateTime.hour)}h.</p>
               <p className="text-amber-700"><strong>Punto de origen:</strong> El observador se ubica automáticamente en el centro del bounding box del modelo 3D (z = suelo + 1.5 m). Para usar el punto de origen de SketchUp, asegúrate de que el modelo OBJ tenga el origen en la posición correcta antes de exportar.</p>
               <p className="text-teal-700"><strong>Datos sintéticos:</strong> Se generarán registros de cielo claro para los 4 días críticos (equinoccios + solsticios), permitiendo ejecutar el cruce Máscara+EPW. Para FS climático real, carga un archivo EPW en "Datos Meteorológicos".</p>
               {sunPath3DPreview.shadowsEnabled && <p>✓ Las sombras estaban habilitadas en Sun Path 3D.</p>}
@@ -1860,7 +1860,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                   onChange={(e) => {
                     setObjSwapYZ(e.target.checked);
                     if (objRawParse) {
-                      const northOff = sunPath3DPreview?.location.northOffset || objNorthOffset;
+                      const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
                       const result = convertOBJToObstacles(objRawParse, undefined, northOff, e.target.checked, objScale);
                       setObjPreview(result);
                     }
@@ -1877,7 +1877,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                     const newScale = parseFloat(e.target.value);
                     setObjScale(newScale);
                     if (objRawParse) {
-                      const northOff = sunPath3DPreview?.location.northOffset || objNorthOffset;
+                      const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
                       const result = convertOBJToObstacles(objRawParse, undefined, northOff, objSwapYZ, newScale);
                       setObjPreview(result);
                     }
@@ -1975,7 +1975,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
         existingObstacles={obstacles}
         existingObstacleVertices3D={obstacleVertices3D}
         onModelImported={handleModelImported}
-        northOffset={sunPath3DPreview?.location.northOffset || objNorthOffset}
+        northOffset={sunPath3DPreview?.location.northOffset ?? objNorthOffset}
       />
 
       {/* Evaluation Model Summary + Facade Selector for Sun Path */}
