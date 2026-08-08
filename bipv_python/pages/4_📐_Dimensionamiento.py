@@ -169,12 +169,25 @@ with col2:
         _vmppt_min  = inversor.get("Vmppt_min") or inversor.get("Vmppt_activo_min") or 0
         _vmp_panel  = panel.get("Vmp_stc") or panel.get("Vmp") or 1
         _n_min_elec = max(1, math.ceil(_vmppt_min / _vmp_panel)) if _vmppt_min else 5
-        _n_min_def  = max(_n_min_elec, int(st.session_state.get("N_min_scan", _n_min_elec)))
+        _n_min_guardado = int(
+            st.session_state.get("N_min_scan", _n_min_elec)
+        )
+        _n_min_def = max(_n_min_elec, _n_min_guardado)
+        _n_min_ajuste_manual = _n_min_def > _n_min_elec
         N_min_scan = st.number_input(
-            f"N mínimo a explorar (eléctrico: {_n_min_elec})",
+            (
+                f"N mínimo a explorar "
+                f"({'ajuste manual; eléctrico: ' + str(_n_min_elec) if _n_min_ajuste_manual else 'eléctrico: ' + str(_n_min_elec)})"
+            ),
             value=_n_min_def, min_value=1, max_value=40, key="N_min_scan",
             help=f"Calculado como ⌈Vmppt_min({_vmppt_min}V) / Vmp_panel({_vmp_panel:.1f}V)⌉ = {_n_min_elec}"
         )
+        if _n_min_ajuste_manual:
+            st.caption(
+                f"ℹ️ El mínimo eléctrico es **{_n_min_elec}**; se está explorando "
+                f"desde **{_n_min_def}** por un valor manual guardado. "
+                "Puedes reducirlo para incluir también configuraciones menores."
+            )
     with col_nm2:
         N_max_scan = st.number_input("N máximo a explorar", value=int(st.session_state.get("N_max_scan", 20)), min_value=2, max_value=40, key="N_max_scan")
 
@@ -205,20 +218,31 @@ if _tmy_applied:
 if panel.get("costo_usd"):
     st.session_state["costo_modulo_usd"] = panel["costo_usd"]
 
-# ── Indicador completitud ficha técnica ───────────────────────────────────────
-_iv_params  = ["Voc", "Vmp", "Isc", "Imp", "N_s", "NsA"]
-_faltantes  = [k for k in _iv_params if not panel.get(k)]
-if not _faltantes:
-    st.success("🟢 Ficha completa — Motor IV se activará automáticamente")
-elif len(_faltantes) <= 2:
-    st.warning(f"🟡 Ficha parcial — faltan: {', '.join(_faltantes)} | Motor IV usará estimación")
+# ── Indicador de datos para Motor IV ──────────────────────────────────────────
+# Este estado debe usar el mismo validador que el aviso superior y Motor IV:
+# Voc/Isc/Vmp/Imp son obligatorios; N_s, tecnología y coeficientes tienen
+# defaults. Evita mostrar simultáneamente "puede simularse" y "solo energético".
+if not _iv_err:
+    st.success(
+        "🟢 Datos IV obligatorios completos — Motor IV se activará automáticamente"
+    )
 else:
-    st.error(f"🔴 Ficha incompleta — faltan: {', '.join(_faltantes)} | solo cálculo energético")
+    _faltantes_obligatorios = ", ".join(c for c, _ in _iv_err)
+    st.error(
+        f"🔴 Ficha incompleta para Motor IV — faltan: "
+        f"{_faltantes_obligatorios} | solo cálculo energético"
+    )
+if _iv_adv and not _iv_err:
+    _adv_motor = ", ".join(c for c, _ in _iv_adv)
+    st.info(
+        f"ℹ️ Motor IV usará estimaciones/defaults en: {_adv_motor}. "
+        "La simulación estará disponible, pero con menor precisión."
+    )
 if panel.get("notas"):
     st.caption(f"📋 {panel['notas'][:120]}")
 
 # ── Motor IV automático — curva IV real para paneles 🟢 ───────────────────────
-if not _faltantes:  # panel 🟢: tiene Voc, Vmp, Isc, Imp, N_s, NsA
+if not _iv_err:  # Voc/Isc/Vmp/Imp presentes; opcionales usan defaults
     _panel_iv = preparar_panel_iv(panel)
     if _panel_iv is not None:
         with st.expander("📈 Curva I-V real (Motor IV activado automáticamente)", expanded=False):
