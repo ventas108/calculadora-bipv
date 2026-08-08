@@ -13,6 +13,8 @@ interface ShadingPoint {
   obstacle: string;
   shadedArea: number;
   fs: number;
+  fsGeometrico?: number;
+  fsClimatico?: number;
 }
 
 interface POAData {
@@ -160,13 +162,18 @@ export function generateSolarReport(data: ReportData): jsPDF {
       });
 
       // Calcular FS mensuales desde shadingPoints si hay
-      let shadingFactors = Array(12).fill(1.0);
+      let transmisionGeometricaMensual = Array(12).fill(1.0);
       if (data.shadingPoints && data.shadingPoints.length > 0) {
         const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        shadingFactors = monthNames.map(monthName => {
+        transmisionGeometricaMensual = monthNames.map(monthName => {
           const monthPoints = data.shadingPoints.filter(p => p.month === monthName);
           if (monthPoints.length === 0) return 1.0;
-          return monthPoints.reduce((a, p) => a + (p.fs ?? 1), 0) / monthPoints.length;
+          return monthPoints.reduce((sum, p) => {
+            // Solo la capa geométrica puede alimentar Producción. Los
+            // reportes antiguos sin ella quedan neutros, nunca combinados.
+            if (typeof p.fsGeometrico !== 'number') return sum + 1;
+            return sum + (1 - Math.max(0, Math.min(1, p.fsGeometrico)));
+          }, 0) / monthPoints.length;
         });
       }
 
@@ -174,7 +181,7 @@ export function generateSolarReport(data: ReportData): jsPDF {
         monthlyPOAInput,
         panelSpecs,
         sysLosses,
-        shadingFactors
+        transmisionGeometricaMensual
       );
     } catch (err) {
       console.warn('[ReportGen] Auto-cálculo de producción falló:', err);
@@ -313,8 +320,8 @@ export function generateSolarReport(data: ReportData): jsPDF {
     // Solsticios: Jun (mes 6) y Dic (mes 12)
     const junData = fa.monthlyData.find(m => m.month === 6);
     const dicData = fa.monthlyData.find(m => m.month === 12);
-    const fsJun = junData ? junData.fsAverage : 1.0;
-    const fsDic = dicData ? dicData.fsAverage : 1.0;
+    const fsJun = junData ? junData.fsGeometricoAverage : 0;
+    const fsDic = dicData ? dicData.fsGeometricoAverage : 0;
     const fsPromSolsticios = (fsJun + fsDic) / 2;
 
     // Tabla resumen de solsticios
@@ -342,7 +349,7 @@ export function generateSolarReport(data: ReportData): jsPDF {
     // KPIs de sombreado de la fachada
     doc.setFontSize(9);
     doc.setTextColor(60, 60, 60);
-    doc.text(`FS Anual Ponderado: ${(fa.annualFS * 100).toFixed(1)}% | POA con sombra: ${fa.annualPOA.toFixed(0)} kWh/m2/ano | POA sin sombra: ${fa.annualPOANoShading.toFixed(0)} kWh/m2/ano`, margin, yPosition);
+    doc.text(`FS_geometrico anual: ${(fa.annualFsGeometrico * 100).toFixed(1)}% sombra | POA con sombra: ${fa.annualPOA.toFixed(0)} kWh/m2/ano | POA sin sombra: ${fa.annualPOANoShading.toFixed(0)} kWh/m2/ano`, margin, yPosition);
     yPosition += 5;
     doc.text(`Perdida anual por sombreado: ${fa.annualShadingLoss.toFixed(1)}% | Area evaluada: ${fa.area.toFixed(1)} m2`, margin, yPosition);
     yPosition += 10;

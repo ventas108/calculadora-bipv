@@ -62,7 +62,7 @@ interface EnergyProductionSimulatorProps {
     avgTemp: number;
     avgWindSpeed: number;
   }>;
-  shadingFactors?: number[];
+  transmisionGeometricaMensual?: number[];
   prospectorData?: ProspectorToSimulatorData | null;
   onDiscardProspector?: () => void;
   optimizerResult?: OptimizerResult | null;
@@ -105,7 +105,7 @@ interface EnergyProductionSimulatorProps {
   onResimultateBIPV?: () => void;
 }
 
-export default function EnergyProductionSimulator({ weatherData, poaData, shadingFactors = Array(12).fill(1.0), prospectorData, onDiscardProspector, optimizerResult, onDiscardOptimizer, pvgisData, onDiscardPvgis, pvwattsData, onDiscardPvwatts, onInstallConfigChange, poaConfig, onPoaConfigChange, facadeAnalysis3D, modelFacades = [], modelObstacles3D, modelNorthOffset = 0, onFacadeSelectFromSimulator, onFinancialParamsChange, onEnergyDataChange, bipvData, onDiscardBipv, onReturnToBIPV, onResimultateBIPV }: EnergyProductionSimulatorProps) {
+export default function EnergyProductionSimulator({ weatherData, poaData, transmisionGeometricaMensual = Array(12).fill(1.0), prospectorData, onDiscardProspector, optimizerResult, onDiscardOptimizer, pvgisData, onDiscardPvgis, pvwattsData, onDiscardPvwatts, onInstallConfigChange, poaConfig, onPoaConfigChange, facadeAnalysis3D, modelFacades = [], modelObstacles3D, modelNorthOffset = 0, onFacadeSelectFromSimulator, onFinancialParamsChange, onEnergyDataChange, bipvData, onDiscardBipv, onReturnToBIPV, onResimultateBIPV }: EnergyProductionSimulatorProps) {
   // Panel technology selection
   const [selectedTech, setSelectedTech] = useState<PanelTechnology>(DEFAULT_PANEL_TECHNOLOGIES[0]);
   const [yearsFromInstall, setYearsFromInstall] = useState(0);
@@ -126,12 +126,12 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
     }
   }, [facadeAnalysis3D]);
 
-  const activeShadingFactors = useMemo(() => {
+  const activeTransmisionGeometricaMensual = useMemo(() => {
     if (use3DShading && facadeAnalysis3D) {
-      return facadeAnalysis3D.monthlyShadingFactors;
+      return facadeAnalysis3D.monthlyTransmisionGeometrica;
     }
-    return shadingFactors;
-  }, [use3DShading, facadeAnalysis3D, shadingFactors]);
+    return transmisionGeometricaMensual;
+  }, [use3DShading, facadeAnalysis3D, transmisionGeometricaMensual]);
 
   // Auto-detección de región climática colombiana
   const detectedRegion = useMemo(() => {
@@ -891,8 +891,8 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
     const cellTempFieldOverride = (fieldMeasurementsEnabled && fieldCellTemp !== null)
       ? fieldCellTemp
       : undefined;
-    return calculateAnnualProduction(monthlyPOAData, panelSpecs, systemLosses, activeShadingFactors, cellTempFieldOverride, iamMensualData, soilingMensualData);
-  }, [monthlyPOAData, panelSpecs, systemLosses, activeShadingFactors, fieldMeasurementsEnabled, fieldCellTemp, iamMensualData, soilingMensualData]);
+    return calculateAnnualProduction(monthlyPOAData, panelSpecs, systemLosses, activeTransmisionGeometricaMensual, cellTempFieldOverride, iamMensualData, soilingMensualData);
+  }, [monthlyPOAData, panelSpecs, systemLosses, activeTransmisionGeometricaMensual, fieldMeasurementsEnabled, fieldCellTemp, iamMensualData, soilingMensualData]);
 
   // ===== ENERGY PERFORMANCE INDEX (EPI) - IEC 61724-1:2021 =====
   // EPI = E_AC_simulador / E_AC_benchmark (PVWatts como benchmark satelital)
@@ -1000,8 +1000,8 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
 
   const COLORS = ['#EF4444', '#F97316', '#F59E0B', '#FBBF24', '#A3E635', '#4ADE80', '#22C55E', '#10B981'];
 
-  const hasShadingData = activeShadingFactors.some(f => f < 1.0);
-  const avgShadingFactor = activeShadingFactors.reduce((a, b) => a + b, 0) / 12;
+  const hasShadingData = activeTransmisionGeometricaMensual.some(f => f < 1.0);
+  const avgTransmisionGeometrica = activeTransmisionGeometricaMensual.reduce((a, b) => a + b, 0) / 12;
 
   return (
     <div className="space-y-6">
@@ -1373,7 +1373,7 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
           availabilityLosses: 1.5,
           iamLosses: 0, // Panel estándar sin IAM ASHRAE
         };
-        const sinBIPV = calculateAnnualProduction(monthlyPOAData, panelEstandar, lossesEstandar, shadingFactors);
+        const sinBIPV = calculateAnnualProduction(monthlyPOAData, panelEstandar, lossesEstandar, activeTransmisionGeometricaMensual);
         
         // Capacidades para Yield
         const kwpConBIPV = (panelPower * panelQuantity) / 1000;
@@ -1619,9 +1619,9 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
             <Shield size={14} />
             <span>
               <strong>Sombreado:</strong> {(use3DShading && facadeAnalysis3D)
-                ? `Modelo 3D: ${facadeAnalysis3D.facadeName} (FS=${(facadeAnalysis3D.annualFS * 100).toFixed(1)}%, Pérdida=${facadeAnalysis3D.annualShadingLoss.toFixed(1)}%)`
+                ? `Modelo 3D: ${facadeAnalysis3D.facadeName} (FS_geometrico=${(facadeAnalysis3D.annualFsGeometrico * 100).toFixed(1)}% sombra, Transmisión aplicada=${(facadeAnalysis3D.annualTransmisionGeometrica * 100).toFixed(1)}%)`
                 : hasShadingData
-                ? `Activo (FS prom. ${(avgShadingFactor * 100).toFixed(1)}%)`
+                ? `Activo (Transmisión geométrica prom. ${(avgTransmisionGeometrica * 100).toFixed(1)}%)`
                 : 'Sin datos (FS=100%). Importa modelo 3D o ingresa puntos en Calculadora.'}
             </span>
           </div>
@@ -1696,7 +1696,7 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
                       </div>
                       {isActive && facadeAnalysis3D && (
                         <div className="text-[10px] text-purple-700 font-medium mt-0.5">
-                          FS={( facadeAnalysis3D.annualFS * 100).toFixed(1)}% | Pérdida={facadeAnalysis3D.annualShadingLoss.toFixed(1)}%
+                          FS_geometrico={( facadeAnalysis3D.annualFsGeometrico * 100).toFixed(1)}% | Pérdida={facadeAnalysis3D.annualShadingLoss.toFixed(1)}%
                         </div>
                       )}
                     </div>
@@ -2681,23 +2681,23 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
           </h4>
           {(use3DShading && facadeAnalysis3D) && (
             <p className="text-xs text-purple-700 mb-2">
-              FS anual: <strong>{(facadeAnalysis3D.annualFS * 100).toFixed(1)}%</strong> | 
+              FS_geometrico anual: <strong>{(facadeAnalysis3D.annualFsGeometrico * 100).toFixed(1)}%</strong> |
               Pérdida por sombra: <strong>{facadeAnalysis3D.annualShadingLoss.toFixed(1)}%</strong> | 
               Horas sol efectivas: <strong>{facadeAnalysis3D.monthlyData.reduce((a, m) => a + m.effectiveSunHours, 0).toFixed(0)}h</strong> de {facadeAnalysis3D.monthlyData.reduce((a, m) => a + m.totalSunHours, 0).toFixed(0)}h disponibles
             </p>
           )}
           {(!use3DShading && hasShadingData) && (
             <p className="text-xs text-amber-700 mb-2">
-              FS anual promedio: <strong>{(avgShadingFactor * 100).toFixed(1)}%</strong> | 
-              Pérdida promedio de sombreado: <strong>{((1 - avgShadingFactor) * 100).toFixed(1)}%</strong>
+              Transmisión geométrica promedio: <strong>{(avgTransmisionGeometrica * 100).toFixed(1)}%</strong> |
+              Pérdida promedio de sombreado: <strong>{((1 - avgTransmisionGeometrica) * 100).toFixed(1)}%</strong>
             </p>
           )}
           <div className="grid grid-cols-6 md:grid-cols-12 gap-1">
             {MONTHS.map((m, i) => (
               <div key={m} className="text-center">
                 <p className="text-[10px] text-gray-500">{m}</p>
-                <p className={`text-xs font-mono font-bold ${activeShadingFactors[i] < 0.9 ? 'text-red-600' : activeShadingFactors[i] < 1.0 ? 'text-amber-600' : 'text-green-600'}`}>
-                  {(activeShadingFactors[i] * 100).toFixed(0)}%
+                <p className={`text-xs font-mono font-bold ${activeTransmisionGeometricaMensual[i] < 0.9 ? 'text-red-600' : activeTransmisionGeometricaMensual[i] < 1.0 ? 'text-amber-600' : 'text-green-600'}`}>
+                  {(activeTransmisionGeometricaMensual[i] * 100).toFixed(0)}%
                 </p>
               </div>
             ))}
@@ -2838,7 +2838,7 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
               <div className="pt-2 border-t mt-2">
                 <div className="flex justify-between items-center font-semibold text-amber-700">
                   <span>Sombreado (auto):</span>
-                  <span>{((1 - avgShadingFactor) * 100).toFixed(1)}%</span>
+                  <span>{((1 - avgTransmisionGeometrica) * 100).toFixed(1)}%</span>
                 </div>
                 <p className="text-[10px] text-gray-400 mt-1">Calculado desde la pestaña Calculadora</p>
               </div>
@@ -3728,7 +3728,7 @@ export default function EnergyProductionSimulator({ weatherData, poaData, shadin
             pvgisAC: pvgisData?.monthlyData?.[idx]?.productionCorrectedAC_kWh ?? null,
             pvwattsAC: pvwattsData?.monthlyData?.[idx]?.ac_kWh ?? null,
             bipvAC: bipvData?.produccionMensualKwh?.[idx] ?? null,
-            shadingPct: shadingFactors[idx] * 100,
+            shadingPct: (1 - activeTransmisionGeometricaMensual[idx]) * 100,
           }))}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
             <XAxis dataKey="month" stroke="#6B7280" />

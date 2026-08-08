@@ -16,7 +16,7 @@ import PVGISAnalyzer, { PVGISToSimulatorData } from '@/components/PVGISAnalyzer'
 import BIPVDiagnostic from '@/components/BIPVDiagnostic';
 import BIPVGlassSimulator from '@/components/BIPVGlassSimulator';
 import { BIPVToEnergyData } from '@/lib/bipvToEnergyBridge';
-import { EPWData, getWeatherCorrectionFactor } from '@/lib/epwParser';
+import { EPWData } from '@/lib/epwParser';
 import { runBIPVSimulation, type WeatherHourData, type BIPVSimulationConfig } from '@/lib/iamSoilingEngine';
 import { BIPV_GLASS_CATALOG } from '@/lib/bipvGlassCatalog';
 import { calculateHourlyPOA } from '@/lib/liuJordanModel';
@@ -44,35 +44,35 @@ export default function Home() {
   const [selectedCity, setSelectedCity] = useState<CityWeatherData | null>(null);
   const [shadingPoints, setShadingPoints] = useState<any[]>([]);
 
-  // Calcular factores de sombreado mensuales promedio de manera reactiva (con o sin meteorología)
-  const monthlyShadingFactors = useMemo(() => {
+  // FS_geometrico es p_shade (0=sin sombra, 1=sombra total).
+  // Producción recibe únicamente su complemento como transmisión geométrica.
+  const monthlyTransmisionGeometrica = useMemo(() => {
     const monthlyFactors = Array(12).fill(1.0);
     const monthCounts = Array(12).fill(0);
-    const monthSums = Array(12).fill(0);
+    const monthShadowSums = Array(12).fill(0);
     const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     
     shadingPoints.forEach(p => {
       const normalizedMonth = normalizeMonthToAbbr(p.month);
       const idx = MONTH_NAMES.indexOf(normalizedMonth);
       if (idx >= 0) {
-        let finalFS = p.fs;
-        if (weatherData) {
-          const monthNum = idx + 1;
-          const correction = getWeatherCorrectionFactor(weatherData, monthNum, p.day, p.hour);
-          finalFS = p.fs * correction;
+        // Nunca inferir geometría desde `fs`: puede ser transmisión manual
+        // histórica o FS combinado con clima. Sin capa geométrica, el punto
+        // queda neutro para Producción.
+        if (typeof p.fsGeometrico === 'number') {
+          monthShadowSums[idx] += Math.max(0, Math.min(1, p.fsGeometrico));
+          monthCounts[idx]++;
         }
-        monthSums[idx] += finalFS;
-        monthCounts[idx]++;
       }
     });
     for (let i = 0; i < 12; i++) {
       if (monthCounts[i] > 0) {
-        monthlyFactors[i] = monthSums[i] / monthCounts[i];
+        monthlyFactors[i] = 1 - monthShadowSums[i] / monthCounts[i];
       }
     }
-    console.log('Integración Calculadora - Puntos:', shadingPoints.length, 'Factores mensuales:', monthlyFactors);
+    console.log('Integración geométrica — puntos:', shadingPoints.length, 'transmisión mensual:', monthlyFactors);
     return monthlyFactors;
-  }, [shadingPoints, weatherData]);
+  }, [shadingPoints]);
 
   // Análisis 3D de fachada activa (prioridad sobre puntos manuales)
   const [facadeAnalysis3D, setFacadeAnalysis3D] = useState<FacadeFullAnalysis | null>(null);
@@ -129,7 +129,7 @@ export default function Home() {
   };
 
   // Callback para recibir factores de sombreado de la calculadora
-  const handleShadingPointsChange = useCallback((points: Array<{month: string; day: number; hour: number; solarHeight: number; solarAzimuth: number; obstacle: string; shadedArea: number; fs: number}>) => {
+  const handleShadingPointsChange = useCallback((points: Array<{month: string; day: number; hour: number; solarHeight: number; solarAzimuth: number; obstacle: string; shadedArea: number; fs: number; fsGeometrico?: number; fsClimatico?: number; fsCombinado?: number}>) => {
     setShadingPoints(points);
   }, []);
 
@@ -507,7 +507,7 @@ export default function Home() {
         const panelQty = energyData.panelQuantity || 1;
         const systemLosses = energyData.systemLosses || 0.15;
         const capacity = panelPower * panelQty / 1000; // kWp
-        const fsAnnual = analysis.annualFS;
+        const fsAnnual = analysis.annualFsGeometrico;
         const prodAC = poaTotal * capacity * (1 - systemLosses) * fsAnnual;
         const specificYield = capacity > 0 ? prodAC / capacity : 0;
         const pr = poaTotal > 0 ? prodAC / (poaTotal * capacity) : 0;
@@ -730,7 +730,7 @@ export default function Home() {
         {view === 'radiation' && weatherData && <SolarRadiationChart weatherData={weatherData} />}
         {view === 'optimizer' && weatherData && <OrientationOptimizer weatherData={weatherData} sharedTilt={effectiveTilt} sharedAzimuth={poaAzimuth} onConfigChange={(cfg) => { setPoaTilt(cfg.tilt); setPoaAzimuth(cfg.azimuth); }} tiltRange={installTiltRange} azimuthLocked={installAzimuthLocked} installationType={installTypeName} onSendToSimulator={(result) => { setOptimizerResult(result); setPoaTilt(result.optimalTilt); setPoaAzimuth(result.optimalAzimuth); handleSetView('energy'); }} />}
         {view === 'poa' && weatherData && <POAAnalyzer weatherData={weatherData} tiltAngle={effectiveTilt} surfaceAzimuth={poaAzimuth} sharedAlbedo={poaAlbedo} sharedUsePerez={poaUsePerez} onConfigChange={(cfg) => { if (cfg.tilt !== undefined) setPoaTilt(cfg.tilt); if (cfg.azimuth !== undefined) setPoaAzimuth(cfg.azimuth); if (cfg.albedo !== undefined) setPoaAlbedo(cfg.albedo); if (cfg.usePerez !== undefined) setPoaUsePerez(cfg.usePerez); }} />}
-        {view === 'energy' && weatherData && poaData.length > 0 && <EnergyProductionSimulator weatherData={weatherData} poaData={poaData} shadingFactors={monthlyShadingFactors} facadeAnalysis3D={facadeAnalysis3D} prospectorData={prospectorData} onDiscardProspector={() => setProspectorData(null)} optimizerResult={optimizerResult} onDiscardOptimizer={() => setOptimizerResult(null)} pvgisData={pvgisData} onDiscardPvgis={() => setPvgisData(null)} pvwattsData={pvwattsData} onDiscardPvwatts={() => setPvwattsData(null)} onInstallConfigChange={(cfg) => { if (cfg.tiltRange) setInstallTiltRange(cfg.tiltRange); if (cfg.azimuthLocked !== undefined) setInstallAzimuthLocked(cfg.azimuthLocked); if (cfg.name) setInstallTypeName(cfg.name); }} poaConfig={{ tilt: effectiveTilt, azimuth: poaAzimuth, albedo: poaAlbedo, usePerez: poaUsePerez, source: optimizerResult ? 'optimizer' : prospectorData ? 'prospector' : 'epw_hourly' }} onPoaConfigChange={(cfg) => { if (cfg.tilt !== undefined) setPoaTilt(cfg.tilt); if (cfg.azimuth !== undefined) setPoaAzimuth(cfg.azimuth); if (cfg.albedo !== undefined) setPoaAlbedo(cfg.albedo); if (cfg.usePerez !== undefined) setPoaUsePerez(cfg.usePerez); }} modelFacades={modelFacades} modelObstacles3D={modelObstacles3D} modelNorthOffset={modelNorthOffset} onFacadeSelectFromSimulator={(idx) => { setExternalFacadeIdx(idx); if (modelFacades && modelFacades[idx] && weatherData) { const analysis = calculateMonthlyShadingFactorsForFacade(modelFacades[idx], weatherData, modelObstacles3D || [], modelNorthOffset); analysis.facadeIdx = idx; setFacadeAnalysis3D(analysis); /* Sincronizar POA con ángulos de la fachada seleccionada (ya en grados) */ setPoaTilt(Math.round(modelFacades[idx].tilt)); setPoaAzimuth(Math.round(modelFacades[idx].azimuthNormal)); } }} onEnergyDataChange={setEnergyData} bipvData={bipvToEnergyData} onDiscardBipv={() => setBipvToEnergyData(null)} onReturnToBIPV={() => handleSetView('bipvglass')} onResimultateBIPV={handleResimultateBIPV} />}
+        {view === 'energy' && weatherData && poaData.length > 0 && <EnergyProductionSimulator weatherData={weatherData} poaData={poaData} transmisionGeometricaMensual={monthlyTransmisionGeometrica} facadeAnalysis3D={facadeAnalysis3D} prospectorData={prospectorData} onDiscardProspector={() => setProspectorData(null)} optimizerResult={optimizerResult} onDiscardOptimizer={() => setOptimizerResult(null)} pvgisData={pvgisData} onDiscardPvgis={() => setPvgisData(null)} pvwattsData={pvwattsData} onDiscardPvwatts={() => setPvwattsData(null)} onInstallConfigChange={(cfg) => { if (cfg.tiltRange) setInstallTiltRange(cfg.tiltRange); if (cfg.azimuthLocked !== undefined) setInstallAzimuthLocked(cfg.azimuthLocked); if (cfg.name) setInstallTypeName(cfg.name); }} poaConfig={{ tilt: effectiveTilt, azimuth: poaAzimuth, albedo: poaAlbedo, usePerez: poaUsePerez, source: optimizerResult ? 'optimizer' : prospectorData ? 'prospector' : 'epw_hourly' }} onPoaConfigChange={(cfg) => { if (cfg.tilt !== undefined) setPoaTilt(cfg.tilt); if (cfg.azimuth !== undefined) setPoaAzimuth(cfg.azimuth); if (cfg.albedo !== undefined) setPoaAlbedo(cfg.albedo); if (cfg.usePerez !== undefined) setPoaUsePerez(cfg.usePerez); }} modelFacades={modelFacades} modelObstacles3D={modelObstacles3D} modelNorthOffset={modelNorthOffset} onFacadeSelectFromSimulator={(idx) => { setExternalFacadeIdx(idx); if (modelFacades && modelFacades[idx] && weatherData) { const analysis = calculateMonthlyShadingFactorsForFacade(modelFacades[idx], weatherData, modelObstacles3D || [], modelNorthOffset); analysis.facadeIdx = idx; setFacadeAnalysis3D(analysis); /* Sincronizar POA con ángulos de la fachada seleccionada (ya en grados) */ setPoaTilt(Math.round(modelFacades[idx].tilt)); setPoaAzimuth(Math.round(modelFacades[idx].azimuthNormal)); } }} onEnergyDataChange={setEnergyData} bipvData={bipvToEnergyData} onDiscardBipv={() => setBipvToEnergyData(null)} onReturnToBIPV={() => handleSetView('bipvglass')} onResimultateBIPV={handleResimultateBIPV} />}
         {view === 'report' && weatherData && (
           <ReportGenerator
             city={selectedCity?.cityName || weatherData.location.city || 'Sin definir'}
@@ -823,11 +823,13 @@ export default function Home() {
               azimuth: facadeAnalysis3D.azimuth ?? 180,
               tilt: facadeAnalysis3D.tilt ?? 90,
               area: facadeAnalysis3D.area ?? 30,
-              monthlyShadingFactors: facadeAnalysis3D.monthlyShadingFactors,
-              annualFS: facadeAnalysis3D.monthlyShadingFactors.reduce((a, b) => a + b, 0) / 12,
-              annualShadingLoss: (1 - facadeAnalysis3D.monthlyShadingFactors.reduce((a, b) => a + b, 0) / 12) * 100,
+              monthlyFsGeometrico: facadeAnalysis3D.monthlyFsGeometrico,
+              monthlyTransmisionGeometrica: facadeAnalysis3D.monthlyTransmisionGeometrica,
+              annualFsGeometrico: facadeAnalysis3D.annualFsGeometrico,
+              annualTransmisionGeometrica: facadeAnalysis3D.annualTransmisionGeometrica,
+              annualShadingLoss: facadeAnalysis3D.annualShadingLoss,
             } : undefined}
-            shadingFactors={monthlyShadingFactors}
+            transmisionGeometricaMensual={monthlyTransmisionGeometrica}
             obstacleVertices3D={modelObstacles3D}
             onSendToEnergySimulator={handleBipvToSimulator}
             hasIrradianceData={!!(weatherData || prospectorData)}

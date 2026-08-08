@@ -55,7 +55,31 @@ const STORAGE_KEY = 'solar_facade_reports';
 function loadStoredReports(): StoredFacadeReport[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((report): StoredFacadeReport | null => {
+        if (!report || typeof report !== 'object' || !report.data || typeof report.data !== 'object') {
+          return null;
+        }
+        const data = report.data as Record<string, unknown>;
+        const legacyAnnualFs = data.annualFS;
+        const annualFsGeometrico = typeof data.annualFsGeometrico === 'number'
+          ? data.annualFsGeometrico
+          : typeof legacyAnnualFs === 'number'
+            ? legacyAnnualFs
+            : null;
+        if (annualFsGeometrico === null) return null;
+        return {
+          ...report,
+          data: {
+            ...data,
+            annualFsGeometrico,
+          },
+        } as StoredFacadeReport;
+      })
+      .filter((report): report is StoredFacadeReport => report !== null);
   } catch {
     return [];
   }
@@ -179,12 +203,12 @@ export default function ReportGenerator({
         capacityFactor,
         performanceRatio,
         systemLosses,
-        annualFS: fa.annualFS,
+        annualFsGeometrico: fa.annualFsGeometrico,
         annualShadingLoss: fa.annualShadingLoss,
         annualPOA: fa.annualPOA,
         annualPOANoShading: fa.annualPOANoShading,
-        fsJunSolstice: junData ? junData.fsAverage : 1.0,
-        fsDecSolstice: dicData ? dicData.fsAverage : 1.0,
+        fsJunSolstice: junData ? junData.fsGeometricoAverage : 0,
+        fsDecSolstice: dicData ? dicData.fsGeometricoAverage : 0,
       },
     };
 
@@ -292,7 +316,7 @@ export default function ReportGenerator({
                 <p><strong>Factor de Capacidad:</strong> {capacityFactor > 0 ? `${capacityFactor.toFixed(1)}%` : 'N/A'}</p>
                 {isFacadeSpecific && (
                   <>
-                    <p><strong>FS Anual:</strong> {(facadeAnalysis3D!.annualFS * 100).toFixed(1)}%</p>
+                    <p><strong>FS_geometrico anual:</strong> {(facadeAnalysis3D!.annualFsGeometrico * 100).toFixed(1)}% sombra</p>
                     <p><strong>Pérdida Sombra:</strong> {facadeAnalysis3D!.annualShadingLoss.toFixed(1)}%</p>
                   </>
                 )}
@@ -371,7 +395,7 @@ export default function ReportGenerator({
                   <div>
                     <p className="text-sm font-medium text-gray-900">{report.facadeName}</p>
                     <p className="text-xs text-gray-500">
-                      {report.data.annualProduction.toFixed(0)} kWh/año | CF: {report.data.capacityFactor.toFixed(1)}% | FS: {(report.data.annualFS * 100).toFixed(1)}%
+                      {report.data.annualProduction.toFixed(0)} kWh/año | CF: {report.data.capacityFactor.toFixed(1)}% | FS_geometrico: {(report.data.annualFsGeometrico * 100).toFixed(1)}%
                     </p>
                     <p className="text-xs text-gray-400">
                       {new Date(report.timestamp).toLocaleString('es-ES')}

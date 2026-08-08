@@ -144,12 +144,14 @@ interface BIPVGlassSimulatorProps {
     azimuth: number;
     tilt: number;
     area: number;
-    monthlyShadingFactors: number[];
-    annualFS: number;
+    monthlyFsGeometrico: number[];
+    monthlyTransmisionGeometrica: number[];
+    annualFsGeometrico: number;
+    annualTransmisionGeometrica: number;
     annualShadingLoss: number;
   } | null;
   /** Factores de sombreado mensuales (manuales o de fachada) */
-  shadingFactors?: number[];
+  transmisionGeometricaMensual?: number[];
   /** Indica si hay datos de irradiación cargados (EPW/PVGIS/PVWatts) para validar orden de importación */
   hasIrradianceData?: boolean;
 }
@@ -197,7 +199,7 @@ export default function BIPVGlassSimulator({
   obstacleVertices3D,
   modelNorthOffset = 0,
   facadeAnalysis3D,
-  shadingFactors,
+  transmisionGeometricaMensual,
   onSendToEnergySimulator,
   hasIrradianceData = false,
 }: BIPVGlassSimulatorProps) {
@@ -388,22 +390,22 @@ export default function BIPVGlassSimulator({
   const is3DActive = !!(useFacadeFromModel && facadeAnalysis3D);
 
   const { hasManualShading, annualManualLoss } = useMemo(() => {
-    const hasShading = !!(shadingFactors && shadingFactors.some(f => f < 1.0));
-    const annualLoss = hasShading ? (1 - shadingFactors!.reduce((a, b) => a + b, 0) / 12) * 100 : 0;
+    const hasShading = !!(transmisionGeometricaMensual && transmisionGeometricaMensual.some(f => f < 1.0));
+    const annualLoss = hasShading ? (1 - transmisionGeometricaMensual!.reduce((a, b) => a + b, 0) / 12) * 100 : 0;
     return { hasManualShading: hasShading, annualManualLoss: annualLoss };
-  }, [shadingFactors]);
+  }, [transmisionGeometricaMensual]);
 
   const monthlyShadingFactors3D = useMemo<number[]>(() => {
     if (applyShadingFactors) {
       if (useFacadeFromModel && facadeAnalysis3D) {
-        return facadeAnalysis3D.monthlyShadingFactors;
+        return facadeAnalysis3D.monthlyTransmisionGeometrica;
       }
-      if (shadingFactors) {
-        return shadingFactors;
+      if (transmisionGeometricaMensual) {
+        return transmisionGeometricaMensual;
       }
     }
     return Array(12).fill(1.0); // Sin sombreado
-  }, [useFacadeFromModel, facadeAnalysis3D, shadingFactors, applyShadingFactors]);
+  }, [useFacadeFromModel, facadeAnalysis3D, transmisionGeometricaMensual, applyShadingFactors]);
 
   const facadeParams = useMemo(() => {
     if (useFacadeFromModel && facades && facades[selectedFacadeIdx]) {
@@ -1303,9 +1305,9 @@ export default function BIPVGlassSimulator({
                     </h4>
                     <p className="text-xs text-gray-600">
                       {is3DActive ? (
-                        <>Fachada: <strong>{facadeAnalysis3D.facadeName}</strong> — Pérdida anual: <strong className="text-orange-600">{(facadeAnalysis3D.annualShadingLoss).toFixed(1)}%</strong> — FS medio: {facadeAnalysis3D.annualFS.toFixed(3)}</>
+                        <>Fachada: <strong>{facadeAnalysis3D.facadeName}</strong> — Pérdida anual: <strong className="text-orange-600">{(facadeAnalysis3D.annualShadingLoss).toFixed(1)}%</strong> — FS geométrico aplicado medio: {facadeAnalysis3D.annualFsGeometrico.toFixed(3)}</>
                       ) : (
-                        <>Pérdida anual: <strong className="text-orange-600">{annualManualLoss.toFixed(1)}%</strong> — FS medio: {(shadingFactors!.reduce((a, b) => a + b, 0) / 12).toFixed(3)}</>
+                        <>Pérdida anual: <strong className="text-orange-600">{annualManualLoss.toFixed(1)}%</strong> — Transmisión geométrica media: {(transmisionGeometricaMensual!.reduce((a, b) => a + b, 0) / 12).toFixed(3)}</>
                       )}
                     </p>
                   </div>
@@ -1323,7 +1325,7 @@ export default function BIPVGlassSimulator({
               {applyShadingFactors && (
                 <div className="mt-2 grid grid-cols-12 gap-1">
                   {['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'].map((m, i) => {
-                    const factor = is3DActive ? facadeAnalysis3D.monthlyShadingFactors[i] : shadingFactors![i];
+                    const factor = is3DActive ? facadeAnalysis3D.monthlyTransmisionGeometrica[i] : transmisionGeometricaMensual![i];
                     return (
                       <div key={i} className="text-center">
                         <div className="text-[9px] text-gray-500">{m}</div>

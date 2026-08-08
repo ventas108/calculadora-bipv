@@ -67,7 +67,7 @@ interface AnalysisPoint {
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-export default function ShadingCalculator({ initialPoints, templateData, weatherData, onPointsChange, onWeatherDataOverride, onFacadeAnalysis3D, onModelDataReady, externalActiveFacadeIdx }: { initialPoints?: any[] | null; templateData?: string[][] | null; weatherData?: EPWData | null; onPointsChange?: (points: Array<{month: string; day: number; hour: number; solarHeight: number; solarAzimuth: number; obstacle: string; shadedArea: number; fs: number}>) => void; onWeatherDataOverride?: (data: EPWData) => void; onFacadeAnalysis3D?: (analysis: FacadeFullAnalysis | null) => void; onModelDataReady?: (data: { facades: DetectedFacade[]; obstacleVertices3D: Vertex3D[][] | undefined; northOffset: number }) => void; externalActiveFacadeIdx?: number | null }) {
+export default function ShadingCalculator({ initialPoints, templateData, weatherData, onPointsChange, onWeatherDataOverride, onFacadeAnalysis3D, onModelDataReady, externalActiveFacadeIdx }: { initialPoints?: any[] | null; templateData?: string[][] | null; weatherData?: EPWData | null; onPointsChange?: (points: Array<{month: string; day: number; hour: number; solarHeight: number; solarAzimuth: number; obstacle: string; shadedArea: number; fs: number; fsGeometrico?: number; fsClimatico?: number; fsCombinado?: number}>) => void; onWeatherDataOverride?: (data: EPWData) => void; onFacadeAnalysis3D?: (analysis: FacadeFullAnalysis | null) => void; onModelDataReady?: (data: { facades: DetectedFacade[]; obstacleVertices3D: Vertex3D[][] | undefined; northOffset: number }) => void; externalActiveFacadeIdx?: number | null }) {
   const [autoCalcEnabled, setAutoCalcEnabled] = useState(true);
   const [showSunPath, setShowSunPath] = useState(false);
   const [obstacles, setObstacles] = useState<ObstaclePolygon[]>([]);
@@ -129,6 +129,8 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
         obstacle: p.obstacle,
         shadowedArea: p.shadedArea,
         fs: p.fs,
+        fsGeometrico: p.fsGeometrico,
+        fsClimatico: p.fsClimatico,
         autoCalculated: p.autoCalculated,
       }));
     }
@@ -545,6 +547,9 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
         obstacle: p.obstacle,
         shadedArea: p.shadowedArea,
         fs: p.fs,
+        fsGeometrico: p.fsGeometrico,
+        fsClimatico: p.fsClimatico,
+        fsCombinado: p.fs,
       })));
     }
   }, [points, onPointsChange]);

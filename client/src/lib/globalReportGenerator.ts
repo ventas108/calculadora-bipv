@@ -63,7 +63,7 @@ export function generateGlobalReport(reports: StoredFacadeReport[], location: Lo
   const totalCapacity = reports.reduce((s, r) => s + (r.data.panelPower * r.data.panelQuantity / 1000), 0);
   const avgCF = reports.length > 0 ? reports.reduce((s, r) => s + r.data.capacityFactor, 0) / reports.length : 0;
   const avgPR = reports.length > 0 ? reports.reduce((s, r) => s + r.data.performanceRatio, 0) / reports.length : 0;
-  const avgFS = reports.length > 0 ? reports.reduce((s, r) => s + r.data.annualFS, 0) / reports.length : 0;
+  const avgFS = reports.length > 0 ? reports.reduce((s, r) => s + r.data.annualFsGeometrico, 0) / reports.length : 0;
   const totalCO2 = totalProduction * CO2_FACTOR_COLOMBIA / 1000;
 
   const globalKPIs = [
@@ -107,7 +107,7 @@ export function generateGlobalReport(reports: StoredFacadeReport[], location: Lo
     `${r.data.azimuth.toFixed(0)}°`,
     r.data.annualProduction.toFixed(0),
     r.data.capacityFactor.toFixed(1),
-    (r.data.annualFS * 100).toFixed(1),
+    (r.data.annualFsGeometrico * 100).toFixed(1),
   ]);
 
   autoTable(doc, {
@@ -196,9 +196,9 @@ export function generateGlobalReport(reports: StoredFacadeReport[], location: Lo
   }
 
   // Superficie con más sombra
-  const worstShading = [...reports].sort((a, b) => a.data.annualFS - b.data.annualFS)[0];
-  if (worstShading && worstShading.data.annualFS < 0.90) {
-    recommendations.push(`- Superficie con mayor sombreado: ${worstShading.facadeName} (FS = ${(worstShading.data.annualFS * 100).toFixed(1)}%, perdida = ${worstShading.data.annualShadingLoss.toFixed(1)}%). Evaluar mitigacion de obstaculos.`);
+  const worstShading = [...reports].sort((a, b) => a.data.annualFsGeometrico - b.data.annualFsGeometrico)[0];
+  if (worstShading && worstShading.data.annualFsGeometrico < 0.90) {
+    recommendations.push(`- Superficie con mayor sombreado: ${worstShading.facadeName} (FS geométrico = ${(worstShading.data.annualFsGeometrico * 100).toFixed(1)}%, perdida = ${worstShading.data.annualShadingLoss.toFixed(1)}%). Evaluar mitigacion de obstaculos.`);
   }
 
   // Producción total

@@ -275,17 +275,17 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
     · df  : DataFrame con columnas [mes, dia, hora, FS] · FS ∈ [0,1] · 0=sin sombra
     · meta: dict con información sobre la fuente del FS usado:
         - "col_original"  : nombre de columna del CSV que se usó
-        - "tipo"          : "geometrico" | "combinado" | "basico"
+        - "tipo"          : "geometrico"
         - "descripcion"   : texto explicativo para mostrar en la UI
         - "advertencias"  : lista de strings con advertencias (puede ser vacía)
 
-    PRIORIDAD DE COLUMNAS (razón física):
-        FS_geometrico > FS (combinado) > cualquier columna FS disponible
+    ÚNICA COLUMNA ACEPTADA:
+        FS_geometrico — sombra por obstáculos físicos.
 
-    Los bypass diodes solo se activan por obstáculos físicos (sombra geométrica).
-    Las nubes (FS_climatico) reducen la irradiancia uniformemente en todo el array
-    → nunca activan bypass diodes. Usar el FS combinado (max(geom, clim)) sobreestima
-    las pérdidas en días nublados. Ref: Deline et al. 2013, Eq. 3.
+    Los bypass diodes solo se activan por obstáculos físicos. Las nubes
+    (FS_climatico) reducen la irradiancia uniformemente en todo el array y
+    nunca pueden activar bypass diodes. Un CSV sin FS_geometrico se rechaza
+    para evitar una pérdida o bypass silenciosamente inflado.
     """
     if hasattr(archivo, "read"):
         raw = archivo.read()
@@ -304,7 +304,7 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
     col_hora: str | None = None
     col_fs_geom: str | None     = None   # FS_geometrico — obstáculos físicos
     col_fs_clim: str | None     = None   # FS_climatico  — nubes (NO para bypass)
-    col_fs_combined: str | None = None   # FS            — max(geom, clim) o básico
+    col_fs_combined: str | None = None   # FS combinado — diagnóstico, nunca bypass
 
     for c in df_raw.columns:
         cl = c.lower().replace(" ", "_").replace("á", "a").replace("í", "i").replace("é", "e")
@@ -333,36 +333,23 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
             col_obstaculo = c
     col_fachada = col_fachada_clean or col_obstaculo  # Fachada limpia tiene prioridad
 
-    # ── Elegir columna FS con prioridad explícita ──────────────────────────────
+    # ── Elegir la única columna permitida para bypass ─────────────────────────
     advertencias: list[str] = []
 
     if col_fs_geom is not None:
-        # ✅ MEJOR OPCIÓN: solo sombra geométrica por obstáculos físicos
         col_fs_elegida = col_fs_geom
         tipo_fs        = "geometrico"
         descripcion_fs = (
             f"✅ Usando **{col_fs_geom}** — sombra por obstáculos físicos únicamente. "
             "Las nubes (FS_climático) se excluyen porque no activan bypass diodes."
         )
-    elif col_fs_combined is not None:
-        # ⚠️ SEGUNDA OPCIÓN: FS combinado (max(geom, clim))
-        col_fs_elegida = col_fs_combined
-        tipo_fs        = "combinado"
-        descripcion_fs = (
-            f"⚠️ Usando **{col_fs_combined}** (FS combinado = max(geom, clim)). "
-            "El resultado puede sobreestimar bypass en días nublados porque incluye FS_climático. "
-            "Para mayor precisión, usa el CSV del flujo «Cruzar Máscara + EPW» que incluye FS_geometrico."
-        )
-        advertencias.append(
-            "CSV sin columna FS_geometrico — se usa el FS combinado. "
-            "Los días nublados pueden aparecer con bypass activo de forma artificial."
-        )
     else:
-        # ❌ Sin ninguna columna FS válida
         raise ValueError(
-            "CSV de sombreado: no se encontró ninguna columna de Factor de Sombreado.\n"
+            "CSV de sombreado inválido para mismatch/bypass: falta la columna "
+            "FS_geometrico (obstáculos físicos). FS_climatico y FS combinado "
+            "son capas de diagnóstico y no pueden activar bypass.\n"
             f"Columnas presentes: {list(df_raw.columns)}\n"
-            "Se esperan columnas como: FS_geometrico, FS, factor_sombreado"
+            "Exporta el CSV desde el flujo oficial que incluya FS_geometrico."
         )
 
     # Verificar columnas obligatorias de tiempo
@@ -425,27 +412,10 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
     df["hora"] = df["hora"].apply(_parse_hora)
     df["FS"]   = pd.to_numeric(df["FS"], errors="coerce").fillna(0.0).clip(0.0, 1.0)
 
-    # ── #32 Detección de convención FS (transmitancia vs p_shade) ─────────────
-    # Solo aplica cuando NO tenemos FS_geometrico (que siempre es p_shade)
+    # ── #32 La convención geométrica oficial es siempre p_shade ───────────────
+    # No se infiere ni invierte: FS_geometrico ya es 0=sin sombra, 1=sombra total.
     convencion_probable = "p_shade"
     inversion_detectada = False
-    if tipo_fs != "geometrico" and len(df) > 20:
-        pct_near_1 = float((df["FS"] > 0.90).mean())
-        pct_near_0 = float((df["FS"] < 0.10).mean())
-        # Señal de transmitancia: la mayoría de horas sin sombra tendrán FS ≈ 1.0
-        # Señal de p_shade:       la mayoría de horas sin sombra tendrán FS ≈ 0.0
-        if pct_near_1 > 0.55 and pct_near_1 > pct_near_0 * 3:
-            convencion_probable = "transmitancia"
-            inversion_detectada = True
-            advertencias.append(
-                f"🔴 FORMATO POSIBLEMENTE INVERTIDO: el {pct_near_1*100:.0f}% de los valores FS "
-                "son > 0.90. El CSV parece estar en **formato transmitancia** "
-                "(1 = sin sombra, 0 = sombra total), pero el modelo bypass necesita "
-                "**formato p_shade** (0 = sin sombra, 1 = sombra total). "
-                "Este CSV probablemente fue exportado desde los 'Puntos manuales' de la "
-                "calculadora, no desde 'Cruzar Máscara + EPW'. "
-                "Activa la opción **'Invertir FS (1 − FS)'** para corregirlo."
-            )
 
     # ── #33 Fachadas disponibles ───────────────────────────────────────────────
     fachadas_disponibles: list[str] = []

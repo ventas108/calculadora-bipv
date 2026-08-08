@@ -115,7 +115,7 @@ export default function MultiFacadeComparison({
         monthlyPOA,
         panelSpecs,
         systemLosses,
-        analysis.monthlyShadingFactors
+        analysis.monthlyTransmisionGeometrica
       );
 
       // POA anual (kWh/m²/año)
@@ -172,7 +172,7 @@ export default function MultiFacadeComparison({
     const totalAC = facadeResults.reduce((s, r) => s + r.productionAC, 0);
     const totalDC = facadeResults.reduce((s, r) => s + r.productionDC, 0);
     const avgPR = facadeResults.reduce((s, r) => s + r.performanceRatio * r.productionAC, 0) / (totalAC || 1);
-    const avgFS = facadeResults.reduce((s, r) => s + r.analysis.annualFS * r.facade.area, 0) / (totalArea || 1);
+    const avgFS = facadeResults.reduce((s, r) => s + r.analysis.annualFsGeometrico * r.facade.area, 0) / (totalArea || 1);
     const bestFacade = facadeResults.reduce((best, r) => r.productionAC > best.productionAC ? r : best, facadeResults[0]);
     return { totalArea, totalAC, totalDC, avgPR, avgFS, bestFacade };
   }, [facadeResults]);
@@ -293,8 +293,8 @@ export default function MultiFacadeComparison({
                       </TableCell>
                       <TableCell className="text-center text-sm">{result.facade.area.toFixed(1)} m²</TableCell>
                       <TableCell className="text-center">
-                        <span className={`text-sm font-medium ${result.analysis.annualFS >= 0.9 ? 'text-green-600' : result.analysis.annualFS >= 0.7 ? 'text-amber-600' : 'text-red-600'}`}>
-                          {(result.analysis.annualFS * 100).toFixed(1)}%
+                        <span className={`text-sm font-medium ${result.analysis.annualFsGeometrico >= 0.9 ? 'text-green-600' : result.analysis.annualFsGeometrico >= 0.7 ? 'text-amber-600' : 'text-red-600'}`}>
+                          {(result.analysis.annualFsGeometrico * 100).toFixed(1)}%
                         </span>
                       </TableCell>
                       <TableCell className="text-center text-sm">{result.poaAnnual.toFixed(0)} <span className="text-xs text-gray-400">kWh/m²</span></TableCell>

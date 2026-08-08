@@ -18,7 +18,7 @@ export interface StoredFacadeReport {
     capacityFactor: number;
     performanceRatio: number;
     systemLosses: number;
-    annualFS: number;
+    annualFsGeometrico: number;
     annualShadingLoss: number;
     annualPOA: number;
     annualPOANoShading: number;

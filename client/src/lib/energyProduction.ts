@@ -318,7 +318,7 @@ export const calculateAnnualProduction = (
   }>,
   panelSpecs: PanelSpecifications,
   systemLosses: SystemLosses,
-  shadingFactors: number[] = Array(12).fill(1.0),
+  transmisionGeometricaMensual: number[] = Array(12).fill(1.0),
   cellTempOverride?: number,
   /** IAM mensual variable: 12 valores de pérdida % por mes (si se proporciona, se aplica PRE-cálculo sobre componente directa) */
   iamMensual?: number[],
@@ -399,7 +399,7 @@ export const calculateAnnualProduction = (
       panelSpecs,
       monthSystemLosses,
       daysInMonths[idx],
-      shadingFactors[idx],
+      transmisionGeometricaMensual[idx],
       cellTempOverride,
       originalPOA,
       data.H_i_m

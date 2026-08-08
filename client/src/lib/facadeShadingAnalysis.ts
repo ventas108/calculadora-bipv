@@ -16,7 +16,8 @@ import { ObstaclePolygon } from '@/components/SunPathDiagram';
 export interface MonthlyFacadeAnalysis {
   month: number; // 1-12
   monthName: string;
-  fsAverage: number; // Factor de sombreado promedio del mes (0-1, 1=sin sombra)
+  fsGeometricoAverage: number; // FS_geometrico p_shade (0=sin sombra, 1=sombra total)
+  transmisionGeometricaAverage: number; // Complemento aplicado a Producción (1=sin pérdida)
   totalSunHours: number; // Horas de sol totales en el mes
   effectiveSunHours: number; // Horas de sol sin sombra
   shadedHours: number; // Horas con sombra
@@ -32,11 +33,13 @@ export interface FacadeFullAnalysis {
   tilt: number;
   area: number;
   monthlyData: MonthlyFacadeAnalysis[];
-  annualFS: number; // FS promedio anual ponderado por irradiancia
+  annualFsGeometrico: number; // FS_geometrico p_shade anual (0=sin sombra, 1=sombra total)
+  annualTransmisionGeometrica: number; // Complemento aplicado a Producción
   annualPOA: number; // kWh/m²/año con sombreado
   annualPOANoShading: number; // kWh/m²/año sin sombreado
   annualShadingLoss: number; // % pérdida anual
-  monthlyShadingFactors: number[]; // Array de 12 valores para el Simulador
+  monthlyFsGeometrico: number[]; // Array de 12 FS_geometrico p_shade
+  monthlyTransmisionGeometrica: number[]; // Array de 12 factores para Producción/BIPV
 }
 
 const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -180,10 +183,12 @@ export function calculateMonthlyShadingFactorsForFacade(
     const monthPOAScaled = (monthPOA * scaleFactor) / 1000; // Wh → kWh/m²
     const monthPOANoShadingScaled = (monthPOANoShading * scaleFactor) / 1000;
 
-    // FS mensual = POA_con_sombra / POA_sin_sombra
-    const fsMonth = monthPOANoShadingScaled > 0
+    // Transmisión mensual = POA_con_sombra / POA_sin_sombra.
+    // FS_geometrico es su complemento p_shade oficial.
+    const transmisionMonth = monthPOANoShadingScaled > 0
       ? Math.min(1.0, monthPOAScaled / monthPOANoShadingScaled)
       : 1.0;
+    const fsGeometricoMonth = 1 - transmisionMonth;
 
     const shadingLoss = monthPOANoShadingScaled > 0
       ? ((monthPOANoShadingScaled - monthPOAScaled) / monthPOANoShadingScaled) * 100
@@ -197,7 +202,8 @@ export function calculateMonthlyShadingFactorsForFacade(
     monthlyData.push({
       month,
       monthName: MONTH_NAMES[month - 1],
-      fsAverage: fsMonth,
+      fsGeometricoAverage: fsGeometricoMonth,
+      transmisionGeometricaAverage: transmisionMonth,
       totalSunHours: sunHoursMonthly,
       effectiveSunHours: effectiveSunHoursMonthly,
       shadedHours: shadedHoursMonthly,
@@ -210,17 +216,19 @@ export function calculateMonthlyShadingFactorsForFacade(
     annualPOANoShading += monthPOANoShadingScaled;
   }
 
-  // FS anual ponderado por irradiancia
-  const annualFS = annualPOANoShading > 0
+  // Transmisión anual ponderada por irradiancia y su complemento oficial.
+  const annualTransmisionGeometrica = annualPOANoShading > 0
     ? Math.min(1.0, annualPOA / annualPOANoShading)
     : 1.0;
+  const annualFsGeometrico = 1 - annualTransmisionGeometrica;
 
   const annualShadingLoss = annualPOANoShading > 0
     ? ((annualPOANoShading - annualPOA) / annualPOANoShading) * 100
     : 0;
 
-  // Array de 12 valores para el Simulador de Energía
-  const monthlyShadingFactors = monthlyData.map(m => m.fsAverage);
+  // Puntos separados: p_shade oficial y transmisión que consume Producción.
+  const monthlyFsGeometrico = monthlyData.map(m => m.fsGeometricoAverage);
+  const monthlyTransmisionGeometrica = monthlyData.map(m => m.transmisionGeometricaAverage);
 
   return {
     facadeName: facade.name,
@@ -229,11 +237,13 @@ export function calculateMonthlyShadingFactorsForFacade(
     tilt: facade.tilt,
     area: facade.area,
     monthlyData,
-    annualFS,
+    annualFsGeometrico,
+    annualTransmisionGeometrica,
     annualPOA,
     annualPOANoShading,
     annualShadingLoss,
-    monthlyShadingFactors,
+    monthlyFsGeometrico,
+    monthlyTransmisionGeometrica,
   };
 }
 
