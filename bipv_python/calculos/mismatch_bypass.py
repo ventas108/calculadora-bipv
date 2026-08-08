@@ -261,6 +261,41 @@ def simular_bypass_horario(
 # 3. Parser CSV de la Calculadora de Sombreado
 # ══════════════════════════════════════════════════════════════════════════════
 
+def _reparar_comas_en_obstaculo(raw: str) -> str:
+    """
+    La Calculadora de Sombreado exporta el CSV sin comillas, y el nombre del
+    obstáculo puede contener comas — ej. «Fachada Norte [Edificio alto 1 (250m, 0m)]».
+    Esas filas tienen más campos que el encabezado y pandas falla con
+    "Error tokenizing data". Aquí se re-unen los campos sobrantes dentro de la
+    columna Obstaculo antes de parsear.
+    """
+    lineas = raw.splitlines()
+    if not lineas:
+        return raw
+    encabezado = [c.strip() for c in lineas[0].split(",")]
+    n_cols = len(encabezado)
+    idx_obs = None
+    for i, c in enumerate(encabezado):
+        if c.lower().replace(" ", "_") in ("obstaculo", "obstacle"):
+            idx_obs = i
+            break
+    if idx_obs is None:
+        return raw  # sin columna Obstaculo no hay nada que reparar
+    reparadas = [lineas[0]]
+    for ln in lineas[1:]:
+        campos = ln.split(",")
+        extra = len(campos) - n_cols
+        if extra > 0:
+            campos = (
+                campos[:idx_obs]
+                + [",".join(campos[idx_obs : idx_obs + extra + 1])]
+                + campos[idx_obs + extra + 1 :]
+            )
+            ln = ",".join(f'"{c}"' if "," in c else c for c in campos)
+        reparadas.append(ln)
+    return "\n".join(reparadas)
+
+
 def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
     """
     Parsea el CSV exportado por la Calculadora de Sombreado
@@ -297,9 +332,11 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
         raw = archivo.read()
         if isinstance(raw, bytes):
             raw = raw.decode("utf-8", errors="replace")
-        df_raw = pd.read_csv(io.StringIO(raw))
     else:
-        df_raw = pd.read_csv(archivo)
+        with open(archivo, "r", encoding="utf-8", errors="replace") as _f:
+            raw = _f.read()
+    raw = _reparar_comas_en_obstaculo(raw)
+    df_raw = pd.read_csv(io.StringIO(raw))
 
     # Normalizar nombres
     df_raw.columns = [str(c).strip() for c in df_raw.columns]
@@ -462,7 +499,13 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
     # CSV antiguos usaban Obstaculo como única dimensión para filtrar la
     # fachada. Conservamos ambos nombres sin perder la identidad del obstáculo.
     if col_obstaculo and not col_fachada_clean and "obstaculo" in df.columns:
-        df["fachada"] = df["obstaculo"]
+        # La calculadora anota el obstáculo dentro del mismo campo:
+        # «Fachada Norte [Edificio alto 1 (250m, 0m)]». Para el selector de
+        # fachada hay que quitar el sufijo [obstáculo]; si no, las horas CON
+        # sombra aparecen como una "fachada" aparte y el filtro las descarta.
+        df["fachada"] = (
+            df["obstaculo"].astype(str).str.replace(r"\s*\[.*\]\s*$", "", regex=True).str.strip()
+        )
     # CSVs históricos usaban Fila como identificador del punto. Mantener un
     # alias punto permite seguir simulando, pero sin perder el nivel fila.
     if "fila" in df.columns and "punto" not in df.columns:
