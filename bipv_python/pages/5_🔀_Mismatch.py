@@ -29,6 +29,11 @@ from calculos.escenarios_fase4 import (
     construir_definicion_escenarios,
     validar_definicion_escenarios,
 )
+from calculos.metricas_escenarios import (
+    metricas_electricas,
+    metricas_recuperacion,
+    metricas_solares,
+)
 
 st.set_page_config(page_title="Mismatch — BIPV", page_icon="🔀", layout="wide")
 
@@ -273,6 +278,230 @@ if _base_guardada_f4:
         )
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# AUDITORÍA — MÉTRICAS SOLARES VS. ELÉCTRICAS
+# ═══════════════════════════════════════════════════════════════════════════════
+st.markdown("---")
+st.subheader("📊 Métricas separadas del escenario actual")
+st.caption(
+    "Las métricas solares describen irradiancia y sombreado. Las eléctricas "
+    "describen energía DC/AC. Una pérdida de POA no se presenta como pérdida "
+    "equivalente de kWh AC."
+)
+
+_df_metricas_fs = st.session_state.get("df_fs_raw")
+_fachada_m = st.session_state.get("bypass_fachada_sel_val")
+if isinstance(_df_metricas_fs, pd.DataFrame) and _fachada_m and "fachada" in _df_metricas_fs.columns:
+    _df_metricas_fs = _df_metricas_fs[
+        _df_metricas_fs["fachada"] == _fachada_m
+    ].copy()
+
+_fs_metricas = None
+_modo_fs_metricas = st.session_state.get("bypass_modo_alineacion", "mensual")
+if (
+    isinstance(_df_metricas_fs, pd.DataFrame)
+    and not _df_metricas_fs.empty
+    and "FS_geometrico" in _df_metricas_fs.columns
+):
+    try:
+        _fs_metricas = alinear_fs_con_tmy(
+            _df_metricas_fs,
+            tmy.index,
+            modo=_modo_fs_metricas,
+        )
+    except Exception:
+        _fs_metricas = None
+elif isinstance(st.session_state.get("res_sombra"), dict):
+    _mask_m = st.session_state["res_sombra"].get("mascara_sombra")
+    if isinstance(_mask_m, pd.Series):
+        _fs_metricas = (
+            _mask_m.reindex(tmy.index).fillna(False).astype(float)
+        )
+
+_poa_ef_m = None
+_poa_ef_fuente_m = None
+if st.session_state.get("motor_optico_ok"):
+    _poa_ef_m = st.session_state.get("poa_efectiva_anual_kWh_m2")
+    _poa_ef_fuente_m = "Motor Óptico (IAM + soiling + térmico)"
+elif st.session_state.get("poa_efectiva_kWh_m2") is not None:
+    _poa_ef_m = st.session_state.get("poa_efectiva_kWh_m2")
+    _poa_ef_fuente_m = "Cascada Mismatch (POA, no energía AC)"
+
+_metricas_solares_m = metricas_solares(
+    poa_bruta_kWh_m2=poa_anual,
+    poa_efectiva_kWh_m2=_poa_ef_m,
+    poa_efectiva_fuente=_poa_ef_fuente_m,
+    fs_horario=_fs_metricas,
+    tmy_index=tmy.index,
+    poa_horaria=poa_base["poa_global"] if "poa_global" in poa_base else None,
+    res_sombra=st.session_state.get("res_sombra"),
+    df_fs=_df_metricas_fs,
+    modo_fs=_modo_fs_metricas,
+)
+_metricas_electricas_m = metricas_electricas(
+    resultado_produccion=st.session_state.get("res_produccion"),
+    bypass=st.session_state.get("bypass_result")
+    if st.session_state.get("bypass_ok")
+    else None,
+    mismatch=st.session_state.get("res_mismatch_or"),
+    eta_inversor=st.session_state.get("eta_inversor"),
+)
+
+with st.container(border=True):
+    st.markdown("#### ☀️ Métricas solares")
+    _sm1, _sm2, _sm3, _sm4 = st.columns(4)
+    _sm1.metric(
+        "POA bruta",
+        (
+            f"{_metricas_solares_m['poa_bruta_kWh_m2']:,.1f} kWh/m²/año"
+            if _metricas_solares_m["poa_bruta_kWh_m2"] is not None
+            else "—"
+        ),
+    )
+    _sm2.metric(
+        "POA efectiva solar",
+        (
+            f"{_metricas_solares_m['poa_efectiva_kWh_m2']:,.1f} kWh/m²/año"
+            if _metricas_solares_m["poa_efectiva_kWh_m2"] is not None
+            else "—"
+        ),
+        help=_metricas_solares_m["poa_efectiva_fuente"] or "Aún no calculada",
+    )
+    _sm3.metric(
+        "FS geométrico",
+        f"{_metricas_solares_m['fs_geometrico_ponderado_pct']:.2f}%",
+    )
+    _sm4.metric(
+        "Horas con sombra",
+        f"{_metricas_solares_m['horas_con_sombra']:,} h/año",
+    )
+    _sm5, _sm6, _sm7, _sm8 = st.columns(4)
+    _sm5.metric(
+        "Pérdida solar de POA",
+        (
+            f"{_metricas_solares_m['perdida_poa_solar_kWh_m2']:,.1f} kWh/m²/año"
+            if _metricas_solares_m["perdida_poa_solar_kWh_m2"] is not None
+            else "—"
+        ),
+        help="No equivale automáticamente a una pérdida de energía AC.",
+    )
+    _sm6.metric(
+        "Meses críticos",
+        ", ".join(_metricas_solares_m["meses_criticos"]) or "—",
+    )
+    _sm7.metric(
+        "Obstáculo responsable",
+        _metricas_solares_m["obstaculo_responsable"] or "No identificado",
+    )
+    _sm8.metric(
+        "Mismatch solar",
+        (
+            f"{_metricas_electricas_m['impacto_mismatch_poa_pct']:.2f}%"
+            if _metricas_electricas_m["impacto_mismatch_poa_pct"] is not None
+            else "—"
+        ),
+        help="Impacto de mismatch expresado como POA; no es pérdida AC.",
+    )
+    _tablas_solares_m = {
+        "Pérdida solar por fachada": _metricas_solares_m["por_fachada"],
+        "Pérdida solar por fila/punto": _metricas_solares_m["por_fila_punto"],
+        "Obstáculos responsables": _metricas_solares_m["por_obstaculo"],
+    }
+    for _titulo_m, _filas_m in _tablas_solares_m.items():
+        if _filas_m:
+            with st.expander(_titulo_m, expanded=False):
+                st.dataframe(
+                    pd.DataFrame(_filas_m).rename(
+                        columns={
+                            "grupo": "Grupo",
+                            "poa_perdida_kWh_m2": "Pérdida solar POA (kWh/m²)",
+                            "fs_geometrico_ponderado_pct": "FS geométrico ponderado (%)",
+                            "horas_con_sombra": "Horas con sombra",
+                        }
+                    ),
+                    hide_index=True,
+                    use_container_width=True,
+                )
+
+with st.container(border=True):
+    st.markdown("#### ⚡ Métricas eléctricas")
+    _em1, _em2, _em3, _em4 = st.columns(4)
+    _em1.metric(
+        "Energía DC",
+        (
+            f"{_metricas_electricas_m['energia_dc_kWh']:,.0f} kWh/año"
+            if _metricas_electricas_m["energia_dc_kWh"] is not None
+            else "No simulada"
+        ),
+    )
+    _em2.metric(
+        "Energía AC",
+        (
+            f"{_metricas_electricas_m['energia_ac_kWh']:,.0f} kWh/año"
+            if _metricas_electricas_m["energia_ac_kWh"] is not None
+            else "No simulada"
+        ),
+    )
+    _em3.metric(
+        "Pérdida eléctrica total",
+        (
+            f"{_metricas_electricas_m['perdida_electrica_total_kWh']:,.0f} kWh/año"
+            if _metricas_electricas_m["perdida_electrica_total_kWh"] is not None
+            else "—"
+        ),
+        help="Inversor + bypass AC equivalente, cuando están disponibles.",
+    )
+    _em4.metric(
+        "Impacto bypass",
+        (
+            f"{_metricas_electricas_m['perdida_bypass_ac_kWh']:,.0f} kWh AC/año"
+            if _metricas_electricas_m["perdida_bypass_ac_kWh"] is not None
+            else "No aplica",
+        ),
+    )
+    _em5, _em6, _em7, _em8 = st.columns(4)
+    _em5.metric(
+        "Pérdida inversor",
+        (
+            f"{_metricas_electricas_m['perdida_inversor_kWh']:,.0f} kWh/año"
+            if _metricas_electricas_m["perdida_inversor_kWh"] is not None
+            else "—"
+        ),
+    )
+    _em6.metric(
+        "Impacto bypass DC",
+        (
+            f"{_metricas_electricas_m['perdida_bypass_dc_kWh']:,.0f} kWh/año"
+            if _metricas_electricas_m["perdida_bypass_dc_kWh"] is not None
+            else "No aplica"
+        ),
+    )
+    _em7.metric(
+        "Mismatch eléctrico",
+        "No aislado",
+        help=_metricas_electricas_m["nota_mismatch"],
+    )
+    _rec_f4 = _definicion_fase4.get("resultados", {}) if _definicion_fase4 else {}
+    _recu_m = metricas_recuperacion(
+        e_ac_referencia_kWh=(_rec_f4.get("referencia") or {}).get("E_ac_kWh"),
+        e_ac_actual_kWh=(_rec_f4.get("actual") or {}).get("E_ac_kWh"),
+        e_ac_optimizada_kWh=(_rec_f4.get("optimizada") or {}).get("E_ac_kWh"),
+    )
+    _em8.metric(
+        "% recuperación AC",
+        (
+            f"{_recu_m['porcentaje_recuperacion']:.1f}%"
+            if _recu_m["disponible"]
+            else "Pendiente"
+        ),
+        help=_recu_m["motivo"],
+    )
+    if not _recu_m["disponible"]:
+        st.caption(
+            "La energía recuperable y su porcentaje aparecerán cuando existan "
+            "resultados E_AC de referencia, situación actual y alternativa optimizada."
+        )
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 1 — SOMBREADO DE HORIZONTE
 # ═══════════════════════════════════════════════════════════════════════════════
 st.markdown("---")
@@ -446,9 +675,10 @@ if btn_sombra or st.session_state.get("sombra_ok"):
     if res_sombra:
         sc1, sc2, sc3, sc4 = st.columns(4)
         sc1.metric("POA bruta",            f"{poa_anual:.0f} kWh/m²")
-        sc2.metric("Pérdida sombreado",    f"{res_sombra['energia_perdida_kWh_m2']:.1f} kWh/m²",
+        sc2.metric("Pérdida solar de POA",    f"{res_sombra['energia_perdida_kWh_m2']:.1f} kWh/m²",
                    delta=f"-{res_sombra['factor_sombra_anual']*100:.1f}%",
-                   delta_color="inverse")
+                   delta_color="inverse",
+                   help="Reducción de irradiancia POA por sombra; no es pérdida equivalente de kWh AC.")
         sc3.metric("Horas sombreadas/año", f"{res_sombra['horas_sombreadas']} h")
         sc4.metric("Factor de sombreado",
                    f"{res_sombra['factor_sombra_anual']*100:.1f}%",
@@ -539,7 +769,7 @@ if multi_orient:
             if res_mismatch_or:
                 mc1, mc2, mc3 = st.columns(3)
                 mc1.metric("POA media ponderada",  f"{res_mismatch_or['energia_ideal_kWh_m2']:.0f} kWh/m²")
-                mc2.metric("Pérdida mismatch or.", f"{res_mismatch_or['energia_perdida_kWh_m2']:.1f} kWh/m²",
+                mc2.metric("Pérdida solar por mismatch", f"{res_mismatch_or['energia_perdida_kWh_m2']:.1f} kWh/m²",
                            delta=f"-{res_mismatch_or['factor_mismatch_pct']:.2f}%",
                            delta_color="inverse")
                 mc3.metric("Factor mismatch",      f"{res_mismatch_or['factor_mismatch_pct']:.2f}%",
@@ -682,10 +912,10 @@ if btn_cascada or st.session_state.get("cascada_ok"):
     cm1, cm2, cm3, cm4 = st.columns(4)
     cm1.metric("POA bruta",        f"{poa_anual:.0f} kWh/m²")
     cm2.metric("POA efectiva",     f"{poa_efectiva:.0f} kWh/m²")
-    cm3.metric("Pérdida total",    f"{perdida_total:.0f} kWh/m²",
+    cm3.metric("Pérdida acumulada de POA",    f"{perdida_total:.0f} kWh/m²",
                delta=f"-{perdida_total/poa_anual*100:.1f}%", delta_color="inverse")
     cm4.metric("Factor global PR",  f"{fg*100:.1f}%",
-               help="Performance Ratio de pérdidas ópticas y eléctricas (sin temperatura)")
+                help="Factor de la cascada de POA; no representa por sí solo el PR eléctrico AC.")
 
     # ── Tabla detalle ─────────────────────────────────────────────────────────
     with st.expander("📋 Ver tabla detallada de la cascada"):

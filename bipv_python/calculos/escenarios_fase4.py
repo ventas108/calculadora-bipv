@@ -181,6 +181,9 @@ def capturar_base_comparacion(state: Mapping[str, Any]) -> dict[str, Any]:
     puntos = _extraer_puntos(state.get("sk_puntos_df"))
     if not puntos:
         puntos = _extraer_puntos(state.get("df_fs_raw"))
+    df_fs = state.get("df_fs_raw")
+    if isinstance(df_fs, pd.DataFrame) and not puntos:
+        puntos = _extraer_puntos(df_fs)
     fachadas_y_puntos = {
         "registros": puntos,
         "fuente_identidad": (

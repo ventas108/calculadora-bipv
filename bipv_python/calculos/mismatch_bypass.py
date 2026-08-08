@@ -333,7 +333,13 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
             col_fachada_clean = c
         elif cl in ("obstaculo", "obstacle"):
             col_obstaculo = c
-    col_fachada = col_fachada_clean or col_obstaculo  # Fachada limpia tiene prioridad
+    col_fachada = col_fachada_clean or col_obstaculo  # Compatibilidad histórica
+    col_punto: str | None = None
+    for c in df_raw.columns:
+        cl = c.lower().replace(" ", "_")
+        if cl in ("punto", "point", "fila", "row"):
+            col_punto = c
+            break
 
     # ── Elegir la única columna permitida para bypass ─────────────────────────
     advertencias: list[str] = []
@@ -366,6 +372,12 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
     cols_leer = [col_mes, col_dia, col_hora, col_fs_elegida]
     if col_fachada and col_fachada not in cols_leer:
         cols_leer.append(col_fachada)
+    if col_fachada_clean and col_fachada_clean not in cols_leer:
+        cols_leer.append(col_fachada_clean)
+    if col_obstaculo and col_obstaculo not in cols_leer:
+        cols_leer.append(col_obstaculo)
+    if col_punto and col_punto not in cols_leer:
+        cols_leer.append(col_punto)
 
     df = df_raw[cols_leer].copy()
     rename: dict[str, str] = {
@@ -374,9 +386,17 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
         col_hora:        "hora",
         col_fs_elegida:  "FS_geometrico",
     }
-    if col_fachada and col_fachada not in rename:
-        rename[col_fachada] = "fachada"
+    if col_fachada_clean:
+        rename[col_fachada_clean] = "fachada"
+    if col_obstaculo and col_obstaculo not in rename:
+        rename[col_obstaculo] = "obstaculo"
+    if col_punto and col_punto not in rename:
+        rename[col_punto] = "punto"
     df = df.rename(columns=rename)
+    # CSV antiguos usaban Obstaculo como única dimensión para filtrar la
+    # fachada. Conservamos ambos nombres sin perder la identidad del obstáculo.
+    if col_obstaculo and not col_fachada_clean and "obstaculo" in df.columns:
+        df["fachada"] = df["obstaculo"]
 
     df = df.dropna(subset=["mes", "dia", "hora"])
 
@@ -456,8 +476,9 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
 
     # Retornar df con fachada cuando esté disponible (para filtrado en UI)
     cols_out = ["mes", "dia", "hora", "FS_geometrico", "FS"]
-    if "fachada" in df.columns:
-        cols_out.append("fachada")
+    for dimension in ("fachada", "punto", "obstaculo"):
+        if dimension in df.columns and dimension not in cols_out:
+            cols_out.append(dimension)
     return df[cols_out].copy(), meta
 
 
