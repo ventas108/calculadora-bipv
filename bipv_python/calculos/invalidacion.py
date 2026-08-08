@@ -40,8 +40,9 @@ KEYS_DERIVADOS_POA = (
     # Bypass — resultados y flags (Página 5); si quedan vivos, Producción
     # re-aplica sombras viejas a la producción nueva
     "E_ac_anual_kWh_bypass",
-    "bypass_ok", "bypass_result", "bypass_p_shade", "bypass_n_series",
-    "bypass_n_parallel", "bypass_panel", "kwh_bypass_anual",
+    "bypass_ok", "bypass_result", "bypass_p_shade",
+    "bypass_n_series_usado", "bypass_n_parallel_usado", "bypass_panel_usado",
+    "kwh_bypass_anual",
     "bypass_modo_usado", "bypass_multisup_ok", "bypass_multisup_resultados",
     # Multi-superficie (Página 9)
     "E_ac_anual_kWh_multisup", "poa_df_multisup",

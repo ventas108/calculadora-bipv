@@ -1504,9 +1504,12 @@ if csv_ok and df_fs_raw is not None:
                     )
                     st.session_state["bypass_result"]     = res_bp
                     st.session_state["bypass_p_shade"]    = p_shade
-                    st.session_state["bypass_n_series"]   = int(N_series_bp)
-                    st.session_state["bypass_n_parallel"] = int(N_parallel_bp)
-                    st.session_state["bypass_panel"]      = panel_bp_nombre
+                    # OJO: no usar las keys de los widgets ("bypass_n_series",
+                    # "bypass_n_parallel", "bypass_panel") — reasignarlas tras
+                    # instanciar el widget lanza StreamlitAPIException.
+                    st.session_state["bypass_n_series_usado"]   = int(N_series_bp)
+                    st.session_state["bypass_n_parallel_usado"] = int(N_parallel_bp)
+                    st.session_state["bypass_panel_usado"]      = panel_bp_nombre
                     st.session_state["bypass_ok"]         = True
                 except Exception as e:
                     st.error(f"❌ Error en simulación bypass: {e}")
