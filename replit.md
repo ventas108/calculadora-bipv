@@ -34,7 +34,9 @@ _Describe the high-level user-facing capabilities of this app once they exist._
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Priorizar una programación asertiva, coherente, limpia y verificable.
+- Antes de modificar, revisar dependencias y reutilizar la lógica existente; evitar duplicaciones y soluciones improvisadas.
+- Entregar cambios funcionales, con validaciones y pruebas proporcionales al riesgo.
 
 ## Gotchas
 
