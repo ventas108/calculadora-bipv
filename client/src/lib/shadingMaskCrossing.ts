@@ -56,6 +56,8 @@ export interface CrossingResult {
   facade: string;
   fsGeometrico: number;
   fsClimatico: number;
+  /** Indicador diagnóstico combinado; nunca se usa para mismatch/bypass. */
+  fsCombinado: number;
   fs: number;
   situacion: string;
   obstacle: string;
@@ -502,6 +504,7 @@ export function executeCrossing(
           facade: facade.name,
           fsGeometrico: Math.round(fsGeom * 1000) / 1000,
           fsClimatico: Math.round(fsClim * 1000) / 1000,
+          fsCombinado: Math.round(fsCombined * 1000) / 1000,
           fs: Math.round(fsCombined * 1000) / 1000,
           situacion,
           obstacle: obstacleNames.length > 0 ? obstacleNames.join(', ') : 'Ninguno',
@@ -582,6 +585,7 @@ export function crossingResultsToAnalysisPoints(results: CrossingResult[]): Arra
   evento: string;
   fsGeometrico: number;
   fsClimatico: number;
+  fsCombinado: number;
   situacion: string;
   hourStr: string;
   facade: string;
@@ -600,6 +604,7 @@ export function crossingResultsToAnalysisPoints(results: CrossingResult[]): Arra
     evento: r.evento,
     fsGeometrico: r.fsGeometrico,
     fsClimatico: r.fsClimatico,
+    fsCombinado: r.fsCombinado,
     situacion: r.situacion,
     hourStr: r.hourStr,
     facade: r.facade,               // campo limpio para columna Fachada en CSV

@@ -36,7 +36,12 @@ vi.mock('jspdf', () => {
     getTextWidth: () => 50,
     lastAutoTable: { finalY: 50 },
   };
-  return { default: vi.fn(() => mockDoc) };
+  class MockJsPDF {
+    constructor() {
+      return mockDoc;
+    }
+  }
+  return { default: MockJsPDF };
 });
 
 vi.mock('jspdf-autotable', () => ({
@@ -64,6 +69,7 @@ describe('Shading Crossing Report Section', () => {
       facade: 'Fachada Norte',
       fsGeometrico: 0.3,
       fsClimatico: 0.2,
+      fsCombinado: 0.44,
       fs: 0.44,
       situacion: 'Parcial',
       obstacle: 'Edificio A',
@@ -79,6 +85,7 @@ describe('Shading Crossing Report Section', () => {
       facade: 'Fachada Norte',
       fsGeometrico: 0.1,
       fsClimatico: 0.15,
+      fsCombinado: 0.235,
       fs: 0.235,
       situacion: 'Despejado',
       obstacle: 'Ninguno',
@@ -94,6 +101,7 @@ describe('Shading Crossing Report Section', () => {
       facade: 'Fachada Este',
       fsGeometrico: 0.6,
       fsClimatico: 0.4,
+      fsCombinado: 0.76,
       fs: 0.76,
       situacion: 'Nublado',
       obstacle: 'Edificio B',
@@ -109,6 +117,7 @@ describe('Shading Crossing Report Section', () => {
       facade: 'Fachada Norte',
       fsGeometrico: 0.0,
       fsClimatico: 0.8,
+      fsCombinado: 0.8,
       fs: 0.8,
       situacion: 'Cubierto',
       obstacle: 'Ninguno',
@@ -124,6 +133,7 @@ describe('Shading Crossing Report Section', () => {
       facade: 'Fachada Este',
       fsGeometrico: 0.2,
       fsClimatico: 0.1,
+      fsCombinado: 0.28,
       fs: 0.28,
       situacion: 'Despejado',
       obstacle: 'Ninguno',

@@ -1628,7 +1628,7 @@ with tab_solar:
                                  if "fachada" in _df_fsp.columns else [])
                     if not _fach_csv:
                         st.caption("El CSV no tiene columna 'Fachada' — FS uniforme para todas.")
-                        _fs_u = _df_fsp.groupby("mes")["FS"].mean()
+                        _fs_u = _df_fsp.groupby("mes")["FS_geometrico"].mean()
                         _fig_fsu = go.Figure(go.Bar(
                             x=_MESES_ES, y=[float(_fs_u.get(m,0)) for m in range(1,13)],
                             marker_color="orange", name="FS uniforme",

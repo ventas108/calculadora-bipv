@@ -251,13 +251,14 @@ def calcular_fs_horario(
 
 def resumen_fs(df_fs: pd.DataFrame) -> dict:
     """Estadísticas para la UI."""
-    horas_sombra = df_fs[df_fs["FS"] > 0]
+    col_fs = "FS_geometrico" if "FS_geometrico" in df_fs.columns else "FS"
+    horas_sombra = df_fs[df_fs[col_fs] > 0]
     return {
         "puntos": int(df_fs["Punto"].nunique()),
         "horas_evaluadas": int(len(df_fs) / max(1, df_fs["Punto"].nunique())),
         "registros_con_sombra": int(len(horas_sombra)),
         "pct_horas_con_sombra": round(100.0 * len(horas_sombra) / max(1, len(df_fs)), 1),
-        "fs_medio_con_sombra": round(float(horas_sombra["FS"].mean()), 3) if len(horas_sombra) else 0.0,
+        "fs_medio_con_sombra": round(float(horas_sombra[col_fs].mean()), 3) if len(horas_sombra) else 0.0,
     }
 
 

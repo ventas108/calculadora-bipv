@@ -233,7 +233,7 @@ if df_fs is not None:
         )
 
     # Perfil mensual medio a mediodía para sanidad visual
-    _md = df_fs[df_fs["Hora"].between(11, 13)].groupby("Mes")["FS"].mean()
+    _md = df_fs[df_fs["Hora"].between(11, 13)].groupby("Mes")["FS_geometrico"].mean()
     if not _md.empty:
         st.caption("FS medio 11:00–13:00 por mes (verificación rápida):")
         st.bar_chart(_md)

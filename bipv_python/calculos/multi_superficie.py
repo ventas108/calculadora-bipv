@@ -260,7 +260,13 @@ def fs_mensual_por_superficie(
     if df.empty:
         return [0.0] * 12
 
-    fs_mes = df.groupby("mes")["FS"].mean()
+    if "FS_geometrico" not in df.columns:
+        raise ValueError(
+            "El DataFrame de sombreado no contiene FS_geometrico; "
+            "FS climático o combinado no puede colorear ni alimentar superficies."
+        )
+
+    fs_mes = df.groupby("mes")["FS_geometrico"].mean()
     return [float(fs_mes.get(m, 0.0)) for m in range(1, 13)]
 
 

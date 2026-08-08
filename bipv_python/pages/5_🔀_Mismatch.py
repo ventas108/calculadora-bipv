@@ -555,11 +555,11 @@ st.markdown("#### 📂 Cargar CSV de la Calculadora de Sombreado")
 st.caption(
     "Exporta el CSV desde bipv.innovacionquimica.com.co → Puntos de Análisis → "
     "**Exportar CSV** (después de ejecutar «Cruzar Máscara + EPW»). "
-    "Columnas requeridas: **Mes, Dia, Hora, FS**"
+    "Columnas requeridas: **Mes, Dia, Hora, FS_geometrico**"
 )
 
 csv_file = st.file_uploader(
-    "Archivo CSV con Factor de Sombreado horario",
+    "Archivo CSV con FS_geometrico horario",
     type=["csv"],
     key="uploader_csv_fs",
     help="CSV exportado por la Calculadora de Factor de Sombreado BIPV",
@@ -598,7 +598,7 @@ meta_fs   = st.session_state.get("meta_fs", {})
 
 if csv_ok and df_fs_raw is not None:
     # ── Banner fuente del FS ───────────────────────────────────────────────
-    tipo_fs = meta_fs.get("tipo", "combinado")
+    tipo_fs = meta_fs.get("tipo", "geometrico")
     if tipo_fs == "geometrico":
         st.success(meta_fs.get("descripcion", ""))
     else:
@@ -672,7 +672,10 @@ if csv_ok and df_fs_raw is not None:
             df_fs_work = df_fs_raw.copy()  # fallback
     if _invertir:
         df_fs_work = df_fs_work.copy()
-        df_fs_work["FS"] = (1.0 - df_fs_work["FS"]).clip(0.0, 1.0)
+        df_fs_work["FS_geometrico"] = (
+            1.0 - df_fs_work["FS_geometrico"]
+        ).clip(0.0, 1.0)
+        df_fs_work["FS"] = df_fs_work["FS_geometrico"]
 
     # ── Estadísticas del CSV ──────────────────────────────────────────────
     try:
@@ -685,8 +688,7 @@ if csv_ok and df_fs_raw is not None:
         sc3.metric(
             f"{'FS_geom' if tipo_fs == 'geometrico' else 'FS'} medio",
             f"{stats['fs_medio']:.3f}",
-            help="0 = sin sombra · 1 = sombra total — "
-                 + ("solo obstáculos físicos" if tipo_fs == "geometrico" else "sombra geom. + nubes"),
+            help="0 = sin sombra · 1 = sombra total — solo obstáculos físicos",
         )
         sc4.metric("Horas con FS > 0",   f"{stats['horas_fs_gt0']} h",
                    help="Horas al año con algún grado de sombreado activo")
@@ -1036,12 +1038,12 @@ if csv_ok and df_fs_raw is not None:
                     f"({res_bp['horas_bypass']} horas/año con bypass activo)"
                 )
 
-            _tipo_fs_res = meta_fs.get("tipo", "combinado")
+            _tipo_fs_res = meta_fs.get("tipo", "geometrico")
             _col_fs_res  = meta_fs.get("col_original", "FS")
             _fs_badge    = (
                 "🟩 FS geométrico (solo obstáculos físicos)"
                 if _tipo_fs_res == "geometrico"
-                else "🟨 FS combinado (geom + nubes) — puede sobreestimar bypass"
+                else "⚠️ Fuente no oficial"
             )
             _modo_usado = st.session_state.get("bypass_modo_usado", "mensual")
             _modo_badge = (

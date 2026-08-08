@@ -413,7 +413,7 @@ export default function CrossingModal({
               <p>• Fachadas: {Array.from(new Set(results.map(r => r.facade))).join(', ')}</p>
               <p>• FS Geométrico promedio: {(results.reduce((s, r) => s + r.fsGeometrico, 0) / results.length).toFixed(3)}</p>
               <p>• FS Climático promedio: {(results.reduce((s, r) => s + r.fsClimatico, 0) / results.length).toFixed(3)}</p>
-              <p>• FS Combinado promedio: {(results.reduce((s, r) => s + r.fs, 0) / results.length).toFixed(3)}</p>
+              <p>• FS Combinado diagnóstico promedio: {(results.reduce((s, r) => s + r.fsCombinado, 0) / results.length).toFixed(3)}</p>
               <p>• Puntos con sombra geométrica: {results.filter(r => r.fsGeometrico > 0).length}</p>
             </div>
           </div>

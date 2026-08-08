@@ -272,7 +272,9 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
     Retorna
     -------
     (df, meta) donde:
-    · df  : DataFrame con columnas [mes, dia, hora, FS] · FS ∈ [0,1] · 0=sin sombra
+    · df  : DataFrame con columnas [mes, dia, hora, FS_geometrico, FS]
+           · FS_geometrico ∈ [0,1] · 0=sin sombra
+           · FS es un alias legado de FS_geometrico, nunca una fuente independiente
     · meta: dict con información sobre la fuente del FS usado:
         - "col_original"  : nombre de columna del CSV que se usó
         - "tipo"          : "geometrico"
@@ -370,7 +372,7 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
         col_mes:         "mes",
         col_dia:         "dia",
         col_hora:        "hora",
-        col_fs_elegida:  "FS",
+        col_fs_elegida:  "FS_geometrico",
     }
     if col_fachada and col_fachada not in rename:
         rename[col_fachada] = "fachada"
@@ -410,7 +412,14 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
             return 0
 
     df["hora"] = df["hora"].apply(_parse_hora)
-    df["FS"]   = pd.to_numeric(df["FS"], errors="coerce").fillna(0.0).clip(0.0, 1.0)
+    df["FS_geometrico"] = (
+        pd.to_numeric(df["FS_geometrico"], errors="coerce")
+        .fillna(0.0)
+        .clip(0.0, 1.0)
+    )
+    # Compatibilidad con consumidores antiguos. Este alias se deriva
+    # exclusivamente de FS_geometrico: jamás se copia la columna FS combinada.
+    df["FS"] = df["FS_geometrico"]
 
     # ── #32 La convención geométrica oficial es siempre p_shade ───────────────
     # No se infiere ni invierte: FS_geometrico ya es 0=sin sombra, 1=sombra total.
@@ -446,7 +455,7 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
     }
 
     # Retornar df con fachada cuando esté disponible (para filtrado en UI)
-    cols_out = ["mes", "dia", "hora", "FS"]
+    cols_out = ["mes", "dia", "hora", "FS_geometrico", "FS"]
     if "fachada" in df.columns:
         cols_out.append("fachada")
     return df[cols_out].copy(), meta
@@ -467,7 +476,7 @@ def alinear_fs_con_tmy(
 
     Parámetros
     ----------
-    df_fs     : DataFrame con columnas [mes, dia, hora, FS]
+    df_fs     : DataFrame con columnas [mes, dia, hora, FS_geometrico]
     tmy_index : DatetimeIndex del TMY (8760 timestamps)
     modo      : "mensual" (recomendado) | "exacto"
 
@@ -484,12 +493,18 @@ def alinear_fs_con_tmy(
 
     Retorna pd.Series (índice = tmy_index, valores FS ∈ [0, 1], nombre="p_shade")
     """
+    if "FS_geometrico" not in df_fs.columns:
+        raise ValueError(
+            "El DataFrame de sombreado no contiene FS_geometrico; "
+            "FS climático o FS combinado no pueden alimentar bypass."
+        )
+
     if modo == "mensual":
         # Promediar FS por (mes, hora) — replica el patrón a todos los días del mes
-        df_agg = (df_fs.groupby(["mes", "hora"])["FS"]
+        df_agg = (df_fs.groupby(["mes", "hora"])["FS_geometrico"]
                   .mean()
                   .reset_index()
-                  .rename(columns={"FS": "FS_mean"}))
+                  .rename(columns={"FS_geometrico": "FS_mean"}))
 
         tmy_df = pd.DataFrame({
             "mes":  tmy_index.month,
@@ -499,10 +514,10 @@ def alinear_fs_con_tmy(
         merged = tmy_df.merge(df_agg, on=["mes", "hora"], how="left")
     else:
         # "exacto": solo los timestamps que aparecen en el CSV
-        df_agg = (df_fs.groupby(["mes", "dia", "hora"])["FS"]
+        df_agg = (df_fs.groupby(["mes", "dia", "hora"])["FS_geometrico"]
                   .mean()
                   .reset_index()
-                  .rename(columns={"FS": "FS_mean"}))
+                  .rename(columns={"FS_geometrico": "FS_mean"}))
 
         tmy_df = pd.DataFrame({
             "mes":  tmy_index.month,
@@ -536,17 +551,27 @@ def cobertura_csv(
     """
     n_tmy = len(tmy_index)
 
+    if "FS_geometrico" not in df_fs.columns:
+        raise ValueError(
+            "El DataFrame de sombreado no contiene FS_geometrico; "
+            "no se puede auditar la cobertura física."
+        )
+
     # ── Cobertura exacta ────────────────────────────────────────────────────
-    df_ex = df_fs.groupby(["mes", "dia", "hora"])["FS"].mean().reset_index()
+    df_ex = df_fs.groupby(["mes", "dia", "hora"])["FS_geometrico"].mean().reset_index()
     tmy_ex = pd.DataFrame({
         "mes": tmy_index.month, "dia": tmy_index.day, "hora": tmy_index.hour,
     }, index=tmy_index)
-    n_exacto = int(tmy_ex.merge(df_ex, on=["mes", "dia", "hora"], how="left")["FS"].notna().sum())
+    n_exacto = int(
+        tmy_ex.merge(df_ex, on=["mes", "dia", "hora"], how="left")["FS_geometrico"].notna().sum()
+    )
 
     # ── Cobertura mensual ───────────────────────────────────────────────────
-    df_men = df_fs.groupby(["mes", "hora"])["FS"].mean().reset_index()
+    df_men = df_fs.groupby(["mes", "hora"])["FS_geometrico"].mean().reset_index()
     tmy_men = pd.DataFrame({"mes": tmy_index.month, "hora": tmy_index.hour}, index=tmy_index)
-    n_mensual = int(tmy_men.merge(df_men, on=["mes", "hora"], how="left")["FS"].notna().sum())
+    n_mensual = int(
+        tmy_men.merge(df_men, on=["mes", "hora"], how="left")["FS_geometrico"].notna().sum()
+    )
 
     # ── Días y meses cubiertos ──────────────────────────────────────────────
     dias_criticos = sorted(
@@ -582,25 +607,31 @@ def estadisticas_fs(df_fs: pd.DataFrame) -> dict:
         horas_fs_gt50   : horas con FS > 0.5
         df_mensual_fs   : DataFrame con FS medio por mes
     """
+    if "FS_geometrico" not in df_fs.columns:
+        raise ValueError(
+            "El DataFrame de sombreado no contiene FS_geometrico; "
+            "las estadísticas de bypass requieren la capa física."
+        )
+
     n_puntos    = df_fs.groupby(["mes", "dia", "hora"]).ngroups   # timestamps únicos
     # "Puntos" puede inferirse si hay obstaculo/evento column, si no = 1
     # Simplemente contar registros por timestamp
-    registros_por_ts = df_fs.groupby(["mes", "dia", "hora"])["FS"].count()
+    registros_por_ts = df_fs.groupby(["mes", "dia", "hora"])["FS_geometrico"].count()
     n_puntos_analisis = int(registros_por_ts.max()) if len(registros_por_ts) > 0 else 1
 
-    fs_medio  = float(df_fs["FS"].mean())
-    fs_max    = float(df_fs["FS"].max())
+    fs_medio  = float(df_fs["FS_geometrico"].mean())
+    fs_max    = float(df_fs["FS_geometrico"].max())
 
-    df_agg = (df_fs.groupby(["mes", "dia", "hora"])["FS"].mean().reset_index())
-    horas_fs_gt0  = int((df_agg["FS"] > 0.0).sum())
-    horas_fs_gt50 = int((df_agg["FS"] > 0.5).sum())
+    df_agg = (df_fs.groupby(["mes", "dia", "hora"])["FS_geometrico"].mean().reset_index())
+    horas_fs_gt0  = int((df_agg["FS_geometrico"] > 0.0).sum())
+    horas_fs_gt50 = int((df_agg["FS_geometrico"] > 0.5).sum())
 
     # FS medio por mes
     meses_es = {1:"Ene",2:"Feb",3:"Mar",4:"Abr",5:"May",6:"Jun",
                 7:"Jul",8:"Ago",9:"Sep",10:"Oct",11:"Nov",12:"Dic"}
-    df_m = df_agg.groupby("mes")["FS"].mean().reset_index()
+    df_m = df_agg.groupby("mes")["FS_geometrico"].mean().reset_index()
     df_m["Mes"]     = df_m["mes"].map(meses_es)
-    df_m["FS medio"] = df_m["FS"].round(3)
+    df_m["FS medio"] = df_m["FS_geometrico"].round(3)
     df_m = df_m[["Mes", "FS medio"]]
 
     return {

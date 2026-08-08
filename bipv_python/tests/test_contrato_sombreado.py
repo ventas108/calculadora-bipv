@@ -119,6 +119,27 @@ def test_mismatch_rechaza_fs_combinado_o_climatico_sin_fs_geometrico():
         cargar_csv_fs(io.StringIO(csv))
 
 
+def test_parser_y_alineacion_ignoran_fs_combinado_cuando_hay_nubosidad():
+    """La nube alta nunca se convierte en p_shade para bypass."""
+    csv = (
+        "Mes,Dia,Hora,FS_geometrico,FS_climatico,FS\n"
+        "3,20,17,0.0,0.9,0.9\n"
+        "3,20,18,0.4,0.8,0.8\n"
+    )
+    df, meta = cargar_csv_fs(io.StringIO(csv))
+
+    assert meta["tipo"] == "geometrico"
+    assert df["FS_geometrico"].tolist() == [0.0, 0.4]
+    # Alias legacy también debe ser físico, no el FS combinado del archivo.
+    assert df["FS"].tolist() == [0.0, 0.4]
+
+    tmy_index = pd.date_range("2024-03-20 17:00", periods=2, freq="h")
+    p_shade = __import__("calculos.mismatch_bypass", fromlist=["alinear_fs_con_tmy"]).alinear_fs_con_tmy(
+        df, tmy_index, modo="exacto"
+    )
+    np.testing.assert_allclose(p_shade.values, [0.0, 0.4])
+
+
 def test_clima_alto_con_geometria_cero_no_reduce_produccion_ni_activa_bypass():
     """FS_climatico no entra al motor de bypass ni reduce su referencia."""
     irradiancia = np.array([800.0, 900.0, 700.0])

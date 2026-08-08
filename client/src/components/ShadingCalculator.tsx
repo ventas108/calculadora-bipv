@@ -61,6 +61,7 @@ interface AnalysisPoint {
   evento?: string; // Equinoccio de Marzo, Solsticio de Junio, etc.
   fsGeometrico?: number; // FS geométrico (sombra por obstáculos físicos)
   fsClimatico?: number; // FS climático (sombra por nubosidad)
+  fsCombinado?: number; // FS combinado diagnóstico; no alimenta mismatch/bypass
   situacion?: string; // Muy nublado, Parcialmente nublado, Cielo despejado, etc.
   hourStr?: string; // Hora en formato string original (ej: "07:30")
   facade?: string; // Nombre de la fachada (columna Fachada en CSV extendido)
@@ -132,6 +133,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
         fs: p.fs,
         fsGeometrico: p.fsGeometrico,
         fsClimatico: p.fsClimatico,
+        fsCombinado: p.fsCombinado,
         autoCalculated: p.autoCalculated,
       }));
     }
@@ -408,11 +410,11 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
     }
     const headers = [
       'Mes', 'Dia', 'Hora', 'Altura Solar (deg)', 'Acimut Solar (deg)',
-      'FS_geometrico', 'FS', 'Fachada', 'Punto', 'timestamp_utc',
+      'FS_geometrico', 'Fachada', 'Punto', 'timestamp_utc',
     ];
     const rows = officialShadingResult.results.map(row => [
       row.month, row.day, row.hour_utc, row.solar_altitude_deg, row.solar_azimuth_deg,
-      row.fs_geometrico, row.fs, row.facade, row.point_id, row.timestamp_utc,
+      row.fs_geometrico, row.facade, row.point_id, row.timestamp_utc,
     ]);
     const csv = [headers, ...rows]
       .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
@@ -550,7 +552,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
         fs: p.fs,
         fsGeometrico: p.fsGeometrico,
         fsClimatico: p.fsClimatico,
-        fsCombinado: p.fs,
+        fsCombinado: p.fsCombinado,
       })));
     }
   }, [points, onPointsChange]);
@@ -605,7 +607,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
     };
 
     const headers = hasExtended
-      ? ['Evento', 'Mes', 'Dia', 'Hora', 'Altura Solar (deg)', 'Acimut Solar (deg)', 'Obstaculo', 'FS_geometrico', 'FS_climatico', 'FS', 'Situacion', 'Fachada']
+      ? ['Evento', 'Mes', 'Dia', 'Hora', 'Altura Solar (deg)', 'Acimut Solar (deg)', 'Obstaculo', 'FS_geometrico', 'FS_climatico', 'FS_combinado_diagnostico', 'Situacion', 'Fachada']
       : ['Mes', 'Dia', 'Hora', 'Altura Solar', 'Acimut Solar', 'Obstaculo', 'Area Sombreada', 'FS'];
 
     const rows = hasExtended
@@ -619,7 +621,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
           escapeCSV(p.obstacle),       // puede tener comas si hay múltiples obstáculos
           (p.fsGeometrico ?? 0).toFixed(3),
           (p.fsClimatico ?? 0).toFixed(3),
-          p.fs.toFixed(3),
+          (p.fsCombinado ?? p.fs).toFixed(3),
           escapeCSV(p.situacion || ''),
           escapeCSV(p.facade || ''),   // columna Fachada para filtrado por fachada activa
         ])
@@ -752,7 +754,9 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
         const rawFs = parseLocalizedNumber(values[9]);
         const fsGeometrico = normalizeFS(rawFsGeom);
         const fsClimatico = normalizeFS(rawFsClim);
-        const fs = normalizeFS(rawFs) || Math.max(fsGeometrico, fsClimatico);
+        const fsCombinado = values[9]?.trim()
+          ? normalizeFS(rawFs)
+          : Math.max(fsGeometrico, fsClimatico);
         const situacion = values[10] || '';
 
         newPoints.push({
@@ -763,12 +767,13 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
           heightSolar,
           azimuthSolar,
           obstacle,
-          shadowedArea: fs * 100,
-          fs,
+          shadowedArea: fsCombinado * 100,
+          fs: fsCombinado,
           autoCalculated: false,
           evento,
           fsGeometrico,
           fsClimatico,
+          fsCombinado,
           situacion,
           hourStr,
         });
@@ -2281,7 +2286,9 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                 {points.some(p => p.fsClimatico !== undefined) && (
                   <th className="px-1.5 py-1.5 text-left text-[10px] font-semibold text-gray-700">FS Clim.</th>
                 )}
-                <th className="px-1.5 py-1.5 text-left text-[10px] font-semibold text-gray-700">FS</th>
+                <th className="px-1.5 py-1.5 text-left text-[10px] font-semibold text-gray-700">
+                  {points.some(p => p.fsCombinado !== undefined) ? 'FS combinado' : 'FS'}
+                </th>
                 {points.some(p => p.situacion) && (
                   <th className="px-1.5 py-1.5 text-left text-[10px] font-semibold text-gray-700">Situación</th>
                 )}

@@ -72,7 +72,7 @@ function computeFacadeSummaries(results: CrossingResult[], facades: FacadeDefini
 
     const fsGeomValues = facadeResults.map(r => r.fsGeometrico);
     const fsClimValues = facadeResults.map(r => r.fsClimatico);
-    const fsValues = facadeResults.map(r => r.fs);
+    const fsValues = facadeResults.map(r => r.fsCombinado);
 
     return {
       name: facade.name,
@@ -107,7 +107,7 @@ function computeHourlyDistribution(results: CrossingResult[], facades: FacadeDef
     facades.forEach(facade => {
       const facadeHourResults = hourResults.filter(r => r.facade === facade.name);
       if (facadeHourResults.length > 0) {
-        facadeAvgs[facade.name] = facadeHourResults.reduce((a, r) => a + r.fs, 0) / facadeHourResults.length;
+        facadeAvgs[facade.name] = facadeHourResults.reduce((a, r) => a + r.fsCombinado, 0) / facadeHourResults.length;
       } else {
         facadeAvgs[facade.name] = 0;
       }
@@ -523,13 +523,13 @@ export function addShadingCrossingSectionToDoc(
     r.azimuthSolar.toFixed(1),
     r.fsGeometrico.toFixed(3),
     r.fsClimatico.toFixed(3),
-    r.fs.toFixed(3),
+    r.fsCombinado.toFixed(3),
     r.situacion,
   ]);
 
   autoTable(doc, {
     startY: y,
-    head: [['Evento', 'Fecha', 'Hora', 'Fachada', 'Alt.°', 'Az.°', 'FS Geom', 'FS Clim', 'FS', 'Cielo']],
+    head: [['Evento', 'Fecha', 'Hora', 'Fachada', 'Alt.°', 'Az.°', 'FS Geom', 'FS Clim', 'FS Comb. (diagnóstico)', 'Cielo']],
     body: detailRows,
     margin: { left: margin, right: margin },
     theme: 'grid',
@@ -550,7 +550,7 @@ export function addShadingCrossingSectionToDoc(
     },
     didParseCell: (hookData: any) => {
       if (hookData.section === 'body') {
-        // Color FS combinado
+        // Color FS combinado diagnóstico
         if (hookData.column.index === 8) {
           const val = parseFloat(hookData.cell.raw as string);
           if (!isNaN(val)) {
