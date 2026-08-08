@@ -46,6 +46,8 @@ interface ReportGeneratorProps {
   capacityFactor: number;
   performanceRatio: number;
   systemLosses: number;
+  solarCalculationScopeLabel?: string;
+  solarRecordCount?: number;
   multiFacadeData?: MultiFacadeData;
   facadeAnalysis3D?: FacadeFullAnalysis | null;
 }
@@ -108,6 +110,8 @@ export default function ReportGenerator({
   capacityFactor,
   performanceRatio,
   systemLosses,
+  solarCalculationScopeLabel,
+  solarRecordCount,
   multiFacadeData,
   facadeAnalysis3D,
 }: ReportGeneratorProps) {
@@ -157,6 +161,8 @@ export default function ReportGenerator({
           systemLosses,
         },
         weatherData,
+        solarCalculationScopeLabel,
+        solarRecordCount,
         multiFacadeData,
         facadeAnalysis3D,
       };
@@ -313,11 +319,12 @@ export default function ReportGenerator({
               <div className="space-y-2 text-sm">
                 <p><strong>Ubicación:</strong> {city}, {country}</p>
                 <p><strong>Producción Anual:</strong> {annualProduction > 0 ? `${annualProduction.toFixed(0)} kWh` : 'No calculada'}</p>
+                <p><strong>Alcance solar:</strong> {solarCalculationScopeLabel || 'No declarado'}{solarRecordCount !== undefined ? ` (${solarRecordCount.toLocaleString()} registros)` : ''}</p>
                 <p><strong>Factor de Capacidad:</strong> {capacityFactor > 0 ? `${capacityFactor.toFixed(1)}%` : 'N/A'}</p>
                 {isFacadeSpecific && (
                   <>
-                    <p><strong>FS_geometrico anual:</strong> {(facadeAnalysis3D!.annualFsGeometrico * 100).toFixed(1)}% sombra</p>
-                    <p><strong>Pérdida Sombra:</strong> {facadeAnalysis3D!.annualShadingLoss.toFixed(1)}%</p>
+                    <p><strong>FS_geometrico ({facadeAnalysis3D!.calculationScopeLabel}):</strong> {(facadeAnalysis3D!.annualFsGeometrico * 100).toFixed(1)}% sombra</p>
+                    <p><strong>Pérdida sombra estimada:</strong> {facadeAnalysis3D!.annualShadingLoss.toFixed(1)}%</p>
                   </>
                 )}
               </div>
@@ -330,7 +337,7 @@ export default function ReportGenerator({
                   {hasWeatherData ? '✓' : '○'} Datos meteorológicos
                 </li>
                 <li className={isFacadeSpecific || hasShadingPoints ? '' : 'opacity-50'}>
-                  {isFacadeSpecific || hasShadingPoints ? '✓' : '○'} Análisis de sombreado {isFacadeSpecific ? '(solsticios)' : `(${shadingPoints.length} puntos)`}
+                  {isFacadeSpecific || hasShadingPoints ? '✓' : '○'} Análisis de sombreado {isFacadeSpecific ? '(fechas críticas)' : `(${shadingPoints.length} puntos)`}
                 </li>
                 <li className={hasPoaData ? '' : 'opacity-50'}>
                   {hasPoaData ? '✓' : '○'} Radiación POA ({poaData.length} meses)

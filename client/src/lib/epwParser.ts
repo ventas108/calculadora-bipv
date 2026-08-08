@@ -33,6 +33,13 @@ export interface WeatherData {
 export interface EPWData {
   location: LocationInfo;
   weatherData: WeatherData[];
+  metadata?: {
+    source?: string;
+    periodOfRecord?: string;
+    representativeYearsByMonth?: string;
+    dataPeriod?: string;
+    isTypicalMeteorologicalYear: boolean;
+  };
 }
 
 export const parseEPW = (content: string): EPWData => {
@@ -123,7 +130,30 @@ export const parseEPW = (content: string): EPWData => {
     }
   }
 
-  return { location, weatherData };
+  const comments = lines
+    .filter(line => line.startsWith('COMMENTS'))
+    .map(line => line.split(',').slice(1).join(',').replace(/^"|"$/g, '').trim());
+  const commentsText = comments.join(' ');
+  const dataPeriodsLine = lines.find(line => line.startsWith('DATA PERIODS'));
+  const dataPeriod = dataPeriodsLine
+    ? dataPeriodsLine.split(',').slice(1).join(',').trim()
+    : undefined;
+  const periodMatch = commentsText.match(/Period of Record=([^;]+)/i);
+  const representativeYearsMatch = commentsText.match(/Period of Record=[^;]+;\s*(.*)$/i);
+
+  return {
+    location,
+    weatherData,
+    metadata: {
+      source: locationLine[4] || undefined,
+      periodOfRecord: periodMatch?.[1]?.trim(),
+      representativeYearsByMonth: representativeYearsMatch?.[1]?.trim(),
+      dataPeriod,
+      isTypicalMeteorologicalYear: /TMY|typical meteorological year|año meteorológico típico/i.test(
+        `${locationLine.join(',')} ${commentsText}`,
+      ),
+    },
+  };
 };
 
 /**

@@ -3,6 +3,8 @@ import { Upload, Cloud, Droplets, Wind, Sun, Trash2, Download, MapPin, Calendar,
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { parseEPW, EPWData, getMonthlyWeatherSummary } from '@/lib/epwParser';
+import { validateSolarRigor } from '@/lib/solarRigor';
+import SolarRigorBanner from './SolarRigorBanner';
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
@@ -307,6 +309,7 @@ export default function WeatherDataManager({ onWeatherDataLoaded, weatherData }:
       {/* Resumen de datos activos */}
       {weatherData && (
         <div className="space-y-4">
+          <SolarRigorBanner report={validateSolarRigor({ epwData: weatherData })} />
           <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6">
             <div className="flex items-start justify-between mb-4">
               <div>
@@ -329,7 +332,9 @@ export default function WeatherDataManager({ onWeatherDataLoaded, weatherData }:
               </div>
               <div className="bg-white rounded p-3 border border-green-100">
                 <p className="text-xs text-gray-600 mb-1">Período</p>
-                <p className="text-sm font-mono font-bold text-green-700">Año típico</p>
+                <p className="text-sm font-mono font-bold text-green-700">
+                  {weatherData.metadata?.isTypicalMeteorologicalYear ? 'TMY/TMYx' : 'Serie cargada'}
+                </p>
               </div>
               <div className="bg-white rounded p-3 border border-green-100">
                 <p className="text-xs text-gray-600 mb-1">Zona Horaria</p>

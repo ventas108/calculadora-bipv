@@ -73,6 +73,8 @@ interface EnergyProductionSimulatorProps {
   onDiscardPvwatts?: () => void;
   onInstallConfigChange?: (config: { tiltRange?: [number, number]; azimuthLocked?: boolean; name?: string }) => void;
   poaConfig?: POAConfig;
+  solarCalculationScopeLabel?: string;
+  solarRecordCount?: number;
   onPoaConfigChange?: (config: Partial<POAConfig>) => void;
   facadeAnalysis3D?: import('@/lib/facadeShadingAnalysis').FacadeFullAnalysis | null;
   modelFacades?: import('@/lib/buildingModelImporter').DetectedFacade[];
@@ -105,7 +107,7 @@ interface EnergyProductionSimulatorProps {
   onResimultateBIPV?: () => void;
 }
 
-export default function EnergyProductionSimulator({ weatherData, poaData, transmisionGeometricaMensual = Array(12).fill(1.0), prospectorData, onDiscardProspector, optimizerResult, onDiscardOptimizer, pvgisData, onDiscardPvgis, pvwattsData, onDiscardPvwatts, onInstallConfigChange, poaConfig, onPoaConfigChange, facadeAnalysis3D, modelFacades = [], modelObstacles3D, modelNorthOffset = 0, onFacadeSelectFromSimulator, onFinancialParamsChange, onEnergyDataChange, bipvData, onDiscardBipv, onReturnToBIPV, onResimultateBIPV }: EnergyProductionSimulatorProps) {
+export default function EnergyProductionSimulator({ weatherData, poaData, transmisionGeometricaMensual = Array(12).fill(1.0), prospectorData, onDiscardProspector, optimizerResult, onDiscardOptimizer, pvgisData, onDiscardPvgis, pvwattsData, onDiscardPvwatts, onInstallConfigChange, poaConfig, onPoaConfigChange, solarCalculationScopeLabel, solarRecordCount, facadeAnalysis3D, modelFacades = [], modelObstacles3D, modelNorthOffset = 0, onFacadeSelectFromSimulator, onFinancialParamsChange, onEnergyDataChange, bipvData, onDiscardBipv, onReturnToBIPV, onResimultateBIPV }: EnergyProductionSimulatorProps) {
   // Panel technology selection
   const [selectedTech, setSelectedTech] = useState<PanelTechnology>(DEFAULT_PANEL_TECHNOLOGIES[0]);
   const [yearsFromInstall, setYearsFromInstall] = useState(0);
@@ -1005,6 +1007,13 @@ export default function EnergyProductionSimulator({ weatherData, poaData, transm
 
   return (
     <div className="space-y-6">
+      {solarCalculationScopeLabel && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          <strong>Alcance solar:</strong> {solarCalculationScopeLabel}
+          {solarRecordCount !== undefined && ` · ${solarRecordCount.toLocaleString()} registros EPW`}
+          {poaConfig?.source === 'prospector' && ' · El Prospector es una estimación representativa y no reemplaza el EPW horario.'}
+        </div>
+      )}
       {/* Prospector Solar Bridge Banner — diferenciado por fuente PVGIS vs PVWatts */}
       {prospectorData && prospectorApplied && (() => {
         const isPVWatts = prospectorData.source === 'heatmap_pvwatts';
@@ -2681,8 +2690,8 @@ export default function EnergyProductionSimulator({ weatherData, poaData, transm
           </h4>
           {(use3DShading && facadeAnalysis3D) && (
             <p className="text-xs text-purple-700 mb-2">
-              FS_geometrico anual: <strong>{(facadeAnalysis3D.annualFsGeometrico * 100).toFixed(1)}%</strong> |
-              Pérdida por sombra: <strong>{facadeAnalysis3D.annualShadingLoss.toFixed(1)}%</strong> | 
+              FS_geometrico ({facadeAnalysis3D.calculationScopeLabel}): <strong>{(facadeAnalysis3D.annualFsGeometrico * 100).toFixed(1)}%</strong> |
+              Pérdida sombra estimada: <strong>{facadeAnalysis3D.annualShadingLoss.toFixed(1)}%</strong> |
               Horas sol efectivas: <strong>{facadeAnalysis3D.monthlyData.reduce((a, m) => a + m.effectiveSunHours, 0).toFixed(0)}h</strong> de {facadeAnalysis3D.monthlyData.reduce((a, m) => a + m.totalSunHours, 0).toFixed(0)}h disponibles
             </p>
           )}

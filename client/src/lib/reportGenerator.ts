@@ -74,6 +74,8 @@ interface ReportData {
   poaData: POAData[];
   energyData: EnergyData;
   weatherData: EPWData;
+  solarCalculationScopeLabel?: string;
+  solarRecordCount?: number;
   multiFacadeData?: MultiFacadeData;
   facadeAnalysis3D?: FacadeFullAnalysis | null;
 }
@@ -230,6 +232,13 @@ export function generateSolarReport(data: ReportData): jsPDF {
 
   doc.setFontSize(13);
   doc.setTextColor(100, 100, 100);
+  doc.setFontSize(9);
+  doc.text(
+    `${data.solarCalculationScopeLabel || 'Alcance solar no declarado'}${data.solarRecordCount !== undefined ? ` · ${data.solarRecordCount.toLocaleString()} registros` : ''}`,
+    pageWidth / 2,
+    yPosition - 8,
+    { align: 'center' },
+  );
   if (isFacadeSpecific) {
     doc.text(`Superficie Evaluada: ${facadeName}`, pageWidth / 2, yPosition, { align: 'center' });
     yPosition += 7;
@@ -303,7 +312,7 @@ export function generateSolarReport(data: ReportData): jsPDF {
   const hasManualShading = data.shadingPoints.length > 0;
 
   if (hasFacadeShading) {
-    // === MODO FACHADA ESPECÍFICA: Solo promedios de solsticios ===
+    // === MODO FACHADA ESPECÍFICA: Fechas y horas críticas ===
     checkSpace(80);
 
     doc.setFontSize(14);
@@ -317,14 +326,14 @@ export function generateSolarReport(data: ReportData): jsPDF {
     yPosition += 7;
 
     const fa = data.facadeAnalysis3D!;
-    // Solsticios: Jun (mes 6) y Dic (mes 12)
+    // Para el resumen legible se muestran junio y diciembre como fechas críticas.
     const junData = fa.monthlyData.find(m => m.month === 6);
     const dicData = fa.monthlyData.find(m => m.month === 12);
     const fsJun = junData ? junData.fsGeometricoAverage : 0;
     const fsDic = dicData ? dicData.fsGeometricoAverage : 0;
     const fsPromSolsticios = (fsJun + fsDic) / 2;
 
-    // Tabla resumen de solsticios
+    // Tabla resumen de fechas críticas
     const solsticeData = [
       ['Parametro', 'Solsticio Junio (21 Jun)', 'Solsticio Diciembre (21 Dic)', 'Promedio Critico'],
       ['FS Promedio', `${(fsJun * 100).toFixed(1)}%`, `${(fsDic * 100).toFixed(1)}%`, `${(fsPromSolsticios * 100).toFixed(1)}%`],
@@ -349,9 +358,9 @@ export function generateSolarReport(data: ReportData): jsPDF {
     // KPIs de sombreado de la fachada
     doc.setFontSize(9);
     doc.setTextColor(60, 60, 60);
-    doc.text(`FS_geometrico anual: ${(fa.annualFsGeometrico * 100).toFixed(1)}% sombra | POA con sombra: ${fa.annualPOA.toFixed(0)} kWh/m2/ano | POA sin sombra: ${fa.annualPOANoShading.toFixed(0)} kWh/m2/ano`, margin, yPosition);
+    doc.text(`${fa.calculationScopeLabel} | FS_geometrico: ${(fa.annualFsGeometrico * 100).toFixed(1)}% sombra | POA con sombra: ${fa.annualPOA.toFixed(0)} kWh/m2 | POA sin sombra: ${fa.annualPOANoShading.toFixed(0)} kWh/m2`, margin, yPosition);
     yPosition += 5;
-    doc.text(`Perdida anual por sombreado: ${fa.annualShadingLoss.toFixed(1)}% | Area evaluada: ${fa.area.toFixed(1)} m2`, margin, yPosition);
+    doc.text(`Perdida estimada por sombreado: ${fa.annualShadingLoss.toFixed(1)}% | Area evaluada: ${fa.area.toFixed(1)} m2`, margin, yPosition);
     yPosition += 10;
 
   } else if (hasManualShading) {
@@ -395,7 +404,7 @@ export function generateSolarReport(data: ReportData): jsPDF {
 
     yPosition = (doc as any).lastAutoTable.finalY + 7;
 
-    // Tabla de puntos de análisis (solo solsticios si hay muchos puntos)
+    // Tabla de puntos de análisis (prioriza junio/diciembre si hay muchos puntos)
     const solsticePoints = data.shadingPoints.filter(p => p.month === 'Jun' || p.month === 'Dic');
     const displayPoints = solsticePoints.length > 0 ? solsticePoints.slice(0, 15) : data.shadingPoints.slice(0, 15);
     const shadingTableData = displayPoints.map(p => [
@@ -410,7 +419,7 @@ export function generateSolarReport(data: ReportData): jsPDF {
     ]);
 
     if (solsticePoints.length > 0) {
-      doc.text('Puntos criticos de solsticios (Jun 21 / Dic 21):', margin, yPosition);
+      doc.text('Puntos críticos representativos (Jun 21 / Dic 21):', margin, yPosition);
       yPosition += 5;
     }
 

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { EPWData } from '@/lib/epwParser';
+import { SolarRigorReport, dayOfYear } from '@/lib/solarRigor';
+import SolarRigorBanner from './SolarRigorBanner';
 import { calculateHourlyPOA } from '@/lib/liuJordanModel';
 import {
   BarChart,
@@ -28,9 +30,10 @@ interface POAAnalyzerProps {
   sharedAlbedo?: number;
   sharedUsePerez?: boolean;
   onConfigChange?: (config: { tilt?: number; azimuth?: number; albedo?: number; usePerez?: boolean }) => void;
+  solarRigorReport?: SolarRigorReport;
 }
 
-export default function POAAnalyzer({ weatherData, tiltAngle: initialTilt = 0, surfaceAzimuth: initialAzimuth = 0, sharedAlbedo, sharedUsePerez, onConfigChange }: POAAnalyzerProps) {
+export default function POAAnalyzer({ weatherData, tiltAngle: initialTilt = 0, surfaceAzimuth: initialAzimuth = 0, sharedAlbedo, sharedUsePerez, onConfigChange, solarRigorReport }: POAAnalyzerProps) {
   const [tilt, setTilt] = useState(initialTilt || Math.round(weatherData.location.latitude));
   const [azimuth, setAzimuth] = useState(initialAzimuth);
   const [albedo, setAlbedo] = useState(sharedAlbedo ?? 0.2);
@@ -58,6 +61,7 @@ export default function POAAnalyzer({ weatherData, tiltAngle: initialTilt = 0, s
   }, [tilt, azimuth, albedo, usePerezModel]);
 
   const poaData = useMemo(() => {
+    if (solarRigorReport && !solarRigorReport.canCalculate) return [];
     const tiltRad = (tilt * Math.PI) / 180;
     const azimuthRad = (azimuth * Math.PI) / 180;
 
@@ -83,18 +87,14 @@ export default function POAAnalyzer({ weatherData, tiltAngle: initialTilt = 0, s
 
       monthWeatherData.forEach(w => {
         // Calcular día del año
-        const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-        let dayOfYear = w.day;
-        for (let i = 0; i < w.month - 1; i++) {
-          dayOfYear += daysInMonths[i];
-        }
+        const day = dayOfYear(w.month, w.day);
 
         const poa = calculateHourlyPOA(
           weatherData.location.latitude,
           weatherData.location.longitude,
-          -75, // Zona horaria estándar para Colombia (UTC-5)
-          dayOfYear,
-          w.hour,
+          weatherData.location.timezone * 15,
+          day,
+          w.hour - 1,
           w.minute,
           w.directNormalIrradiance,
           w.diffuseHorizontalIrradiance,
@@ -123,31 +123,41 @@ export default function POAAnalyzer({ weatherData, tiltAngle: initialTilt = 0, s
     });
 
     return monthlyData;
-  }, [weatherData, tilt, azimuth, albedo, usePerezModel]);
+  }, [weatherData, tilt, azimuth, albedo, usePerezModel, solarRigorReport]);
 
   const stats = useMemo(() => {
     const totalPOAValues = poaData.map(d => d.totalPOA);
     const directPOAValues = poaData.map(d => d.directPOA);
     const diffusePOAValues = poaData.map(d => d.diffusePOA);
 
-    const avgTotal = Math.round(totalPOAValues.reduce((a, b) => a + b, 0) / totalPOAValues.length);
-    const avgDirect = Math.round(directPOAValues.reduce((a, b) => a + b, 0) / directPOAValues.length);
-    const avgDiffuse = Math.round(diffusePOAValues.reduce((a, b) => a + b, 0) / diffusePOAValues.length);
+    const count = totalPOAValues.length;
+    const avgTotal = count ? Math.round(totalPOAValues.reduce((a, b) => a + b, 0) / count) : 0;
+    const avgDirect = count ? Math.round(directPOAValues.reduce((a, b) => a + b, 0) / count) : 0;
+    const avgDiffuse = count ? Math.round(diffusePOAValues.reduce((a, b) => a + b, 0) / count) : 0;
 
     return {
       avgTotal,
-      maxTotal: Math.max(...totalPOAValues),
-      minTotal: Math.min(...totalPOAValues),
+      maxTotal: count ? Math.max(...totalPOAValues) : 0,
+      minTotal: count ? Math.min(...totalPOAValues) : 0,
       avgDirect,
       avgDiffuse,
-      directRatio: ((avgDirect / avgTotal) * 100).toFixed(1),
-      diffuseRatio: ((avgDiffuse / avgTotal) * 100).toFixed(1),
-      annualPOA: Math.round(totalPOAValues.reduce((a, b) => a + b, 0) * 30), // Aproximación anual
+      directRatio: avgTotal ? ((avgDirect / avgTotal) * 100).toFixed(1) : '0.0',
+      diffuseRatio: avgTotal ? ((avgDiffuse / avgTotal) * 100).toFixed(1) : '0.0',
+      annualPOA: Math.round(poaData.reduce((sum, data, index) => {
+        const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][index];
+        return sum + data.totalPOA * daysInMonth * 24 / 1000;
+      }, 0)),
     };
   }, [poaData]);
 
   return (
     <div className="space-y-6">
+      {solarRigorReport && <SolarRigorBanner report={solarRigorReport} compact />}
+      {solarRigorReport && !solarRigorReport.canCalculate && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+          No se calcula POA hasta corregir el EPW y las validaciones de rigor solar.
+        </div>
+      )}
       <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
           <Zap size={20} className="text-amber-600" />
@@ -234,9 +244,11 @@ export default function POAAnalyzer({ weatherData, tiltAngle: initialTilt = 0, s
           </div>
 
           <div className="bg-green-50 rounded p-3 border border-green-200">
-            <p className="text-xs text-gray-600 mb-1">POA Anual Aprox.</p>
+            <p className="text-xs text-gray-600 mb-1">POA del alcance</p>
             <p className="text-2xl font-mono font-bold text-green-700">{stats.annualPOA}</p>
-            <p className="text-xs text-gray-500">kWh/m²</p>
+            <p className="text-xs text-gray-500">
+              kWh/m² · {solarRigorReport?.scopeLabel ?? 'alcance EPW'}
+            </p>
           </div>
         </div>
       </div>

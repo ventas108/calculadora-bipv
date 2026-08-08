@@ -4,6 +4,7 @@ import { EPWData } from '@/lib/epwParser';
 import { calculateMonthlyShadingFactorsForFacade, FacadeFullAnalysis } from '@/lib/facadeShadingAnalysis';
 import { calculateAnnualProduction, PanelSpecifications, SystemLosses } from '@/lib/energyProduction';
 import { calculateHourlyPOA } from '@/lib/liuJordanModel';
+import { dayOfYear } from '@/lib/solarRigor';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Building2, TrendingUp, Zap, Sun, ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -79,10 +80,10 @@ export default function MultiFacadeComparison({
 
         for (const w of monthData) {
           if (w.globalHorizontalIrradiance > 0 || w.directNormalIrradiance > 0) {
-            const dayOfYear = Math.floor((monthIdx * 30.44) + (w.day || 15));
+            const doy = dayOfYear(w.month, w.day || 15);
             const hourlyPOA = calculateHourlyPOA(
               lat, lon, stdMeridian,
-              dayOfYear,
+              doy,
               w.hour - 1,
               w.minute || 0,
               w.directNormalIrradiance,

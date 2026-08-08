@@ -40,6 +40,8 @@ export interface FacadeFullAnalysis {
   annualShadingLoss: number; // % pérdida anual
   monthlyFsGeometrico: number[]; // Array de 12 FS_geometrico p_shade
   monthlyTransmisionGeometrica: number[]; // Array de 12 factores para Producción/BIPV
+  calculationScope: 'critical_dates';
+  calculationScopeLabel: 'Cálculo representativo de fechas y horas críticas';
 }
 
 const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -244,6 +246,8 @@ export function calculateMonthlyShadingFactorsForFacade(
     annualShadingLoss,
     monthlyFsGeometrico,
     monthlyTransmisionGeometrica,
+    calculationScope: 'critical_dates',
+    calculationScopeLabel: 'Cálculo representativo de fechas y horas críticas',
   };
 }
 

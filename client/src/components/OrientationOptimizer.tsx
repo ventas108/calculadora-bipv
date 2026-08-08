@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Slider } from '@/components/ui/slider';
 import { Card } from '@/components/ui/card';
 import { EPWData } from '@/lib/epwParser';
+import { dayOfYear } from '@/lib/solarRigor';
 import {
   LineChart,
   Line,
@@ -116,9 +117,9 @@ function calculateMonthlyForOrientation(
 
     for (const w of monthData) {
       if (w.globalHorizontalIrradiance > 0 || w.directNormalIrradiance > 0) {
-        const dayOfYear = Math.floor((monthIdx * 30.44) + (w.day || 15));
-        const solarDeclination = 23.45 * Math.sin((2 * Math.PI * (dayOfYear - 81)) / 365) * (Math.PI / 180);
-        const hourAngle = ((w.hour + (w.minute || 0) / 60) - 12) * 15 * (Math.PI / 180);
+        const doy = dayOfYear(w.month, w.day || 15);
+        const solarDeclination = 23.45 * Math.sin((2 * Math.PI * (doy - 81)) / 365) * (Math.PI / 180);
+        const hourAngle = (((w.hour - 1) + (w.minute || 0) / 60) - 12) * 15 * (Math.PI / 180);
 
         const zenithAngle = Math.acos(
           Math.min(1, Math.max(-1,

@@ -23,6 +23,8 @@ import { calculateHourlyPOA } from '@/lib/liuJordanModel';
 import { ProspectorToSimulatorData } from '@/components/SolarProspector';
 import { FacadeFullAnalysis, calculateMonthlyShadingFactorsForFacade } from '@/lib/facadeShadingAnalysis';
 import { normalizeMonthToAbbr } from '@/lib/monthHelper';
+import { validateSolarRigor } from '@/lib/solarRigor';
+import SolarRigorBanner from '@/components/SolarRigorBanner';
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
@@ -355,9 +357,24 @@ export default function Home() {
   // Sincronizado con parámetros del Análisis POA (tilt, azimut, albedo, modelo)
   // Incluye windSpeed real del EPW
   const effectiveTilt = poaTilt ?? Math.round(weatherData?.location.latitude ?? 5);
+  const solarRigorReport = useMemo(() => validateSolarRigor({
+    epwData: weatherData,
+    tilt: effectiveTilt,
+    azimuth: poaAzimuth,
+    northOffset: modelNorthOffset,
+    scaleFactor: 1,
+    facades: modelFacades,
+    analysisPoints: shadingPoints.map(point => ({
+      month: MONTHS.indexOf(normalizeMonthToAbbr(point.month)) + 1,
+      day: point.day,
+      hour: point.hour,
+      solarHeight: point.solarHeight,
+      solarAzimuth: point.solarAzimuth,
+    })),
+  }), [weatherData, effectiveTilt, poaAzimuth, modelNorthOffset, modelFacades, shadingPoints]);
 
   const poaData = useMemo(() => {
-    if (!weatherData) return [];
+    if (!weatherData || !solarRigorReport.canCalculate) return [];
 
     // === OVERRIDE: Si hay datos del Prospector, generar POA desde GHI PVGIS ===
     if (prospectorData) {
@@ -412,8 +429,10 @@ export default function Home() {
       for (const w of monthData) {
         // Solo calcular para horas con irradiancia > 0
         if (w.globalHorizontalIrradiance > 0 || w.directNormalIrradiance > 0) {
-          // Día del año aproximado
-          const dayOfYear = Math.floor((monthIdx * 30.44) + (w.day || 15));
+          // EPW conserva el día calendario exacto; no aproximar el mes.
+          const dayOfYear = Math.floor(
+            (Date.UTC(2023, w.month - 1, w.day || 15) - Date.UTC(2023, 0, 0)) / 86400000,
+          );
           const hourlyPOA = calculateHourlyPOA(
             lat, lon, stdMeridian,
             dayOfYear,
@@ -454,7 +473,7 @@ export default function Home() {
         avgWindSpeed: Math.round(avgWindSpeed * 10) / 10,
       };
     });
-  }, [weatherData, prospectorData, effectiveTilt, poaAzimuth, poaAlbedo, poaUsePerez]);
+  }, [weatherData, prospectorData, effectiveTilt, poaAzimuth, poaAlbedo, poaUsePerez, solarRigorReport.canCalculate]);
 
   // Datos para el mapa
   const mapCities = useMemo(() => {
@@ -493,7 +512,7 @@ export default function Home() {
           const doy = Math.floor((Date.UTC(2023, h.month - 1, h.day) - Date.UTC(2023, 0, 0)) / 86400000);
           const poa = calculateHourlyPOA(
             lat, lon, stdMeridian,
-            doy, h.hour, h.minute || 30,
+            doy, h.hour - 1, h.minute || 30,
             h.directNormalIrradiance || 0,
             h.diffuseHorizontalIrradiance || 0,
             h.globalHorizontalIrradiance || 0,
@@ -729,8 +748,11 @@ export default function Home() {
         {view === 'weather' && <WeatherDataManager onWeatherDataLoaded={setWeatherData} weatherData={weatherData} />}
         {view === 'radiation' && weatherData && <SolarRadiationChart weatherData={weatherData} />}
         {view === 'optimizer' && weatherData && <OrientationOptimizer weatherData={weatherData} sharedTilt={effectiveTilt} sharedAzimuth={poaAzimuth} onConfigChange={(cfg) => { setPoaTilt(cfg.tilt); setPoaAzimuth(cfg.azimuth); }} tiltRange={installTiltRange} azimuthLocked={installAzimuthLocked} installationType={installTypeName} onSendToSimulator={(result) => { setOptimizerResult(result); setPoaTilt(result.optimalTilt); setPoaAzimuth(result.optimalAzimuth); handleSetView('energy'); }} />}
-        {view === 'poa' && weatherData && <POAAnalyzer weatherData={weatherData} tiltAngle={effectiveTilt} surfaceAzimuth={poaAzimuth} sharedAlbedo={poaAlbedo} sharedUsePerez={poaUsePerez} onConfigChange={(cfg) => { if (cfg.tilt !== undefined) setPoaTilt(cfg.tilt); if (cfg.azimuth !== undefined) setPoaAzimuth(cfg.azimuth); if (cfg.albedo !== undefined) setPoaAlbedo(cfg.albedo); if (cfg.usePerez !== undefined) setPoaUsePerez(cfg.usePerez); }} />}
-        {view === 'energy' && weatherData && poaData.length > 0 && <EnergyProductionSimulator weatherData={weatherData} poaData={poaData} transmisionGeometricaMensual={monthlyTransmisionGeometrica} facadeAnalysis3D={facadeAnalysis3D} prospectorData={prospectorData} onDiscardProspector={() => setProspectorData(null)} optimizerResult={optimizerResult} onDiscardOptimizer={() => setOptimizerResult(null)} pvgisData={pvgisData} onDiscardPvgis={() => setPvgisData(null)} pvwattsData={pvwattsData} onDiscardPvwatts={() => setPvwattsData(null)} onInstallConfigChange={(cfg) => { if (cfg.tiltRange) setInstallTiltRange(cfg.tiltRange); if (cfg.azimuthLocked !== undefined) setInstallAzimuthLocked(cfg.azimuthLocked); if (cfg.name) setInstallTypeName(cfg.name); }} poaConfig={{ tilt: effectiveTilt, azimuth: poaAzimuth, albedo: poaAlbedo, usePerez: poaUsePerez, source: optimizerResult ? 'optimizer' : prospectorData ? 'prospector' : 'epw_hourly' }} onPoaConfigChange={(cfg) => { if (cfg.tilt !== undefined) setPoaTilt(cfg.tilt); if (cfg.azimuth !== undefined) setPoaAzimuth(cfg.azimuth); if (cfg.albedo !== undefined) setPoaAlbedo(cfg.albedo); if (cfg.usePerez !== undefined) setPoaUsePerez(cfg.usePerez); }} modelFacades={modelFacades} modelObstacles3D={modelObstacles3D} modelNorthOffset={modelNorthOffset} onFacadeSelectFromSimulator={(idx) => { setExternalFacadeIdx(idx); if (modelFacades && modelFacades[idx] && weatherData) { const analysis = calculateMonthlyShadingFactorsForFacade(modelFacades[idx], weatherData, modelObstacles3D || [], modelNorthOffset); analysis.facadeIdx = idx; setFacadeAnalysis3D(analysis); /* Sincronizar POA con ángulos de la fachada seleccionada (ya en grados) */ setPoaTilt(Math.round(modelFacades[idx].tilt)); setPoaAzimuth(Math.round(modelFacades[idx].azimuthNormal)); } }} onEnergyDataChange={setEnergyData} bipvData={bipvToEnergyData} onDiscardBipv={() => setBipvToEnergyData(null)} onReturnToBIPV={() => handleSetView('bipvglass')} onResimultateBIPV={handleResimultateBIPV} />}
+        {view === 'poa' && weatherData && <POAAnalyzer weatherData={weatherData} tiltAngle={effectiveTilt} surfaceAzimuth={poaAzimuth} sharedAlbedo={poaAlbedo} sharedUsePerez={poaUsePerez} solarRigorReport={solarRigorReport} onConfigChange={(cfg) => { if (cfg.tilt !== undefined) setPoaTilt(cfg.tilt); if (cfg.azimuth !== undefined) setPoaAzimuth(cfg.azimuth); if (cfg.albedo !== undefined) setPoaAlbedo(cfg.albedo); if (cfg.usePerez !== undefined) setPoaUsePerez(cfg.usePerez); }} />}
+        {view === 'energy' && weatherData && !solarRigorReport.canCalculate && (
+          <SolarRigorBanner report={solarRigorReport} />
+        )}
+        {view === 'energy' && weatherData && poaData.length > 0 && <EnergyProductionSimulator weatherData={weatherData} poaData={poaData} transmisionGeometricaMensual={monthlyTransmisionGeometrica} solarCalculationScopeLabel={solarRigorReport.scopeLabel} solarRecordCount={solarRigorReport.recordCount} facadeAnalysis3D={facadeAnalysis3D} prospectorData={prospectorData} onDiscardProspector={() => setProspectorData(null)} optimizerResult={optimizerResult} onDiscardOptimizer={() => setOptimizerResult(null)} pvgisData={pvgisData} onDiscardPvgis={() => setPvgisData(null)} pvwattsData={pvwattsData} onDiscardPvwatts={() => setPvwattsData(null)} onInstallConfigChange={(cfg) => { if (cfg.tiltRange) setInstallTiltRange(cfg.tiltRange); if (cfg.azimuthLocked !== undefined) setInstallAzimuthLocked(cfg.azimuthLocked); if (cfg.name) setInstallTypeName(cfg.name); }} poaConfig={{ tilt: effectiveTilt, azimuth: poaAzimuth, albedo: poaAlbedo, usePerez: poaUsePerez, source: optimizerResult ? 'optimizer' : prospectorData ? 'prospector' : 'epw_hourly' }} onPoaConfigChange={(cfg) => { if (cfg.tilt !== undefined) setPoaTilt(cfg.tilt); if (cfg.azimuth !== undefined) setPoaAzimuth(cfg.azimuth); if (cfg.albedo !== undefined) setPoaAlbedo(cfg.albedo); if (cfg.usePerez !== undefined) setPoaUsePerez(cfg.usePerez); }} modelFacades={modelFacades} modelObstacles3D={modelObstacles3D} modelNorthOffset={modelNorthOffset} onFacadeSelectFromSimulator={(idx) => { setExternalFacadeIdx(idx); if (modelFacades && modelFacades[idx] && weatherData) { const analysis = calculateMonthlyShadingFactorsForFacade(modelFacades[idx], weatherData, modelObstacles3D || [], modelNorthOffset); analysis.facadeIdx = idx; setFacadeAnalysis3D(analysis); /* Sincronizar POA con ángulos de la fachada seleccionada (ya en grados) */ setPoaTilt(Math.round(modelFacades[idx].tilt)); setPoaAzimuth(Math.round(modelFacades[idx].azimuthNormal)); } }} onEnergyDataChange={setEnergyData} bipvData={bipvToEnergyData} onDiscardBipv={() => setBipvToEnergyData(null)} onReturnToBIPV={() => handleSetView('bipvglass')} onResimultateBIPV={handleResimultateBIPV} />}
         {view === 'report' && weatherData && (
           <ReportGenerator
             city={selectedCity?.cityName || weatherData.location.city || 'Sin definir'}
@@ -751,6 +773,8 @@ export default function Home() {
             capacityFactor={energyData.capacityFactor}
             performanceRatio={energyData.performanceRatio}
             systemLosses={energyData.systemLosses}
+            solarCalculationScopeLabel={solarRigorReport.scopeLabel}
+            solarRecordCount={solarRigorReport.recordCount}
             multiFacadeData={multiFacadeReportData}
             facadeAnalysis3D={facadeAnalysis3D}
           />
