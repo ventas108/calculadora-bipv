@@ -42,6 +42,19 @@ def _run(request: dict) -> dict:
     )
     if mesh.is_empty:
         raise ValueError("La malla no contiene triángulos válidos")
+    mesh._bipv_obstacle_id_by_face = np.asarray(
+        [
+            str(t.get("obstacle_id"))
+            if t.get("obstacle_id") is not None
+            else f"triangle-{i + 1:06d}"
+            for i, t in enumerate(triangles)
+        ],
+        dtype=object,
+    )
+    mesh._bipv_obstacle_name_by_face = np.asarray(
+        [t.get("obstacle_name") for t in triangles],
+        dtype=object,
+    )
 
     timestamps = pd.DatetimeIndex(request["timestamps_utc"])
     points = [

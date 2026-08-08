@@ -45,6 +45,11 @@ import { normalizeMonthToAbbr } from '@/lib/monthHelper';
 import { runOfficialShadingEngine } from '@/lib/shadingEngineClient';
 import type { ShadingEngineResult } from '@shared/shading-engine-contract';
 
+interface ObstacleGeometryMetadata {
+  obstacle_id: string;
+  obstacle_name?: string;
+}
+
 interface AnalysisPoint {
   id: string;
   month: string;
@@ -94,6 +99,9 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
   // Evaluation model state (edificio a evaluar)
   const [evaluationModel, setEvaluationModel] = useState<EvaluationModel | null>(null);
   const [obstacleVertices3D, setObstacleVertices3D] = useState<Vertex3D[][] | undefined>(undefined);
+  // Metadata paralelo: no cambia el contrato histórico de la geometría que
+  // consumen la Vista 3D y el análisis de fachadas.
+  const [obstacleGeometryMetadata, setObstacleGeometryMetadata] = useState<ObstacleGeometryMetadata[]>([]);
   const [modelFacadeDefinitions, setModelFacadeDefinitions] = useState<FacadeDefinition[] | null>(null);
   const [lastCrossingResults, setLastCrossingResults] = useState<CrossingResult[] | null>(null);
   const [lastCrossingFacades, setLastCrossingFacades] = useState<FacadeDefinition[] | null>(null);
@@ -345,13 +353,18 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
 
     // Cada grupo importado conserva vértices repetidos por cara; se triangula
     // secuencialmente sin crear un segundo modelo geométrico.
-    const triangles = obstacleVertices3D.flatMap(group => {
+    const triangles = obstacleVertices3D.flatMap((group, groupIndex) => {
+      const metadata = obstacleGeometryMetadata[groupIndex];
       const result = [];
       for (let i = 0; i + 2 < group.length; i += 3) {
         result.push({
           a: [group[i].x, group[i].y, group[i].z] as [number, number, number],
           b: [group[i + 1].x, group[i + 1].y, group[i + 1].z] as [number, number, number],
           c: [group[i + 2].x, group[i + 2].y, group[i + 2].z] as [number, number, number],
+          ...(metadata ? {
+            obstacle_id: metadata.obstacle_id,
+            ...(metadata.obstacle_name ? { obstacle_name: metadata.obstacle_name } : {}),
+          } : {}),
         });
       }
       return result;
@@ -412,9 +425,18 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
       'Mes', 'Dia', 'Hora', 'Altura Solar (deg)', 'Acimut Solar (deg)',
       'FS_geometrico', 'Fachada', 'Punto', 'timestamp_utc',
     ];
+    const hasObstacleMetadata = officialShadingResult.results.some(
+      row => row.obstacle_id || row.obstacle_name || row.first_hit_distance_m !== undefined,
+    );
+    if (hasObstacleMetadata) {
+      headers.push('obstacle_id', 'obstacle_name', 'first_hit_distance_m');
+    }
     const rows = officialShadingResult.results.map(row => [
       row.month, row.day, row.hour_utc, row.solar_altitude_deg, row.solar_azimuth_deg,
       row.fs_geometrico, row.facade, row.point_id, row.timestamp_utc,
+      ...(hasObstacleMetadata
+        ? [row.obstacle_id ?? '', row.obstacle_name ?? '', row.first_hit_distance_m ?? '']
+        : []),
     ]);
     const csv = [headers, ...rows]
       .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
@@ -1039,6 +1061,13 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
         ];
       });
       setObstacleVertices3D(prev => prev ? [...prev, ...vertices3D] : vertices3D);
+      setObstacleGeometryMetadata(prev => [
+        ...prev,
+        ...marshPreview.solidBlocks.map(block => ({
+          obstacle_id: `marsh-${block.index}`,
+          obstacle_name: `Site Designer bloque ${block.index + 1}`,
+        })),
+      ]);
     }
     
     toast.success(
@@ -1366,6 +1395,13 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
         return objVerts;
       });
       setObstacleVertices3D(prev => prev ? [...prev, ...vertices3D] : vertices3D);
+      setObstacleGeometryMetadata(prev => [
+        ...prev,
+        ...objRawParse.objects.map((obj, index) => ({
+          obstacle_id: `obj-${index}-${obj.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'sin-nombre'}`,
+          obstacle_name: obj.name,
+        })),
+      ]);
     }
     
     toast.success(

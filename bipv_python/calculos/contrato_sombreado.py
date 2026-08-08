@@ -24,6 +24,11 @@ REQUIRED_RESULT_COLUMNS = {
     "Fachada",
     "Punto",
 }
+OPTIONAL_RESULT_COLUMNS = {
+    "obstacle_id",
+    "obstacle_name",
+    "first_hit_distance_m",
+}
 
 
 def _finite(value: Any) -> bool:
@@ -95,6 +100,16 @@ def validar_solicitud(request: dict[str, Any]) -> None:
                 or not all(_finite(value) for value in coordinates)
             ):
                 raise ValueError(f"Vértice {vertex} inválido en triángulo")
+        for key in ("obstacle_id", "obstacle_name"):
+            if key in triangle and triangle[key] is not None and (
+                not isinstance(triangle[key], str) or not triangle[key].strip()
+            ):
+                raise ValueError(f"{key} inválido en triángulo")
+        if "first_hit_distance_m" in triangle and triangle["first_hit_distance_m"] is not None:
+            if not _finite(triangle["first_hit_distance_m"]) or float(
+                triangle["first_hit_distance_m"]
+            ) < 0:
+                raise ValueError("first_hit_distance_m inválido en triángulo")
 
     transparency = request.get("transparency", 0.0)
     if not _finite(transparency) or not 0.0 <= float(transparency) <= 1.0:
@@ -140,6 +155,17 @@ def validar_resultado(payload: dict[str, Any]) -> None:
         if not 0.0 <= fs_geo <= 1.0 or abs(fs - fs_geo) > 1e-9:
             raise ValueError("FS_geometrico y fs deben coincidir en [0, 1]")
         _utc_timestamp(row["timestamp_utc"])
+        if "obstacle_id" in row and row["obstacle_id"] is not None:
+            if not isinstance(row["obstacle_id"], str) or not row["obstacle_id"]:
+                raise ValueError("obstacle_id inválido")
+        if "obstacle_name" in row and row["obstacle_name"] is not None:
+            if not isinstance(row["obstacle_name"], str) or not row["obstacle_name"]:
+                raise ValueError("obstacle_name inválido")
+        if "first_hit_distance_m" in row and row["first_hit_distance_m"] is not None:
+            if not _finite(row["first_hit_distance_m"]) or float(
+                row["first_hit_distance_m"]
+            ) < 0:
+                raise ValueError("first_hit_distance_m inválido")
 
 
 def resultado_a_contrato(df: pd.DataFrame) -> dict[str, Any]:
@@ -167,6 +193,16 @@ def resultado_a_contrato(df: pd.DataFrame) -> dict[str, Any]:
             "fs_combinado": None,
             "fs": fs_geo,
         })
+        for column in OPTIONAL_RESULT_COLUMNS:
+            if column in df.columns:
+                value = row[column]
+                if pd.isna(value):
+                    value = None
+                elif column == "first_hit_distance_m":
+                    value = float(value)
+                else:
+                    value = str(value)
+                results[-1][column] = value
 
     payload = {
         "contract_version": CONTRACT_VERSION,

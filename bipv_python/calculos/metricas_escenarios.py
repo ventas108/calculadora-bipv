@@ -175,6 +175,88 @@ def _agregar_grupos(
     )
 
 
+def _agregar_obstaculos_responsables(
+    df_fs: pd.DataFrame | None,
+    tmy_index: pd.DatetimeIndex | None,
+    poa: pd.Series | None,
+    *,
+    modo: str,
+    modo_agregacion: str,
+) -> list[dict[str, Any]]:
+    """Prioriza por pérdida acumulada, conservando causalidad del primer hit.
+
+    Un obstáculo puede ser el primer impacto de algunos rayos y no de otros.
+    La tabla se ordena por ``POA × FS_geometrico`` acumulado; el campo
+    ``first_hit`` permanece como evidencia geométrica y no como criterio de
+    ranking.
+    """
+    if (
+        not isinstance(df_fs, pd.DataFrame)
+        or df_fs.empty
+        or "obstacle_id" not in df_fs.columns
+        or tmy_index is None
+        or poa is None
+    ):
+        return []
+    trabajo = df_fs.copy()
+    trabajo["obstacle_id"] = trabajo["obstacle_id"].where(
+        trabajo["obstacle_id"].notna(), None
+    )
+    trabajo = trabajo[trabajo["obstacle_id"].notna()].copy()
+    if trabajo.empty:
+        return []
+    nombres = (
+        trabajo[["obstacle_id", "obstacle_name"]]
+        if "obstacle_name" in trabajo.columns
+        else trabajo[["obstacle_id"]].assign(obstacle_name=None)
+    )
+    nombres = nombres.drop_duplicates("obstacle_id")
+    # El cálculo por obstáculo no mezcla obstáculos en un promedio espacial:
+    # cada grupo representa solo los puntos cuyos primeros impactos llevan ese
+    # id, y usa la misma reducción temporal/espacial oficial.
+    resultado = []
+    for obstacle_id, grupo in trabajo.groupby("obstacle_id", dropna=False):
+        alineado = _alinear_fs_grupo(
+            grupo,
+            tmy_index,
+            poa,
+            modo=modo,
+            modo_agregacion=modo_agregacion,
+            identidad_col="punto" if "punto" in grupo.columns else None,
+        )
+        perdida = float(alineado["poa_perdida_kWh_m2"].sum())
+        poa_total = float(alineado["poa_Wm2"].clip(lower=0).sum() / 1000.0)
+        nombre = nombres.loc[
+            nombres["obstacle_id"] == obstacle_id, "obstacle_name"
+        ].iloc[0]
+        resultado.append(
+            {
+                "grupo": str(nombre) if pd.notna(nombre) and str(nombre) else str(obstacle_id),
+                "obstacle_id": str(obstacle_id),
+                "obstacle_name": (
+                    str(nombre) if pd.notna(nombre) and str(nombre) else None
+                ),
+                "poa_perdida_kWh_m2": round(perdida, 2),
+                "fs_geometrico_ponderado_pct": round(
+                    perdida / poa_total * 100.0 if poa_total > 0 else 0.0,
+                    2,
+                ),
+                "horas_con_sombra": int(
+                    (alineado["FS_geometrico"] > 0).sum()
+                ),
+                "first_hit": True,
+                "agregacion": alineado.attrs.get(
+                    "agregacion_fs", {}
+                ).get("etiqueta", modo_agregacion),
+            }
+        )
+    return sorted(
+        resultado,
+        key=lambda item: item["poa_perdida_kWh_m2"],
+        reverse=True,
+    )
+
+
 def metricas_solares(
     *,
     poa_bruta_kWh_m2: float | None,
@@ -270,8 +352,23 @@ def metricas_solares(
         if poa_bruta is not None and poa_efectiva is not None
         else None
     )
-    obstaculo_responsable = (
-        _agregar_grupos(
+    obstaculo_responsable = _agregar_obstaculos_responsables(
+        df_fs,
+        tmy_index,
+        poa_horaria,
+        modo=modo_fs,
+        modo_agregacion=modo_agregacion_fs,
+    )
+    # Compatibilidad con CSV históricos: antes no existía obstacle_id y
+    # ``obstaculo`` era la única etiqueta disponible. No se puede afirmar
+    # causalidad de primer impacto en ese caso, pero sí conservar el ranking
+    # histórico para no perder diagnósticos ya guardados.
+    if (
+        not obstaculo_responsable
+        and isinstance(df_fs, pd.DataFrame)
+        and "obstaculo" in df_fs.columns
+    ):
+        obstaculo_responsable = _agregar_grupos(
             df_fs,
             tmy_index,
             poa_horaria,
@@ -280,7 +377,11 @@ def metricas_solares(
             modo_agregacion=modo_agregacion_fs,
             identidad_col="punto",
         )
-    )
+        for item in obstaculo_responsable:
+            item["causalidad"] = "historica_sin_obstacle_id"
+    else:
+        for item in obstaculo_responsable:
+            item["causalidad"] = "primer_hit"
     por_fachada = _agregar_grupos(
         df_fs,
         tmy_index,

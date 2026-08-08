@@ -340,12 +340,25 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
     col_fachada = col_fachada_clean or col_obstaculo  # Compatibilidad histórica
     col_punto: str | None = None
     col_fila: str | None = None
+    col_obstacle_id: str | None = None
+    col_obstacle_name: str | None = None
+    col_first_hit_distance: str | None = None
     for c in df_raw.columns:
         cl = c.lower().replace(" ", "_")
         if cl in ("punto", "point"):
             col_punto = c
         elif cl in ("fila", "row"):
             col_fila = c
+        elif cl in ("obstacle_id", "obstaculo_id", "id_obstaculo"):
+            col_obstacle_id = c
+        elif cl in ("obstacle_name", "obstaculo_name", "nombre_obstaculo"):
+            col_obstacle_name = c
+        elif cl in (
+            "first_hit_distance_m",
+            "distancia_primer_impacto_m",
+            "distancia_primer_hit_m",
+        ):
+            col_first_hit_distance = c
 
     # Conservar los metadatos de tamaño para que el modelo no tenga que
     # adivinarlos: se aceptan los mismos aliases que el contrato de agregación.
@@ -410,6 +423,13 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
         cols_leer.append(col_punto)
     if col_fila and col_fila not in cols_leer:
         cols_leer.append(col_fila)
+    for columna in (
+        col_obstacle_id,
+        col_obstacle_name,
+        col_first_hit_distance,
+    ):
+        if columna and columna not in cols_leer:
+            cols_leer.append(columna)
     for columna in columnas_peso_encontradas.values():
         if columna not in cols_leer:
             cols_leer.append(columna)
@@ -429,6 +449,12 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
         rename[col_punto] = "punto"
     if col_fila and col_fila not in rename:
         rename[col_fila] = "fila"
+    if col_obstacle_id:
+        rename[col_obstacle_id] = "obstacle_id"
+    if col_obstacle_name:
+        rename[col_obstacle_name] = "obstacle_name"
+    if col_first_hit_distance:
+        rename[col_first_hit_distance] = "first_hit_distance_m"
     for canonica, original in columnas_peso_encontradas.items():
         if original not in rename:
             rename[original] = canonica
@@ -441,6 +467,11 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
     # alias punto permite seguir simulando, pero sin perder el nivel fila.
     if "fila" in df.columns and "punto" not in df.columns:
         df["punto"] = df["fila"]
+    # La identidad causal es opcional. ``obstaculo`` es el nombre histórico
+    # que ya consumen las tablas de Mismatch; solo se crea cuando el CSV trae
+    # nombre explícito, sin inventarlo para archivos antiguos.
+    if "obstacle_name" in df.columns:
+        df["obstaculo"] = df["obstacle_name"]
 
     df = df.dropna(subset=["mes", "dia", "hora"])
 
@@ -484,6 +515,10 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
     # Compatibilidad con consumidores antiguos. Este alias se deriva
     # exclusivamente de FS_geometrico: jamás se copia la columna FS combinada.
     df["FS"] = df["FS_geometrico"]
+    if "first_hit_distance_m" in df.columns:
+        df["first_hit_distance_m"] = pd.to_numeric(
+            df["first_hit_distance_m"], errors="coerce"
+        )
 
     # ── #32 La convención geométrica oficial es siempre p_shade ───────────────
     # No se infiere ni invierte: FS_geometrico ya es 0=sin sombra, 1=sombra total.
@@ -523,6 +558,7 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
     cols_out = ["mes", "dia", "hora", "FS_geometrico", "FS"]
     for dimension in (
         "fachada", "fila", "punto", "obstaculo",
+        "obstacle_id", "obstacle_name", "first_hit_distance_m",
         "n_modulos", "area_activa_m2", "potencia_instalada_kw",
     ):
         if dimension in df.columns and dimension not in cols_out:

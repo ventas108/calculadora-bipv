@@ -23,6 +23,7 @@ Convenciones geométricas (las de SketchUp):
 from __future__ import annotations
 
 import io
+import re
 
 import numpy as np
 import pandas as pd
@@ -52,18 +53,70 @@ def cargar_malla(archivo, tipo: str, escala: float = 1.0,
     rotacion_norte_deg: giro horario (visto desde arriba) para alinear el eje
       verde (Y) del modelo con el norte real.
 
-    Retorna un trimesh.Trimesh único (escenas se aplanan).
+    Retorna un ``trimesh.Trimesh`` único (escenas se aplanan). Además conserva
+    metadata opcional por cara:
+
+    ``_bipv_obstacle_id_by_face`` y ``_bipv_obstacle_name_by_face``.
+
+    ``force="mesh"`` (usado anteriormente) elimina la identidad de objetos de
+    OBJ/GLB/DAE al aplanar la escena. Se carga primero como escena para
+    conservarla cuando el formato la trae; el ray-casting sigue usando una
+    única malla y por tanto no cambia la física ni ``FS_geometrico``.
     """
     if not TRIMESH_OK:
         raise ImportError("trimesh no está instalado (pip install trimesh)")
 
     if isinstance(archivo, (bytes, bytearray)):
-        obj = trimesh.load(io.BytesIO(archivo), file_type=tipo, force="mesh")
+        cargado = trimesh.load(io.BytesIO(archivo), file_type=tipo, force="scene")
     else:
-        obj = trimesh.load(archivo, force="mesh")
+        cargado = trimesh.load(archivo, force="scene")
 
-    if isinstance(obj, trimesh.Scene):  # por si force="mesh" no aplanó
-        obj = obj.to_mesh()
+    piezas: list[tuple[object, str | None]] = []
+    if isinstance(cargado, trimesh.Scene):
+        # dump() aplica las transformaciones de cada nodo y conserva el nombre
+        # del nodo en metadata; no dependemos de que el loader exponga el
+        # nombre como atributo del objeto geométrico.
+        for pieza in cargado.dump(concatenate=False):
+            nombre = pieza.metadata.get("name") if hasattr(pieza, "metadata") else None
+            piezas.append((pieza, str(nombre).strip() if nombre else None))
+    else:
+        piezas.append((cargado, None))
+
+    piezas = [
+        (pieza, nombre)
+        for pieza, nombre in piezas
+        if getattr(pieza, "vertices", np.empty((0, 3))).shape[0]
+        and getattr(pieza, "faces", np.empty((0, 3))).shape[0]
+    ]
+    if not piezas:
+        raise ValueError("El modelo no contiene geometría (¿exportaste solo aristas?)")
+
+    # Cada pieza con nombre conserva una identidad de obstáculo. Cuando el
+    # formato solo entrega triángulos anónimos se usa un id sintético estable
+    # por cara; no se fabrica un nombre humano para esa geometría.
+    mallas = [pieza for pieza, _ in piezas]
+    nombres = [nombre for _, nombre in piezas]
+    obj = trimesh.util.concatenate(mallas)
+    ids: list[str] = []
+    nombres_por_cara: list[str | None] = []
+    desplazamiento = 0
+    usados: dict[str, int] = {}
+    for pieza, nombre in piezas:
+        n_caras = int(pieza.faces.shape[0])
+        if nombre:
+            base = _id_obstaculo(nombre)
+            usados[base] = usados.get(base, 0) + 1
+            obstacle_id = base if usados[base] == 1 else f"{base}-{usados[base]}"
+            ids.extend([obstacle_id] * n_caras)
+            nombres_por_cara.extend([nombre] * n_caras)
+        else:
+            ids.extend(
+                f"triangle-{desplazamiento + i + 1:06d}"
+                for i in range(n_caras)
+            )
+            nombres_por_cara.extend([None] * n_caras)
+        desplazamiento += n_caras
+
     if obj.vertices.shape[0] == 0 or obj.faces.shape[0] == 0:
         raise ValueError("El modelo no contiene geometría (¿exportaste solo aristas?)")
     if not np.isfinite(obj.vertices).all():
@@ -83,11 +136,95 @@ def cargar_malla(archivo, tipo: str, escala: float = 1.0,
         # giro horario visto desde arriba = giro -θ alrededor de Z
         ang = -np.deg2rad(float(rotacion_norte_deg))
         obj.apply_transform(trimesh.transformations.rotation_matrix(ang, [0, 0, 1]))
+    # Atributos privados para no alterar la API de trimesh ni los consumidores
+    # existentes que esperan directamente un Trimesh.
+    obj._bipv_obstacle_id_by_face = np.asarray(ids, dtype=object)
+    obj._bipv_obstacle_name_by_face = np.asarray(nombres_por_cara, dtype=object)
     return obj
 
 
 MAX_TRIANGULOS = 300_000     # más allá, el ray-casting puro-Python se vuelve inviable
 MAX_RAYOS = 6_000_000        # presupuesto puntos × horas con sol
+
+
+def _id_obstaculo(nombre: str) -> str:
+    """Genera un identificador estable y legible para un objeto importado."""
+    normalizado = re.sub(r"[^a-z0-9]+", "-", nombre.strip().lower()).strip("-")
+    return f"obj-{normalizado or 'sin-nombre'}"
+
+
+def _metadata_caras(malla) -> tuple[np.ndarray, np.ndarray]:
+    """Devuelve ids/nombres por cara, con fallback sintético estable."""
+    n_caras = int(malla.faces.shape[0])
+    ids = getattr(malla, "_bipv_obstacle_id_by_face", None)
+    names = getattr(malla, "_bipv_obstacle_name_by_face", None)
+    if ids is None or len(ids) != n_caras:
+        ids = np.asarray(
+            [f"triangle-{i + 1:06d}" for i in range(n_caras)],
+            dtype=object,
+        )
+    else:
+        ids = np.asarray(ids, dtype=object)
+    if names is None or len(names) != n_caras:
+        names = np.asarray([None] * n_caras, dtype=object)
+    else:
+        names = np.asarray(names, dtype=object)
+    return ids, names
+
+
+def _primeras_intersecciones(
+    malla,
+    origenes: np.ndarray,
+    direcciones: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Obtiene hit, triángulo y distancia mínima por rayo.
+
+    ``intersects_any`` solo informa booleanos. Aquí se conservan todas las
+    intersecciones disponibles y se elige la más cercana, que es la causalidad
+    geométrica correcta cuando hay obstáculos alineados.
+    """
+    n_rayos = len(origenes)
+    hit = np.zeros(n_rayos, dtype=bool)
+    tri_primero = np.full(n_rayos, -1, dtype=np.int64)
+    distancia = np.full(n_rayos, np.nan, dtype=float)
+    try:
+        locations, index_ray, index_tri = malla.ray.intersects_location(
+            ray_origins=origenes,
+            ray_directions=direcciones,
+            multiple_hits=True,
+        )
+        if len(index_ray):
+            distancias = np.linalg.norm(
+                np.asarray(locations) - origenes[np.asarray(index_ray)],
+                axis=1,
+            )
+            # Orden estable: distancia y luego índice de triángulo.
+            orden = np.lexsort((
+                np.asarray(index_tri, dtype=np.int64),
+                distancias,
+                np.asarray(index_ray, dtype=np.int64),
+            ))
+            for pos in orden:
+                rayo = int(index_ray[pos])
+                d = float(distancias[pos])
+                if not hit[rayo] or d < distancia[rayo]:
+                    hit[rayo] = True
+                    tri_primero[rayo] = int(index_tri[pos])
+                    distancia[rayo] = d
+        return hit, tri_primero, distancia
+    except Exception:
+        # Mantener el cálculo solar operativo en instalaciones de trimesh que
+        # no tienen el backend de intersección detallada. En ese caso no se
+        # inventa distancia ni identidad, pero FS conserva exactamente su
+        # comportamiento anterior.
+        hit = np.asarray(
+            malla.ray.intersects_any(
+                ray_origins=origenes,
+                ray_directions=direcciones,
+            ),
+            dtype=bool,
+        )
+        return hit, tri_primero, distancia
 
 
 def estimar_rayos(n_puntos: int, n_horas_sol: int = 4400) -> int:
@@ -228,9 +365,24 @@ def calcular_fs_horario(
     for pt in puntos:
         origen = np.array([float(pt["x"]), float(pt["y"]), float(pt["z"])])
         origenes = np.repeat(origen[None, :], n_h, axis=0) + dirs * OFFSET_RAYO_M
-        hits = malla.ray.intersects_any(ray_origins=origenes,
-                                        ray_directions=dirs)     # (H,) bool
+        hits, tri_primero, distancias = _primeras_intersecciones(
+            malla, origenes, dirs
+        )
         fs_geo = np.where(hits, fs_choque, 0.0)
+        ids_caras, nombres_caras = _metadata_caras(malla)
+        obstacle_ids = [
+            str(ids_caras[tri]) if 0 <= tri < len(ids_caras) else None
+            for tri in tri_primero
+        ]
+        obstacle_names = [
+            (
+                str(nombres_caras[tri])
+                if 0 <= tri < len(nombres_caras)
+                and nombres_caras[tri] is not None
+                else None
+            )
+            for tri in tri_primero
+        ]
         filas.append(pd.DataFrame({
             "timestamp_utc": [
                 pd.Timestamp(ts).tz_convert("UTC").isoformat().replace("+00:00", "Z")
@@ -249,6 +401,9 @@ def calcular_fs_horario(
             "N módulos": pt.get("n_modulos", 0.0),
             "Área activa (m²)": pt.get("area_activa_m2", 0.0),
             "Potencia instalada (kW)": pt.get("potencia_instalada_kw", 0.0),
+            "obstacle_id": obstacle_ids,
+            "obstacle_name": obstacle_names,
+            "first_hit_distance_m": np.round(distancias, 6),
         }))
     return pd.concat(filas, ignore_index=True)
 
@@ -289,4 +444,9 @@ def exportar_csv_fs(df_fs: pd.DataFrame) -> bytes:
     for columna, valor in defaults.items():
         if columna not in salida.columns:
             salida[columna] = valor
+    # Metadata de obstáculo solo se exporta cuando existe. Así los CSV
+    # históricos no reciben nombres artificiales ni cambian de semántica.
+    for columna in ("obstacle_id", "obstacle_name", "first_hit_distance_m"):
+        if columna in salida.columns:
+            cols.append(columna)
     return salida[cols].to_csv(index=False).encode("utf-8-sig")

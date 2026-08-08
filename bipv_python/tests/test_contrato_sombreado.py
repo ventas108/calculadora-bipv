@@ -19,7 +19,11 @@ from calculos.contrato_sombreado import (  # noqa: E402
 )
 from calculos.mismatch_bypass import cargar_csv_fs, simular_bypass_horario  # noqa: E402
 from calculos.sombras_3d import posiciones_solares  # noqa: E402
-from calculos.sombras_3d import calcular_fs_horario, vector_al_sol  # noqa: E402
+from calculos.sombras_3d import (  # noqa: E402
+    calcular_fs_horario,
+    exportar_csv_fs,
+    vector_al_sol,
+)
 from datos.tecnologias_bipv import ASP_ST1_T40  # noqa: E402
 
 
@@ -215,3 +219,70 @@ def test_ray_casting_real_produce_sombra_geometrica_determinista():
     assert len(rows) == 1
     assert rows.iloc[0]["FS_geometrico"] == 1.0
     assert rows.iloc[0]["FS"] == rows.iloc[0]["FS_geometrico"]
+
+
+def test_ray_casting_conserva_primer_obstaculo_y_distancia():
+    """Dos obstáculos alineados: la causalidad es el primer impacto."""
+    timestamp = pd.DatetimeIndex(["2024-03-20T17:00:00Z"])
+    solar = posiciones_solares(6.25, -75.56, timestamp)
+    direction = vector_al_sol(
+        solar.iloc[0]["elevacion"],
+        solar.iloc[0]["acimut"],
+    )
+
+    near = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
+    near.apply_translation(direction * 3.0)
+    far = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
+    far.apply_translation(direction * 8.0)
+    mesh = trimesh.util.concatenate([near, far])
+    mesh._bipv_obstacle_id_by_face = np.asarray(
+        ["near"] * len(near.faces) + ["far"] * len(far.faces),
+        dtype=object,
+    )
+    mesh._bipv_obstacle_name_by_face = np.asarray(
+        ["Obstáculo cercano"] * len(near.faces)
+        + ["Obstáculo lejano"] * len(far.faces),
+        dtype=object,
+    )
+
+    rows = calcular_fs_horario(
+        mesh,
+        [{"nombre": "P1", "fachada": "Sur", "x": 0.0, "y": 0.0, "z": 0.0}],
+        6.25,
+        -75.56,
+        timestamp,
+    )
+
+    assert rows.iloc[0]["FS_geometrico"] == 1.0
+    assert rows.iloc[0]["obstacle_id"] == "near"
+    assert rows.iloc[0]["obstacle_name"] == "Obstáculo cercano"
+    assert rows.iloc[0]["first_hit_distance_m"] > 0
+    assert rows.iloc[0]["first_hit_distance_m"] < 8.0
+
+
+def test_metadata_de_obstaculo_sobrevive_exportacion_e_importacion_csv():
+    frame = pd.DataFrame(
+        [{
+            "Mes": 3,
+            "Dia": 20,
+            "Hora": 17,
+            "Altura Solar (deg)": 83.5,
+            "Acimut Solar (deg)": 158.4,
+            "FS_geometrico": 1.0,
+            "FS": 1.0,
+            "Fachada": "Sur",
+            "Fila": "F1",
+            "Punto": "P1",
+            "obstacle_id": "obj-edificio-a",
+            "obstacle_name": "Edificio A",
+            "first_hit_distance_m": 4.25,
+        }]
+    )
+    csv = exportar_csv_fs(frame).decode("utf-8-sig")
+    assert "obstacle_id" in csv
+    assert "obstacle_name" in csv
+    loaded, _ = cargar_csv_fs(io.StringIO(csv))
+    assert loaded.iloc[0]["obstacle_id"] == "obj-edificio-a"
+    assert loaded.iloc[0]["obstacle_name"] == "Edificio A"
+    assert loaded.iloc[0]["obstaculo"] == "Edificio A"
+    assert loaded.iloc[0]["first_hit_distance_m"] == pytest.approx(4.25)

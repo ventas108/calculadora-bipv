@@ -26,6 +26,10 @@ export interface ShadingEngineTriangle {
   a: [number, number, number];
   b: [number, number, number];
   c: [number, number, number];
+  /** Identidad opcional del obstáculo que contiene este triángulo. */
+  obstacle_id?: string;
+  /** Nombre humano opcional; no se inventa para geometría anónima. */
+  obstacle_name?: string;
 }
 
 export interface ShadingEngineRequest {
@@ -53,6 +57,10 @@ export interface ShadingEngineResultRow {
   fs_combinado: null;
   /** The only factor consumed by mismatch/bypass. */
   fs: number;
+  /** First geometric hit, optional for backwards-compatible payloads. */
+  obstacle_id?: string | null;
+  obstacle_name?: string | null;
+  first_hit_distance_m?: number | null;
 }
 
 export interface ShadingEngineResult {
@@ -120,7 +128,16 @@ export function isOfficialShadingEngineResult(
       item.fs_climatico === null &&
       item.fs_combinado === null &&
       finite(item.fs) &&
-      Math.abs(item.fs - item.fs_geometrico) <= 1e-9
+      Math.abs(item.fs - item.fs_geometrico) <= 1e-9 &&
+      (item.obstacle_id === undefined ||
+        item.obstacle_id === null ||
+        typeof item.obstacle_id === "string") &&
+      (item.obstacle_name === undefined ||
+        item.obstacle_name === null ||
+        typeof item.obstacle_name === "string") &&
+      (item.first_hit_distance_m === undefined ||
+        item.first_hit_distance_m === null ||
+        (finite(item.first_hit_distance_m) && item.first_hit_distance_m >= 0))
     );
   });
 }
