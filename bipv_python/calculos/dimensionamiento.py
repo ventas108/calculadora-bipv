@@ -7,12 +7,28 @@ Resultado validado vs XLSM (hoja Optimizacion_String):
   N=7 → ALERTA (Vmp realista margen < 7.5%)
   N=9 → FALLA (Voc frío > 1100V)
 """
+import math
 from dataclasses import dataclass
 from typing import Literal
 
 
 EstadoVerif = Literal["OK", "ALERTA", "FALLA"]
 UMBRAL_ALERTA_PCT = 7.5  # % — umbral de alerta (extraído de hoja Optimizacion_String L14)
+
+
+def _numero_finito(valor, default: float = 0.0) -> float:
+    """Convierte valores del Excel y trata NaN/inf como dato faltante."""
+    try:
+        numero = float(valor)
+        return numero if math.isfinite(numero) else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _entero_catalogo(valor, default: int = 0) -> int:
+    """Convierte contadores del catálogo sin ejecutar int(NaN)."""
+    numero = _numero_finito(valor, float(default))
+    return int(numero) if numero >= 0 else default
 
 
 @dataclass
@@ -95,17 +111,15 @@ def evaluar_compatibilidad_string(
         isc_equiv = (
             float(panel["Isc_stc"]) * int(N_strings_tracker) * float(FS_isc)
         )
-        vdc_max = float(inversor.get("Vdc_max") or 0.0)
-        vmppt_min = float(
+        vdc_max = _numero_finito(inversor.get("Vdc_max"))
+        vmppt_min = _numero_finito(
             inversor.get("Vmppt_min")
             or inversor.get("Vmppt_activo_min")
-            or 0.0
         )
-        vmppt_max = float(inversor.get("Vmppt_max") or 0.0)
-        isc_max = float(
+        vmppt_max = _numero_finito(inversor.get("Vmppt_max"))
+        isc_max = _numero_finito(
             inversor.get("Isc_max_tracker")
             or inversor.get("I_max_tracker")
-            or 0.0
         )
     except (KeyError, TypeError, ValueError):
         return {
@@ -222,10 +236,34 @@ def mapear_inversores_catalogo(
             for n in range(n_min, n_max + 1)
         ]
         evaluables = [r for r in evaluaciones if r.get("evaluable")]
-        compatibles = [r for r in evaluables if r.get("compatible")]
+        n_trackers = _entero_catalogo(
+            inversor.get("n_trackers") or inversor.get("N_mppt")
+        )
+        strings_tracker = _entero_catalogo(
+            inversor.get("n_strings_tracker")
+            or inversor.get("N_strings_nativo")
+        )
+        faltantes_conexion = []
+        if n_trackers <= 0:
+            faltantes_conexion.append("número de trackers")
+        if strings_tracker <= 0:
+            faltantes_conexion.append("strings por tracker")
+        compatibles = (
+            [r for r in evaluables if r.get("compatible")]
+            if not faltantes_conexion
+            else []
+        )
 
-        vmppt_max = float(inversor.get("Vmppt_max") or 0.0)
-        if compatibles:
+        vmppt_max = _numero_finito(inversor.get("Vmppt_max"))
+        if faltantes_conexion:
+            elegido = next(iter(evaluables), evaluaciones[0] if evaluaciones else {})
+            estado = "🟡 No evaluable"
+            motivo = (
+                "Ficha incompleta: faltan "
+                + ", ".join(faltantes_conexion)
+                + "."
+            )
+        elif compatibles:
             # Igual criterio que el optimizador: aprovechar al máximo el techo
             # MPPT, sin introducir una preferencia comercial arbitraria.
             elegido = max(
@@ -263,12 +301,8 @@ def mapear_inversores_catalogo(
                 f"{inversor.get('Vmppt_min') or inversor.get('Vmppt_activo_min') or '—'}–"
                 f"{inversor.get('Vmppt_max') or '—'}"
             ),
-            "trackers": int(inversor.get("n_trackers") or inversor.get("N_mppt") or 0),
-            "strings_tracker": int(
-                inversor.get("n_strings_tracker")
-                or inversor.get("N_strings_nativo")
-                or 0
-            ),
+            "trackers": n_trackers,
+            "strings_tracker": strings_tracker,
             "P_ac_nom_kW": (
                 round(float(inversor.get("P_ac_nom_W")) / 1000.0, 2)
                 if inversor.get("P_ac_nom_W")

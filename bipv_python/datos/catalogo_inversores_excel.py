@@ -1,4 +1,5 @@
 """Loader Catalogo_Inversores con costos y semáforo de completitud."""
+import math as _math
 import os as _os
 
 import pandas as pd
@@ -8,8 +9,11 @@ _EXCEL = "/var/www/bipv/calculadora-bipv/bipv_python/datos/inversores_catalogo.x
 _SHEET = "Catalogo_Inversores"
 
 def _f(val, default=None):
-    try:    return float(val)
-    except: return default
+    try:
+        _value = float(val)
+        return _value if _math.isfinite(_value) else default
+    except (TypeError, ValueError):
+        return default
 
 
 def excel_mtime_inv() -> float:

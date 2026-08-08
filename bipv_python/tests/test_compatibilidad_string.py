@@ -1,3 +1,5 @@
+import math
+
 import pytest
 
 from calculos.dimensionamiento import (
@@ -13,6 +15,8 @@ def _eco_sna_12k() -> dict:
         "Vmppt_min": 120,
         "Vmppt_max": 440,
         "Isc_max_tracker": 44,
+        "n_trackers": 2,
+        "n_strings_tracker": 1,
     }
 
 
@@ -89,3 +93,28 @@ def test_mapeo_catalogo_encuentra_n_viable_y_marca_ficha_incompleta() -> None:
     assert por_modelo["ECO HIBRID SNA 12K"]["N_string_recomendado"] == 3
     assert por_modelo["ECO HIBRID SNA 12K"]["N_viables"] == "2–3"
     assert por_modelo["Ficha incompleta"]["estado"] == "🟡 No evaluable"
+
+
+def test_mapeo_catalogo_no_se_detiene_con_nan_en_contadores() -> None:
+    mapeo = mapear_inversores_catalogo(
+        ASP_ST1_T40,
+        {
+            "Ficha con NaN": {
+                "Vdc_max": 1000,
+                "Vmppt_min": 200,
+                "Vmppt_max": 800,
+                "Isc_max_tracker": 20,
+                "n_trackers": math.nan,
+                "n_strings_tracker": math.nan,
+            }
+        },
+        N_min=2,
+        N_max=3,
+        N_strings_tracker=1,
+    )
+
+    assert len(mapeo) == 1
+    assert mapeo[0]["estado"] == "🟡 No evaluable"
+    assert mapeo[0]["trackers"] == 0
+    assert mapeo[0]["strings_tracker"] == 0
+    assert "trackers" in mapeo[0]["motivo"]
