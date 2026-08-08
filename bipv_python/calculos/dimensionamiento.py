@@ -114,33 +114,45 @@ def evaluar_compatibilidad_string(
             "mensajes": ["Faltan parámetros eléctricos válidos del panel o del inversor."],
         }
 
-    mensajes = []
+    faltantes = []
     if not vdc_max:
-        mensajes.append("Vdc máximo del inversor no está disponible.")
-    elif voc_frio > vdc_max:
+        faltantes.append("Vdc máximo")
+    if not vmppt_min:
+        faltantes.append("MPPT mínimo")
+    if not vmppt_max:
+        faltantes.append("MPPT máximo")
+    if not isc_max:
+        faltantes.append("corriente máxima por tracker")
+    if faltantes:
+        return {
+            "compatible": False,
+            "evaluable": False,
+            "mensajes": [
+                f"Ficha incompleta: falta(n) {', '.join(faltantes)} del inversor."
+            ],
+            "faltantes": faltantes,
+            "N_serie": n,
+        }
+
+    mensajes = []
+    if voc_frio > vdc_max:
         mensajes.append(f"Voc en frío {voc_frio:.0f} V > Vdc máximo {vdc_max:.0f} V")
 
-    if not vmppt_min:
-        mensajes.append("MPPT mínimo del inversor no está disponible.")
-    elif vmp_real < vmppt_min:
+    if vmp_real < vmppt_min:
         mensajes.append(f"Vmp real {vmp_real:.0f} V < MPPT mínimo {vmppt_min:.0f} V")
-    if vmppt_min and vmp_extremo < vmppt_min:
+    if vmp_extremo < vmppt_min:
         mensajes.append(
             f"Vmp extremo {vmp_extremo:.0f} V < MPPT mínimo {vmppt_min:.0f} V"
         )
 
-    if not vmppt_max:
-        mensajes.append("MPPT máximo del inversor no está disponible.")
-    elif vmp_real > vmppt_max:
+    if vmp_real > vmppt_max:
         mensajes.append(f"Vmp real {vmp_real:.0f} V > MPPT máximo {vmppt_max:.0f} V")
-    if vmppt_max and vmp_extremo > vmppt_max:
+    if vmp_extremo > vmppt_max:
         mensajes.append(
             f"Vmp extremo {vmp_extremo:.0f} V > MPPT máximo {vmppt_max:.0f} V"
         )
 
-    if not isc_max:
-        mensajes.append("Corriente máxima por tracker no está disponible.")
-    elif isc_equiv > isc_max:
+    if isc_equiv > isc_max:
         mensajes.append(
             f"Isc de strings {isc_equiv:.2f} A > límite por tracker {isc_max:.2f} A"
         )
@@ -155,6 +167,125 @@ def evaluar_compatibilidad_string(
         "Vmp_extremo": vmp_extremo,
         "Isc_equiv_tracker": isc_equiv,
     }
+
+
+def mapear_inversores_catalogo(
+    panel: dict,
+    inversores: dict,
+    N_min: int = 1,
+    N_max: int = 40,
+    T_frio: float = -5.0,
+    T_real: float = 36.35,
+    T_extremo: float = 41.94,
+    N_strings_tracker: int = 1,
+    FS_isc: float = 1.25,
+) -> list[dict]:
+    """Mapea inversores opcionales para un panel en todo el rango de N/string.
+
+    Regla de opción: un inversor es opcional si existe al menos un N dentro del
+    rango indicado que pasa simultáneamente Voc frío, MPPT mínimo, MPPT máximo
+    y corriente por tracker. No cambia la selección activa del proyecto.
+    """
+    try:
+        n_min = max(1, int(N_min))
+        n_max = max(n_min, int(N_max))
+    except (TypeError, ValueError):
+        n_min, n_max = 1, 40
+
+    def _resumir_rango(valores: list[int]) -> str:
+        if not valores:
+            return "—"
+        grupos = []
+        inicio = anterior = valores[0]
+        for valor in valores[1:]:
+            if valor == anterior + 1:
+                anterior = valor
+                continue
+            grupos.append(str(inicio) if inicio == anterior else f"{inicio}–{anterior}")
+            inicio = anterior = valor
+        grupos.append(str(inicio) if inicio == anterior else f"{inicio}–{anterior}")
+        return ", ".join(grupos)
+
+    filas = []
+    for nombre, inversor in sorted((inversores or {}).items()):
+        evaluaciones = [
+            evaluar_compatibilidad_string(
+                panel=panel,
+                inversor=inversor,
+                N_serie=n,
+                T_frio=T_frio,
+                T_real=T_real,
+                T_extremo=T_extremo,
+                N_strings_tracker=N_strings_tracker,
+                FS_isc=FS_isc,
+            )
+            for n in range(n_min, n_max + 1)
+        ]
+        evaluables = [r for r in evaluaciones if r.get("evaluable")]
+        compatibles = [r for r in evaluables if r.get("compatible")]
+
+        vmppt_max = float(inversor.get("Vmppt_max") or 0.0)
+        if compatibles:
+            # Igual criterio que el optimizador: aprovechar al máximo el techo
+            # MPPT, sin introducir una preferencia comercial arbitraria.
+            elegido = max(
+                compatibles,
+                key=lambda r: (
+                    r["Vmp_real"] / vmppt_max if vmppt_max else 0.0,
+                    r["N_serie"],
+                ),
+            )
+            estado = "✅ Compatible"
+            motivo = "Al menos un N/string pasa todos los límites eléctricos."
+        elif evaluables:
+            elegido = min(evaluables, key=lambda r: (len(r.get("mensajes", [])), r["N_serie"]))
+            estado = "🔴 No compatible"
+            motivo = (
+                f"Mejor intento N={elegido['N_serie']}: "
+                + "; ".join(elegido.get("mensajes", []))
+            )
+        else:
+            elegido = evaluaciones[0] if evaluaciones else {}
+            estado = "🟡 No evaluable"
+            motivo = "; ".join(elegido.get("mensajes", [])) or "Rango sin evaluaciones."
+
+        filas.append({
+            "modelo": nombre,
+            "estado": estado,
+            "compatible": bool(compatibles),
+            "N_string_recomendado": elegido.get("N_serie"),
+            "N_viables": _resumir_rango(sorted(r["N_serie"] for r in compatibles)),
+            "Voc_frio_V": round(elegido["Voc_frio"], 1) if elegido.get("Voc_frio") is not None else None,
+            "Vmp_real_V": round(elegido["Vmp_real"], 1) if elegido.get("Vmp_real") is not None else None,
+            "Isc_tracker_A": round(elegido["Isc_equiv_tracker"], 2) if elegido.get("Isc_equiv_tracker") is not None else None,
+            "Vdc_max_V": inversor.get("Vdc_max"),
+            "MPPT_V": (
+                f"{inversor.get('Vmppt_min') or inversor.get('Vmppt_activo_min') or '—'}–"
+                f"{inversor.get('Vmppt_max') or '—'}"
+            ),
+            "trackers": int(inversor.get("n_trackers") or inversor.get("N_mppt") or 0),
+            "strings_tracker": int(
+                inversor.get("n_strings_tracker")
+                or inversor.get("N_strings_nativo")
+                or 0
+            ),
+            "P_ac_nom_kW": (
+                round(float(inversor.get("P_ac_nom_W")) / 1000.0, 2)
+                if inversor.get("P_ac_nom_W")
+                else inversor.get("P_ac_nom_kW")
+            ),
+            "costo_usd": inversor.get("costo_usd"),
+            "motivo": motivo,
+        })
+
+    return sorted(
+        filas,
+        key=lambda fila: (
+            not fila["compatible"],
+            fila["N_string_recomendado"] is None,
+            fila["modelo"],
+        ),
+    )
 
 
 def optimizar_n_serie(panel: dict, inversor: dict,

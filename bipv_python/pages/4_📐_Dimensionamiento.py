@@ -3,7 +3,11 @@ import math
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from calculos.dimensionamiento import optimizar_n_serie, dimensionar_sistema
+from calculos.dimensionamiento import (
+    mapear_inversores_catalogo,
+    optimizar_n_serie,
+    dimensionar_sistema,
+)
 from calculos.modelo_iv import preparar_panel_iv, resolver_curva_iv, resolver_panel_calibrado
 from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
@@ -321,6 +325,75 @@ if inversor.get("datos_completos"):
 else:
     _inv_falt = [k for k in ["Vdc_max","Vmppt_min","Vmppt_max","n_trackers","n_strings_tracker","I_max_tracker","P_dc_max_W"] if not inversor.get(k)]
     st.warning(f"🟡 Inversor incompleto — faltan: {', '.join(_inv_falt)}" if _inv_falt else "🟡 Inversor marcado como incompleto en catálogo")
+
+with st.expander("🧭 Mapear inversores opcionales para este panel", expanded=False):
+    st.caption(
+        "Nueva regla eléctrica: un inversor es opcional si al menos un "
+        "**N/string** del rango explorado cumple simultáneamente Voc en frío, "
+        "MPPT mínimo y máximo, y corriente máxima por tracker. "
+        "El rango de este mapeo es independiente del inversor seleccionado. "
+        "El mapeo es informativo y no cambia el inversor seleccionado."
+    )
+    _map_c1, _map_c2 = st.columns(2)
+    with _map_c1:
+        _n_min_mapeo = st.number_input(
+            "N mínimo para el mapeo",
+            min_value=1,
+            max_value=40,
+            value=1,
+            step=1,
+            key="N_min_mapeo_inversores",
+        )
+    with _map_c2:
+        _n_max_mapeo = st.number_input(
+            "N máximo para el mapeo",
+            min_value=1,
+            max_value=40,
+            value=max(20, int(N_max_scan)),
+            step=1,
+            key="N_max_mapeo_inversores",
+        )
+    if _n_max_mapeo < _n_min_mapeo:
+        st.warning("El N máximo debe ser igual o mayor que el N mínimo.")
+        _n_max_mapeo = _n_min_mapeo
+    _cat_inv_mapeo = _cat_inv or INVERSORES
+    _mapeo_inv = mapear_inversores_catalogo(
+        panel=panel,
+        inversores=_cat_inv_mapeo,
+        N_min=int(_n_min_mapeo),
+        N_max=int(_n_max_mapeo),
+        T_frio=float(T_frio),
+        T_real=float(T_real),
+        T_extremo=float(T_extr),
+        N_strings_tracker=int(N_str_tr),
+    )
+    _df_mapeo = pd.DataFrame(_mapeo_inv)
+    _n_mapeo_ok = sum(fila["compatible"] for fila in _mapeo_inv)
+    _n_mapeo_no_eval = sum(fila["estado"] == "🟡 No evaluable" for fila in _mapeo_inv)
+    st.markdown(
+        f"**{_n_mapeo_ok} de {len(_mapeo_inv)} inversores** tienen al menos un "
+        f"N/string viable para **{panel_nombre}** · "
+        f"{_n_mapeo_no_eval} no evaluables por ficha incompleta."
+    )
+    if not _df_mapeo.empty:
+        _cols_mapeo = [
+            "modelo", "estado", "N_string_recomendado", "N_viables",
+            "Voc_frio_V", "Vmp_real_V", "Isc_tracker_A", "Vdc_max_V",
+            "MPPT_V", "trackers", "strings_tracker", "P_ac_nom_kW",
+            "costo_usd", "motivo",
+        ]
+        st.dataframe(
+            _df_mapeo[_cols_mapeo],
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.download_button(
+            "⬇️ Descargar mapeo de inversores (CSV)",
+            _df_mapeo.to_csv(index=False).encode("utf-8-sig"),
+            "mapeo_inversores_panel.csv",
+            "text/csv",
+            key="descargar_mapeo_inversores_panel",
+        )
 
 if st.button("▶️ Optimizar N paneles/string", type="primary"):
     resultados = optimizar_n_serie(
