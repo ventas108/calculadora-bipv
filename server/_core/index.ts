@@ -7,6 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { registerPVGISProxy } from "../pvgisProxy";
 import { registerPVWattsProxy } from "../pvwattsProxy";
+import { registerShadingEngineProxy } from "../shadingEngineProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -39,6 +40,7 @@ async function startServer() {
   registerStorageProxy(app);
   registerPVGISProxy(app);
   registerPVWattsProxy(app);
+  registerShadingEngineProxy(app);
   registerOAuthRoutes(app);
   // tRPC API
   app.use(

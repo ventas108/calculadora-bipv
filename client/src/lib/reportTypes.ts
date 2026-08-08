@@ -18,9 +18,6 @@ export interface StoredFacadeReport {
     capacityFactor: number;
     performanceRatio: number;
     systemLosses: number;
-    paybackPeriod: number;
-    roi10Year: number;
-    roi25Year: number;
     annualFS: number;
     annualShadingLoss: number;
     annualPOA: number;

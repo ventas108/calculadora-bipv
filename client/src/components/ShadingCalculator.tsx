@@ -41,6 +41,8 @@ import { parseGLTF, validateGLTF, getGLTFSummary } from '@/lib/gltfParser';
 import { detectFormat, isUnsupportedFormat, getConversionAdvice, parseMultiFormat } from '@/lib/multiFormatParser';
 import { FacadeFullAnalysis, calculateMonthlyShadingFactorsForFacade } from '@/lib/facadeShadingAnalysis';
 import { normalizeMonthToAbbr } from '@/lib/monthHelper';
+import { runOfficialShadingEngine } from '@/lib/shadingEngineClient';
+import type { ShadingEngineResult } from '@shared/shading-engine-contract';
 
 interface AnalysisPoint {
   id: string;
@@ -93,6 +95,8 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
   const [modelFacadeDefinitions, setModelFacadeDefinitions] = useState<FacadeDefinition[] | null>(null);
   const [lastCrossingResults, setLastCrossingResults] = useState<CrossingResult[] | null>(null);
   const [lastCrossingFacades, setLastCrossingFacades] = useState<FacadeDefinition[] | null>(null);
+  const [officialShadingResult, setOfficialShadingResult] = useState<ShadingEngineResult | null>(null);
+  const [isOfficialEngineRunning, setIsOfficialEngineRunning] = useState(false);
   // Fachada/techo activa para proyección de obstáculos en el diagrama solar
   const [activeFacadeIdx, setActiveFacadeIdx] = useState<number | null>(null);
 
@@ -317,6 +321,106 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
   const handleRawCrossingResults = (results: CrossingResult[], facades: FacadeDefinition[]) => {
     setLastCrossingResults(results);
     setLastCrossingFacades(facades);
+  };
+
+  const buildOfficialEngineRequest = () => {
+    if (!weatherData || !evaluationModel || !obstacleVertices3D?.length) {
+      throw new Error('Carga el EPW, un modelo 3D con obstáculos y fachadas detectadas antes de ejecutar el motor oficial.');
+    }
+    const points = evaluationModel.detectedFacades.map((facade, index) => ({
+      id: `facade_${index}_${facade.name}`,
+      facade: facade.name,
+      x_m: facade.evaluationPoint.x,
+      y_m: facade.evaluationPoint.y,
+      z_m: facade.evaluationPoint.z,
+    }));
+    if (points.length === 0) {
+      throw new Error('El modelo 3D no tiene puntos de evaluación de fachada.');
+    }
+
+    // Cada grupo importado conserva vértices repetidos por cara; se triangula
+    // secuencialmente sin crear un segundo modelo geométrico.
+    const triangles = obstacleVertices3D.flatMap(group => {
+      const result = [];
+      for (let i = 0; i + 2 < group.length; i += 3) {
+        result.push({
+          a: [group[i].x, group[i].y, group[i].z] as [number, number, number],
+          b: [group[i + 1].x, group[i + 1].y, group[i + 1].z] as [number, number, number],
+          c: [group[i + 2].x, group[i + 2].y, group[i + 2].z] as [number, number, number],
+        });
+      }
+      return result;
+    });
+    if (triangles.length === 0) {
+      throw new Error('La geometría de obstáculos no contiene triángulos.');
+    }
+
+    const timestamps_utc = weatherData.weatherData.map(record => {
+      const localHour = Math.max(0, Math.min(23, record.hour - 1));
+      const utcMillis = Date.UTC(
+        record.year || 2024,
+        record.month - 1,
+        record.day,
+        localHour - weatherData.location.timezone,
+        record.minute || 0,
+      );
+      return new Date(utcMillis).toISOString();
+    });
+
+    return {
+      contract_version: 'bipv.shading.v1' as const,
+      timestamps_utc,
+      location: {
+        latitude: weatherData.location.latitude,
+        longitude: weatherData.location.longitude,
+        timezone: weatherData.location.timezone,
+        elevation_m: weatherData.location.elevation,
+      },
+      points,
+      triangles,
+      transparency: 0,
+    };
+  };
+
+  const runOfficialEngine = async () => {
+    setIsOfficialEngineRunning(true);
+    try {
+      const result = await runOfficialShadingEngine(buildOfficialEngineRequest());
+      setOfficialShadingResult(result);
+      const shaded = result.results.filter(row => row.fs_geometrico > 0).length;
+      toast.success(
+        `Motor Python oficial completado: ${result.results.length.toLocaleString()} registros, ${shaded.toLocaleString()} con sombra geométrica.`,
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo ejecutar el motor Python oficial.');
+    } finally {
+      setIsOfficialEngineRunning(false);
+    }
+  };
+
+  const exportOfficialCSV = () => {
+    if (!officialShadingResult) {
+      toast.error('Ejecuta primero el motor Python oficial.');
+      return;
+    }
+    const headers = [
+      'Mes', 'Dia', 'Hora', 'Altura Solar (deg)', 'Acimut Solar (deg)',
+      'FS_geometrico', 'FS', 'Fachada', 'Punto', 'timestamp_utc',
+    ];
+    const rows = officialShadingResult.results.map(row => [
+      row.month, row.day, row.hour_utc, row.solar_altitude_deg, row.solar_azimuth_deg,
+      row.fs_geometrico, row.fs, row.facade, row.point_id, row.timestamp_utc,
+    ]);
+    const csv = [headers, ...rows]
+      .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'FS_geometrico_motor_python.csv';
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   // Exportar PDF con resultados del cruce
@@ -2059,6 +2163,25 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
               <Zap size={16} />
               Cruzar Máscara + EPW
             </Button>
+            <Button
+              onClick={runOfficialEngine}
+              disabled={isOfficialEngineRunning || !weatherData || !evaluationModel || !obstacleVertices3D?.length}
+              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white"
+              title="Usa el ray-casting oficial de Python y no mezcla FS climático"
+            >
+              <Building2 size={16} />
+              {isOfficialEngineRunning ? 'Ejecutando Python...' : 'Motor solar Python'}
+            </Button>
+            {officialShadingResult && (
+              <Button
+                onClick={exportOfficialCSV}
+                variant="outline"
+                className="flex items-center gap-2 border-slate-400 text-slate-800"
+              >
+                <Download size={16} />
+                CSV FS geométrico oficial
+              </Button>
+            )}
             {lastCrossingResults && lastCrossingResults.length > 0 && (
               <Button
                 onClick={exportCrossingPDF}
@@ -2070,6 +2193,23 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
             )}
           </div>
         </div>
+
+        {officialShadingResult && (
+          <div className="mt-4 rounded-lg border border-slate-300 bg-slate-50 p-4 text-sm text-slate-800">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <strong>Diagnóstico oficial Python</strong>
+              <span className="text-xs font-mono">bipv.shading.v1 · UTC · FS_geometrico</span>
+            </div>
+            <p className="mt-2">
+              {officialShadingResult.results.length.toLocaleString()} registros horarios ·{' '}
+              {new Set(officialShadingResult.results.map(row => row.point_id)).size} puntos ·{' '}
+              {officialShadingResult.results.filter(row => row.fs_geometrico > 0).length.toLocaleString()} registros con sombra.
+            </p>
+            <p className="mt-1 text-xs text-slate-600">
+              FS climático y FS combinado no forman parte de este resultado y no activan mismatch ni bypass.
+            </p>
+          </div>
+        )}
 
         <div className="overflow-x-auto border border-gray-200 rounded-lg">
           <table className="w-full text-xs">

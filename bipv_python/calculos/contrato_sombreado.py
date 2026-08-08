@@ -81,6 +81,25 @@ def validar_solicitud(request: dict[str, Any]) -> None:
             if not _finite(point.get(coordinate)):
                 raise ValueError(f"{point_id}.{coordinate} no es numérico")
 
+    triangles = request.get("triangles", [])
+    if not isinstance(triangles, list):
+        raise ValueError("triangles debe ser una lista")
+    for triangle in triangles:
+        if not isinstance(triangle, dict):
+            raise ValueError("Cada triángulo debe ser un objeto")
+        for vertex in ("a", "b", "c"):
+            coordinates = triangle.get(vertex)
+            if (
+                not isinstance(coordinates, list)
+                or len(coordinates) != 3
+                or not all(_finite(value) for value in coordinates)
+            ):
+                raise ValueError(f"Vértice {vertex} inválido en triángulo")
+
+    transparency = request.get("transparency", 0.0)
+    if not _finite(transparency) or not 0.0 <= float(transparency) <= 1.0:
+        raise ValueError("transparency fuera de rango")
+
 
 def validar_resultado(payload: dict[str, Any]) -> None:
     """Rechaza resultados ambiguos antes de entregarlos a la interfaz."""

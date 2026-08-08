@@ -11,22 +11,30 @@ export interface ShadingEngineLocation {
   latitude: number;
   longitude: number;
   timezone: number;
-  elevationM: number;
+  elevation_m: number;
 }
 
 export interface ShadingEnginePoint {
   id: string;
   facade: string;
-  xM: number;
-  yM: number;
-  zM: number;
+  x_m: number;
+  y_m: number;
+  z_m: number;
+}
+
+export interface ShadingEngineTriangle {
+  a: [number, number, number];
+  b: [number, number, number];
+  c: [number, number, number];
 }
 
 export interface ShadingEngineRequest {
-  contractVersion: typeof SHADING_ENGINE_CONTRACT_VERSION;
-  timestampsUtc: string[];
+  contract_version: typeof SHADING_ENGINE_CONTRACT_VERSION;
+  timestamps_utc: string[];
   location: ShadingEngineLocation;
   points: ShadingEnginePoint[];
+  triangles: ShadingEngineTriangle[];
+  transparency?: number;
 }
 
 export interface ShadingEngineResultRow {
@@ -48,14 +56,14 @@ export interface ShadingEngineResultRow {
 }
 
 export interface ShadingEngineResult {
-  contractVersion: typeof SHADING_ENGINE_CONTRACT_VERSION;
+  contract_version: typeof SHADING_ENGINE_CONTRACT_VERSION;
   engine: "python";
   authority: "official_solar_engine";
   conventions: {
     timestamp: "UTC";
     azimuth: "north_clockwise";
     coordinates: "x_east_y_north_z_up_m";
-    fsGeometrico: "0_no_geometric_shadow_1_total_geometric_shadow";
+    fs_geometrico: "0_no_geometric_shadow_1_total_geometric_shadow";
   };
   results: ShadingEngineResultRow[];
 }
@@ -74,7 +82,7 @@ export function isOfficialShadingEngineResult(
   if (!value || typeof value !== "object") return false;
   const payload = value as Partial<ShadingEngineResult>;
   if (
-    payload.contractVersion !== SHADING_ENGINE_CONTRACT_VERSION ||
+    payload.contract_version !== SHADING_ENGINE_CONTRACT_VERSION ||
     payload.engine !== "python" ||
     payload.authority !== "official_solar_engine" ||
     !Array.isArray(payload.results)

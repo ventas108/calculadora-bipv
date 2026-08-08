@@ -115,12 +115,7 @@ export default function Home() {
     capacityFactor: 0,
     performanceRatio: 0,
     systemLosses: 0.15,
-    paybackPeriod: 0,
-    roi10Year: 0,
-    roi25Year: 0,
   });
-  // Parámetros financieros del Simulador (editables por el usuario)
-  const [financialParams, setFinancialParams] = useState({ electricityRate: 0.15, systemCost: 0, costPerWp: 4500 });
 
   const handleSelectCity = (city: CityWeatherData) => {
     setSelectedCity(city);
@@ -517,16 +512,6 @@ export default function Home() {
         const specificYield = capacity > 0 ? prodAC / capacity : 0;
         const pr = poaTotal > 0 ? prodAC / (poaTotal * capacity) : 0;
 
-        // ROI por fachada - usar parámetros del Simulador si disponibles
-        // electricityRate del simulador está en USD/kWh, convertir a COP/kWh (TRM ~4200)
-        const TRM_APPROX = 4200;
-        const elecRateCOP = financialParams.electricityRate > 0 ? financialParams.electricityRate * TRM_APPROX : 850;
-        const costPerWpCOP = financialParams.costPerWp > 0 ? financialParams.costPerWp * TRM_APPROX : 4500;
-        const facadeSystemCost = capacity * 1000 * costPerWpCOP; // COP
-        const facadeAnnualSavings = prodAC * elecRateCOP;
-        const facadePayback = facadeAnnualSavings > 0 ? facadeSystemCost / facadeAnnualSavings : 99;
-        const facadeROI25 = facadeSystemCost > 0 ? ((facadeAnnualSavings * 25 - facadeSystemCost) / facadeSystemCost) * 100 : 0;
-
         return {
           facadeName: facade.name,
           azimuth: facadeAz,
@@ -538,9 +523,6 @@ export default function Home() {
           specificYield,
           performanceRatio: pr,
           rank: 0,
-          annualSavingsCOP: facadeAnnualSavings,
-          paybackYears: facadePayback,
-          roi25Year: facadeROI25,
         };
       });
       // Ordenar por producción y asignar rank
@@ -550,12 +532,6 @@ export default function Home() {
       const totalAC = results.reduce((s, r) => s + r.productionAC, 0);
       const avgFS = totalArea > 0 ? results.reduce((s, r) => s + r.fsAnnual * r.area, 0) / totalArea : 1;
       const avgPR = totalArea > 0 ? results.reduce((s, r) => s + r.performanceRatio * r.area, 0) / totalArea : 0;
-      const TRM_APPROX = 4200;
-      const elecRateCOP = financialParams.electricityRate > 0 ? financialParams.electricityRate * TRM_APPROX : 850;
-      const costPerWpCOP = financialParams.costPerWp > 0 ? financialParams.costPerWp * TRM_APPROX : 4500;
-      const totalCapacity = (energyData.panelPower || 400) * (energyData.panelQuantity || 1) / 1000;
-      const totalSystemCost = totalCapacity * 1000 * costPerWpCOP;
-
       return {
         results,
         totalArea,
@@ -565,15 +541,12 @@ export default function Home() {
         bestFacade: results[0]?.facadeName || '',
         panelInfo: `${energyData.panelPower}W x ${energyData.panelQuantity}`,
         systemCapacity: `${(energyData.panelPower * energyData.panelQuantity / 1000).toFixed(2)} kWp`,
-        systemCostPerWp: costPerWpCOP,
-        electricityRate: elecRateCOP,
-        totalSystemCost,
       };
     } catch (e) {
       console.error('Error calculando multi-fachada para reporte:', e);
       return undefined;
     }
-  }, [modelFacades, weatherData, modelObstacles3D, modelNorthOffset, energyData, financialParams]);
+  }, [modelFacades, weatherData, modelObstacles3D, modelNorthOffset, energyData]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -757,7 +730,7 @@ export default function Home() {
         {view === 'radiation' && weatherData && <SolarRadiationChart weatherData={weatherData} />}
         {view === 'optimizer' && weatherData && <OrientationOptimizer weatherData={weatherData} sharedTilt={effectiveTilt} sharedAzimuth={poaAzimuth} onConfigChange={(cfg) => { setPoaTilt(cfg.tilt); setPoaAzimuth(cfg.azimuth); }} tiltRange={installTiltRange} azimuthLocked={installAzimuthLocked} installationType={installTypeName} onSendToSimulator={(result) => { setOptimizerResult(result); setPoaTilt(result.optimalTilt); setPoaAzimuth(result.optimalAzimuth); handleSetView('energy'); }} />}
         {view === 'poa' && weatherData && <POAAnalyzer weatherData={weatherData} tiltAngle={effectiveTilt} surfaceAzimuth={poaAzimuth} sharedAlbedo={poaAlbedo} sharedUsePerez={poaUsePerez} onConfigChange={(cfg) => { if (cfg.tilt !== undefined) setPoaTilt(cfg.tilt); if (cfg.azimuth !== undefined) setPoaAzimuth(cfg.azimuth); if (cfg.albedo !== undefined) setPoaAlbedo(cfg.albedo); if (cfg.usePerez !== undefined) setPoaUsePerez(cfg.usePerez); }} />}
-        {view === 'energy' && weatherData && poaData.length > 0 && <EnergyProductionSimulator weatherData={weatherData} poaData={poaData} shadingFactors={monthlyShadingFactors} facadeAnalysis3D={facadeAnalysis3D} prospectorData={prospectorData} onDiscardProspector={() => setProspectorData(null)} optimizerResult={optimizerResult} onDiscardOptimizer={() => setOptimizerResult(null)} pvgisData={pvgisData} onDiscardPvgis={() => setPvgisData(null)} pvwattsData={pvwattsData} onDiscardPvwatts={() => setPvwattsData(null)} onInstallConfigChange={(cfg) => { if (cfg.tiltRange) setInstallTiltRange(cfg.tiltRange); if (cfg.azimuthLocked !== undefined) setInstallAzimuthLocked(cfg.azimuthLocked); if (cfg.name) setInstallTypeName(cfg.name); }} poaConfig={{ tilt: effectiveTilt, azimuth: poaAzimuth, albedo: poaAlbedo, usePerez: poaUsePerez, source: optimizerResult ? 'optimizer' : prospectorData ? 'prospector' : 'epw_hourly' }} onPoaConfigChange={(cfg) => { if (cfg.tilt !== undefined) setPoaTilt(cfg.tilt); if (cfg.azimuth !== undefined) setPoaAzimuth(cfg.azimuth); if (cfg.albedo !== undefined) setPoaAlbedo(cfg.albedo); if (cfg.usePerez !== undefined) setPoaUsePerez(cfg.usePerez); }} modelFacades={modelFacades} modelObstacles3D={modelObstacles3D} modelNorthOffset={modelNorthOffset} onFacadeSelectFromSimulator={(idx) => { setExternalFacadeIdx(idx); if (modelFacades && modelFacades[idx] && weatherData) { const analysis = calculateMonthlyShadingFactorsForFacade(modelFacades[idx], weatherData, modelObstacles3D || [], modelNorthOffset); analysis.facadeIdx = idx; setFacadeAnalysis3D(analysis); /* Sincronizar POA con ángulos de la fachada seleccionada (ya en grados) */ setPoaTilt(Math.round(modelFacades[idx].tilt)); setPoaAzimuth(Math.round(modelFacades[idx].azimuthNormal)); } }} onFinancialParamsChange={setFinancialParams} onEnergyDataChange={setEnergyData} bipvData={bipvToEnergyData} onDiscardBipv={() => setBipvToEnergyData(null)} onReturnToBIPV={() => handleSetView('bipvglass')} onResimultateBIPV={handleResimultateBIPV} />}
+        {view === 'energy' && weatherData && poaData.length > 0 && <EnergyProductionSimulator weatherData={weatherData} poaData={poaData} shadingFactors={monthlyShadingFactors} facadeAnalysis3D={facadeAnalysis3D} prospectorData={prospectorData} onDiscardProspector={() => setProspectorData(null)} optimizerResult={optimizerResult} onDiscardOptimizer={() => setOptimizerResult(null)} pvgisData={pvgisData} onDiscardPvgis={() => setPvgisData(null)} pvwattsData={pvwattsData} onDiscardPvwatts={() => setPvwattsData(null)} onInstallConfigChange={(cfg) => { if (cfg.tiltRange) setInstallTiltRange(cfg.tiltRange); if (cfg.azimuthLocked !== undefined) setInstallAzimuthLocked(cfg.azimuthLocked); if (cfg.name) setInstallTypeName(cfg.name); }} poaConfig={{ tilt: effectiveTilt, azimuth: poaAzimuth, albedo: poaAlbedo, usePerez: poaUsePerez, source: optimizerResult ? 'optimizer' : prospectorData ? 'prospector' : 'epw_hourly' }} onPoaConfigChange={(cfg) => { if (cfg.tilt !== undefined) setPoaTilt(cfg.tilt); if (cfg.azimuth !== undefined) setPoaAzimuth(cfg.azimuth); if (cfg.albedo !== undefined) setPoaAlbedo(cfg.albedo); if (cfg.usePerez !== undefined) setPoaUsePerez(cfg.usePerez); }} modelFacades={modelFacades} modelObstacles3D={modelObstacles3D} modelNorthOffset={modelNorthOffset} onFacadeSelectFromSimulator={(idx) => { setExternalFacadeIdx(idx); if (modelFacades && modelFacades[idx] && weatherData) { const analysis = calculateMonthlyShadingFactorsForFacade(modelFacades[idx], weatherData, modelObstacles3D || [], modelNorthOffset); analysis.facadeIdx = idx; setFacadeAnalysis3D(analysis); /* Sincronizar POA con ángulos de la fachada seleccionada (ya en grados) */ setPoaTilt(Math.round(modelFacades[idx].tilt)); setPoaAzimuth(Math.round(modelFacades[idx].azimuthNormal)); } }} onEnergyDataChange={setEnergyData} bipvData={bipvToEnergyData} onDiscardBipv={() => setBipvToEnergyData(null)} onReturnToBIPV={() => handleSetView('bipvglass')} onResimultateBIPV={handleResimultateBIPV} />}
         {view === 'report' && weatherData && (
           <ReportGenerator
             city={selectedCity?.cityName || weatherData.location.city || 'Sin definir'}
@@ -778,9 +751,6 @@ export default function Home() {
             capacityFactor={energyData.capacityFactor}
             performanceRatio={energyData.performanceRatio}
             systemLosses={energyData.systemLosses}
-            paybackPeriod={energyData.paybackPeriod}
-            roi10Year={energyData.roi10Year}
-            roi25Year={energyData.roi25Year}
             multiFacadeData={multiFacadeReportData}
             facadeAnalysis3D={facadeAnalysis3D}
           />

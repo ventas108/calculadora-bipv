@@ -35,9 +35,6 @@ interface EnergyData {
   capacityFactor: number;
   performanceRatio: number;
   systemLosses: number;
-  paybackPeriod: number;
-  roi10Year: number;
-  roi25Year: number;
 }
 
 interface MultiFacadeResult {
@@ -51,10 +48,6 @@ interface MultiFacadeResult {
   specificYield: number;
   performanceRatio: number;
   rank: number;
-  // ROI por fachada
-  annualSavingsCOP: number; // Ahorro anual en COP
-  paybackYears: number; // Período de recuperación en años
-  roi25Year: number; // ROI a 25 años (%)
 }
 
 export interface MultiFacadeData {
@@ -66,10 +59,6 @@ export interface MultiFacadeData {
   bestFacade: string;
   panelInfo: string;
   systemCapacity: string;
-  // Parámetros financieros del sistema
-  systemCostPerWp: number; // Costo por Wp (COP)
-  electricityRate: number; // Tarifa eléctrica (COP/kWh)
-  totalSystemCost: number; // Costo total del sistema (COP)
 }
 
 interface ReportData {
@@ -89,10 +78,6 @@ interface ReportData {
 
 // Factor de emisión de CO2 para Colombia (kg CO2/kWh)
 const CO2_FACTOR_COLOMBIA = 0.126; // Factor SIN Colombia 2023
-// Tarifa eléctrica promedio Colombia (COP/kWh) - estrato 4
-const ELECTRICITY_RATE_COP = 850;
-// TRM aproximada
-const TRM = 4200;
 
 export function generateSolarReport(data: ReportData): jsPDF {
   const doc = new jsPDF({
@@ -210,8 +195,6 @@ export function generateSolarReport(data: ReportData): jsPDF {
   // Cálculos derivados
   const systemCapacityKW = (e.panelPower || 400) * (e.quantity || 1) / 1000;
   const co2Avoided = annualProd * CO2_FACTOR_COLOMBIA / 1000; // toneladas/año
-  const annualSavingsCOP = annualProd * ELECTRICITY_RATE_COP;
-  const annualSavingsUSD = annualSavingsCOP / TRM;
 
   // HSP mensual (Horas Sol Pico)
   // totalPOA es el promedio de W/m² sobre TODAS las horas del mes (incluyendo noche=0)
@@ -293,8 +276,6 @@ export function generateSolarReport(data: ReportData): jsPDF {
     ['Radiacion POA Promedio', avgPOA],
     ['Horas Sol Pico Anuales', annualHSP > 0 ? `${annualHSP.toFixed(0)} h` : 'N/A'],
     ['CO2 Evitado', co2Avoided > 0 ? `${co2Avoided.toFixed(2)} ton/ano` : 'N/A'],
-    ['Ahorro Economico Estimado', annualSavingsCOP > 0 ? `$${(annualSavingsCOP / 1000).toFixed(0)} mil COP/ano (~$${annualSavingsUSD.toFixed(0)} USD)` : 'N/A'],
-    ['Periodo de Recuperacion', (e.paybackPeriod || 0) > 0 ? `${e.paybackPeriod.toFixed(1)} anos` : 'Requiere datos financieros'],
   ];
 
   autoTable(doc, {
@@ -565,7 +546,6 @@ export function generateSolarReport(data: ReportData): jsPDF {
     ['Perdidas del Sistema', `${((e.systemLosses || 0.15) * 100).toFixed(1)}%`],
     ['', ''],
     ['CO2 Evitado', co2Avoided > 0 ? `${co2Avoided.toFixed(2)} ton/ano` : 'N/A'],
-    ['Ahorro Economico', annualSavingsCOP > 0 ? `$${(annualSavingsCOP / 1000).toFixed(0)} mil COP/ano` : 'N/A'],
   ];
 
   autoTable(doc, {
@@ -624,48 +604,14 @@ export function generateSolarReport(data: ReportData): jsPDF {
     yPosition = (doc as any).lastAutoTable.finalY + 10;
   }
 
-  // ===== 5. ANÁLISIS FINANCIERO =====
-  if ((e.paybackPeriod || 0) > 0 || (e.roi10Year || 0) > 0) {
-    checkSpace(60);
-
-    doc.setFontSize(14);
-    doc.setTextColor(25, 118, 210);
-    doc.text('5. ANALISIS FINANCIERO', margin, yPosition);
-    yPosition += 10;
-
-    doc.setFontSize(10);
-    doc.setTextColor(0, 0, 0);
-
-    const financialData = [
-      ['Metrica', 'Valor'],
-      ['Periodo de Recuperacion (Payback)', (e.paybackPeriod || 0) > 0 ? `${e.paybackPeriod.toFixed(1)} anos` : 'N/A'],
-      ['ROI a 10 anos', (e.roi10Year || 0) > 0 ? `${(e.roi10Year * 100).toFixed(1)}%` : 'N/A'],
-      ['ROI a 25 anos', (e.roi25Year || 0) > 0 ? `${(e.roi25Year * 100).toFixed(1)}%` : 'N/A'],
-      ['Ahorro Anual Estimado', annualSavingsCOP > 0 ? `$${(annualSavingsCOP / 1000).toFixed(0)} mil COP (~$${annualSavingsUSD.toFixed(0)} USD)` : 'N/A'],
-    ];
-
-    autoTable(doc, {
-      startY: yPosition,
-      head: [financialData[0]],
-      body: financialData.slice(1),
-      margin: { left: margin, right: margin },
-      theme: 'grid',
-      headStyles: { fillColor: [244, 67, 54], textColor: [255, 255, 255] },
-      bodyStyles: { textColor: [0, 0, 0] },
-      alternateRowStyles: { fillColor: [255, 245, 245] },
-    });
-
-    yPosition = (doc as any).lastAutoTable.finalY + 15;
-  }
-
-  // ===== 6. ANÁLISIS MULTI-FACHADA (MODELO 3D) =====
+  // ===== 5. ANÁLISIS MULTI-FACHADA (MODELO 3D) =====
   // Solo se muestra en reportes globales, NO en reportes individuales por fachada
   if (!isFacadeSpecific && data.multiFacadeData && data.multiFacadeData.results.length > 0) {
     newPage();
 
     doc.setFontSize(14);
     doc.setTextColor(25, 118, 210);
-    doc.text('6. ANALISIS COMPARATIVO MULTI-FACHADA (BIPV)', margin, yPosition);
+    doc.text('5. ANALISIS COMPARATIVO MULTI-FACHADA (BIPV)', margin, yPosition);
     yPosition += 8;
 
     doc.setFontSize(9);
@@ -677,8 +623,6 @@ export function generateSolarReport(data: ReportData): jsPDF {
 
     // KPIs resumen
     const mf = data.multiFacadeData;
-    const totalSavingsBuilding = mf.results.reduce((s, r) => s + (r.annualSavingsCOP || 0), 0);
-    const avgPayback = mf.results.length > 0 ? mf.results.reduce((s, r) => s + (r.paybackYears || 0), 0) / mf.results.length : 0;
     const kpiData = [
       ['Metrica', 'Valor'],
       ['Produccion Total Edificio', `${(mf.totalProductionAC ?? 0).toFixed(0)} kWh/ano`],
@@ -688,10 +632,6 @@ export function generateSolarReport(data: ReportData): jsPDF {
       ['Mejor Superficie', mf.bestFacade || 'N/A'],
       ['Superficies Evaluadas', `${mf.results?.length ?? 0}`],
       ['CO2 Evitado (Edificio)', `${((mf.totalProductionAC ?? 0) * CO2_FACTOR_COLOMBIA / 1000).toFixed(2)} ton/ano`],
-      ['Ahorro Anual Total (Edificio)', `$${(totalSavingsBuilding / 1000).toFixed(0)} mil COP/ano`],
-      ['Payback Promedio', `${avgPayback.toFixed(1)} anos`],
-      ['Costo por Wp', `$${(mf.systemCostPerWp || 4500)} COP/Wp`],
-      ['Tarifa Electrica', `$${(mf.electricityRate || 850)} COP/kWh`],
     ];
 
     autoTable(doc, {
@@ -714,7 +654,7 @@ export function generateSolarReport(data: ReportData): jsPDF {
     doc.text('Ranking de Superficies por Produccion', margin, yPosition);
     yPosition += 7;
 
-    const facadeTableHead = [['#', 'Superficie', 'Az/Incl', 'FS', 'Prod AC (kWh)', 'Yield', 'Ahorro (mil COP)', 'Payback (anos)', 'ROI 25a (%)']];
+    const facadeTableHead = [['#', 'Superficie', 'Az/Incl', 'FS', 'Prod AC (kWh)', 'Yield']];
     const facadeTableBody = (mf.results || []).map(r => [
       `${r.rank ?? ''}`,
       r.facadeName || '',
@@ -722,15 +662,9 @@ export function generateSolarReport(data: ReportData): jsPDF {
       `${((r.fsAnnual ?? 1) * 100).toFixed(1)}%`,
       (r.productionAC ?? 0).toFixed(0),
       `${(r.specificYield ?? 0).toFixed(0)}`,
-      `$${((r.annualSavingsCOP ?? 0) / 1000).toFixed(0)}`,
-      (r.paybackYears ?? 99) < 50 ? (r.paybackYears ?? 0).toFixed(1) : '>50',
-      (r.roi25Year ?? 0).toFixed(0),
     ]);
 
     // Agregar fila TOTAL
-    const totalSavings = mf.results.reduce((s, r) => s + (r.annualSavingsCOP || 0), 0);
-    const bestPayback = Math.min(...mf.results.map(r => r.paybackYears || 99));
-    const avgROI25 = mf.results.length > 0 ? mf.results.reduce((s, r) => s + (r.roi25Year || 0), 0) / mf.results.length : 0;
     facadeTableBody.push([
       '',
       'TOTAL / PROMEDIO',
@@ -738,9 +672,6 @@ export function generateSolarReport(data: ReportData): jsPDF {
       `${((mf.avgFS ?? 0) * 100).toFixed(1)}%`,
       (mf.totalProductionAC ?? 0).toFixed(0),
       '--',
-      `$${(totalSavings / 1000).toFixed(0)}`,
-      bestPayback < 50 ? bestPayback.toFixed(1) : '>50',
-      avgROI25.toFixed(0),
     ]);
 
     autoTable(doc, {
@@ -759,9 +690,6 @@ export function generateSolarReport(data: ReportData): jsPDF {
         3: { cellWidth: 14 },
         4: { cellWidth: 22 },
         5: { cellWidth: 16 },
-        6: { cellWidth: 22 },
-        7: { cellWidth: 20 },
-        8: { cellWidth: 20 },
       },
       didParseCell: (hookData: any) => {
         if (hookData.section === 'body' && hookData.row.index === facadeTableBody.length - 1) {
@@ -773,81 +701,22 @@ export function generateSolarReport(data: ReportData): jsPDF {
 
     yPosition = (doc as any).lastAutoTable.finalY + 10;
 
-    // ===== ANÁLISIS DE SENSIBILIDAD FINANCIERA =====
-    checkSpace(60);
-    doc.setFontSize(11);
-    doc.setTextColor(25, 118, 210);
-    doc.text('Analisis de Sensibilidad Financiera (Tarifa Electrica +/-20%)', margin, yPosition);
-    yPosition += 7;
-
-    const baseRate = mf.electricityRate || ELECTRICITY_RATE_COP;
-    const scenarios = [
-      { name: 'Pesimista (-20%)', factor: 0.80 },
-      { name: 'Base', factor: 1.00 },
-      { name: 'Optimista (+20%)', factor: 1.20 },
-    ];
-
-    const sensitivityHead = [['Escenario', 'Tarifa (COP/kWh)', 'Ahorro Anual (mil COP)', 'Payback (anos)', 'ROI 25a (%)']];
-    const totalProdAC = mf.totalProductionAC || 0;
-    const totalSysCost = mf.totalSystemCost || (totalProdAC * baseRate * 5); // fallback
-    const sensitivityBody = scenarios.map(sc => {
-      const rate = baseRate * sc.factor;
-      const annualSav = totalProdAC * rate;
-      const payback = annualSav > 0 ? totalSysCost / annualSav : 99;
-      const roi25 = totalSysCost > 0 ? ((annualSav * 25 - totalSysCost) / totalSysCost) * 100 : 0;
-      return [
-        sc.name,
-        `$${rate.toFixed(0)}`,
-        `$${(annualSav / 1000).toFixed(0)}`,
-        payback < 50 ? payback.toFixed(1) : '>50',
-        roi25.toFixed(0) + '%',
-      ];
-    });
-
-    autoTable(doc, {
-      startY: yPosition,
-      head: sensitivityHead,
-      body: sensitivityBody,
-      margin: { left: margin, right: margin },
-      theme: 'grid',
-      headStyles: { fillColor: [56, 142, 60], textColor: [255, 255, 255], fontSize: 8 },
-      bodyStyles: { textColor: [0, 0, 0], fontSize: 8 },
-      alternateRowStyles: { fillColor: [232, 245, 233] },
-      didParseCell: (hookData: any) => {
-        // Resaltar fila base
-        if (hookData.section === 'body' && hookData.row.index === 1) {
-          hookData.cell.styles.fontStyle = 'bold';
-          hookData.cell.styles.fillColor = [200, 230, 201];
-        }
-      },
-    });
-
-    yPosition = (doc as any).lastAutoTable.finalY + 8;
-
-    // Nota de sensibilidad
-    doc.setFontSize(7);
-    doc.setTextColor(120, 120, 120);
-    const sensNote = `Nota: El analisis de sensibilidad muestra el impacto de variaciones del +/-20% en la tarifa electrica sobre los indicadores financieros del edificio completo. Tarifa base: $${baseRate.toFixed(0)} COP/kWh. Costo sistema: $${(totalSysCost / 1000000).toFixed(1)}M COP.`;
-    const sensNoteLines = doc.splitTextToSize(sensNote, pageWidth - 2 * margin);
-    doc.text(sensNoteLines, margin, yPosition);
-    yPosition += sensNoteLines.length * 4 + 8;
-
     // Nota metodológica
     checkSpace(20);
     doc.setFontSize(7);
     doc.setTextColor(120, 120, 120);
-    const noteText = `Nota: La produccion se calcula individualmente para cada superficie usando su azimut e inclinacion especificos con el modelo Liu-Jordan isotropico. Los FS se calculan por interseccion de obstaculos con la trayectoria solar mensual. Los parametros financieros (tarifa electrica y costo/Wp) se toman de los valores configurados en el Simulador de Produccion.`;
+    const noteText = `Nota: La produccion se calcula individualmente para cada superficie usando su azimut e inclinacion especificos con el modelo Liu-Jordan isotropico. Los FS se calculan por interseccion de obstaculos con la trayectoria solar mensual. Este reporte es un diagnostico solar y no constituye una cotizacion financiera.`;
     const noteLines = doc.splitTextToSize(noteText, pageWidth - 2 * margin);
     doc.text(noteLines, margin, yPosition);
     yPosition += noteLines.length * 4 + 10;
   }
 
-  // ===== 7. DATOS METEOROLÓGICOS =====
+  // ===== 6. DATOS METEOROLÓGICOS =====
   checkSpace(80);
 
   doc.setFontSize(14);
   doc.setTextColor(25, 118, 210);
-  const meteoSectionNum = data.multiFacadeData && data.multiFacadeData.results.length > 0 ? '7' : (((e.paybackPeriod || 0) > 0 || (e.roi10Year || 0) > 0) ? '6' : '5');
+  const meteoSectionNum = data.multiFacadeData && data.multiFacadeData.results.length > 0 ? '6' : '5';
   doc.text(`${meteoSectionNum}. DATOS METEOROLOGICOS`, margin, yPosition);
   yPosition += 10;
 
@@ -1008,23 +877,6 @@ export function generateSolarReport(data: ReportData): jsPDF {
     } else {
       recommendations.push('  * Bajo aprovechamiento. Considerar optimizar orientacion o reducir perdidas.');
     }
-  }
-
-  // Recomendación financiera
-  if ((e.paybackPeriod || 0) > 0) {
-    const payback = e.paybackPeriod;
-    recommendations.push(`- Periodo de recuperacion: ${payback.toFixed(1)} anos.`);
-    if (payback < 5) {
-      recommendations.push('  * Retorno de inversion rapido. Proyecto altamente rentable.');
-    } else if (payback < 8) {
-      recommendations.push('  * Retorno moderado. Proyecto viable economicamente.');
-    } else if (payback < 12) {
-      recommendations.push('  * Retorno lento. Evaluar financiamiento y subsidios disponibles.');
-    } else {
-      recommendations.push('  * Retorno prolongado. Considerar reducir costos o aumentar autoconsumo.');
-    }
-  } else if (annualSavingsCOP > 0) {
-    recommendations.push(`- Ahorro estimado: $${(annualSavingsCOP / 1000).toFixed(0)} mil COP/ano (~$${annualSavingsUSD.toFixed(0)} USD/ano). Configure costos del sistema para calcular payback.`);
   }
 
   // Recomendaciones de mantenimiento

@@ -39,14 +39,14 @@ describe("contrato oficial del motor de sombreado", () => {
 
   it("rechaza resultados que mezclen clima o finanzas con FS_geometrico", () => {
     const valid = {
-      contractVersion: SHADING_ENGINE_CONTRACT_VERSION,
+      contract_version: SHADING_ENGINE_CONTRACT_VERSION,
       engine: "python" as const,
       authority: "official_solar_engine" as const,
       conventions: {
         timestamp: "UTC" as const,
         azimuth: "north_clockwise" as const,
         coordinates: "x_east_y_north_z_up_m" as const,
-        fsGeometrico: "0_no_geometric_shadow_1_total_geometric_shadow" as const,
+        fs_geometrico: "0_no_geometric_shadow_1_total_geometric_shadow" as const,
       },
       results: [{
         timestamp_utc: "2024-03-20T17:00:00Z",

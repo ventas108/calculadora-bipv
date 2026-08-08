@@ -46,9 +46,6 @@ interface ReportGeneratorProps {
   capacityFactor: number;
   performanceRatio: number;
   systemLosses: number;
-  paybackPeriod: number;
-  roi10Year: number;
-  roi25Year: number;
   multiFacadeData?: MultiFacadeData;
   facadeAnalysis3D?: FacadeFullAnalysis | null;
 }
@@ -87,9 +84,6 @@ export default function ReportGenerator({
   capacityFactor,
   performanceRatio,
   systemLosses,
-  paybackPeriod,
-  roi10Year,
-  roi25Year,
   multiFacadeData,
   facadeAnalysis3D,
 }: ReportGeneratorProps) {
@@ -137,9 +131,6 @@ export default function ReportGenerator({
           capacityFactor,
           performanceRatio,
           systemLosses,
-          paybackPeriod,
-          roi10Year,
-          roi25Year,
         },
         weatherData,
         multiFacadeData,
@@ -188,9 +179,6 @@ export default function ReportGenerator({
         capacityFactor,
         performanceRatio,
         systemLosses,
-        paybackPeriod,
-        roi10Year,
-        roi25Year,
         annualFS: fa.annualFS,
         annualShadingLoss: fa.annualShadingLoss,
         annualPOA: fa.annualPOA,
@@ -302,7 +290,6 @@ export default function ReportGenerator({
                 <p><strong>Ubicación:</strong> {city}, {country}</p>
                 <p><strong>Producción Anual:</strong> {annualProduction > 0 ? `${annualProduction.toFixed(0)} kWh` : 'No calculada'}</p>
                 <p><strong>Factor de Capacidad:</strong> {capacityFactor > 0 ? `${capacityFactor.toFixed(1)}%` : 'N/A'}</p>
-                <p><strong>Payback:</strong> {paybackPeriod > 0 ? `${paybackPeriod.toFixed(1)} años` : 'N/A'}</p>
                 {isFacadeSpecific && (
                   <>
                     <p><strong>FS Anual:</strong> {(facadeAnalysis3D!.annualFS * 100).toFixed(1)}%</p>
@@ -326,9 +313,6 @@ export default function ReportGenerator({
                 </li>
                 <li className={annualProduction > 0 ? '' : 'opacity-50'}>
                   {annualProduction > 0 ? '✓' : '○'} Proyecciones energéticas
-                </li>
-                <li className={paybackPeriod > 0 ? '' : 'opacity-50'}>
-                  {paybackPeriod > 0 ? '✓' : '○'} Análisis financiero
                 </li>
               </ul>
             </div>
@@ -387,7 +371,7 @@ export default function ReportGenerator({
                   <div>
                     <p className="text-sm font-medium text-gray-900">{report.facadeName}</p>
                     <p className="text-xs text-gray-500">
-                      {report.data.annualProduction.toFixed(0)} kWh/año | CF: {report.data.capacityFactor.toFixed(1)}% | FS: {(report.data.annualFS * 100).toFixed(1)}% | Payback: {report.data.paybackPeriod > 0 ? `${report.data.paybackPeriod.toFixed(1)} años` : 'N/A'}
+                      {report.data.annualProduction.toFixed(0)} kWh/año | CF: {report.data.capacityFactor.toFixed(1)}% | FS: {(report.data.annualFS * 100).toFixed(1)}%
                     </p>
                     <p className="text-xs text-gray-400">
                       {new Date(report.timestamp).toLocaleString('es-ES')}

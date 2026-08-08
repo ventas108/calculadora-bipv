@@ -65,9 +65,6 @@ export function generateGlobalReport(reports: StoredFacadeReport[], location: Lo
   const avgPR = reports.length > 0 ? reports.reduce((s, r) => s + r.data.performanceRatio, 0) / reports.length : 0;
   const avgFS = reports.length > 0 ? reports.reduce((s, r) => s + r.data.annualFS, 0) / reports.length : 0;
   const totalCO2 = totalProduction * CO2_FACTOR_COLOMBIA / 1000;
-  const avgPayback = reports.filter(r => r.data.paybackPeriod > 0).length > 0
-    ? reports.filter(r => r.data.paybackPeriod > 0).reduce((s, r) => s + r.data.paybackPeriod, 0) / reports.filter(r => r.data.paybackPeriod > 0).length
-    : 0;
 
   const globalKPIs = [
     ['Metrica', 'Valor'],
@@ -79,7 +76,6 @@ export function generateGlobalReport(reports: StoredFacadeReport[], location: Lo
     ['Performance Ratio Promedio', `${avgPR.toFixed(1)}%`],
     ['FS Promedio Ponderado', `${(avgFS * 100).toFixed(1)}%`],
     ['CO2 Evitado Total', `${totalCO2.toFixed(2)} ton/ano`],
-    ['Payback Promedio', avgPayback > 0 ? `${avgPayback.toFixed(1)} anos` : 'N/A'],
     ['Superficies Evaluadas', `${reports.length}`],
   ];
 
@@ -103,7 +99,7 @@ export function generateGlobalReport(reports: StoredFacadeReport[], location: Lo
   doc.text('2. TABLA COMPARATIVA POR SUPERFICIE', margin, yPosition);
   yPosition += 10;
 
-  const compHead = ['Superficie', 'Area (m2)', 'Tilt', 'Azim', 'Prod. (kWh)', 'CF (%)', 'FS (%)', 'Payback'];
+  const compHead = ['Superficie', 'Area (m2)', 'Tilt', 'Azim', 'Prod. (kWh)', 'CF (%)', 'FS (%)'];
   const compBody = reports.map(r => [
     r.facadeName.length > 18 ? r.facadeName.substring(0, 18) + '...' : r.facadeName,
     r.data.area.toFixed(0),
@@ -112,7 +108,6 @@ export function generateGlobalReport(reports: StoredFacadeReport[], location: Lo
     r.data.annualProduction.toFixed(0),
     r.data.capacityFactor.toFixed(1),
     (r.data.annualFS * 100).toFixed(1),
-    r.data.paybackPeriod > 0 ? `${r.data.paybackPeriod.toFixed(1)} a` : 'N/A',
   ]);
 
   autoTable(doc, {
@@ -160,40 +155,11 @@ export function generateGlobalReport(reports: StoredFacadeReport[], location: Lo
 
   yPosition = (doc as any).lastAutoTable.finalY + 15;
 
-  // ===== 4. ANÁLISIS FINANCIERO COMPARATIVO =====
-  checkSpace(60);
-  doc.setFontSize(14);
-  doc.setTextColor(25, 118, 210);
-  doc.text('4. ANALISIS FINANCIERO COMPARATIVO', margin, yPosition);
-  yPosition += 10;
-
-  const finHead = ['Superficie', 'Prod. (kWh)', 'Paneles', 'Payback (anos)', 'ROI 25a (%)'];
-  const finBody = reports.map(r => [
-    r.facadeName.length > 20 ? r.facadeName.substring(0, 20) + '...' : r.facadeName,
-    r.data.annualProduction.toFixed(0),
-    r.data.panelQuantity.toString(),
-    r.data.paybackPeriod > 0 ? r.data.paybackPeriod.toFixed(1) : 'N/A',
-    r.data.roi25Year > 0 ? r.data.roi25Year.toFixed(0) : 'N/A',
-  ]);
-
-  autoTable(doc, {
-    startY: yPosition,
-    head: [finHead],
-    body: finBody,
-    margin: { left: margin, right: margin },
-    theme: 'grid',
-    headStyles: { fillColor: [156, 39, 176], textColor: [255, 255, 255], fontSize: 8 },
-    bodyStyles: { textColor: [0, 0, 0], fontSize: 8 },
-    alternateRowStyles: { fillColor: [243, 229, 245] },
-  });
-
-  yPosition = (doc as any).lastAutoTable.finalY + 15;
-
-  // ===== 5. RANKING Y RECOMENDACIONES =====
+  // ===== 4. RANKING Y RECOMENDACIONES =====
   newPage();
   doc.setFontSize(14);
   doc.setTextColor(25, 118, 210);
-  doc.text('5. RANKING Y RECOMENDACIONES', margin, yPosition);
+  doc.text('4. RANKING Y RECOMENDACIONES', margin, yPosition);
   yPosition += 10;
 
   // Ranking por producción
@@ -211,22 +177,6 @@ export function generateGlobalReport(reports: StoredFacadeReport[], location: Lo
   });
 
   yPosition += 8;
-
-  // Ranking por payback
-  const sortedByPayback = [...reports].filter(r => r.data.paybackPeriod > 0).sort((a, b) => a.data.paybackPeriod - b.data.paybackPeriod);
-  if (sortedByPayback.length > 0) {
-    doc.text('Ranking por Retorno de Inversion (menor payback = mejor):', margin, yPosition);
-    yPosition += 6;
-
-    sortedByPayback.forEach((r, i) => {
-      checkSpace(8);
-      const medal = i === 0 ? '1ro' : i === 1 ? '2do' : i === 2 ? '3ro' : `${i + 1}to`;
-      doc.text(`  ${medal}. ${r.facadeName} - Payback: ${r.data.paybackPeriod.toFixed(1)} anos`, margin, yPosition);
-      yPosition += 6;
-    });
-
-    yPosition += 8;
-  }
 
   // Recomendaciones globales
   checkSpace(40);
@@ -255,23 +205,11 @@ export function generateGlobalReport(reports: StoredFacadeReport[], location: Lo
   recommendations.push(`- Produccion total del edificio: ${totalProduction.toFixed(0)} kWh/ano con ${totalCapacity.toFixed(1)} kWp instalados.`);
   recommendations.push(`- Impacto ambiental: ${totalCO2.toFixed(2)} toneladas de CO2 evitadas por ano (equivalente a ${(totalCO2 * 50).toFixed(0)} arboles).`);
 
-  // Payback
-  if (avgPayback > 0) {
-    recommendations.push(`- Payback promedio del edificio: ${avgPayback.toFixed(1)} anos.`);
-    if (avgPayback < 7) {
-      recommendations.push('  * Proyecto altamente viable economicamente.');
-    } else if (avgPayback < 12) {
-      recommendations.push('  * Proyecto viable. Evaluar financiamiento para optimizar flujo de caja.');
-    } else {
-      recommendations.push('  * Retorno prolongado. Considerar priorizar superficies con menor payback.');
-    }
-  }
-
   // Priorización
   if (reports.length > 2) {
-    const priority = sortedByPayback.length > 0 ? sortedByPayback.slice(0, Math.ceil(sortedByPayback.length / 2)) : sortedByProd.slice(0, Math.ceil(sortedByProd.length / 2));
+    const priority = sortedByProd.slice(0, Math.ceil(sortedByProd.length / 2));
     const priorityNames = priority.map(r => r.facadeName).join(', ');
-    recommendations.push(`- Prioridad de instalacion (por viabilidad economica): ${priorityNames}.`);
+    recommendations.push(`- Prioridad tecnica para una siguiente evaluacion: ${priorityNames}.`);
   }
 
   recommendations.forEach(rec => {
