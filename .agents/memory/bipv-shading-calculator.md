@@ -69,3 +69,21 @@ doble conteo; además, nubosidad (`FS_climatico`) no debe activar bypass físico
 **How to apply:** el informe externo muestra pérdidas ópticas como contexto y pérdidas
 geométricas como diagnóstico; solo BIPV publica producción final, energía perdida del
 sistema y efecto económico.
+
+## Arquitectura de integración acordada
+
+La mejora no crea un tercer sistema 3D dentro de BIPV. La salida del módulo externo debe
+conectarse al flujo existente: **Sombras desde SketchUp → contrato CSV/FS →
+Mismatch/Bypass → Vista 3D → Producción**.
+
+**Regla:** la ruta interna de SketchUp y la ruta externa de Andrew Marsh/EPW son dos
+productores de datos compatibles que convergen en el mismo parser y `df_fs_raw`; no se
+duplican importador, ray-casting, bypass, IAM, soiling ni producción.
+
+**Why:** BIPV ya tiene `pages/5a_🌳_Sombras_SketchUp.py`, `calculos/sombras_3d.py`,
+`cargar_csv_fs` y visualización de FS en Vista 3D; duplicar esa cadena generaría
+resultados divergentes y mantenimiento doble.
+
+**How to apply:** el módulo externo entrega `FS_geometrico` por fachada/punto/hora y
+metadatos; BIPV valida, guarda por usuario/proyecto, visualiza y recalcula la producción
+con su motor propio. La carga manual sigue siendo respaldo de la integración autorizada.
