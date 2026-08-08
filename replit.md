@@ -26,7 +26,9 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- La calculadora de sombreado seguirá una arquitectura híbrida: React/TypeScript para interfaz, carga de archivos y visualización; Python para el motor solar oficial, reproducible y compatible con BIPV.
+- Antes de migrar cálculos se hará un inventario del código TypeScript actual. Se decidirá explícitamente qué queda como previsualización en React, qué pasa a Python y cuál será la única fuente oficial de resultados.
+- La salida oficial será `FS_geometrico` con metadatos trazables, reutilizando el contrato y la cadena existentes de BIPV para Mismatch, bypass, Vista 3D y producción.
 
 ## Product
 

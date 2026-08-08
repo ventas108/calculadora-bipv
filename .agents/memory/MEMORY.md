@@ -12,3 +12,4 @@
 - [BIPV - Sombras desde SketchUp](bipv-sombras-sketchup.md) — ray-casting trimesh alineado al TMY UTC de la sesión (obligatorio); mismo CSV FS_geometrico que la calculadora web
 - [BIPV - persistencia por usuario](bipv-persistencia-usuario.md) — todo estado a disco va a datos/persistencia/<hash>__*.json vía ruta_datos_usuario(), cargar tras login; nunca archivos globales
 - [BIPV - cachés st.cache_data y mtime](bipv-streamlit-cache-mtime.md) — st.cache_data NO hashea params "_x": el mtime de invalidación debe llamarse `mtime` sin guion bajo; patrón wrapper + .clear
+- [BIPV - motor híbrido de sombreado](bipv-motor-sombreado-hibrido.md) — React/TypeScript para interfaz y visualización; Python como motor solar oficial tras inventariar el cálculo actual
