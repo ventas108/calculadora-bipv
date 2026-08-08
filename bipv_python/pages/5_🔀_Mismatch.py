@@ -23,6 +23,10 @@ from calculos.solar import calcular_poa, ORIENTACIONES
 from datos.ciudades_colombia import CIUDADES
 from calculos.tz_utils import utc_offset_latam, tz_label
 from datos.tecnologias_bipv import MODULOS_BIPV
+from calculos.escenarios_fase4 import (
+    construir_definicion_escenarios,
+    validar_definicion_escenarios,
+)
 
 st.set_page_config(page_title="Mismatch — BIPV", page_icon="🔀", layout="wide")
 
@@ -75,6 +79,134 @@ else:
     st.info(
         f"📍 **{ciudad}** — POA fachada {or_label} / {tilt_def}°: "
         f"**{poa_anual:,.0f} kWh/m²/año**"
+    )
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FASE 4.1 — DEFINICIÓN DE ESCENARIOS
+# ═══════════════════════════════════════════════════════════════════════════════
+st.markdown("---")
+st.subheader("🧩 Fase 4.1 — Definición de escenarios")
+st.caption(
+    "Primero se fija la base de comparación. Esta etapa no calcula recuperación "
+    "ni modifica el sombreado; solo deja trazables los escenarios."
+)
+
+_fase4_actual = st.session_state.get("escenarios_fase4", {})
+_fase4_nombre_default = (
+    _fase4_actual.get("nombre_proyecto")
+    or st.session_state.get("nombre_proyecto")
+    or "Proyecto BIPV Bogotá Teusaquillo"
+)
+_fase4_fuentes = _fase4_actual.get("politica_fuentes_actual", {}).get(
+    "fuentes_declaradas", ["horizonte", "sketchup"]
+)
+
+with st.container(border=True):
+    _fase4_nombre = st.text_input(
+        "Proyecto al que pertenece la comparación",
+        value=_fase4_nombre_default,
+        key="fase4_nombre_proyecto",
+    )
+    _f4c1, _f4c2 = st.columns(2)
+    with _f4c1:
+        _fase4_horizonte = st.checkbox(
+            "Usar perfil de horizonte",
+            value="horizonte" in _fase4_fuentes,
+            key="fase4_fuente_horizonte",
+            help="Perfil editado en esta página de Mismatch.",
+        )
+    with _f4c2:
+        _fase4_sketchup = st.checkbox(
+            "Usar modelo/CSV de SketchUp",
+            value="sketchup" in _fase4_fuentes,
+            key="fase4_fuente_sketchup",
+            help="Sombreado horario proveniente del modelo 3D.",
+        )
+    _fase4_tipo = st.selectbox(
+        "Tipo de optimización permitido",
+        options=["paneles", "obstaculos", "ambos", "por_definir"],
+        index=["paneles", "obstaculos", "ambos", "por_definir"].index(
+            _fase4_actual.get("escenarios", {})
+            .get("optimizada", {})
+            .get("tipo_optimizacion", "paneles")
+        ),
+        format_func=lambda valor: {
+            "paneles": "Ubicación, separación o distribución de paneles",
+            "obstaculos": "Reducir, retirar o reubicar obstáculos",
+            "ambos": "Paneles y obstáculos",
+            "por_definir": "Por definir",
+        }[valor],
+        key="fase4_tipo_optimizacion",
+    )
+
+    _fuentes_disponibles = {
+        "horizonte": bool(
+            st.session_state.get("sombra_ok")
+            and st.session_state.get("puntos_horiz")
+        ),
+        "sketchup": bool(
+            st.session_state.get("csv_fs_ok")
+            or st.session_state.get("csv_fs_sketchup_bytes")
+            or st.session_state.get("sk_df_fs") is not None
+        ),
+    }
+    _estado_h = "cargado" if _fuentes_disponibles["horizonte"] else "pendiente"
+    _estado_s = "cargado" if _fuentes_disponibles["sketchup"] else "pendiente"
+    st.caption(
+        f"Disponibilidad actual: horizonte **{_estado_h}** · "
+        f"SketchUp **{_estado_s}**. La declaración del escenario puede hacerse "
+        "antes de recalcular ambas fuentes."
+    )
+
+    if st.button(
+        "💾 Guardar definición de escenarios",
+        type="primary",
+        key="fase4_guardar_definicion",
+    ):
+        try:
+            _definicion_fase4 = construir_definicion_escenarios(
+                nombre_proyecto=_fase4_nombre,
+                fuente_horizonte=_fase4_horizonte,
+                fuente_sketchup=_fase4_sketchup,
+                tipo_optimizacion=_fase4_tipo,
+                panel_nombre=st.session_state.get("panel_nombre_dim"),
+                inversor_nombre=st.session_state.get("inversor_nombre_dim"),
+            )
+            _definicion_fase4["fuentes_disponibles"] = _fuentes_disponibles
+            validar_definicion_escenarios(_definicion_fase4)
+            st.session_state["escenarios_fase4"] = _definicion_fase4
+            st.session_state["fase4_definicion_ok"] = True
+            st.success(
+                "✅ Definición guardada: referencia, situación actual y "
+                "alternativa optimizada."
+            )
+        except ValueError as _e_fase4:
+            st.error(f"❌ No se pudo guardar la definición: {_e_fase4}")
+
+_definicion_fase4 = st.session_state.get("escenarios_fase4")
+if _definicion_fase4:
+    _esc_f4 = _definicion_fase4["escenarios"]
+    _actual_f4 = _esc_f4["actual"]
+    _opt_f4 = _esc_f4["optimizada"]
+    st.markdown("#### Estado de los escenarios")
+    _ec1, _ec2, _ec3 = st.columns(3)
+    _ec1.success("**Referencia**\n\nSin obstáculos · FS geométrico = 0")
+    if _actual_f4["estado"] == "definido_reconciliacion_pendiente":
+        _ec2.warning(
+            "**Situación actual**\n\n"
+            "Definida · reconciliar horizonte + SketchUp antes de comparar"
+        )
+    else:
+        _ec2.success("**Situación actual**\n\nFuente de sombreado definida")
+    _ec3.info(
+        "**Alternativa optimizada**\n\n"
+        "Pendiente de parámetros de ubicación/separación/distribución"
+        if _opt_f4["estado"] == "pendiente_parametros"
+        else "**Alternativa optimizada**\n\nDefinida"
+    )
+    st.caption(
+        "🔒 Invariantes: misma ubicación, TMY, timestamps UTC, fachadas/puntos, "
+        "panel, inversor y configuración eléctrica."
     )
 
 # ═══════════════════════════════════════════════════════════════════════════════
