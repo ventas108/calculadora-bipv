@@ -128,6 +128,42 @@ def validar_cobertura_anual_8760(
     )
 
 
+def validar_entradas_horarias_8760(
+    tmy: pd.DataFrame,
+    poa_base: pd.DataFrame,
+    *,
+    poa_col: str = "poa_global",
+) -> None:
+    """
+    Valida las entradas físicas antes de ejecutar Producción.
+
+    A diferencia de una intersección de índices, esta función falla si una
+    fuente está truncada, desplazada o contiene un hueco horario. ``tmy`` debe
+    contener ``T2m`` y ``poa_base`` debe contener la POA usada por el motor.
+    """
+    if not isinstance(tmy, pd.DataFrame):
+        raise ValueError("tmy debe ser un DataFrame")
+    if not isinstance(poa_base, pd.DataFrame):
+        raise ValueError("poa_base debe ser un DataFrame")
+
+    _validar_indice_horario(tmy, nombre="tmy")
+    _validar_indice_horario(poa_base, nombre="poa_base")
+
+    if not tmy.index.equals(poa_base.index):
+        raise ValueError(
+            "tmy y poa_base deben tener exactamente el mismo índice horario; "
+            "no se permite una intersección parcial"
+        )
+
+    _validar_columna_numerica(tmy, "T2m", nombre="tmy")
+    _validar_columna_numerica(
+        poa_base,
+        poa_col,
+        nombre="poa_base",
+        no_negativa=True,
+    )
+
+
 def agregar_anual_8760_poa(
     resultado_horario: pd.DataFrame,
     poa_horaria: pd.DataFrame,

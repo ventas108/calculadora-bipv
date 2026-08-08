@@ -263,17 +263,36 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 P_dc_stc_kW       = P_stc_kW,
                 k_bipv            = _k_bipv_sim,
             )
-            res_base = simular_produccion_anual(**_sim_kwargs)
-            res_iv   = None
-            if usar_iv and _panel_apto_iv:
-                # #105: pasar el panel YA preparado (evita repetir el fit_desoto
-                # y garantiza que se simula con el mismo SDM mostrado arriba).
-                # Propagar el NOCT del Motor Óptico (misma fuente de verdad que el SDM base).
-                _panel_iv_sdm = _panel_iv_prep
-                if _motor_ok and _noct_mo is not None:
-                    _panel_iv_sdm = dict(_panel_iv_prep)
-                    _panel_iv_sdm["NOCT"] = _noct_mo
-                res_iv = simular_produccion_iv(**{**_sim_kwargs, "panel": _panel_iv_sdm})
+            try:
+                res_base = simular_produccion_anual(**_sim_kwargs)
+                res_iv   = None
+                if usar_iv and _panel_apto_iv:
+                    # #105: pasar el panel YA preparado (evita repetir el fit_desoto
+                    # y garantiza que se simula con el mismo SDM mostrado arriba).
+                    # Propagar el NOCT del Motor Óptico (misma fuente de verdad que el SDM base).
+                    _panel_iv_sdm = _panel_iv_prep
+                    if _motor_ok and _noct_mo is not None:
+                        _panel_iv_sdm = dict(_panel_iv_prep)
+                        _panel_iv_sdm["NOCT"] = _noct_mo
+                    res_iv = simular_produccion_iv(**{**_sim_kwargs, "panel": _panel_iv_sdm})
+            except ValueError as exc:
+                # No conservar resultados de una simulación anterior: una
+                # cobertura incompleta nunca debe parecer un anual válido.
+                for _key in (
+                    "res_produccion",
+                    "res_produccion_base",
+                    "res_produccion_iv",
+                    "E_ac_anual_kWh",
+                    "PR_sistema",
+                ):
+                    st.session_state[_key] = None
+                st.session_state["produccion_ok"] = False
+                st.session_state["produccion_modo_iv"] = False
+                st.error(
+                    "⛔ No se puede simular Producción: el TMY y la POA deben "
+                    f"cubrir exactamente el mismo año completo de 8.760 horas. Detalle: {exc}"
+                )
+                st.stop()
 
         # El modo IV es opt-in: si está activo y disponible, queda como oficial.
         res = res_iv if (usar_iv and res_iv is not None) else res_base

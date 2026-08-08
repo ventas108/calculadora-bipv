@@ -6,7 +6,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from calculos.agregador_anual import agregar_anual_8760_poa
+from calculos.agregador_anual import (
+    agregar_anual_8760_poa,
+    validar_entradas_horarias_8760,
+)
+from calculos.produccion import simular_produccion_anual
 from calculos.produccion_iv import simular_produccion_iv
 from datos.tecnologias_bipv import ASP_ST1_T40
 
@@ -94,6 +98,30 @@ def test_agrega_resultado_real_del_motor_iv_sin_reconstruirlo_por_mes() -> None:
     assert agregado["annual_8760"]["energia"]["P_ac_kW"] == pytest.approx(
         res_iv["df_horario"]["P_ac_kW"].sum()
     )
+    assert res_iv["annual_8760"]["energia"]["P_ac_kW"] == pytest.approx(
+        res_iv["df_horario"]["P_ac_kW"].sum()
+    )
+    assert res_iv["critical_dates"] is None
+
+
+def test_motor_base_expone_el_mismo_contrato_anual_oficial() -> None:
+    resultado, poa = _serie_anual()
+    tmy = pd.DataFrame({"T2m": np.full(8760, 20.0)}, index=resultado.index)
+    res_base = simular_produccion_anual(
+        tmy=tmy,
+        poa_base=poa,
+        panel=ASP_ST1_T40,
+        N_paneles=1,
+        eta_inversor=0.975,
+        factor_pr_mismatch=1.0,
+    )
+
+    assert res_base["annual_8760"]["horas"] == 8760
+    assert res_base["annual_8760"]["cobertura_completa"] is True
+    assert res_base["annual_8760"]["energia"]["P_ac_kW"] == pytest.approx(
+        res_base["df_horario"]["P_ac_kW"].sum()
+    )
+    assert res_base["critical_dates"] is None
 
 
 def test_critical_dates_queda_separado_y_no_cambia_el_anual() -> None:
@@ -108,3 +136,42 @@ def test_critical_dates_queda_separado_y_no_cambia_el_anual() -> None:
 
     assert agregado["critical_dates"] == critical_dates
     assert agregado["annual_8760"]["energia"]["P_ac_kW"] == pytest.approx(8760.0)
+
+
+def test_valida_entradas_de_produccion_antes_de_simular() -> None:
+    resultado, poa = _serie_anual()
+    tmy = pd.DataFrame({"T2m": np.full(8760, 20.0)}, index=resultado.index)
+
+    validar_entradas_horarias_8760(tmy, poa)
+
+
+@pytest.mark.parametrize(
+    "mutacion, mensaje",
+    [
+        ("faltante_tmy", "8760"),
+        ("faltante_poa", "8760"),
+        ("desfase", "exactamente el mismo|año TMY"),
+        ("poa_negativa", "negativos"),
+        ("temperatura_nan", "no finitos"),
+    ],
+)
+def test_rechaza_entradas_invalidas_antes_de_produccion(
+    mutacion: str,
+    mensaje: str,
+) -> None:
+    resultado, poa = _serie_anual()
+    tmy = pd.DataFrame({"T2m": np.full(8760, 20.0)}, index=resultado.index)
+
+    if mutacion == "faltante_tmy":
+        tmy = tmy.drop(tmy.index[100])
+    elif mutacion == "faltante_poa":
+        poa = poa.drop(poa.index[100])
+    elif mutacion == "desfase":
+        poa.index = poa.index + pd.Timedelta(hours=1)
+    elif mutacion == "poa_negativa":
+        poa.iloc[0, 0] = -1.0
+    elif mutacion == "temperatura_nan":
+        tmy.iloc[0, 0] = np.nan
+
+    with pytest.raises(ValueError, match=mensaje):
+        validar_entradas_horarias_8760(tmy, poa)

@@ -27,6 +27,10 @@ from calculos.modelo_iv import (
     G_REF,
 )
 from calculos.temperatura import temperatura_celda_noct
+from calculos.agregador_anual import (
+    agregar_anual_8760_poa,
+    validar_entradas_horarias_8760,
+)
 
 
 def preparar_para_iv(panel: dict) -> tuple:
@@ -180,8 +184,11 @@ def simular_produccion_iv(
     if P_dc_stc_kW is None:
         P_dc_stc_kW = round(panel.get("Pmax_stc", 60) * N_paneles / 1000, 3)
 
-    # ── Alinear índices ────────────────────────────────────────────────────────
-    idx   = poa_base.index.intersection(tmy.index)
+    # ── Validar año TMY completo antes de simular ─────────────────────────────
+    # Nunca usar intersection(): descartaría horas silenciosamente y después
+    # las métricas anuales aparentarían cubrir 8760 h aunque no lo hagan.
+    validar_entradas_horarias_8760(tmy, poa_base)
+    idx   = tmy.index
     G_raw = poa_base.loc[idx, "poa_global"].values.astype(float)
     T_amb = tmy.loc[idx, "T2m"].values.astype(float)
 
@@ -235,6 +242,15 @@ def simular_produccion_iv(
         "perdida_T_kW": perdida_temp_por_modulo * N_paneles / 1000.0,
     }, index=idx)
 
+    # ── Contrato anual oficial: suma directa de las 8760 horas ───────────────
+    # Se conserva además el formato histórico de las claves E_* para
+    # compatibilidad con Baterías, Financiero y Reporte.
+    anual_8760 = agregar_anual_8760_poa(
+        resultado_horario=df_h,
+        poa_horaria=poa_base,
+        columnas_energia=("P_dc_kW", "P_ac_kW", "perdida_T_kW"),
+    )["annual_8760"]
+
     # ── DataFrame mensual ─────────────────────────────────────────────────────
     meses_es = {1:"Ene",2:"Feb",3:"Mar",4:"Abr",5:"May",6:"Jun",
                 7:"Jul",8:"Ago",9:"Sep",10:"Oct",11:"Nov",12:"Dic"}
@@ -263,6 +279,8 @@ def simular_produccion_iv(
         "H_ef_kWh_m2":             round(H_ef, 1),
         "df_horario":              df_h,
         "df_mensual":              df_m,
+        "annual_8760":             anual_8760,
+        "critical_dates":          None,
         "uso_modelo_simplificado": False,
         "metodo":                  "curva_iv",
         "sdm_origen":              _sdm_origen,   # "calibrado" | "estimado_ficha" (#105)
