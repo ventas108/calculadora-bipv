@@ -66,6 +66,97 @@ def calcular_vmp_string(N, Vmp_stc, Tk_gamma, T_cel):
     return N * Vmp_stc * (1 + Tk_gamma / 100.0 * (T_cel - 25.0))
 
 
+def evaluar_compatibilidad_string(
+    panel: dict,
+    inversor: dict,
+    N_serie: int,
+    T_frio: float = -5.0,
+    T_real: float = 36.35,
+    T_extremo: float = 41.94,
+    N_strings_tracker: int = 1,
+    FS_isc: float = 1.25,
+) -> dict:
+    """Evalúa una configuración concreta de string contra un inversor.
+
+    Esta función es deliberadamente pura para que Producción, Dimensionamiento
+    y las pruebas usen exactamente los mismos límites eléctricos.
+    """
+    try:
+        n = int(N_serie)
+        voc_frio = calcular_voc_string(
+            n, float(panel["Voc_stc"]), float(panel["Tk_beta"]), float(T_frio)
+        )
+        vmp_real = calcular_vmp_string(
+            n, float(panel["Vmp_stc"]), float(panel["Tk_gamma"]), float(T_real)
+        )
+        vmp_extremo = calcular_vmp_string(
+            n, float(panel["Vmp_stc"]), float(panel["Tk_gamma"]), float(T_extremo)
+        )
+        isc_equiv = (
+            float(panel["Isc_stc"]) * int(N_strings_tracker) * float(FS_isc)
+        )
+        vdc_max = float(inversor.get("Vdc_max") or 0.0)
+        vmppt_min = float(
+            inversor.get("Vmppt_min")
+            or inversor.get("Vmppt_activo_min")
+            or 0.0
+        )
+        vmppt_max = float(inversor.get("Vmppt_max") or 0.0)
+        isc_max = float(
+            inversor.get("Isc_max_tracker")
+            or inversor.get("I_max_tracker")
+            or 0.0
+        )
+    except (KeyError, TypeError, ValueError):
+        return {
+            "compatible": False,
+            "evaluable": False,
+            "mensajes": ["Faltan parámetros eléctricos válidos del panel o del inversor."],
+        }
+
+    mensajes = []
+    if not vdc_max:
+        mensajes.append("Vdc máximo del inversor no está disponible.")
+    elif voc_frio > vdc_max:
+        mensajes.append(f"Voc en frío {voc_frio:.0f} V > Vdc máximo {vdc_max:.0f} V")
+
+    if not vmppt_min:
+        mensajes.append("MPPT mínimo del inversor no está disponible.")
+    elif vmp_real < vmppt_min:
+        mensajes.append(f"Vmp real {vmp_real:.0f} V < MPPT mínimo {vmppt_min:.0f} V")
+    if vmppt_min and vmp_extremo < vmppt_min:
+        mensajes.append(
+            f"Vmp extremo {vmp_extremo:.0f} V < MPPT mínimo {vmppt_min:.0f} V"
+        )
+
+    if not vmppt_max:
+        mensajes.append("MPPT máximo del inversor no está disponible.")
+    elif vmp_real > vmppt_max:
+        mensajes.append(f"Vmp real {vmp_real:.0f} V > MPPT máximo {vmppt_max:.0f} V")
+    if vmppt_max and vmp_extremo > vmppt_max:
+        mensajes.append(
+            f"Vmp extremo {vmp_extremo:.0f} V > MPPT máximo {vmppt_max:.0f} V"
+        )
+
+    if not isc_max:
+        mensajes.append("Corriente máxima por tracker no está disponible.")
+    elif isc_equiv > isc_max:
+        mensajes.append(
+            f"Isc de strings {isc_equiv:.2f} A > límite por tracker {isc_max:.2f} A"
+        )
+
+    return {
+        "compatible": not mensajes,
+        "evaluable": True,
+        "mensajes": mensajes,
+        "N_serie": n,
+        "Voc_frio": voc_frio,
+        "Vmp_real": vmp_real,
+        "Vmp_extremo": vmp_extremo,
+        "Isc_equiv_tracker": isc_equiv,
+    }
+
+
 def optimizar_n_serie(panel: dict, inversor: dict,
                       T_frio: float = -5.0,
                       T_real: float = 36.35,

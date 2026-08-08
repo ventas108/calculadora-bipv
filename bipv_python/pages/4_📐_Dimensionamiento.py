@@ -37,7 +37,16 @@ with col1:
                                   format_func=_fmt_panel_dim)
     _cat_inv = cargar_catalogo_inversores()
     _lista_inv = list(_cat_inv.keys()) if _cat_inv else list(INVERSORES.keys())
-    _idx_inv = next((i for i,k in enumerate(_lista_inv) if "MID15KTL3" in k or "MID 15KTL3" in k), 0)
+    _inv_default = st.session_state.get("inversor_nombre_dim", "")
+    _idx_inv = (
+        _lista_inv.index(_inv_default)
+        if _inv_default in _lista_inv
+        else next(
+            (i for i, k in enumerate(_lista_inv)
+             if "MID15KTL3" in k or "MID 15KTL3" in k),
+            0,
+        )
+    )
     inversor_nombre = st.selectbox("Inversor", _lista_inv, index=_idx_inv)
 
 # Cargar dicts antes de col2 para que estén disponibles al calcular N_min_scan
@@ -164,7 +173,7 @@ if _tmy_df is not None and _ciudad_ss and _ciudad_ss != _ciudad_applied:
 
 with col2:
     T_frio   = st.number_input("T_mín diseño (°C)", value=float(
-                                st.session_state.get("T_min_diseno", 5.0)),
+                                st.session_state.get("T_min_diseno", -5.0)),
                 key="T_min_diseno",
                 help="Auto-calculado como mínimo histórico del TMY. Determina Voc_max y riesgo sobre Vdc_max del inversor.")
     T_real   = st.number_input("T_celda caliente realista (°C)", value=float(

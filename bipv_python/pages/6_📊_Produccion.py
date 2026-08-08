@@ -8,11 +8,14 @@ import numpy as np
 from calculos.produccion import simular_produccion_anual, perdidas_desglosadas, panel_tiene_sdm_completo
 from calculos.produccion_iv import simular_produccion_iv, panel_apto_para_iv, preparar_para_iv
 from calculos.modelo_iv import resolver_panel_calibrado
-from calculos.dimensionamiento import calcular_voc_string, calcular_vmp_string
+from calculos.dimensionamiento import evaluar_compatibilidad_string
 from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_inversores import INVERSORES
 from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
-from datos.catalogo_inversores_excel import cargar_catalogo_inversores
+from datos.catalogo_inversores_excel import (
+    cargar_catalogo_inversores,
+    obtener_inversor_excel,
+)
 
 st.set_page_config(page_title="Producción — BIPV", page_icon="📊", layout="wide")
 
@@ -178,6 +181,31 @@ with col_c3:
     _inv_default = st.session_state.get("inversor_nombre_dim", "")
     _inv_idx_p   = _lista_inv_p.index(_inv_default) if _inv_default in _lista_inv_p else 0
     inversor_nombre = st.selectbox("Inversor", _lista_inv_p, index=_inv_idx_p)
+    # La selección hecha aquí también debe cargar la ficha eléctrica. Antes
+    # solo se cambiaba el nombre visible y la variable `inversor` no existía
+    # en Producción, por lo que no se evaluaban las alarmas del equipo.
+    inversor = (
+        obtener_inversor_excel(inversor_nombre)
+        if _cat_inv_p
+        else INVERSORES.get(inversor_nombre, {})
+    )
+    # Mantener la elección sincronizada con Dimensionamiento y con las páginas
+    # aguas abajo. El valor debe ser el equipo realmente seleccionado aquí.
+    st.session_state["inversor_nombre_dim"] = inversor_nombre
+    st.session_state["inversor_dict_dim"] = inversor
+    if not inversor:
+        st.error(
+            f"🔴 No se encontró la ficha técnica de **{inversor_nombre}**. "
+            "No se puede certificar la compatibilidad eléctrica."
+        )
+    else:
+        st.caption(
+            f"Ficha eléctrica: Vdc máx **{inversor.get('Vdc_max', '—')} V** · "
+            f"MPPT **{inversor.get('Vmppt_min', '—')}–{inversor.get('Vmppt_max', '—')} V** · "
+            f"{inversor.get('n_trackers', '—')} tracker(s) · "
+            f"{inversor.get('n_strings_tracker', '—')} string(s)/tracker · "
+            f"Isc máx **{inversor.get('Isc_max_tracker', '—')} A**"
+        )
     eta_inv = st.slider(
         "Eficiencia del inversor (%)",
         min_value=90.0, max_value=99.0,
@@ -194,71 +222,48 @@ _n_serie_cfg = st.session_state.get("N_serie")
 _n_strings_tracker_cfg = int(st.session_state.get("N_str_tr", 1) or 1)
 _compat_inversor_ok = True
 _compat_inversor_mensajes = []
-if _n_serie_cfg:
+_compat_inversor_evaluable = bool(_n_serie_cfg and inversor)
+if not _n_serie_cfg:
+    _compat_inversor_ok = False
+    _compat_inversor_mensajes.append(
+        "No hay N/string validado en Dimensionamiento; no se puede certificar "
+        "la tensión ni la ventana MPPT del sistema."
+    )
+elif not inversor:
+    _compat_inversor_ok = False
+    _compat_inversor_mensajes.append(
+        "La ficha técnica del inversor seleccionado no está disponible."
+    )
+else:
     try:
-        _n_serie_cfg = int(_n_serie_cfg)
-        _t_frio_cfg = float(st.session_state.get("T_min_diseno", 5.0))
-        _t_real_cfg = float(st.session_state.get("T_cel_realista", 36.35))
-        _t_ext_cfg = float(st.session_state.get("T_cel_extremo", 41.94))
-        _voc_frio_cfg = calcular_voc_string(
-            _n_serie_cfg, float(panel.get("Voc_stc") or panel.get("Voc")), _t_beta
-            if (_t_beta := float(panel.get("Tk_beta") or panel.get("CoefVoc_C") or -0.37))
-            else -0.37, _t_frio_cfg
+        _compat_resultado = evaluar_compatibilidad_string(
+            panel=panel,
+            inversor=inversor,
+            N_serie=int(_n_serie_cfg),
+            T_frio=float(st.session_state.get("T_min_diseno", -5.0)),
+            T_real=float(st.session_state.get("T_cel_realista", 36.35)),
+            T_extremo=float(st.session_state.get("T_cel_extremo", 41.94)),
+            N_strings_tracker=_n_strings_tracker_cfg,
         )
-        _vmp_real_cfg = calcular_vmp_string(
-            _n_serie_cfg, float(panel.get("Vmp_stc") or panel.get("Vmp")),
-            float(panel.get("Tk_gamma") or panel.get("beta_mp") or -0.4), _t_real_cfg
-        )
-        _vmp_ext_cfg = calcular_vmp_string(
-            _n_serie_cfg, float(panel.get("Vmp_stc") or panel.get("Vmp")),
-            float(panel.get("Tk_gamma") or panel.get("beta_mp") or -0.4), _t_ext_cfg
-        )
-        _isc_eq_cfg = (
-            float(panel.get("Isc_stc") or panel.get("Isc") or 0.0)
-            * _n_strings_tracker_cfg * 1.25
-        )
-        _vdc_max_cfg = float(inversor.get("Vdc_max") or 0.0)
-        _vmppt_min_cfg = float(inversor.get("Vmppt_min") or inversor.get("Vmppt_activo_min") or 0.0)
-        _vmppt_max_cfg = float(inversor.get("Vmppt_max") or 0.0)
-        _imax_cfg = float(inversor.get("Isc_max_tracker") or inversor.get("I_max_tracker") or 0.0)
-
-        if _vdc_max_cfg and _voc_frio_cfg > _vdc_max_cfg:
-            _compat_inversor_ok = False
-            _compat_inversor_mensajes.append(
-                f"Voc en frío {_voc_frio_cfg:.0f} V > Vdc máximo {_vdc_max_cfg:.0f} V"
-            )
-        if _vmppt_min_cfg and _vmp_real_cfg < _vmppt_min_cfg:
-            _compat_inversor_ok = False
-            _compat_inversor_mensajes.append(
-                f"Vmp real {_vmp_real_cfg:.0f} V < MPPT mínimo {_vmppt_min_cfg:.0f} V"
-            )
-        if _vmppt_min_cfg and _vmp_ext_cfg < _vmppt_min_cfg:
-            _compat_inversor_ok = False
-            _compat_inversor_mensajes.append(
-                f"Vmp extremo {_vmp_ext_cfg:.0f} V < MPPT mínimo {_vmppt_min_cfg:.0f} V"
-            )
-        if _vmppt_max_cfg and _vmp_real_cfg > _vmppt_max_cfg:
-            _compat_inversor_ok = False
-            _compat_inversor_mensajes.append(
-                f"Vmp real {_vmp_real_cfg:.0f} V > MPPT máximo {_vmppt_max_cfg:.0f} V"
-            )
-        if _imax_cfg and _isc_eq_cfg > _imax_cfg:
-            _compat_inversor_ok = False
-            _compat_inversor_mensajes.append(
-                f"Isc de strings {_isc_eq_cfg:.2f} A > límite por tracker {_imax_cfg:.2f} A"
-            )
+        _compat_inversor_ok = _compat_resultado["compatible"]
+        _compat_inversor_mensajes.extend(_compat_resultado["mensajes"])
     except (TypeError, ValueError):
-        _compat_inversor_ok = True
+        _compat_inversor_ok = False
+        _compat_inversor_mensajes.append(
+            "Faltan parámetros eléctricos válidos del panel o del inversor."
+        )
 
-if _n_serie_cfg and not _compat_inversor_ok:
+if not _compat_inversor_ok:
     st.error(
-        f"🔴 **Inversor {inversor_nombre} incompatible con la configuración actual** "
-        f"({_n_serie_cfg} módulos/string).  \n"
+        f"🔴 **No se puede aprobar la configuración eléctrica de "
+        f"{inversor_nombre}**"
+        + (f" ({_n_serie_cfg} módulos/string)." if _n_serie_cfg else ".")
+        + "  \n"
         + "  \n".join(f"- {m}" for m in _compat_inversor_mensajes)
         + "  \n\nCorrige el inversor o el número de módulos por string en "
           "📐 **Dimensionamiento** antes de usar Producción para el diseño final."
     )
-elif _n_serie_cfg:
+elif _compat_inversor_evaluable:
     st.success(
         f"🟢 **Compatibilidad eléctrica preliminar:** {inversor_nombre} con "
         f"{_n_serie_cfg} módulos/string y {_n_strings_tracker_cfg} string(s)/tracker."
@@ -319,7 +324,7 @@ btn_sim = st.button(
     use_container_width=True,
 )
 
-if btn_sim and _n_serie_cfg and not _compat_inversor_ok:
+if btn_sim and not _compat_inversor_ok:
     # La eficiencia del inversor no corrige una incompatibilidad de tensión,
     # corriente o ventana MPPT. No permitir que el resultado llegue a
     # Financiero como si fuera una configuración de diseño válida.
