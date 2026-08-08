@@ -1461,7 +1461,8 @@ if csv_ok and df_fs_raw is not None:
             "El resto del año se asume FS=0 (sin bypass). Útil para verificación."
         ),
     )
-    st.session_state["bypass_modo_alineacion"] = modo_alineacion
+    # El widget con key="bypass_modo_alineacion" ya mantiene session_state
+    # sincronizado; reasignarlo tras instanciar el widget lanza StreamlitAPIException.
 
     # ── Botón de simulación ───────────────────────────────────────────────
     btn_bypass = st.button(
