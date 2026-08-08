@@ -52,3 +52,20 @@ rigor; mantenerlos daría una apariencia de precisión y debilitaría la confian
 **Cómo aplicar:** priorizar rigor solar, escenarios actual vs. alternativas, pérdida
 geométrica separada de nubosidad, informe técnico reproducible, integración autorizada
 con BIPV y una auditoría de pruebas mínimas antes de anunciar la nueva versión.
+
+## Relación con el Motor Óptico de BIPV
+
+El módulo externo puede calcular IAM Ashrae, soiling y POA para su diagnóstico comparativo,
+pero esos factores no se transfieren como pérdidas acumulables a la Calculadora BIPV.
+
+**Regla:** el intercambio principal es `FS_geometrico` por fachada/punto/hora más los
+metadatos del escenario; BIPV vuelve a calcular IAM, soiling, temperatura, mismatch,
+bypass y producción final. La pérdida atribuible al obstáculo se mide comparando dos
+corridas BIPV idénticas: sin máscara geométrica vs. con máscara geométrica.
+
+**Why:** aplicar POA/IAM/soiling en ambas aplicaciones y sumar porcentajes produciría
+doble conteo; además, nubosidad (`FS_climatico`) no debe activar bypass físico.
+
+**How to apply:** el informe externo muestra pérdidas ópticas como contexto y pérdidas
+geométricas como diagnóstico; solo BIPV publica producción final, energía perdida del
+sistema y efecto económico.
