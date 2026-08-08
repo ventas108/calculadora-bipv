@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from calculos.dimensionamiento import optimizar_n_serie, dimensionar_sistema
-from calculos.modelo_iv import preparar_panel_iv, resolver_curva_iv
+from calculos.modelo_iv import preparar_panel_iv, resolver_curva_iv, resolver_panel_calibrado
 from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
 from datos.catalogo_inversores_excel import cargar_catalogo_inversores, obtener_inversor_excel
@@ -41,7 +41,8 @@ with col1:
     inversor_nombre = st.selectbox("Inversor", _lista_inv, index=_idx_inv)
 
 # Cargar dicts antes de col2 para que estén disponibles al calcular N_min_scan
-panel    = obtener_panel_excel(panel_nombre) if _cat_excel else MODULOS_BIPV[panel_nombre]
+_panel_catalogo = obtener_panel_excel(panel_nombre) if _cat_excel else MODULOS_BIPV[panel_nombre]
+panel    = resolver_panel_calibrado(_panel_catalogo)
 inversor = obtener_inversor_excel(inversor_nombre) if _cat_inv else seleccionar_inversor(inversor_nombre)
 
 # ── Aviso Motor IV: panel sin datos IV suficientes (#118) ─────────────────────

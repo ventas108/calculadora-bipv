@@ -280,7 +280,12 @@ with col1:
     st.metric("T_celda calculada", f"{T_cel:.1f} °C")
 
     st.markdown("---")
-    st.subheader("Parámetros SDM @ STC")
+    st.subheader("Parámetros SDM usados en la simulación")
+    st.caption(
+        f"Los valores de la curva mostrada corresponden a "
+        f"G={G:.0f} W/m² y T_celda={T_cel:.1f} °C. "
+        "La validación formal @ STC se ejecuta abajo a G=1000 W/m² y T=25 °C."
+    )
     if _estimado:
         st.caption("⚠️ Estimados — no calibrados")
     _prec = 3 if _estimado else 2
@@ -344,7 +349,7 @@ with col2:
         _err_v = abs(res["Voc"]  - _panel_activo["Voc_stc"])  / _panel_activo["Voc_stc"]  * 100
         _icono = "✅" if max(_err_p, _err_v) < 5 else "⚠️"
         st.caption(
-            f"{_icono} vs ficha STC — "
+            f"{_icono} vs ficha STC (referencia; curva a T_celda={T_cel:.1f} °C) — "
             f"Pmax: {res['Pmax']:.1f} W vs {_panel_activo['Pmax_stc']:.1f} W "
             f"(err {_err_p:.1f}%) | "
             f"Voc: {res['Voc']:.1f} V vs {_panel_activo['Voc_stc']:.1f} V "
@@ -381,12 +386,17 @@ else:
             st.error("❌ Revisar calibración SDM")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 5. CURVA FF vs IRRADIANCIA
+# 5. COMPARACIÓN FF vs IRRADIANCIA
 # ═══════════════════════════════════════════════════════════════════════════════
 
 st.markdown("---")
-st.subheader("📈 Curva FF vs Irradiancia (validación VBA)")
-if st.button("Generar curva FF vs G (T=25°C isotérmico)", key="btn_ff_g"):
+st.subheader("📈 Comparación FF vs Irradiancia")
+st.caption(
+    "La curva azul es la respuesta del SDM actual; los puntos rojos son "
+    "referencias VBA históricas. Esta gráfica es informativa y no sustituye "
+    "la validación formal SDM @ STC."
+)
+if st.button("Generar comparación FF vs G (T=25°C isotérmico)", key="btn_ff_g"):
     Gs_plot  = list(range(50, 1050, 25))
     FFs_plot = [
         resolver_curva_iv(G_i, 25.0, _panel_activo, n_puntos=0)["FF"] * 100
@@ -403,7 +413,7 @@ if st.button("Generar curva FF vs G (T=25°C isotérmico)", key="btn_ff_g"):
         vba_FF = [69.75, 76.28, 74.51, 72.87, 71.55, 64.92]
         fig2.add_trace(go.Scatter(
             x=vba_G, y=vba_FF, mode="markers",
-            name="VBA (referencia CdTe)",
+            name="VBA (referencia histórica CdTe)",
             marker=dict(color="red", size=10, symbol="x"),
         ))
     fig2.update_layout(
@@ -413,6 +423,7 @@ if st.button("Generar curva FF vs G (T=25°C isotérmico)", key="btn_ff_g"):
     st.plotly_chart(fig2, use_container_width=True)
     if not _estimado:
         st.caption(
-            "Los puntos rojos ✕ son los valores del VBA. "
-            "Las líneas azules son el resultado de Python."
+            "Los puntos rojos ✕ son referencias históricas del VBA; "
+            "las líneas azules son el resultado del SDM Python. La validación "
+            "oficial es la sección SDM vs Ficha Técnica @ STC."
         )

@@ -187,11 +187,12 @@ def resolver_panel_calibrado(panel: dict) -> dict:
     if not calibrado or not tiene_sdm_completo(calibrado):
         return panel
 
-    # Preservar metadatos comerciales/térmicos del catálogo seleccionado, pero
-    # nunca sobrescribir los parámetros eléctricos del SDM auditado.
+    # Preservar metadatos comerciales del catálogo seleccionado, pero nunca
+    # sobrescribir parámetros eléctricos ni térmicos del modelo auditado.
+    # En particular, NOCT puede ser un valor estimado en el Excel.
     metadatos = (
         "marca", "fabricante", "costo_usd", "area_m2", "dimensiones_mm",
-        "NOCT", "transparencia_pct", "bifacialidad_pct", "notas",
+        "transparencia_pct", "bifacialidad_pct", "notas",
         "confianza", "fuente_NsA",
     )
     resultado = dict(calibrado)

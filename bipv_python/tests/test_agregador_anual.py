@@ -141,6 +141,7 @@ def test_panel_excel_con_mismo_nombre_usa_sdm_calibrado_canonico() -> None:
 
     assert resuelto is not None
     assert resuelto["_sdm_calibrado_canonico"] is True
+    assert resuelto["NOCT"] == pytest.approx(45.0)
 
 
 def test_critical_dates_queda_separado_y_no_cambia_el_anual() -> None:
