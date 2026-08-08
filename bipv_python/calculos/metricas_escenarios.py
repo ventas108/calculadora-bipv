@@ -14,6 +14,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from calculos.agregacion_fs import promedio_fs_por_claves, resolver_peso
+
 
 MESES_ES = {
     1: "Ene",
@@ -65,14 +67,39 @@ def _alinear_fs_grupo(
     poa: pd.Series,
     *,
     modo: str,
+    modo_agregacion: str = "auto",
+    identidad_col: str | None = None,
 ) -> pd.DataFrame:
     columnas = _periodo_fs(grupo, modo)
-    fs = (
-        grupo.groupby(columnas, dropna=False)["FS_geometrico"]
-        .mean()
-        .rename("FS_geometrico")
-        .reset_index()
-    )
+    if identidad_col and identidad_col in grupo.columns:
+        # Un punto puede aparecer en varios días críticos. Primero se reduce
+        # por punto y hora para que la cantidad de registros no cambie su peso.
+        fs_punto = (
+            grupo.groupby(columnas + [identidad_col], dropna=False)
+            .agg(FS_geometrico=("FS_geometrico", "mean"))
+            .reset_index()
+        )
+        columnas_peso = [
+            columna
+            for columna in (
+                "n_modulos",
+                "area_activa_m2",
+                "potencia_instalada_kw",
+            )
+            if columna in grupo.columns
+        ]
+        if columnas_peso:
+            pesos = grupo[[identidad_col] + columnas_peso].drop_duplicates(
+                subset=[identidad_col]
+            )
+            fs_punto = fs_punto.merge(pesos, on=identidad_col, how="left")
+        fs, auditoria = promedio_fs_por_claves(
+            fs_punto, columnas, modo=modo_agregacion
+        )
+    else:
+        fs, auditoria = promedio_fs_por_claves(
+            grupo, columnas, modo=modo_agregacion
+        )
     claves_tmy = pd.DataFrame(index=tmy_index)
     claves_tmy["mes"] = tmy_index.month
     claves_tmy["dia"] = tmy_index.day
@@ -85,6 +112,7 @@ def _alinear_fs_grupo(
     unido["poa_perdida_kWh_m2"] = (
         unido["poa_Wm2"] * unido["FS_geometrico"] / 1000.0
     )
+    unido.attrs["agregacion_fs"] = auditoria
     return unido
 
 
@@ -95,6 +123,8 @@ def _agregar_grupos(
     *,
     modo: str,
     columna: str,
+    modo_agregacion: str = "auto",
+    identidad_col: str | None = None,
 ) -> list[dict[str, Any]]:
     if (
         not isinstance(df_fs, pd.DataFrame)
@@ -106,7 +136,14 @@ def _agregar_grupos(
         return []
     resultado = []
     for etiqueta, grupo in df_fs.groupby(columna, dropna=False):
-        alineado = _alinear_fs_grupo(grupo, tmy_index, poa, modo=modo)
+        alineado = _alinear_fs_grupo(
+            grupo,
+            tmy_index,
+            poa,
+            modo=modo,
+            modo_agregacion=modo_agregacion,
+            identidad_col=identidad_col,
+        )
         poa_total = float(alineado["poa_Wm2"].clip(lower=0).sum() / 1000.0)
         perdida = float(alineado["poa_perdida_kWh_m2"].sum())
         resultado.append(
@@ -119,6 +156,11 @@ def _agregar_grupos(
                 ),
                 "horas_con_sombra": int(
                     (alineado["FS_geometrico"] > 0).sum()
+                ),
+                "agregacion": (
+                    alineado.attrs.get("agregacion_fs", {}).get(
+                        "etiqueta", modo_agregacion
+                    )
                 ),
             }
         )
@@ -140,6 +182,7 @@ def metricas_solares(
     res_sombra: Mapping[str, Any] | None = None,
     df_fs: pd.DataFrame | None = None,
     modo_fs: str = "mensual",
+    modo_agregacion_fs: str = "auto",
 ) -> dict[str, Any]:
     """Construye el grupo de métricas solares sin inferir energía AC."""
     poa_bruta = _float_or_none(poa_bruta_kWh_m2)
@@ -200,15 +243,50 @@ def metricas_solares(
     )
     obstaculo_responsable = (
         _agregar_grupos(
-            df_fs, tmy_index, poa_horaria, modo=modo_fs, columna="obstaculo"
+            df_fs,
+            tmy_index,
+            poa_horaria,
+            modo=modo_fs,
+            columna="obstaculo",
+            modo_agregacion=modo_agregacion_fs,
+            identidad_col="punto",
         )
     )
     por_fachada = _agregar_grupos(
-        df_fs, tmy_index, poa_horaria, modo=modo_fs, columna="fachada"
+        df_fs,
+        tmy_index,
+        poa_horaria,
+        modo=modo_fs,
+        columna="fachada",
+        modo_agregacion=modo_agregacion_fs,
+        identidad_col="punto",
     )
-    por_fila_punto = _agregar_grupos(
-        df_fs, tmy_index, poa_horaria, modo=modo_fs, columna="punto"
+    por_fila = _agregar_grupos(
+        df_fs,
+        tmy_index,
+        poa_horaria,
+        modo=modo_fs,
+        columna="fila",
+        modo_agregacion=modo_agregacion_fs,
+        identidad_col="punto",
+    ) if isinstance(df_fs, pd.DataFrame) and "fila" in df_fs.columns else []
+    por_punto = _agregar_grupos(
+        df_fs,
+        tmy_index,
+        poa_horaria,
+        modo=modo_fs,
+        columna="punto",
+        modo_agregacion=modo_agregacion_fs,
     )
+    agregacion_auditoria: dict[str, Any] = {
+        "modo_solicitado": modo_agregacion_fs,
+        "modo_aplicado": "simple",
+        "columna_peso": None,
+        "etiqueta": "promedio simple por punto",
+        "advertencias": [],
+    }
+    if isinstance(df_fs, pd.DataFrame) and not df_fs.empty:
+        _, agregacion_auditoria = resolver_peso(df_fs, modo_agregacion_fs)
     return {
         "poa_bruta_kWh_m2": poa_bruta,
         "poa_efectiva_kWh_m2": poa_efectiva,
@@ -220,7 +298,15 @@ def metricas_solares(
         "horas_con_sombra": horas_sombra,
         "meses_criticos": meses_criticos,
         "por_fachada": por_fachada,
-        "por_fila_punto": por_fila_punto,
+        "por_fila": por_fila,
+        "por_punto": por_punto,
+        "por_fila_punto": por_punto or por_fila,
+        "agregacion_fs": modo_agregacion_fs,
+        "agregacion_fs_auditoria": agregacion_auditoria,
+        "nota_agregacion_fs": (
+            "La agregación usa el tamaño representado por cada punto. "
+            "Si no hay pesos válidos, se informa el fallback a promedio simple."
+        ),
         "por_obstaculo": obstaculo_responsable,
         "obstaculo_responsable": (
             obstaculo_responsable[0]["grupo"]

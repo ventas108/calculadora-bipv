@@ -15,6 +15,7 @@ from calculos.metricas_escenarios import (  # noqa: E402
     metricas_recuperacion,
     metricas_solares,
 )
+from calculos.agregacion_fs import promedio_fs_por_claves, resolver_peso  # noqa: E402
 from calculos.mismatch_bypass import cargar_csv_fs  # noqa: E402
 
 
@@ -170,3 +171,84 @@ def test_poa_se_puede_comparar_como_diagnostico_sin_ser_magnitud_de_decision():
     assert contrato["magnitud"] == "POA efectiva"
     assert contrato["es_magnitud_decision"] is False
     assert contrato["recuperacion_pct"] == round(200 / 300 * 100, 2)
+
+
+def test_agregacion_auto_pondera_por_modulos_y_no_por_filas_iguales():
+    df = pd.DataFrame(
+        {
+            "mes": [3, 3],
+            "hora": [12, 12],
+            "punto": ["Fila pequeña", "Fila grande"],
+            "FS_geometrico": [1.0, 0.0],
+            "n_modulos": [1, 3],
+        }
+    )
+
+    agregado, auditoria = promedio_fs_por_claves(
+        df, ["mes", "hora"], modo="auto"
+    )
+
+    assert agregado.loc[0, "FS_geometrico"] == 0.25
+    assert auditoria["modo_aplicado"] == "modulos"
+    assert auditoria["columna_peso"] == "n_modulos"
+
+
+def test_agregacion_puede_seleccionar_area_o_potencia():
+    df = pd.DataFrame(
+        {
+            "mes": [3, 3],
+            "hora": [12, 12],
+            "FS_geometrico": [1.0, 0.0],
+            "area_activa_m2": [2.0, 6.0],
+            "potencia_instalada_kW": [1.0, 9.0],
+        }
+    )
+
+    por_area, aud_area = promedio_fs_por_claves(
+        df, ["mes", "hora"], modo="area"
+    )
+    por_potencia, aud_potencia = promedio_fs_por_claves(
+        df, ["mes", "hora"], modo="potencia"
+    )
+
+    assert por_area.loc[0, "FS_geometrico"] == 0.25
+    assert aud_area["modo_aplicado"] == "area"
+    assert por_potencia.loc[0, "FS_geometrico"] == 0.1
+    assert aud_potencia["modo_aplicado"] == "potencia"
+
+
+def test_agregacion_auto_fallback_a_simple_es_auditable():
+    df = pd.DataFrame(
+        {
+            "mes": [3, 3],
+            "hora": [12, 12],
+            "FS_geometrico": [1.0, 0.0],
+        }
+    )
+
+    agregado, auditoria = promedio_fs_por_claves(
+        df, ["mes", "hora"], modo="auto"
+    )
+
+    assert agregado.loc[0, "FS_geometrico"] == 0.5
+    assert auditoria["modo_aplicado"] == "simple"
+    assert auditoria["advertencias"]
+
+
+def test_agregacion_no_mezcla_pesos_incompletos_silenciosamente():
+    df = pd.DataFrame(
+        {
+            "mes": [3, 3],
+            "hora": [12, 12],
+            "FS_geometrico": [1.0, 0.0],
+            "n_modulos": [2, None],
+        }
+    )
+
+    agregado, auditoria = promedio_fs_por_claves(
+        df, ["mes", "hora"], modo="modulos"
+    )
+
+    assert agregado.loc[0, "FS_geometrico"] == 0.5
+    assert auditoria["modo_aplicado"] == "simple"
+    assert auditoria["n_pesos_validos"] == 1

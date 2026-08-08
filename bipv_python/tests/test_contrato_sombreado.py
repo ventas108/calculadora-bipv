@@ -140,6 +140,30 @@ def test_parser_y_alineacion_ignoran_fs_combinado_cuando_hay_nubosidad():
     np.testing.assert_allclose(p_shade.values, [0.0, 0.4])
 
 
+def test_alineacion_bypass_pondera_por_modulos():
+    """La serie que entra al bypass respeta el tamaño de cada punto."""
+    from calculos.mismatch_bypass import alinear_fs_con_tmy
+
+    df = pd.DataFrame(
+        {
+            "mes": [3, 3],
+            "dia": [20, 20],
+            "hora": [17, 17],
+            "FS_geometrico": [1.0, 0.0],
+            "punto": ["Fila pequeña", "Fila grande"],
+            "n_modulos": [1, 3],
+        }
+    )
+    idx = pd.date_range("2024-03-20 17:00", periods=1, freq="h")
+
+    p_shade = alinear_fs_con_tmy(
+        df, idx, modo="exacto", modo_agregacion="auto"
+    )
+
+    assert p_shade.iloc[0] == pytest.approx(0.25)
+    assert p_shade.attrs["agregacion_fs"]["modo_aplicado"] == "modulos"
+
+
 def test_clima_alto_con_geometria_cero_no_reduce_produccion_ni_activa_bypass():
     """FS_climatico no entra al motor de bypass ni reduce su referencia."""
     irradiancia = np.array([800.0, 900.0, 700.0])

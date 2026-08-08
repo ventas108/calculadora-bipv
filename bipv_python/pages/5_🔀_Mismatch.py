@@ -295,6 +295,26 @@ if isinstance(_df_metricas_fs, pd.DataFrame) and _fachada_m and "fachada" in _df
         _df_metricas_fs["fachada"] == _fachada_m
     ].copy()
 
+_opciones_agregacion_fs = {
+    "auto": "Automático (módulos → área → potencia)",
+    "simple": "Promedio simple por punto",
+    "modulos": "Ponderado por número de módulos",
+    "area": "Ponderado por área activa",
+    "potencia": "Ponderado por potencia instalada",
+}
+_modo_agregacion_fs = st.selectbox(
+    "⚖️ Agregación espacial de fachada / fila / punto",
+    options=list(_opciones_agregacion_fs),
+    format_func=lambda modo: _opciones_agregacion_fs[modo],
+    index=0,
+    key="bypass_modo_agregacion",
+    help=(
+        "Automático prioriza número de módulos, luego área activa y finalmente "
+        "potencia instalada. Si no existe un peso válido, usa promedio simple "
+        "y deja una advertencia auditable."
+    ),
+)
+
 _fs_metricas = None
 _modo_fs_metricas = st.session_state.get("bypass_modo_alineacion", "mensual")
 if (
@@ -307,6 +327,7 @@ if (
             _df_metricas_fs,
             tmy.index,
             modo=_modo_fs_metricas,
+            modo_agregacion=_modo_agregacion_fs,
         )
     except Exception:
         _fs_metricas = None
@@ -336,6 +357,7 @@ _metricas_solares_m = metricas_solares(
     res_sombra=st.session_state.get("res_sombra"),
     df_fs=_df_metricas_fs,
     modo_fs=_modo_fs_metricas,
+    modo_agregacion_fs=_modo_agregacion_fs,
 )
 _metricas_electricas_m = metricas_electricas(
     resultado_produccion=st.session_state.get("res_produccion"),
@@ -403,9 +425,21 @@ with st.container(border=True):
     )
     _tablas_solares_m = {
         "Pérdida solar por fachada": _metricas_solares_m["por_fachada"],
-        "Pérdida solar por fila/punto": _metricas_solares_m["por_fila_punto"],
+        "Pérdida solar por fila": _metricas_solares_m["por_fila"],
+        "Pérdida solar por punto": _metricas_solares_m["por_punto"],
         "Obstáculos responsables": _metricas_solares_m["por_obstaculo"],
     }
+    _aud_agregacion = _metricas_solares_m["agregacion_fs_auditoria"]
+    st.caption(
+        f"Agregación aplicada: **{_aud_agregacion['etiqueta']}**"
+        + (
+            f" · columna `{_aud_agregacion['columna_peso']}`"
+            if _aud_agregacion["columna_peso"]
+            else ""
+        )
+    )
+    for _advertencia_ag in _aud_agregacion["advertencias"]:
+        st.warning(f"⚠️ {_advertencia_ag}")
     for _titulo_m, _filas_m in _tablas_solares_m.items():
         if _filas_m:
             with st.expander(_titulo_m, expanded=False):
@@ -416,6 +450,7 @@ with st.container(border=True):
                             "poa_perdida_kWh_m2": "Pérdida solar POA (kWh/m²)",
                             "fs_geometrico_ponderado_pct": "FS geométrico ponderado (%)",
                             "horas_con_sombra": "Horas con sombra",
+                            "agregacion": "Agregación aplicada",
                         }
                     ),
                     hide_index=True,
@@ -1353,8 +1388,17 @@ if csv_ok and df_fs_raw is not None:
                     # Alinear FS con el TMY (df_fs_work: filtrado por fachada e invertido si aplica)
                     tmy_idx  = st.session_state["tmy_df"].index
                     _modo    = st.session_state.get("bypass_modo_alineacion", "mensual")
-                    p_shade  = alinear_fs_con_tmy(df_fs_work, tmy_idx, modo=_modo)
+                    _modo_ag = st.session_state.get(
+                        "bypass_modo_agregacion", "auto"
+                    )
+                    p_shade  = alinear_fs_con_tmy(
+                        df_fs_work,
+                        tmy_idx,
+                        modo=_modo,
+                        modo_agregacion=_modo_ag,
+                    )
                     st.session_state["bypass_modo_usado"] = _modo
+                    st.session_state["bypass_modo_agregacion_usado"] = _modo_ag
 
                     # Simular bypass
                     res_bp = simular_bypass_horario(

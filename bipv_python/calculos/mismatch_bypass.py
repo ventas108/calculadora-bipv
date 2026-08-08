@@ -22,6 +22,10 @@ import numpy as np
 import pandas as pd
 import pvlib
 
+from calculos.agregacion_fs import (
+    normalizar_nombre_columna,
+    promedio_fs_por_claves,
+)
 from calculos.modelo_iv import obtener_constantes_tecnologia
 
 # ── Constantes físicas ─────────────────────────────────────────────────────────
@@ -335,11 +339,37 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
             col_obstaculo = c
     col_fachada = col_fachada_clean or col_obstaculo  # Compatibilidad histórica
     col_punto: str | None = None
+    col_fila: str | None = None
     for c in df_raw.columns:
         cl = c.lower().replace(" ", "_")
-        if cl in ("punto", "point", "fila", "row"):
+        if cl in ("punto", "point"):
             col_punto = c
-            break
+        elif cl in ("fila", "row"):
+            col_fila = c
+
+    # Conservar los metadatos de tamaño para que el modelo no tenga que
+    # adivinarlos: se aceptan los mismos aliases que el contrato de agregación.
+    columnas_peso = {
+        "n_modulos": (
+            "nmodulos", "numeromodulos", "cantidadmodulos", "numpaneles",
+            "npaneles", "cantidadpaneles", "modulos",
+        ),
+        "area_activa_m2": (
+            "areaactivam2", "areaactiva", "aream2",
+            "areamodulosm2", "superficieactivam2",
+        ),
+        "potencia_instalada_kw": (
+            "potenciainstaladakw", "potenciainstalada", "potenciakw",
+            "potenciakwp", "potenciaw", "potenciainstaladaw", "pdcw", "pdckw",
+        ),
+    }
+    columnas_peso_encontradas: dict[str, str] = {}
+    for c in df_raw.columns:
+        normalizada = normalizar_nombre_columna(c)
+        for canonica, aliases in columnas_peso.items():
+            if canonica not in columnas_peso_encontradas and normalizada in aliases:
+                columnas_peso_encontradas[canonica] = c
+                break
 
     # ── Elegir la única columna permitida para bypass ─────────────────────────
     advertencias: list[str] = []
@@ -378,6 +408,11 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
         cols_leer.append(col_obstaculo)
     if col_punto and col_punto not in cols_leer:
         cols_leer.append(col_punto)
+    if col_fila and col_fila not in cols_leer:
+        cols_leer.append(col_fila)
+    for columna in columnas_peso_encontradas.values():
+        if columna not in cols_leer:
+            cols_leer.append(columna)
 
     df = df_raw[cols_leer].copy()
     rename: dict[str, str] = {
@@ -392,11 +427,20 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
         rename[col_obstaculo] = "obstaculo"
     if col_punto and col_punto not in rename:
         rename[col_punto] = "punto"
+    if col_fila and col_fila not in rename:
+        rename[col_fila] = "fila"
+    for canonica, original in columnas_peso_encontradas.items():
+        if original not in rename:
+            rename[original] = canonica
     df = df.rename(columns=rename)
     # CSV antiguos usaban Obstaculo como única dimensión para filtrar la
     # fachada. Conservamos ambos nombres sin perder la identidad del obstáculo.
     if col_obstaculo and not col_fachada_clean and "obstaculo" in df.columns:
         df["fachada"] = df["obstaculo"]
+    # CSVs históricos usaban Fila como identificador del punto. Mantener un
+    # alias punto permite seguir simulando, pero sin perder el nivel fila.
+    if "fila" in df.columns and "punto" not in df.columns:
+        df["punto"] = df["fila"]
 
     df = df.dropna(subset=["mes", "dia", "hora"])
 
@@ -472,11 +516,15 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
         # #33
         "fachadas_disponibles": fachadas_disponibles,
         "tiene_fachada_col":    "fachada" in df.columns,
+        "columnas_peso":        columnas_peso_encontradas,
     }
 
     # Retornar df con fachada cuando esté disponible (para filtrado en UI)
     cols_out = ["mes", "dia", "hora", "FS_geometrico", "FS"]
-    for dimension in ("fachada", "punto", "obstaculo"):
+    for dimension in (
+        "fachada", "fila", "punto", "obstaculo",
+        "n_modulos", "area_activa_m2", "potencia_instalada_kw",
+    ):
         if dimension in df.columns and dimension not in cols_out:
             cols_out.append(dimension)
     return df[cols_out].copy(), meta
@@ -490,6 +538,7 @@ def alinear_fs_con_tmy(
     df_fs: pd.DataFrame,
     tmy_index: pd.DatetimeIndex,
     modo: str = "mensual",
+    modo_agregacion: str = "auto",
 ) -> pd.Series:
     """
     Convierte el DataFrame de FS (mes/dia/hora) en una Serie horaria alineada
@@ -520,38 +569,55 @@ def alinear_fs_con_tmy(
             "FS climático o FS combinado no pueden alimentar bypass."
         )
 
-    if modo == "mensual":
-        # Promediar FS por (mes, hora) — replica el patrón a todos los días del mes
-        df_agg = (df_fs.groupby(["mes", "hora"])["FS_geometrico"]
-                  .mean()
-                  .reset_index()
-                  .rename(columns={"FS_geometrico": "FS_mean"}))
+    claves = ["mes", "hora"] if modo == "mensual" else ["mes", "dia", "hora"]
+    identidad = "punto" if "punto" in df_fs.columns else None
+    df_base = df_fs.copy()
+    if identidad:
+        # Un punto puede aparecer en varios días críticos: reducir primero
+        # por punto evita que la cantidad de registros altere su peso.
+        df_punto = (
+            df_base.groupby(claves + [identidad], dropna=False)
+            .agg(FS_geometrico=("FS_geometrico", "mean"))
+            .reset_index()
+        )
+        columnas_peso = [
+            c for c in ("n_modulos", "area_activa_m2", "potencia_instalada_kw")
+            if c in df_base.columns
+        ]
+        if columnas_peso:
+            pesos = df_base[[identidad] + columnas_peso].drop_duplicates(
+                subset=[identidad]
+            )
+            df_punto = df_punto.merge(pesos, on=identidad, how="left")
+        df_agg, auditoria = promedio_fs_por_claves(
+            df_punto, claves, modo=modo_agregacion
+        )
+    else:
+        df_agg, auditoria = promedio_fs_por_claves(
+            df_base, claves, modo=modo_agregacion
+        )
+    df_agg = df_agg.rename(columns={"FS_geometrico": "FS_mean"})
 
+    if modo == "mensual":
         tmy_df = pd.DataFrame({
-            "mes":  tmy_index.month,
+            "mes": tmy_index.month,
             "hora": tmy_index.hour,
         }, index=tmy_index)
-
         merged = tmy_df.merge(df_agg, on=["mes", "hora"], how="left")
     else:
-        # "exacto": solo los timestamps que aparecen en el CSV
-        df_agg = (df_fs.groupby(["mes", "dia", "hora"])["FS_geometrico"]
-                  .mean()
-                  .reset_index()
-                  .rename(columns={"FS_geometrico": "FS_mean"}))
-
         tmy_df = pd.DataFrame({
-            "mes":  tmy_index.month,
-            "dia":  tmy_index.day,
+            "mes": tmy_index.month,
+            "dia": tmy_index.day,
             "hora": tmy_index.hour,
         }, index=tmy_index)
-
         merged = tmy_df.merge(df_agg, on=["mes", "dia", "hora"], how="left")
 
     merged.index = tmy_index
     merged["FS_mean"] = merged["FS_mean"].fillna(0.0)
 
-    return pd.Series(merged["FS_mean"].values, index=tmy_index, name="p_shade")
+    serie = pd.Series(merged["FS_mean"].values, index=tmy_index, name="p_shade")
+    serie.attrs["agregacion_fs"] = auditoria
+    return serie
 
 
 def cobertura_csv(

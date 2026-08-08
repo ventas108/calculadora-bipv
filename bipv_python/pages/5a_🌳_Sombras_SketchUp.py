@@ -117,8 +117,18 @@ st.markdown("---")
 st.subheader("2️⃣ Puntos de análisis (una fila de módulos = un punto)")
 
 _default_pts = pd.DataFrame([
-    {"Punto": "Fila 1", "Fachada": "Principal", "x (m)": 0.0, "y (m)": 0.0, "z (m)": 1.0},
-    {"Punto": "Fila 2", "Fachada": "Principal", "x (m)": 0.0, "y (m)": 3.0, "z (m)": 1.0},
+    {
+        "Punto": "Fila 1", "Fila": "Fila 1", "Fachada": "Principal",
+        "N módulos": 1, "Área activa (m²)": 0.0,
+        "Potencia instalada (kW)": 0.0,
+        "x (m)": 0.0, "y (m)": 0.0, "z (m)": 1.0,
+    },
+    {
+        "Punto": "Fila 2", "Fila": "Fila 2", "Fachada": "Principal",
+        "N módulos": 1, "Área activa (m²)": 0.0,
+        "Potencia instalada (kW)": 0.0,
+        "x (m)": 0.0, "y (m)": 3.0, "z (m)": 1.0,
+    },
 ])
 df_pts = st.data_editor(
     st.session_state.get("sk_puntos_df", _default_pts),
@@ -128,8 +138,9 @@ st.session_state["sk_puntos_df"] = df_pts
 st.caption(
     "Coordenadas en el sistema del modelo (X=Este/rojo, Y=Norte/verde, Z=altura), en metros. "
     "La **Fachada** permite filtrar en la Página 5 (igual que en la Calculadora web). "
-    "⚠️ Importante: la Página 5 PROMEDIA los puntos de cada hora con igual peso — usa un punto "
-    "por fila de módulos y procura que cada fila tenga un número similar de módulos."
+    "Los pesos opcionales **N módulos**, **Área activa** y **Potencia instalada** "
+    "permiten que la Página 5 pondere filas de distinto tamaño. Si se dejan vacíos o "
+    "en cero, el contrato informa y usa promedio simple."
 )
 
 transparencia = st.slider(
@@ -191,6 +202,12 @@ if st.button("▶️ Calcular sombras (ray-casting)", type="primary",
         try:
             puntos.append({
                 "nombre": str(fila["Punto"]), "fachada": str(fila["Fachada"]),
+                "fila": str(fila.get("Fila", fila["Punto"])),
+                "n_modulos": float(fila.get("N módulos", 0) or 0),
+                "area_activa_m2": float(fila.get("Área activa (m²)", 0) or 0),
+                "potencia_instalada_kw": float(
+                    fila.get("Potencia instalada (kW)", 0) or 0
+                ),
                 "x": float(fila["x (m)"]), "y": float(fila["y (m)"]), "z": float(fila["z (m)"]),
             })
         except (ValueError, TypeError):

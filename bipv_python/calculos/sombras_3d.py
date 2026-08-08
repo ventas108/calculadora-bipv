@@ -207,7 +207,7 @@ def calcular_fs_horario(
 
     Retorna DataFrame largo con columnas:
       Mes, Dia, Hora, Altura Solar (deg), Acimut Solar (deg),
-      FS_geometrico, FS, Fachada, Punto
+      FS_geometrico, FS, Fachada, Fila, Punto y pesos espaciales opcionales.
     Una fila por punto × hora con sol. Horas sin sol no se exportan
     (FS irrelevante: no hay irradiancia directa que recortar).
     """
@@ -244,7 +244,11 @@ def calcular_fs_horario(
             "FS_geometrico": np.round(fs_geo, 4),
             "FS": np.round(fs_geo, 4),
             "Fachada": pt.get("fachada") or "Principal",
+            "Fila": pt.get("fila") or pt.get("nombre") or "P1",
             "Punto": pt.get("nombre") or "P1",
+            "N módulos": pt.get("n_modulos", 0.0),
+            "Área activa (m²)": pt.get("area_activa_m2", 0.0),
+            "Potencia instalada (kW)": pt.get("potencia_instalada_kw", 0.0),
         }))
     return pd.concat(filas, ignore_index=True)
 
@@ -269,6 +273,20 @@ def exportar_csv_fs(df_fs: pd.DataFrame) -> bytes:
     las nubes NO deben activar bypass) + Fachada. Convención 0=sin sombra,
     1=sombra total — la nativa del modelo bypass, sin riesgo de FS invertido.
     """
-    cols = ["Mes", "Dia", "Hora", "Altura Solar (deg)", "Acimut Solar (deg)",
-            "FS_geometrico", "FS", "Fachada", "Punto"]
-    return df_fs[cols].to_csv(index=False).encode("utf-8-sig")
+    cols = [
+        "Mes", "Dia", "Hora", "Altura Solar (deg)", "Acimut Solar (deg)",
+        "FS_geometrico", "FS", "Fachada", "Fila", "Punto",
+        "N módulos", "Área activa (m²)", "Potencia instalada (kW)",
+    ]
+    salida = df_fs.copy()
+    # Compatibilidad con resultados generados antes del contrato espacial.
+    defaults = {
+        "Fila": salida["Punto"] if "Punto" in salida.columns else "P1",
+        "N módulos": 1.0,
+        "Área activa (m²)": 0.0,
+        "Potencia instalada (kW)": 0.0,
+    }
+    for columna, valor in defaults.items():
+        if columna not in salida.columns:
+            salida[columna] = valor
+    return salida[cols].to_csv(index=False).encode("utf-8-sig")
