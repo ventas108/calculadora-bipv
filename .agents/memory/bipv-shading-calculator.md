@@ -35,3 +35,20 @@ Columnas: `Evento, Mes, Dia, Hora, Altura Solar (deg), Acimut Solar (deg), Obsta
 **Why:** Evita reimplementar la geometría de sombras 3D en la calculadora Streamlit — reutiliza el cálculo ya certificado de la herramienta de sombreado existente.
 
 **How to apply:** En Página 5 (Mismatch), añadir uploader del CSV. Parsear con pandas, indexar por timestamp (Mes+Dia+Hora → alinear con TMY). Guardar como `st.session_state["df_fs_por_fila"]`.
+
+## Dirección de producto acordada (agosto de 2026)
+
+La calculadora web de sombreado se convertirá en el **“Módulo de diagnóstico solar y
+optimización económica para proyectos BIPV”**: debe decidir qué alternativa reduce
+demostrablemente la pérdida solar, no calcular CAPEX, OPEX, TIR, VPN, payback ni precios.
+
+**Regla:** la palabra “económica” significa optimización de energía perdida/recuperada y
+apoyo a una decisión de diseño; la conversión a COP y rentabilidad ocurre únicamente en
+la Calculadora BIPV — Colombia, después de importar el escenario elegido.
+
+**Por qué:** los cálculos financieros aislados del módulo no tienen suficientes datos ni
+rigor; mantenerlos daría una apariencia de precisión y debilitaría la confianza comercial.
+
+**Cómo aplicar:** priorizar rigor solar, escenarios actual vs. alternativas, pérdida
+geométrica separada de nubosidad, informe técnico reproducible, integración autorizada
+con BIPV y una auditoría de pruebas mínimas antes de anunciar la nueva versión.
