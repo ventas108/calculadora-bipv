@@ -24,6 +24,8 @@ from datos.ciudades_colombia import CIUDADES
 from calculos.tz_utils import utc_offset_latam, tz_label
 from datos.tecnologias_bipv import MODULOS_BIPV
 from calculos.escenarios_fase4 import (
+    BASE_COMPONENTS,
+    capturar_base_comparacion,
     construir_definicion_escenarios,
     validar_definicion_escenarios,
 )
@@ -82,16 +84,19 @@ else:
     )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# FASE 4.1 — DEFINICIÓN DE ESCENARIOS
+# FASE 4.2 — BASE ÚNICA DE COMPARACIÓN
 # ═══════════════════════════════════════════════════════════════════════════════
 st.markdown("---")
-st.subheader("🧩 Fase 4.1 — Definición de escenarios")
+st.subheader("🔒 Fase 2 — Base única de comparación")
 st.caption(
-    "Primero se fija la base de comparación. Esta etapa no calcula recuperación "
-    "ni modifica el sombreado; solo deja trazables los escenarios."
+    "Todos los escenarios deben reutilizar exactamente la misma ubicación, TMY, "
+    "horas UTC, fachadas/puntos, panel, configuración eléctrica, temperatura, "
+    "modelo óptico y reglas de agregación."
 )
 
 _fase4_actual = st.session_state.get("escenarios_fase4", {})
+_base_live_f4 = capturar_base_comparacion(st.session_state)
+_base_guardada_f4 = _fase4_actual.get("base_comparacion")
 _fase4_nombre_default = (
     _fase4_actual.get("nombre_proyecto")
     or st.session_state.get("nombre_proyecto")
@@ -159,7 +164,7 @@ with st.container(border=True):
     )
 
     if st.button(
-        "💾 Guardar definición de escenarios",
+        "💾 Guardar definición y congelar base",
         type="primary",
         key="fase4_guardar_definicion",
     ):
@@ -173,13 +178,22 @@ with st.container(border=True):
                 inversor_nombre=st.session_state.get("inversor_nombre_dim"),
             )
             _definicion_fase4["fuentes_disponibles"] = _fuentes_disponibles
+            _definicion_fase4["base_comparacion"] = _base_live_f4
             validar_definicion_escenarios(_definicion_fase4)
             st.session_state["escenarios_fase4"] = _definicion_fase4
             st.session_state["fase4_definicion_ok"] = True
-            st.success(
-                "✅ Definición guardada: referencia, situación actual y "
-                "alternativa optimizada."
-            )
+            if _base_live_f4["lista_para_comparar"]:
+                st.session_state["fase4_base_comparacion_ok"] = True
+                st.success(
+                    "✅ Definición guardada y base única congelada. "
+                    f"ID: `{_base_live_f4['base_id'][:12]}`"
+                )
+            else:
+                st.session_state["fase4_base_comparacion_ok"] = False
+                st.warning(
+                    "⚠️ Definición guardada como borrador. La comparación queda "
+                    "bloqueada hasta completar la base única."
+                )
         except ValueError as _e_fase4:
             st.error(f"❌ No se pudo guardar la definición: {_e_fase4}")
 
@@ -206,8 +220,57 @@ if _definicion_fase4:
     )
     st.caption(
         "🔒 Invariantes: misma ubicación, TMY, timestamps UTC, fachadas/puntos, "
-        "panel, inversor y configuración eléctrica."
+        "panel, inversor, configuración eléctrica, temperatura, modelo óptico "
+        "y agregación."
     )
+
+_base_guardada_f4 = _definicion_fase4.get("base_comparacion") if _definicion_fase4 else None
+if _base_guardada_f4:
+    _base_cambio_f4 = (
+        _base_guardada_f4.get("base_id") != _base_live_f4.get("base_id")
+    )
+    if _base_cambio_f4:
+        st.error(
+            "🚫 La base única cambió desde que fue congelada. No compares estos "
+            "escenarios hasta volver a guardarla."
+        )
+        st.session_state["fase4_base_comparacion_ok"] = False
+    elif _base_guardada_f4.get("lista_para_comparar") is True:
+        st.success(
+            f"✅ Base única lista para comparar · ID `{_base_guardada_f4['base_id'][:12]}`"
+        )
+        _component_labels_f4 = {
+            "ubicacion": "Ubicación",
+            "tmy": "TMY",
+            "timestamps_utc": "Timestamps UTC",
+            "poa_base": "POA base",
+            "fachadas_y_puntos": "Fachadas y puntos",
+            "panel": "Panel",
+            "configuracion_electrica": "Configuración eléctrica",
+            "temperatura_y_modelo_optico": "Temperatura y modelo óptico",
+            "agregacion": "Agregación mensual/anual",
+        }
+        with st.expander("Ver componentes congelados de la base", expanded=False):
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {
+                            "Componente": _component_labels_f4[key],
+                            "Estado": "✅ Igual para todos los escenarios",
+                            "Huella": value["huella"][:16],
+                        }
+                        for key, value in _base_guardada_f4["componentes"].items()
+                        if key in BASE_COMPONENTS
+                    ]
+                ),
+                hide_index=True,
+                use_container_width=True,
+            )
+    else:
+        st.warning(
+            "⚠️ Base guardada como borrador. Faltan: "
+            + "; ".join(_base_guardada_f4.get("faltantes", []))
+        )
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 1 — SOMBREADO DE HORIZONTE
