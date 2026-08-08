@@ -243,3 +243,12 @@ FS_geometrico
 ```
 
 La fuente oficial futura será Python, pero la equivalencia se demostrará comparando primero las rutas TypeScript actuales y la ruta Python existente de BIPV.
+
+La implementación de esa primera frontera está en:
+
+- `docs/contratos/shading-engine-contract.v1.json`
+- `shared/shading-engine-contract.ts`
+- `bipv_python/calculos/contrato_sombreado.py`
+- `docs/fixtures/sombreado-referencia.json`
+
+La ruta de ray-casting Python conserva además `timestamp_utc` en su salida interna.

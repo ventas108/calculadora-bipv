@@ -1,0 +1,131 @@
+"""Regresión determinista del contrato del motor oficial de sombreado."""
+import json
+import os
+import sys
+
+import pandas as pd
+import pytest
+import trimesh
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from calculos.contrato_sombreado import (  # noqa: E402
+    CONTRACT_VERSION,
+    resultado_a_contrato,
+    validar_resultado,
+    validar_solicitud,
+)
+from calculos.sombras_3d import posiciones_solares  # noqa: E402
+from calculos.sombras_3d import calcular_fs_horario, vector_al_sol  # noqa: E402
+
+
+ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
+
+
+def _fixture():
+    with open(
+        os.path.join(ROOT, "docs", "fixtures", "sombreado-referencia.json"),
+        encoding="utf-8",
+    ) as fh:
+        return json.load(fh)
+
+
+def test_pvlib_reproduce_la_referencia_solar():
+    fixture = _fixture()
+    timestamps = pd.DatetimeIndex(
+        [case["timestamp_utc"] for case in fixture["solar_position_cases"]]
+    )
+    solar = posiciones_solares(
+        fixture["location"]["latitude"],
+        fixture["location"]["longitude"],
+        timestamps,
+    )
+
+    for index, case in enumerate(fixture["solar_position_cases"]):
+        assert abs(
+            solar.iloc[index]["elevacion"] - case["expected_altitude_deg"]
+        ) < case["tolerance_deg"]
+        assert abs(
+            solar.iloc[index]["acimut"] - case["expected_azimuth_deg"]
+        ) < case["tolerance_deg"]
+
+
+def test_solicitud_requiere_timestamps_utc_y_puntos_unicos():
+    base = {
+        "contract_version": CONTRACT_VERSION,
+        "location": {
+            "latitude": 6.25,
+            "longitude": -75.56,
+            "timezone": -5,
+            "elevation_m": 1495,
+        },
+        "timestamps_utc": ["2024-03-20T17:00:00Z"],
+        "points": [{
+            "id": "P1",
+            "facade": "Sur",
+            "x_m": 0,
+            "y_m": 0,
+            "z_m": 2,
+        }],
+    }
+    validar_solicitud(base)
+    with pytest.raises(ValueError, match="zona horaria"):
+        validar_solicitud({**base, "timestamps_utc": ["2024-03-20T12:00:00"]})
+    with pytest.raises(ValueError, match="repetido"):
+        validar_solicitud({
+            **base,
+            "points": [base["points"][0], base["points"][0]],
+        })
+
+
+def test_resultado_solo_expone_fs_geometrico_como_fs_oficial():
+    frame = pd.DataFrame([{
+        "timestamp_utc": "2024-03-20T17:00:00Z",
+        "Mes": 3,
+        "Dia": 20,
+        "Hora": 17,
+        "Altura Solar (deg)": 83.53,
+        "Acimut Solar (deg)": 158.45,
+        "FS_geometrico": 1.0,
+        "Fachada": "Sur",
+        "Punto": "P1",
+    }])
+    payload = resultado_a_contrato(frame)
+    validar_resultado(payload)
+    assert payload["contract_version"] == CONTRACT_VERSION
+    assert payload["engine"] == "python"
+    assert payload["results"][0]["fs"] == 1.0
+    assert payload["results"][0]["fs_climatico"] is None
+    assert payload["results"][0]["fs_combinado"] is None
+
+    invalid = {
+        **payload,
+        "results": [{**payload["results"][0], "fs_climatico": 0.5}],
+    }
+    with pytest.raises(ValueError, match="no permite"):
+        validar_resultado(invalid)
+
+
+def test_ray_casting_real_produce_sombra_geometrica_determinista():
+    """Un obstáculo colocado sobre el vector solar debe producir FS=1."""
+    timestamp = pd.DatetimeIndex(["2024-03-20T17:00:00Z"])
+    solar = posiciones_solares(6.25, -75.56, timestamp)
+    direction = vector_al_sol(
+        solar.iloc[0]["elevacion"],
+        solar.iloc[0]["acimut"],
+    )
+
+    # El centro del cubo queda sobre el rayo que parte del punto P1.
+    obstacle = trimesh.creation.box(extents=[1.0, 1.0, 1.0])
+    obstacle.apply_translation(direction * 3.0)
+    rows = calcular_fs_horario(
+        obstacle,
+        [{"nombre": "P1", "fachada": "Sur", "x": 0.0, "y": 0.0, "z": 0.0}],
+        6.25,
+        -75.56,
+        timestamp,
+    )
+
+    assert len(rows) == 1
+    assert rows.iloc[0]["FS_geometrico"] == 1.0
+    assert rows.iloc[0]["FS"] == rows.iloc[0]["FS_geometrico"]

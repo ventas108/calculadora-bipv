@@ -232,6 +232,10 @@ def calcular_fs_horario(
                                         ray_directions=dirs)     # (H,) bool
         fs_geo = np.where(hits, fs_choque, 0.0)
         filas.append(pd.DataFrame({
+            "timestamp_utc": [
+                pd.Timestamp(ts).tz_convert("UTC").isoformat().replace("+00:00", "Z")
+                for ts in con_sol.index
+            ],
             "Mes": con_sol["mes"].to_numpy(),
             "Dia": con_sol["dia"].to_numpy(),
             "Hora": con_sol["hora"].to_numpy(),

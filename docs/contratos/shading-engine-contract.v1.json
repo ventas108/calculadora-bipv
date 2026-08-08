@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bipv.innovacionquimica.com.co/contracts/shading-engine/v1",
+  "title": "BIPV official shading engine contract",
+  "description": "Boundary between the React preview and the official Python solar engine.",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "engine",
+    "authority",
+    "conventions",
+    "results"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "bipv.shading.v1"
+    },
+    "engine": {
+      "const": "python"
+    },
+    "authority": {
+      "const": "official_solar_engine"
+    },
+    "conventions": {
+      "type": "object",
+      "required": [
+        "timestamp",
+        "azimuth",
+        "coordinates",
+        "fs_geometrico"
+      ],
+      "properties": {
+        "timestamp": {
+          "const": "UTC"
+        },
+        "azimuth": {
+          "const": "north_clockwise"
+        },
+        "coordinates": {
+          "const": "x_east_y_north_z_up_m"
+        },
+        "fs_geometrico": {
+          "const": "0_no_geometric_shadow_1_total_geometric_shadow"
+        }
+      },
+      "additionalProperties": false
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "timestamp_utc",
+          "month",
+          "day",
+          "hour_utc",
+          "solar_altitude_deg",
+          "solar_azimuth_deg",
+          "point_id",
+          "facade",
+          "fs_geometrico",
+          "fs_climatico",
+          "fs_combinado",
+          "fs"
+        ],
+        "properties": {
+          "timestamp_utc": { "type": "string", "format": "date-time" },
+          "month": { "type": "integer", "minimum": 1, "maximum": 12 },
+          "day": { "type": "integer", "minimum": 1, "maximum": 31 },
+          "hour_utc": { "type": "integer", "minimum": 0, "maximum": 23 },
+          "solar_altitude_deg": { "type": "number" },
+          "solar_azimuth_deg": { "type": "number" },
+          "point_id": { "type": "string", "minLength": 1 },
+          "facade": { "type": "string", "minLength": 1 },
+          "fs_geometrico": { "type": "number", "minimum": 0, "maximum": 1 },
+          "fs_climatico": { "type": ["null"] },
+          "fs_combinado": { "type": ["null"] },
+          "fs": { "type": "number", "minimum": 0, "maximum": 1 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
