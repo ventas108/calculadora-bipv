@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Calculadora BIPV Colombia"
+description = "Aplicación web desplegable para evaluar proyectos BIPV en Colombia, visualizar el estado del motor solar y conectar la interfaz React con el API oficial del proyecto."
+version = "1.0.0"
+id = "artifacts/bipv-calculadora"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 26225
+
+[services.development]
+run = "pnpm --filter @workspace/bipv-calculadora run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/bipv-calculadora", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/bipv-calculadora/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26225"
+BASE_PATH = "/"
