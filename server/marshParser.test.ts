@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 // We test the parser logic by importing from the client lib
 // Since these are pure functions, they work in any JS environment
@@ -117,7 +119,7 @@ describe('Andrew Marsh Site Designer Parser', () => {
       const summary = getMarshFileSummary(sampleMarshJSON);
       expect(summary.solidBlockCount).toBe(2);
       expect(summary.gridCount).toBe(1);
-      expect(summary.units).toBe('milímetros');
+      expect(summary.units).toBe('SI (m)');
       expect(summary.location).toContain('6.3356');
       expect(summary.location).toContain('-75.5502');
     });
@@ -240,8 +242,13 @@ describe('Andrew Marsh Site Designer Parser', () => {
       };
       const result = parseMarshSiteDesigner(noGrid);
       expect(result.analysisGrids.length).toBe(0);
-      // Should fallback to centroid of blocks
+      // Without a grid, use the model origin instead of a block centroid.
       expect(result.observationPoint).toBeDefined();
+      expect(result.observationPointSource).toBe('origin_fallback');
+      expect(result.observationPoint.x).toBe(0);
+      expect(result.observationPoint.y).toBe(0);
+      expect(result.observationPoint.z).toBe(1.5);
+      expect(result.observationPointWarning).toContain('No se encontró una grilla');
     });
 
     it('should preserve location data', () => {
@@ -250,5 +257,34 @@ describe('Andrew Marsh Site Designer Parser', () => {
       expect(result.location.longitude).toBe(-75.5502);
       expect(result.location.timezone).toBe(-5);
     });
+  });
+
+  it('lee el Site Designer real de Bogotá y conserva el árbol, elevación y norte', () => {
+    const fixture = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'attached_assets/site-designer-2026-07-14-1606-10_1786198985402.json'), 'utf8'),
+    ) as MarshSiteDesignerJSON;
+
+    expect(validateMarshJSON(fixture)).toBe(true);
+    const result = parseMarshSiteDesigner(fixture);
+
+    expect(result.location).toMatchObject({
+      latitude: 4.702,
+      longitude: -74.147,
+      timezone: -5,
+      northOffset: 7,
+      elevation: 2548.4,
+    });
+    expect(result.unitScale).toBe(0.001);
+    expect(result.analysisGrids).toHaveLength(0);
+    expect(result.observationPointSource).toBe('origin_fallback');
+    expect(result.solidBlocks).toHaveLength(1);
+    expect(result.solidBlocks[0].isTree).toBe(true);
+    expect(result.solidBlocks[0].blockSubclass).toBe('TreeBlock');
+    expect(result.solidBlocks[0].dimensions.width).toBeCloseTo(4.2, 10);
+    expect(result.solidBlocks[0].dimensions.height).toBeCloseTo(3.2, 10);
+    expect(result.solidBlocks[0].dimensions.depth).toBeCloseTo(10, 10);
+    expect(result.obstacles).toHaveLength(1);
+    expect(result.obstacles[0].name).toContain('Árbol');
+    expect(result.obstacles[0].vertices.length).toBeGreaterThanOrEqual(3);
   });
 });

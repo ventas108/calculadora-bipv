@@ -1,0 +1,129 @@
+{
+    "Location": {
+        "latitude": 4.702,
+        "longitude": -74.147,
+        "timezone": -5,
+        "northOffset": 7,
+        "elevation": 2548.4
+    },
+    "DateTime": {
+        "clockTime": 10.5,
+        "dayOfMonth": 9,
+        "monthOfYear": 7,
+        "year": 2026
+    },
+    "Grid": {
+        "useCaching": true,
+        "interactive": true,
+        "legendScale": 100,
+        "designTarget": 5,
+        "contourCount": 20,
+        "showGridColors": false,
+        "showGridLines": true,
+        "showPoints": true,
+        "showValues": false,
+        "showSmooth": true,
+        "show3DGrid": true,
+        "showContourLines": false,
+        "showContourBands": false,
+        "showTargetArea": false,
+        "defaultCellSize": 2000,
+        "opacity": 0.75
+    },
+    "SunPath": {
+        "showSunPos": true,
+        "showSunDirection": true,
+        "showSunAngles": false,
+        "showSunPath": true,
+        "showAnnualArea": true,
+        "showAnnualLines": true,
+        "showShading": true,
+        "showAxis": true,
+        "showIn3D": true,
+        "radius": 0.6,
+        "center": [
+            0,
+            0,
+            50
+        ]
+    },
+    "Shading": {
+        "subsample": true,
+        "showObstructionColor": false,
+        "showRays": false,
+        "jittered": true,
+        "interactive": true,
+        "outputType": 0,
+        "skyType": 17,
+        "subdivisionAngle": 3,
+        "subdivisionVisible": false,
+        "subdivisionType": 1,
+        "projectionType": 1,
+        "chartVisible": true
+    },
+    "Blocks": [
+        {
+            "min": [
+                900,
+                200,
+                0
+            ],
+            "max": [
+                5100,
+                3400,
+                10000
+            ],
+            "color": [
+                0.15027917572618232,
+                0.9744513566986605,
+                0,
+                1
+            ],
+            "majorAxis": 0,
+            "fixedSize": 0,
+            "isSolid": true,
+            "group": 0,
+            "isTree": true,
+            "blockSubclass": "TreeBlock",
+            "trunkHeight": 0.3646884620791428,
+            "trunkRadius": 0.051345881193266454
+        }
+    ],
+    "Display": {
+        "surfaceOpacity": 0.8,
+        "outlineOpacity": 0.75,
+        "surfaceShininess": 75,
+        "ambientFactor": 0.85
+    },
+    "Model": {
+        "units": 1,
+        "shadowsShow": true,
+        "shadowsShowDiffuse": true,
+        "surfaceGridShow": false,
+        "blocksMergeOverlapping": true,
+        "dimensionsShow": true,
+        "dimensionSize": 0.65,
+        "snapActive": true,
+        "snapAlignBounds": true,
+        "snapAlignCenter": false,
+        "snapAlignGrid": true,
+        "snapToAdjacent": true,
+        "snapToSelected": true,
+        "snapToAll": false,
+        "snapGrid": 500
+    },
+    "Animation": {
+        "animateTime": true,
+        "animateDate": true,
+        "animateLatitude": false,
+        "animateLongitude": false,
+        "daylightOnly": true,
+        "speed": 12.5
+    },
+    "Slider": {
+        "show": true,
+        "wrap": false,
+        "detail": false,
+        "index": 3
+    }
+}

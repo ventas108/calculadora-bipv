@@ -23,6 +23,7 @@ export interface MarshLocation {
   longitude: number;
   timezone: number;
   northOffset: number; // degrees, clockwise rotation of north from Y-axis
+  elevation?: number;
 }
 
 export interface MarshBlock {
@@ -33,6 +34,8 @@ export interface MarshBlock {
   fixedSize: number;
   isSolid: boolean;
   group: number;
+  isTree?: boolean;
+  blockSubclass?: string;
   isGrid?: boolean;
   isPlanar?: boolean;
   hidden?: boolean;
@@ -51,7 +54,12 @@ export interface MarshBlock {
 }
 
 export interface MarshModel {
-  units: number; // 0=m, 1=cm, 2=mm, 3=ft, 4=in
+  /**
+   * Andrew Marsh display unit code:
+   * 0=default, 1=metric millimetres, 2=metric SI, 3=imperial.
+   * Geometry coordinates remain millimetres in the exported model.
+   */
+  units: number;
 }
 
 export interface MarshSiteDesignerJSON {
@@ -79,6 +87,8 @@ export interface MarshParseResult {
   solidBlocks: MarshSolidBlock[];
   analysisGrids: MarshAnalysisGrid[];
   observationPoint: { x: number; y: number; z: number }; // in meters
+  observationPointSource: 'custom' | 'analysis_grid' | 'origin_fallback';
+  observationPointWarning?: string;
   unitScale: number; // multiplier to convert file units to meters
   obstacles: ObstaclePolygon[];
 }
@@ -89,6 +99,8 @@ export interface MarshSolidBlock {
   max: { x: number; y: number; z: number }; // in meters
   color: string; // hex color
   dimensions: { width: number; height: number; depth: number }; // in meters
+  isTree: boolean;
+  blockSubclass?: string;
 }
 
 export interface MarshAnalysisGrid {
@@ -103,14 +115,10 @@ export interface MarshAnalysisGrid {
 // ── Unit conversion ────────────────────────────────────────────────────
 
 function getUnitScale(units: number): number {
-  switch (units) {
-    case 0: return 1;       // meters
-    case 1: return 0.01;    // cm → m
-    case 2: return 0.001;   // mm → m
-    case 3: return 0.3048;  // ft → m
-    case 4: return 0.0254;  // in → m
-    default: return 0.001;  // default mm
-  }
+  // Site Designer stores block coordinates in millimetres. Model.units
+  // controls display formatting (1=mm, 2=SI display, 3=imperial), not the
+  // coordinate unit. Code 0 is the default and is also millimetre geometry.
+  return 0.001;
 }
 
 // ── Color conversion ───────────────────────────────────────────────────
@@ -332,13 +340,26 @@ export function validateMarshJSON(data: unknown): data is MarshSiteDesignerJSON 
   // Must have Location with lat/lon
   if (!obj.Location || typeof obj.Location !== 'object') return false;
   const loc = obj.Location as Record<string, unknown>;
-  if (typeof loc.latitude !== 'number' || typeof loc.longitude !== 'number') return false;
+  if (
+    typeof loc.latitude !== 'number' ||
+    typeof loc.longitude !== 'number' ||
+    !Number.isFinite(loc.latitude) ||
+    !Number.isFinite(loc.longitude) ||
+    loc.latitude < -90 ||
+    loc.latitude > 90 ||
+    loc.longitude < -180 ||
+    loc.longitude > 180
+  ) return false;
 
   // Must have Blocks array
   if (!Array.isArray(obj.Blocks)) return false;
 
   // Must have Model with units
   if (!obj.Model || typeof obj.Model !== 'object') return false;
+  const model = obj.Model as Record<string, unknown>;
+  if (typeof model.units !== 'number' || !Number.isInteger(model.units) || model.units < 0 || model.units > 3) {
+    return false;
+  }
 
   return true;
 }
@@ -358,7 +379,7 @@ export function parseMarshSiteDesigner(
   customObserverPoint?: { x: number; y: number; z: number }
 ): MarshParseResult {
   const unitScale = getUnitScale(json.Model.units);
-  const northOffset = json.Location.northOffset || 0;
+  const northOffset = json.Location.northOffset ?? 0;
 
   // ── Separate solid blocks from analysis grids ──────────────────────
   const solidBlocks: MarshSolidBlock[] = [];
@@ -402,12 +423,16 @@ export function parseMarshSiteDesigner(
           height: Math.abs(maxM.y - minM.y),
           depth: Math.abs(maxM.z - minM.z),
         },
+        isTree: block.isTree === true || block.blockSubclass === 'TreeBlock',
+        blockSubclass: block.blockSubclass,
       });
     }
   });
 
   // ── Determine observation point ────────────────────────────────────
   let observationPoint: Point3D;
+  let observationPointSource: MarshParseResult['observationPointSource'];
+  let observationPointWarning: string | undefined;
 
   if (customObserverPoint) {
     observationPoint = {
@@ -415,19 +440,20 @@ export function parseMarshSiteDesigner(
       y: customObserverPoint.y * unitScale,
       z: customObserverPoint.z * unitScale,
     };
+    observationPointSource = 'custom';
   } else if (analysisGrids.length > 0) {
     // Use the center of the first (primary) analysis grid
     const grid = analysisGrids[0];
     observationPoint = { ...grid.center };
+    observationPointSource = 'analysis_grid';
   } else {
-    // Fallback: centroid of all solid blocks at ground level
-    if (solidBlocks.length > 0) {
-      const cx = solidBlocks.reduce((s, b) => s + (b.min.x + b.max.x) / 2, 0) / solidBlocks.length;
-      const cy = solidBlocks.reduce((s, b) => s + (b.min.y + b.max.y) / 2, 0) / solidBlocks.length;
-      observationPoint = { x: cx, y: cy, z: 1.5 }; // 1.5m eye height
-    } else {
-      observationPoint = { x: 0, y: 0, z: 1.5 };
-    }
+    // Without an analysis grid, Site Designer's model origin is the least
+    // assumptive target location. The previous block-centroid fallback could
+    // place the observer inside the only obstruction and create a false mask.
+    observationPoint = { x: 0, y: 0, z: 1.5 };
+    observationPointSource = 'origin_fallback';
+    observationPointWarning =
+      'No se encontró una grilla de análisis. Se usa el origen del modelo a 1,5 m; confirma que el origen sea el punto de observación antes de usar la máscara.';
   }
 
   // ── Convert each solid block to an angular obstacle polygon ────────
@@ -458,11 +484,11 @@ export function parseMarshSiteDesigner(
     // Determine a descriptive name based on block dimensions
     const maxDim = Math.max(block.dimensions.width, block.dimensions.height, block.dimensions.depth);
     const blockHeight = block.dimensions.depth; // Z is vertical
-    let blockType = 'Obstáculo';
-    if (blockHeight > 20) blockType = 'Edificio alto';
-    else if (blockHeight > 8) blockType = 'Edificio';
-    else if (blockHeight > 3) blockType = 'Estructura';
-    else blockType = 'Muro';
+    let blockType = block.isTree ? 'Árbol' : 'Obstáculo';
+    if (!block.isTree && blockHeight > 20) blockType = 'Edificio alto';
+    else if (!block.isTree && blockHeight > 8) blockType = 'Edificio';
+    else if (!block.isTree && blockHeight > 3) blockType = 'Estructura';
+    else if (!block.isTree) blockType = 'Muro';
 
     const distToObserver = Math.sqrt(
       Math.pow((block.min.x + block.max.x) / 2 - observationPoint.x, 2) +
@@ -486,6 +512,8 @@ export function parseMarshSiteDesigner(
     solidBlocks,
     analysisGrids,
     observationPoint,
+    observationPointSource,
+    observationPointWarning,
     unitScale,
     obstacles,
   };
@@ -501,11 +529,10 @@ export function getMarshFileSummary(json: MarshSiteDesignerJSON): {
   units: string;
 } {
   const unitNames: Record<number, string> = {
-    0: 'metros',
-    1: 'centímetros',
-    2: 'milímetros',
-    3: 'pies',
-    4: 'pulgadas',
+    0: 'predeterminadas (mm)',
+    1: 'milímetros',
+    2: 'SI (m)',
+    3: 'imperial',
   };
 
   let solidCount = 0;

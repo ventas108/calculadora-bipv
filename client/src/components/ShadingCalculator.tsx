@@ -995,7 +995,10 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
         }
 
         setMarshPreview(result);
-        toast.info(`Archivo cargado: ${result.solidBlocks.length} bloques sólidos detectados. Revisa la previsualización y confirma la importación.`);
+        toast.info(
+          `Archivo cargado: ${result.solidBlocks.length} bloque(s) sólido(s) detectado(s). ` +
+          (result.observationPointWarning ? 'Revisa el punto de observación antes de confirmar.' : 'Revisa la previsualización y confirma la importación.')
+        );
       } catch (error) {
         toast.error('Error al leer el archivo JSON de Andrew Marsh');
         console.error(error);
@@ -1011,6 +1014,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
 
   const confirmMarshImport = () => {
     if (!marshPreview) return;
+    setObjNorthOffset(marshPreview.location.northOffset ?? 0);
     setObstacles(prev => [...prev, ...marshPreview.obstacles]);
     
     // Extraer vértices 3D de los bloques sólidos para recalcular desde otro punto de observación
@@ -1536,6 +1540,12 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                 </p>
               </div>
               <div className="bg-indigo-50 rounded-lg p-3">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wide">Elevación / Norte</p>
+                <p className="text-sm font-mono font-semibold text-indigo-800">
+                  {marshPreview.location.elevation?.toFixed(1) ?? '—'}m · {marshPreview.location.northOffset.toFixed(1)}°
+                </p>
+              </div>
+              <div className="bg-indigo-50 rounded-lg p-3">
                 <p className="text-[10px] text-gray-500 uppercase tracking-wide">Bloques Sólidos</p>
                 <p className="text-sm font-mono font-semibold text-indigo-800">{marshPreview.solidBlocks.length}</p>
               </div>
@@ -1546,6 +1556,11 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                 </p>
               </div>
             </div>
+            {marshPreview.observationPointWarning && (
+              <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-3">
+                <strong>Advertencia de punto de observación:</strong> {marshPreview.observationPointWarning}
+              </div>
+            )}
 
             {/* Blocks table */}
             <div className="overflow-x-auto border border-gray-200 rounded-lg">
@@ -1571,7 +1586,9 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                     return (
                       <tr key={obs.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="px-3 py-2 font-mono">{idx + 1}</td>
-                        <td className="px-3 py-2 font-medium">{obs.name}</td>
+                        <td className="px-3 py-2 font-medium">
+                          {block?.isTree ? '🌳 ' : ''}{obs.name}
+                        </td>
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-1">
                             <span
