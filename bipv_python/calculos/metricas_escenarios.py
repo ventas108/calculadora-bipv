@@ -15,6 +15,10 @@ import numpy as np
 import pandas as pd
 
 from calculos.agregacion_fs import promedio_fs_por_claves, resolver_peso
+from calculos.criticos_solares import (
+    calcular_horas_meses_criticos,
+    normalizar_configuracion_criticos,
+)
 
 
 MESES_ES = {
@@ -183,10 +187,16 @@ def metricas_solares(
     df_fs: pd.DataFrame | None = None,
     modo_fs: str = "mensual",
     modo_agregacion_fs: str = "auto",
+    configuracion_criticos: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Construye el grupo de métricas solares sin inferir energía AC."""
+    """Construye el grupo de métricas solares sin inferir energía AC.
+
+    ``horas_criticas`` y ``meses_criticos`` son diagnóstico independiente:
+    nunca filtran ni modifican la serie usada para producción.
+    """
     poa_bruta = _float_or_none(poa_bruta_kWh_m2)
     poa_efectiva = _float_or_none(poa_efectiva_kWh_m2)
+    config_criticos = normalizar_configuracion_criticos(configuracion_criticos)
     fs = _serie_numerica(
         fs_horario,
         tmy_index if tmy_index is not None else pd.RangeIndex(0),
@@ -196,6 +206,11 @@ def metricas_solares(
         poa = pd.to_numeric(poa_horaria, errors="coerce").fillna(0.0)
         perdida_solar = float((poa.clip(lower=0) * fs).sum() / 1000.0)
         horas_sombra = int((fs > 0).sum())
+        criticos = calcular_horas_meses_criticos(
+            poa,
+            fs,
+            configuracion=config_criticos,
+        )
         df_mes = pd.DataFrame(
             {
                 "mes": tmy_index.month,
@@ -215,11 +230,9 @@ def metricas_solares(
         )
         mensual["mes_nombre"] = mensual["mes"].map(MESES_ES)
         mensual["poa_perdida_kWh_m2"] = mensual["poa_perdida_kWh_m2"].round(2)
-        meses_criticos = (
-            mensual.sort_values("poa_perdida_kWh_m2", ascending=False)
-            .head(3)["mes_nombre"]
-            .tolist()
-        )
+        meses_criticos = [
+            item["mes_nombre"] for item in criticos["meses_criticos"]
+        ]
         fs_ponderado_pct = (
             perdida_solar / (float(poa.clip(lower=0).sum()) / 1000.0) * 100.0
             if poa.clip(lower=0).sum() > 0
@@ -235,6 +248,22 @@ def metricas_solares(
         ) * 100.0
         mensual = pd.DataFrame()
         meses_criticos = []
+        criticos = {
+            "configuracion": config_criticos,
+            "criterio_hora": (
+                "POA >= irradiancia_minima_wm2 y "
+                "FS_geometrico > fs_minimo"
+            ),
+            "criterio_mes": (
+                "orden descendente por suma mensual de "
+                "poa_perdida_kWh_m2"
+            ),
+            "horas_sombreadas": horas_sombra,
+            "horas_candidatas": 0,
+            "horas_criticas": [],
+            "meses_criticos": [],
+            "mes_critico": None,
+        }
 
     perdida_poa_total = (
         max(poa_bruta - poa_efectiva, 0.0)
@@ -294,9 +323,20 @@ def metricas_solares(
         "perdida_poa_solar_kWh_m2": (
             round(perdida_poa_total, 2) if perdida_poa_total is not None else None
         ),
+        "perdida_sombreado_poa_kWh_m2": (
+            round(perdida_solar, 6) if perdida_solar is not None else None
+        ),
         "fs_geometrico_ponderado_pct": round(fs_ponderado_pct, 2),
         "horas_con_sombra": horas_sombra,
         "meses_criticos": meses_criticos,
+        "horas_criticas": criticos["horas_criticas"],
+        "horas_criticas_n": len(criticos["horas_criticas"]),
+        "horas_candidatas_criticas": criticos["horas_candidatas"],
+        "meses_criticos_detalle": criticos["meses_criticos"],
+        "mes_critico": criticos["mes_critico"],
+        "configuracion_criticos": criticos["configuracion"],
+        "criterio_hora_critica": criticos["criterio_hora"],
+        "criterio_mes_critico": criticos["criterio_mes"],
         "por_fachada": por_fachada,
         "por_fila": por_fila,
         "por_punto": por_punto,

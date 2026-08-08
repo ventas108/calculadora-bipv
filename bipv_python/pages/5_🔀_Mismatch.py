@@ -315,6 +315,55 @@ _modo_agregacion_fs = st.selectbox(
     ),
 )
 
+with st.expander("⚙️ Configuración de horas y meses críticos", expanded=False):
+    st.caption(
+        "El diagnóstico no cambia la producción anual. Una hora solo es crítica "
+        "si tiene POA suficiente y una pérdida geométrica mínima; los meses se "
+        "ordenan por POA perdida acumulada."
+    )
+    _cc1, _cc2, _cc3, _cc4 = st.columns(4)
+    _crit_poa_min = _cc1.number_input(
+        "POA mínima (W/m²)",
+        min_value=0.0,
+        max_value=2000.0,
+        value=100.0,
+        step=10.0,
+        key="criticos_irradiancia_minima_wm2",
+        help="Evita marcar madrugada o noche con POA casi nula.",
+    )
+    _crit_fs_min = _cc2.number_input(
+        "FS mínimo",
+        min_value=0.0,
+        max_value=1.0,
+        value=0.05,
+        step=0.01,
+        format="%.2f",
+        key="criticos_fs_minimo",
+        help="Pérdida geométrica mínima para considerar crítica una hora.",
+    )
+    _crit_top_horas = _cc3.number_input(
+        "Horas a mostrar",
+        min_value=1,
+        max_value=100,
+        value=10,
+        step=1,
+        key="criticos_top_n_horas",
+    )
+    _crit_top_meses = _cc4.number_input(
+        "Meses a mostrar",
+        min_value=1,
+        max_value=12,
+        value=3,
+        step=1,
+        key="criticos_top_n_meses",
+    )
+_configuracion_criticos = {
+    "irradiancia_minima_wm2": _crit_poa_min,
+    "fs_minimo": _crit_fs_min,
+    "top_n_horas": _crit_top_horas,
+    "top_n_meses": _crit_top_meses,
+}
+
 _fs_metricas = None
 _modo_fs_metricas = st.session_state.get("bypass_modo_alineacion", "mensual")
 if (
@@ -358,6 +407,7 @@ _metricas_solares_m = metricas_solares(
     df_fs=_df_metricas_fs,
     modo_fs=_modo_fs_metricas,
     modo_agregacion_fs=_modo_agregacion_fs,
+    configuracion_criticos=_configuracion_criticos,
 )
 _metricas_electricas_m = metricas_electricas(
     resultado_produccion=st.session_state.get("res_produccion"),
@@ -409,6 +459,7 @@ with st.container(border=True):
     _sm6.metric(
         "Meses críticos",
         ", ".join(_metricas_solares_m["meses_criticos"]) or "—",
+        help=_metricas_solares_m["criterio_mes_critico"],
     )
     _sm7.metric(
         "Obstáculo responsable",
@@ -440,6 +491,44 @@ with st.container(border=True):
     )
     for _advertencia_ag in _aud_agregacion["advertencias"]:
         st.warning(f"⚠️ {_advertencia_ag}")
+    _horas_criticas_m = _metricas_solares_m["horas_criticas"]
+    _meses_criticos_m = _metricas_solares_m["meses_criticos_detalle"]
+    if _horas_criticas_m or _meses_criticos_m:
+        with st.expander("🔎 Evidencia del diagnóstico crítico", expanded=False):
+            st.caption(
+                f"{_metricas_solares_m['horas_candidatas_criticas']} horas "
+                "superaron los dos umbrales. Se muestran los primeros registros "
+                "ordenados por POA perdida."
+            )
+            if _horas_criticas_m:
+                st.dataframe(
+                    pd.DataFrame(_horas_criticas_m).rename(
+                        columns={
+                            "timestamp": "Timestamp",
+                            "mes_nombre": "Mes",
+                            "hora": "Hora",
+                            "poa_Wm2": "POA (W/m²)",
+                            "FS_geometrico": "FS geométrico",
+                            "poa_perdida_kWh_m2": "POA perdida (kWh/m²)",
+                        }
+                    ),
+                    hide_index=True,
+                    use_container_width=True,
+                )
+            if _meses_criticos_m:
+                st.dataframe(
+                    pd.DataFrame(_meses_criticos_m).rename(
+                        columns={
+                            "mes_nombre": "Mes",
+                            "poa_perdida_kWh_m2": "POA perdida (kWh/m²)",
+                            "horas_con_sombra": "Horas con sombra",
+                            "horas_criticas": "Horas críticas",
+                            "fs_geometrico_medio": "FS geométrico medio",
+                        }
+                    ),
+                    hide_index=True,
+                    use_container_width=True,
+                )
     for _titulo_m, _filas_m in _tablas_solares_m.items():
         if _filas_m:
             with st.expander(_titulo_m, expanded=False):
