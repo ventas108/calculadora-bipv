@@ -29,6 +29,7 @@ from calculos.escenarios_fase4 import (
     construir_definicion_escenarios,
     validar_definicion_escenarios,
 )
+from calculos.ejecutor_escenarios import ejecutar_escenarios
 from calculos.metricas_escenarios import (
     comparar_resultados_escenarios,
     metricas_electricas,
@@ -1666,6 +1667,84 @@ if csv_ok and df_fs_raw is not None:
                 f"Fuente FS: **{_col_fs_res}** ({_fs_badge}) · "
                 f"Cobertura: **{_modo_badge}**"
             )
+
+            # ── Fase 4: ejecutar escenarios sobre la base congelada ────────
+            _def_f4_exec = st.session_state.get("escenarios_fase4")
+            st.markdown("#### 🔁 Escenarios Fase 4 (E_AC anual por escenario)")
+            if not _def_f4_exec or not isinstance(
+                _def_f4_exec.get("base_comparacion"), dict
+            ):
+                st.info(
+                    "Primero guarda la definición y congela la base única "
+                    "(sección Fase 4 arriba) para poder ejecutar los escenarios."
+                )
+            elif st.button(
+                "▶️ Ejecutar escenarios (referencia / actual / optimizada)",
+                key="btn_ejecutar_escenarios_f4",
+                use_container_width=True,
+            ):
+                try:
+                    with st.spinner("Simulando los escenarios con la base congelada..."):
+                        _res_f4 = ejecutar_escenarios(
+                            definicion=_def_f4_exec,
+                            base_estado_actual=capturar_base_comparacion(
+                                st.session_state
+                            ),
+                            tmy=st.session_state["tmy_df"],
+                            poa_global=poa_bp,
+                            panel=panel_bp,
+                            n_serie=int(N_series_bp),
+                            n_paralelo=int(N_parallel_bp),
+                            eta_inversor=float(
+                                st.session_state.get("eta_inversor")
+                            ),
+                            df_fs_actual=df_fs_work,
+                            df_fs_optimizada=st.session_state.get(
+                                "df_fs_optimizada_f4"
+                            ),
+                            modo_alineacion=st.session_state.get(
+                                "bypass_modo_alineacion", "mensual"
+                            ),
+                            modo_agregacion=st.session_state.get(
+                                "bypass_modo_agregacion", "auto"
+                            ),
+                        )
+                    _def_f4_exec["resultados"] = _res_f4
+                    st.session_state["escenarios_fase4"] = _def_f4_exec
+                    st.success(
+                        "✅ Escenarios ejecutados sobre la base "
+                        f"`{_res_f4['base_id'][:12]}`. "
+                        "El % de recuperación AC se actualizará arriba al recargar."
+                    )
+                    st.rerun()
+                except (ValueError, TypeError, KeyError) as _e_exec_f4:
+                    st.error(f"❌ No se pudieron ejecutar los escenarios: {_e_exec_f4}")
+            _res_guardados_f4 = (_def_f4_exec or {}).get("resultados")
+            if _res_guardados_f4:
+                _filas_res_f4 = []
+                for _esc_id in ("referencia", "actual", "optimizada"):
+                    _r = _res_guardados_f4.get(_esc_id, {})
+                    _filas_res_f4.append(
+                        {
+                            "Escenario": _esc_id.capitalize(),
+                            "Estado": _r.get("estado", "—"),
+                            "E_AC anual (kWh/año)": _r.get("E_AC_anual_kWh"),
+                            "E_DC anual (kWh/año)": _r.get("E_DC_anual_kWh"),
+                            "Pérdida bypass (kWh DC/año)": _r.get(
+                                "kwh_bypass_anual"
+                            ),
+                        }
+                    )
+                st.dataframe(
+                    pd.DataFrame(_filas_res_f4),
+                    hide_index=True,
+                    use_container_width=True,
+                )
+                st.caption(
+                    f"Base congelada: `{_res_guardados_f4.get('base_id', '')[:12]}` · "
+                    "mismo método eléctrico en los tres escenarios; solo cambia "
+                    "el FS geométrico."
+                )
 
 elif not csv_ok:
     st.info(

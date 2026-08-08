@@ -1,0 +1,48 @@
+{
+    "Location": {
+        "latitude": 6.33904,
+        "longitude": -75.54216,
+        "timezone": -5,
+        "northOffset": 7
+    },
+    "DateTime": {
+        "clockTime": 15.5,
+        "dayOfMonth": 6,
+        "monthOfYear": 2,
+        "year": 2026
+    },
+    "SunPath": {
+        "showSunPos": true,
+        "showSunDirection": true,
+        "showSunAngles": false,
+        "showSunPath": true,
+        "showAnnualArea": true,
+        "showAnnualLines": true,
+        "showAxis": true,
+        "radius": 0.6,
+        "solarChart": 0,
+        "center": [
+            0,
+            0,
+            50
+        ]
+    },
+    "Display": {
+        "surfaceOpacity": 0.8,
+        "outlineOpacity": 0.75,
+        "surfaceShininess": 75,
+        "ambientFactor": 0.85
+    },
+    "Model": {
+        "shadowsShow": true,
+        "mapTiles": "OSM"
+    },
+    "Animation": {
+        "animateTime": true,
+        "animateDate": true,
+        "animateLatitude": false,
+        "animateLongitude": false,
+        "daylightOnly": true,
+        "speed": 12.5
+    }
+}
