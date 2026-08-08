@@ -30,8 +30,8 @@ from calculos.escenarios_fase4 import (
     validar_definicion_escenarios,
 )
 from calculos.metricas_escenarios import (
+    comparar_resultados_escenarios,
     metricas_electricas,
-    metricas_recuperacion,
     metricas_solares,
 )
 
@@ -480,26 +480,75 @@ with st.container(border=True):
         "No aislado",
         help=_metricas_electricas_m["nota_mismatch"],
     )
-    _rec_f4 = _definicion_fase4.get("resultados", {}) if _definicion_fase4 else {}
-    _recu_m = metricas_recuperacion(
-        e_ac_referencia_kWh=(_rec_f4.get("referencia") or {}).get("E_ac_kWh"),
-        e_ac_actual_kWh=(_rec_f4.get("actual") or {}).get("E_ac_kWh"),
-        e_ac_optimizada_kWh=(_rec_f4.get("optimizada") or {}).get("E_ac_kWh"),
+    _rec_f4 = (
+        _definicion_fase4.get("resultados", {})
+        if _definicion_fase4
+        else {}
+    )
+    _contrato_ac_f4 = comparar_resultados_escenarios(
+        _rec_f4,
+        magnitud="E_AC_anual_kWh",
+        unidad="kWh/año",
     )
     _em8.metric(
         "% recuperación AC",
         (
-            f"{_recu_m['porcentaje_recuperacion']:.1f}%"
-            if _recu_m["disponible"]
+            _contrato_ac_f4["recuperacion_etiqueta"]
+            if _contrato_ac_f4["escenarios_completos"]
             else "Pendiente"
         ),
-        help=_recu_m["motivo"],
+        help=_contrato_ac_f4["motivo_recuperacion"],
     )
-    if not _recu_m["disponible"]:
+    if not _contrato_ac_f4["escenarios_completos"]:
         st.caption(
             "La energía recuperable y su porcentaje aparecerán cuando existan "
-            "resultados E_AC de referencia, situación actual y alternativa optimizada."
+            "resultados E_AC_anual_kWh de referencia, situación actual y "
+            "alternativa optimizada."
         )
+    else:
+        st.caption(
+            "Decisión de diseño: E_AC_anual_kWh. La recuperación está limitada "
+            "al intervalo 0–100%."
+        )
+    with st.expander("📐 Ver contrato de pérdidas y recuperación", expanded=False):
+        st.markdown(
+            f"- **Magnitud de decisión:** `E_AC_anual_kWh` ({_contrato_ac_f4['unidad']})\n"
+            f"- **Pérdida por escenario:** `{_contrato_ac_f4['formula_perdida']}`\n"
+            f"- **Recuperación:** `{_contrato_ac_f4['formula_recuperacion']}`\n"
+            "- **Diagnóstico solar:** el mismo comparador puede usar `POA efectiva`, "
+            "pero no sustituye la decisión basada en E_AC."
+        )
+        if _contrato_ac_f4["escenarios_completos"]:
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {
+                            "Escenario": escenario.capitalize(),
+                            "E_AC anual (kWh/año)": valor,
+                            "Pérdida vs referencia": (
+                                _contrato_ac_f4["perdidas_etiqueta"][escenario]
+                            ),
+                        }
+                        for escenario, valor in _contrato_ac_f4["valores"].items()
+                    ]
+                ),
+                hide_index=True,
+                use_container_width=True,
+            )
+            st.metric(
+                "Energía recuperable",
+                (
+                    f"{_contrato_ac_f4['energia_recuperable']:,.1f} kWh/año"
+                    if _contrato_ac_f4["energia_recuperable"] is not None
+                    else "No aplica"
+                ),
+                help=_contrato_ac_f4["motivo_recuperacion"],
+            )
+        else:
+            st.info(
+                "La comparación queda pendiente hasta contar con E_AC_anual_kWh "
+                "en los tres escenarios."
+            )
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 1 — SOMBREADO DE HORIZONTE

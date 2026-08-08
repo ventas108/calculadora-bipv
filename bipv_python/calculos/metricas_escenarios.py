@@ -8,6 +8,7 @@ Regla principal:
 from __future__ import annotations
 
 from collections.abc import Mapping
+import re
 from typing import Any
 
 import numpy as np
@@ -284,37 +285,242 @@ def metricas_electricas(
     }
 
 
+def contrato_comparacion_escenarios(
+    *,
+    e_referencia: float | None,
+    e_actual: float | None,
+    e_optimizada: float | None,
+    magnitud: str = "E_AC_anual_kWh",
+    unidad: str = "kWh/año",
+) -> dict[str, Any]:
+    """Aplica el contrato común de pérdidas y recuperación de escenarios.
+
+    ``magnitud`` identifica la misma magnitud usada por los tres escenarios.
+    Para la decisión de diseño debe ser ``E_AC_anual_kWh``; ``POA efectiva``
+    puede pasarse explícitamente como diagnóstico solar.
+
+    Pérdida del escenario:
+        ((E_referencia - E_escenario) / E_referencia) × 100
+
+    Recuperación:
+        ((E_optimizada - E_actual) /
+         (E_referencia - E_actual)) × 100
+
+    Cuando la referencia es cero o no existe pérdida recuperable, el porcentaje
+    no se inventa: se devuelve como ``None`` y con etiqueta ``No aplica``.
+    """
+    valores = {
+        "referencia": _float_or_none(e_referencia),
+        "actual": _float_or_none(e_actual),
+        "optimizada": _float_or_none(e_optimizada),
+    }
+    referencia = valores["referencia"]
+    perdidas_pct: dict[str, float | None] = {
+        "referencia": 0.0 if referencia is not None else None,
+        "actual": None,
+        "optimizada": None,
+    }
+    motivo_perdidas = None
+    if referencia is None:
+        motivo_perdidas = "Se requiere E_referencia para calcular pérdidas."
+    elif referencia == 0:
+        motivo_perdidas = (
+            "E_referencia = 0; las pérdidas porcentuales no aplican."
+        )
+    else:
+        for escenario in ("actual", "optimizada"):
+            valor = valores[escenario]
+            if valor is not None:
+                perdidas_pct[escenario] = round(
+                    (referencia - valor) / referencia * 100.0,
+                    2,
+                )
+
+    actual = valores["actual"]
+    optimizada = valores["optimizada"]
+    perdida_recuperable = (
+        referencia - actual
+        if referencia is not None and actual is not None
+        else None
+    )
+    recuperacion_pct: float | None = None
+    recuperacion_estado = "pendiente"
+    motivo_recuperacion = (
+        "Se requieren E_referencia, E_actual y E_optimizada."
+    )
+    if perdida_recuperable is not None and perdida_recuperable <= 0:
+        recuperacion_estado = "no_aplica"
+        motivo_recuperacion = (
+            "E_referencia - E_actual <= 0; no existe pérdida recuperable."
+        )
+    elif (
+        perdida_recuperable is not None
+        and optimizada is not None
+        and perdida_recuperable > 0
+    ):
+        recuperacion_pct = round(
+            float(
+                np.clip(
+                    (optimizada - actual) / perdida_recuperable * 100.0,
+                    0.0,
+                    100.0,
+                )
+            ),
+            2,
+        )
+        recuperacion_estado = "calculada"
+        motivo_recuperacion = "Comparación con la misma magnitud en los tres escenarios."
+
+    return {
+        "magnitud": magnitud,
+        "unidad": unidad,
+        "es_magnitud_decision": magnitud == "E_AC_anual_kWh",
+        "valores": valores,
+        "perdidas_pct": perdidas_pct,
+        "perdidas_etiqueta": {
+            escenario: (
+                "No aplica"
+                if porcentaje is None
+                else f"{porcentaje:.2f}%"
+            )
+            for escenario, porcentaje in perdidas_pct.items()
+        },
+        "motivo_perdidas": motivo_perdidas,
+        "energia_recuperable": (
+            round(max(perdida_recuperable, 0.0), 2)
+            if perdida_recuperable is not None
+            else None
+        ),
+        "recuperacion_pct": recuperacion_pct,
+        "recuperacion_estado": recuperacion_estado,
+        "recuperacion_etiqueta": (
+            "No aplica" if recuperacion_estado == "no_aplica"
+            else f"{recuperacion_pct:.2f}%" if recuperacion_pct is not None
+            else "Pendiente"
+        ),
+        "motivo_recuperacion": motivo_recuperacion,
+        "formula_perdida": (
+            "((E_referencia - E_escenario) / E_referencia) × 100"
+        ),
+        "formula_recuperacion": (
+            "((E_optimizada - E_actual) / "
+            "(E_referencia - E_actual)) × 100; límite 0–100%"
+        ),
+    }
+
+
+def _clave_normalizada(clave: Any) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(clave).lower())
+
+
+def _extraer_magnitud_resultado(
+    resultado: Mapping[str, Any] | None,
+    magnitud: str,
+) -> float | None:
+    """Lee resultados de escenarios tolerando aliases históricos."""
+    if not isinstance(resultado, Mapping):
+        return None
+    normalizadas = {
+        _clave_normalizada(clave): valor
+        for clave, valor in resultado.items()
+    }
+    if magnitud == "E_AC_anual_kWh":
+        aliases = (
+            "eacanualkwh",
+            "eackwh",
+            "eac",
+            "energiaacanualkwh",
+        )
+    elif magnitud == "POA efectiva":
+        aliases = (
+            "poaefectivaanualkwhm2",
+            "poaefectivakwhm2",
+            "poaefectiva",
+        )
+    else:
+        aliases = (_clave_normalizada(magnitud),)
+    for alias in aliases:
+        if alias in normalizadas:
+            valor = _float_or_none(normalizadas[alias])
+            if valor is not None:
+                return valor
+    return None
+
+
+def comparar_resultados_escenarios(
+    resultados: Mapping[str, Mapping[str, Any]] | None,
+    *,
+    magnitud: str = "E_AC_anual_kWh",
+    unidad: str = "kWh/año",
+) -> dict[str, Any]:
+    """Aplica el contrato a resultados etiquetados por escenario.
+
+    La misma ``magnitud`` se extrae para referencia, actual y optimizada.
+    Si falta cualquiera de los tres resultados, el contrato queda pendiente y
+    no se sustituye silenciosamente por POA u otra métrica.
+    """
+    resultados = resultados if isinstance(resultados, Mapping) else {}
+    valores = {
+        escenario: _extraer_magnitud_resultado(
+            resultados.get(escenario),
+            magnitud,
+        )
+        for escenario in ("referencia", "actual", "optimizada")
+    }
+    contrato = contrato_comparacion_escenarios(
+        e_referencia=valores["referencia"],
+        e_actual=valores["actual"],
+        e_optimizada=valores["optimizada"],
+        magnitud=magnitud,
+        unidad=unidad,
+    )
+    contrato["escenarios_completos"] = all(
+        valor is not None for valor in valores.values()
+    )
+    if not contrato["escenarios_completos"]:
+        contrato["recuperacion_estado"] = "pendiente"
+        contrato["recuperacion_etiqueta"] = "Pendiente"
+        contrato["motivo_recuperacion"] = (
+            f"Faltan resultados {magnitud} en uno o más escenarios."
+        )
+    return contrato
+
+
 def metricas_recuperacion(
     *,
     e_ac_referencia_kWh: float | None,
     e_ac_actual_kWh: float | None,
     e_ac_optimizada_kWh: float | None,
 ) -> dict[str, Any]:
-    """Calcula recuperación AC, limitada a 0–100 % y sin pérdida recuperable."""
-    referencia = _float_or_none(e_ac_referencia_kWh)
-    actual = _float_or_none(e_ac_actual_kWh)
-    optimizada = _float_or_none(e_ac_optimizada_kWh)
-    if referencia is None or actual is None or optimizada is None:
-        return {
-            "disponible": False,
-            "energia_recuperable_kWh": None,
-            "energia_recuperada_kWh": None,
-            "porcentaje_recuperacion": None,
-            "motivo": "Se requieren E_AC de referencia, actual y optimizada.",
-        }
-    recuperable = max(referencia - actual, 0.0)
-    recuperada = min(max(optimizada - actual, 0.0), recuperable)
-    porcentaje = (
-        recuperada / recuperable * 100.0 if recuperable > 0 else 0.0
+    """Compatibilidad: aplica el contrato usando E_AC como magnitud de decisión."""
+    contrato = contrato_comparacion_escenarios(
+        e_referencia=e_ac_referencia_kWh,
+        e_actual=e_ac_actual_kWh,
+        e_optimizada=e_ac_optimizada_kWh,
+        magnitud="E_AC_anual_kWh",
+        unidad="kWh/año",
+    )
+    recuperable = contrato["energia_recuperable"]
+    porcentaje = contrato["recuperacion_pct"]
+    recuperada = (
+        min(
+            max(
+                (_float_or_none(e_ac_optimizada_kWh) or 0.0)
+                - (_float_or_none(e_ac_actual_kWh) or 0.0),
+                0.0,
+            ),
+            recuperable,
+        )
+        if recuperable is not None
+        else None
     )
     return {
-        "disponible": True,
-        "energia_recuperable_kWh": round(recuperable, 2),
-        "energia_recuperada_kWh": round(recuperada, 2),
-        "porcentaje_recuperacion": round(float(np.clip(porcentaje, 0.0, 100.0)), 2),
-        "motivo": (
-            "No hay pérdida AC recuperable entre referencia y situación actual."
-            if recuperable == 0
-            else "Comparación AC de escenarios con base común."
+        **contrato,
+        "disponible": contrato["recuperacion_estado"] == "calculada",
+        "energia_recuperable_kWh": recuperable,
+        "energia_recuperada_kWh": (
+            round(recuperada, 2) if recuperada is not None else None
         ),
+        "porcentaje_recuperacion": porcentaje,
+        "motivo": contrato["motivo_recuperacion"],
     }

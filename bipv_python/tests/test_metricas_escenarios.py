@@ -9,6 +9,8 @@ import pandas as pd
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from calculos.metricas_escenarios import (  # noqa: E402
+    contrato_comparacion_escenarios,
+    comparar_resultados_escenarios,
     metricas_electricas,
     metricas_recuperacion,
     metricas_solares,
@@ -91,3 +93,80 @@ def test_recuperacion_solo_usa_ac_y_se_limita_a_la_perdida():
     assert recuperacion["energia_recuperable_kWh"] == 300.0
     assert recuperacion["energia_recuperada_kWh"] == 300.0
     assert recuperacion["porcentaje_recuperacion"] == 100.0
+
+
+def test_contrato_calcula_perdidas_con_la_referencia_y_protege_cero():
+    contrato = contrato_comparacion_escenarios(
+        e_referencia=1000.0,
+        e_actual=800.0,
+        e_optimizada=950.0,
+        magnitud="E_AC_anual_kWh",
+    )
+
+    assert contrato["perdidas_pct"]["referencia"] == 0.0
+    assert contrato["perdidas_pct"]["actual"] == 20.0
+    assert contrato["perdidas_pct"]["optimizada"] == 5.0
+    assert contrato["recuperacion_pct"] == 75.0
+    assert contrato["recuperacion_etiqueta"] == "75.00%"
+
+    cero = contrato_comparacion_escenarios(
+        e_referencia=0.0,
+        e_actual=0.0,
+        e_optimizada=100.0,
+    )
+    assert cero["perdidas_pct"]["actual"] is None
+    assert cero["recuperacion_estado"] == "no_aplica"
+    assert cero["recuperacion_etiqueta"] == "No aplica"
+
+
+def test_contrato_marca_no_aplica_si_no_hay_perdida_recuperable():
+    contrato = contrato_comparacion_escenarios(
+        e_referencia=900.0,
+        e_actual=950.0,
+        e_optimizada=1000.0,
+    )
+
+    assert contrato["energia_recuperable"] == 0.0
+    assert contrato["recuperacion_pct"] is None
+    assert contrato["recuperacion_etiqueta"] == "No aplica"
+
+
+def test_comparador_acepta_alias_real_de_e_ac_y_no_mezcla_magnitudes():
+    resultados = {
+        "referencia": {"E_ac_anual_kWh": 1000.0, "poa_efectiva_anual_kWh_m2": 900.0},
+        "actual": {"E_AC_anual_kWh": 800.0, "poa_efectiva_anual_kWh_m2": 700.0},
+        "optimizada": {"E_ac_KWh": 950.0, "poa_efectiva_anual_kWh_m2": 850.0},
+    }
+    contrato = comparar_resultados_escenarios(resultados)
+
+    assert contrato["escenarios_completos"] is True
+    assert contrato["valores"] == {
+        "referencia": 1000.0,
+        "actual": 800.0,
+        "optimizada": 950.0,
+    }
+    assert contrato["perdidas_etiqueta"]["actual"] == "20.00%"
+    assert contrato["recuperacion_etiqueta"] == "75.00%"
+
+    pendiente = comparar_resultados_escenarios(
+        resultados,
+        magnitud="POA efectiva",
+        unidad="kWh/m²/año",
+    )
+    assert pendiente["escenarios_completos"] is True
+    assert pendiente["es_magnitud_decision"] is False
+    assert pendiente["valores"]["actual"] == 700.0
+
+
+def test_poa_se_puede_comparar_como_diagnostico_sin_ser_magnitud_de_decision():
+    contrato = contrato_comparacion_escenarios(
+        e_referencia=1000.0,
+        e_actual=700.0,
+        e_optimizada=900.0,
+        magnitud="POA efectiva",
+        unidad="kWh/m²/año",
+    )
+
+    assert contrato["magnitud"] == "POA efectiva"
+    assert contrato["es_magnitud_decision"] is False
+    assert contrato["recuperacion_pct"] == round(200 / 300 * 100, 2)
