@@ -11,7 +11,13 @@ from calculos.dimensionamiento import (
 from calculos.modelo_iv import preparar_panel_iv, resolver_curva_iv, resolver_panel_calibrado
 from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
-from datos.catalogo_inversores_excel import cargar_catalogo_inversores, obtener_inversor_excel
+from datos.catalogo_inversores_excel import (
+    cargar_catalogo_inversores,
+    obtener_inversor_excel,
+    diagnostico_catalogo_inversores as _diag_inv_fn,
+    excel_mtime_inv as _mtime_inv,
+    cargar_catalogo_inversores as _cargar_cat_inv,
+)
 from datos.catalogo_inversores import INVERSORES, seleccionar_inversor
 from calculos.panel_iv_check import analizar_panel_motiv as _check_iv_dim
 
@@ -76,54 +82,6 @@ elif _iv_adv:
             f"Campos opcionales ausentes: {', '.join(f'`{c}`' for c in _adv_campos)} "
             f"— se usarán defaults por tecnología."
         )
-
-# ── #122 — Diagnóstico del catálogo de inversores (patrón #24 de baterías) ───
-from datos.catalogo_inversores_excel import (
-    diagnostico_catalogo_inversores as _diag_inv_fn,
-    excel_mtime_inv as _mtime_inv,
-    cargar_catalogo_inversores as _cargar_cat_inv,
-)
-_diag_inv = _diag_inv_fn(mtime=_mtime_inv())
-if _diag_inv["estado"] == "error":
-    st.error(
-        f"🔴 **Catálogo de inversores con problemas** — "
-        f"{_diag_inv.get('detalle', 'faltan columnas críticas')}.  \n"
-        f"Columnas críticas ausentes: "
-        f"{', '.join(_diag_inv['columnas_criticas_faltantes']) or '—'}. "
-        f"El dimensionamiento de strings puede salir incorrecto."
-    )
-elif _diag_inv["estado"] == "parcial":
-    _resumen_p = []
-    if _diag_inv["columnas_importantes_faltantes"]:
-        _resumen_p.append(f"{len(_diag_inv['columnas_importantes_faltantes'])} columnas importantes ausentes")
-    if _diag_inv["modelos_duplicados"]:
-        _resumen_p.append(f"{len(_diag_inv['modelos_duplicados'])} modelos duplicados")
-    if _diag_inv["modelos_incompletos"]:
-        _resumen_p.append(f"{len(_diag_inv['modelos_incompletos'])} modelos incompletos")
-    st.warning(f"🟡 Catálogo de inversores parcial: {' · '.join(_resumen_p)} — detalles abajo.")
-
-with st.expander("🔍 Diagnóstico del catálogo de inversores", expanded=False):
-    st.caption(f"Hoja usada: `{_diag_inv.get('hoja_usada', '—')}` · "
-               f"Modelos cargados: **{_diag_inv.get('modelos_cargados', 0)}** · "
-               f"Hojas en el Excel: {', '.join(_diag_inv.get('hojas_disponibles', []))}")
-    if _diag_inv["columnas_criticas_faltantes"]:
-        st.error("🔴 Columnas críticas ausentes: "
-                 + ", ".join(f"`{c}`" for c in _diag_inv["columnas_criticas_faltantes"]))
-    if _diag_inv["columnas_importantes_faltantes"]:
-        st.warning("🟡 Columnas importantes ausentes: "
-                   + ", ".join(f"`{c}`" for c in _diag_inv["columnas_importantes_faltantes"]))
-    for _d in _diag_inv["modelos_duplicados"]:
-        st.warning(f"🟡 **{_d['modelo']}** aparece {len(_d['filas_excel'])} veces "
-                   f"(filas Excel {_d['filas_excel']}) — solo la última fila se usa.")
-    for _m in _diag_inv["modelos_incompletos"]:
-        st.info(f"ℹ️ **{_m['modelo']}**: faltan {', '.join(_m['campos_faltantes'])}")
-    if _diag_inv["estado"] == "ok":
-        st.success("🟢 Catálogo OK — columnas completas, sin duplicados ni modelos incompletos.")
-    if st.button("🔄 Recargar catálogo de inversores", key="_reload_cat_inv",
-                 help="Vuelve a leer el Excel del servidor (limpia la caché)."):
-        _cargar_cat_inv.clear()
-        _diag_inv_fn.clear()
-        st.rerun()
 
 # ── #58 — Aviso cuando las especificaciones del panel son estimadas ──────────
 # El catálogo Excel trae Confianza="Media" cuando las dimensiones físicas del
@@ -326,13 +284,20 @@ else:
     _inv_falt = [k for k in ["Vdc_max","Vmppt_min","Vmppt_max","n_trackers","n_strings_tracker","I_max_tracker","P_dc_max_W"] if not inversor.get(k)]
     st.warning(f"🟡 Inversor incompleto — faltan: {', '.join(_inv_falt)}" if _inv_falt else "🟡 Inversor marcado como incompleto en catálogo")
 
-with st.expander("🧭 Mapear inversores opcionales para este panel", expanded=False):
+st.markdown("---")
+st.subheader("🧭 Mapeo de inversores opcionales para este panel")
+st.caption(
+    "Esta es una regla eléctrica informativa: el inversor seleccionado arriba "
+    "no se cambia automáticamente. Se evalúa todo el catálogo contra el rango "
+    "de N/string indicado y se reportan los límites usados."
+)
+with st.container(border=True):
     st.caption(
-        "Nueva regla eléctrica: un inversor es opcional si al menos un "
+        "✅ **Regla aplicada:** un inversor es opcional si al menos un "
         "**N/string** del rango explorado cumple simultáneamente Voc en frío, "
         "MPPT mínimo y máximo, y corriente máxima por tracker. "
         "El rango de este mapeo es independiente del inversor seleccionado. "
-        "El mapeo es informativo y no cambia el inversor seleccionado."
+        "El resultado no cambia la selección del proyecto."
     )
     _map_c1, _map_c2 = st.columns(2)
     with _map_c1:
@@ -370,10 +335,15 @@ with st.expander("🧭 Mapear inversores opcionales para este panel", expanded=F
     _df_mapeo = pd.DataFrame(_mapeo_inv)
     _n_mapeo_ok = sum(fila["compatible"] for fila in _mapeo_inv)
     _n_mapeo_no_eval = sum(fila["estado"] == "🟡 No evaluable" for fila in _mapeo_inv)
-    st.markdown(
-        f"**{_n_mapeo_ok} de {len(_mapeo_inv)} inversores** tienen al menos un "
-        f"N/string viable para **{panel_nombre}** · "
-        f"{_n_mapeo_no_eval} no evaluables por ficha incompleta."
+    _n_mapeo_rech = len(_mapeo_inv) - _n_mapeo_ok - _n_mapeo_no_eval
+    _mc1, _mc2, _mc3 = st.columns(3)
+    _mc1.metric("✅ Compatibles", _n_mapeo_ok)
+    _mc2.metric("🔴 No compatibles", _n_mapeo_rech)
+    _mc3.metric("🟡 No evaluables", _n_mapeo_no_eval)
+    st.caption(
+        f"Panel evaluado: **{panel_nombre}** · rango mapeado: "
+        f"**N={int(_n_min_mapeo)}–{int(_n_max_mapeo)} módulos/string** · "
+        f"{len(_mapeo_inv)} inversores del catálogo."
     )
     if not _df_mapeo.empty:
         _cols_mapeo = [
@@ -394,6 +364,49 @@ with st.expander("🧭 Mapear inversores opcionales para este panel", expanded=F
             "text/csv",
             key="descargar_mapeo_inversores_panel",
         )
+
+# ── #122 — Diagnóstico del catálogo de inversores (patrón #24 de baterías) ───
+_diag_inv = _diag_inv_fn(mtime=_mtime_inv())
+if _diag_inv["estado"] == "error":
+    st.error(
+        f"🔴 **Catálogo de inversores con problemas** — "
+        f"{_diag_inv.get('detalle', 'faltan columnas críticas')}.  \n"
+        f"Columnas críticas ausentes: "
+        f"{', '.join(_diag_inv['columnas_criticas_faltantes']) or '—'}. "
+        f"El dimensionamiento de strings puede salir incorrecto."
+    )
+elif _diag_inv["estado"] == "parcial":
+    _resumen_p = []
+    if _diag_inv["columnas_importantes_faltantes"]:
+        _resumen_p.append(f"{len(_diag_inv['columnas_importantes_faltantes'])} columnas importantes ausentes")
+    if _diag_inv["modelos_duplicados"]:
+        _resumen_p.append(f"{len(_diag_inv['modelos_duplicados'])} modelos duplicados")
+    if _diag_inv["modelos_incompletos"]:
+        _resumen_p.append(f"{len(_diag_inv['modelos_incompletos'])} modelos incompletos")
+    st.warning(f"🟡 Catálogo de inversores parcial: {' · '.join(_resumen_p)} — detalles abajo.")
+
+with st.expander("🔍 Diagnóstico del catálogo de inversores", expanded=False):
+    st.caption(f"Hoja usada: `{_diag_inv.get('hoja_usada', '—')}` · "
+               f"Modelos cargados: **{_diag_inv.get('modelos_cargados', 0)}** · "
+               f"Hojas en el Excel: {', '.join(_diag_inv.get('hojas_disponibles', []))}")
+    if _diag_inv["columnas_criticas_faltantes"]:
+        st.error("🔴 Columnas críticas ausentes: "
+                 + ", ".join(f"`{c}`" for c in _diag_inv["columnas_criticas_faltantes"]))
+    if _diag_inv["columnas_importantes_faltantes"]:
+        st.warning("🟡 Columnas importantes ausentes: "
+                   + ", ".join(f"`{c}`" for c in _diag_inv["columnas_importantes_faltantes"]))
+    for _d in _diag_inv["modelos_duplicados"]:
+        st.warning(f"🟡 **{_d['modelo']}** aparece {len(_d['filas_excel'])} veces "
+                   f"(filas Excel {_d['filas_excel']}) — solo la última fila se usa.")
+    for _m in _diag_inv["modelos_incompletos"]:
+        st.info(f"ℹ️ **{_m['modelo']}**: faltan {', '.join(_m['campos_faltantes'])}")
+    if _diag_inv["estado"] == "ok":
+        st.success("🟢 Catálogo OK — columnas completas, sin duplicados ni modelos incompletos.")
+    if st.button("🔄 Recargar catálogo de inversores", key="_reload_cat_inv",
+                 help="Vuelve a leer el Excel del servidor (limpia la caché)."):
+        _cargar_cat_inv.clear()
+        _diag_inv_fn.clear()
+        st.rerun()
 
 if st.button("▶️ Optimizar N paneles/string", type="primary"):
     resultados = optimizar_n_serie(
