@@ -200,7 +200,12 @@ def capturar_base_comparacion(state: Mapping[str, Any]) -> dict[str, Any]:
         "panel_nombre": panel_nombre,
         "inversor_nombre": inversor_nombre,
         "N_paneles": n_paneles,
-        "N_serie": state.get("N_serie"),
+        # N_serie se escribe al cargar un inversor compatible; en una sesión
+        # nueva puede no existir aún — usar el N del bloque bypass como
+        # respaldo (es el que realmente se simula).
+        "N_serie": _primer_valor(
+            state, "N_serie", "bypass_n_series", "bypass_n_series_usado"
+        ),
         "N_strings_tracker": state.get("N_str_tr"),
         "eta_inversor": state.get("eta_inversor"),
     }
@@ -215,7 +220,14 @@ def capturar_base_comparacion(state: Mapping[str, Any]) -> dict[str, Any]:
         "motor_optico_k_soil_vert",
     )
     optical_parameters = {key: state.get(key) for key in optical_keys}
-    optical_parameters["soiling_personalizado"] = state.get("mo_soiling_custom")
+    _soiling_custom = state.get("mo_soiling_custom")
+    if _soiling_custom is None and state.get("motor_optico_ok"):
+        # El flag vive en un widget de la página Motor Óptico: tras un F5 la
+        # clave no existe hasta visitar la página, aunque los resultados del
+        # motor sigan vigentes. Si el motor corrió y no hay flag, el soiling
+        # aplicado fue el estacional estándar (custom=False).
+        _soiling_custom = False
+    optical_parameters["soiling_personalizado"] = _soiling_custom
     if state.get("mo_soiling_custom"):
         optical_parameters["soiling_mensual"] = {
             f"mes_{month}": state.get(f"mo_soil_{month - 1}")
@@ -324,8 +336,15 @@ def capturar_base_comparacion(state: Mapping[str, Any]) -> dict[str, Any]:
         missing.append("panel seleccionado")
     if inversor is None or inversor_nombre is None:
         missing.append("inversor seleccionado")
-    if any(value is None for value in configuracion_electrica.values()):
-        missing.append("configuración eléctrica completa")
+    _elec_faltan = [
+        key for key, value in configuracion_electrica.items() if value is None
+    ]
+    if _elec_faltan:
+        missing.append(
+            "configuración eléctrica completa (faltan: "
+            + ", ".join(_elec_faltan)
+            + ")"
+        )
     optical_missing = [
         key for key, value in optical_parameters.items()
         if value is None
