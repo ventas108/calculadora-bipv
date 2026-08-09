@@ -1689,6 +1689,20 @@ if csv_ok and df_fs_raw is not None:
                     "Primero guarda la definición y congela la base única "
                     "(sección Fase 4 arriba) para poder ejecutar los escenarios."
                 )
+            elif (
+                _def_f4_exec["base_comparacion"].get("lista_para_comparar")
+                is not True
+            ):
+                _faltantes_f4 = _def_f4_exec["base_comparacion"].get(
+                    "faltantes", []
+                )
+                st.warning(
+                    "⚠️ La base congelada quedó **incompleta** (se guardó antes "
+                    "de terminar los pasos previos). Faltaba: "
+                    + ("; ".join(_faltantes_f4) if _faltantes_f4 else "—")
+                    + ". Completa esos pasos y vuelve a pulsar "
+                    "**💾 Guardar definición y congelar base** para poder ejecutar."
+                )
             elif st.button(
                 "▶️ Ejecutar escenarios (referencia / actual / optimizada)",
                 key="btn_ejecutar_escenarios_f4",
