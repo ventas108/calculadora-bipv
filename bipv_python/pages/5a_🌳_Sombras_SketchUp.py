@@ -35,6 +35,7 @@ from calculos.sombras_3d import (
     resumen_malla,
     validar_puntos,
 )
+from calculos.sitedesigner_marsh import cargar_escena_sitedesigner, verificar_ubicacion
 
 st.title("🌳 Sombras desde tu modelo de SketchUp")
 st.caption(
@@ -70,45 +71,67 @@ st.markdown("---")
 st.subheader("1️⃣ Modelo 3D del sitio")
 
 archivo = st.file_uploader(
-    "Modelo exportado de SketchUp",
-    type=["obj", "stl", "dae", "ply", "glb"],
-    help="Solo los obstáculos que producen sombra — sin los paneles.",
+    "Modelo exportado de SketchUp — o escena JSON de Site Designer (Andrew Marsh)",
+    type=["obj", "stl", "dae", "ply", "glb", "json"],
+    help="SketchUp: solo los obstáculos que producen sombra — sin los paneles. "
+         "Site Designer: el JSON exportado con los Blocks (obstáculos) dibujados.",
 )
-c1, c2 = st.columns(2)
-with c1:
-    escala = st.selectbox(
-        "Unidades del modelo",
-        options=[("Metros (recomendado)", 1.0), ("Centímetros", 0.01),
-                 ("Milímetros", 0.001), ("Pulgadas", 0.0254), ("Pies", 0.3048)],
-        format_func=lambda o: o[0],
-    )[1]
-with c2:
-    rot_norte = st.number_input(
-        "Corrección de norte (° horario)",
-        min_value=-180.0, max_value=180.0, value=0.0, step=1.0,
-        help="Si el norte real NO es el eje verde del modelo: ángulo que hay que "
-             "girar el modelo (visto desde arriba, sentido horario) para alinearlo.",
+_es_sitedesigner = archivo is not None and archivo.name.lower().endswith(".json")
+if _es_sitedesigner:
+    # Site Designer: unidades SIEMPRE milímetros y norte tomado del propio
+    # archivo (northOffset) — sin selectores para no dar lugar a errores.
+    escala, rot_norte = 1.0, 0.0
+    st.caption(
+        "🌐 Archivo de **Site Designer**: unidades en milímetros y corrección de "
+        "norte tomadas automáticamente del archivo — no hay nada que configurar."
     )
+else:
+    c1, c2 = st.columns(2)
+    with c1:
+        escala = st.selectbox(
+            "Unidades del modelo",
+            options=[("Metros (recomendado)", 1.0), ("Centímetros", 0.01),
+                     ("Milímetros", 0.001), ("Pulgadas", 0.0254), ("Pies", 0.3048)],
+            format_func=lambda o: o[0],
+        )[1]
+    with c2:
+        rot_norte = st.number_input(
+            "Corrección de norte (° horario)",
+            min_value=-180.0, max_value=180.0, value=0.0, step=1.0,
+            help="Si el norte real NO es el eje verde del modelo: ángulo que hay que "
+                 "girar el modelo (visto desde arriba, sentido horario) para alinearlo.",
+        )
 
 malla = None
+_meta_sd = None
 if archivo is not None:
     _tipo = archivo.name.rsplit(".", 1)[-1].lower()
     try:
-        malla = cargar_malla(archivo.getvalue(), _tipo, escala=escala,
-                             rotacion_norte_deg=rot_norte)
-        r = resumen_malla(malla)
-        st.success(
-            f"Modelo cargado: **{r['n_triangulos']:,} triángulos** · dimensiones "
-            f"{r['dim_x_m']} × {r['dim_y_m']} × {r['dim_z_m']} m (alto {r['z_min']}–{r['z_max']} m)."
-        )
-        if max(r["dim_x_m"], r["dim_y_m"], r["dim_z_m"]) > 2000:
-            st.warning(
-                "⚠️ El modelo mide más de 2 km — probablemente las unidades no son metros. "
-                "Cambia el selector de unidades.", icon="⚠️",
+        if _es_sitedesigner:
+            malla, _meta_sd = cargar_escena_sitedesigner(archivo.getvalue())
+            st.success(
+                f"Escena Site Designer cargada: **{_meta_sd['n_bloques']} obstáculo(s)** · "
+                f"dimensiones {_meta_sd['dim_m']['x']} × {_meta_sd['dim_m']['y']} × "
+                f"{_meta_sd['dim_m']['z']} m · norte corregido {_meta_sd['north_offset_deg']}° · "
+                f"ubicación del archivo ({_meta_sd['lat']:.3f}, {_meta_sd['lon']:.3f})."
             )
+        else:
+            malla = cargar_malla(archivo.getvalue(), _tipo, escala=escala,
+                                 rotacion_norte_deg=rot_norte)
+            r = resumen_malla(malla)
+            st.success(
+                f"Modelo cargado: **{r['n_triangulos']:,} triángulos** · dimensiones "
+                f"{r['dim_x_m']} × {r['dim_y_m']} × {r['dim_z_m']} m (alto {r['z_min']}–{r['z_max']} m)."
+            )
+            if max(r["dim_x_m"], r["dim_y_m"], r["dim_z_m"]) > 2000:
+                st.warning(
+                    "⚠️ El modelo mide más de 2 km — probablemente las unidades no son metros. "
+                    "Cambia el selector de unidades.", icon="⚠️",
+                )
     except Exception as e:
         st.error(f"❌ No se pudo leer el modelo: {e}")
         malla = None
+        _meta_sd = None
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 2. Puntos de análisis
@@ -165,6 +188,10 @@ with cc1:
 with cc2:
     lon = st.number_input("Longitud", min_value=-180.0, max_value=180.0,
                           value=float(_coords[1]) if _coords else -76.635, format="%.4f")
+
+if _meta_sd is not None:
+    for _aviso_ubi in verificar_ubicacion(_meta_sd, lat, lon):
+        st.warning(_aviso_ubi, icon="⚠️")
 
 if _tmy is not None:
     st.info(
@@ -231,6 +258,10 @@ if st.button("▶️ Calcular sombras (ray-casting)", type="primary",
                 )
                 st.session_state["sk_df_fs"] = df_fs
                 st.session_state["sk_firma"] = _firma
+                # Trazabilidad: de dónde salió la geometría de este cálculo
+                st.session_state["sk_fuente"] = (
+                    "externa_marsh" if _meta_sd is not None else "sketchup"
+                )
             except Exception as e:
                 st.error(f"❌ Error en el cálculo: {e}")
 
@@ -256,12 +287,16 @@ if df_fs is not None:
         st.bar_chart(_md)
 
     csv_bytes = exportar_csv_fs(df_fs)
-    nombre_csv = "sombras_sketchup_FS_horario.csv"
+    _fuente_activa = st.session_state.get("sk_fuente", "sketchup")
+    nombre_csv = ("sombras_marsh_FS_horario.csv"
+                  if _fuente_activa == "externa_marsh"
+                  else "sombras_sketchup_FS_horario.csv")
     st.download_button("⬇️ Descargar CSV de FS horario", csv_bytes, nombre_csv, "text/csv")
 
     if st.button("📤 Enviar a la Página 5 (Mismatch/Bypass)", type="primary"):
         st.session_state["csv_fs_sketchup_bytes"] = csv_bytes
         st.session_state["csv_fs_sketchup_nombre"] = nombre_csv
+        st.session_state["fs_fuente"] = _fuente_activa
         st.success(
             "Listo — abre 🔀 **Mismatch** y oprime el botón «🌳 Usar el CSV generado en "
             "Sombras SketchUp». De ahí en adelante la cadena es la de siempre: "
