@@ -278,6 +278,14 @@ _ETIQUETA_PLAN = {"prueba": "🕐 Prueba gratuita", "mensual": "📅 Plan Mensua
 
 
 def _login_form(st) -> None:
+    # El login corre ANTES de que la página llame a bloquear_traduccion();
+    # sin esto, el traductor de Chrome rompe el DOM del formulario
+    # ("NotFoundError: removeChild"). Aplicar la protección aquí también.
+    try:
+        from utils.ui import bloquear_traduccion
+        bloquear_traduccion()
+    except Exception:
+        pass
     st.title("🔐 Calculadora BIPV — Acceso")
     st.caption("Software profesional de simulación fotovoltaica · "
                "INNOVACION QUIMICA SAS")
