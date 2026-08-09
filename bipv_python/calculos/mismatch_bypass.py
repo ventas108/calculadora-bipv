@@ -382,8 +382,18 @@ def cargar_csv_fs(archivo) -> tuple[pd.DataFrame, dict]:
     col_first_hit_distance: str | None = None
     for c in df_raw.columns:
         cl = c.lower().replace(" ", "_")
-        if cl in ("punto", "point") or cl.startswith(("punto_", "point_")):
-            # Acepta variantes como "Punto de análisis" / "point_id"
+        if cl in (
+            "punto",
+            "point",
+            "punto_de_análisis",
+            "punto_de_analisis",
+            "punto_análisis",
+            "punto_analisis",
+            "point_id",
+            "punto_id",
+        ):
+            # Acepta variantes como "Punto de análisis" / "point_id",
+            # sin capturar coordenadas tipo "Punto X".
             if col_punto is None:
                 col_punto = c
         elif cl in ("fila", "row"):

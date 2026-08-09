@@ -124,13 +124,18 @@ def _extraer_puntos(frame: Any) -> list[dict[str, Any]]:
         return []
     col_punto = _buscar_columna(frame, ("Punto", "point", "nombre"))
     if col_punto is None:
-        # Variantes de encabezado como "Punto de análisis" o "point id"
+        # Variantes de encabezado como "Punto de análisis" o "point_id";
+        # exigir sufijo conocido para no capturar coordenadas ("Punto X").
+        _sufijos_ok = ("", "deanalisis", "deanálisis", "analisis", "análisis", "id")
         for column in frame.columns:
             normalizada = "".join(
                 char for char in str(column).lower() if char.isalnum()
             )
-            if normalizada.startswith(("punto", "point")):
-                col_punto = column
+            for prefijo in ("punto", "point"):
+                if normalizada.startswith(prefijo) and normalizada[len(prefijo):] in _sufijos_ok:
+                    col_punto = column
+                    break
+            if col_punto is not None:
                 break
     col_fachada = _buscar_columna(
         frame, ("Fachada", "fachada", "facade", "obstaculo", "obstacle")
@@ -219,7 +224,9 @@ def capturar_base_comparacion(state: Mapping[str, Any]) -> dict[str, Any]:
         ),
         # Preferir el valor persistido como resultado; el widget de
         # Dimensionamiento nace con valor 1, así que 1 es el respaldo fiel.
-        "N_strings_tracker": _primer_valor(state, "N_str_tr_usado", "N_str_tr")
+        # El widget vivo manda; el resultado persistido es solo respaldo
+        # para sesiones restauradas donde el widget aún no se renderizó.
+        "N_strings_tracker": _primer_valor(state, "N_str_tr", "N_str_tr_usado")
         or 1,
         "eta_inversor": state.get("eta_inversor"),
     }
