@@ -123,7 +123,18 @@ def _extraer_puntos(frame: Any) -> list[dict[str, Any]]:
     if not isinstance(frame, pd.DataFrame) or frame.empty:
         return []
     col_punto = _buscar_columna(frame, ("Punto", "point", "nombre"))
-    col_fachada = _buscar_columna(frame, ("Fachada", "fachada", "facade"))
+    if col_punto is None:
+        # Variantes de encabezado como "Punto de análisis" o "point id"
+        for column in frame.columns:
+            normalizada = "".join(
+                char for char in str(column).lower() if char.isalnum()
+            )
+            if normalizada.startswith(("punto", "point")):
+                col_punto = column
+                break
+    col_fachada = _buscar_columna(
+        frame, ("Fachada", "fachada", "facade", "obstaculo", "obstacle")
+    )
     if col_punto is None or col_fachada is None:
         return []
     columnas_coord = {
@@ -206,7 +217,9 @@ def capturar_base_comparacion(state: Mapping[str, Any]) -> dict[str, Any]:
         "N_serie": _primer_valor(
             state, "N_serie", "bypass_n_series", "bypass_n_series_usado"
         ),
-        "N_strings_tracker": state.get("N_str_tr"),
+        # El widget de Dimensionamiento nace con valor 1; si la sesión nueva
+        # aún no visitó ese bloque, 1 es exactamente lo que usa toda la app.
+        "N_strings_tracker": _primer_valor(state, "N_str_tr") or 1,
         "eta_inversor": state.get("eta_inversor"),
     }
 
