@@ -149,17 +149,17 @@ if _tmy_df is not None and _ciudad_ss and _ciudad_ss != _ciudad_applied:
         pass  # Si falla, usa defaults anteriores sin interrumpir
 
 with col2:
-    T_frio   = st.number_input("T_mín diseño (°C)", value=float(
-                                st.session_state.get("T_min_diseno", -5.0)),
-                key="T_min_diseno",
+    # No pasar value= junto con key= cuando session_state ya trae el valor:
+    # Streamlit advierte "created with a default value but also had its value
+    # set via the Session State API". Se siembra el default solo si falta.
+    st.session_state.setdefault("T_min_diseno", -5.0)
+    st.session_state.setdefault("T_cel_realista", 36.35)
+    st.session_state.setdefault("T_cel_extremo", 41.94)
+    T_frio   = st.number_input("T_mín diseño (°C)", key="T_min_diseno",
                 help="Auto-calculado como mínimo histórico del TMY. Determina Voc_max y riesgo sobre Vdc_max del inversor.")
-    T_real   = st.number_input("T_celda caliente realista (°C)", value=float(
-                                st.session_state.get("T_cel_realista", 36.35)),
-                key="T_cel_realista",
+    T_real   = st.number_input("T_celda caliente realista (°C)", key="T_cel_realista",
                 help="T_amb P95 + (NOCT-20)/800×800 W/m². Determina Vmp de operación habitual.")
-    T_extr   = st.number_input("T_celda caliente extremo (°C)", value=float(
-                                st.session_state.get("T_cel_extremo", 41.94)),
-                key="T_cel_extremo",
+    T_extr   = st.number_input("T_celda caliente extremo (°C)", key="T_cel_extremo",
                 help="T_amb máxima histórica + (NOCT-20)/800×1000 W/m². Determina Vmp mínimo (peor caso MPPT).")
     N_str_tr = st.number_input("N_strings por tracker (via combinadoras)", value=int(st.session_state.get("N_str_tr", 1)), min_value=1, key="N_str_tr")
     col_nm1, col_nm2 = st.columns(2)
