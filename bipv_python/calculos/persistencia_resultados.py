@@ -146,6 +146,33 @@ def restaurar_resultados_produccion(session_state, usuario: str) -> bool:
     return restauro_clave
 
 
+# ── Selección de equipos (panel + inversor) por usuario — tarea #225 ─────────
+
+def _ruta_seleccion_equipos(usuario: str) -> str:
+    return ruta_datos_usuario("seleccion_equipos.json", usuario)
+
+
+def guardar_seleccion_equipos(usuario: str, panel: str, inversor: str) -> bool:
+    """Persiste el panel e inversor elegidos para restaurarlos en nuevas sesiones."""
+    if not usuario or not (panel or inversor):
+        return False
+    return _escribir_json_atomico(
+        _ruta_seleccion_equipos(usuario),
+        {"panel": str(panel or ""), "inversor": str(inversor or "")},
+    )
+
+
+def cargar_seleccion_equipos(usuario: str) -> dict:
+    """Devuelve {"panel": str, "inversor": str} persistidos (o dict vacío)."""
+    if not usuario:
+        return {}
+    data = _leer_json(_ruta_seleccion_equipos(usuario))
+    return {
+        "panel": str(data.get("panel") or ""),
+        "inversor": str(data.get("inversor") or ""),
+    }
+
+
 def limpiar_resultados_produccion(usuario: str) -> None:
     """Borra los resultados persistidos (cambio de ciudad/coords/proyecto)."""
     if not usuario:

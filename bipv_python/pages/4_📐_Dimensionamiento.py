@@ -26,6 +26,21 @@ st.set_page_config(page_title="Dimensionamiento — BIPV", page_icon="📐", lay
 from calculos.auth import requerir_login
 requerir_login()
 
+# ── #225: restaurar panel/inversor predeterminados del usuario ────────────────
+# Debe correr ANTES de instanciar los selectores (patrón widgets keyed).
+from calculos.persistencia_resultados import (
+    cargar_seleccion_equipos,
+    guardar_seleccion_equipos,
+)
+_auth_email_dim = st.session_state.get("auth_email", "")
+if not st.session_state.get("_sel_equipos_restaurada"):
+    st.session_state["_sel_equipos_restaurada"] = True
+    _sel_pers = cargar_seleccion_equipos(_auth_email_dim)
+    if _sel_pers.get("panel") and "panel_pref_persistido" not in st.session_state:
+        st.session_state["panel_pref_persistido"] = _sel_pers["panel"]
+    if _sel_pers.get("inversor") and not st.session_state.get("inversor_nombre_dim"):
+        st.session_state["inversor_nombre_dim"] = _sel_pers["inversor"]
+
 from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
 mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
@@ -37,7 +52,11 @@ col1, col2 = st.columns(2)
 with col1:
     _cat_excel = cargar_catalogo_excel()
     _lista_paneles = list(_cat_excel.keys()) if _cat_excel else list(MODULOS_BIPV.keys())
-    _idx_default = _lista_paneles.index("ASP-ST1-T40") if "ASP-ST1-T40" in _lista_paneles else 0
+    _panel_pref = st.session_state.get("panel_pref_persistido", "")
+    if _panel_pref in _lista_paneles:
+        _idx_default = _lista_paneles.index(_panel_pref)
+    else:
+        _idx_default = _lista_paneles.index("ASP-ST1-T40") if "ASP-ST1-T40" in _lista_paneles else 0
     # #118 — badge ✅/⚠️ en la lista (mismo criterio que Motor IV: faltan Voc/Isc/Vmp/Imp)
     def _fmt_panel_dim(name: str) -> str:
         _p = (_cat_excel.get(name) if _cat_excel else None) or MODULOS_BIPV.get(name) or {}
@@ -73,6 +92,24 @@ with col1:
         _lista_inv,
         key="inversor_selector_dim",
     )
+    # #225 — fijar la selección actual como predeterminada del usuario
+    if st.button(
+        "📌 Fijar panel + inversor como predeterminados",
+        key="btn_fijar_seleccion_equipos",
+        help=(
+            "Guarda esta selección en tu cuenta: al abrir la app en una nueva "
+            "sesión (F5 o reinicio del servidor), estos serán los valores "
+            "preseleccionados en vez de los defaults de fábrica."
+        ),
+    ):
+        if guardar_seleccion_equipos(_auth_email_dim, panel_nombre, inversor_nombre):
+            st.session_state["panel_pref_persistido"] = panel_nombre
+            st.success(
+                f"📌 Guardado: **{panel_nombre}** + **{inversor_nombre}** "
+                "quedarán preseleccionados en tus próximas sesiones."
+            )
+        else:
+            st.warning("No se pudo guardar la selección (revisa permisos del servidor).")
 
 # Cargar dicts antes de col2 para que estén disponibles al calcular N_min_scan
 _panel_catalogo = obtener_panel_excel(panel_nombre) if _cat_excel else MODULOS_BIPV[panel_nombre]
@@ -444,6 +481,9 @@ with st.container(border=True):
                     _fila_compatible["N_string_recomendado"]
                 )
                 st.session_state["prorrateo_preliminar_panel"] = panel_nombre
+                # #225 — persistir también al cargar un compatible
+                guardar_seleccion_equipos(_auth_email_dim, panel_nombre, _modelo_compatible)
+                st.session_state["panel_pref_persistido"] = panel_nombre
                 st.rerun()
         else:
             st.info(
