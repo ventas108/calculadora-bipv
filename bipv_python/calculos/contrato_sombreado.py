@@ -218,3 +218,13 @@ def resultado_a_contrato(df: pd.DataFrame) -> dict[str, Any]:
     }
     validar_resultado(payload)
     return payload
+
+def etiqueta_fuente_fs(fuente) -> str:
+    """
+    Etiqueta humana de la fuente del FS geométrico para informes.
+    Trazabilidad (#230): campo informativo, no cambia ningún cálculo.
+    """
+    return {
+        "sketchup": "SketchUp (interno)",
+        "externa_marsh": "Site Designer + TMY (externo)",
+    }.get(fuente, "CSV externo")

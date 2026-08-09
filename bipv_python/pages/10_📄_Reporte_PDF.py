@@ -851,6 +851,21 @@ def generar_html_reporte() -> str:
         e_dc_uni = bypass_res_r.get("kwh_dc_uniforme", 0)
         e_ac_bp  = st.session_state.get("E_ac_anual_kWh_bypass", 0)
         col_fs_r = meta_fs_r.get("col_original", "FS")
+        from calculos.contrato_sombreado import etiqueta_fuente_fs as _etq_fs_pdf
+        # Preferir la fuente registrada en la base congelada (sobrevive F5);
+        # respaldo: la de la sesión viva.
+        _fs_fuente_r = None
+        _f4_r = st.session_state.get("escenarios_fase4") or {}
+        _base_r = _f4_r.get("base_comparacion") or {}
+        try:
+            _fs_fuente_r = (_base_r.get("componentes", {})
+                            .get("fachadas_y_puntos", {})
+                            .get("valor", {}).get("fs_fuente"))
+        except AttributeError:
+            _fs_fuente_r = None
+        if not _fs_fuente_r:
+            _fs_fuente_r = st.session_state.get("fs_fuente")
+        _etiqueta_fuente_fs_r = _etq_fs_pdf(_fs_fuente_r)
         tipo_fsr = meta_fs_r.get("tipo", "combinado")
         modo_uso = st.session_state.get("bypass_modo_usado", "mensual")
         df_m_bp  = bypass_res_r.get("df_mensual_bypass")
@@ -875,6 +890,10 @@ def generar_html_reporte() -> str:
             ("Fuente de datos FS",
              col_fs_r, "",
              "Geometrico = solo obstáculos físicos · Combinado = geom + nubes (sobreestima)"),
+            ("Fuente del sombreado",
+             _etiqueta_fuente_fs_r, "",
+             "Herramienta que generó la geometría de sombras: SketchUp (interno), "
+             "Site Designer + TMY (externo) o CSV externo"),
             ("Modo cobertura temporal",
              "Patrón mensual" if modo_uso == "mensual" else "Días críticos exactos", "",
              "Mensual replica el patrón del día crítico a todos los días del mes"),

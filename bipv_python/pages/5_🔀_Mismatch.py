@@ -1678,6 +1678,11 @@ if csv_ok and df_fs_raw is not None:
                 f"Fuente FS: **{_col_fs_res}** ({_fs_badge}) · "
                 f"Cobertura: **{_modo_badge}**"
             )
+            from calculos.contrato_sombreado import etiqueta_fuente_fs as _etq_fs
+            st.caption(
+                "🧭 Fuente del sombreado: "
+                f"**{_etq_fs(st.session_state.get('fs_fuente'))}**"
+            )
 
             # ── Fase 4: ejecutar escenarios sobre la base congelada ────────
             _def_f4_exec = st.session_state.get("escenarios_fase4")

@@ -708,6 +708,11 @@ if btn_sim or st.session_state.get("produccion_ok"):
         # Actualizar E_ac con corrección bypass para páginas financieras
         st.session_state["E_ac_anual_kWh_bypass"] = round(e_ac_corr, 0)
         st.session_state["kwh_bypass_anual"]       = round(kwh_bypass, 1)
+        from calculos.contrato_sombreado import etiqueta_fuente_fs as _etq_fs
+        st.caption(
+            "🧭 Fuente del sombreado aplicado: "
+            f"**{_etq_fs(st.session_state.get('fs_fuente'))}**"
+        )
 
     st.caption(
         f"E ref (P_STC × POA): **{e_ref:,.0f} kWh** | "

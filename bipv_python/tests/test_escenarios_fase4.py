@@ -197,3 +197,25 @@ def test_cambio_de_tmy_rompe_la_base_unica():
 
     with pytest.raises(ValueError, match="tmy|TMY"):
         comparar_bases(base_a, base_b)
+
+def test_fs_fuente_viaja_en_la_base_sin_cambiar_la_huella():
+    """#230: fs_fuente es informativo — viaja en la base congelada pero NO
+    cambia la huella (las bases ya congeladas siguen siendo válidas)."""
+    estado_sin = _estado_base()
+    estado_con = _estado_base()
+    estado_con["fs_fuente"] = "externa_marsh"
+    base_sin = capturar_base_comparacion(estado_sin)
+    base_con = capturar_base_comparacion(estado_con)
+    comp_sin = base_sin["componentes"]["fachadas_y_puntos"]
+    comp_con = base_con["componentes"]["fachadas_y_puntos"]
+    assert comp_sin["valor"]["fs_fuente"] is None
+    assert comp_con["valor"]["fs_fuente"] == "externa_marsh"
+    assert comp_sin["huella"] == comp_con["huella"]
+
+
+def test_etiqueta_fuente_fs():
+    from calculos.contrato_sombreado import etiqueta_fuente_fs
+    assert etiqueta_fuente_fs("sketchup") == "SketchUp (interno)"
+    assert etiqueta_fuente_fs("externa_marsh") == "Site Designer + TMY (externo)"
+    assert etiqueta_fuente_fs(None) == "CSV externo"
+    assert etiqueta_fuente_fs("otra_cosa") == "CSV externo"

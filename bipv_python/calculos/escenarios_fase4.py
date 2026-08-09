@@ -213,6 +213,13 @@ def capturar_base_comparacion(state: Mapping[str, Any]) -> dict[str, Any]:
             "sk_puntos_df" if state.get("sk_puntos_df") is not None else "df_fs_raw"
         ),
     }
+    # Trazabilidad (campo INFORMATIVO): de dónde salió el FS geométrico
+    # ("sketchup" | "externa_marsh" | None = CSV subido a mano). Se agrega al
+    # valor DESPUÉS de calcular la huella para no invalidar bases ya congeladas
+    # — no cambia ningún cálculo, solo viaja para mostrarse en informes.
+    fs_fuente = state.get("fs_fuente")
+    huella_fachadas = _huella(fachadas_y_puntos)
+    fachadas_y_puntos["fs_fuente"] = fs_fuente
 
     panel = state.get("panel_dict")
     panel_nombre = _primer_valor(state, "panel_nombre_final", "panel_nombre_dim")
@@ -318,7 +325,7 @@ def capturar_base_comparacion(state: Mapping[str, Any]) -> dict[str, Any]:
         },
         "fachadas_y_puntos": {
             "valor": fachadas_y_puntos,
-            "huella": _huella(fachadas_y_puntos),
+            "huella": huella_fachadas,
         },
         "panel": {
             "valor": {"nombre": panel_nombre, "ficha": panel},
