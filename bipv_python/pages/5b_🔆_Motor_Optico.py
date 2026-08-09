@@ -156,8 +156,10 @@ if _panel_detectado:
         )
 else:
     st.info(
-        "ℹ️ No se detectó un panel configurado en 🏠 Proyecto. "
-        "Configura los parámetros manualmente o regresa a Proyecto para seleccionar un panel."
+        "ℹ️ No se detectó un panel activo en la sesión. El panel se selecciona en "
+        "📐 **Dimensionamiento** — abre esa página, elige el panel y vuelve aquí "
+        "para el auto-llenado (b₀, τ, NOCT, γ). También puedes configurar los "
+        "parámetros manualmente."
     )
 
 # ══════════════════════════════════════════════════════════════════════════════
