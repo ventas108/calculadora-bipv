@@ -162,7 +162,20 @@ _ciudad_ss = st.session_state.get("tmy_ciudad", "")
 _ciudad_applied = st.session_state.get("_dim_tmy_ciudad_ref", None)
 _temp_auto_info = None
 
-if _tmy_df is not None and _ciudad_ss and _ciudad_ss != _ciudad_applied:
+# Guardián: si las tres temperaturas quedaron en 0 (p. ej. un proyecto
+# guardado con ceros las pisó al restaurarse), re-sembrar desde el TMY.
+# Físicamente T_mín, T_realista y T_extremo nunca son 0.0 a la vez.
+_temps_en_cero = all(
+    abs(float(st.session_state.get(_k) or 0.0)) < 1e-9
+    for _k in ("T_min_diseno", "T_cel_realista", "T_cel_extremo")
+) and any(
+    st.session_state.get(_k) is not None
+    for _k in ("T_min_diseno", "T_cel_realista", "T_cel_extremo")
+)
+
+if _tmy_df is not None and _ciudad_ss and (
+    _ciudad_ss != _ciudad_applied or _temps_en_cero
+):
     try:
         _noct    = float(panel.get("NOCT", 45.0))
         _t2m     = _tmy_df["T2m"] if "T2m" in _tmy_df.columns else _tmy_df.iloc[:, 0]

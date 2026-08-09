@@ -683,9 +683,17 @@ if st.button("💾 Guardar configuración", type="primary"):
         st.session_state["cobertura_pct"]  = cobertura_pct
     if ciudad in CIUDADES:
         c = CIUDADES[ciudad]
-        st.session_state["T_min_diseno"]   = c["T_min_diseno"]
-        st.session_state["T_cel_realista"] = c["T_cel_realista"]
-        st.session_state["T_cel_extremo"]  = c["T_cel_extremo"]
+        # No pisar las temperaturas ya calculadas desde el TMY con ceros o
+        # nulos del catálogo de ciudades (dejaba los widgets "en ceros").
+        _temps_ciudad = (
+            c.get("T_min_diseno"),
+            c.get("T_cel_realista"),
+            c.get("T_cel_extremo"),
+        )
+        if any(_t not in (None, 0, 0.0) for _t in _temps_ciudad):
+            st.session_state["T_min_diseno"]   = c["T_min_diseno"]
+            st.session_state["T_cel_realista"] = c["T_cel_realista"]
+            st.session_state["T_cel_extremo"]  = c["T_cel_extremo"]
         st.session_state["GHI_kWh_m2_dia"] = c["GHI_kWh_m2_dia"]
         st.session_state["lat_proyecto"] = st.session_state.get("_lat_custom_temp", c["lat"])
         st.session_state["lon_proyecto"] = st.session_state.get("_lon_custom_temp", c["lon"])
