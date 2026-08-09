@@ -194,6 +194,13 @@ with st.container(border=True):
                     "✅ Definición guardada y base única congelada. "
                     f"ID: `{_base_live_f4['base_id'][:12]}`"
                 )
+                if _base_live_f4.get("eta_inversor") is None:
+                    st.warning(
+                        "⚠️ La base se congeló sin la eficiencia del inversor (η) "
+                        "porque aún no se ha corrido 📊 Producción en esta sesión. "
+                        "Corre Producción y vuelve a congelar la base antes de "
+                        "ejecutar los escenarios."
+                    )
             else:
                 st.session_state["fase4_base_comparacion_ok"] = False
                 st.warning(
@@ -1688,6 +1695,22 @@ if csv_ok and df_fs_raw is not None:
                 use_container_width=True,
             ):
                 try:
+                    # eta_inversor solo existe tras correr Producción; en una
+                    # sesión nueva usar el valor congelado en la base (es el
+                    # mismo contra el que el ejecutor verifica coherencia).
+                    _eta_f4 = st.session_state.get("eta_inversor")
+                    if _eta_f4 is None:
+                        _eta_f4 = (_def_f4_exec.get("base_comparacion") or {}).get(
+                            "eta_inversor"
+                        )
+                    if _eta_f4 is None:
+                        st.error(
+                            "❌ Falta la eficiencia del inversor (η). Corre una vez "
+                            "la página 📊 Producción en esta sesión (o congela la "
+                            "base después de correrla) y vuelve a ejecutar los "
+                            "escenarios."
+                        )
+                        st.stop()
                     with st.spinner("Simulando los escenarios con la base congelada..."):
                         _res_f4 = ejecutar_escenarios(
                             definicion=_def_f4_exec,
