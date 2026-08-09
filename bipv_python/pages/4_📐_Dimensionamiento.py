@@ -428,11 +428,27 @@ with st.container(border=True):
             "MPPT_V", "trackers", "strings_tracker", "P_ac_nom_kW",
             "costo_usd", "motivo",
         ]
-        st.dataframe(
+        _sel_mapeo = st.dataframe(
             _df_mapeo[_cols_mapeo],
             use_container_width=True,
             hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row",
+            key="tabla_mapeo_inversores",
         )
+        st.caption(
+            "💡 Haz clic en una fila de la tabla para llevar ese modelo "
+            "directamente a la casilla «Inversor compatible» de abajo."
+        )
+        _modelo_click_tabla = ""
+        try:
+            _filas_sel = _sel_mapeo.selection.rows
+            if _filas_sel:
+                _modelo_click_tabla = str(
+                    _df_mapeo[_cols_mapeo].iloc[_filas_sel[0]]["modelo"]
+                )
+        except Exception:
+            _modelo_click_tabla = ""
         _compatibles_mapeo = [
             fila for fila in _mapeo_inv
             if fila.get("compatible") and fila.get("N_string_recomendado")
@@ -447,6 +463,25 @@ with st.container(border=True):
                 fila["modelo"]: fila for fila in _compatibles_mapeo
             }
             _opciones_compatibles = list(_compatibles_por_nombre)
+            # Clic en la tabla → llevar el modelo a la casilla de abajo.
+            # Solo cuando la selección de la tabla CAMBIA (no en cada rerun),
+            # y ANTES de instanciar el selectbox (patrón widgets keyed).
+            if (
+                _modelo_click_tabla
+                and _modelo_click_tabla
+                != st.session_state.get("_ultimo_modelo_click_tabla", "")
+            ):
+                st.session_state["_ultimo_modelo_click_tabla"] = _modelo_click_tabla
+                if _modelo_click_tabla in _opciones_compatibles:
+                    st.session_state["selector_inversor_compatible_mapeo"] = (
+                        _modelo_click_tabla
+                    )
+                else:
+                    st.warning(
+                        f"**{_modelo_click_tabla}** no es compatible con este "
+                        "panel en el rango de N/string mapeado, así que no se "
+                        "puede cargar en la casilla."
+                    )
             _modelo_prelim_default = st.session_state.get(
                 "prorrateo_preliminar_modelo", ""
             )
