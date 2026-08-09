@@ -15,6 +15,7 @@ from calculos.mismatch import (
 from calculos.mismatch_bypass import (
     cargar_csv_fs,
     alinear_fs_con_tmy,
+    combinar_fs_con_horizonte,
     cobertura_csv,
     simular_bypass_horario,
     estadisticas_fs,
@@ -219,10 +220,18 @@ if _definicion_fase4:
     _ec1, _ec2, _ec3 = st.columns(3)
     _ec1.success("**Referencia**\n\nSin obstáculos · FS geométrico = 0")
     if _actual_f4["estado"] == "definido_reconciliacion_pendiente":
-        _ec2.warning(
-            "**Situación actual**\n\n"
-            "Definida · reconciliar horizonte + SketchUp antes de comparar"
-        )
+        if st.session_state.get("bypass_horizonte_incluido"):
+            _ec2.success(
+                "**Situación actual**\n\n"
+                "Definida · horizonte + modelo 3D combinados en el bypass "
+                "(máximo hora a hora)"
+            )
+        else:
+            _ec2.warning(
+                "**Situación actual**\n\n"
+                "Definida · reconciliar horizonte + SketchUp antes de comparar "
+                "(actívalo en la sección del bypass)"
+            )
     else:
         _ec2.success("**Situación actual**\n\nFuente de sombreado definida")
     _ec3.info(
@@ -1471,6 +1480,33 @@ if csv_ok and df_fs_raw is not None:
     # El widget con key="bypass_modo_alineacion" ya mantiene session_state
     # sincronizado; reasignarlo tras instanciar el widget lanza StreamlitAPIException.
 
+    # ── Horizonte: combinar con el FS 3D (#232) ───────────────────────────
+    _horiz_disponible = bool(
+        st.session_state.get("sombra_ok")
+        and isinstance(st.session_state.get("res_sombra"), dict)
+        and st.session_state["res_sombra"].get("horas_sombreadas", 0) > 0
+    )
+    if _horiz_disponible:
+        incluir_horizonte = st.checkbox(
+            "🏔️ Incluir el perfil de horizonte en el bypass (recomendado)",
+            value=True,
+            key="bypass_incluir_horizonte",
+            help=(
+                "Combina hora a hora la sombra del horizonte (montañas/edificios "
+                "lejanos, sección de arriba) con el FS del modelo 3D tomando la "
+                "PEOR de las dos — máximo, nunca suma, para no contar dos veces "
+                "el mismo obstáculo."
+            ),
+        )
+    else:
+        incluir_horizonte = False
+        if st.session_state.get("puntos_horiz") is None:
+            st.caption(
+                "🏔️ Sin perfil de horizonte calculado — solo se usará el FS del "
+                "modelo 3D. Si el sitio tiene montañas o edificios lejanos, "
+                "calcula el sombreado de horizonte arriba y vuelve."
+            )
+
     # ── Botón de simulación ───────────────────────────────────────────────
     btn_bypass = st.button(
         "⚡ Calcular pérdida real por bypass diodes",
@@ -1498,6 +1534,18 @@ if csv_ok and df_fs_raw is not None:
                     st.session_state["bypass_modo_usado"] = _modo
                     st.session_state["bypass_modo_agregacion_usado"] = _modo_ag
 
+                    # Combinar con el horizonte (#232): máximo hora a hora
+                    _info_horiz = None
+                    if incluir_horizonte:
+                        _mask_h = st.session_state["res_sombra"]["mascara_sombra"]
+                        p_shade, _info_horiz = combinar_fs_con_horizonte(
+                            p_shade, _mask_h
+                        )
+                    st.session_state["bypass_horizonte_info"] = _info_horiz
+                    st.session_state["bypass_horizonte_incluido"] = bool(
+                        incluir_horizonte
+                    )
+
                     # Simular bypass
                     res_bp = simular_bypass_horario(
                         G_eff      = poa_bp,
@@ -1523,6 +1571,23 @@ if csv_ok and df_fs_raw is not None:
                     st.session_state["bypass_ok"] = False
 
         res_bp = st.session_state.get("bypass_result", {})
+
+        # #232: si el checkbox de horizonte cambió después de calcular, el
+        # resultado mostrado ya no corresponde a la selección — avisar.
+        if res_bp and bool(incluir_horizonte) != bool(
+            st.session_state.get("bypass_horizonte_incluido")
+        ):
+            st.warning(
+                "⚠️ Cambiaste la opción del horizonte después de calcular: el "
+                "resultado de abajo se calculó "
+                + (
+                    "SIN el horizonte incluido. "
+                    if incluir_horizonte
+                    else "CON el horizonte incluido. "
+                )
+                + "Pulsa «⚡ Calcular pérdida real por bypass diodes» para "
+                "actualizarlo."
+            )
 
         if res_bp:
             # ── Métricas resumen ───────────────────────────────────────────
@@ -1679,9 +1744,18 @@ if csv_ok and df_fs_raw is not None:
                 f"Cobertura: **{_modo_badge}**"
             )
             from calculos.contrato_sombreado import etiqueta_fuente_fs as _etq_fs
+            _horiz_txt = ""
+            if st.session_state.get("bypass_horizonte_incluido"):
+                _ih = st.session_state.get("bypass_horizonte_info") or {}
+                _horiz_txt = (
+                    f" · 🏔️ Horizonte incluido ({_ih.get('horas_horizonte', 0)} h/año, "
+                    f"{_ih.get('horas_solo_horizonte', 0)} h solo por horizonte)"
+                )
+            elif st.session_state.get("sombra_ok"):
+                _horiz_txt = " · 🏔️ Horizonte NO incluido en este cálculo"
             st.caption(
                 "🧭 Fuente del sombreado: "
-                f"**{_etq_fs(st.session_state.get('fs_fuente'))}**"
+                f"**{_etq_fs(st.session_state.get('fs_fuente'))}**{_horiz_txt}"
             )
 
             # ── Fase 4: ejecutar escenarios sobre la base congelada ────────
@@ -1753,6 +1827,23 @@ if csv_ok and df_fs_raw is not None:
                             ),
                             modo_agregacion=st.session_state.get(
                                 "bypass_modo_agregacion", "auto"
+                            ),
+                            # Horizonte (#232): obligatorio si la definición
+                            # lo declara; el ejecutor valida coherencia.
+                            mascara_horizonte=(
+                                st.session_state["res_sombra"]["mascara_sombra"]
+                                if (
+                                    "horizonte"
+                                    in (
+                                        (_def_f4_exec.get("politica_fuentes_actual")
+                                         or {}).get("fuentes_declaradas", [])
+                                    )
+                                    and st.session_state.get("sombra_ok")
+                                    and isinstance(
+                                        st.session_state.get("res_sombra"), dict
+                                    )
+                                )
+                                else None
                             ),
                         )
                     _def_f4_exec["resultados"] = _res_f4

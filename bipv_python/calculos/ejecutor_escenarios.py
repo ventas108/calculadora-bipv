@@ -29,7 +29,11 @@ from calculos.escenarios_fase4 import (
     validar_base_comparacion,
     validar_definicion_escenarios,
 )
-from calculos.mismatch_bypass import alinear_fs_con_tmy, simular_bypass_horario
+from calculos.mismatch_bypass import (
+    alinear_fs_con_tmy,
+    combinar_fs_con_horizonte,
+    simular_bypass_horario,
+)
 
 RESULTADOS_SCHEMA_VERSION = "bipv.scenario-results.v1"
 _HORAS_ANIO = 8760
@@ -181,6 +185,7 @@ def ejecutar_escenarios(
     df_fs_optimizada: pd.DataFrame | None = None,
     modo_alineacion: str = "mensual",
     modo_agregacion: str = "auto",
+    mascara_horizonte: pd.Series | None = None,
 ) -> dict[str, Any]:
     """Ejecuta los tres escenarios sobre la base congelada de ``definicion``.
 
@@ -265,12 +270,40 @@ def ejecutar_escenarios(
     )
 
     # Situación actual: FS geométrico reconciliado de la fuente declarada.
+    # Si la definición declara 'horizonte' como fuente, la máscara es
+    # OBLIGATORIA: nunca se simula "actual" fingiendo que el horizonte no
+    # existe (#232). Si llega máscara sin declararla, también se aborta —
+    # supuestos mezclados.
+    fuentes_actual = (definicion.get("politica_fuentes_actual") or {}).get(
+        "fuentes_declaradas", []
+    )
+    horizonte_declarado = "horizonte" in fuentes_actual
+    if horizonte_declarado and mascara_horizonte is None:
+        raise ValueError(
+            "La definición declara 'horizonte' como fuente de la situación "
+            "actual, pero no se entregó la máscara de sombreado de horizonte. "
+            "Calcula el sombreado de horizonte en esta sesión (sección 🏔️ de "
+            "Mismatch) antes de ejecutar los escenarios."
+        )
+    if mascara_horizonte is not None and not horizonte_declarado:
+        raise ValueError(
+            "Se entregó una máscara de horizonte pero la definición congelada "
+            "no declara 'horizonte' como fuente; redefine los escenarios con "
+            "el horizonte activado para no mezclar supuestos."
+        )
+
     p_shade_actual = alinear_fs_con_tmy(
         df_fs_actual, tmy.index, modo=modo_alineacion, modo_agregacion=modo_agregacion
     )
+    fuente_actual = "fs_geometrico_actual"
+    if mascara_horizonte is not None:
+        p_shade_actual, _ = combinar_fs_con_horizonte(
+            p_shade_actual, mascara_horizonte
+        )
+        fuente_actual = "fs_geometrico_actual+horizonte"
     actual = _simular_escenario(
         p_shade=_validar_p_shade("p_shade actual", p_shade_actual.to_numpy()),
-        fuente_p_shade="fs_geometrico_actual",
+        fuente_p_shade=fuente_actual,
         **comunes,
     )
 
@@ -282,9 +315,17 @@ def ejecutar_escenarios(
             modo=modo_alineacion,
             modo_agregacion=modo_agregacion,
         )
+        # El horizonte es del sitio, no de la distribución de paneles: si la
+        # situación actual lo incluye, la alternativa también (misma física).
+        fuente_opt = "fs_geometrico_optimizado"
+        if mascara_horizonte is not None:
+            p_shade_opt, _ = combinar_fs_con_horizonte(
+                p_shade_opt, mascara_horizonte
+            )
+            fuente_opt = "fs_geometrico_optimizado+horizonte"
         optimizada = _simular_escenario(
             p_shade=_validar_p_shade("p_shade optimizada", p_shade_opt.to_numpy()),
-            fuente_p_shade="fs_geometrico_optimizado",
+            fuente_p_shade=fuente_opt,
             **comunes,
         )
     else:

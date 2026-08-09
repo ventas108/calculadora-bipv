@@ -245,3 +245,69 @@ def test_rechaza_panel_sin_noct():
     definicion = _definicion_con_base(state)
     with pytest.raises(ValueError, match="NOCT"):
         _ejecutar(state, definicion)
+
+
+# ─── #232: horizonte en el ejecutor ──────────────────────────────────────────
+def _definicion_con_horizonte(state):
+    definicion = construir_definicion_escenarios(
+        nombre_proyecto="Teusaquillo",
+        fuente_horizonte=True,
+        fuente_sketchup=True,
+        tipo_optimizacion="paneles",
+        panel_nombre=state["panel_nombre_dim"],
+        inversor_nombre=state["inversor_nombre_dim"],
+    )
+    definicion["base_comparacion"] = capturar_base_comparacion(state)
+    return definicion
+
+
+def _mascara_horizonte(idx, horas=(7, 8)):
+    return pd.Series(idx.hour.isin(horas), index=idx)
+
+
+def _ejecutar_horiz(state, definicion, *, mascara=None):
+    return ejecutar_escenarios(
+        definicion=definicion,
+        base_estado_actual=capturar_base_comparacion(state),
+        tmy=state["tmy_df"],
+        poa_global=_poa_diurna(state["tmy_df"].index),
+        panel=state["panel_dict"],
+        n_serie=state["N_serie"],
+        n_paralelo=state["N_paneles_dim"] // state["N_serie"],
+        eta_inversor=state["eta_inversor"],
+        df_fs_actual=_df_fs(0.5),
+        mascara_horizonte=mascara,
+    )
+
+
+def test_horizonte_declarado_sin_mascara_aborta():
+    state = _estado_con_panel_sdm()
+    definicion = _definicion_con_horizonte(state)
+    with pytest.raises(ValueError, match="horizonte"):
+        _ejecutar_horiz(state, definicion, mascara=None)
+
+
+def test_mascara_sin_declarar_horizonte_aborta():
+    state = _estado_con_panel_sdm()
+    definicion = _definicion_con_base(state)  # solo sketchup
+    with pytest.raises(ValueError, match="no declara 'horizonte'"):
+        _ejecutar_horiz(
+            state, definicion, mascara=_mascara_horizonte(state["tmy_df"].index)
+        )
+
+
+def test_horizonte_combinado_reduce_energia_del_actual():
+    state = _estado_con_panel_sdm()
+    definicion = _definicion_con_horizonte(state)
+    mascara = _mascara_horizonte(state["tmy_df"].index, horas=(8, 9, 10))
+    res = _ejecutar_horiz(state, definicion, mascara=mascara)
+    assert res["actual"]["fuente_p_shade"] == "fs_geometrico_actual+horizonte"
+
+    # El mismo caso SIN horizonte (definición solo sketchup) da más energía:
+    definicion_sin = _definicion_con_base(state)
+    res_sin = _ejecutar(state, definicion_sin)
+    assert res["actual"]["E_AC_anual_kWh"] < res_sin["actual"]["E_AC_anual_kWh"]
+    # La referencia no cambia: sigue siendo FS = 0 por definición.
+    assert res["referencia"]["E_AC_anual_kWh"] == pytest.approx(
+        res_sin["referencia"]["E_AC_anual_kWh"]
+    )

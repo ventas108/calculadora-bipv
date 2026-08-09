@@ -821,3 +821,55 @@ def estadisticas_fs(df_fs: pd.DataFrame) -> dict:
         "horas_fs_gt50":     horas_fs_gt50,
         "df_mensual_fs":     df_m,
     }
+
+
+# ─── Combinación FS 3D + horizonte (#232) ────────────────────────────────────
+def combinar_fs_con_horizonte(p_shade, mascara_horizonte):
+    """
+    Combina el FS geométrico 3D (ya alineado al TMY) con la sombra de horizonte.
+
+    p_shade            : pd.Series FS en [0,1] con índice = TMY (8760 h UTC).
+    mascara_horizonte  : pd.Series bool (True = sol por debajo del horizonte),
+                         índice horario del mismo TMY/POA de la sesión.
+
+    Regla física: en cada hora manda la sombra PEOR — máximo de ambas fuentes,
+    nunca la suma (evita el doble conteo cuando el mismo obstáculo aparece en
+    las dos). El horizonte es sombra total → FS_horizonte = 1.0 en horas
+    bloqueadas, 0.0 en el resto.
+
+    Retorna (fs_combinado: pd.Series, info: dict) con:
+      horas_horizonte        : horas donde el horizonte aporta sombra
+      horas_solo_horizonte   : horas donde SOLO el horizonte sombrea (FS 3D < 1)
+    Lanza ValueError si los índices no son compatibles — nunca alinea en
+    silencio series de calendarios distintos.
+    """
+    if not isinstance(p_shade, pd.Series) or not isinstance(mascara_horizonte, pd.Series):
+        raise ValueError("combinar_fs_con_horizonte espera dos pd.Series")
+    if len(mascara_horizonte) != len(p_shade):
+        raise ValueError(
+            f"El horizonte tiene {len(mascara_horizonte)} horas y el FS 3D "
+            f"{len(p_shade)} — recalcula el sombreado de horizonte con el TMY "
+            "actual de la sesión (☀️ Recurso Solar cambió)."
+        )
+    mask = mascara_horizonte
+    if not mask.index.equals(p_shade.index):
+        # mismos timestamps aunque el objeto índice difiera (p.ej. tz repr)
+        try:
+            mask = mascara_horizonte.reindex(p_shade.index)
+        except Exception as e:  # índice no comparable
+            raise ValueError(f"Índices de horizonte y FS incompatibles: {e}")
+        if mask.isna().any():
+            raise ValueError(
+                "Las horas del horizonte no coinciden con las del TMY de la "
+                "sesión — recalcula el sombreado de horizonte antes de combinar."
+            )
+    fs_h = mask.astype(float)  # True → 1.0 (sombra total), False → 0.0
+    fs_comb = pd.Series(
+        np.maximum(p_shade.values.astype(float), fs_h.values),
+        index=p_shade.index,
+    )
+    info = {
+        "horas_horizonte": int(fs_h.sum()),
+        "horas_solo_horizonte": int(((fs_h >= 1.0) & (p_shade < 1.0)).sum()),
+    }
+    return fs_comb, info
