@@ -217,9 +217,10 @@ def capturar_base_comparacion(state: Mapping[str, Any]) -> dict[str, Any]:
         "N_serie": _primer_valor(
             state, "N_serie", "bypass_n_series", "bypass_n_series_usado"
         ),
-        # El widget de Dimensionamiento nace con valor 1; si la sesión nueva
-        # aún no visitó ese bloque, 1 es exactamente lo que usa toda la app.
-        "N_strings_tracker": _primer_valor(state, "N_str_tr") or 1,
+        # Preferir el valor persistido como resultado; el widget de
+        # Dimensionamiento nace con valor 1, así que 1 es el respaldo fiel.
+        "N_strings_tracker": _primer_valor(state, "N_str_tr_usado", "N_str_tr")
+        or 1,
         "eta_inversor": state.get("eta_inversor"),
     }
 
@@ -233,19 +234,28 @@ def capturar_base_comparacion(state: Mapping[str, Any]) -> dict[str, Any]:
         "motor_optico_k_soil_vert",
     )
     optical_parameters = {key: state.get(key) for key in optical_keys}
-    _soiling_custom = state.get("mo_soiling_custom")
+    # Preferir el flag persistido como resultado al ejecutar el Motor Óptico;
+    # las keys de widget (mo_soiling_custom, mo_soil_*) desaparecen tras F5.
+    _soiling_custom = _primer_valor(
+        state, "motor_optico_soiling_custom", "mo_soiling_custom"
+    )
     if _soiling_custom is None and state.get("motor_optico_ok"):
-        # El flag vive en un widget de la página Motor Óptico: tras un F5 la
-        # clave no existe hasta visitar la página, aunque los resultados del
-        # motor sigan vigentes. Si el motor corrió y no hay flag, el soiling
-        # aplicado fue el estacional estándar (custom=False).
+        # Motor ejecutado sin flag registrado → se aplicó el soiling
+        # estacional estándar (custom=False).
         _soiling_custom = False
     optical_parameters["soiling_personalizado"] = _soiling_custom
-    if state.get("mo_soiling_custom"):
-        optical_parameters["soiling_mensual"] = {
-            f"mes_{month}": state.get(f"mo_soil_{month - 1}")
-            for month in range(1, 13)
-        }
+    if _soiling_custom:
+        _soiling_config = state.get("motor_optico_soiling_config")
+        if isinstance(_soiling_config, dict) and _soiling_config:
+            optical_parameters["soiling_mensual"] = {
+                f"mes_{month}": _soiling_config.get(month)
+                for month in range(1, 13)
+            }
+        else:
+            optical_parameters["soiling_mensual"] = {
+                f"mes_{month}": state.get(f"mo_soil_{month - 1}")
+                for month in range(1, 13)
+            }
     optical = {
         "modelo_optico": "cascada_optica",
         "modelo_temperatura": "temperatura_celda_noct",

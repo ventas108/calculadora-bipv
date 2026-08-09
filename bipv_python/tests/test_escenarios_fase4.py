@@ -102,6 +102,49 @@ def _estado_base():
     }
 
 
+def test_base_completa_en_sesion_restaurada_sin_keys_de_widget():
+    """Simula un F5/restart: solo sobreviven los resultados persistidos.
+
+    Las keys de widget (N_str_tr, mo_soiling_custom, mo_soil_*, N_serie del
+    botón de carga) no existen hasta renderizar sus páginas; la base debe
+    quedar completa igualmente usando los resultados persistidos.
+    """
+    estado = _estado_base()
+    # Keys de widget que desaparecen tras F5
+    for key in ("N_str_tr", "mo_soiling_custom", "N_serie"):
+        estado.pop(key)
+    # Sin sk_puntos_df: la identidad viene del CSV cargado (encabezado real
+    # de la calculadora de sombreado: "Punto de análisis")
+    estado.pop("sk_puntos_df")
+    estado["df_fs_raw"] = pd.DataFrame(
+        [{"Punto de análisis": "P1", "fachada": "Sur", "FS_geometrico": 0.8}]
+    )
+    # Resultados persistidos al ejecutar los cálculos
+    estado["bypass_n_series_usado"] = 6
+    estado["N_str_tr_usado"] = 1
+    estado["motor_optico_soiling_custom"] = False
+
+    base = capturar_base_comparacion(estado)
+    assert base["faltantes"] == []
+    assert base["lista_para_comparar"] is True
+    config = base["componentes"]["configuracion_electrica"]["valor"]["configuracion"]
+    assert config["N_serie"] == 6
+    assert config["N_strings_tracker"] == 1
+    optico = base["componentes"]["temperatura_y_modelo_optico"]["valor"]["parametros"]
+    assert optico["soiling_personalizado"] is False
+
+
+def test_soiling_custom_persistido_usa_config_del_motor():
+    estado = _estado_base()
+    estado.pop("mo_soiling_custom")
+    estado["motor_optico_soiling_custom"] = True
+    estado["motor_optico_soiling_config"] = {m: 0.04 for m in range(1, 13)}
+    base = capturar_base_comparacion(estado)
+    optico = base["componentes"]["temperatura_y_modelo_optico"]["valor"]["parametros"]
+    assert optico["soiling_personalizado"] is True
+    assert optico["soiling_mensual"]["mes_7"] == 0.04
+
+
 def test_base_unica_completa_se_puede_validar():
     base = capturar_base_comparacion(_estado_base())
 

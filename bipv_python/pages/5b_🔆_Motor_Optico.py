@@ -391,6 +391,11 @@ if run_btn:
             st.session_state["motor_optico_coef_temp"]     = coef_temp
             st.session_state["motor_optico_f_iam_dif"]     = f_iam_dif
             st.session_state["motor_optico_k_soil_vert"]   = k_soiling_vert
+            # Persistir la configuración de soiling COMO RESULTADO (no solo
+            # como key de widget): las keys de widget desaparecen tras F5 y
+            # dejaban la base de Fase 4 "incompleta" sin motivo real.
+            st.session_state["motor_optico_soiling_custom"] = bool(usar_soiling_custom)
+            st.session_state["motor_optico_soiling_config"] = soiling_config
 
             st.success(
                 f"✅ Cascada calculada. "

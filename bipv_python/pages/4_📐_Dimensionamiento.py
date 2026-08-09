@@ -511,6 +511,8 @@ with st.container(border=True):
                 st.session_state["N_serie"] = int(
                     _fila_compatible["N_string_recomendado"]
                 )
+                # Resultado (sobrevive F5, a diferencia de la key del widget)
+                st.session_state["N_str_tr_usado"] = int(N_str_tr)
                 st.session_state["prorrateo_preliminar_modelo"] = _modelo_compatible
                 st.session_state["prorrateo_preliminar_N"] = int(
                     _fila_compatible["N_string_recomendado"]
@@ -725,6 +727,7 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
             f"0 riesgos · Vmp = {mejor.Vmp_real:.1f} V{_util_msg}"
         )
         st.session_state["N_serie"] = mejor.N_serie
+        st.session_state["N_str_tr_usado"] = int(N_str_tr)
 
         # Dimensionamiento del sistema — respeta el factor de ocupación
         # (agrivoltaica: los paneles solo cubren un % del terreno; el resto
