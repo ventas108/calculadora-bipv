@@ -134,6 +134,31 @@ def test_base_completa_en_sesion_restaurada_sin_keys_de_widget():
     assert optico["soiling_personalizado"] is False
 
 
+def test_csv_sin_columna_punto_deriva_identidad_de_fila_o_fachada():
+    estado = _estado_base()
+    estado.pop("sk_puntos_df")
+    # CSV real de la calculadora de sombreado: sin columna de punto explícita
+    estado["df_fs_raw"] = pd.DataFrame(
+        [
+            {"fachada": "Norte", "fila": 1, "FS_geometrico": 0.8},
+            {"fachada": "Norte", "fila": 2, "FS_geometrico": 0.9},
+        ]
+    )
+    base = capturar_base_comparacion(estado)
+    assert base["faltantes"] == []
+    registros = base["componentes"]["fachadas_y_puntos"]["valor"]["registros"]
+    assert len(registros) == 2
+
+    # Solo fachada/obstáculo, sin fila: un punto por fachada
+    estado["df_fs_raw"] = pd.DataFrame(
+        [{"obstaculo": "Fachada Norte", "FS_geometrico": 0.8}] * 3
+    )
+    base = capturar_base_comparacion(estado)
+    assert base["faltantes"] == []
+    registros = base["componentes"]["fachadas_y_puntos"]["valor"]["registros"]
+    assert len(registros) == 1
+
+
 def test_soiling_custom_persistido_usa_config_del_motor():
     estado = _estado_base()
     estado.pop("mo_soiling_custom")

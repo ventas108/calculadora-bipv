@@ -140,8 +140,15 @@ def _extraer_puntos(frame: Any) -> list[dict[str, Any]]:
     col_fachada = _buscar_columna(
         frame, ("Fachada", "fachada", "facade", "obstaculo", "obstacle")
     )
-    if col_punto is None or col_fachada is None:
+    if col_fachada is None:
         return []
+    col_fila = _buscar_columna(frame, ("fila", "row"))
+    if col_punto is None:
+        # El CSV no trae columna de punto explícita: derivar una identidad
+        # determinista (fila si existe; si no, la propia fachada). Congelado
+        # y verificación en vivo usan esta misma función, así que la
+        # comparación sigue siendo consistente.
+        col_punto = col_fila or col_fachada
     columnas_coord = {
         "x_m": _buscar_columna(frame, ("x (m)", "x_m", "x")),
         "y_m": _buscar_columna(frame, ("y (m)", "y_m", "y")),
@@ -361,7 +368,20 @@ def capturar_base_comparacion(state: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(poa, pd.DataFrame):
         missing.append("POA base")
     if not puntos:
-        missing.append("fachadas y puntos de análisis")
+        _detalles_fuentes = []
+        for nombre_fuente in ("sk_puntos_df", "df_fs_raw"):
+            frame_fuente = state.get(nombre_fuente)
+            if isinstance(frame_fuente, pd.DataFrame):
+                _detalles_fuentes.append(
+                    f"{nombre_fuente} con columnas: "
+                    + ", ".join(str(c) for c in frame_fuente.columns)
+                )
+        detalle = (
+            " (revisadas: " + "; ".join(_detalles_fuentes) + ")"
+            if _detalles_fuentes
+            else " (no hay CSV de sombreado cargado ni puntos de SketchUp en la sesión)"
+        )
+        missing.append("fachadas y puntos de análisis" + detalle)
     if panel is None or panel_nombre is None:
         missing.append("panel seleccionado")
     if inversor is None or inversor_nombre is None:
