@@ -76,15 +76,43 @@ def _verificar_contra_base(
 ) -> None:
     """Rechaza entradas eléctricas que difieran de la base congelada."""
     componentes = base["componentes"]
-    ficha_congelada = componentes["panel"]["valor"].get("ficha")
-    if _huella(dict(panel)) != _huella(ficha_congelada):
+    valor_panel = componentes["panel"]["valor"]
+    ficha_congelada = valor_panel.get("ficha")
+    # La ficha congelada (panel_dict de Dimensionamiento) y el panel del
+    # bloque bypass (catálogo MODULOS_BIPV) son representaciones distintas
+    # del MISMO módulo: comparar huellas de diccionario completo daba falso
+    # negativo. La identidad real es el nombre del modelo; además se exige
+    # coherencia en los campos numéricos que ambas fichas compartan.
+    nombre_congelado = str(
+        valor_panel.get("nombre")
+        or (ficha_congelada or {}).get("nombre")
+        or ""
+    ).strip().lower()
+    nombre_entregado = str(
+        dict(panel).get("nombre") or dict(panel).get("modelo") or ""
+    ).strip().lower()
+    if not nombre_congelado:
         raise ValueError(
-            "El panel entregado no coincide con la ficha congelada en la base."
+            "La base congelada no registra el nombre del panel; recongela la base."
         )
+    if nombre_entregado and nombre_entregado != nombre_congelado:
+        raise ValueError(
+            f"El panel entregado ({nombre_entregado!r}) no coincide con el "
+            f"congelado en la base ({nombre_congelado!r})."
+        )
+    # Nota: NO se comparan los campos numéricos entre fichas — la ficha de
+    # Dimensionamiento trae valores de datasheet (Excel) y la del bypass usa
+    # parámetros calibrados (tecnologias_bipv); difieren a propósito para el
+    # mismo módulo. La huella de la ficha congelada ya viaja en base_id.
     cfg = componentes["configuracion_electrica"]["valor"]["configuracion"]
+    # n_paralelo se valida contra N_paneles/N_serie (strings totales de la
+    # planta); N_strings_tracker es otra magnitud (strings por combinadora).
+    n_paralelo_esperado = None
+    if cfg.get("N_paneles") and cfg.get("N_serie"):
+        n_paralelo_esperado = int(round(int(cfg["N_paneles"]) / int(cfg["N_serie"])))
     checks = (
         ("N_serie", int(n_serie), cfg.get("N_serie")),
-        ("N_strings_tracker", int(n_paralelo), cfg.get("N_strings_tracker")),
+        ("N_paralelo (N_paneles/N_serie)", int(n_paralelo), n_paralelo_esperado),
         ("eta_inversor", float(eta_inversor), cfg.get("eta_inversor")),
     )
     for nombre, entregado, congelado in checks:

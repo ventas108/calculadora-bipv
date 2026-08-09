@@ -74,7 +74,7 @@ def _ejecutar(state, definicion, *, df_opt=None):
         poa_global=_poa_diurna(state["tmy_df"].index),
         panel=state["panel_dict"],
         n_serie=state["N_serie"],
-        n_paralelo=state["N_str_tr"],
+        n_paralelo=state["N_paneles_dim"] // state["N_serie"],
         eta_inversor=state["eta_inversor"],
         df_fs_actual=_df_fs(0.5),
         df_fs_optimizada=df_opt,
@@ -134,7 +134,7 @@ def test_rechaza_estado_que_difiere_de_la_base_congelada():
             poa_global=_poa_diurna(state["tmy_df"].index),
             panel=state["panel_dict"],
             n_serie=state["N_serie"],
-            n_paralelo=state["N_str_tr"],
+            n_paralelo=state["N_paneles_dim"] // state["N_serie"],
             eta_inversor=state["eta_inversor"],
             df_fs_actual=_df_fs(0.5),
         )
@@ -160,7 +160,7 @@ def test_rechaza_series_no_horarias():
             poa_global=np.full(100, 450.0),
             panel=state["panel_dict"],
             n_serie=state["N_serie"],
-            n_paralelo=state["N_str_tr"],
+            n_paralelo=state["N_paneles_dim"] // state["N_serie"],
             eta_inversor=state["eta_inversor"],
             df_fs_actual=_df_fs(0.5),
         )
@@ -169,8 +169,8 @@ def test_rechaza_series_no_horarias():
 def test_rechaza_panel_distinto_al_congelado():
     state = _estado_con_panel_sdm()
     definicion = _definicion_con_base(state)
-    otro_panel = dict(_PANEL_SDM, Pmax_stc=999.0)
-    with pytest.raises(ValueError, match="ficha congelada"):
+    otro_panel = dict(_PANEL_SDM, nombre="OTRO-PANEL-X")
+    with pytest.raises(ValueError, match="no coincide con el"):
         ejecutar_escenarios(
             definicion=definicion,
             base_estado_actual=capturar_base_comparacion(state),
@@ -178,7 +178,7 @@ def test_rechaza_panel_distinto_al_congelado():
             poa_global=_poa_diurna(state["tmy_df"].index),
             panel=otro_panel,
             n_serie=state["N_serie"],
-            n_paralelo=state["N_str_tr"],
+            n_paralelo=state["N_paneles_dim"] // state["N_serie"],
             eta_inversor=state["eta_inversor"],
             df_fs_actual=_df_fs(0.5),
         )
@@ -195,7 +195,7 @@ def test_rechaza_configuracion_electrica_distinta_a_la_congelada():
             poa_global=_poa_diurna(state["tmy_df"].index),
             panel=state["panel_dict"],
             n_serie=state["N_serie"] + 1,
-            n_paralelo=state["N_str_tr"],
+            n_paralelo=state["N_paneles_dim"] // state["N_serie"],
             eta_inversor=state["eta_inversor"],
             df_fs_actual=_df_fs(0.5),
         )
@@ -214,7 +214,7 @@ def test_rechaza_poa_no_finita():
             poa_global=poa,
             panel=state["panel_dict"],
             n_serie=state["N_serie"],
-            n_paralelo=state["N_str_tr"],
+            n_paralelo=state["N_paneles_dim"] // state["N_serie"],
             eta_inversor=state["eta_inversor"],
             df_fs_actual=_df_fs(0.5),
         )
@@ -231,7 +231,7 @@ def test_rechaza_fs_fuera_de_rango():
             poa_global=_poa_diurna(state["tmy_df"].index),
             panel=state["panel_dict"],
             n_serie=state["N_serie"],
-            n_paralelo=state["N_str_tr"],
+            n_paralelo=state["N_paneles_dim"] // state["N_serie"],
             eta_inversor=state["eta_inversor"],
             df_fs_actual=_df_fs(1.5),
         )
