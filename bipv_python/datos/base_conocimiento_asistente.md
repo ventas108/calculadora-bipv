@@ -1,4 +1,4 @@
-# Manual de Usuario — Calculadora BIPV (fuente: MANUAL_CALCULADORA_BIPV_v3.3_agosto2026.docx)
+# Manual de Usuario — Calculadora BIPV (fuente: MANUAL_CALCULADORA_BIPV_v3.4_agosto2026.docx)
 
 ## Manual de Usuario — Calculadora BIPV
 
@@ -33,6 +33,7 @@ Versión: Agosto 2026 | URL: calc.innovacionquimica.com.co
 - Cadena completa — bypass y multi-superficie
 - Interpretación de resultados clave
 - Preguntas frecuentes
+- Anexo — Sombras desde Site Designer / Andrew Marsh (ruta externa, agosto 2026)  NUEVO
 - Anexo — Actualizaciones 6-7 de agosto 2026 (Asistente, cuentas, proyectos y Vista 3D solar)  NUEVO
 ────────────────────────────────────────────────────────────
 
@@ -2044,74 +2045,51 @@ El CSV de Factor de Sombreado ahora puede traer los meses escritos (Ene, Feb, Ma
 
 ────────────────────────────────────────────────────────────
 
-## 19. Anexo — Actualizaciones del 8 de agosto de 2026
+────────────────────────────────────────────────────────────
 
-Esta entrega completa la cadena de escenarios de Mismatch (Fase 4), hace más cómodo el trabajo diario en Dimensionamiento (el panel y el inversor preferidos ya se recuerdan entre sesiones y la tabla de mapeo es interactiva) y corrige varios errores detectados en producción.
+## 20. Anexo — Sombras desde Site Designer (Andrew Marsh): la ruta externa
+
+Además de SketchUp y de la Calculadora de Sombreado 3D web, la app acepta escenas dibujadas en Site Designer, la herramienta gratuita de Andrew Marsh que corre en el navegador (buscar «Andrew Marsh Site Designer» o «3D Site Designer drajmarsh»). Es la opción más rápida para modelar los edificios vecinos como cajas simples: se dibujan los volúmenes, se exporta un archivo JSON y la calculadora hace el resto con su propio motor solar — el mismo ray-casting oficial de la ruta SketchUp. Site Designer solo aporta la geometría; los números de sombra los calcula siempre la calculadora, por eso ambas rutas dan resultados idénticos para la misma escena.
 
 ────────────────────────────────────────────────────────────
 
-19.1 Página 5 — Mismatch: ejecutor de escenarios Fase 4  NUEVO
+20.1 Qué dibujar en Site Designer  NUEVO
 
-Nuevo botón "▶️ Ejecutar escenarios" al final del bloque de Mismatch. Compara tres escenarios de producción sobre la misma base congelada:
+- Primero fija la ubicación del proyecto en Site Designer (latitud/longitud o buscando la ciudad): esa ubicación viaja dentro del JSON y la calculadora la compara contra el proyecto activo — si no coincide, avisa.
+- Dibuja SOLO los obstáculos que producen sombra: edificios vecinos, muros, volúmenes de la propia edificación si sombrean la fachada. Cada obstáculo es un bloque (caja) con su posición y altura reales.
+- NO dibujes los paneles ni la fachada de estudio: los puntos de análisis se definen después, dentro de la calculadora (igual que en la ruta SketchUp).
+- Si Site Designer muestra el norte girado (northOffset), déjalo tal cual: el archivo lo registra y la calculadora aplica la corrección automáticamente.
+────────────────────────────────────────────────────────────
 
-- Referencia: producción sin pérdida por sombreado parcial.
-- Actual: producción descontando la pérdida real calculada por el modelo de bypass diodes.
-- Optimizada: requiere parámetros adicionales; mientras no se configuren aparece como "pendiente_parametros" (es normal).
-Orden correcto del flujo: cargar el CSV de Factor de Sombreado → definir los strings (N_serie × N_strings) → "💾 Guardar definición y congelar base" → "⚡ Calcular pérdida real por bypass diodes" → "▶️ Ejecutar escenarios".
+20.2 Exportar el JSON  NUEVO
 
-⚠️ Para no cometer errores: si cambias algo aguas arriba (panel, orientación, Motor Óptico), vuelve a congelar la base y recalcula el bypass antes de ejecutar escenarios — el ejecutor verifica que los datos vivos coincidan con la base congelada y avisa si no.
+- En Site Designer usa la opción de guardar/exportar el proyecto: descarga un archivo con nombre tipo «site-designer-AAAA-MM-DD-HHMM-SS.json».
+- No edites el JSON a mano. Si le falta información (por ejemplo el norte), la calculadora lo rechaza con un mensaje claro en vez de asumir valores.
+El archivo contiene la ubicación (latitud, longitud, zona horaria, elevación, corrección de norte) y los obstáculos como cajas en milímetros. La conversión a metros es automática y fija — no hay selector de unidades que configurar.
 
 ────────────────────────────────────────────────────────────
 
-19.2 Página 5 — Mismatch: CSV de sombreado con obstáculos con comas  CORREGIDO
+20.3 Cargarlo en la calculadora  NUEVO
 
-El CSV que exporta la Calculadora de Sombreado 3D web puede traer nombres de obstáculos con comas (por ejemplo "edificio alto, 250 m"). Antes esas filas rompían la lectura o se descartaban en silencio; ahora la app repara esas líneas automáticamente y además reconoce la fachada aunque venga con el sufijo "[obstáculo]" — las horas CON sombra ya no se pierden al filtrar por fachada.
-
-────────────────────────────────────────────────────────────
-
-19.3 Página 4 — Dimensionamiento: la app recuerda tu panel e inversor  NUEVO
-
-Antes, al recargar la página (F5) o reiniciar el servidor, el selector de inversor volvía al modelo de fábrica y había que recargar el correcto a mano. Ahora:
-
-- Botón "📌 Fijar panel + inversor como predeterminados" (debajo del selector de Inversor): guarda tu selección actual en tu cuenta. En cada sesión nueva, esos serán los valores preseleccionados.
-- Además, al usar "⚡ Cargar y recalcular prorrateo preliminar", el modelo cargado queda guardado como predeterminado automáticamente, sin pasos extra.
-- El guardado es privado por usuario y solo se aplica si el modelo sigue existiendo en el catálogo.
+- Corre primero ☀️ Recurso Solar (el TMY del proyecto es obligatorio para alinear las horas de sombra con Producción).
+- Abre 🌳 Sombras y sube el archivo .json en el mismo cargador donde va el modelo de SketchUp. La app confirma cuántos obstáculos leyó, sus dimensiones en metros, el norte corregido y la ubicación del archivo.
+- Define los puntos de análisis (una fila de módulos = un punto, con sus coordenadas x, y, z en metros en el mismo sistema de la escena) y pulsa ▶️ Calcular sombras.
+- Envía el resultado a la Página 5 con «📤 Enviar a Mismatch»: de ahí en adelante la cadena es la de siempre — bypass → E_ac corregida → Producción → Financiero.
+Si la app avisa que la ubicación del archivo no coincide con la del proyecto, verifica que la escena sea del sitio correcto antes de continuar: una escena de otro proyecto produce sombras sin sentido físico.
 
 ────────────────────────────────────────────────────────────
 
-19.4 Página 4 — Dimensionamiento: tabla de mapeo interactiva  NUEVO
+20.4 Trazabilidad: el informe dice de dónde salieron las sombras  NUEVO
 
-En el "Mapeo de inversores opcionales para este panel", ahora puedes hacer clic directamente en una fila de la tabla y ese modelo pasa de inmediato a la casilla «Inversor compatible» de abajo.
+La fuente del sombreado queda registrada y visible en toda la cadena: en el resumen del modelo bypass (Página 5), en Producción y en el Reporte PDF aparece «Fuente del sombreado: SketchUp (interno)», «Site Designer + TMY (externo)» o «CSV externo». Es un dato informativo — no cambia ningún cálculo — pero le da credibilidad al informe que se entrega al cliente.
 
-El flujo es en dos pasos, a propósito:
-
-1. Clic en la fila = explorar (llena la casilla, no cambia nada del proyecto).
-2. Botón "⚡ Cargar y recalcular prorrateo preliminar" = confirmar (el modelo sube al selector principal y se recalcula todo).
-⚠️ Para no cometer errores: el inversor oficial del proyecto solo cambia al confirmar con el botón — así un clic exploratorio en la tabla no altera tu diseño por accidente. Si haces clic en una fila no compatible, la app avisa y no la carga.
+¿Cuándo usar cada ruta? Site Designer: escenas rápidas de cajas (edificios vecinos) sin instalar nada. SketchUp: geometrías detalladas, aleros, árboles con transparencia. Calculadora web: cuando ya existe el análisis punto a punto. Las tres desembocan en el mismo CSV de FS horario y el mismo modelo bypass.
 
 ────────────────────────────────────────────────────────────
 
-19.5 Pantalla de acceso: protección contra el traductor de Chrome  CORREGIDO
+Manual actualizado el 7 de agosto de 2026
 
-Si Chrome traducía automáticamente la página, el formulario de login podía mostrar un error rojo ("NotFoundError: removeChild"). La pantalla de acceso ahora bloquea el traductor igual que el resto de la app.
-
-Consejo: si Chrome te ofrece "Traducir esta página", elige "Nunca traducir este sitio" — la app ya está en español.
-
-────────────────────────────────────────────────────────────
-
-19.6 Otras correcciones del 8 de agosto  CORREGIDO
-
-- Mismatch: corregido un error que rompía la página al mostrar la métrica de alineación ("No aplica") y dos conflictos internos de estado que producían el error StreamlitAPIException al calcular el bypass.
-- Motor Óptico: el mensaje de ayuda ahora indica correctamente que el panel se selecciona en la página 📐 Dimensionamiento (antes decía Proyecto).
-- Dimensionamiento: eliminadas las advertencias amarillas de los campos de temperatura (T_min diseño, T_celda realista, T_celda extremo).
-
-────────────────────────────────────────────────────────────
-
-Manual actualizado el 8 de agosto de 2026
-
-Novedades del 8 de agosto: ejecutor de escenarios Fase 4 en Mismatch, panel e inversor predeterminados que sobreviven entre sesiones, tabla de mapeo de inversores interactiva (clic en la fila), CSV de sombreado tolerante a obstáculos con comas, y login protegido contra el traductor de Chrome.
-
-Novedades de la versión anterior (6–7 de agosto): Asistente 🧭 con guía paso a paso y chat del manual, login con planes y pagos (Wompi/transferencia), múltiples proyectos privados por usuario, persistencia de resultados y presupuesto, perfil de carga horario, motor óptico-térmico sin doble conteo, CAPEX vinculado al Financiero, reporte PDF con gráficas y logo, diagnóstico del catálogo de inversores y análisis de orientación en la Vista 3D (incidencia geométrica y energía real con TMY).
+Novedades de esta versión: Asistente 🧭 con guía paso a paso y chat del manual, login con planes y pagos (Wompi/transferencia), múltiples proyectos privados por usuario, persistencia de resultados y presupuesto, perfil de carga horario, motor óptico-térmico sin doble conteo, CAPEX vinculado al Financiero, reporte PDF con gráficas y logo, diagnóstico del catálogo de inversores y análisis de orientación en la Vista 3D (incidencia geométrica y energía real con TMY).
 
 Calculadora BIPV — Innovación Química
 
