@@ -1,0 +1,40 @@
+Plan Fase 5 — lo pendiente
+Paso 1 — Definir el formato de entrada externo (decisión previa, tuya)
+Andrew Marsh (3D Sun-Path / Shading Box) no exporta un único formato estándar. Necesitamos fijar qué entregará el usuario:
+•	Opción A: tabla de máscara de sombras (perfil de obstrucción azimut/altura) exportada de la herramienta de Marsh.
+•	Opción B: porcentajes de sombreado horarios ya calculados (tabla mes × hora).
+De esta decisión depende el traductor del Paso 2. (Mi recomendación: soportar la B primero — es traducción directa a FS_geometrico; la A requiere cruzar la máscara con la posición solar, cosa que Mismatch ya sabe hacer con "Cruzar Máscara + EPW" y se puede reutilizar.)
+Paso 2 — Traductor externo → contrato oficial
+Nuevo módulo calculos/fuente_externa_fs.py:
+•	Lee la salida de Marsh + el EPW de la sesión (mismo TMY, misma zona horaria — regla obligatoria que ya aplica SketchUp).
+•	Convierte a las columnas del contrato: Fachada, Fila, Punto, Mes, Hora, FS_geometrico (rango 0–1, validado por contrato_sombreado.py).
+•	Marca la procedencia: columna o metadato fuente = "externa_marsh" vs "sketchup".
+•	Sin motor nuevo: solo traducción de formato.
+Paso 3 — Validación del CSV antes del parser
+•	Pasar la salida del traductor por validar_contrato_sombreado() y rechazar con mensaje claro si falta FS_geometrico o hay valores fuera de [0,1] (nunca recortar en silencio — lección ya aprendida en el ejecutor de escenarios).
+•	Verificar coherencia horaria contra el TMY/EPW de la sesión (UTC), igual que hace Sombras SketchUp.
+Paso 4 — Punto de entrada en la página 5 Mismatch
+•	En el uploader actual de CSV FS, agregar la fuente externa como segunda pestaña/opción: "📄 CSV calculadora/SketchUp" | "🌐 Diagnóstico externo (Marsh + EPW)".
+•	Ambas rutas desembocan en el mismo cargar_csv_fs → df_fs_raw → congelar base → bypass → escenarios. Cero cambios río abajo.
+•	Guardar en session_state la fuente activa (fs_fuente) para trazabilidad.
+Paso 5 — Vista 3D: mostrar ambas fuentes como compatibles
+•	En la sección "Métricas de sombras" de la Vista 3D (que ya lee resultados de Mismatch), mostrar la etiqueta de origen: "Sombreado: SketchUp (interno)" o "Sombreado: Marsh + EPW (externo)".
+•	Este es el alcance mínimo del plan (la Vista 3D como visualizador de ambas fuentes). Pintar el FS punto a punto sobre los paneles 3D sería una extensión aparte (se toca con la tarea #167 ya en cola — no mezclarlas).
+Paso 6 — Trazabilidad hasta el final de la cadena
+•	Que la fuente del FS viaje con la base congelada y aparezca en: resumen del bypass, Producción, y el Reporte PDF ("Fuente del sombreado: …"). Es un campo informativo, no cambia ningún cálculo.
+Paso 7 — Pruebas y documentación
+•	Banco de prueba: mismo escenario (tu caso Bogotá / Fachada Norte / edificio 250 m) alimentado por ambas rutas → los resultados de bypass deben ser comparables.
+•	Anexo nuevo en el Manual del Usuario para que el Asistente sepa explicar la ruta externa.
+Resumen de esfuerzo
+Paso	Tamaño	Depende de
+1. Formato de entrada	decisión tuya	—
+2. Traductor	el grueso del trabajo	Paso 1
+3. Validación	pequeño (reutiliza contrato)	2
+4. Entrada en Mismatch	pequeño	3
+5. Etiqueta en Vista 3D	pequeño	4
+6. Trazabilidad	pequeño	4
+7. Pruebas + manual	mediano	todo
+El único paso que me bloquea es el Paso 1: ¿qué exporta exactamente tu flujo con Andrew Marsh — la máscara de obstrucción (azimut/altura) o una tabla de porcentajes de sombra por hora? Si tienes un archivo de ejemplo, súbelo y con eso defino el traductor sin adivinar.
+
+
+
