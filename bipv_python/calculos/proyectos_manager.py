@@ -203,6 +203,18 @@ def listar_proyectos() -> list[dict]:
     return proyectos
 
 
+# ── #229 — temperaturas de diseño en cero ────────────────────────────────────
+# Ceros heredados de JSONs guardados con un bug antiguo pisaban los valores
+# buenos al restaurar; y como la restauración borra el TMY, el guardián de
+# Dimensionamiento no podía re-sembrar. Regla: nunca GUARDAR ni RESTAURAR el
+# trío en cero. Lógica pura en calculos/temperatura.py (testeable sin
+# streamlit).
+from calculos.temperatura import (  # noqa: E402
+    KEYS_TEMPS_DISENO as _KEYS_TEMPS_DISENO,
+    temps_diseno_en_cero as _temps_diseno_en_cero,
+)
+
+
 def guardar_proyecto_actual(nombre: str | None = None) -> str:
     """
     Serializa el session_state actual (claves seguras) a disco.
@@ -228,6 +240,13 @@ def guardar_proyecto_actual(nombre: str | None = None) -> str:
             estado[k] = v
         except Exception:
             pass
+
+    # #229 — no persistir temperaturas de diseño físicamente imposibles:
+    # si el trío quedó en cero (estado corrupto heredado), se omite del JSON
+    # para que al restaurar apliquen el TMY o los defaults sanos.
+    if _temps_diseno_en_cero(estado):
+        for _k in _KEYS_TEMPS_DISENO:
+            estado.pop(_k, None)
 
     # Normalizar tipos numpy a Python nativo antes de escribir
     estado_limpio = json.loads(json.dumps(estado, cls=_SafeEncoder))
@@ -300,6 +319,15 @@ def cargar_proyecto(slug: str) -> str:
         limpiar_resultados_produccion(st.session_state.get("auth_email", ""))
     except Exception:
         pass
+
+    # #229 — sanear JSONs legados: si el trío de temperaturas de diseño viene
+    # en cero, NO restaurarlo (pisaría valores buenos con ceros imposibles).
+    # Se avisa vía flag que Dimensionamiento muestra al usuario.
+    if _temps_diseno_en_cero(estado):
+        for _k in _KEYS_TEMPS_DISENO:
+            estado.pop(_k, None)
+            st.session_state.pop(_k, None)
+        st.session_state["_temps_diseno_saneadas"] = True
 
     # Cargar estado guardado (sobrescribe valores actuales)
     for k, v in estado.items():

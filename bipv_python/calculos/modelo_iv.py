@@ -368,9 +368,31 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
     _ns_original      = None
     _ns_halfcut_info  = None
 
+    n_typ = {"CdTe": 1.09, "Mono-Si": 1.05, "Poli-Si": 1.10}.get(tec_norm, 1.05)
     if NsA:
-        a_ref = float(NsA) * Vt_ref
-        N_s_est = N_s or int(round(float(NsA) / const.get("n_mediana", 1.05)))
+        # ── #67: el camino NsA TAMBIÉN se verifica contra half-cut ──────────
+        # NsA = n × Ns viene del mismo catálogo/ficha: si el Ns registrado es
+        # el total de semiceldas (p.ej. 144 en vez de 72), NsA arrastra el
+        # mismo doble conteo y duplicaría a_ref (Voc del modelo se dispara).
+        # Derivar celdas con la n MEDIANA de la tecnología (igual que antes de
+        # #67): para CIGS n_mediana=1.35 ≠ n_typ 1.05 y usar la equivocada
+        # clasificaría mal paneles legítimos.
+        _n_med = const.get("n_mediana", n_typ)
+        _N_s_deriv = N_s or int(round(float(NsA) / _n_med))
+        _panel_chk = dict(panel)
+        _panel_chk["N_s"] = _N_s_deriv
+        _hc = verificar_ns_halfcut(_panel_chk)
+        if _hc and _hc["tipo"] == "ns_duplicado":
+            _ns_original     = int(_N_s_deriv)
+            N_s_est          = _hc["N_s_sugerido"]
+            _ns_corregido    = True
+            _ns_halfcut_info = _hc
+            # NsA heredó el doble conteo → recomputar desde el Ns corregido
+            # con la misma n que se usó para derivar (coherencia a_ref/celdas)
+            a_ref = _n_med * N_s_est * Vt_ref
+        else:
+            a_ref = float(NsA) * Vt_ref
+            N_s_est = _N_s_deriv
     elif N_s:
         n_typ = {"CdTe": 1.09, "Mono-Si": 1.05, "Poli-Si": 1.10}.get(tec_norm, 1.05)
         # ── Verificar si N_s es incorrecto por half-cut (tarea #67) ──────────

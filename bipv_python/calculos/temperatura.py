@@ -30,3 +30,25 @@ def temperatura_celda_noct(G_poa, T_amb, NOCT: float = 45.0, k_bipv: float = 1.0
     k   = float(np.clip(k_bipv, 0.5, 2.0))   # límites físicos razonables
     noct = float(NOCT)
     return T + G * ((noct - 20.0) / 800.0) * k
+
+
+# ── #229 — validación del trío de temperaturas de diseño ─────────────────────
+KEYS_TEMPS_DISENO = ("T_min_diseno", "T_cel_realista", "T_cel_extremo")
+
+
+def temps_diseno_en_cero(estado: dict) -> bool:
+    """
+    True solo si las TRES temperaturas de diseño están presentes y en 0.0.
+
+    Físicamente T_mín, T_celda realista y T_celda extremo nunca son 0 °C a la
+    vez (un solo 0 °C es legítimo, p. ej. T_mín en páramo; un subconjunto en
+    cero con las demás ausentes tampoco se toca — solo el trío completo en
+    cero es el estado corrupto heredado que no debe guardarse ni restaurarse).
+    """
+    valores = [estado.get(k) for k in KEYS_TEMPS_DISENO]
+    if any(v is None for v in valores):
+        return False
+    try:
+        return all(abs(float(v)) < 1e-9 for v in valores)
+    except (TypeError, ValueError):
+        return False

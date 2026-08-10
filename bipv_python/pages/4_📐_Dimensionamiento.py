@@ -173,6 +173,17 @@ _temps_en_cero = all(
     for _k in ("T_min_diseno", "T_cel_realista", "T_cel_extremo")
 )
 
+# #229 — aviso: el proyecto restaurado traía las temperaturas en cero y se
+# descartaron (JSON legado con el bug de ciudades). Se re-siembran del TMY si
+# existe; si no, de los defaults de la ciudad al volver a Guardar en Proyecto.
+if st.session_state.pop("_temps_diseno_saneadas", False):
+    st.info(
+        "🌡️ El proyecto guardado traía las temperaturas de diseño en 0 °C "
+        "(un estado inválido de una versión anterior). Se descartaron y se "
+        "recalcularán automáticamente desde el TMY de ☀️ Recurso Solar — "
+        "verifica los valores antes de dimensionar."
+    )
+
 if _tmy_df is not None and _ciudad_ss and (
     _ciudad_ss != _ciudad_applied or _temps_en_cero
 ):
