@@ -103,3 +103,44 @@ def test_no_ejecuta_agentes_sin_boton_explicito():
             "una llamada a un agente (con costo real de API) está fuera de un "
             "bloque condicional -- se ejecutaría automáticamente al cargar la página"
         )
+
+
+def test_pregunta_de_ambos_agentes_declara_el_tipo_de_instalacion_real():
+    # Regresión: un usuario corrió un ejercicio de "Granja fotovoltaica" y el
+    # Analista narró en clave de "fachada de edificio" -- el SYSTEM_PROMPT de
+    # los agentes asumía BIPV-en-fachada por defecto. El fix tiene dos partes:
+    # el SYSTEM_PROMPT ya no asume fachada (ver tests de agentes/), Y esta
+    # página declara el tipo real como dato explícito en cada pregunta para
+    # que el agente nunca tenga que adivinarlo. Este test cubre la segunda
+    # parte -- que _contexto_tipo (derivado de session_state["tipo_instalacion"])
+    # efectivamente viaje a las DOS llamadas, no solo a una.
+    src = _leer(_PAGINA_IA)
+    assert 'st.session_state.get("tipo_instalacion"' in src
+
+    tree = ast.parse(src)
+    llamadas = [
+        n for n in ast.walk(tree)
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+        and n.func.id in ("ejecutar_analisis", "ejecutar_asesoria")
+    ]
+    assert len(llamadas) == 2
+
+    def _usa_contexto_tipo(nodo_llamada, arbol):
+        # La pregunta se arma en una asignación previa (`pregunta = ...` /
+        # `pregunta_asesor = ...`) dentro del mismo bloque `if`. Verificamos
+        # que ese `if` contenga una f-string que referencie _contexto_tipo.
+        for nodo in ast.walk(arbol):
+            if isinstance(nodo, ast.If):
+                contiene_llamada = any(h is nodo_llamada for h in ast.walk(nodo))
+                if not contiene_llamada:
+                    continue
+                for hijo in ast.walk(nodo):
+                    if isinstance(hijo, ast.Name) and hijo.id == "_contexto_tipo":
+                        return True
+        return False
+
+    for llamada in llamadas:
+        assert _usa_contexto_tipo(llamada, tree), (
+            f"la llamada a {llamada.func.id} no parece incluir _contexto_tipo "
+            "en su bloque -- el agente podría volver a adivinar el tipo de instalación"
+        )
