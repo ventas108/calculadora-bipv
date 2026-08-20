@@ -79,6 +79,93 @@ class SimulationResult:
         return self.dim["P_dc_stc_kW"]
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# Multi-superficie — ampliación del alcance v1 (una sola superficie).
+#
+# Decisión de diseño: cada superficie se simula con el MISMO motor riguroso
+# (SDM De Soto 2006 vía calculos.produccion) que la superficie única de
+# run_bipv_simulation(), NO con el atajo e_ac = POA × área × eta_panel × PR
+# que usa hoy calculos/multi_superficie.py (y por lo tanto 9_Vista_3D.py).
+# Ese atajo es más rápido pero menos preciso; usarlo aquí habría reproducido
+# exactamente el tipo de "resultado distinto según qué código lo calculó"
+# que se corrigió en la unificación de geometría solar (Fase 1). Cuando
+# haga falta la versión rápida (para exploración masiva del optimizador),
+# se puede envolver como modelo sustituto — pero explícitamente, no por
+# duplicación silenciosa.
+#
+# Fuera de alcance a propósito (igual que en BIPVConfiguration): MPPT
+# compartido entre superficies de distinta orientación conectadas al mismo
+# inversor (ver calculos/mppt_combinado.py — es un fenómeno eléctrico
+# específico, con su propio modelo SDM combinado). v1 asume que cada
+# superficie tiene su propio canal MPPT/inversor independiente — la
+# arquitectura BIPV más común.
+# ─────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class SuperficieBIPV:
+    """Una superficie física dentro de un proyecto multi-superficie.
+
+    `config` reutiliza BIPVConfiguration completo; lat/lon/alt_m de esa
+    config se ignoran y se sobreescriben con la ubicación del proyecto
+    (todas las superficies están en el mismo sitio) — ver
+    run_bipv_simulation_multisuperficie().
+    """
+    nombre: str
+    config: "BIPVConfiguration"
+    tipo: str = "Fachada"   # informativo: Fachada | Techo | Pérgola | Marquesina
+    activa: bool = True
+
+
+@dataclass
+class ProyectoMultiSuperficie:
+    """Entrada de run_bipv_simulation_multisuperficie()."""
+
+    lat: float
+    lon: float
+    alt_m: float
+    superficies: list[SuperficieBIPV] = field(default_factory=list)
+
+
+@dataclass
+class MultiSurfaceSimulationResult:
+    """Salida de run_bipv_simulation_multisuperficie().
+
+    Expone las mismas propiedades que SimulationResult (E_ac_anual_kWh,
+    P_dc_stc_kW) para que run_financial_simulation() funcione sin cambios
+    sobre un proyecto multi-superficie — duck typing intencional, no
+    herencia, para no forzar un solo tipo de "resultado de energía".
+    """
+
+    tmy: pd.DataFrame
+    resultados_por_superficie: dict[str, SimulationResult]
+    superficies: list[SuperficieBIPV]   # incluye inactivas, para trazabilidad
+
+    @property
+    def E_ac_anual_kWh(self) -> float:
+        return sum(r.E_ac_anual_kWh for r in self.resultados_por_superficie.values())
+
+    @property
+    def P_dc_stc_kW(self) -> float:
+        return sum(r.P_dc_stc_kW for r in self.resultados_por_superficie.values())
+
+    @property
+    def area_total_m2(self) -> float:
+        return sum(
+            s.config.area_m2 for s in self.superficies
+            if s.activa and s.nombre in self.resultados_por_superficie
+        )
+
+    @property
+    def PR_ponderado(self) -> float:
+        """PR ponderado por energía DC de cada superficie — evita que una
+        superficie pequeña con PR atípico distorsione el promedio simple."""
+        resultados = list(self.resultados_por_superficie.values())
+        e_dc_total = sum(r.produccion["E_dc_anual_kWh"] for r in resultados)
+        if e_dc_total <= 0:
+            return 0.0
+        return sum(r.PR * r.produccion["E_dc_anual_kWh"] for r in resultados) / e_dc_total
+
+
 @dataclass
 class FinancialConfiguration:
     """Entrada de run_financial_simulation()."""

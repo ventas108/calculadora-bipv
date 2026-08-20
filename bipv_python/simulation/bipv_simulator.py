@@ -14,6 +14,8 @@ v1 — alcance (ver docstring de simulation/schemas.py):
     diodos, sin bifacial, sin multi-superficie, sin ray-casting 3D.
     Ampliar esto es trabajo de una fase posterior — no de este commit.
 """
+from dataclasses import replace
+
 import pandas as pd
 
 from calculos import dimensionamiento
@@ -21,7 +23,12 @@ from calculos import mismatch
 from calculos import produccion as produccion_calc
 from calculos import solar
 
-from simulation.schemas import BIPVConfiguration, SimulationResult
+from simulation.schemas import (
+    BIPVConfiguration,
+    SimulationResult,
+    ProyectoMultiSuperficie,
+    MultiSurfaceSimulationResult,
+)
 
 
 def run_bipv_simulation(
@@ -78,4 +85,53 @@ def run_bipv_simulation(
         factor_pr_mismatch=factor_pr_mismatch,
         dim=dim,
         produccion=prod,
+    )
+
+
+def run_bipv_simulation_multisuperficie(
+    proyecto: ProyectoMultiSuperficie,
+    tmy: pd.DataFrame | None = None,
+) -> MultiSurfaceSimulationResult:
+    """
+    Ejecuta run_bipv_simulation() para cada superficie ACTIVA del proyecto,
+    compartiendo un único TMY (mismo sitio para todas las superficies) y
+    agregando los resultados. Ver el bloque de comentarios sobre
+    multi-superficie en simulation/schemas.py para el alcance y por qué NO
+    se usa el modelo simplificado de calculos/multi_superficie.py.
+
+    Las superficies con `activa=False` se omiten del cálculo pero se
+    conservan en el resultado para trazabilidad (MultiSurfaceSimulationResult
+    .superficies incluye todas; .resultados_por_superficie solo las activas).
+
+    Lanza ValueError si no hay ninguna superficie activa — no tiene sentido
+    devolver un resultado vacío silenciosamente para un proyecto que se
+    pidió simular.
+    """
+    activas = [s for s in proyecto.superficies if s.activa]
+    if not activas:
+        raise ValueError(
+            "ProyectoMultiSuperficie no tiene ninguna superficie activa para simular"
+        )
+
+    nombres = [s.nombre for s in activas]
+    duplicados = {n for n in nombres if nombres.count(n) > 1}
+    if duplicados:
+        # Los resultados se indexan por nombre — un duplicado pisaría
+        # silenciosamente el resultado de la superficie anterior.
+        raise ValueError(
+            f"Nombres de superficie duplicados entre las activas: {sorted(duplicados)}"
+        )
+
+    if tmy is None:
+        tmy = solar.obtener_tmy_pvgis(proyecto.lat, proyecto.lon)
+
+    resultados: dict[str, SimulationResult] = {}
+    for sup in activas:
+        cfg = replace(sup.config, lat=proyecto.lat, lon=proyecto.lon, alt_m=proyecto.alt_m)
+        resultados[sup.nombre] = run_bipv_simulation(cfg, tmy=tmy)
+
+    return MultiSurfaceSimulationResult(
+        tmy=tmy,
+        resultados_por_superficie=resultados,
+        superficies=proyecto.superficies,
     )
