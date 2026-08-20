@@ -76,6 +76,20 @@ def crear_herramienta_bankability(registro: dict[str, CandidatoRegistrado]):
     return evaluar_bankability
 
 
+def _fmt(valor: float | None, spec: str, faltante: str = "N/D") -> str:
+    """Formatea un número con `spec` (p.ej. ',.0f'), o `faltante` si es None.
+
+    Hasta ahora formatear_candidatos() solo recibía objetivos calculados por
+    optimization/numerical_optimizer.py (siempre numéricos por construcción,
+    ver sus tests). Con agentes/ invocado desde una página real (Análisis
+    IA) que arma el candidato a mano desde st.session_state, un campo puede
+    faltar sin que sea un bug del motor -- y un `f"{None:,.0f}"` ahí
+    rompería la página entera con el error genérico de Streamlit en vez de
+    mostrar simplemente "N/D".
+    """
+    return format(valor, spec) if valor is not None else faltante
+
+
 def formatear_candidatos(registro: dict[str, CandidatoRegistrado], titulo: str = "Candidatos evaluados") -> str:
     lineas = [f"## {titulo}", ""]
     for cid, c in registro.items():
@@ -85,8 +99,10 @@ def formatear_candidatos(registro: dict[str, CandidatoRegistrado], titulo: str =
         payback = f"{obj['payback_simple']:.1f} años" if obj.get("payback_simple") is not None else "None"
         lineas.append(
             f"- **{cid}**: tilt={cfg.tilt:.1f}° azimuth={cfg.azimuth:.1f}° | "
-            f"energía={obj['energia_anual']:,.0f} kWh, PR={obj['pr']:.3f} | "
-            f"CAPEX=USD {c.capex_usd:,.0f}, NPV=USD {obj['npv']:,.0f}, "
+            f"potencia DC={_fmt(obj.get('capacidad_instalada'), '.1f')} kWp | "
+            f"energía={_fmt(obj.get('energia_anual'), ',.0f')} kWh, "
+            f"PR={_fmt(obj.get('pr'), '.3f')} | "
+            f"CAPEX=USD {c.capex_usd:,.0f}, NPV=USD {_fmt(obj.get('npv'), ',.0f')}, "
             f"IRR={irr}, payback={payback}"
         )
     return "\n".join(lineas)
