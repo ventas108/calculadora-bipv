@@ -16,7 +16,7 @@ el XLSM de referencia.
 from dataclasses import dataclass
 
 from calculos import dimensionamiento
-from simulation.schemas import BIPVConfiguration, SimulationResult
+from simulation.schemas import BIPVConfiguration
 
 
 @dataclass(frozen=True)
@@ -78,14 +78,39 @@ def evaluar_compatibilidad_electrica(
 
 def evaluar_constraints(
     config: BIPVConfiguration,
-    resultado: SimulationResult,
+    dim: dict,
     **kwargs_electrico,
 ) -> list[ConstraintResult]:
-    """Corre todos los constraints conocidos sobre una configuración ya simulada."""
+    """
+    Corre todos los constraints conocidos.
+
+    dim : el dict de calculos.dimensionamiento.dimensionar_sistema() — puede
+          venir de un SimulationResult ya calculado (resultado.dim) o
+          calcularse directo sin correr la física completa (ver
+          evaluar_factibilidad_previa(), más barato para un optimizador).
+    """
     return [
-        evaluar_cobertura_area(resultado.dim),
+        evaluar_cobertura_area(dim),
         evaluar_compatibilidad_electrica(config, **kwargs_electrico),
     ]
+
+
+def evaluar_factibilidad_previa(
+    config: BIPVConfiguration,
+    **kwargs_electrico,
+) -> list[ConstraintResult]:
+    """
+    Los mismos constraints de evaluar_constraints(), pero SIN correr la
+    física completa (TMY/POA/sombreado/producción) — dimensionar_sistema()
+    es aritmética pura. Pensada para que un generador de candidatos (Fase 4)
+    descarte configuraciones inválidas ANTES de gastar una simulación en
+    ellas, tal como pide el docstring de este módulo.
+    """
+    dim = dimensionamiento.dimensionar_sistema(
+        config.panel, config.area_m2, config.N_serie,
+        config.N_strings_tracker, config.N_mppt,
+    )
+    return evaluar_constraints(config, dim, **kwargs_electrico)
 
 
 def todas_cumplidas(resultados: list[ConstraintResult], *, requerir_evaluables: bool = True) -> bool:

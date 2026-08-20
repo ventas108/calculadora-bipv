@@ -108,9 +108,14 @@ def test_evaluar_constraints_end_to_end(tmy_bogota):
         N_serie=8, N_strings_tracker=8,
     )
     resultado = run_bipv_simulation(cfg, tmy=tmy_bogota)
-    constraints = opt_constraints.evaluar_constraints(cfg, resultado)
+    constraints = opt_constraints.evaluar_constraints(cfg, resultado.dim)
     assert {c.nombre for c in constraints} == {"cobertura_area", "compatibilidad_electrica"}
     assert opt_constraints.todas_cumplidas(constraints) is True
+
+    # evaluar_factibilidad_previa() debe dar el mismo resultado sin correr
+    # la simulación física (solo dimensionamiento, aritmética pura).
+    previa = opt_constraints.evaluar_factibilidad_previa(cfg)
+    assert [(c.nombre, c.cumple) for c in previa] == [(c.nombre, c.cumple) for c in constraints]
 
 
 # ── objectives.py ─────────────────────────────────────────────────────────
