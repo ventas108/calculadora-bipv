@@ -48,6 +48,13 @@ class BIPVConfiguration:
     eta_inversor: float = 0.97
     k_bipv: float = 1.3   # confinamiento térmico BIPV (IEA-PVPS T15); 1.0=ventilado libre
 
+    # dict del catálogo INVERSORES (Vdc_max, Vmppt_min/max, Isc_max_tracker...).
+    # Opcional para no romper Fase 2: run_bipv_simulation() NUNCA lo usa (solo
+    # necesita eta_inversor). Lo consume optimization/constraints.py para
+    # validar compatibilidad eléctrica real del string — sin él, esa
+    # restricción no es evaluable (ver ConstraintResult.evaluable).
+    inversor: dict | None = None
+
     # ── Pérdidas de cascada además del sombreado de horizonte (%, 0–100) ──
     pct_mismatch_fab: float = 2.0
     pct_soiling: float = 2.0
