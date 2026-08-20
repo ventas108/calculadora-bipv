@@ -219,6 +219,7 @@ with col_m1:
 factor_activo = (
     FACTOR_PROMEDIO_KG_KWH if "promedio" in metodologia.lower() else FACTOR_MARGINAL_KG_KWH
 )
+co2_metodologia = "GHG Protocol" if "promedio" in metodologia.lower() else "CDM Marginal"
 
 with col_m2:
     tasa_deg_co2 = st.slider(
@@ -881,7 +882,7 @@ else:
 # ─────────────────────────────────────────────────────────────────────────────
 st.session_state["co2_factor_kg_kwh"]      = factor_activo
 st.session_state["co2_factor_fecha"]       = st.session_state.get("co2_factor_fecha", "UPME Resolución 520/2019 (año 2022)")
-st.session_state["co2_metodologia"]        = "GHG Protocol" if "promedio" in metodologia.lower() else "CDM Marginal"
+st.session_state["co2_metodologia"]        = co2_metodologia
 st.session_state["co2_anual_t"]            = co2_anual_t
 st.session_state["co2_total_t"]            = co2_total_t
 st.session_state["co2_total_prom_t"]       = co2_total_prom_t

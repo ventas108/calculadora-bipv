@@ -129,3 +129,21 @@ def test_pagina_no_reimplementa_constantes_co2():
     assert "FACTOR_MARGINAL_KG_KWH  = 0.300" not in src
     assert "KG_CO2_ARBOL_ANUAL       = 22.0" not in src
     assert 'INTENSIDAD_IPCC = {\n    "Carbón' not in src
+
+
+def test_pagina_define_co2_metodologia_antes_de_usarla():
+    # Regresión de un NameError preexistente: la página citaba
+    # `co2_metodologia` en un f-string (tabla exportable de la Sección 9)
+    # sin haberla asignado nunca como variable local — solo existía como
+    # st.session_state["co2_metodologia"], escrito además DESPUÉS del uso.
+    with open(_PAGINA_CO2, encoding="utf-8") as f:
+        lines = f.readlines()
+    idx_asignacion = next(
+        i for i, l in enumerate(lines) if l.startswith("co2_metodologia = ")
+    )
+    idx_uso = next(
+        i for i, l in enumerate(lines) if "{co2_metodologia}" in l
+    )
+    assert idx_asignacion < idx_uso, (
+        "co2_metodologia se usa antes de asignarse — volvería el NameError"
+    )
