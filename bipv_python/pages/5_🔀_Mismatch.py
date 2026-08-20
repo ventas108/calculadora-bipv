@@ -4,7 +4,6 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import numpy as np
-import pvlib
 
 from calculos.mismatch import (
     calcular_sombreado_horizonte,
@@ -20,7 +19,7 @@ from calculos.mismatch_bypass import (
     simular_bypass_horario,
     estadisticas_fs,
 )
-from calculos.solar import calcular_poa, ORIENTACIONES
+from calculos.solar import calcular_poa, ORIENTACIONES, posiciones_solares_representativas
 from datos.ciudades_colombia import CIUDADES
 from calculos.tz_utils import utc_offset_latam, tz_label
 from datos.tecnologias_bipv import MODULOS_BIPV
@@ -755,19 +754,10 @@ with col_tbl:
 st.subheader("🌞 Diagrama de trayectoria solar y horizonte")
 
 @st.cache_data(show_spinner=False)
-def _solar_path_diario(lat, lon, alt_m):
-    """Posiciones solares horarias para cada mes (1 día representativo/mes)."""
-    loc = pvlib.location.Location(latitude=lat, longitude=lon, altitude=alt_m, tz="UTC")
-    dias_rep = pd.date_range("2001-01-15", periods=12, freq="MS") + pd.Timedelta(days=14)
-    frames = []
-    for dia in dias_rep:
-        times = pd.date_range(dia, dia + pd.Timedelta(hours=23), freq="h", tz="UTC")
-        sp    = loc.get_solarposition(times)
-        sp["mes"] = dia.month
-        frames.append(sp[sp["apparent_elevation"] > 0])
-    return pd.concat(frames)
+def _solar_path_cache(lat, lon, alt_m):
+    return posiciones_solares_representativas(lat, lon, alt_m)
 
-solar_path = _solar_path_diario(lat, lon, alt_m)
+solar_path = _solar_path_cache(lat, lon, alt_m)
 
 # Parsear horizonte editado
 puntos_horizonte = []
