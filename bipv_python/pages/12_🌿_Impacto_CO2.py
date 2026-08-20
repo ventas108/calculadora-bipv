@@ -20,6 +20,7 @@ import numpy as np
 import datetime
 
 from datos.ciudades_colombia import FACTOR_CO2_COLOMBIA_KG_KWH
+from calculos import co2 as co2_calc
 
 st.set_page_config(page_title="Huella CO₂ — BIPV", page_icon="🌿", layout="wide")
 
@@ -42,44 +43,17 @@ st.caption(
 # ── Factores de emisión SIN Colombia ─────────────────────────────────────────
 # Fuente: XM S.A. E.S.P. — Operador del SIN · UPME Resolución 520/2019
 FACTOR_PROMEDIO_KG_KWH  = FACTOR_CO2_COLOMBIA_KG_KWH        # 0.126 kg/kWh — GHG Protocol location-based
-FACTOR_MARGINAL_KG_KWH  = 0.300          # kg/kWh — Factor marginal combinado (CDM AMS-I.D)
-                                          # OM ≈ 0.25, BM ≈ 0.35 → CM = (OM+BM)/2 ≈ 0.30
-                                          # Fuente: UNFCCC CDM Tool 07 — Combined margin
 
-# ── Equivalencias de impacto — Colombia ──────────────────────────────────────
-# Árbol nativo adulto: absorción media 22 kgCO₂/año (IDEAM 2010 — "Vegetación Bosque Húmedo")
-KG_CO2_ARBOL_ANUAL       = 22.0          # kg CO₂/árbol/año — IDEAM
-
-# Hogar colombiano promedio — consumo eléctrico UPME 2022
-KWH_HOGAR_ANUAL          = 1_560.0       # kWh/año (130 kWh/mes residencial estrato 3-4)
-
-# Vehículo promedio Colombia — gasolina corriente
-KG_CO2_KM_VEHICULO       = 0.162         # kgCO₂/km — IDEAM FECOC 2022 (auto gasolina)
-
-# Vuelo doméstico — ICAO Carbon Emissions Calculator 2023
-KG_CO2_VUELO_BOG_MDE     = 89.0          # kg CO₂/pasajero/vuelo ida (BOG–MDE ≈ 0.089 tCO₂)
-
-# Barril de petróleo colombiano — combustión completa
-KG_CO2_BARRIL_PETROLEO   = 431.7         # kgCO₂/barril (EPA AP-42 · API gravedad 31°)
-
-# Cilindro GLP Colombia (40 lb = 18.14 kg)
-KG_CO2_CILINDRO_GLP      = 55.6          # kgCO₂/cilindro 40 lb (IPCC 2006 Vol. 2 cap. 1)
-
-# ── Intensidades carbono por tecnología — IPCC AR6 WG III Tabla A.III.2 ──────
-INTENSIDAD_IPCC = {
-    "Carbón (subcrítico)":     820,
-    "Carbón (ultrasupercrítico)": 670,
-    "Gas natural ciclo abierto":  490,
-    "Gas natural ciclo combinado": 410,
-    "Fuel oil / Diesel":       650,
-    "Solar PV suelo (c-Si)":    24,
-    "Solar BIPV fachada":       30,     # +25% vs PV suelo por vidrio laminado y soporte
-    "Eólica terrestre":         7,
-    "Hidroeléctrica":           24,
-    "Nuclear":                  12,
-    "Geotérmica":               38,
-    "Biomasa":                  230,    # promedio, varía mucho
-}
+# Factor marginal, equivalencias de impacto e intensidades IPCC ahora viven
+# en calculos/co2.py (mismos valores y fuentes — ver docstring del módulo).
+FACTOR_MARGINAL_KG_KWH = co2_calc.FACTOR_MARGINAL_KG_KWH
+KG_CO2_ARBOL_ANUAL      = co2_calc.KG_CO2_ARBOL_ANUAL
+KWH_HOGAR_ANUAL         = co2_calc.KWH_HOGAR_ANUAL
+KG_CO2_KM_VEHICULO      = co2_calc.KG_CO2_KM_VEHICULO
+KG_CO2_VUELO_BOG_MDE    = co2_calc.KG_CO2_VUELO_BOG_MDE
+KG_CO2_BARRIL_PETROLEO  = co2_calc.KG_CO2_BARRIL_PETROLEO
+KG_CO2_CILINDRO_GLP     = co2_calc.KG_CO2_CILINDRO_GLP
+INTENSIDAD_IPCC         = co2_calc.INTENSIDAD_IPCC
 
 # ── Colores semáforo  ─────────────────────────────────────────────────────────
 COLOR_VERDE   = "#2E7D32"
@@ -267,26 +241,22 @@ with col_m2:
 # CÁLCULOS PRINCIPALES
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Producción año a año con degradación
-anos_array  = np.arange(1, n_anos + 1)
-e_ac_anual  = e_ac * (1 - tasa_deg_co2 / 100) ** (anos_array - 1)   # kWh/año cada año
+# Producción año a año con degradación + emisiones evitadas — calculos/co2.py
+anos_array, e_ac_anual = co2_calc.produccion_anual_con_degradacion(e_ac, tasa_deg_co2, n_anos)
 e_ac_total  = e_ac_anual.sum()     # kWh acumulados en vida útil
 
-# CO₂ evitado (factor activo)
-co2_anual_kg      = e_ac * factor_activo                     # kg/año — año 1
-co2_anual_t       = co2_anual_kg / 1000                      # tCO₂/año — año 1
-co2_total_t       = (e_ac_anual * factor_activo / 1000).sum()  # tCO₂ acumulado 25 años
-
-# CO₂ con ambos factores (para comparar)
-co2_total_prom_t  = (e_ac_anual * FACTOR_PROMEDIO_KG_KWH  / 1000).sum()
-co2_total_marg_t  = (e_ac_anual * FACTOR_MARGINAL_KG_KWH  / 1000).sum()
+_r_emisiones = co2_calc.emisiones_evitadas(
+    e_ac, e_ac_anual, factor_activo, FACTOR_PROMEDIO_KG_KWH, FACTOR_MARGINAL_KG_KWH
+)
+co2_anual_kg        = _r_emisiones["co2_anual_kg"]
+co2_anual_t         = _r_emisiones["co2_anual_t"]
+co2_total_t         = _r_emisiones["co2_total_t"]
+co2_total_prom_t    = _r_emisiones["co2_total_prom_t"]
+co2_total_marg_t    = _r_emisiones["co2_total_marg_t"]
+intensidad_sistema  = _r_emisiones["intensidad_sistema"]
 
 # Valor en bonos de carbono
-valor_bonos_usd   = co2_total_t * precio_bono_usd
-valor_bonos_cop   = valor_bonos_usd * tipo_cambio
-
-# Intensidad del sistema
-intensidad_sistema = factor_activo * 1000  # gCO₂/kWh (para comparar con IPCC)
+valor_bonos_usd, valor_bonos_cop = co2_calc.valor_bonos_carbono(co2_total_t, precio_bono_usd, tipo_cambio)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SECCIÓN 2 — BANNER DE 4 MÉTRICAS GRANDES
@@ -352,13 +322,14 @@ st.caption(
     f"Factor activo: {factor_activo*1000:.0f} gCO₂/kWh"
 )
 
-# Calcular equivalencias
-arboles        = co2_total_t * 1000 / KG_CO2_ARBOL_ANUAL / n_anos   # árboles permanentes equivalentes
-hogares        = e_ac_total / KWH_HOGAR_ANUAL                         # hogares abastecidos
-km_vehiculo    = co2_total_t * 1000 / KG_CO2_KM_VEHICULO / 1000       # miles de km
-vuelos_bogmde  = co2_total_t * 1000 / KG_CO2_VUELO_BOG_MDE
-barriles       = co2_total_t * 1000 / KG_CO2_BARRIL_PETROLEO
-cilindros_glp  = co2_total_t * 1000 / KG_CO2_CILINDRO_GLP
+# Calcular equivalencias — calculos/co2.py
+_r_equiv       = co2_calc.equivalencias_impacto(co2_total_t, e_ac_total, n_anos)
+arboles        = _r_equiv["arboles"]         # árboles permanentes equivalentes
+hogares        = _r_equiv["hogares"]         # hogares abastecidos
+km_vehiculo    = _r_equiv["km_vehiculo"]     # miles de km
+vuelos_bogmde  = _r_equiv["vuelos_bogmde"]
+barriles       = _r_equiv["barriles"]
+cilindros_glp  = _r_equiv["cilindros_glp"]
 
 eq_data = [
     {
@@ -666,13 +637,12 @@ st.subheader("🇨🇴 8. Contribución al NDC Colombia 2030")
 
 # Meta NDC: reducir ~169 Mt CO₂eq en 2030 (51% vs escenario tendencial)
 # Sector energía: ~35% de las emisiones = ~59 Mt a reducir del sector energía
-META_NDC_TOTAL_MT   = 169.0    # Mt CO₂eq total Colombia 2030
-META_SECTOR_MT      = 59.0     # Mt CO₂eq sector energía (≈35% del total)
-EMIS_NAL_MT_AÑO     = 258.0    # Mt CO₂eq/año Colombia (IDEAM BUR4 2023)
+# Metas NDC y cálculo de contribución — calculos/co2.py
+META_NDC_TOTAL_MT   = co2_calc.META_NDC_TOTAL_MT   # Mt CO₂eq total Colombia 2030
+META_SECTOR_MT      = co2_calc.META_SECTOR_MT      # Mt CO₂eq sector energía (≈35% del total)
+EMIS_NAL_MT_AÑO     = co2_calc.EMIS_NAL_MT_ANIO     # Mt CO₂eq/año Colombia (IDEAM BUR4 2023)
 
-pct_ndc_total   = co2_total_t / (META_NDC_TOTAL_MT * 1e6) * 100
-pct_ndc_sector  = co2_total_t / (META_SECTOR_MT   * 1e6) * 100
-pct_emis_nac    = co2_anual_t / (EMIS_NAL_MT_AÑO  * 1e6) * 100
+pct_ndc_total, pct_ndc_sector, pct_emis_nac = co2_calc.contribucion_ndc(co2_total_t, co2_anual_t)
 
 col_ndc1, col_ndc2, col_ndc3 = st.columns(3)
 col_ndc1.metric(
@@ -757,20 +727,22 @@ with st.expander("📥 Ingresar producción real del inversor (mes a mes)", expa
             )
     st.session_state["co2_kwh_real_dict"] = kwh_real_dict
 
-# Calcular métricas reales
+# Calcular métricas reales — calculos/co2.py
 kwh_real_list  = [kwh_real_dict.get(m, 0.0) for m in _meses]
 kwh_real_total = sum(kwh_real_list)
 meses_con_dato = sum(1 for v in kwh_real_list if v > 0)
 
-if meses_con_dato > 0:
-    # CO₂ real vs proyectado por mes
-    co2_real_mes  = [v * factor_activo / 1000 for v in kwh_real_list]      # tCO₂/mes real
-    co2_proy_mes  = [v * factor_activo / 1000 for v in _proy_mes]          # tCO₂/mes proyectado
-    co2_real_acum = sum(co2_real_mes[:meses_con_dato])
-    co2_proy_acum = sum(co2_proy_mes[:meses_con_dato])
-    cumpl_pct     = (co2_real_acum / co2_proy_acum * 100) if co2_proy_acum > 0 else 0
-    delta_co2     = co2_real_acum - co2_proy_acum
-    kwh_real_anual_proy = kwh_real_total / meses_con_dato * 12 if meses_con_dato > 0 else 0
+_r_cumpl = co2_calc.cumplimiento_real_vs_proyectado(kwh_real_list, _proy_mes, factor_activo, e_ac)
+
+if _r_cumpl is not None:
+    co2_real_mes         = _r_cumpl["co2_real_mes"]
+    co2_proy_mes         = _r_cumpl["co2_proy_mes"]
+    co2_real_acum        = _r_cumpl["co2_real_acum"]
+    co2_proy_acum        = _r_cumpl["co2_proy_acum"]
+    cumpl_pct            = _r_cumpl["cumpl_pct"]
+    delta_co2            = _r_cumpl["delta_co2"]
+    kwh_real_anual_proy  = _r_cumpl["kwh_real_anual_proy"]
+    pr_real_pct          = _r_cumpl["pr_real_pct"]
 
     # Métricas resumen
     cr1, cr2, cr3, cr4 = st.columns(4)
@@ -794,7 +766,7 @@ if meses_con_dato > 0:
         delta_color="normal" if delta_co2 >= 0 else "inverse",
         help="≥ 90% = excelente · 75–89% = aceptable · < 75% = revisar sombreado u O&M",
     )
-    pr_real_pct = (kwh_real_total / (e_ac * meses_con_dato / 12) * 100) if e_ac > 0 else 0
+    # pr_real_pct ya viene de co2_calc.cumplimiento_real_vs_proyectado() arriba.
     cr4.metric(
         "PR real vs PR simulado",
         f"{pr_real_pct:.1f}%",
