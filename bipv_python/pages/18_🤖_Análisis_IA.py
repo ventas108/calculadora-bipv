@@ -74,10 +74,10 @@ if st.session_state.get("metricas_financiero") is None:
 # ── Clave de API ──────────────────────────────────────────────────────────────
 if not os.environ.get("ANTHROPIC_API_KEY", "").strip():
     st.error(
-        "Falta `ANTHROPIC_API_KEY` en el entorno del servidor. En el droplet: "
-        "`sudo systemctl edit bipv-calculadora` → agrega bajo `[Service]` la línea "
-        "`Environment=\"ANTHROPIC_API_KEY=sk-ant-...\"` → guarda → "
-        "`sudo systemctl restart bipv-calculadora`.",
+        "Falta `ANTHROPIC_API_KEY` en el entorno del servidor. El proceso corre bajo "
+        "**PM2** (`streamlit-bipv`), no systemctl. En el droplet:\n\n"
+        "`export ANTHROPIC_API_KEY=\"sk-ant-...\"` (tu clave real) → "
+        "`pm2 restart streamlit-bipv --update-env` → `pm2 save` para que persista.",
         icon="🔑",
     )
     st.stop()
@@ -130,11 +130,19 @@ def _candidato_actual() -> CandidatoRegistrado:
 
 registro = {"Actual": _candidato_actual()}
 
+# El SYSTEM_PROMPT de ambos agentes ya no asume "fachada" por defecto, pero
+# además le declaramos el tipo real como dato explícito -- así el agente
+# nunca tiene que adivinarlo a partir del nombre genérico "BIPV" de la
+# plataforma. Encontrado en producción: un usuario corrió un ejercicio de
+# Granja fotovoltaica y el Analista narró en clave de fachada de edificio.
+_tipo_instalacion = st.session_state.get("tipo_instalacion", "no especificado en el proyecto")
+_contexto_tipo = f"Tipo de instalación de este proyecto: {_tipo_instalacion}."
+
 st.subheader("📋 Diseño que van a leer los agentes")
 st.info(
-    "v1: un único candidato — el diseño actual del proyecto, tal como quedó en "
-    "📊 Producción y 💰 Financiero. Todavía no genera variantes ni corre un barrido "
-    "de sensibilidad — ver el porqué en el docstring de este archivo.",
+    f"v1: un único candidato — el diseño actual del proyecto ({_tipo_instalacion}), tal "
+    "como quedó en 📊 Producción y 💰 Financiero. Todavía no genera variantes ni corre un "
+    "barrido de sensibilidad — ver el porqué en el docstring de este archivo.",
     icon="ℹ️",
 )
 st.markdown(formatear_candidatos(registro, titulo="Candidato"))
@@ -151,11 +159,11 @@ with col_analista:
         with st.spinner("Consultando a Claude (Analista Técnico-Financiero)…"):
             try:
                 pregunta = (
-                    "Este es el ÚNICO diseño actual del proyecto — no se corrió un barrido "
-                    "de sensibilidad ni se generaron variantes todavía, así que no compares "
-                    "contra alternativas que no existen. Evalúa su salud financiera y su "
-                    "bancabilidad contra los tres perfiles de inversionista, y dime "
-                    "explícitamente qué información adicional (sensibilidad, variantes de "
+                    f"{_contexto_tipo} Este es el ÚNICO diseño actual del proyecto — no se "
+                    "corrió un barrido de sensibilidad ni se generaron variantes todavía, así "
+                    "que no compares contra alternativas que no existen. Evalúa su salud "
+                    "financiera y su bancabilidad contra los tres perfiles de inversionista, y "
+                    "dime explícitamente qué información adicional (sensibilidad, variantes de "
                     "diseño) haría falta para un diagnóstico más completo."
                 )
                 mensaje = ejecutar_analisis([], registro, pregunta=pregunta)
@@ -183,7 +191,11 @@ with col_asesor:
     if st.button("Ejecutar Asesor", key="btn_asesor", use_container_width=True):
         with st.spinner("Consultando a Claude (Asesor de Inversión)…"):
             try:
-                mensaje = ejecutar_asesoria(registro)
+                pregunta_asesor = (
+                    f"{_contexto_tipo} Evalúa estos candidatos contra los tres perfiles de "
+                    "inversionista y dame tu recomendación de inversión."
+                )
+                mensaje = ejecutar_asesoria(registro, pregunta=pregunta_asesor)
                 st.session_state["ia_asesor_texto"] = _texto_asesor(mensaje)
                 st.session_state["ia_asesor_uso"] = (
                     mensaje.usage.input_tokens, mensaje.usage.output_tokens,
