@@ -28,6 +28,15 @@ class OptimizationVariable:
     opciones: tuple | None = None   # solo para tipo="categorica"
     unidad: str = ""
     descripcion: str = ""
+    # True cuando minimo y maximo son el MISMO punto físico (p.ej. azimuth:
+    # 0°=360°=Norte). Un consumidor que compare directamente minimo vs
+    # maximo para medir "cuánto importa esta variable" (ver
+    # optimization/sensitivity.py) obtiene un resultado degenerado —
+    # comparando Norte contra Norte, no explorando el rango real. Detectado
+    # en producción: el Analista Técnico-Financiero señaló un impacto de
+    # sensibilidad de exactamente 0 en un barrido de azimuth 0°→360° como
+    # "bandera roja metodológica" antes de que nadie lo notara en el código.
+    circular: bool = False
 
 
 def variables_geometria(tipo_superficie: str | None = None) -> list[OptimizationVariable]:
@@ -55,6 +64,7 @@ def variables_geometria(tipo_superficie: str | None = None) -> list[Optimization
         OptimizationVariable(
             "azimuth", "continua", 0.0, 360.0, unidad="°",
             descripcion="Orientación — convención pvlib: 0=Norte, 90=Este, 180=Sur, 270=Oeste.",
+            circular=True,   # 0°=360°=Norte — ver comentario en OptimizationVariable.circular
         ),
     ]
 

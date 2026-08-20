@@ -17,6 +17,14 @@ propósito — "mover" una elección de catálogo no es un barrido continuo
 entre dos extremos, es una comparación explícita de opciones discretas con
 su propia semántica; mezclarla aquí oscurecería el resultado en vez de
 aclararlo.
+
+Variables circulares (OptimizationVariable.circular=True, p.ej. azimuth):
+minimo y maximo son el MISMO punto físico (0°=360°=Norte), así que el
+barrido no compara minimo vs maximo sino minimo vs el punto medio del
+dominio (el verdadero opuesto en el ciclo, p.ej. Norte vs Sur) — ver
+_valores_extremos() más abajo. Sin esto, "valor_alto" en ResultadoSensibilidad
+sería una repetición de "valor_bajo" y el impacto daría cero por
+construcción, no porque la variable no importe.
 """
 from dataclasses import dataclass, replace
 
@@ -49,6 +57,21 @@ def _evaluar(config: BIPVConfiguration, tmy: pd.DataFrame, fin_config_builder) -
     return extraer_objetivos(sim, fin)
 
 
+def _valores_extremos(var: OptimizationVariable) -> tuple[float, float]:
+    """
+    Los dos puntos a evaluar en el barrido OAT para `var`.
+
+    Para variables normales: (minimo, maximo).
+    Para variables circulares (var.circular=True): minimo y maximo son el
+    MISMO punto físico (p.ej. azimuth 0°=360°=Norte), así que se usa el
+    punto medio del dominio como el verdadero opuesto en el ciclo
+    (Norte vs Sur, no Norte vs Norte).
+    """
+    if var.circular:
+        return var.minimo, var.minimo + (var.maximo - var.minimo) / 2
+    return var.minimo, var.maximo
+
+
 def analizar_sensibilidad(
     config_base: BIPVConfiguration,
     variables: list[OptimizationVariable],
@@ -65,7 +88,7 @@ def analizar_sensibilidad(
         if var.tipo == "categorica":
             continue   # ver docstring del módulo
 
-        bajo, alto = var.minimo, var.maximo
+        bajo, alto = _valores_extremos(var)
         if var.tipo == "entera":
             bajo, alto = int(bajo), int(alto)
 

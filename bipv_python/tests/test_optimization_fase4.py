@@ -75,6 +75,31 @@ def test_ordenar_por_impacto_descendente(tmy_bogota):
     assert impactos == sorted(impactos, reverse=True)
 
 
+def test_sensibilidad_azimuth_circular_ya_no_es_degenerada(tmy_bogota):
+    # Regresión: el Analista Técnico-Financiero (agente) señaló un impacto
+    # de sensibilidad de exactamente 0 en un barrido de azimuth 0°→360°
+    # como "bandera roja metodológica" -- tenía razón. minimo=0 y
+    # maximo=360 son el MISMO azimuth físico (Norte), así que el barrido
+    # comparaba Norte contra Norte. Con tilt=90° (fachada vertical), Norte
+    # vs Sur SÍ debe producir una diferencia real de energía.
+    from optimization.sensitivity import _valores_extremos
+
+    variables = opt_vars.variables_geometria("Fachada")
+    azimuth_var = next(v for v in variables if v.nombre == "azimuth")
+    assert azimuth_var.circular is True
+
+    bajo, alto = _valores_extremos(azimuth_var)
+    assert (bajo, alto) == (0.0, 180.0)   # Norte vs Sur, no Norte vs Norte
+
+    cfg = dataclasses.replace(_cfg_electricamente_valida(), tilt=90.0, azimuth=180.0)
+    resultados = analizar_sensibilidad(cfg, variables, tmy_bogota)
+    r_azimuth = next(r for r in resultados if r.variable == "azimuth")
+
+    assert r_azimuth.valor_bajo == 0.0
+    assert r_azimuth.valor_alto == 180.0
+    assert r_azimuth.impacto_absoluto["energia_anual"] > 0.0
+
+
 # ── scenario_generator.py ────────────────────────────────────────────────
 
 def test_muestrear_variable_categorica_lanza_error():
