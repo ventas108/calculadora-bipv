@@ -58,7 +58,13 @@ def evaluar_bankability(
 
     if perfil.minimum_irr_pct is not None:
         valor = fin.irr_pct
-        cumple = valor is not None and valor >= perfil.minimum_irr_pct
+        # bool(...) explícito: valor puede venir de una comparación con un
+        # numpy.float64 (metricas de financiero.py), y numpy_float >= float
+        # da numpy.bool_ — un tipo que NO es json.dumps-serializable aunque
+        # se comporte como bool (numpy.bool_ no hereda de bool, a diferencia
+        # de numpy.float64 que sí hereda de float). Encontrado en producción
+        # al correr el Analista Técnico-Financiero contra datos reales.
+        cumple = bool(valor is not None and valor >= perfil.minimum_irr_pct)
         mensaje = (
             f"IRR {valor:.1f}% {'≥' if cumple else '<'} mínimo requerido {perfil.minimum_irr_pct:.1f}%"
             if valor is not None else
@@ -68,7 +74,7 @@ def evaluar_bankability(
 
     if perfil.maximum_payback_anos is not None:
         valor = fin.payback_simple_anos
-        cumple = valor is not None and valor <= perfil.maximum_payback_anos
+        cumple = bool(valor is not None and valor <= perfil.maximum_payback_anos)
         mensaje = (
             f"Payback {valor:.1f} años {'≤' if cumple else '>'} máximo aceptado {perfil.maximum_payback_anos:.1f}"
             if valor is not None else
@@ -80,12 +86,12 @@ def evaluar_bankability(
 
     if perfil.minimum_npv_usd is not None:
         valor = fin.npv_usd
-        cumple = valor >= perfil.minimum_npv_usd
+        cumple = bool(valor >= perfil.minimum_npv_usd)
         mensaje = f"VPN USD {valor:,.0f} {'≥' if cumple else '<'} mínimo USD {perfil.minimum_npv_usd:,.0f}"
         criterios.append(CriterioBankability("NPV", cumple, valor, perfil.minimum_npv_usd, mensaje))
 
     if perfil.maximum_capex_usd is not None:
-        cumple = capex_usd is not None and capex_usd <= perfil.maximum_capex_usd
+        cumple = bool(capex_usd is not None and capex_usd <= perfil.maximum_capex_usd)
         mensaje = (
             "CAPEX no fue provisto a evaluar_bankability() — no se puede verificar el tope"
             if capex_usd is None else

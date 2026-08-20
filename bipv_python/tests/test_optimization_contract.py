@@ -9,7 +9,9 @@ panel/inversor de referencia ya validados contra el XLSM en
 test_validacion_vba.py (N=8 → OK, N=9 → FALLA) para no inventar umbrales.
 """
 import dataclasses
+import json
 
+import numpy as np
 import pytest
 
 from datos.catalogo_inversores import INVERSORES
@@ -201,3 +203,36 @@ def test_bankability_maximo_capex_sin_proveer_capex_no_cumple():
     criterio = ev.criterios[0]
     assert criterio.nombre == "CAPEX máximo"
     assert criterio.cumple is False
+
+
+def test_bankability_cumple_es_bool_nativo_no_numpy_bool():
+    # Regresión: encontrado corriendo el Analista Técnico-Financiero (agente)
+    # contra datos reales -- fin.irr_pct/npv_usd/payback_simple_anos venían
+    # de metricas calculadas con numpy, así que `valor >= umbral` daba
+    # numpy.bool_. numpy.bool_ imprime como "bool" (__class__.__name__) pero
+    # NO hereda de bool (a diferencia de numpy.float64, que sí hereda de
+    # float) -- json.dumps() lo rechaza con
+    # "TypeError: Object of type bool is not JSON serializable", un error
+    # confuso porque el nombre de la clase engaña. Cualquier consumidor que
+    # serialice CriterioBankability (como la herramienta del agente) se
+    # rompía en todos los perfiles.
+    fin = FinancialResult(beneficios_1715=None, flujos=[], metricas={
+        "vpn_usd": np.float64(1234.0),
+        "tir_pct": np.float64(18.0),
+        "payback_simple": np.float64(5.0),
+        "lcoe_usd_kWh": np.float64(0.05),
+    })
+    perfil = InvestorProfile(
+        nombre="Test", minimum_irr_pct=12.0, maximum_payback_anos=8.0,
+        minimum_npv_usd=0.0, maximum_capex_usd=100_000.0,
+    )
+    ev = evaluar_bankability(fin, perfil, capex_usd=np.float64(50_000.0))
+
+    assert len(ev.criterios) == 4
+    for criterio in ev.criterios:
+        assert type(criterio.cumple) is bool, (
+            f"{criterio.nombre}: cumple es {type(criterio.cumple)}, no bool nativo"
+        )
+
+    # La razón real de este test: esto no debe volver a lanzar TypeError.
+    json.dumps({"criterios": [{"cumple": c.cumple} for c in ev.criterios]})
