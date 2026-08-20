@@ -198,6 +198,43 @@ def resumen_mensual(tmy: pd.DataFrame, poa: pd.DataFrame) -> pd.DataFrame:
     return monthly
 
 
+def posiciones_solares_representativas(
+    lat: float, lon: float, alt_m: float, elevacion_min: float = 0.0
+) -> pd.DataFrame:
+    """
+    Posiciones solares horarias para 12 días representativos del año
+    (día 15 de cada mes, año estándar 2001, UTC).
+
+    Uso: diagramas de trayectoria solar (sun-path chart). NO interviene en
+    el cálculo de energía ni de sombreado horizonte, que usa la resolución
+    horaria real del TMY — ver calcular_poa() y calculos.mismatch.
+
+    elevacion_min : conserva solo posiciones con apparent_elevation
+                    estrictamente mayor a este umbral (grados).
+    """
+    loc = pvlib.location.Location(latitude=lat, longitude=lon, altitude=alt_m, tz="UTC")
+    dias_rep = pd.date_range("2001-01-15", periods=12, freq="MS") + pd.Timedelta(days=14)
+    frames = []
+    for dia in dias_rep:
+        times = pd.date_range(dia, dia + pd.Timedelta(hours=23), freq="h", tz="UTC")
+        sp = loc.get_solarposition(times)
+        sp["mes"] = dia.month
+        frames.append(sp[sp["apparent_elevation"] > elevacion_min])
+    return pd.concat(frames) if frames else pd.DataFrame()
+
+
+def posiciones_solares_anio_estandar(lat: float, lon: float, alt_m: float) -> pd.DataFrame:
+    """
+    Posiciones solares para un año estándar de 8760 h UTC (sin datos TMY).
+
+    Uso: render geométrico 3D del recorrido solar — independiente del
+    cálculo energético, que sigue el calendario real del TMY.
+    """
+    loc = pvlib.location.Location(latitude=lat, longitude=lon, altitude=alt_m, tz="UTC")
+    times = pd.date_range("2001-01-01", periods=8760, freq="h", tz="UTC")
+    return loc.get_solarposition(times)
+
+
 def heatmap_poa_horario(poa: pd.DataFrame, utc_offset: int = 0) -> pd.DataFrame:
     """
     Matriz 24h × 12 meses para heatmap — promedio POA por hora y mes.

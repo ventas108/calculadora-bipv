@@ -5,44 +5,21 @@ import plotly.graph_objects as go
 
 from datos.ciudades_colombia import CIUDADES
 from calculos.tz_utils import utc_offset_latam, tz_label
+from calculos.solar import posiciones_solares_representativas, posiciones_solares_anio_estandar
+from calculos.mismatch import _interpolar_horizonte as _interp_horizonte
 
-# ── Funciones auxiliares nivel módulo (cacheables con st.cache_data) ──────────
+# ── Envoltorios cacheables sobre las funciones puras de calculos/solar.py ────
+# (la geometría vive en calculos/ — ver también pages/5_🔀_Mismatch.py, que
+# usa la misma función para su diagrama de trayectoria solar)
 
 @st.cache_data(show_spinner=False)
 def _solar_path_mensual(lat: float, lon: float, alt_m: float):
-    """Posiciones solares horarias para 12 días representativos (uno por mes)."""
-    import pvlib, pandas as pd
-    loc    = pvlib.location.Location(lat, lon, altitude=alt_m, tz="UTC")
-    dias   = pd.date_range("2001-01-15", periods=12, freq="MS") + pd.Timedelta(days=14)
-    frames = []
-    for dia in dias:
-        times = pd.date_range(dia, dia + pd.Timedelta(hours=23), freq="h", tz="UTC")
-        sp    = loc.get_solarposition(times)
-        sp["mes"] = dia.month
-        frames.append(sp[sp["apparent_elevation"] > 0.5])
-    return pd.concat(frames) if frames else pd.DataFrame()
+    return posiciones_solares_representativas(lat, lon, alt_m, elevacion_min=0.5)
 
 
 @st.cache_data(show_spinner=False)
 def _solar_anual_std(lat: float, lon: float, alt_m: float):
-    """Posiciones solares para año estándar 8760 h UTC (sin datos TMY)."""
-    import pvlib, pandas as pd
-    loc   = pvlib.location.Location(lat, lon, altitude=alt_m, tz="UTC")
-    times = pd.date_range("2001-01-01", periods=8760, freq="h", tz="UTC")
-    return loc.get_solarposition(times)
-
-
-def _interp_horizonte(puntos_az_el: list, az_array) -> "np.ndarray":
-    """Interpola la elevación del horizonte (0-360°, periódico)."""
-    import numpy as np
-    if not puntos_az_el:
-        return np.zeros(len(az_array))
-    datos = sorted(puntos_az_el, key=lambda p: p[0])
-    azs   = np.array([p[0] for p in datos])
-    els   = np.array([p[1] for p in datos])
-    azs_e = np.concatenate([[azs[-1] - 360], azs, [azs[0] + 360]])
-    els_e = np.concatenate([[els[-1]], els, [els[0]]])
-    return np.interp(np.asarray(az_array, dtype=float), azs_e, els_e)
+    return posiciones_solares_anio_estandar(lat, lon, alt_m)
 
 st.set_page_config(page_title="Vista 3D — BIPV", page_icon="🗺️", layout="wide")
 
