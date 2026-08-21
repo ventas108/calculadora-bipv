@@ -1,18 +1,24 @@
 # -*- coding: utf-8 -*-
-"""Regresión: un usuario cargando cotizaciones reales reportó que la columna
-'Total USD' de una fila recién agregada a las tablas de costos no se
-actualizaba hasta el siguiente refresco de la página -- comportamiento
-conocido de st.data_editor (la columna calculada de una fila nueva no se
-re-renderiza hasta el próximo rerun, y a veces ese rerun no se dispara
-solo). No es un bug en la fórmula (Cantidad × USD_un se recalcula
-correcto en cada rerun, ver el código de _editar_seccion) -- es que el
-usuario no siempre tiene una forma obvia de forzar ese rerun.
+"""Regresión, en dos rondas, de un mismo síntoma reportado por un usuario
+cargando cotizaciones reales: la columna calculada 'Total USD' de una
+tabla de costos se quedaba mostrando un valor viejo tras editar una fila.
 
-Fix: un botón "🔄 Recalcular" (solo st.rerun(), no toca la fórmula) en
-CADA tabla de costos editable: las 4 que pasan por _editar_seccion()
-(Perfilería, Mano de Obra, Sistema FV, Inversor -- y por extensión
-Catálogo, que también usa _editar_seccion()) y la de Costos Blandos, que
-tiene su propio st.data_editor separado.
+Ronda 1: se agregó un botón "🔄 Recalcular" que solo hacía st.rerun() --
+insuficiente, el usuario reportó que seguía sin funcionar.
+
+Ronda 2 (el bug real): st.data_editor de Streamlit cachea en el navegador
+el valor de columnas calculadas/disabled y no siempre las refresca aunque
+el `data` que le pasa Python cambie -- un st.rerun() por sí solo no rompe
+ese caché del lado del componente. Fix: versionar el `key` del widget
+(f"ed_{key}_v{N}") e incrementar N cuando el usuario pide 'Recalcular' o
+'Resetear' -- un `key` nuevo fuerza a Streamlit a tratar el widget como un
+componente distinto, sin caché previo. No se versiona en cada edición
+individual (eso reconstruiría la tabla en cada tecla).
+
+Cubre las 4 tablas que pasan por _editar_seccion() (Perfilería, Mano de
+Obra, Sistema FV, Inversor -- y por extensión Catálogo, que también usa
+_editar_seccion()) y la de Costos Blandos, que tiene su propio
+st.data_editor separado.
 
 Sin streamlit disponible en este entorno de desarrollo, se audita el
 código fuente vía regex -- mismo patrón que tests/test_pagina_analisis_ia.py.
@@ -40,3 +46,20 @@ def test_boton_recalcular_existe_en_costos_blandos():
     # _editar_seccion() -- necesita su propio botón.
     src = _leer()
     assert 'col_rc.button("🔄 Recalcular", key="recalc_soft"' in src
+
+
+def test_data_editor_de_editar_seccion_usa_key_versionada():
+    # El key estático f"ed_{key}" no rompe el caché del navegador al
+    # cambiar de versión -- debe incluir el contador _ver_key.
+    src = _leer()
+    assert 'key=f"ed_{key}_v{st.session_state[_ver_key]}"' in src
+    assert '_ver_key = f"_ver_{key}"' in src
+    # Recalcular y Resetear DEBEN incrementar la versión antes del rerun.
+    assert "st.session_state[_ver_key] += 1" in src
+
+
+def test_data_editor_de_costos_blandos_usa_key_versionada():
+    src = _leer()
+    assert 'key=f"ed_soft_v{st.session_state[\'_ver_soft\']}"' in src
+    assert '"_ver_soft" not in st.session_state' in src
+    assert 'st.session_state["_ver_soft"] += 1' in src
