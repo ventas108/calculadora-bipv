@@ -542,12 +542,22 @@ def validar_sdm_vs_ficha(panel: dict, tolerancia_pct=5.0) -> dict:
       Isc calculado  =   0.800 A  (ficha:   0.8 A  → error 0.00% ✓)
       Pmax calculado =  60.48 W  (ficha:  63.0 W  → error 3.97% ✓ <5%)
       FF calculado   =  64.92%   (VBA: 64.92% ✓)
+
+    Incluye también Vmp e Imp (2026-08-21): resolver_curva_iv() ya los
+    calcula, pero antes no se comparaban contra la ficha -- un punto ciego
+    real, porque Voc/Isc/Pmax podían validar los tres mientras Vmp estaba
+    mal calibrado, y Vmp es justo el valor que usan los chequeos de
+    compatibilidad eléctrica (ventana MPPT) en
+    calculos.dimensionamiento.calcular_vmp_string() y en los comparadores
+    de paneles/inversores.
     """
     res = resolver_curva_iv(1000.0, 25.0, panel, n_puntos=0)
 
     campos = {
         "Voc":  (res["Voc"],  panel["Voc_stc"]),
         "Isc":  (res["Isc"],  panel["Isc_stc"]),
+        "Vmp":  (res["Vmp"],  panel["Vmp_stc"]),
+        "Imp":  (res["Imp"],  panel["Imp_stc"]),
         "Pmax": (res["Pmax"], panel["Pmax_stc"]),
     }
     resultado = {}
@@ -590,6 +600,19 @@ _CAUSA_TECNICA_FALLO = {
         "revisa R_s (resistencia serie) y R_sh_ref (resistencia shunt), que determinan "
         "la forma de la curva I-V entre Voc e Isc sin afectar sus extremos."
     ),
+    "Vmp": (
+        "el punto de máxima potencia calculado no coincide con el de la ficha -- esto es "
+        "crítico porque Vmp (no Voc) es el valor que usan los chequeos de compatibilidad "
+        "eléctrica (ventana MPPT) para dimensionar el string. Si Voc SÍ valida pero Vmp "
+        "no, revisa R_s y R_sh_ref: definen dónde cae la 'rodilla' de la curva entre Voc "
+        "e Isc, y por lo tanto dónde queda el punto de máxima potencia."
+    ),
+    "Imp": (
+        "la corriente en el punto de máxima potencia no coincide con la de la ficha -- "
+        "si Isc SÍ valida pero Imp no, el Factor de Forma real del panel difiere del "
+        "calibrado: revisa R_s y R_sh_ref junto con Vmp (ambos suelen fallar juntos, ya "
+        "que Imp y Vmp describen el mismo punto de la curva)."
+    ),
 }
 
 
@@ -608,7 +631,7 @@ def explicar_fallo_validacion_sdm(panel_nombre: str, val: dict) -> str:
     fallos = [(p, d) for p, d in val.items() if p != "validacion_ok" and not d["ok"]]
     if not fallos:
         return (
-            f"✅ {panel_nombre}: SDM validado -- Voc/Isc/Pmax dentro de la tolerancia "
+            f"✅ {panel_nombre}: SDM validado -- Voc/Isc/Vmp/Imp/Pmax dentro de la tolerancia "
             "de error (5%) contra la ficha técnica."
         )
 

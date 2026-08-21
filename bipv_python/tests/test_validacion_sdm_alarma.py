@@ -68,6 +68,29 @@ def test_solo_menciona_las_metricas_que_realmente_fallan():
     assert "fotocorriente calibrada (I_L_ref)" not in texto  # causa técnica de Isc, no debe aparecer
 
 
+def test_valida_tambien_vmp_e_imp_no_solo_voc_isc_pmax():
+    # 2026-08-21: Vmp/Imp se agregaron porque resolver_curva_iv() ya los
+    # calculaba pero no se comparaban contra la ficha -- un punto ciego real,
+    # ya que Vmp es el valor que usan los chequeos de compatibilidad
+    # eléctrica (ventana MPPT), no Voc.
+    val = validar_sdm_vs_ficha(ASP_ST1_T40)
+    assert "Vmp" in val and "Imp" in val
+    assert val["Vmp"]["ok"] is True
+    assert val["Imp"]["ok"] is True
+
+
+def test_vmp_mal_calibrado_falla_y_explica_causa_especifica_de_vmp():
+    panel_malo = {**ASP_ST1_T40, "Vmp_stc": 70.0}   # ficha incoherente con el SDM real
+    val = validar_sdm_vs_ficha(panel_malo)
+    assert val["Vmp"]["ok"] is False
+    assert val["Voc"]["ok"] is True   # Voc no depende de Vmp_stc, sigue validando
+
+    texto = explicar_fallo_validacion_sdm("Panel-Prueba", val)
+    assert "Vmp" in texto
+    assert "ventana MPPT" in texto  # causa técnica específica de Vmp
+    assert "fotocorriente calibrada (I_L_ref)" not in texto  # causa de Isc no debe aparecer
+
+
 def test_cuenta_correctamente_cuantas_metricas_fallan_de_cuantas_totales():
     panel_malo = {**ASP_ST1_T40, "Voc_stc": 90.0}
     val = validar_sdm_vs_ficha(panel_malo)
