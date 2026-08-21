@@ -9,6 +9,7 @@
 4. Botón para adoptar la configuración ganadora y exportar la tabla.
 """
 import math
+import os
 
 import numpy as np
 import pandas as pd
@@ -36,7 +37,9 @@ init_trm()
 from calculos.comparador_inversores import (
     barrido_dc_ac,
     comparar_configuraciones,
+    comparar_todos_los_inversores_compatibles,
     filtrar_inversores_compatibles,
+    formatear_comparacion_inversores,
     unidades_necesarias,
 )
 from calculos.invalidacion import KEYS_DERIVADOS_POA
@@ -309,6 +312,114 @@ if _sel:
                 f"{len(_limpiadas)} resultados derivados: vuelve a correr "
                 "📊 Producción y 💰 Financiero con la nueva configuración."
             )
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Comparar TODOS los inversores compatibles + Analista de Producción
+# ══════════════════════════════════════════════════════════════════════════════
+# A diferencia del multiselect de arriba (2-4 modelos elegidos a mano), esto
+# corre para TODO el catálogo compatible de una sola vez -- barato porque
+# reusa la misma serie horaria p_ac_W ya simulada (solo aplica clipping/
+# escala por candidato, no vuelve a correr física). No reemplaza el flujo
+# manual: ese sigue sirviendo para comparar puntualmente 2-4 modelos que ya
+# tienes en mente; esto sirve para un barrido amplio con opinión de IA.
+st.markdown("---")
+st.subheader("🔍 Comparar TODOS los inversores compatibles del catálogo")
+st.caption(
+    f"Corre la misma comparación de arriba (E_ac con clipping real, CAPEX, VPN, TIR, LCOE) "
+    f"para los **{n_ok} inversores compatibles** con tu string actual, de una sola vez."
+)
+
+if st.button("▶️ Comparar todos los inversores", type="primary", key="btn_comparar_todos_inv"):
+    df_inv_cmp = comparar_todos_los_inversores_compatibles(
+        df_comp, n_strings_total, p_ac_W, p_dc_stc_kW,
+        capex_sin_inversores_usd=capex_sin_inv,
+        tarifa_cop_kwh=tarifa, tipo_cambio=trm,
+        tasa_descuento=tasa_desc / 100.0,
+        tasa_degradacion_pct=degradacion, opex_pct_capex=opex_pct,
+    )
+    st.session_state["_df_comparador_inversores"] = df_inv_cmp
+
+df_inv_cmp = st.session_state.get("_df_comparador_inversores")
+if df_inv_cmp is not None and not df_inv_cmp.empty:
+    _cols_internas_inv = [c for c in df_inv_cmp.columns if c.startswith("_")]
+    st.dataframe(
+        df_inv_cmp.drop(columns=_cols_internas_inv).style.format({
+            "AC total (kW)": "{:,.1f}", "Ratio DC/AC": "{:.2f}",
+            "E_ac (kWh/año)": "{:,.0f}", "Clipping (%)": "{:.2f}",
+            "CAPEX (USD)": "{:,.0f}", "VPN (USD)": "{:,.0f}", "TIR (%)": "{:.1f}",
+            "Payback (años)": "{:.1f}", "LCOE (USD/kWh)": "{:.4f}", "LCOE (COP/kWh)": "{:.0f}",
+        }, na_rep="—"),
+        use_container_width=True, hide_index=True,
+    )
+
+    _incompatibles_inv = df_inv_cmp[df_inv_cmp["Compatible"] == "❌"]
+    if not _incompatibles_inv.empty:
+        for _, r in _incompatibles_inv.iterrows():
+            st.warning(f"**{r['Modelo']}**: {r['_motivo']}", icon="⚠️")
+
+    st.download_button(
+        "⬇️ Descargar comparativa completa (CSV)",
+        df_inv_cmp.drop(columns=_cols_internas_inv).to_csv(index=False).encode("utf-8-sig"),
+        "comparativa_todos_inversores.csv", "text/csv",
+    )
+
+    st.divider()
+    st.subheader("🔍 Analista de Producción")
+    st.caption(
+        "Agente de IA (Claude) que lee SOLO la comparación de arriba — nunca inventa un "
+        "número — y opina qué inversor conviene implementar. Criterio técnico (energía con "
+        "clipping real, % de clipping, compatibilidad eléctrica), no financiero: esa decisión "
+        "sigue siendo del Asesor de Inversión, en 🤖 Análisis IA."
+    )
+    st.page_link(
+        "pages/18_🤖_Análisis_IA.py",
+        label="Ir al Analista Técnico-Financiero y al Asesor de Inversión (🤖 Análisis IA) →",
+        icon="🤖",
+    )
+    st.caption(
+        "Este botón hace una llamada real a la API y tiene un costo pequeño; "
+        "no se ejecuta automáticamente."
+    )
+    if not os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        st.info(
+            "Falta `ANTHROPIC_API_KEY` en el entorno del servidor para activar este agente "
+            "(el resto de la página funciona igual sin ella). En el droplet: "
+            "`export ANTHROPIC_API_KEY=\"sk-ant-...\"` → `pm2 restart streamlit-bipv "
+            "--update-env` → `pm2 save`.",
+            icon="🔑",
+        )
+    elif st.button("🔍 Ejecutar Analista de Producción", key="btn_analista_inversores"):
+        with st.spinner("Consultando a Claude (Analista de Producción)…"):
+            try:
+                from agentes.analista_produccion import (
+                    ejecutar_analisis_produccion, texto_final as _texto_analista_prod,
+                )
+                _tipo_inst_inv = st.session_state.get("tipo_instalacion", "no especificado en el proyecto")
+                contexto = formatear_comparacion_inversores(df_inv_cmp, _tipo_inst_inv)
+                pregunta = (
+                    "Analiza estos inversores y dame tu recomendación técnica sobre cuál "
+                    "implementar, considerando energía con clipping real y compatibilidad "
+                    "eléctrica con el string ya definido."
+                )
+                mensaje = ejecutar_analisis_produccion(contexto, pregunta=pregunta)
+                st.session_state["ia_inversor_texto"] = _texto_analista_prod(mensaje)
+                st.session_state["ia_inversor_uso"] = (
+                    mensaje.usage.input_tokens, mensaje.usage.output_tokens,
+                )
+            except Exception as e:
+                st.session_state["ia_inversor_texto"] = None
+                st.error(f"❌ {e}")
+
+    if st.session_state.get("ia_inversor_texto"):
+        st.markdown(st.session_state["ia_inversor_texto"])
+        tin, tout = st.session_state.get("ia_inversor_uso", (0, 0))
+        st.caption(f"🔢 {tin:,} tokens de entrada · {tout:,} de salida")
+        if st.button("🗑️ Limpiar", key="btn_limpiar_analista_inversores"):
+            st.session_state.pop("ia_inversor_texto", None)
+            st.session_state.pop("ia_inversor_uso", None)
+            st.rerun()
+elif df_inv_cmp is not None:
+    st.error("Ningún inversor pudo compararse — revisa el catálogo o el filtro de compatibilidad arriba.")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 3. Barrido de ratio DC/AC
