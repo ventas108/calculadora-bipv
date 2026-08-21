@@ -752,6 +752,112 @@ if dim_res and not dim_res.get("error"):
         }
         st.table(pd.DataFrame(tabla_dim))
 
+# ══════════════════════════════════════════════════════════════════════════════
+# Comparador de TODAS las baterías del catálogo + Analista de Producción
+# ══════════════════════════════════════════════════════════════════════════════
+# A diferencia de 🧩 Comparador de Paneles / 🧭 Comparador de Orientación (páginas
+# propias, hermanas de 4b), esto vive dentro de la misma página 11 -- batería ya
+# tiene su propio flujo B-6 completo aquí (consumo/autonomía/inversor ya están
+# en pantalla), así que un comparador separado solo duplicaría esos mismos
+# widgets sin necesidad.
+if tiene_catalogo:
+    st.divider()
+    st.subheader("🔍 Comparar todas las baterías del catálogo")
+    st.caption(
+        f"Dimensiona y evalúa compatibilidad con **{_inv_nombre or 'el inversor del proyecto'}** "
+        f"para las {len(cat_bat)} baterías del catálogo, con el mismo consumo diario "
+        f"({E_consumo_diario:.0f} kWh/día) y autonomía ({autonomia_h} h) configurados arriba."
+    )
+
+    from calculos.comparador_baterias import comparar_baterias, formatear_comparacion_baterias
+
+    if st.button("▶️ Comparar baterías", type="primary", key="btn_comparar_baterias"):
+        df_bat_cmp = comparar_baterias(
+            cat_bat, _inv_dim, _inv_nombre, E_consumo_diario, autonomia_h,
+        )
+        st.session_state["_df_comparador_baterias"] = df_bat_cmp
+
+    df_bat_cmp = st.session_state.get("_df_comparador_baterias")
+    if df_bat_cmp is not None and not df_bat_cmp.empty:
+        _cols_internas = [c for c in df_bat_cmp.columns if c.startswith("_")]
+        st.dataframe(
+            df_bat_cmp.drop(columns=_cols_internas).style.format({
+                "N° unidades": "{:.0f}", "Capacidad instalada (kWh)": "{:,.1f}",
+                "Capacidad útil (kWh)": "{:,.1f}", "DoD real (%)": "{:.1f}",
+                "Vida estimada (años)": "{:.1f}", "Costo total (USD)": "{:,.0f}",
+            }, na_rep="—"),
+            use_container_width=True, hide_index=True,
+        )
+        st.caption(
+            "Compatible: ✅ confirmado · ⚠️ el catálogo no tiene datos suficientes para "
+            "confirmar (no es un sí garantizado) · ❌ incompatibilidad detectada."
+        )
+
+        st.download_button(
+            "⬇️ Descargar comparativa (CSV)",
+            df_bat_cmp.drop(columns=_cols_internas).to_csv(index=False).encode("utf-8-sig"),
+            "comparativa_baterias.csv", "text/csv",
+        )
+
+        st.divider()
+        st.subheader("🔍 Analista de Producción")
+        st.caption(
+            "Agente de IA (Claude) que lee SOLO la comparación de arriba — nunca inventa un "
+            "número — y opina qué batería conviene implementar. Criterio técnico (autonomía, "
+            "DoD, vida útil, compatibilidad de voltaje), no financiero: esa decisión sigue "
+            "siendo del Asesor de Inversión, en 🤖 Análisis IA."
+        )
+        st.page_link(
+            "pages/18_🤖_Análisis_IA.py",
+            label="Ir al Analista Técnico-Financiero y al Asesor de Inversión (🤖 Análisis IA) →",
+            icon="🤖",
+        )
+        st.caption(
+            "Este botón hace una llamada real a la API y tiene un costo pequeño; "
+            "no se ejecuta automáticamente."
+        )
+        import os as _os_ia
+        if not _os_ia.environ.get("ANTHROPIC_API_KEY", "").strip():
+            st.info(
+                "Falta `ANTHROPIC_API_KEY` en el entorno del servidor para activar este agente "
+                "(el resto de la página funciona igual sin ella). En el droplet: "
+                "`export ANTHROPIC_API_KEY=\"sk-ant-...\"` → `pm2 restart streamlit-bipv "
+                "--update-env` → `pm2 save`.",
+                icon="🔑",
+            )
+        elif st.button("🔍 Ejecutar Analista de Producción", key="btn_analista_baterias"):
+            with st.spinner("Consultando a Claude (Analista de Producción)…"):
+                try:
+                    from agentes.analista_produccion import (
+                        ejecutar_analisis_produccion, texto_final as _texto_analista_prod,
+                    )
+                    _tipo_inst_bat = st.session_state.get("tipo_instalacion", "no especificado en el proyecto")
+                    contexto = formatear_comparacion_baterias(df_bat_cmp, _tipo_inst_bat)
+                    pregunta = (
+                        "Analiza estas baterías y dame tu recomendación técnica sobre cuál "
+                        "implementar para garantizar la autonomía configurada con la mejor "
+                        "vida útil posible."
+                    )
+                    mensaje = ejecutar_analisis_produccion(contexto, pregunta=pregunta)
+                    st.session_state["ia_bateria_texto"] = _texto_analista_prod(mensaje)
+                    st.session_state["ia_bateria_uso"] = (
+                        mensaje.usage.input_tokens, mensaje.usage.output_tokens,
+                    )
+                except Exception as e:
+                    st.session_state["ia_bateria_texto"] = None
+                    st.error(f"❌ {e}")
+
+        if st.session_state.get("ia_bateria_texto"):
+            st.markdown(st.session_state["ia_bateria_texto"])
+            tin, tout = st.session_state.get("ia_bateria_uso", (0, 0))
+            st.caption(f"🔢 {tin:,} tokens de entrada · {tout:,} de salida")
+            if st.button("🗑️ Limpiar", key="btn_limpiar_analista_baterias"):
+                st.session_state.pop("ia_bateria_texto", None)
+                st.session_state.pop("ia_bateria_uso", None)
+                st.rerun()
+    elif df_bat_cmp is not None:
+        st.error("Ninguna batería del catálogo pudo compararse — revisa el diagnóstico del catálogo arriba.")
+
 st.divider()
 
 # ══════════════════════════════════════════════════════════════════════════════

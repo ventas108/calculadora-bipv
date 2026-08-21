@@ -52,11 +52,13 @@ st.caption(
 st.info(
     "Estos son 2 de los 3 agentes de IA de la calculadora — el Analista Técnico-Financiero "
     "y el Asesor de Inversión, ambos aquí abajo. El tercero, el **Analista de Producción** "
-    "(criterio técnico: energía, PR — no decide la inversión), vive dentro de los "
-    "resultados de 🧩 Comparador de Paneles y 🧭 Comparador de Orientación.",
+    "(criterio técnico según el candidato: energía/PR para paneles y orientación, "
+    "autonomía/DoD/vida útil para baterías — nunca decide la inversión), vive dentro de "
+    "los resultados de 🧩 Comparador de Paneles, 🧭 Comparador de Orientación y "
+    "🔋 Baterías y Balance.",
     icon="🧭",
 )
-col_link1, col_link2 = st.columns(2)
+col_link1, col_link2, col_link3 = st.columns(3)
 with col_link1:
     st.page_link(
         "pages/4c_🧩_Comparador_Paneles.py",
@@ -68,6 +70,12 @@ with col_link2:
         "pages/4d_🧭_Comparador_Orientación.py",
         label="Ir al Analista de Producción (🧭 Comparador de Orientación) →",
         icon="🧭",
+    )
+with col_link3:
+    st.page_link(
+        "pages/11_🔋_Baterias_y_Balance.py",
+        label="Ir al Analista de Producción (🔋 Baterías y Balance) →",
+        icon="🔋",
     )
 
 # ── Prerrequisitos: el mismo criterio que usa 🧭 Asistente para 'listo' ──────
