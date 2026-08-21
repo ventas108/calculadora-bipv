@@ -7,7 +7,11 @@ cambia, estos tests deben reflejarlo, no al revés.
 from datos.catalogo_inversores import INVERSORES
 from datos.tecnologias_bipv import ASP_ST1_T40
 from simulation.schemas import BIPVConfiguration
-from calculos.comparador_paneles import comparar_paneles, paneles_excluidos_por_ficha_incompleta
+from calculos.comparador_paneles import (
+    comparar_paneles,
+    formatear_comparacion_paneles,
+    paneles_excluidos_por_ficha_incompleta,
+)
 from tests.test_simulation_pipeline import _tmy_sintetico_offline, LAT, LON, ALT_M
 
 GROWATT = INVERSORES["Growatt-MID15KTL3-X"]
@@ -74,3 +78,53 @@ def test_comparar_paneles_marca_incompatibilidad_electrica_real():
         tarifa_cop_kWh=750.0, tipo_cambio=4000.0,
     )
     assert df.iloc[0]["Compatible"] == "❌"
+
+
+# ── formatear_comparacion_paneles() -- contexto para agentes/analista_produccion.py
+
+def test_formatear_comparacion_declara_el_tipo_de_instalacion():
+    # Mismo principio que corrigió el sesgo de fachada en los otros agentes:
+    # el tipo de instalación va como dato explícito, no algo que el LLM deba
+    # adivinar del nombre genérico "BIPV" de la plataforma.
+    tmy = _tmy_sintetico_offline(LAT, LON, ALT_M)
+    df = comparar_paneles(
+        _cfg_base(), tmy, "Granja FV campo",
+        tarifa_cop_kWh=750.0, tipo_cambio=4000.0,
+    )
+    texto = formatear_comparacion_paneles(df, "Granja FV campo")
+    assert "Tipo de instalación: Granja FV campo" in texto
+
+
+def test_formatear_comparacion_cita_los_numeros_reales_del_dataframe():
+    tmy = _tmy_sintetico_offline(LAT, LON, ALT_M)
+    df = comparar_paneles(
+        _cfg_base(), tmy, "BIPV fachada/pérgola",
+        tarifa_cop_kWh=750.0, tipo_cambio=4000.0,
+    )
+    fila = df.iloc[0]
+    texto = formatear_comparacion_paneles(df, "BIPV fachada/pérgola")
+    assert fila["Panel"] in texto
+    assert f"{fila['E_ac (kWh/año)']:,.0f}" in texto
+    assert f"{fila['PR']:.3f}" in texto
+
+
+def test_formatear_comparacion_incluye_motivo_de_incompatibilidad():
+    # El agente necesita saber POR QUÉ un candidato se descartó, no solo
+    # que salga marcado ❌, para no recomendarlo sin explicación.
+    import dataclasses
+    tmy = _tmy_sintetico_offline(LAT, LON, ALT_M)
+    cfg = dataclasses.replace(_cfg_base(), N_serie=40)
+    df = comparar_paneles(
+        cfg, tmy, "BIPV fachada/pérgola",
+        tarifa_cop_kWh=750.0, tipo_cambio=4000.0,
+    )
+    texto = formatear_comparacion_paneles(df, "BIPV fachada/pérgola")
+    assert "❌" in texto
+    assert df.iloc[0]["_motivo_electrico"] in texto
+
+
+def test_formatear_comparacion_dataframe_vacio_no_crashea():
+    import pandas as pd
+    texto = formatear_comparacion_paneles(pd.DataFrame(), "Granja FV campo")
+    assert "Granja FV campo" in texto
+    assert "No hay ningún panel simulable" in texto

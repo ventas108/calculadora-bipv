@@ -34,9 +34,14 @@ mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 
 from datos.ciudades_colombia import CIUDADES
 from calculos.presupuesto import BENCH, ZONA_FACTOR
-from calculos.comparador_paneles import comparar_paneles, paneles_excluidos_por_ficha_incompleta
+from calculos.comparador_paneles import (
+    comparar_paneles,
+    formatear_comparacion_paneles,
+    paneles_excluidos_por_ficha_incompleta,
+)
 from calculos.invalidacion import KEYS_DERIVADOS_POA
 from simulation.schemas import BIPVConfiguration
+from agentes.analista_produccion import ejecutar_analisis_produccion, texto_final as _texto_analista_prod
 
 st.title("🧩 Comparador de Paneles")
 st.caption(
@@ -171,6 +176,47 @@ if df_cmp is not None and not df_cmp.empty:
         df_cmp.drop(columns=["_motivo_electrico"]).to_csv(index=False).encode("utf-8-sig"),
         "comparativa_paneles.csv", "text/csv",
     )
+
+    st.divider()
+    st.subheader("🔍 Analista de Producción")
+    st.caption(
+        "Agente de IA (Claude) que lee SOLO la comparación de arriba — nunca inventa un "
+        "número — y opina qué implementar para optimizar la generación de energía. Criterio "
+        "técnico (energía, PR, compatibilidad eléctrica), no financiero: esa decisión sigue "
+        "siendo del Asesor de Inversión. Este botón hace una llamada real a la API y tiene un "
+        "costo pequeño; no se ejecuta automáticamente."
+    )
+    if not os.environ.get("ANTHROPIC_API_KEY", "").strip():
+        st.info(
+            "Falta `ANTHROPIC_API_KEY` en el entorno del servidor para activar este agente "
+            "(el resto de la página funciona igual sin ella). En el droplet: "
+            "`export ANTHROPIC_API_KEY=\"sk-ant-...\"` → `pm2 restart streamlit-bipv "
+            "--update-env` → `pm2 save`.",
+            icon="🔑",
+        )
+    elif st.button("🔍 Ejecutar Analista de Producción", key="btn_analista_prod"):
+        with st.spinner("Consultando a Claude (Analista de Producción)…"):
+            try:
+                contexto = formatear_comparacion_paneles(df_cmp, tipo_instalacion)
+                mensaje = ejecutar_analisis_produccion(contexto)
+                st.session_state["ia_produccion_texto"] = _texto_analista_prod(mensaje)
+                st.session_state["ia_produccion_uso"] = (
+                    mensaje.usage.input_tokens, mensaje.usage.output_tokens,
+                )
+            except Exception as e:
+                st.session_state["ia_produccion_texto"] = None
+                st.error(f"❌ {e}")
+
+    if st.session_state.get("ia_produccion_texto"):
+        st.markdown(st.session_state["ia_produccion_texto"])
+        tin, tout = st.session_state.get("ia_produccion_uso", (0, 0))
+        st.caption(f"🔢 {tin:,} tokens de entrada · {tout:,} de salida")
+        if st.button("🗑️ Limpiar", key="btn_limpiar_analista_prod"):
+            st.session_state.pop("ia_produccion_texto", None)
+            st.session_state.pop("ia_produccion_uso", None)
+            st.rerun()
+
+    st.divider()
 
     _elegibles = df_cmp[df_cmp["Compatible"] != "❌"]["Panel"].tolist()
     if _elegibles:

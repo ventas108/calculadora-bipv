@@ -94,6 +94,38 @@ def comparar_paneles(
     return df
 
 
+def formatear_comparacion_paneles(df: pd.DataFrame, tipo_instalacion: str) -> str:
+    """Texto plano para un agente de IA (agentes/analista_produccion.py) --
+    NUNCA se le pasa el DataFrame crudo a un LLM, se formatea explícitamente
+    para que solo tenga los números que puede citar, más el contexto que
+    evita el sesgo encontrado en producción: el prompt del agente NO debe
+    tener que adivinar el tipo de instalación (ver la nota "no asumas
+    fachada" en agentes/analista_tecnico_financiero.py) -- aquí se declara
+    como dato explícito, igual que hace pages/18_Análisis_IA.py.
+
+    Incluye los candidatos incompatibles (marcados ❌) CON su motivo -- un
+    agente no debería recomendar un panel que no calza eléctricamente, y
+    para eso necesita saber que existe y por qué se descartó, no que
+    simplemente falte de la lista.
+    """
+    if df.empty:
+        return f"Tipo de instalación: {tipo_instalacion}.\n\nNo hay ningún panel simulable en el catálogo."
+
+    lineas = [f"Tipo de instalación: {tipo_instalacion}.", "", "## Paneles comparados (ordenados por LCOE)", ""]
+    for _, r in df.iterrows():
+        irr = f"{r['TIR (%)']:.1f}%" if r["TIR (%)"] is not None else "None (sin solución real)"
+        payback = f"{r['Payback (años)']:.1f} años" if r["Payback (años)"] is not None else "None"
+        lineas.append(
+            f"- **{r['Panel']}** ({r['Tecnología']}) — Compatible eléctricamente: {r['Compatible']}"
+            + (f" ({r['_motivo_electrico']})" if r["Compatible"] == "❌" else "") + "\n"
+            f"  módulos={r['N° módulos']}, P_dc={r['P_dc (kWp)']:.2f} kWp, "
+            f"E_ac={r['E_ac (kWh/año)']:,.0f} kWh/año, PR={r['PR']:.3f} | "
+            f"CAPEX=USD {r['CAPEX (USD)']:,.0f}, VPN=USD {r['VPN (USD)']:,.0f}, "
+            f"IRR={irr}, payback={payback}, LCOE={r['LCOE (USD/kWh)']:.4f} USD/kWh"
+        )
+    return "\n".join(lineas)
+
+
 def paneles_excluidos_por_ficha_incompleta(catalogo: dict | None = None) -> list[str]:
     """Nombres de paneles del catálogo que variable_panel() excluye por no
     tener Pmax_stc -- para mostrarle al usuario POR QUÉ no aparecen en la
