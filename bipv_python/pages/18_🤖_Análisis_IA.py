@@ -44,10 +44,22 @@ from agentes.asesor_inversion import ejecutar_asesoria, texto_final as _texto_as
 
 st.title("🤖 Análisis IA")
 st.caption(
-    "Dos agentes de IA (Claude, vía Anthropic) leen SOLO resultados que la calculadora "
+    "Los agentes de IA (Claude, vía Anthropic) leen SOLO resultados que la calculadora "
     "ya calculó — nunca inventan un número financiero ni de producción. Cada botón de "
     "abajo hace una llamada real a la API y tiene un costo pequeño; no se ejecuta nada "
     "automáticamente."
+)
+st.info(
+    "Estos son 2 de los 3 agentes de IA de la calculadora — el Analista Técnico-Financiero "
+    "y el Asesor de Inversión, ambos aquí abajo. El tercero, el **Analista de Producción** "
+    "(criterio técnico: energía, PR, compatibilidad eléctrica — no decide la inversión), "
+    "vive en 🧩 Comparador de Paneles, dentro de los resultados de la comparación.",
+    icon="🧭",
+)
+st.page_link(
+    "pages/4c_🧩_Comparador_Paneles.py",
+    label="Ir al Analista de Producción (🧩 Comparador de Paneles) →",
+    icon="🧩",
 )
 
 # ── Prerrequisitos: el mismo criterio que usa 🧭 Asistente para 'listo' ──────

@@ -192,8 +192,16 @@ if df_cmp is not None and not df_cmp.empty:
         "Agente de IA (Claude) que lee SOLO la comparación de arriba — nunca inventa un "
         "número — y opina qué implementar para optimizar la generación de energía. Criterio "
         "técnico (energía, PR, compatibilidad eléctrica), no financiero: esa decisión sigue "
-        "siendo del Asesor de Inversión. Este botón hace una llamada real a la API y tiene un "
-        "costo pequeño; no se ejecuta automáticamente."
+        "siendo del Asesor de Inversión, en 🤖 Análisis IA."
+    )
+    st.page_link(
+        "pages/18_🤖_Análisis_IA.py",
+        label="Ir al Analista Técnico-Financiero y al Asesor de Inversión (🤖 Análisis IA) →",
+        icon="🤖",
+    )
+    st.caption(
+        "Este botón hace una llamada real a la API y tiene un costo pequeño; "
+        "no se ejecuta automáticamente."
     )
     if not os.environ.get("ANTHROPIC_API_KEY", "").strip():
         st.info(

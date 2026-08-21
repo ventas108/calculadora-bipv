@@ -144,3 +144,16 @@ def test_pregunta_de_ambos_agentes_declara_el_tipo_de_instalacion_real():
             f"la llamada a {llamada.func.id} no parece incluir _contexto_tipo "
             "en su bloque -- el agente podría volver a adivinar el tipo de instalación"
         )
+
+
+def test_page_link_al_analista_de_produccion_apunta_a_un_archivo_real():
+    # El usuario reportó que el tercer agente (Analista de Producción, en
+    # 🧩 Comparador de Paneles) no era visible desde aquí -- se agregó un
+    # st.page_link() de vuelta. Un typo en la ruta (fácil con nombres de
+    # archivo llenos de emoji) dejaría el enlace roto sin que nada lo avise.
+    src = _leer(_PAGINA_IA)
+    rutas = re.findall(r'st\.page_link\(\s*"(pages/[^"]+\.py)"', src)
+    assert rutas, "no encontré ningún st.page_link() en la página"
+    for ruta in rutas:
+        ruta_absoluta = os.path.join(_ROOT, ruta)
+        assert os.path.isfile(ruta_absoluta), f"st.page_link() apunta a un archivo que no existe: {ruta}"

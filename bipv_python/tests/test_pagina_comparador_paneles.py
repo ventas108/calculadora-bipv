@@ -164,3 +164,16 @@ def test_adopcion_invalida_poa_efectiva_a_diferencia_del_comparador_de_inversore
     src = _leer(_PAGINA)
     assert "for k in KEYS_DERIVADOS_POA if k in st.session_state" in src
     assert 'if k != "poa_efectiva_df"' not in src
+
+
+def test_page_link_a_analisis_ia_apunta_a_un_archivo_real():
+    # El usuario reportó que no encontraba el Analista de Producción -- se
+    # agregó un st.page_link() de vuelta hacia 🤖 Análisis IA (donde viven
+    # los otros dos agentes). Un typo en la ruta dejaría el enlace roto sin
+    # que nada lo avise -- mismo test simétrico que en test_pagina_analisis_ia.py.
+    src = _leer(_PAGINA)
+    rutas = re.findall(r'st\.page_link\(\s*"(pages/[^"]+\.py)"', src)
+    assert rutas, "no encontré ningún st.page_link() en la página"
+    for ruta in rutas:
+        ruta_absoluta = os.path.join(_ROOT, ruta)
+        assert os.path.isfile(ruta_absoluta), f"st.page_link() apunta a un archivo que no existe: {ruta}"
