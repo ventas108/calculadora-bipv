@@ -11,6 +11,8 @@ reemplaza una validación manual contra la app real con datos PVGIS —
 sirve para probar que el pipeline encadena correctamente los módulos de
 calculos/ con los mismos contratos que ya usan las páginas Streamlit.
 """
+import dataclasses
+
 import numpy as np
 import pandas as pd
 import pvlib
@@ -95,6 +97,62 @@ def test_run_bipv_simulation_estructura_y_coherencia(tmy_bogota):
 
     # ── El resultado expone lo que promete el contrato (SimulationResult) ─
     assert r.P_dc_stc_kW == pytest.approx(r.dim["P_dc_stc_kW"])
+
+
+def test_multi_inversor_escala_paneles_y_potencia_sin_cambiar_razones(tmy_bogota):
+    # Hallazgo real (2026-08-21): un proyecto de Granja FV con 9 inversores
+    # -- 80 paneles/inversor, 511.2 kWp totales (9 x 56.80 kWp/inversor) --
+    # mostraba solo 1/9 de la energía real porque BIPVConfiguration no tenía
+    # forma de expresar "N inversores idénticos". N_inversores=1 (default)
+    # debe reproducir EXACTAMENTE el comportamiento de antes de este fix.
+    config_1 = dataclasses.replace(
+        _config_base(), tilt=20.0, area_m2=2100.0,
+        N_serie=8, N_strings_tracker=10,   # 80 paneles/inversor
+    )
+    assert config_1.N_inversores == 1   # default explícito del contrato
+
+    r1 = run_bipv_simulation(config_1, tmy=tmy_bogota)
+    assert r1.dim["N_paneles"] == 80
+
+    config_9 = dataclasses.replace(config_1, N_inversores=9)
+    r9 = run_bipv_simulation(config_9, tmy=tmy_bogota)
+
+    assert r9.dim["N_paneles"] == 720                       # 80 * 9, como el caso real
+    assert r9.dim["P_dc_stc_kW"] == pytest.approx(r1.dim["P_dc_stc_kW"] * 9)
+    assert r9.dim["area_ocupada_m2"] == pytest.approx(r1.dim["area_ocupada_m2"] * 9)
+    # cobertura_pct de r1 ya viene redondeada a 1 decimal (dimensionar_sistema) --
+    # multiplicarla x9 amplifica ese redondeo (~2% relativo en un valor chico como
+    # 2.7). r9.dim["cobertura_pct"] se calcula del área EXACTA x9, no de la
+    # versión ya redondeada -- es el valor más preciso, no un bug. Tolerancia
+    # laxa a propósito, coherente con ese redondeo de 1 decimal previo.
+    assert r9.dim["cobertura_pct"] == pytest.approx(r1.dim["cobertura_pct"] * 9, rel=0.02)
+
+    # Energía absoluta escala x9 (tolerancia laxa: E_ac_anual_kWh se
+    # redondea a 0 decimales en calculos/produccion.py -- comparar los
+    # totales redondeados, no el redondeado-de-1-unidad x9).
+    assert r9.E_ac_anual_kWh == pytest.approx(r1.E_ac_anual_kWh * 9, rel=1e-3)
+
+    # Las razones (PR, Y_f, Y_a, CF) NO cambian -- normalizadas por P_dc_stc_kW,
+    # el factor de escala se cancela en numerador y denominador.
+    assert r9.PR == pytest.approx(r1.PR, abs=1e-9)
+    assert r9.produccion["Y_f"] == pytest.approx(r1.produccion["Y_f"], rel=1e-6)
+    assert r9.produccion["CF_pct"] == pytest.approx(r1.produccion["CF_pct"], rel=1e-6)
+
+
+def test_multi_inversor_con_n_inversores_1_es_identico_al_comportamiento_previo():
+    # N_inversores=1 (default) no debe alterar dim en absoluto -- ni el
+    # dict debe ganar la clave "N_inversores" que solo se agrega cuando
+    # != 1 (para no romper nada que ya lea dim.keys() literalmente).
+    from calculos import dimensionamiento
+    config = _config_base()
+    dim_directo = dimensionamiento.dimensionar_sistema(
+        config.panel, config.area_m2, config.N_serie,
+        config.N_strings_tracker, config.N_mppt,
+    )
+    tmy = _tmy_sintetico_offline(LAT, LON, ALT_M)
+    r = run_bipv_simulation(config, tmy=tmy)
+    assert r.dim == dim_directo
+    assert "N_inversores" not in dim_directo
 
 
 def test_sombreado_horizonte_reduce_produccion_nunca_la_aumenta(tmy_bogota):

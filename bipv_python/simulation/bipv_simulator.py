@@ -13,6 +13,8 @@ v1 — alcance (ver docstring de simulation/schemas.py):
     UNA superficie, sombreado por horizonte editable, sin bypass de
     diodos, sin bifacial, sin multi-superficie, sin ray-casting 3D.
     Ampliar esto es trabajo de una fase posterior — no de este commit.
+    SÍ soporta multi-inversor (BIPVConfiguration.N_inversores) desde
+    2026-08-22 -- ver la nota "Multi-inversor" en schemas.py.
 """
 from dataclasses import replace
 
@@ -71,6 +73,31 @@ def run_bipv_simulation(
         config.panel, config.area_m2, config.N_serie,
         config.N_strings_tracker, config.N_mppt,
     )
+
+    # Multi-inversor: dim de arriba es la topología de UN inversor
+    # (N_serie × N_strings_tracker × N_mppt). Si el proyecto tiene varios
+    # inversores IDÉNTICOS (misma config, mismo sitio/tilt/azimuth -- una
+    # granja FV típica), se escala N_paneles/área/potencia por
+    # config.N_inversores ANTES de simular producción.
+    #
+    # Por qué escalar las ENTRADAS de simular_produccion_anual() (N_paneles,
+    # P_dc_stc_kW) y no cada campo de SALIDA a mano: esa función computa
+    # PR = Y_f/Y_r, Y_a = E_dc/P_dc_stc_kW, Y_f = E_ac/P_dc_stc_kW y
+    # CF = E_ac/(P_dc_stc_kW×8760) -- todas normalizadas por P_dc_stc_kW.
+    # Si N_paneles y P_dc_stc_kW escalan por el mismo factor, E_dc/E_ac
+    # (absolutos) escalan correctamente con ellos, mientras que PR/Y_f/Y_a/
+    # CF_pct (razones) quedan EXACTAMENTE iguales porque el factor se
+    # cancela en numerador y denominador -- no es una aproximación.
+    if config.N_inversores != 1:
+        dim = dict(dim)
+        dim["N_paneles"] = dim["N_paneles"] * config.N_inversores
+        dim["area_ocupada_m2"] = round(dim["area_ocupada_m2"] * config.N_inversores, 2)
+        dim["P_dc_stc_kW"] = round(dim["P_dc_stc_kW"] * config.N_inversores, 3)
+        dim["cobertura_pct"] = (
+            round(dim["area_ocupada_m2"] / config.area_m2 * 100, 1)
+            if config.area_m2 > 0 else 0
+        )
+        dim["N_inversores"] = config.N_inversores
 
     prod = produccion_calc.simular_produccion_anual(
         tmy, poa, config.panel, dim["N_paneles"], config.eta_inversor,
