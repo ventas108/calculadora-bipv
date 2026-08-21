@@ -300,7 +300,15 @@ def generar_cotizacion_excel(datos: dict) -> bytes:
 
     def _fila_total(label, valor_cop, valor_usd=None, negrita=False, resaltar=False):
         nonlocal r
-        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=_col_total_cop - 1)
+        # El label solo puede fusionar hasta ANTES de la columna de total USD
+        # (si existe) -- fusionar hasta _col_total_cop - 1 la incluiría (es
+        # menor que _col_total_cop), y escribir el valor USD en una celda
+        # fusionada no-ancla lanza 'MergedCell' object attribute 'value' is
+        # read-only. Encontrado en producción: cualquier cotización con al
+        # menos un ítem con precio en USD (p.ej. equipo importado) y TRM > 0
+        # disparaba esto al generar el Excel.
+        _col_label_fin = (_col_total_usd - 1) if _col_total_usd else (_col_total_cop - 1)
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=_col_label_fin)
         a = ws.cell(r, 1, label)
         a.font = f_bold if (negrita or resaltar) else f_norm
         a.alignment = right
