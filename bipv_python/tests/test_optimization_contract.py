@@ -52,10 +52,16 @@ def test_variables_geometria_usa_bounds_reales_de_tipos_superficie():
     assert (tilt_generico.minimo, tilt_generico.maximo) == (0.0, 90.0)
 
 
-def test_variable_panel_opciones_coincide_con_catalogo_real():
+def test_variable_panel_opciones_coincide_con_catalogo_real_simulable():
+    # No es TODO MODULOS_BIPV -- variable_panel() excluye por defecto los
+    # paneles con Pmax_stc=None (fichas incompletas que hacen reventar
+    # dimensionar_sistema()). Ver docstring de variable_panel() y
+    # tests/test_optimization_fase4.py::test_variable_panel_excluye_fichas_incompletas_del_catalogo_real
+    # para el hallazgo completo.
     from datos.tecnologias_bipv import MODULOS_BIPV
     var = opt_vars.variable_panel()
-    assert set(var.opciones) == set(MODULOS_BIPV.keys())
+    esperado = {k for k, v in MODULOS_BIPV.items() if v.get("Pmax_stc") is not None}
+    assert set(var.opciones) == esperado
 
 
 def test_variable_k_bipv_rango_documentado():

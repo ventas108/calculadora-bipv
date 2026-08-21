@@ -70,12 +70,49 @@ def variables_geometria(tipo_superficie: str | None = None) -> list[Optimization
 
 
 def variable_panel(catalogo: dict | None = None) -> OptimizationVariable:
-    """Elección de panel — categórica sobre el catálogo real MODULOS_BIPV."""
+    """Elección de panel — categórica sobre el catálogo real MODULOS_BIPV.
+
+    `opciones` guarda las CLAVES del catálogo (str), no los dicts completos
+    — mantiene el contrato liviano y legible para un agente. La resolución
+    clave→dict real la hace optimization.scenario_generator al armar el
+    candidato, no este módulo (aquí solo se define el vocabulario).
+
+    Filtro real, no arbitrario: por defecto se excluyen los paneles sin
+    Pmax_stc -- calculos.dimensionamiento.dimensionar_sistema() revienta con
+    TypeError (N_paneles * None) si se les intenta dimensionar. Hallazgo al
+    construir esta función: de los 7 paneles de MODULOS_BIPV, solo
+    ASP-ST1-T40 tiene ficha completa (Pmax_stc/Imp_stc) -- los otros 6
+    (T10/T20/T30/T50/T60/T70) son entradas de catálogo incompletas,
+    preexistentes, nunca ejercitadas porque el proyecto real usa T40. Esto
+    también afecta hoy a 📐 Dimensionamiento si alguien selecciona uno de
+    esos paneles manualmente -- no es un problema nuevo de este módulo, solo
+    el primer lugar que lo detecta y lo evita en vez de ofrecerlo como si
+    fuera una opción válida.
+    """
     if catalogo is None:
         from datos.tecnologias_bipv import MODULOS_BIPV as catalogo
+        catalogo = {k: v for k, v in catalogo.items() if v.get("Pmax_stc") is not None}
     return OptimizationVariable(
         "panel", "categorica", opciones=tuple(catalogo.keys()),
-        descripcion="Referencia del catálogo de paneles BIPV (datos.tecnologias_bipv.MODULOS_BIPV).",
+        descripcion="Referencia del catálogo de paneles BIPV (datos.tecnologias_bipv.MODULOS_BIPV, "
+                    "solo entradas con ficha completa).",
+    )
+
+
+def variable_inversor(catalogo: dict | None = None) -> OptimizationVariable:
+    """Elección de inversor — categórica sobre el catálogo real INVERSORES.
+
+    Mismo patrón que variable_panel(): `opciones` guarda las claves, no los
+    dicts. Elegir un inversor determina también eta_inversor (campo antes
+    fijo en FIJOS_NO_OPTIMIZABLES) — scenario_generator sincroniza ambos al
+    resolver la clave, para que nunca queden un inversor y una eficiencia
+    de inversor distintos en el mismo candidato.
+    """
+    if catalogo is None:
+        from datos.catalogo_inversores import INVERSORES as catalogo
+    return OptimizationVariable(
+        "inversor", "categorica", opciones=tuple(catalogo.keys()),
+        descripcion="Referencia del catálogo de inversores (datos.catalogo_inversores.INVERSORES).",
     )
 
 
@@ -130,7 +167,12 @@ FIJOS_NO_OPTIMIZABLES: dict[str, str] = {
     "area_m2": "área disponible de la superficie — restricción física del edificio, no una decisión",
     "albedo": "reflectividad del entorno — dato del sitio",
     "puntos_horizonte": "perfil de obstáculos reales — dato del sitio (levantamiento/SketchUp)",
-    "eta_inversor": "queda determinado al elegir el inversor — no se optimiza por separado del panel",
+    "eta_inversor": (
+        "queda determinado al elegir el inversor — no se optimiza por separado. "
+        "Si 'inversor' SÍ es una variable de decisión (ver variable_inversor()), "
+        "optimization.scenario_generator sincroniza eta_inversor automáticamente "
+        "con la eficiencia del inversor sorteado en cada candidato."
+    ),
     "pct_mismatch_fab": "pérdida de fabricación — supuesto técnico, no una decisión de diseño",
     "pct_soiling": "supuesto de mantenimiento/limpieza — política de O&M, no diseño",
     "pct_cableado": "supuesto de instalación eléctrica — no una decisión de diseño BIPV",
