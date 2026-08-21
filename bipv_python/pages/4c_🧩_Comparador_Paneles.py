@@ -43,6 +43,15 @@ from calculos.invalidacion import KEYS_DERIVADOS_POA
 from simulation.schemas import BIPVConfiguration
 from agentes.analista_produccion import ejecutar_analisis_produccion, texto_final as _texto_analista_prod
 
+# Sin esto, session_state["tipo_cambio"] no existe hasta que el usuario visite
+# 💰 Financiero/💼 Presupuesto en la misma sesión, y el number_input de TRM de
+# abajo cae silenciosamente en el default hardcodeado (4000.0) en vez de la
+# TRM real -- reportado por el usuario probando esta página. init_trm() solo
+# llama al API si la clave aún no existe, así que no pisa un valor ya
+# cargado/editado en otra página de esta sesión.
+from calculos.trm_utils import init_trm
+init_trm()
+
 st.title("🧩 Comparador de Paneles")
 st.caption(
     "Compara paneles reales del catálogo sobre el MISMO sitio, geometría e inversor de tu "
