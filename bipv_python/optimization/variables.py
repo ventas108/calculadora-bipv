@@ -99,20 +99,66 @@ def variable_panel(catalogo: dict | None = None) -> OptimizationVariable:
     )
 
 
+def _catalogo_inversores_real() -> dict:
+    """Catálogo de inversores real más completo disponible.
+
+    Prioriza el catálogo Excel (datos/inversores_catalogo.xlsx vía
+    datos.catalogo_inversores_excel.cargar_catalogo_inversores() — 105
+    modelos reales, editable desde 🔌 Catálogo Inversores) sobre el Python
+    hardcodeado (datos.catalogo_inversores.INVERSORES — 7 modelos). Mismo
+    criterio de preferencia que ya usa pages/4b_⚖️_Comparador_Inversores.py
+    para el comparador en vivo; hasta 2026-08-21 esta función (y por lo
+    tanto variable_inversor()) usaba solo el catálogo angosto de 7, aunque
+    el motor de Fase 4 no estaba conectado a ninguna página todavía.
+
+    Import perezoso con fallback silencioso: optimization/ se mantiene sin
+    depender de streamlit (no está instalado en el entorno de pruebas, y
+    catalogo_inversores_excel.py lo importa a nivel de módulo para
+    @st.cache_data) -- si el import falla, o el Excel no está disponible,
+    o queda vacío, cae al catálogo Python sin propagar la excepción.
+
+    Normaliza una diferencia real de forma entre las dos fuentes: el
+    catálogo Python separa "fabricante"/"modelo"; el Excel solo trae
+    "nombre" (la columna "Modelo" completa). Se agrega un alias "modelo"
+    en las entradas del Excel que no lo traigan, para que un consumidor
+    (p.ej. scenario_generator, sus tests) no tenga que conocer cuál de las
+    dos fuentes resolvió cada candidato.
+    """
+    try:
+        from datos.catalogo_inversores_excel import cargar_catalogo_inversores
+        catalogo = cargar_catalogo_inversores()
+    except Exception:
+        catalogo = None
+
+    if not catalogo:
+        from datos.catalogo_inversores import INVERSORES
+        return INVERSORES
+
+    return {
+        k: (v if "modelo" in v else {**v, "modelo": v.get("nombre", k)})
+        for k, v in catalogo.items()
+    }
+
+
 def variable_inversor(catalogo: dict | None = None) -> OptimizationVariable:
-    """Elección de inversor — categórica sobre el catálogo real INVERSORES.
+    """Elección de inversor — categórica sobre el catálogo real más completo
+    disponible (ver _catalogo_inversores_real()).
 
     Mismo patrón que variable_panel(): `opciones` guarda las claves, no los
     dicts. Elegir un inversor determina también eta_inversor (campo antes
     fijo en FIJOS_NO_OPTIMIZABLES) — scenario_generator sincroniza ambos al
     resolver la clave, para que nunca queden un inversor y una eficiencia
-    de inversor distintos en el mismo candidato.
+    de inversor distintos en el mismo candidato. El catálogo Excel no trae
+    dato real de eficiencia (el datasheet fuente no la reporta para esos
+    105 modelos) -- scenario_generator solo sincroniza eta_inversor cuando
+    el dato real existe, nunca lo inventa.
     """
     if catalogo is None:
-        from datos.catalogo_inversores import INVERSORES as catalogo
+        catalogo = _catalogo_inversores_real()
     return OptimizationVariable(
         "inversor", "categorica", opciones=tuple(catalogo.keys()),
-        descripcion="Referencia del catálogo de inversores (datos.catalogo_inversores.INVERSORES).",
+        descripcion="Referencia del catálogo real de inversores (Excel si está disponible, "
+                    "si no datos.catalogo_inversores.INVERSORES).",
     )
 
 
