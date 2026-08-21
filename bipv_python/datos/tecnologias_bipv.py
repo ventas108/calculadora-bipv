@@ -80,22 +80,60 @@ ASP_ST1_T40 = {
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Familia completa ASP-ST1 (misma Voc/Vmp, Isc varía con transparencia)
+# Familia completa ASP-ST1 (misma Voc/Vmp/Ns/a_ref -- Isc/Pmax varían con
+# transparencia).
+#
+# Pmax_stc/Imp_stc (2026-08-21): antes None (fichas incompletas, excluidas por
+# variable_panel() de todo barrido/comparador). Se completan con los valores
+# REALES de datos/paneles_catalogo.xlsx (hoja Catalogo_Paneles_FV, filas
+# SolTech ST1, Confianza=high) -- el T40 ahí coincide exactamente (63.0 W,
+# 0.700 A) con el valor ya calibrado arriba, confirma que es la misma fuente.
+# Ese Excel alimenta 📐 Dimensionamiento / 📋 Catálogo Paneles, pero NUNCA a
+# 🧩 Comparador de Paneles (que solo lee este archivo) -- dos catálogos
+# desconectados en el código; de ahí que estos datos reales llevaran tiempo
+# sin usarse aquí.
+#
+# I_L_ref (fotocorriente SDM) SÍ se escala por variante -- proporcional al
+# Isc_stc real de cada una, con el mismo ratio I_L_ref/Isc_stc que ya tiene
+# T40 calibrado (0.8152/0.80 ≈ 1.019). Sin este escalado, las 6 variantes
+# heredarían la fotocorriente calibrada para el Isc de T40 (0.80 A) --
+# subestimando la energía real de T10 (Isc=1.19 A, 48% más corriente) y
+# sobreestimando la de T70 (Isc=0.40 A, 50% menos) en la simulación física
+# completa (run_bipv_simulation), aunque el Pmax_stc "de placa" se viera
+# correcto en una tabla STC.
+#
+# I_o_ref/R_s/R_sh_ref/a_ref/NOCT NO se re-derivan por variante -- se
+# conservan los del T40, calibrados por ajuste de curva contra la hoja
+# FF_vs_Irradiancia del XLSM (validado contra Batzner et al. 2001). Es una
+# aproximación razonada, no una calibración SDM independiente por variante:
+# el Excel deriva su propio a_ref por fórmula (Ns=223, n=0.879 → NsA=196.1),
+# marcado explícitamente "NOCT ESTIMADO... NO es dato de fabricante" -- se
+# prefiere aquí el valor curve-fit y validado del T40 sobre esa estimación.
 # ──────────────────────────────────────────────────────────────────────────────
+_RATIO_IL_ISC_T40 = ASP_ST1_T40["I_L_ref"] / ASP_ST1_T40["Isc_stc"]   # ≈ 1.019
+
+
+def _variante_asp_st1(transparencia_pct: int, isc_stc: float, pmax_stc: float, imp_stc: float) -> dict:
+    return {
+        **ASP_ST1_T40,
+        "nombre": f"ASP-ST1-T{transparencia_pct}",
+        "transparencia_pct": transparencia_pct,
+        "Isc_stc": isc_stc,
+        "Imp_stc": imp_stc,
+        "Pmax_stc": pmax_stc,
+        "FF_stc": pmax_stc / (ASP_ST1_T40["Voc_stc"] * isc_stc),
+        "I_L_ref": round(isc_stc * _RATIO_IL_ISC_T40, 4),
+    }
+
+
 FAMILIA_ASP_ST1 = {
-    "ASP-ST1-T10": {**ASP_ST1_T40, "nombre": "ASP-ST1-T10", "transparencia_pct": 10,
-                    "Isc_stc": 1.19, "Imp_stc": None, "Pmax_stc": None},
-    "ASP-ST1-T20": {**ASP_ST1_T40, "nombre": "ASP-ST1-T20", "transparencia_pct": 20,
-                    "Isc_stc": 1.07, "Imp_stc": None, "Pmax_stc": None},
-    "ASP-ST1-T30": {**ASP_ST1_T40, "nombre": "ASP-ST1-T30", "transparencia_pct": 30,
-                    "Isc_stc": 0.93, "Imp_stc": None, "Pmax_stc": None},
+    "ASP-ST1-T10": _variante_asp_st1(10, 1.19, 94.0, 1.050),
+    "ASP-ST1-T20": _variante_asp_st1(20, 1.07, 84.0, 0.940),
+    "ASP-ST1-T30": _variante_asp_st1(30, 0.93, 73.0, 0.810),
     "ASP-ST1-T40": ASP_ST1_T40,
-    "ASP-ST1-T50": {**ASP_ST1_T40, "nombre": "ASP-ST1-T50", "transparencia_pct": 50,
-                    "Isc_stc": 0.66, "Imp_stc": None, "Pmax_stc": None},
-    "ASP-ST1-T60": {**ASP_ST1_T40, "nombre": "ASP-ST1-T60", "transparencia_pct": 60,
-                    "Isc_stc": 0.53, "Imp_stc": None, "Pmax_stc": None},
-    "ASP-ST1-T70": {**ASP_ST1_T40, "nombre": "ASP-ST1-T70", "transparencia_pct": 70,
-                    "Isc_stc": 0.40, "Imp_stc": None, "Pmax_stc": None},
+    "ASP-ST1-T50": _variante_asp_st1(50, 0.66, 52.0, 0.580),
+    "ASP-ST1-T60": _variante_asp_st1(60, 0.53, 42.0, 0.470),
+    "ASP-ST1-T70": _variante_asp_st1(70, 0.40, 31.0, 0.352),
 }
 
 # Catálogo unificado

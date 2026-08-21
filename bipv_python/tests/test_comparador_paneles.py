@@ -25,20 +25,23 @@ def _cfg_base():
 
 
 def test_paneles_excluidos_por_ficha_incompleta_refleja_el_catalogo_real():
+    # Hasta 2026-08-21 T10-T70 estaban excluidos (Pmax_stc=None) -- se
+    # completaron con los valores reales de datos/paneles_catalogo.xlsx (ver
+    # datos/tecnologias_bipv.py). Hoy los 7 tienen ficha completa.
     excluidos = paneles_excluidos_por_ficha_incompleta()
-    assert "ASP-ST1-T40" not in excluidos
-    assert "ASP-ST1-T10" in excluidos   # ficha incompleta conocida (Pmax_stc=None)
+    assert excluidos == []
 
 
-def test_comparar_paneles_no_crashea_y_devuelve_solo_simulables():
+def test_comparar_paneles_no_crashea_y_devuelve_todos_los_simulables():
     tmy = _tmy_sintetico_offline(LAT, LON, ALT_M)
     df = comparar_paneles(
         _cfg_base(), tmy, "BIPV fachada/pérgola",
         tarifa_cop_kWh=750.0, tipo_cambio=4000.0,
     )
     assert not df.empty
-    assert set(df["Panel"]) == {"ASP-ST1-T40"}   # el único simulable hoy
-    assert "ASP-ST1-T10" not in df["Panel"].tolist()
+    # Ahora los 7 de la familia ASP-ST1 son simulables (ver nota "2026-08-21"
+    # en datos/tecnologias_bipv.py) -- ya no solo T40.
+    assert set(df["Panel"]) == {f"ASP-ST1-T{n}" for n in (10, 20, 30, 40, 50, 60, 70)}
 
 
 def test_comparar_paneles_columnas_esperadas_y_valores_positivos():
