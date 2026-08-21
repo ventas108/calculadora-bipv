@@ -102,9 +102,12 @@ def test_sensibilidad_azimuth_circular_ya_no_es_degenerada(tmy_bogota):
 
 # ── scenario_generator.py ────────────────────────────────────────────────
 
-def test_muestrear_variable_categorica_lanza_error():
-    with pytest.raises(ValueError, match="categórica"):
-        _muestrear_variable(opt_vars.variable_panel(), rng=__import__("random").Random(0))
+def test_muestrear_variable_categorica_devuelve_opcion_real_del_catalogo():
+    # Antes generar_candidatos() no muestreaba categóricas (panel/inversor
+    # quedaban fuera del barrido); ahora sí -- ver docstring del módulo.
+    var = opt_vars.variable_panel()
+    valor = _muestrear_variable(var, rng=__import__("random").Random(0))
+    assert valor in var.opciones
 
 
 def test_generar_candidatos_sin_inversor_no_fabrica_candidatos():
@@ -146,6 +149,71 @@ def test_generar_candidatos_es_reproducible_con_seed():
     c1 = generar_candidatos(cfg, variables, n_candidatos=5, seed=42)
     c2 = generar_candidatos(cfg, variables, n_candidatos=5, seed=42)
     assert [(c.tilt, c.azimuth) for c in c1] == [(c.tilt, c.azimuth) for c in c2]
+
+
+# ── scenario_generator.py + panel/inversor (extensión) ─────────────────────
+# generar_candidatos() ahora también sortea variables categóricas de
+# catálogo (panel, inversor) -- antes solo geometría/strings. Estos tests
+# usan el catálogo REAL (INVERSORES, MODULOS_BIPV vía opt_vars.variable_panel())
+# a propósito: un catálogo sintético habría escondido el hallazgo real de
+# que 6 de los 7 paneles de MODULOS_BIPV tienen Pmax_stc=None y no son
+# simulables -- ver el docstring de variable_panel().
+
+def _variables_panel_inversor_completas():
+    return (
+        opt_vars.variables_geometria("Fachada")
+        + [opt_vars.variable_panel(), opt_vars.variable_inversor()]
+        + opt_vars.variables_string()
+    )
+
+
+def test_variable_panel_excluye_fichas_incompletas_del_catalogo_real():
+    # Hallazgo real: de los 7 paneles de MODULOS_BIPV, 6 tienen Pmax_stc=None
+    # (fichas incompletas, nunca ejercitadas porque el proyecto real usa
+    # T40) -- dimensionar_sistema() revienta con TypeError si se les intenta
+    # dimensionar. variable_panel() los excluye por defecto.
+    from datos.tecnologias_bipv import MODULOS_BIPV
+    var = opt_vars.variable_panel()
+    assert "ASP-ST1-T40" in var.opciones
+    incompletos = {k for k, v in MODULOS_BIPV.items() if v.get("Pmax_stc") is None}
+    assert incompletos, "el catálogo cambió -- confirma si sigue habiendo fichas incompletas"
+    assert not (incompletos & set(var.opciones))
+
+
+def test_generar_candidatos_con_panel_e_inversor_varia_ambos():
+    cfg = _cfg_electricamente_valida()
+    candidatos = generar_candidatos(
+        cfg, _variables_panel_inversor_completas(), n_candidatos=15, seed=3,
+    )
+    assert len(candidatos) == 15
+    inversores = {c.inversor["modelo"] for c in candidatos}
+    assert len(inversores) > 1, "el barrido debería explorar más de un inversor real"
+    inversor_var = opt_vars.variable_inversor()
+    for c in candidatos:
+        assert c.panel["nombre"] in opt_vars.variable_panel().opciones
+        assert any(c.inversor["modelo"] == INVERSORES[k]["modelo"] for k in inversor_var.opciones)
+
+
+def test_generar_candidatos_sincroniza_eta_inversor_con_el_inversor_sorteado():
+    # Regresión: un candidato con inversor Growatt pero eta_inversor de otra
+    # marca sería una config internamente inconsistente. Verificado contra
+    # el catálogo real, no un valor inventado.
+    cfg = _cfg_electricamente_valida()
+    candidatos = generar_candidatos(
+        cfg, _variables_panel_inversor_completas(), n_candidatos=15, seed=5,
+    )
+    assert len(candidatos) == 15
+    for c in candidatos:
+        assert c.eta_inversor == pytest.approx(c.inversor["eficiencia_max"])
+
+
+def test_generar_candidatos_panel_inversor_es_reproducible_con_seed():
+    cfg = _cfg_electricamente_valida()
+    variables = _variables_panel_inversor_completas()
+    c1 = generar_candidatos(cfg, variables, n_candidatos=10, seed=99)
+    c2 = generar_candidatos(cfg, variables, n_candidatos=10, seed=99)
+    assert [(c.panel["nombre"], c.inversor["modelo"], c.N_serie) for c in c1] == \
+           [(c.panel["nombre"], c.inversor["modelo"], c.N_serie) for c in c2]
 
 
 # ── numerical_optimizer.py ───────────────────────────────────────────────
