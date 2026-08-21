@@ -8,7 +8,10 @@ from calculos.dimensionamiento import (
     optimizar_n_serie,
     dimensionar_sistema,
 )
-from calculos.modelo_iv import preparar_panel_iv, resolver_curva_iv, resolver_panel_calibrado
+from calculos.modelo_iv import (
+    preparar_panel_iv, resolver_curva_iv, resolver_panel_calibrado,
+    validar_sdm_vs_ficha, explicar_fallo_validacion_sdm,
+)
 from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
 from datos.catalogo_inversores_excel import (
@@ -306,6 +309,30 @@ if panel.get("notas"):
 if not _iv_err:  # Voc/Isc/Vmp/Imp presentes; opcionales usan defaults
     _panel_iv = preparar_panel_iv(panel)
     if _panel_iv is not None:
+        # ── Alarma real de validación SDM vs ficha (#Motor IV) ────────────────
+        # Antes, la única forma de enterarse de que un panel calibrado NO
+        # reproduce su ficha técnica (>5% de error) era entrar manualmente a
+        # 🔬 Motor IV y presionar el botón de validación -- sin ninguna alarma
+        # en el resto de la app. Corre aquí automáticamente porque este panel
+        # ya está resuelto en este punto de la página, sin costo de API (es
+        # una comparación numérica determinista, no un agente de IA).
+        if _panel_iv.get("_estimado"):
+            st.session_state.pop("motor_iv_validacion_ok", None)
+            st.session_state.pop("motor_iv_validacion_detalle", None)
+            st.session_state.pop("motor_iv_validacion_panel", None)
+        else:
+            _val_sdm_dim = validar_sdm_vs_ficha(_panel_iv)
+            st.session_state["motor_iv_validacion_ok"] = _val_sdm_dim["validacion_ok"]
+            st.session_state["motor_iv_validacion_detalle"] = _val_sdm_dim
+            st.session_state["motor_iv_validacion_panel"] = panel_nombre
+            if _val_sdm_dim["validacion_ok"]:
+                st.caption(
+                    "✅ Motor IV: SDM validado contra la ficha técnica "
+                    "(Voc/Isc/Pmax dentro de 5% de error)."
+                )
+            else:
+                st.error(explicar_fallo_validacion_sdm(panel_nombre, _val_sdm_dim))
+
         with st.expander("📈 Curva I-V real (Motor IV activado automáticamente)", expanded=False):
             _col_iv1, _col_iv2 = st.columns(2)
             with _col_iv1:

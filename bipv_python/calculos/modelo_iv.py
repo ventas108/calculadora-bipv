@@ -565,3 +565,74 @@ def validar_sdm_vs_ficha(panel: dict, tolerancia_pct=5.0) -> dict:
         }
     resultado["validacion_ok"] = todo_ok
     return resultado
+
+
+# ── Causa técnica típica por métrica cuando validar_sdm_vs_ficha() falla ──────
+# No son certezas, son la explicación más probable dado cómo entra cada
+# parámetro en el modelo de diodo -- ver el docstring de cada campo en
+# datos/tecnologias_bipv.py::ASP_ST1_T40 para el rol exacto de cada uno.
+_CAUSA_TECNICA_FALLO = {
+    "Voc": (
+        "el número de celdas en serie (N_s) o el parámetro a_ref (n×N_s) usado para "
+        "calibrar el SDM no corresponde a la construcción real de este panel -- revisa "
+        "'Ns (Celdas Serie)' y 'n (Factor Idealidad)' en la hoja Catalogo_Paneles_FV del "
+        "Excel."
+    ),
+    "Isc": (
+        "la fotocorriente calibrada (I_L_ref) no corresponde al área activa real del "
+        "panel -- típico cuando se copiaron los parámetros SDM de OTRA variante de "
+        "transparencia/potencia de la misma familia sin reescalar I_L_ref proporcional "
+        "al Isc real de esta ficha específica."
+    ),
+    "Pmax": (
+        "la potencia máxima calculada no reproduce la de placa. Si Voc e Isc SÍ "
+        "validan pero Pmax no, el problema está en el Factor de Forma de la curva: "
+        "revisa R_s (resistencia serie) y R_sh_ref (resistencia shunt), que determinan "
+        "la forma de la curva I-V entre Voc e Isc sin afectar sus extremos."
+    ),
+}
+
+
+def explicar_fallo_validacion_sdm(panel_nombre: str, val: dict) -> str:
+    """
+    Texto técnico determinista (NO es una llamada a un agente de IA -- mismo
+    principio que el resto de los avisos de la calculadora: directo, cita
+    números exactos, sin costo ni latencia de API) que explica EN QUÉ
+    métricas falla validar_sdm_vs_ficha() y qué revisar en el catálogo.
+
+    Se muestra automáticamente en 📐 Dimensionamiento y 📊 Producción cuando
+    la validación no pasa -- antes de esto, la única forma de enterarse era
+    entrar manualmente a 🔬 Motor IV y presionar el botón de validación, sin
+    ninguna alarma en el resto de la app.
+    """
+    fallos = [(p, d) for p, d in val.items() if p != "validacion_ok" and not d["ok"]]
+    if not fallos:
+        return (
+            f"✅ {panel_nombre}: SDM validado -- Voc/Isc/Pmax dentro de la tolerancia "
+            "de error (5%) contra la ficha técnica."
+        )
+
+    n_total = len(val) - 1  # descuenta la clave "validacion_ok"
+    lineas = [
+        f"🔴 **{panel_nombre} — validación SDM vs ficha técnica: {len(fallos)} de "
+        f"{n_total} métricas fuera de tolerancia (>5% de error).**",
+        "",
+        "Esto significa que los parámetros del modelo de diodo (I_L_ref, I_o_ref, R_s, "
+        "R_sh_ref, a_ref) usados para simular este panel NO reproducen su comportamiento "
+        "real a condiciones estándar (1000 W/m², 25°C). Todo cálculo de energía que use "
+        "este panel (📊 Producción, 💰 Financiero, 🧩 Comparador de Paneles, 🔋 Baterías) "
+        "hereda ese mismo desajuste.",
+        "",
+    ]
+    for param, datos in fallos:
+        lineas.append(
+            f"- **{param}**: calculado={datos['calculado']} vs ficha={datos['referencia']} "
+            f"→ error {datos['error_pct']}% (límite 5%). "
+            + _CAUSA_TECNICA_FALLO.get(param, "revisa la calibración de este parámetro.")
+        )
+    lineas.append("")
+    lineas.append(
+        "Corrige la calibración en el catálogo y vuelve a correr la validación en "
+        "🔬 Motor IV antes de confiar en los resultados de energía de este panel."
+    )
+    return "\n".join(lineas)

@@ -31,6 +31,21 @@ st.caption(
     "Temperatura NOCT · Métricas IEC 61724"
 )
 
+# ── Alarma de validación SDM (calculada en 📐 Dimensionamiento) ────────────────
+# Esta página confía en los mismos parámetros del modelo de diodo que Motor IV
+# valida contra la ficha técnica -- si esa validación falló para el panel que
+# sigue activo, avisar aquí también: es justo donde se usan esos parámetros
+# 8.760 veces para calcular la energía que alimenta Financiero/Baterías.
+if (
+    st.session_state.get("motor_iv_validacion_ok") is False
+    and st.session_state.get("motor_iv_validacion_panel") == st.session_state.get("panel_nombre_dim")
+):
+    from calculos.modelo_iv import explicar_fallo_validacion_sdm
+    st.error(explicar_fallo_validacion_sdm(
+        st.session_state.get("motor_iv_validacion_panel", "el panel activo"),
+        st.session_state.get("motor_iv_validacion_detalle", {}),
+    ))
+
 # ── Prerequisitos ─────────────────────────────────────────────────────────────
 if not st.session_state.get("recurso_solar_ok"):
     st.warning("⚠️ Primero ejecuta ☀️ Recurso Solar para obtener el TMY del sitio.")
