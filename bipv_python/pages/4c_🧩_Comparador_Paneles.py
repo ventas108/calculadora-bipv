@@ -59,6 +59,11 @@ st.caption(
     "atajo. Los datos financieros usan una estimación paramétrica de CAPEX, no una cotización "
     "real — sirve para comparar orden de magnitud entre paneles, no para presupuestar."
 )
+st.page_link(
+    "pages/4d_🧭_Comparador_Orientación.py",
+    label="¿Buscas la mejor inclinación/orientación en vez de panel? Ir a 🧭 Comparador de Orientación →",
+    icon="🧭",
+)
 
 # ── Prerrequisitos: mismo criterio que 🤖 Análisis IA ────────────────────────
 _faltan = []
