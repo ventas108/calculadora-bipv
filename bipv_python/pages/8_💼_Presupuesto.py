@@ -208,12 +208,16 @@ def _editar_seccion(key, label, inyectar=None, referencia_mercado=""):
     _usr = st.session_state.get("auth_email", "")
     _persistible = key in pstore.SECCIONES_PERSISTIBLES and bool(_usr)
 
-    col_r, col_f = st.columns([2, 4])
+    col_r, col_rc, col_f = st.columns([1.4, 1.4, 4])
     if col_r.button(f"↺ Resetear '{label}'", key=f"reset_{key}",
                     help="Vuelve a la plantilla original y descarta lo guardado en disco."):
         st.session_state.pop(ss_key, None)
         if _persistible:
             pstore.borrar_seccion(key, _usr)   # #114 — descartar también lo guardado
+        st.rerun()
+    if col_rc.button("🔄 Recalcular", key=f"recalc_{key}",
+                    help="La columna 'Total USD' de una fila recién agregada a veces no se "
+                         "actualiza hasta el próximo refresco de la página -- este botón lo fuerza."):
         st.rerun()
 
     # ── #114 — Restaurar fuente guardada en disco (antes del widget) ─────────
@@ -836,9 +840,14 @@ with t6:
         ]
 
     # ── Botón: sugerir valores conservadores ─────────────────────────────────
-    col_rs, col_sug, col_fs = st.columns([2, 2, 4])
+    col_rs, col_rc, col_sug, col_fs = st.columns([1.4, 1.4, 2, 4])
     if col_rs.button("↺ Resetear 'Costos Blandos'", key="reset_soft"):
         st.session_state.pop(ss_soft, None)
+        st.rerun()
+
+    if col_rc.button("🔄 Recalcular", key="recalc_soft",
+                    help="La columna 'Total USD' de una fila recién agregada a veces no se "
+                         "actualiza hasta el próximo refresco de la página -- este botón lo fuerza."):
         st.rerun()
 
     _btn_sug = col_sug.button("🪄 Sugerir valores conservadores", key="sug_soft",
