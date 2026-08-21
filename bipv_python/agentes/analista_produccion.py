@@ -4,18 +4,21 @@ Analista de Producción — tercer agente de la capa de IA (Fase 5).
 Rol: dado un conjunto de candidatos técnicos YA COMPARADOS por el motor
 determinista -- panel (calculos/comparador_paneles.py, re-simula con
 run_bipv_simulation()), orientación (calculos/comparador_orientacion.py,
-misma física, barre tilt/azimuth) o batería (calculos/comparador_baterias.py,
-dimensionar_bateria() + compatibilidad_bateria.check_compatibilidad()) --
-priorizar hallazgos TÉCNICOS y opinar explícitamente qué implementar.
+misma física, barre tilt/azimuth), batería (calculos/comparador_baterias.py,
+dimensionar_bateria() + compatibilidad_bateria.check_compatibilidad()) o
+inversor (calculos/comparador_inversores.py,
+comparar_todos_los_inversores_compatibles(), clipping AC real sobre la
+serie horaria ya simulada) -- priorizar hallazgos TÉCNICOS y opinar
+explícitamente qué implementar.
 
 Alcance deliberado, distinto de los otros dos agentes:
 - Analista Técnico-Financiero (agentes/analista_tecnico_financiero.py):
   hallazgos sobre UN diseño ya elegido, con foco financiero/bancabilidad.
 - Asesor de Inversión (agentes/asesor_inversion.py): decisión de inversión,
   con foco financiero (TIR/VPN/bancabilidad) sobre un frente de Pareto.
-- Analista de Producción (este): decisión de HARDWARE (panel, batería) u
-  ORIENTACIÓN con foco TÉCNICO (criterio distinto según el tipo de
-  comparación que le llega -- ver regla 2 del SYSTEM_PROMPT) -- NUNCA la
+- Analista de Producción (este): decisión de HARDWARE (panel, batería,
+  inversor) u ORIENTACIÓN con foco TÉCNICO (criterio distinto según el tipo
+  de comparación que le llega -- ver regla 2 del SYSTEM_PROMPT) -- NUNCA la
   decisión financiera final. Si el candidato técnicamente superior no es el
   financieramente más viable, este agente lo dice explícitamente y remite
   la decisión de inversión al Asesor de Inversión -- no inventa un balance
@@ -25,7 +28,8 @@ No usa herramienta: a diferencia de los otros dos (que llaman
 evaluar_bankability en vivo), este agente no tiene un cálculo de seguimiento
 que ejecutar -- todo lo que necesita ya viene en el texto formateado por el
 formateador correspondiente (formatear_comparacion_paneles/_orientacion/
-_baterias). Por eso es una llamada simple a la API, sin tool_runner.
+_baterias/_inversores). Por eso es una llamada simple a la API, sin
+tool_runner.
 
 Corrige explícitamente el sesgo encontrado en producción (2026-08-21): los
 otros dos agentes asumían "BIPV en fachada" por defecto y narraron mal un
@@ -67,6 +71,12 @@ recomiendes una batería marcada ❌ incompatible). Un estado ⚠️ en \
 compatibilidad de batería significa que el catálogo no tiene datos \
 suficientes para confirmar -- NUNCA lo trates como un "sí" garantizado, \
 dilo explícitamente como incertidumbre.
+   - INVERSORES: energía anual con clipping AC real (E_ac) y el % de \
+clipping (menos es mejor -- indica menos pérdida por recorte del inversor) \
+y compatibilidad eléctrica con el string ya definido (nunca recomiendes un \
+inversor marcado ❌ incompatible). NO uses Performance Ratio (PR) aquí -- no \
+aplica, el panel y la geometría no cambian entre candidatos, solo el \
+inversor.
    CAPEX/VPN/TIR/LCOE/costo (cuando estén presentes) los citas como \
 contexto de apoyo, no como el criterio que decide -- esa decisión de \
 inversión es del Asesor de Inversión, no la tuya. Si el candidato \
@@ -82,11 +92,12 @@ suposición.
    (a) hallazgo técnico principal en 1-2 líneas (qué variable domina la \
 diferencia entre candidatos, citando el número),
    (b) tabla o lista comparativa candidato por candidato con su estado de \
-compatibilidad (eléctrica para paneles, de voltaje para baterías -- para \
-orientación no aplica, omítelo),
+compatibilidad (eléctrica para paneles e inversores, de voltaje para \
+baterías -- para orientación no aplica, omítelo),
    (c) recomendación explícita de qué implementar -- para optimizar la \
-generación de energía (paneles/orientación) o para garantizar la autonomía \
-con la mejor vida útil (baterías) -- solo desde el criterio técnico,
+generación de energía (paneles/orientación/inversores) o para garantizar la \
+autonomía con la mejor vida útil (baterías) -- solo desde el criterio \
+técnico,
    (d) qué NO evaluaste (viabilidad financiera detallada, disponibilidad \
 del equipo, garantía, tiempos de entrega) para que quede claro que tu \
 recomendación es técnica, no la decisión de inversión final.

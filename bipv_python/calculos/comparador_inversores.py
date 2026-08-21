@@ -123,6 +123,167 @@ def unidades_necesarias(n_strings_total: int, strings_max_por_equipo: int) -> in
     return math.ceil(n_strings_total / strings_max_por_equipo)
 
 
+# Columnas financieras/técnicas de comparar_configuraciones() -- se usan para
+# rellenar con None las filas de inversores incompatibles/sin datos, que no
+# pasan por esa función (no hay unidades que calcular para ellos).
+_COLS_FINANCIERAS = (
+    "Configuración", "AC total (kW)", "Ratio DC/AC", "E_ac (kWh/año)",
+    "Clipping (%)", "CAPEX (USD)", "TIR (%)", "VPN (USD)",
+    "Payback (años)", "LCOE (USD/kWh)", "LCOE (COP/kWh)",
+)
+
+
+def comparar_todos_los_inversores_compatibles(
+    df_compatibilidad: pd.DataFrame,
+    n_strings_total: int,
+    p_ac_horaria_W,
+    p_dc_stc_kW: float,
+    capex_sin_inversores_usd: float,
+    tarifa_cop_kwh: float,
+    tipo_cambio: float,
+    tasa_descuento: float = 0.10,
+    tasa_escalacion_tarifa: float = 0.0,
+    tasa_degradacion_pct: float = 0.4,
+    opex_pct_capex: float = 1.5,
+    n_anos: int = 25,
+    beneficios_1715_usd: float = 0.0,
+) -> pd.DataFrame:
+    """
+    Arma automáticamente las configuraciones para TODOS los inversores del
+    catálogo marcados compatible=True en `df_compatibilidad` (salida de
+    filtrar_inversores_compatibles()) -- a diferencia del flujo manual de 4b
+    (el usuario elige 2-4 modelos a mano), esto cubre TODO el catálogo
+    compatible de una sola vez. Barato de calcular: reusa la misma serie
+    horaria p_ac_horaria_W ya simulada en 📊 Producción -- cada candidato
+    solo aplica clipping/escala sobre esa serie, no vuelve a correr física.
+
+    A diferencia de comparar_configuraciones() (que asume que ya le pasaron
+    candidatos filtrados), esta función SÍ incluye los inversores marcados
+    incompatibles en el resultado -- con "Compatible": "❌" y su motivo en
+    "_motivo" -- mismo principio de transparencia que
+    calculos.comparador_paneles.comparar_paneles(): un agente de IA necesita
+    saber que un candidato existe y por qué se descartó, no que simplemente
+    falte de la lista sin explicación.
+
+    Devuelve un DataFrame ordenado por: compatibles primero (por LCOE
+    ascendente entre ellos), incompatibles al final -- vacío si
+    df_compatibilidad está vacío.
+    """
+    if df_compatibilidad.empty:
+        return pd.DataFrame()
+
+    configs = []
+    filas_excluidas = []
+
+    def _fila_excluida(modelo: str, motivo: str) -> dict:
+        fila = {c: None for c in _COLS_FINANCIERAS}
+        fila.update({"Modelo": modelo, "Compatible": "❌", "_motivo": motivo, "Configuración": modelo})
+        return fila
+
+    for _, row in df_compatibilidad.iterrows():
+        if not row["compatible"]:
+            filas_excluidas.append(_fila_excluida(row["modelo"], row["motivo"]))
+            continue
+
+        p_ac_u = (row["P_ac_nom_kW"] or 0) * 1000.0
+        if p_ac_u <= 0:
+            filas_excluidas.append(
+                _fila_excluida(row["modelo"], "Sin potencia AC nominal (P_ac_nom_W) en el catálogo")
+            )
+            continue
+
+        n_u = unidades_necesarias(n_strings_total, int(row["strings_max"]))
+        if n_u <= 0:
+            filas_excluidas.append(
+                _fila_excluida(row["modelo"], "No se pudieron determinar las unidades necesarias")
+            )
+            continue
+
+        nombre = row["modelo"] + (" (1 str/MPPT)" if row["modo"] == "1 string/tracker" else "")
+        configs.append({
+            "modelo": row["modelo"], "nombre": nombre,
+            "p_ac_unidad_W": p_ac_u, "n_unidades": n_u,
+            "costo_unidad_usd": row["costo_usd"] if row["costo_usd"] is not None else 0.0,
+        })
+
+    df_cmp = pd.DataFrame()
+    if configs:
+        df_cmp = comparar_configuraciones(
+            p_ac_horaria_W,
+            [{"nombre": c["nombre"], "p_ac_unidad_W": c["p_ac_unidad_W"],
+              "n_unidades": c["n_unidades"], "costo_unidad_usd": c["costo_unidad_usd"]}
+             for c in configs],
+            p_dc_stc_kW,
+            capex_sin_inversores_usd=capex_sin_inversores_usd,
+            tarifa_cop_kwh=tarifa_cop_kwh, tipo_cambio=tipo_cambio,
+            tasa_descuento=tasa_descuento, tasa_escalacion_tarifa=tasa_escalacion_tarifa,
+            tasa_degradacion_pct=tasa_degradacion_pct, opex_pct_capex=opex_pct_capex,
+            n_anos=n_anos, beneficios_1715_usd=beneficios_1715_usd,
+        )
+        df_cmp.insert(0, "Modelo", [c["modelo"] for c in configs])
+        df_cmp["Compatible"] = "✅"
+        df_cmp["_motivo"] = ""
+
+    df_todo = pd.concat([df_cmp, pd.DataFrame(filas_excluidas)], ignore_index=True)
+    if not df_todo.empty:
+        df_todo["_orden_compat"] = df_todo["Compatible"].map({"✅": 0, "❌": 1})
+        df_todo = (
+            df_todo.sort_values(
+                ["_orden_compat", "LCOE (USD/kWh)"], ascending=[True, True], na_position="last",
+            )
+            .drop(columns="_orden_compat")
+            .reset_index(drop=True)
+        )
+    return df_todo
+
+
+def formatear_comparacion_inversores(df: pd.DataFrame, tipo_instalacion: str) -> str:
+    """Texto plano para agentes/analista_produccion.py -- mismo principio que
+    formatear_comparacion_paneles(): nunca se le pasa el DataFrame crudo a un
+    LLM, y el tipo de instalación se declara explícito.
+
+    Aclara que el criterio técnico aquí es energía con clipping real (E_ac)
+    y % de clipping (menos es mejor) -- NO Performance Ratio (PR), que no
+    aplica a esta comparación (el panel/geometría no cambian, solo el
+    inversor). Incluye los incompatibles CON su motivo, igual que
+    formatear_comparacion_paneles().
+    """
+    if df.empty:
+        return (
+            f"Tipo de instalación: {tipo_instalacion}.\n\n"
+            "No hay ningún inversor comparable en el catálogo."
+        )
+
+    lineas = [
+        f"Tipo de instalación: {tipo_instalacion}.",
+        "",
+        "Esta comparación es de INVERSORES sobre el MISMO panel, string (N en serie) y "
+        "geometría del proyecto -- el criterio técnico es energía anual con clipping AC real "
+        "(E_ac) y el % de clipping (pérdida por recorte del inversor; menos es mejor). NO "
+        "Performance Ratio (PR) -- no aplica aquí, el panel/geometría no cambian, solo el "
+        "inversor.",
+        "",
+        "## Inversores comparados (compatibles primero, ordenados por LCOE ascendente; "
+        "incompatibles al final con su motivo)",
+        "",
+    ]
+    for _, r in df.iterrows():
+        if r["Compatible"] == "❌":
+            lineas.append(f"- **{r['Modelo']}** — Compatible: ❌ ({r['_motivo']})")
+            continue
+        irr = f"{r['TIR (%)']:.1f}%" if r["TIR (%)"] is not None else "None (sin solución real)"
+        payback = f"{r['Payback (años)']:.1f} años" if r["Payback (años)"] is not None else "None"
+        lcoe = f"{r['LCOE (USD/kWh)']:.4f} USD/kWh" if r["LCOE (USD/kWh)"] is not None else "None"
+        lineas.append(
+            f"- **{r['Configuración']}** — Compatible: ✅\n"
+            f"  E_ac={r['E_ac (kWh/año)']:,.0f} kWh/año, clipping={r['Clipping (%)']:.2f}%, "
+            f"AC total={r['AC total (kW)']:.1f} kW, ratio DC/AC={r['Ratio DC/AC']:.2f} | "
+            f"CAPEX=USD {r['CAPEX (USD)']:,.0f}, VPN=USD {r['VPN (USD)']:,.0f}, "
+            f"IRR={irr}, payback={payback}, LCOE={lcoe}"
+        )
+    return "\n".join(lineas)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 2. Comparación de configuraciones con clipping AC real
 # ══════════════════════════════════════════════════════════════════════════════
