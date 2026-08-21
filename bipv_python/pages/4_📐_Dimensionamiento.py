@@ -328,7 +328,7 @@ if not _iv_err:  # Voc/Isc/Vmp/Imp presentes; opcionales usan defaults
             if _val_sdm_dim["validacion_ok"]:
                 st.caption(
                     "✅ Motor IV: SDM validado contra la ficha técnica "
-                    "(Voc/Isc/Pmax dentro de 5% de error)."
+                    "(Voc/Isc/Vmp/Imp/Pmax dentro de 5% de error)."
                 )
             else:
                 st.error(explicar_fallo_validacion_sdm(panel_nombre, _val_sdm_dim))
