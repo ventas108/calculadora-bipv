@@ -287,8 +287,9 @@ def _editar_seccion(key, label, inyectar=None, referencia_mercado=""):
             "Cantidad":    st.column_config.NumberColumn("Cantidad", format="%.2f"),
             "Unidad":      st.column_config.TextColumn("Unidad", width="small"),
             "USD_un":      st.column_config.NumberColumn("USD/un", format="%.2f"),
-            "Total USD":   st.column_config.NumberColumn("Total USD", disabled=True, format="%.2f"),
         },
+        # "Total USD" NO se incluye aquí a propósito -- ver nota abajo.
+        column_order=["Activo", "Descripcion", "Ref", "Cantidad", "Unidad", "USD_un"],
         use_container_width=True, num_rows="dynamic",
         key=f"ed_{key}_v{st.session_state[_ver_key]}",
     )
@@ -305,6 +306,30 @@ def _editar_seccion(key, label, inyectar=None, referencia_mercado=""):
         # La fuente cambió sin cambiar filas → persistirla también
         pstore.guardar_seccion(key, edited.to_dict("records"), _usr, fuente)
         st.session_state[f"_fuente_persistida_{key}"] = fuente
+
+    # ── "Total USD" por fila: tabla de SOLO LECTURA, aparte de la editable ───
+    # Ni la versión de key ni el botón "Recalcular" bastaron -- el usuario lo
+    # confirmó en producción: el subtotal (calculado en Python, más abajo) SÍ
+    # daba el número correcto, pero la celda "Total USD" DENTRO de la grilla
+    # editable seguía mostrando un valor viejo. st.data_editor de Streamlit
+    # puede cachear en el navegador el valor de una columna disabled/calculada
+    # y no siempre la refresca aunque el dato de fondo cambie -- ni un
+    # st.rerun() ni cambiar el `key` del widget lo garantizan en todos los
+    # casos. La única forma verdaderamente confiable de eliminar el problema
+    # es no mostrar ese valor DENTRO de un componente editable: st.dataframe
+    # no tiene estado de edición que cachear, así que se reconstruye completo
+    # y correcto en cada rerun, sin excepción.
+    st.caption("Total por ítem (se recalcula solo, no es editable):")
+    st.dataframe(
+        edited[["Descripcion", "Cantidad", "USD_un", "Total USD"]],
+        column_config={
+            "Descripcion": st.column_config.TextColumn("Descripción", width="large"),
+            "Cantidad":    st.column_config.NumberColumn("Cantidad", format="%.2f"),
+            "USD_un":      st.column_config.NumberColumn("USD/un", format="%.2f"),
+            "Total USD":   st.column_config.NumberColumn("Total USD", format="%.2f"),
+        },
+        hide_index=True, use_container_width=True,
+    )
 
     activos  = edited["Activo"].fillna(False).astype(bool)
     total    = float((edited.loc[activos,  "Cantidad"] * edited.loc[activos,  "USD_un"]).sum())
@@ -929,8 +954,13 @@ with t6:
             "Cantidad":    st.column_config.NumberColumn("Cantidad", format="%.2f"),
             "Unidad":      st.column_config.TextColumn("Unidad", width="small"),
             "USD_un":      st.column_config.NumberColumn("USD/un o USD/glb", format="%.2f"),
-            "Total USD":   st.column_config.NumberColumn("Total USD", disabled=True, format="%.2f"),
         },
+        # "Total USD" NO se incluye aquí a propósito -- misma razón que en
+        # _editar_seccion(): st.data_editor puede cachear en el navegador el
+        # valor de una columna disabled/calculada y no refrescarla aunque el
+        # dato de fondo cambie. Se muestra aparte, en una st.dataframe de
+        # solo lectura (sin estado de edición que cachear) más abajo.
+        column_order=["Activo", "Descripcion", "Ref", "Cantidad", "Unidad", "USD_un"],
         use_container_width=True, num_rows="dynamic",
         key=f"ed_soft_v{st.session_state['_ver_soft']}",
     )
@@ -939,6 +969,18 @@ with t6:
     ed_soft["Total USD"] = (ed_soft["Cantidad"] * ed_soft["USD_un"]).round(2)
     if not ed_soft.equals(st.session_state[ss_soft]):
         st.session_state[ss_soft] = ed_soft
+
+    st.caption("Total por ítem (se recalcula solo, no es editable):")
+    st.dataframe(
+        ed_soft[["Descripcion", "Cantidad", "USD_un", "Total USD"]],
+        column_config={
+            "Descripcion": st.column_config.TextColumn("Descripción", width="large"),
+            "Cantidad":    st.column_config.NumberColumn("Cantidad", format="%.2f"),
+            "USD_un":      st.column_config.NumberColumn("USD/un o USD/glb", format="%.2f"),
+            "Total USD":   st.column_config.NumberColumn("Total USD", format="%.2f"),
+        },
+        hide_index=True, use_container_width=True,
+    )
 
     act_s  = ed_soft["Activo"].fillna(False).astype(bool)
     sub6   = float((ed_soft.loc[act_s, "Cantidad"] * ed_soft.loc[act_s, "USD_un"]).sum())

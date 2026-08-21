@@ -1,19 +1,30 @@
 # -*- coding: utf-8 -*-
-"""Regresión, en dos rondas, de un mismo síntoma reportado por un usuario
+"""Regresión, en tres rondas, de un mismo síntoma reportado por un usuario
 cargando cotizaciones reales: la columna calculada 'Total USD' de una
-tabla de costos se quedaba mostrando un valor viejo tras editar una fila.
+tabla de costos se quedaba mostrando un valor viejo tras editar una fila
+-- aunque el Subtotal (calculado en Python aparte) SIEMPRE dio el número
+correcto, confirmando que nunca fue un bug de fórmula, solo de qué
+mostraba la grilla en pantalla.
 
 Ronda 1: se agregó un botón "🔄 Recalcular" que solo hacía st.rerun() --
 insuficiente, el usuario reportó que seguía sin funcionar.
 
-Ronda 2 (el bug real): st.data_editor de Streamlit cachea en el navegador
-el valor de columnas calculadas/disabled y no siempre las refresca aunque
-el `data` que le pasa Python cambie -- un st.rerun() por sí solo no rompe
-ese caché del lado del componente. Fix: versionar el `key` del widget
-(f"ed_{key}_v{N}") e incrementar N cuando el usuario pide 'Recalcular' o
-'Resetear' -- un `key` nuevo fuerza a Streamlit a tratar el widget como un
-componente distinto, sin caché previo. No se versiona en cada edición
-individual (eso reconstruiría la tabla en cada tecla).
+Ronda 2: se versionó el `key` del data_editor (f"ed_{key}_v{N}") para
+forzar un remount completo del componente al presionar 'Recalcular' --
+tampoco resultó suficiente en todos los casos; el usuario lo confirmó de
+nuevo en producción.
+
+Ronda 3 (fix definitivo): dejar de mostrar "Total USD" DENTRO de la
+grilla editable. st.data_editor puede cachear en el navegador el valor
+de una columna disabled/calculada de forma que ni un rerun ni un `key`
+nuevo garantizan romper -- es un comportamiento del componente, no algo
+que el backend de Streamlit controle del todo. La única forma
+verdaderamente confiable es no depender de esa columna dentro de un
+widget con estado de edición: se excluye del data_editor vía
+`column_order` (sigue existiendo en los datos, solo no se renderiza ahí)
+y se muestra aparte en un st.dataframe de solo lectura, que no tiene
+estado de edición que cachear y por lo tanto se reconstruye completo y
+correcto en cada rerun sin excepción.
 
 Cubre las 4 tablas que pasan por _editar_seccion() (Perfilería, Mano de
 Obra, Sistema FV, Inversor -- y por extensión Catálogo, que también usa
@@ -63,3 +74,26 @@ def test_data_editor_de_costos_blandos_usa_key_versionada():
     assert 'key=f"ed_soft_v{st.session_state[\'_ver_soft\']}"' in src
     assert '"_ver_soft" not in st.session_state' in src
     assert 'st.session_state["_ver_soft"] += 1' in src
+
+
+def test_total_usd_no_esta_dentro_de_la_grilla_editable_de_editar_seccion():
+    # Fix definitivo (ronda 3): "Total USD" se excluye del data_editor via
+    # column_order -- ya no puede quedarse con un valor cacheado del
+    # navegador porque ya no vive ahí.
+    src = _leer()
+    assert 'column_order=["Activo", "Descripcion", "Ref", "Cantidad", "Unidad", "USD_un"]' in src
+    # La única aparición de "Total USD" en column_config del editor debía
+    # desaparecer -- ahora solo debe quedar en el st.dataframe de solo lectura.
+    assert '"Total USD":   st.column_config.NumberColumn("Total USD", disabled=True' not in src
+
+
+def test_total_usd_no_esta_dentro_de_la_grilla_editable_de_costos_blandos():
+    src = _leer()
+    assert 'column_order=["Activo", "Descripcion", "Ref", "Cantidad", "Unidad", "USD_un"]' in src
+
+
+def test_existe_tabla_de_solo_lectura_con_total_usd_en_ambos_lugares():
+    src = _leer()
+    assert src.count('st.dataframe(') >= 2  # una en _editar_seccion(), otra en Costos Blandos
+    assert src.count('edited[["Descripcion", "Cantidad", "USD_un", "Total USD"]]') == 1
+    assert src.count('ed_soft[["Descripcion", "Cantidad", "USD_un", "Total USD"]]') == 1
