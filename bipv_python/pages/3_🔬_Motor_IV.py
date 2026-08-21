@@ -15,6 +15,7 @@ from calculos.modelo_iv import (
     estimar_sdm_desde_ficha,
     verificar_ns_halfcut,
     preparar_panel_iv,
+    explicar_fallo_validacion_sdm,
 )
 from calculos.panel_iv_check import analizar_panel_motiv as _analizar_panel_motiv
 from calculos.temperatura import temperatura_celda_noct
@@ -372,6 +373,12 @@ if _estimado:
 else:
     if st.button("Ejecutar validación (G=1000 W/m², T=25°C)", key="btn_validar"):
         val = validar_sdm_vs_ficha(_panel_activo)
+        # Persistir el resultado -- 📐 Dimensionamiento y 📊 Producción leen
+        # estas mismas claves para mostrar la alarma sin que el usuario tenga
+        # que volver a entrar aquí (ver explicar_fallo_validacion_sdm()).
+        st.session_state["motor_iv_validacion_ok"] = val["validacion_ok"]
+        st.session_state["motor_iv_validacion_detalle"] = val
+        st.session_state["motor_iv_validacion_panel"] = _panel_nom_ss
         for param, datos in val.items():
             if param == "validacion_ok":
                 continue
@@ -383,7 +390,7 @@ else:
         if val["validacion_ok"]:
             st.success("✅ SDM validado — error < 5% en todos los parámetros")
         else:
-            st.error("❌ Revisar calibración SDM")
+            st.error(explicar_fallo_validacion_sdm(_panel_nom_ss, val))
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 5. COMPARACIÓN FF vs IRRADIANCIA
