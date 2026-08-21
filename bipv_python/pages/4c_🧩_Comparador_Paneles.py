@@ -69,6 +69,24 @@ if st.session_state.get("inversor_dict_dim") is None:
     )
     st.stop()
 
+# ⚠️ LIMITACIÓN CONOCIDA (encontrada 2026-08-21, pendiente de corregir) — ver
+# simulation/schemas.py::BIPVConfiguration para el detalle completo. Esta
+# comparación simula N_serie × N_strings_tracker × N_mppt paneles, que es la
+# topología de UN SOLO INVERSOR -- si tu proyecto usa varios inversores
+# (Granja FV típicamente), estos números representan solo una fracción
+# 1/N_inv_total de la energía/CAPEX/financiero real del proyecto completo.
+_n_inv_total = int(st.session_state.get("N_inv_total", 1) or 1)
+if _n_inv_total > 1:
+    st.warning(
+        f"⚠️ **Limitación conocida**: tu proyecto usa **{_n_inv_total} inversores** "
+        "(📐 Dimensionamiento), pero esta comparación simula solo la topología de UN "
+        "inversor (N_serie × N_strings_tracker). Energía, CAPEX y métricas financieras "
+        f"de abajo representan ~1/{_n_inv_total} del proyecto completo, no la granja "
+        "entera — no los uses todavía para decidir sobre el proyecto real. Pendiente "
+        "de corregir.",
+        icon="⚠️",
+    )
+
 
 def _config_base() -> BIPVConfiguration:
     ciudad_nombre = st.session_state.get("ciudad")
