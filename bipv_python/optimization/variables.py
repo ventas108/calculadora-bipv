@@ -165,6 +165,12 @@ FIJOS_NO_OPTIMIZABLES: dict[str, str] = {
     "lon": "ubicación del proyecto — dato del sitio, no una decisión",
     "alt_m": "ubicación del proyecto — dato del sitio, no una decisión",
     "area_m2": "área disponible de la superficie — restricción física del edificio, no una decisión",
+    "N_inversores": (
+        "cuántos inversores idénticos tiene el proyecto (Granja FV típicamente) — "
+        "una decisión de diseño de mayor nivel (cuántas unidades comprar), no algo "
+        "que un barrido de tilt/azimuth/panel deba variar candidato a candidato. "
+        "Ver la nota 'Multi-inversor' en simulation/schemas.py."
+    ),
     "albedo": "reflectividad del entorno — dato del sitio",
     "puntos_horizonte": "perfil de obstáculos reales — dato del sitio (levantamiento/SketchUp)",
     "eta_inversor": (

@@ -12,33 +12,27 @@ ray-casting 3D), sin bypass de diodos, sin bifacial, sin multi-superficie.
 Esos casos siguen viviendo solo en las páginas Streamlit hasta que se
 amplíe este contrato — no se han tocado en esta fase.
 
-⚠️ LIMITACIÓN CONOCIDA (encontrada 2026-08-21, probando 🧩 Comparador de
-Paneles contra un proyecto real de Granja FV multi-inversor -- pendiente
-de corregir): N_serie/N_strings_tracker/N_mppt aquí representan la
-topología de UN SOLO INVERSOR -- calculos.dimensionamiento.dimensionar_sistema()
-calcula N_paneles = N_serie × N_strings_tracker × N_mppt, sin ningún
-factor de "número de inversores". Esto es DISTINTO de "sin multi-superficie"
-de arriba: multi-superficie es sobre distintas ORIENTACIONES (fachada +
-techo), esto es sobre ESCALA dentro de la MISMA orientación (una granja
-con N inversores idénticos en paralelo).
+Multi-inversor (corregido 2026-08-22 -- encontrado el día anterior probando
+🧩 Comparador de Paneles contra un proyecto real de Granja FV con 9
+inversores): N_serie/N_strings_tracker/N_mppt representan la topología de
+UN SOLO INVERSOR -- calculos.dimensionamiento.dimensionar_sistema() calcula
+N_paneles = N_serie × N_strings_tracker × N_mppt para esa única unidad.
+Esto es DISTINTO de "sin multi-superficie" de arriba: multi-superficie es
+sobre distintas ORIENTACIONES (fachada + techo), esto es sobre ESCALA
+dentro de la MISMA orientación (una granja con N inversores idénticos en
+paralelo, mismo sitio/tilt/azimuth). BIPVConfiguration.N_inversores (abajo)
+resuelve esto: run_bipv_simulation() escala N_paneles y P_dc_stc_kW por
+ese factor ANTES de simular producción -- ver el comentario en
+simulation/bipv_simulator.py para por qué escalar las ENTRADAS (no cada
+campo de salida a mano) es matemáticamente exacto aquí, no una
+aproximación: calculos.produccion.simular_produccion_anual() computa
+PR/Y_f/Y_a/CF_pct como razones normalizadas por P_dc_stc_kW, así que
+escalan igual en numerador y denominador y no cambian de valor.
 
-Para un proyecto que usa múltiples inversores (session_state["N_inv_total"]
-> 1 en 📐 Dimensionamiento -- Granja FV típicamente), run_bipv_simulation()
-y todo lo que la llama DIRECTAMENTE con N_serie/N_strings_tracker/N_mppt
-(optimization/, página 4c Comparador de Paneles, los scripts de prueba de
-agentes/) representan SOLO 1/N_inv_total de la energía/CAPEX/financiero
-real del proyecto completo. Ningún consumidor de este contrato multiplica
-por N_inv_total todavía -- verificar y corregir antes de confiar en estos
-números para un proyecto multi-inversor.
-
-Página 18 Análisis IA NO tiene este problema -- verificado en el código
-real de 📊 Producción: para un proyecto Granja FV, esa página YA usa
-session_state["N_paneles_granja"] (el total de la granja completa, no
-N_serie×N_strings_tracker) como default de N_paneles, y Análisis IA lee
-session_state["E_ac_anual_kWh"]/metricas_financiero directamente -- nunca
-llama a run_bipv_simulation(). El bug está acotado a los consumidores que
-SÍ construyen una BIPVConfiguration desde N_serie/N_strings_tracker/N_mppt
-crudos en vez de leer los resultados ya escalados de Producción.
+Página 18 Análisis IA nunca tuvo este problema -- lee
+session_state["E_ac_anual_kWh"]/metricas_financiero directamente (que para
+Granja FV ya usa session_state["N_paneles_granja"], el total real, como
+default en 📊 Producción), nunca llama a run_bipv_simulation().
 
 dataclasses en vez de Pydantic a propósito: es el mínimo necesario para
 tener un contrato tipado y sin ambigüedad; Pydantic (validación de
@@ -73,6 +67,11 @@ class BIPVConfiguration:
     N_serie: int = 1
     N_strings_tracker: int = 1
     N_mppt: int = 1
+    # Cuántas unidades IDÉNTICAS de [N_serie × N_strings_tracker × N_mppt]
+    # tiene el proyecto -- 1 = un solo inversor (caso BIPV típico), >1 = una
+    # granja FV con varios inversores en paralelo, mismo sitio/tilt/azimuth.
+    # Ver la nota "Multi-inversor" en el docstring del módulo.
+    N_inversores: int = 1
     eta_inversor: float = 0.97
     k_bipv: float = 1.3   # confinamiento térmico BIPV (IEA-PVPS T15); 1.0=ventilado libre
 

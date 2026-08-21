@@ -88,16 +88,21 @@ def test_no_simula_sin_boton_explicito():
         )
 
 
-def test_advierte_limitacion_multi_inversor_cuando_aplica():
-    # Hallazgo real (2026-08-21): run_bipv_simulation() arma N_paneles desde
-    # N_serie x N_strings_tracker x N_mppt -- la topología de UN inversor,
-    # no session_state["N_paneles_granja"] (el total real de una Granja FV
-    # multi-inversor). La página debe avisarlo explícitamente cuando
-    # N_inv_total > 1, en vez de mostrar números subestimados sin aviso.
+def test_config_base_pasa_n_inversores_al_motor():
+    # Corregido 2026-08-22 (ver simulation/schemas.py -- nota "Multi-inversor"):
+    # run_bipv_simulation() ahora escala N_paneles/P_dc_stc_kW por
+    # config.N_inversores, así que _config_base() DEBE pasar N_inv_total del
+    # proyecto real -- si no, el comparador vuelve a subestimar la energía de
+    # un proyecto multi-inversor como el de la granja de 9 inversores.
     src = _leer(_PAGINA)
     assert 'st.session_state.get("N_inv_total", 1)' in src
+    assert "N_inversores=_n_inv_total" in src
+
+
+def test_avisa_que_la_comparacion_es_del_proyecto_completo_cuando_aplica():
+    src = _leer(_PAGINA)
     assert "_n_inv_total > 1" in src
-    assert "Limitación conocida" in src
+    assert "proyecto completo" in src
 
 
 def test_adopcion_invalida_poa_efectiva_a_diferencia_del_comparador_de_inversores():

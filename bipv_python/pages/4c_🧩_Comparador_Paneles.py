@@ -69,22 +69,19 @@ if st.session_state.get("inversor_dict_dim") is None:
     )
     st.stop()
 
-# ⚠️ LIMITACIÓN CONOCIDA (encontrada 2026-08-21, pendiente de corregir) — ver
-# simulation/schemas.py::BIPVConfiguration para el detalle completo. Esta
-# comparación simula N_serie × N_strings_tracker × N_mppt paneles, que es la
-# topología de UN SOLO INVERSOR -- si tu proyecto usa varios inversores
-# (Granja FV típicamente), estos números representan solo una fracción
-# 1/N_inv_total de la energía/CAPEX/financiero real del proyecto completo.
+# Multi-inversor (corregido 2026-08-22 -- ver la nota en
+# simulation/schemas.py::BIPVConfiguration para el detalle completo y por
+# qué escalar N_paneles/P_dc_stc_kW como ENTRADAS de la simulación es
+# matemáticamente exacto, no una aproximación). Un proyecto con varios
+# inversores idénticos (Granja FV típicamente) declara N_inv_total en
+# 📐 Dimensionamiento -- _config_base() lo pasa como N_inversores.
 _n_inv_total = int(st.session_state.get("N_inv_total", 1) or 1)
 if _n_inv_total > 1:
-    st.warning(
-        f"⚠️ **Limitación conocida**: tu proyecto usa **{_n_inv_total} inversores** "
-        "(📐 Dimensionamiento), pero esta comparación simula solo la topología de UN "
-        "inversor (N_serie × N_strings_tracker). Energía, CAPEX y métricas financieras "
-        f"de abajo representan ~1/{_n_inv_total} del proyecto completo, no la granja "
-        "entera — no los uses todavía para decidir sobre el proyecto real. Pendiente "
-        "de corregir.",
-        icon="⚠️",
+    st.info(
+        f"ℹ️ Tu proyecto usa **{_n_inv_total} inversores** — la comparación de abajo "
+        "representa el **proyecto completo** (energía, CAPEX y financiero ya escalados "
+        f"× {_n_inv_total}), no un solo inversor.",
+        icon="ℹ️",
     )
 
 
@@ -103,6 +100,7 @@ def _config_base() -> BIPVConfiguration:
         albedo=float(st.session_state.get("albedo_suelo", 0.20)),
         N_serie=int(st.session_state.get("N_serie", 1)),
         N_strings_tracker=int(st.session_state.get("N_str_tr_usado", 1)),
+        N_inversores=_n_inv_total,
         eta_inversor=float(st.session_state.get("eta_inversor", 0.97)),
         k_bipv=float(st.session_state.get("motor_optico_k_bipv", 1.0)),
         inversor=st.session_state.get("inversor_dict_dim"),
@@ -182,8 +180,17 @@ if df_cmp is not None and not df_cmp.empty:
             fila = df_cmp[df_cmp["Panel"] == _elegido].iloc[0]
             st.session_state["panel_dict"] = MODULOS_BIPV[_elegido]
             st.session_state["panel_nombre_dim"] = _elegido
-            st.session_state["N_paneles_dim"] = int(fila["N° módulos"])
-            st.session_state["P_dc_stc_kW_dim"] = float(fila["P_dc (kWp)"])
+            # "N° módulos"/"P_dc (kWp)" ya son el PROYECTO COMPLETO (× N_inversores,
+            # ver comparar_paneles()) -- para un proyecto multi-inversor van en las
+            # claves de GRANJA (📐 Dimensionamiento), no en las de "un inversor"
+            # (N_paneles_dim/P_dc_stc_kW_dim), que 📊 Producción solo usa como
+            # fallback cuando N_paneles_granja no está definido.
+            if _n_inv_total > 1:
+                st.session_state["N_paneles_granja"] = int(fila["N° módulos"])
+                st.session_state["P_dc_total_kWp"] = float(fila["P_dc (kWp)"])
+            else:
+                st.session_state["N_paneles_dim"] = int(fila["N° módulos"])
+                st.session_state["P_dc_stc_kW_dim"] = float(fila["P_dc (kWp)"])
             # Adopción atómica: a diferencia de adoptar un inversor (que solo
             # invalida el lado AC), cambiar de panel invalida TAMBIÉN la POA
             # efectiva del Motor Óptico (depende de NOCT/transparencia del
