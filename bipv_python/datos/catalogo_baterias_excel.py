@@ -71,6 +71,17 @@ _COL_MAP = {
     "Tensión Nominal (V)":         "voltaje_V",
     "Tension Nominal (V)":         "voltaje_V",
     "Nominal Voltage (V)":         "voltaje_V",
+    # Voltaje — rango real de operación (varía con el estado de carga; #25
+    # amplía calculos/compatibilidad_bateria.py para usarlo, antes solo
+    # comparaba el nominal contra la ventana del inversor)
+    "Voltaje Min (V)":             "voltaje_min_V",
+    "Voltaje Mínimo (V)":          "voltaje_min_V",
+    "Voltaje Minimo (V)":          "voltaje_min_V",
+    "Min Voltage (V)":             "voltaje_min_V",
+    "Voltaje Max (V)":             "voltaje_max_V",
+    "Voltaje Máximo (V)":          "voltaje_max_V",
+    "Voltaje Maximo (V)":          "voltaje_max_V",
+    "Max Voltage (V)":             "voltaje_max_V",
     # DoD
     "DoD (%)":                     "dod_pct",
     "DoD Máximo (%)":              "dod_pct",
@@ -119,6 +130,7 @@ _COL_MAP = {
 
 # Claves numéricas internas
 _NUM_KEYS = {"capacidad_kWh", "potencia_kW", "voltaje_V",
+             "voltaje_min_V", "voltaje_max_V",
              "dod_pct", "ciclos_vida", "eta_rte_pct",
              "costo_usd", "garantia_anos"}
 
@@ -128,6 +140,8 @@ _CAMPO_ALIASES_SUGERIDOS: dict[str, list[str]] = {
     "capacidad_kWh": ["Capacidad (kWh)", "Energía Nominal (kWh)", "Energy (kWh)"],
     "potencia_kW":   ["Potencia Continua (kW)", "Potencia Max (kW)", "Continuous Power (kW)"],
     "voltaje_V":     ["Voltaje Nominal (V)", "Tensión Nominal (V)", "Nominal Voltage (V)"],
+    "voltaje_min_V": ["Voltaje Min (V)", "Voltaje Mínimo (V)", "Min Voltage (V)"],
+    "voltaje_max_V": ["Voltaje Max (V)", "Voltaje Máximo (V)", "Max Voltage (V)"],
     "dod_pct":       ["DoD Máximo (%)", "Profundidad Descarga (%)", "Depth of Discharge (%)"],
     "ciclos_vida":   ["Ciclos de Vida", "Cycle Life", "Cycles"],
     "eta_rte_pct":   ["Eficiencia RTE (%)", "Round-trip Efficiency (%)", "RTE (%)"],
@@ -434,6 +448,8 @@ _CANON_COLS: dict[str, str] = {
     "capacidad_kWh": "Capacidad (kWh)",
     "potencia_kW":   "Potencia Continua (kW)",
     "voltaje_V":     "Voltaje Nominal (V)",
+    "voltaje_min_V": "Voltaje Min (V)",
+    "voltaje_max_V": "Voltaje Max (V)",
     "dod_pct":       "DoD Máximo (%)",
     "ciclos_vida":   "Ciclos de Vida",
     "eta_rte_pct":   "Eficiencia RTE (%)",
