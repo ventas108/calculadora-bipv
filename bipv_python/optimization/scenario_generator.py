@@ -36,10 +36,23 @@ def _resolver_categoricas_de_catalogo(cambios: dict) -> dict:
         from datos.tecnologias_bipv import MODULOS_BIPV
         resuelto["panel"] = MODULOS_BIPV[resuelto["panel"]]
     if "inversor" in resuelto:
-        from datos.catalogo_inversores import INVERSORES
-        inversor_dict = INVERSORES[resuelto["inversor"]]
+        # Debe resolver contra el MISMO catálogo del que variable_inversor()
+        # sacó las opciones -- si aquí se usara el INVERSORES angosto (7)
+        # mientras variable_inversor() sortea del Excel (105), el 94% de las
+        # claves sorteadas no existirían en INVERSORES y esto reventaría con
+        # KeyError. Ver optimization.variables._catalogo_inversores_real().
+        from optimization.variables import _catalogo_inversores_real
+        inversor_dict = _catalogo_inversores_real()[resuelto["inversor"]]
         resuelto["inversor"] = inversor_dict
-        resuelto["eta_inversor"] = inversor_dict["eficiencia_max"]
+        # El catálogo Excel (105 modelos reales) no trae eficiencia -- el
+        # datasheet fuente no reporta ese dato para esos modelos (ver
+        # datos/catalogo_inversores_excel.py). Solo sincronizamos
+        # eta_inversor cuando el dato real existe (el Python de 7 modelos sí
+        # lo trae) -- nunca lo inventamos con un valor típico de placa; si
+        # falta, el candidato conserva el eta_inversor que ya traía
+        # config_base.
+        if inversor_dict.get("eficiencia_max") is not None:
+            resuelto["eta_inversor"] = inversor_dict["eficiencia_max"]
     return resuelto
 
 
