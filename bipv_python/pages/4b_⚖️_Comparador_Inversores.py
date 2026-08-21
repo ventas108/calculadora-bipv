@@ -23,6 +23,15 @@ mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 
 requerir_login()
 
+# Sin esto, session_state["tipo_cambio"] no existe hasta que el usuario visite
+# 💰 Financiero/💼 Presupuesto en la misma sesión, y el number_input de abajo
+# cae silenciosamente en el default hardcodeado (4000.0) en vez de la TRM real
+# -- encontrado auditando pages/4c_🧩_Comparador_Paneles.py (hermano de esta
+# página, con el mismo patrón de TRM). init_trm() solo hace la llamada al API
+# si la clave aún no existe, así que no pisa un valor ya cargado/editado.
+from calculos.trm_utils import init_trm
+init_trm()
+
 
 from calculos.comparador_inversores import (
     barrido_dc_ac,

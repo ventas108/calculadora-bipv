@@ -123,6 +123,21 @@ def test_analista_produccion_recibe_el_tipo_de_instalacion_real():
     assert "formatear_comparacion_paneles(df_cmp, tipo_instalacion)" in src
 
 
+def test_llama_init_trm_antes_de_leer_tipo_cambio():
+    # Reportado por el usuario: la TRM mostraba el default hardcodeado
+    # (4000.0) en vez de la TRM real, porque session_state["tipo_cambio"]
+    # solo existe si el usuario ya visitó 💰 Financiero/💼 Presupuesto en
+    # esta sesión (esas páginas son las que llaman init_trm()). Esta
+    # página debe llamarlo también, no asumir que ya corrió en otro lado.
+    src = _leer(_PAGINA)
+    assert "from calculos.trm_utils import init_trm" in src
+    assert "init_trm()" in src
+    # Debe llamarse ANTES del primer session_state.get("tipo_cambio"...).
+    idx_init = src.index("init_trm()")
+    idx_uso = src.index('st.session_state.get("tipo_cambio"')
+    assert idx_init < idx_uso
+
+
 def test_config_base_pasa_n_inversores_al_motor():
     # Corregido 2026-08-22 (ver simulation/schemas.py -- nota "Multi-inversor"):
     # run_bipv_simulation() ahora escala N_paneles/P_dc_stc_kW por
