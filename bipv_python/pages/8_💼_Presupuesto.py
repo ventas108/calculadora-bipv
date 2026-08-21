@@ -208,16 +208,31 @@ def _editar_seccion(key, label, inyectar=None, referencia_mercado=""):
     _usr = st.session_state.get("auth_email", "")
     _persistible = key in pstore.SECCIONES_PERSISTIBLES and bool(_usr)
 
+    # ── Versión del widget: st.data_editor a veces cachea en el navegador el
+    # valor de columnas calculadas/disabled (como "Total USD") y no las
+    # refresca aunque el dato de fondo cambie -- un st.rerun() por sí solo no
+    # siempre alcanza a romper ese caché del lado del componente, solo
+    # re-ejecuta el Python. Cambiar el `key` del widget fuerza a Streamlit a
+    # tratarlo como un componente NUEVO (sin caché previo) en el próximo
+    # render. No se incrementa en cada edición (eso reconstruiría la tabla
+    # en cada tecla, perdiendo foco/scroll) -- solo cuando el usuario pide
+    # explícitamente 'Recalcular' o 'Resetear'.
+    _ver_key = f"_ver_{key}"
+    if _ver_key not in st.session_state:
+        st.session_state[_ver_key] = 0
+
     col_r, col_rc, col_f = st.columns([1.4, 1.4, 4])
     if col_r.button(f"↺ Resetear '{label}'", key=f"reset_{key}",
                     help="Vuelve a la plantilla original y descarta lo guardado en disco."):
         st.session_state.pop(ss_key, None)
         if _persistible:
             pstore.borrar_seccion(key, _usr)   # #114 — descartar también lo guardado
+        st.session_state[_ver_key] += 1
         st.rerun()
     if col_rc.button("🔄 Recalcular", key=f"recalc_{key}",
-                    help="La columna 'Total USD' de una fila recién agregada a veces no se "
-                         "actualiza hasta el próximo refresco de la página -- este botón lo fuerza."):
+                    help="Si 'Total USD' se quedó con un valor viejo tras editar una fila, "
+                         "este botón reconstruye la tabla desde cero para forzar el refresco."):
+        st.session_state[_ver_key] += 1
         st.rerun()
 
     # ── #114 — Restaurar fuente guardada en disco (antes del widget) ─────────
@@ -274,7 +289,8 @@ def _editar_seccion(key, label, inyectar=None, referencia_mercado=""):
             "USD_un":      st.column_config.NumberColumn("USD/un", format="%.2f"),
             "Total USD":   st.column_config.NumberColumn("Total USD", disabled=True, format="%.2f"),
         },
-        use_container_width=True, num_rows="dynamic", key=f"ed_{key}",
+        use_container_width=True, num_rows="dynamic",
+        key=f"ed_{key}_v{st.session_state[_ver_key]}",
     )
     edited["Cantidad"] = pd.to_numeric(edited["Cantidad"], errors="coerce").fillna(0.0)
     edited["USD_un"]   = pd.to_numeric(edited["USD_un"],   errors="coerce").fillna(0.0)
@@ -839,15 +855,23 @@ with t6:
             ["Gastos notariales, registros y licencias",       "LEG-002",  1.0, "glb", _v(0.005,   500,  2_000)],
         ]
 
+    # Mismo patrón de "versión" que _editar_seccion(): cambiar el `key` del
+    # data_editor fuerza a Streamlit a tratarlo como un componente nuevo,
+    # rompiendo cualquier caché del navegador en columnas calculadas/disabled.
+    if "_ver_soft" not in st.session_state:
+        st.session_state["_ver_soft"] = 0
+
     # ── Botón: sugerir valores conservadores ─────────────────────────────────
     col_rs, col_rc, col_sug, col_fs = st.columns([1.4, 1.4, 2, 4])
     if col_rs.button("↺ Resetear 'Costos Blandos'", key="reset_soft"):
         st.session_state.pop(ss_soft, None)
+        st.session_state["_ver_soft"] += 1
         st.rerun()
 
     if col_rc.button("🔄 Recalcular", key="recalc_soft",
-                    help="La columna 'Total USD' de una fila recién agregada a veces no se "
-                         "actualiza hasta el próximo refresco de la página -- este botón lo fuerza."):
+                    help="Si 'Total USD' se quedó con un valor viejo tras editar una fila, "
+                         "este botón reconstruye la tabla desde cero para forzar el refresco."):
+        st.session_state["_ver_soft"] += 1
         st.rerun()
 
     _btn_sug = col_sug.button("🪄 Sugerir valores conservadores", key="sug_soft",
@@ -860,6 +884,7 @@ with t6:
             _df_tmp = st.session_state[ss_soft].copy()
             _df_tmp.at[7, "Activo"] = False
             st.session_state[ss_soft] = _df_tmp
+            st.session_state["_ver_soft"] += 1
             st.toast(f"✅ Costos blandos sugeridos sobre CAPEX directo USD {_capex_dir_proxy:,.0f}", icon="🪄")
         else:
             st.warning("⚠️ Completa primero al menos una pestaña de cotización (Perfilería, Mano de Obra, etc.) "
@@ -906,7 +931,8 @@ with t6:
             "USD_un":      st.column_config.NumberColumn("USD/un o USD/glb", format="%.2f"),
             "Total USD":   st.column_config.NumberColumn("Total USD", disabled=True, format="%.2f"),
         },
-        use_container_width=True, num_rows="dynamic", key="ed_soft",
+        use_container_width=True, num_rows="dynamic",
+        key=f"ed_soft_v{st.session_state['_ver_soft']}",
     )
     ed_soft["Cantidad"] = pd.to_numeric(ed_soft["Cantidad"], errors="coerce").fillna(0.0)
     ed_soft["USD_un"]   = pd.to_numeric(ed_soft["USD_un"],   errors="coerce").fillna(0.0)
