@@ -586,6 +586,10 @@ with col_b1:
                 "Capacidad (kWh)":      bat.get("capacidad_kWh", "—"),
                 "Potencia (kW)":        bat.get("potencia_kW", "—"),
                 "Voltaje nominal (V)":  bat.get("voltaje_V", "—"),
+                "Rango de voltaje (V)": (
+                    f"{bat['voltaje_min_V']:.0f}–{bat['voltaje_max_V']:.0f}"
+                    if bat.get("voltaje_min_V") and bat.get("voltaje_max_V") else "—"
+                ),
                 "DoD máximo (%)":       bat.get("dod_pct", "—"),
                 "Ciclos de vida":       bat.get("ciclos_vida", "—"),
                 "Eficiencia RTE (%)":   bat.get("eta_rte_pct", "—"),

@@ -52,6 +52,30 @@ CASOS = [
 
     ("Tipo indeterminado, batería LV → warning (no bloquea)",
      {"voltaje_V": 48}, {}, "PowerInv 20K", "warning"),
+
+    # ── Rango completo de operación (voltaje_min_V/voltaje_max_V) ──────────
+    # Antes solo se comparaba el nominal contra la ventana del inversor --
+    # una batería con nominal dentro de rango pero mínimo/máximo real fuera
+    # se habría marcado "ok" sin serlo.
+    ("Nominal dentro de rango, pero MÍNIMO real cae por debajo → error",
+     {"voltaje_V": 614.4, "voltaje_min_V": 480, "voltaje_max_V": 700},
+     {"es_hibrido": True, "bat_voltaje_min": 500, "bat_voltaje_max": 800},
+     "Inversor Genérico X", "error"),
+
+    ("Nominal dentro de rango, pero MÁXIMO real supera el techo → error",
+     {"voltaje_V": 614.4, "voltaje_min_V": 550, "voltaje_max_V": 820},
+     {"es_hibrido": True, "bat_voltaje_min": 500, "bat_voltaje_max": 800},
+     "Inversor Genérico X", "error"),
+
+    ("Rango completo de la batería SÍ cabe dentro del inversor → ok",
+     {"voltaje_V": 614.4, "voltaje_min_V": 537.6, "voltaje_max_V": 691.2},
+     {"es_hibrido": True, "bat_voltaje_min": 500, "bat_voltaje_max": 800},
+     "Inversor Genérico X", "ok"),
+
+    ("Sin voltaje_min_V/voltaje_max_V en el catálogo → cae al chequeo nominal (sin cambio)",
+     {"voltaje_V": 51.2},
+     {"es_hibrido": True, "bat_voltaje_min": 40, "bat_voltaje_max": 60},
+     "DEYE SUN-7.6K-SG01LP1", "ok"),
 ]
 
 fallos = 0
