@@ -357,6 +357,19 @@ if df_inv_cmp is not None and not df_inv_cmp.empty:
         for _, r in _incompatibles_inv.iterrows():
             st.warning(f"**{r['Modelo']}**: {r['_motivo']}", icon="⚠️")
 
+    # Compatibles con CAPEX/LCOE que NO incluye el costo real del inversor
+    # (el catálogo no lo trae) -- mismo aviso que ya daba el flujo manual de
+    # arriba, ahora también aquí para no perderlo al comparar todo el catálogo.
+    _sin_costo_inv = df_inv_cmp[(df_inv_cmp["Compatible"] == "✅") & (df_inv_cmp["_motivo"] != "")]
+    if not _sin_costo_inv.empty:
+        st.warning(
+            f"⚠️ **{len(_sin_costo_inv)} de {int((df_inv_cmp['Compatible'] == '✅').sum())}** "
+            "modelos compatibles no tienen costo en el catálogo — su CAPEX/LCOE en la tabla "
+            "de arriba solo incluye el CAPEX base, no el costo del equipo. No son comparables "
+            "en igualdad de condiciones contra un modelo que sí tenga costo real: "
+            + ", ".join(f"**{m}**" for m in _sin_costo_inv["Modelo"]) + "."
+        )
+
     st.download_button(
         "⬇️ Descargar comparativa completa (CSV)",
         df_inv_cmp.drop(columns=_cols_internas_inv).to_csv(index=False).encode("utf-8-sig"),

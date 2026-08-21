@@ -185,7 +185,12 @@ def comparar_todos_los_inversores_compatibles(
             filas_excluidas.append(_fila_excluida(row["modelo"], row["motivo"]))
             continue
 
-        p_ac_u = (row["P_ac_nom_kW"] or 0) * 1000.0
+        # pd.notna(), no "row['P_ac_nom_kW'] or 0": NaN es truthy en Python
+        # (bool(nan) es True) y "NaN <= 0" siempre da False, así que un
+        # inversor compatible pero SIN potencia AC en el catálogo pasaría
+        # este filtro con p_ac_u=NaN en vez de quedar excluido -- mismo tipo
+        # de bug que el de costo_usd, encontrado por el mismo motivo.
+        p_ac_u = (row["P_ac_nom_kW"] * 1000.0) if pd.notna(row["P_ac_nom_kW"]) else 0.0
         if p_ac_u <= 0:
             filas_excluidas.append(
                 _fila_excluida(row["modelo"], "Sin potencia AC nominal (P_ac_nom_W) en el catálogo")
@@ -199,11 +204,18 @@ def comparar_todos_los_inversores_compatibles(
             )
             continue
 
+        # pd.notna(), no "is not None": un DataFrame convierte el None de
+        # dict Python a NaN en la columna -- "row['costo_usd'] is not None"
+        # es True incluso para NaN, dejaría pasar un costo corrupto que
+        # revienta calcular_flujo_caja() con "cannot convert float NaN to
+        # integer" más adelante (encontrado al agregar el test de este caso).
+        _costo_ok = pd.notna(row["costo_usd"])
         nombre = row["modelo"] + (" (1 str/MPPT)" if row["modo"] == "1 string/tracker" else "")
         configs.append({
             "modelo": row["modelo"], "nombre": nombre,
             "p_ac_unidad_W": p_ac_u, "n_unidades": n_u,
-            "costo_unidad_usd": row["costo_usd"] if row["costo_usd"] is not None else 0.0,
+            "costo_unidad_usd": row["costo_usd"] if _costo_ok else 0.0,
+            "costo_disponible": _costo_ok,
         })
 
     df_cmp = pd.DataFrame()
@@ -222,7 +234,21 @@ def comparar_todos_los_inversores_compatibles(
         )
         df_cmp.insert(0, "Modelo", [c["modelo"] for c in configs])
         df_cmp["Compatible"] = "✅"
-        df_cmp["_motivo"] = ""
+        # No es un motivo de exclusión (el candidato SÍ es compatible) -- es
+        # una advertencia de que el CAPEX/LCOE de esta fila NO incluye el
+        # costo real del equipo (el catálogo no lo trae), así que no es
+        # comparable en igualdad de condiciones contra un modelo que sí
+        # tenga costo real. Hallazgo real: ni el catálogo Python (7 modelos)
+        # ni el Excel real (105 modelos) tienen "Costo Inversor" poblado hoy
+        # para ningún modelo -- sin este aviso, el comparador entero
+        # entregaría CAPEX/LCOE subestimados en silencio.
+        df_cmp["_motivo"] = [
+            "" if c["costo_disponible"] else
+            "Costo del inversor no disponible en el catálogo -- su CAPEX/LCOE de esta fila "
+            "NO incluye el costo del equipo, no es comparable en igualdad de condiciones "
+            "contra un modelo que sí tenga costo real"
+            for c in configs
+        ]
 
     df_todo = pd.concat([df_cmp, pd.DataFrame(filas_excluidas)], ignore_index=True)
     if not df_todo.empty:
@@ -274,12 +300,13 @@ def formatear_comparacion_inversores(df: pd.DataFrame, tipo_instalacion: str) ->
         irr = f"{r['TIR (%)']:.1f}%" if r["TIR (%)"] is not None else "None (sin solución real)"
         payback = f"{r['Payback (años)']:.1f} años" if r["Payback (años)"] is not None else "None"
         lcoe = f"{r['LCOE (USD/kWh)']:.4f} USD/kWh" if r["LCOE (USD/kWh)"] is not None else "None"
+        aviso_costo = f" ⚠️ {r['_motivo']}." if r.get("_motivo") else ""
         lineas.append(
             f"- **{r['Configuración']}** — Compatible: ✅\n"
             f"  E_ac={r['E_ac (kWh/año)']:,.0f} kWh/año, clipping={r['Clipping (%)']:.2f}%, "
             f"AC total={r['AC total (kW)']:.1f} kW, ratio DC/AC={r['Ratio DC/AC']:.2f} | "
             f"CAPEX=USD {r['CAPEX (USD)']:,.0f}, VPN=USD {r['VPN (USD)']:,.0f}, "
-            f"IRR={irr}, payback={payback}, LCOE={lcoe}"
+            f"IRR={irr}, payback={payback}, LCOE={lcoe}.{aviso_costo}"
         )
     return "\n".join(lineas)
 

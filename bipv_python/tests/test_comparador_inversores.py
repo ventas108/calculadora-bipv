@@ -108,6 +108,47 @@ def test_huawei_usa_modo_1_string_tracker_en_la_configuracion():
     assert "1 str/MPPT" in df.loc["Huawei-100K", "Configuración"]
 
 
+def test_compatible_sin_costo_en_catalogo_queda_avisado_no_silencioso():
+    # Hallazgo real: NI el catálogo Python (7 modelos) NI el Excel real (105
+    # modelos) tienen costo de inversor poblado hoy -- sin este aviso, el
+    # comparador entregaría CAPEX/LCOE subestimados en silencio (costo
+    # tratado como 0) para candidatos que SÍ son compatibles.
+    df = _comparar().set_index("Modelo")
+    assert df.loc["Huawei-100K", "_motivo"] == ""  # este SÍ tiene costo_usd=5500 en el fixture
+    assert df.loc["TriP-30K", "_motivo"] == ""      # este también (costo_usd=2000)
+
+
+def test_compatible_sin_potencia_ac_queda_excluido_no_crashea():
+    # Mismo tipo de bug que el de costo: un DataFrame convierte el
+    # P_ac_nom_W=None del dict Python a NaN -- "row['P_ac_nom_kW'] or 0"
+    # dejaría pasar NaN sin excluir la fila. Verificado con un compatible
+    # real (TriP-30K) al que le falta la potencia AC.
+    inv_sin_potencia = dict(INVERSORES)
+    inv_sin_potencia["TriP-30K"] = {**INVERSORES["TriP-30K"], "P_ac_nom_W": None}
+    df_compat = filtrar_inversores_compatibles(PANEL, inv_sin_potencia, N_serie=18, T_frio=10.0, T_real=36.35)
+    df = comparar_todos_los_inversores_compatibles(
+        df_compat, n_strings_total=17, p_ac_horaria_W=_horas(),
+        p_dc_stc_kW=220.32, capex_sin_inversores_usd=160_000,
+        tarifa_cop_kwh=950, tipo_cambio=4000,
+    ).set_index("Modelo")
+    assert df.loc["TriP-30K", "Compatible"] == "❌"
+    assert "Sin potencia AC nominal" in df.loc["TriP-30K", "_motivo"]
+
+
+def test_compatible_realmente_sin_costo_queda_marcado():
+    inv_sin_costo = dict(INVERSORES)
+    inv_sin_costo["TriP-30K"] = {**INVERSORES["TriP-30K"], "costo_usd": None}
+    df_compat = filtrar_inversores_compatibles(PANEL, inv_sin_costo, N_serie=18, T_frio=10.0, T_real=36.35)
+    df = comparar_todos_los_inversores_compatibles(
+        df_compat, n_strings_total=17, p_ac_horaria_W=_horas(),
+        p_dc_stc_kW=220.32, capex_sin_inversores_usd=160_000,
+        tarifa_cop_kwh=950, tipo_cambio=4000,
+    ).set_index("Modelo")
+    assert df.loc["TriP-30K", "Compatible"] == "✅"
+    assert "no disponible en el catálogo" in df.loc["TriP-30K", "_motivo"]
+    assert df.loc["Huawei-100K", "_motivo"] == ""
+
+
 def test_dataframe_compatibilidad_vacio_devuelve_vacio():
     df = comparar_todos_los_inversores_compatibles(
         pd.DataFrame(), n_strings_total=17, p_ac_horaria_W=_horas(),
@@ -162,3 +203,16 @@ def test_formatear_dataframe_vacio_no_crashea():
     texto = formatear_comparacion_inversores(pd.DataFrame(), "Granja FV campo")
     assert "Granja FV campo" in texto
     assert "No hay ningún inversor" in texto
+
+
+def test_formatear_avisa_cuando_el_costo_no_esta_disponible():
+    inv_sin_costo = dict(INVERSORES)
+    inv_sin_costo["TriP-30K"] = {**INVERSORES["TriP-30K"], "costo_usd": None}
+    df_compat = filtrar_inversores_compatibles(PANEL, inv_sin_costo, N_serie=18, T_frio=10.0, T_real=36.35)
+    df = comparar_todos_los_inversores_compatibles(
+        df_compat, n_strings_total=17, p_ac_horaria_W=_horas(),
+        p_dc_stc_kW=220.32, capex_sin_inversores_usd=160_000,
+        tarifa_cop_kwh=950, tipo_cambio=4000,
+    )
+    texto = formatear_comparacion_inversores(df, "BIPV fachada/pérgola")
+    assert "no disponible en el catálogo" in texto
