@@ -88,6 +88,18 @@ def test_no_simula_sin_boton_explicito():
         )
 
 
+def test_advierte_limitacion_multi_inversor_cuando_aplica():
+    # Hallazgo real (2026-08-21): run_bipv_simulation() arma N_paneles desde
+    # N_serie x N_strings_tracker x N_mppt -- la topología de UN inversor,
+    # no session_state["N_paneles_granja"] (el total real de una Granja FV
+    # multi-inversor). La página debe avisarlo explícitamente cuando
+    # N_inv_total > 1, en vez de mostrar números subestimados sin aviso.
+    src = _leer(_PAGINA)
+    assert 'st.session_state.get("N_inv_total", 1)' in src
+    assert "_n_inv_total > 1" in src
+    assert "Limitación conocida" in src
+
+
 def test_adopcion_invalida_poa_efectiva_a_diferencia_del_comparador_de_inversores():
     # A diferencia de 4b (que excluye poa_efectiva_df de la invalidación
     # porque el inversor no afecta la POA), adoptar un panel SÍ debe

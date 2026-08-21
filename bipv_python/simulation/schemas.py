@@ -12,6 +12,34 @@ ray-casting 3D), sin bypass de diodos, sin bifacial, sin multi-superficie.
 Esos casos siguen viviendo solo en las páginas Streamlit hasta que se
 amplíe este contrato — no se han tocado en esta fase.
 
+⚠️ LIMITACIÓN CONOCIDA (encontrada 2026-08-21, probando 🧩 Comparador de
+Paneles contra un proyecto real de Granja FV multi-inversor -- pendiente
+de corregir): N_serie/N_strings_tracker/N_mppt aquí representan la
+topología de UN SOLO INVERSOR -- calculos.dimensionamiento.dimensionar_sistema()
+calcula N_paneles = N_serie × N_strings_tracker × N_mppt, sin ningún
+factor de "número de inversores". Esto es DISTINTO de "sin multi-superficie"
+de arriba: multi-superficie es sobre distintas ORIENTACIONES (fachada +
+techo), esto es sobre ESCALA dentro de la MISMA orientación (una granja
+con N inversores idénticos en paralelo).
+
+Para un proyecto que usa múltiples inversores (session_state["N_inv_total"]
+> 1 en 📐 Dimensionamiento -- Granja FV típicamente), run_bipv_simulation()
+y todo lo que la llama DIRECTAMENTE con N_serie/N_strings_tracker/N_mppt
+(optimization/, página 4c Comparador de Paneles, los scripts de prueba de
+agentes/) representan SOLO 1/N_inv_total de la energía/CAPEX/financiero
+real del proyecto completo. Ningún consumidor de este contrato multiplica
+por N_inv_total todavía -- verificar y corregir antes de confiar en estos
+números para un proyecto multi-inversor.
+
+Página 18 Análisis IA NO tiene este problema -- verificado en el código
+real de 📊 Producción: para un proyecto Granja FV, esa página YA usa
+session_state["N_paneles_granja"] (el total de la granja completa, no
+N_serie×N_strings_tracker) como default de N_paneles, y Análisis IA lee
+session_state["E_ac_anual_kWh"]/metricas_financiero directamente -- nunca
+llama a run_bipv_simulation(). El bug está acotado a los consumidores que
+SÍ construyen una BIPVConfiguration desde N_serie/N_strings_tracker/N_mppt
+crudos en vez de leer los resultados ya escalados de Producción.
+
 dataclasses en vez de Pydantic a propósito: es el mínimo necesario para
 tener un contrato tipado y sin ambigüedad; Pydantic (validación de
 esquema, JSON schema para tool-calling de agentes) es una decisión de
