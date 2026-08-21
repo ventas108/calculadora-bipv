@@ -167,17 +167,21 @@ def _variables_panel_inversor_completas():
     )
 
 
-def test_variable_panel_excluye_fichas_incompletas_del_catalogo_real():
-    # Hallazgo real: de los 7 paneles de MODULOS_BIPV, 6 tienen Pmax_stc=None
-    # (fichas incompletas, nunca ejercitadas porque el proyecto real usa
+def test_variable_panel_incluye_toda_la_familia_asp_st1_completa():
+    # Hasta 2026-08-21, 6 de los 7 paneles de MODULOS_BIPV tenían Pmax_stc=None
+    # (fichas incompletas, nunca ejercitadas porque el proyecto real usaba
     # T40) -- dimensionar_sistema() revienta con TypeError si se les intenta
-    # dimensionar. variable_panel() los excluye por defecto.
+    # dimensionar. Se completaron con los valores reales de
+    # datos/paneles_catalogo.xlsx (ver datos/tecnologias_bipv.py) -- ahora
+    # los 7 tienen ficha completa y variable_panel() ya no excluye ninguno.
+    # Si el catálogo vuelve a crecer con una ficha incompleta, este test debe
+    # fallar para que se note, no pasar en silencio.
     from datos.tecnologias_bipv import MODULOS_BIPV
     var = opt_vars.variable_panel()
     assert "ASP-ST1-T40" in var.opciones
     incompletos = {k for k, v in MODULOS_BIPV.items() if v.get("Pmax_stc") is None}
-    assert incompletos, "el catálogo cambió -- confirma si sigue habiendo fichas incompletas"
-    assert not (incompletos & set(var.opciones))
+    assert not incompletos, f"hay fichas incompletas de nuevo en el catálogo: {sorted(incompletos)}"
+    assert set(var.opciones) == set(MODULOS_BIPV.keys())
 
 
 def test_generar_candidatos_con_panel_e_inversor_varia_ambos():
