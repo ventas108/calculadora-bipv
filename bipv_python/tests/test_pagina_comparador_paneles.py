@@ -45,9 +45,9 @@ def test_todas_las_claves_leidas_tienen_escritor_real():
     leidas = _claves_leidas_en(src)
     escritas = _claves_escritas_en_repo()
 
-    # La propia página escribe estas al comparar/adoptar -- no son claves
-    # que otra página deba producir.
-    propias = {"_df_comparador_paneles"}
+    # La propia página escribe estas al comparar/adoptar/consultar al agente
+    # -- no son claves que otra página deba producir.
+    propias = {"_df_comparador_paneles", "ia_produccion_texto", "ia_produccion_uso"}
 
     faltantes = leidas - escritas - propias
     assert not faltantes, (
@@ -86,6 +86,41 @@ def test_no_simula_sin_boton_explicito():
             "comparar_paneles() está fuera de un bloque condicional -- se "
             "ejecutaría automáticamente al cargar la página"
         )
+
+
+def test_analista_produccion_no_se_ejecuta_sin_boton_explicito():
+    # ejecutar_analisis_produccion() tiene costo real de API -- mismo
+    # requisito que comparar_paneles(), verificado por separado porque es
+    # un llamado distinto con su propio botón.
+    src = _leer(_PAGINA)
+    tree = ast.parse(src)
+
+    llamadas = [
+        n for n in ast.walk(tree)
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+        and n.func.id == "ejecutar_analisis_produccion"
+    ]
+    assert llamadas, "no encontré la llamada a ejecutar_analisis_produccion() en la página"
+
+    def _dentro_de_if(nodo_llamada, arbol):
+        for nodo in ast.walk(arbol):
+            if isinstance(nodo, ast.If):
+                if any(h is nodo_llamada for h in ast.walk(nodo)):
+                    return True
+        return False
+
+    for llamada in llamadas:
+        assert _dentro_de_if(llamada, tree), (
+            "ejecutar_analisis_produccion() está fuera de un bloque condicional -- se "
+            "ejecutaría automáticamente al cargar la página"
+        )
+
+
+def test_analista_produccion_recibe_el_tipo_de_instalacion_real():
+    # Mismo principio que corrigió el sesgo de fachada en los otros agentes
+    # -- el contexto que arma esta página debe declarar el tipo real.
+    src = _leer(_PAGINA)
+    assert "formatear_comparacion_paneles(df_cmp, tipo_instalacion)" in src
 
 
 def test_config_base_pasa_n_inversores_al_motor():
