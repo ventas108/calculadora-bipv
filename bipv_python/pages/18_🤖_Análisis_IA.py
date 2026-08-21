@@ -52,15 +52,23 @@ st.caption(
 st.info(
     "Estos son 2 de los 3 agentes de IA de la calculadora — el Analista Técnico-Financiero "
     "y el Asesor de Inversión, ambos aquí abajo. El tercero, el **Analista de Producción** "
-    "(criterio técnico: energía, PR, compatibilidad eléctrica — no decide la inversión), "
-    "vive en 🧩 Comparador de Paneles, dentro de los resultados de la comparación.",
+    "(criterio técnico: energía, PR — no decide la inversión), vive dentro de los "
+    "resultados de 🧩 Comparador de Paneles y 🧭 Comparador de Orientación.",
     icon="🧭",
 )
-st.page_link(
-    "pages/4c_🧩_Comparador_Paneles.py",
-    label="Ir al Analista de Producción (🧩 Comparador de Paneles) →",
-    icon="🧩",
-)
+col_link1, col_link2 = st.columns(2)
+with col_link1:
+    st.page_link(
+        "pages/4c_🧩_Comparador_Paneles.py",
+        label="Ir al Analista de Producción (🧩 Comparador de Paneles) →",
+        icon="🧩",
+    )
+with col_link2:
+    st.page_link(
+        "pages/4d_🧭_Comparador_Orientación.py",
+        label="Ir al Analista de Producción (🧭 Comparador de Orientación) →",
+        icon="🧭",
+    )
 
 # ── Prerrequisitos: el mismo criterio que usa 🧭 Asistente para 'listo' ──────
 _faltan = []
