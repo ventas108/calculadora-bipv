@@ -140,9 +140,43 @@ if _excluidos:
     )
 
 st.subheader("⚙️ Supuestos para estimar CAPEX y financiero")
+
+# El tipo de instalación REAL del proyecto (declarado en 🏠 Proyecto) usa una
+# taxonomía de 6 categorías; BENCH (calculos/presupuesto.py) solo tiene 3
+# perfiles de costo. Este selector es un PERFIL DE COSTOS, no el tipo real de
+# instalación -- hallazgo real (2026-08-21): al no pre-seleccionar nada, este
+# selectbox arrancaba en "Granja FV campo" (la primera clave de BENCH) para
+# TODOS los proyectos, incluida una fachada real -- y ese mismo valor se le
+# pasaba al Analista de Producción como si fuera el tipo real del proyecto,
+# haciendo que narrara "esta granja FV en campo" sobre una simulación de
+# fachada. Mismo agrupamiento que ya usa pages/8_💼_Presupuesto.py (línea
+# ~1094) para el benchmark de OPEX.
+_MAPA_TIPO_A_CAPEX = {
+    "Fachada BIPV":               "BIPV fachada/pérgola",
+    "Pérgola / sombreadero":      "BIPV fachada/pérgola",
+    "Marquesina / voladizo":      "BIPV fachada/pérgola",
+    "Techo inclinado (BIPV)":     "Techo industrial",
+    "Techo plano (con soporte)":  "Techo industrial",
+    "Granja fotovoltaica":        "Granja FV campo",
+}
+_tipo_real_proyecto = st.session_state.get("tipo_instalacion", "")
+_capex_sugerido = _MAPA_TIPO_A_CAPEX.get(_tipo_real_proyecto)
+_idx_capex_sugerido = (
+    list(BENCH.keys()).index(_capex_sugerido) if _capex_sugerido in BENCH else 0
+)
+
 c1, c2, c3 = st.columns(3)
 with c1:
-    tipo_instalacion = st.selectbox("Tipo de instalación (referencia CAPEX)", list(BENCH.keys()))
+    tipo_instalacion = st.selectbox(
+        "Perfil de costos CAPEX (referencia)", list(BENCH.keys()),
+        index=_idx_capex_sugerido,
+        help=(
+            f"Solo determina qué tabla de costos usar para estimar CAPEX -- NO es el tipo "
+            f"real de tu proyecto. Auto-sugerido desde tu proyecto real "
+            f"({_tipo_real_proyecto or 'no declarado en 🏠 Proyecto'}). Cámbialo si quieres "
+            "comparar contra otro perfil de costos."
+        ),
+    )
     tarifa = st.number_input(
         "Tarifa (COP/kWh)", min_value=0.0,
         value=float(st.session_state.get("tarifa_cop_kwh", 750.0)), step=10.0,
@@ -219,7 +253,11 @@ if df_cmp is not None and not df_cmp.empty:
     elif st.button("🔍 Ejecutar Analista de Producción", key="btn_analista_prod"):
         with st.spinner("Consultando a Claude (Analista de Producción)…"):
             try:
-                contexto = formatear_comparacion_paneles(df_cmp, tipo_instalacion)
+                # El agente narra el TIPO REAL del proyecto (🏠 Proyecto), no el
+                # perfil de costos CAPEX -- son conceptos distintos, ver la nota
+                # arriba de "Perfil de costos CAPEX (referencia)".
+                _tipo_para_agente = _tipo_real_proyecto or "no especificado en el proyecto"
+                contexto = formatear_comparacion_paneles(df_cmp, _tipo_para_agente)
                 mensaje = ejecutar_analisis_produccion(contexto)
                 st.session_state["ia_produccion_texto"] = _texto_analista_prod(mensaje)
                 st.session_state["ia_produccion_uso"] = (
