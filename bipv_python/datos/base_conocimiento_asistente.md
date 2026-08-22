@@ -16,6 +16,14 @@ Versión: Agosto 2026 | URL: calc.innovacionquimica.com.co
 - Página 2 — Recurso Solar  ACTUALIZADO
 - Página 3 — Motor IV  ACTUALIZADO
 - Página 4 — Dimensionamiento
+6b. Página 4b — Comparador de Inversores ⚖️  ACTUALIZADO
+
+6c. Página 4c — Comparador de Paneles 🧩  NUEVO
+
+6d. Página 4d — Comparador de Orientación 🧭  NUEVO
+
+6e. Página 18 — 🤖 Análisis IA y los Analistas de Producción  NUEVO
+
 - Página 5b — Motor Óptico
 - Página 5 — Mismatch y Bypass Diodes  NUEVO
 8a. Página 5a — Sombras desde SketchUp 🌳  NUEVO
@@ -35,6 +43,7 @@ Versión: Agosto 2026 | URL: calc.innovacionquimica.com.co
 - Preguntas frecuentes
 - Anexo — Sombras desde Site Designer / Andrew Marsh (ruta externa, agosto 2026)  NUEVO
 - Anexo — Actualizaciones 6-7 de agosto 2026 (Asistente, cuentas, proyectos y Vista 3D solar)  NUEVO
+- Anexo — Actualizaciones del 21 de agosto de 2026 (comparadores, validación Motor IV, consumo y excedentes)  NUEVO
 ────────────────────────────────────────────────────────────
 
 ## 1. Descripción general
@@ -307,6 +316,21 @@ Si el panel seleccionado tiene su ficha técnica completa (Voc, Isc, Vmp, Imp, N
 
 ────────────────────────────────────────────────────────────
 
+### Validación automática SDM vs ficha técnica — alarma y texto técnico  NUEVO (21-ago-2026)
+
+El Motor IV (modelo De Soto/pvlib de 5 parámetros) es el motor de cálculo detrás de las curvas de Página 3, y también se reutiliza internamente en Producción (Modo IV), Mismatch/Bypass y Vista 3D (MPPT combinado). Para saber si ese modelo reproduce fielmente la ficha del panel, la app ahora valida automáticamente 5 métricas en condiciones STC (1000 W/m², 25 °C): Voc, Isc, Vmp, Imp y Pmax, cada una con tolerancia de 5% de error frente al valor de la ficha.
+
+- La validación corre SOLA (sin apretar ningún botón) al entrar a 📐 Dimensionamiento, siempre que el panel tenga ficha calibrada (no aplica a paneles "estimados", que no tienen ficha completa).
+- Si las 5 métricas están dentro de tolerancia, verás un mensaje corto: "✅ Motor IV: SDM validado (Voc/Isc/Vmp/Imp/Pmax dentro de 5% de error)".
+- Si alguna métrica falla, aparece una alarma 🔴 con un texto técnico específico: cuáles métricas fallaron, el valor calculado, el valor de ficha, el % de error exacto de cada una, y una causa técnica probable por métrica (por ejemplo: Rs mal ajustada afecta Vmp/Imp; Rsh afecta la pendiente cerca de Isc; a_ref/I_o_ref afectan Voc). Es un texto determinístico igual que todo el resto del Manual — no requiere clave de IA ni gasta ninguna llamada al agente.
+- Puedes además correr la validación manualmente en 🔬 Motor IV con el botón "Ejecutar validación", que muestra el mismo texto técnico.
+
+¿Dónde más aparece esta alarma? Si el SDM no valida, 📊 Producción, 🔀 Mismatch y 🗺️ Vista 3D muestran el mismo aviso 🔴 apenas abres la página (mientras sigas con el mismo panel) — porque las tres reutilizan el SDM del panel para sus propios cálculos (curva IV completa en Producción/Modo IV, bypass diodes en Mismatch, MPPT combinado multi-superficie en Vista 3D).
+
+⚠️ Para no cometer errores: un SDM que no valida NO bloquea el cálculo — la app sigue funcionando con esos parámetros, pero los resultados de energía, mismatch o MPPT combinado pueden tener más error del esperado. Si ves la alarma 🔴, revisa primero los datos de la ficha técnica del panel (Voc, Isc, Vmp, Imp, Ns y coeficientes térmicos) antes de confiar en los resultados aguas abajo.
+
+────────────────────────────────────────────────────────────
+
 ## 6. Página 4 — Dimensionamiento
 
 Propósito: Calcular cuántos paneles caben en la fachada y seleccionar el inversor óptimo.
@@ -368,6 +392,54 @@ Aplícalas en este orden — primero descartar, luego comparar, luego desempatar
 - Se INVALIDAN automáticamente los resultados guardados de Producción, Bypass, Financiero y CO₂ (estaban calculados con el inversor anterior) — es la misma invalidación en cadena del resto de la app.
 - Paso obligatorio después de adoptar: vuelve a correr 📊 Producción y 💰 Financiero. Sin eso el proyecto queda sin energía oficial.
 - El CAPEX y el costo USD/kW del comparador son supuestos editables: cuando tengas cotizaciones reales de los finalistas, actualízalos y confirma que el ganador sigue ganando.
+
+────────────────────────────────────────────────────────────
+
+### 🔍 Comparar TODOS los inversores compatibles + Analista de Producción  NUEVO (21-ago-2026)
+
+Además de comparar 2-4 modelos elegidos a mano (sección 2️⃣), la página tiene una sección adicional que evalúa TODO el catálogo de inversores compatibles de una sola vez, ordenados por LCOE (los incompatibles se listan al final, marcados ❌ con el motivo del rechazo). Si un inversor compatible no tiene costo cargado en el catálogo, la fila se marca con una advertencia y su LCOE no es comparable, en vez de romper el cálculo o mostrar un número falso.
+
+- Botón "🤖 Analista de Producción": envía la tabla completa al agente de IA, que redacta una recomendación técnica en lenguaje natural (razona sobre E_ac con clipping, %clipping y compatibilidad eléctrica — NO usa Performance Ratio para inversores, esa métrica es de paneles/orientación).
+- El agente conoce el tipo de instalación REAL del proyecto (Fachada BIPV, Techo, Pérgola, Granja FV, etc. — el que elegiste en 🏠 Proyecto), no un perfil de costos genérico, así que sus razones citan correctamente el contexto BIPV/fachada/pérgola o campo abierto según corresponda.
+⚠️ Para no cometer errores: la comparación de TODOS los inversores usa la simulación horaria ya corrida en 📊 Producción, igual que la comparación manual de 2-4 — si cambiaste el panel o el string después de correr Producción, vuelve a correrla antes de comparar.
+
+────────────────────────────────────────────────────────────
+
+## 6c. Página 4c — Comparador de Paneles 🧩  NUEVO
+
+Propósito: Comparar varios modelos de panel del catálogo (o combinaciones panel×orientación) usando la misma simulación horaria del proyecto, con E_ac, Performance Ratio (PR) y compatibilidad eléctrica de cada opción, más un botón de Analista de Producción que redacta la recomendación técnica.
+
+- Compatibilidad eléctrica: ✅/❌ (dos estados, igual que Inversores) — evalúa la ventana de voltaje/corriente del panel contra el string y el inversor ya configurados.
+- E_ac y PR: para paneles se calculan ambos (a diferencia de Inversores, donde el PR no aplica).
+- Botón "🤖 Analista de Producción": redacta la recomendación citando E_ac, PR y compatibilidad eléctrica de cada panel comparado.
+
+### Perfil de costos CAPEX (referencia) — no confundir con el tipo de instalación real  ACTUALIZADO (21-ago-2026)
+
+La página tiene un selector "Perfil de costos CAPEX (referencia)" que solo sirve para mostrar un benchmark de costo por m² (Granja FV campo / Techo industrial / BIPV fachada-pérgola) — es una referencia de comparación de costos, NO el tipo de instalación del proyecto. Este selector ahora se preselecciona automáticamente según el tipo de instalación real que elegiste en 🏠 Proyecto (Fachada BIPV, Techo, Pérgola, Marquesina y Granja FV se agrupan al perfil CAPEX correspondiente), pero puedes cambiarlo manualmente si solo quieres comparar costos contra otro perfil.
+
+⚠️ Para no cometer errores: el texto que redacta el Analista de Producción SIEMPRE describe el tipo de instalación REAL del proyecto (el de 🏠 Proyecto), nunca el perfil de costos CAPEX que hayas elegido para comparar — así que si cambias el perfil CAPEX para ver otro benchmark de costos, la recomendación del agente no cambia de tipo de proyecto por eso. (Antes del 21 de agosto de 2026 esto no era así: la recomendación citaba el perfil CAPEX en vez del tipo real, por ejemplo diciendo "esta granja FV en campo" en una simulación de fachada — ya está corregido.)
+
+────────────────────────────────────────────────────────────
+
+## 6d. Página 4d — Comparador de Orientación 🧭  NUEVO
+
+Propósito: Comparar varias orientaciones/tilts candidatos (por ejemplo distintas fachadas o distintos ángulos de una misma fachada) usando la misma simulación horaria del proyecto, con E_ac y PR de cada orientación, más el botón de Analista de Producción.
+
+- Solo evalúa E_ac y PR (no aplica compatibilidad eléctrica — la orientación no cambia el string ni el inversor).
+- Botón "🤖 Analista de Producción": redacta la recomendación técnica citando E_ac y PR de cada orientación comparada, y cuál conviene según el objetivo del proyecto (más energía total vs. mejor aprovechamiento del área disponible).
+- Útil para decidir ENTRE fachadas candidatas de un mismo edificio, o para justificar ante el cliente por qué se eligió una orientación sobre otra.
+
+────────────────────────────────────────────────────────────
+
+## 6e. Página 18 — 🤖 Análisis IA: los 4 Analistas de Producción  NUEVO (ACTUALIZADO 21-ago-2026)
+
+Página central que reúne los accesos directos a los 4 Analistas de Producción de la app: 🧩 Comparador de Paneles, 🧭 Comparador de Orientación, 🔋 Baterías y Balance, y ⚖️ Comparador de Inversores. Desde aquí puedes leer qué evalúa cada uno y saltar directamente a la página correspondiente con un clic.
+
+- Los 4 accesos están organizados en una cuadrícula 2×2 con etiquetas cortas ("Comparador de Paneles →", "Comparador de Orientación →", "Baterías y Balance →", "Comparador de Inversores →") para que no se encimen visualmente.
+- Cada uno de los 4 agentes tiene un alcance distinto y no debe confundirse con los otros: paneles y orientación evalúan E_ac/PR/compatibilidad eléctrica (orientación sin compatibilidad); baterías evalúa autonomía, profundidad de descarga (DoD), vida útil y compatibilidad de voltaje; inversores evalúa E_ac con clipping/%clipping y compatibilidad eléctrica, explícitamente SIN Performance Ratio.
+- Todos son llamadas de IA bajo demanda (requieren clave configurada en el servidor y se activan solo al oprimir su botón) — no corren automáticamente ni tienen costo si no los usas.
+⚠️ Para no cometer errores: cada Analista de Producción solo conoce los resultados de SU propia página de comparación (la tabla que ves en pantalla en ese momento) — no tiene memoria de comparaciones anteriores ni de otras páginas. Si cambias algo (panel, string, inversor), vuelve a generar la comparación antes de volver a pedirle la recomendación.
+
 ## 7. Página 5b — Motor Óptico
 
 Propósito: Aplicar las correcciones ópticas específicas de BIPV sobre la POA bruta.
@@ -566,6 +638,12 @@ Interpretación del % de pérdida bypass:
 - > 10%: Muy alto — el sistema BIPV tiene un problema de sombreado serio
 ────────────────────────────────────────────────────────────
 
+### Alarma de validación SDM (Motor IV)  NUEVO (21-ago-2026)
+
+El modelo de bypass diodes de esta página resuelve el circuito IV panel por panel usando el mismo SDM (De Soto) que 🔬 Motor IV. Si ese panel no validó contra su ficha técnica (error > 5% en Voc/Isc/Vmp/Imp/Pmax), verás la misma alarma 🔴 con el texto técnico de causa probable apenas abras esta página — porque la pérdida por bypass que calculas aquí depende directamente de esos mismos parámetros del modelo. Ver la sección "Validación automática SDM vs ficha técnica" en Página 3 — Motor IV para el detalle completo.
+
+────────────────────────────────────────────────────────────
+
 ## 8a. Página 5a — Sombras desde SketchUp 🌳  NUEVO
 
 Nueva página (agosto 2026) que calcula el Factor de Sombreado horario automáticamente a partir de un modelo 3D del sitio hecho en SketchUp. Es la segunda puerta de entrada al modelo de bypass diodes: la Calculadora de Sombreado web (sección 14) sigue funcionando igual — las dos rutas conviven y producen el mismo CSV. Esta funcionalidad cierra la brecha frente a PVsyst en escenas 3D de sombras cercanas, con un modelador mejor.
@@ -604,6 +682,10 @@ La página usa la librería trimesh (ya incluida en requirements.txt). Si el ser
 ## 8b. Página 9 — Vista 3D y Multi-Superficie  NUEVO
 
 Propósito: Modelar proyectos BIPV con más de una superficie (fachada + techo + pérgola + marquesina), combinando sus POA y producciones en un único valor de E_ac total que alimenta Financiero, Baterías y CO₂.
+
+### Alarma de validación SDM (Motor IV)  NUEVO (21-ago-2026)
+
+El MPPT combinado multi-superficie (mezcla módulo → string → grupo) también resuelve el circuito IV con el mismo SDM (De Soto) de cada panel. Si el panel usado no validó contra su ficha técnica (error > 5% en Voc/Isc/Vmp/Imp/Pmax), esta página muestra la misma alarma 🔴 con el texto técnico de causa probable, porque el reparto de mismatch entre superficies depende de esos mismos parámetros. Ver la sección "Validación automática SDM vs ficha técnica" en Página 3 — Motor IV.
 
 Cuándo usarla: Solo si el proyecto tiene múltiples superficies con distintas orientaciones. Para una sola superficie (techo plano, fachada única), Página 9 no es necesaria.
 
@@ -885,6 +967,18 @@ Precio real del inversor del catálogo  NUEVO (5-ago-2026)
 El precio del inversor seleccionado en el catálogo fluye automáticamente al análisis financiero, en lugar de usar un estimado genérico por kW.
 
 ⚠️ Para no cometer errores: verifica que la ficha del inversor en el catálogo tenga precio cargado. Si el campo está vacío, revisa el valor que aparece en Financiero antes de generar el presupuesto.
+
+────────────────────────────────────────────────────────────
+
+### Autoconsumo vs. excedente exportado: tarifa diferenciada  NUEVO (21-ago-2026)
+
+Cuando en 🔋 Baterías y Balance tienes un balance energético activo, el análisis financiero ahora separa la energía en dos partes con su propia tarifa:
+
+- Energía autoconsumida: se valora a la tarifa de energía normal (COP/kWh) — es el ahorro por NO comprarle esa energía a la red.
+- Energía exportada como excedente: se valora a una tarifa de excedentes propia, editable, que aparece como el campo "Tarifa de excedentes exportados (COP/kWh)" (referencia: Res. CREG 174 de 2021 — medición neta). Por defecto empieza igual a la tarifa de compra (sin descontar ningún porcentaje inventado) hasta que ajustes el valor real de tu contrato o comercializador.
+Antes de este cambio, si había un balance de baterías activo, el excedente exportado NO generaba ningún ingreso en el modelo financiero — quedaba completamente excluido del cálculo. Ahora se incluye siempre, a la tarifa que definas.
+
+⚠️ Para no cometer errores: si tu proyecto es 100% autoconsumo (sin excedente, o sin balance de baterías corrido), este widget ni siquiera aparece — toda la energía se sigue valorando a la tarifa normal, igual que antes. El widget solo aparece cuando 🔋 Baterías y Balance reporta una fracción de exportación real (E_exportacion_anual_kWh > 0).
 
 ────────────────────────────────────────────────────────────
 
@@ -1446,6 +1540,26 @@ Resultados:
 - Tasa de autosuficiencia (%) — fracción de la producción solar autoconsumida
 - Excedentes a red (kWh/año)
 - Dimensionamiento recomendado de la batería (kWh y ciclos/año)
+────────────────────────────────────────────────────────────
+
+### Consumo sincronizado con la factura real de 🏠 Proyecto  NUEVO (21-ago-2026)
+
+Si en 🏠 Proyecto elegiste el modo "Conozco mi consumo/factura" (en vez de "Tengo un área disponible"), ese valor de consumo real ahora es el punto de partida por defecto en los 3 modos de consumo de esta página (consumo diario, perfil típico anual, resolución horaria y 12 valores manuales) — en vez de estimarlo siempre desde la producción solar (E_ac/365 o E_ac × 1.2). Verás un aviso "📄 Sugerido desde tu factura/consumo declarado en Proyecto: ..." cuando aplique.
+
+- Puedes seguir ajustando el valor manualmente en cualquier momento — el valor de Proyecto solo fija el default inicial, no un valor forzado.
+- Si en Proyecto elegiste "Tengo un área disponible" (sin factura), el comportamiento no cambia: se sigue estimando desde la producción, como antes.
+⚠️ Para no cometer errores: si tienes la factura real, complétala en 🏠 Proyecto ANTES de entrar a Baterías — así los 3 modos de consumo parten de la misma cifra real en vez de 3 estimaciones distintas entre sí.
+
+────────────────────────────────────────────────────────────
+
+### ⚖️ Comparador de Baterías + Analista de Producción  NUEVO
+
+Sección para comparar varios modelos de batería del catálogo (o configuraciones de capacidad) bajo el mismo balance energético del proyecto, con autonomía, profundidad de descarga (DoD) y vida útil estimada de cada opción.
+
+- Columna Compatible con 3 estados (a diferencia de paneles/inversores, que solo tienen 2): ✅ compatible confirmado, ⚠️ el catálogo no tiene datos suficientes para confirmar la compatibilidad de voltaje (NO tratar como un "sí"), ❌ incompatible confirmado.
+- Botón "🤖 Analista de Producción": redacta la recomendación citando autonomía, DoD, vida útil y compatibilidad de voltaje de cada batería comparada.
+⚠️ Para no cometer errores: una batería marcada ⚠️ no es una batería aprobada — significa que falta información en su ficha de catálogo para confirmar la compatibilidad de voltaje. Verifica manualmente contra la ficha del fabricante antes de adoptarla.
+
 ────────────────────────────────────────────────────────────
 
 ## 13. Página 10 — Reporte PDF
@@ -2087,9 +2201,47 @@ La fuente del sombreado queda registrada y visible en toda la cadena: en el resu
 
 ────────────────────────────────────────────────────────────
 
-Manual actualizado el 7 de agosto de 2026
+## 21. Anexo — Actualizaciones del 21 de agosto de 2026
 
-Novedades de esta versión: Asistente 🧭 con guía paso a paso y chat del manual, login con planes y pagos (Wompi/transferencia), múltiples proyectos privados por usuario, persistencia de resultados y presupuesto, perfil de carga horario, motor óptico-térmico sin doble conteo, CAPEX vinculado al Financiero, reporte PDF con gráficas y logo, diagnóstico del catálogo de inversores y análisis de orientación en la Vista 3D (incidencia geométrica y energía real con TMY).
+Esta entrega completa el comparador exhaustivo de inversores, cierra la validación técnica del Motor IV con una alarma explicativa que se propaga a Producción/Mismatch/Vista 3D, y corrige la desconexión entre el consumo real (factura) y el motor financiero, incluyendo por primera vez una tarifa diferenciada para el excedente exportado.
+
+────────────────────────────────────────────────────────────
+
+21.1 ⚖️ Comparador de Inversores: comparar TODO el catálogo compatible  NUEVO
+
+Antes solo se podían comparar 2-4 modelos elegidos a mano. Ahora una sección adicional evalúa TODOS los inversores compatibles del catálogo de una sola vez, ordenados por LCOE, con los incompatibles listados aparte y motivo de rechazo. Incluye botón de Analista de Producción. Ver sección 6b.
+
+────────────────────────────────────────────────────────────
+
+21.2 🤖 Análisis IA: corrección del layout de accesos y del tipo de instalación citado  ACTUALIZADO
+
+Los 4 accesos a los Analistas de Producción (Paneles/Orientación/Baterías/Inversores) se reorganizaron en cuadrícula 2×2 para que las etiquetas no se encimen. Además, se corrigió un error donde 🧩 Comparador de Paneles enviaba al agente el perfil de costos CAPEX de referencia en vez del tipo de instalación real del proyecto — el síntoma reportado era que la recomendación citaba "esta granja FV en campo" en una simulación de fachada. Ver secciones 6c y 6e.
+
+────────────────────────────────────────────────────────────
+
+21.3 🔬 Motor IV: alarma de validación SDM vs ficha técnica  NUEVO
+
+La validación de Voc/Isc/Vmp/Imp/Pmax contra la ficha técnica (antes solo informativa en Motor IV) ahora corre automáticamente al entrar a Dimensionamiento y, si falla (error > 5%), muestra un texto técnico explicando exactamente qué métricas fallan y por qué — el mismo aviso se propaga a Producción, Mismatch y Vista 3D porque los cuatro reutilizan el mismo modelo SDM del panel. Ver sección 5 y las notas en secciones 8 y 8b.
+
+────────────────────────────────────────────────────────────
+
+21.4 🔋 Baterías y Balance: consumo sincronizado con la factura real  ACTUALIZADO
+
+Los 3 modos de consumo de esta página (diario, anual con perfil típico/horario/12 valores) ahora usan como default el consumo real declarado en 🏠 Proyecto (modo "Conozco mi consumo/factura") en vez de estimarlo siempre desde la producción solar. Ver sección 12.
+
+────────────────────────────────────────────────────────────
+
+21.5 💰 Financiero: tarifa diferenciada para el excedente exportado  NUEVO
+
+El motor financiero distinguía toda la energía a una sola tarifa; cuando había batería con excedente exportado, ese excedente ni siquiera generaba ingreso. Ahora la energía autoconsumida y la exportada se valoran cada una con su propia tarifa (la de excedentes es editable, con referencia a Res. CREG 174/2021, y por defecto igual a la tarifa de compra hasta que la ajustes). Ver sección 10.
+
+⚠️ Para no cometer errores: revisa el nuevo campo "Tarifa de excedentes exportados" en Financiero si tu proyecto exporta energía a la red — antes de este cambio, esa energía no aportaba nada a la TIR/VPN aunque físicamente se estuviera exportando.
+
+────────────────────────────────────────────────────────────
+
+Manual actualizado el 21 de agosto de 2026
+
+Novedades de esta versión: comparador exhaustivo de TODOS los inversores compatibles, corrección del layout y del tipo de instalación citado en 🤖 Análisis IA, alarma de validación SDM vs ficha técnica propagada a Motor IV/Producción/Mismatch/Vista 3D, sincronización del consumo real (factura) en Baterías y Balance, y tarifa diferenciada de excedentes exportados en Financiero.
 
 Calculadora BIPV — Innovación Química
 
