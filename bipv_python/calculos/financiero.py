@@ -123,6 +123,8 @@ def calcular_flujo_caja(
     n_anos: int = 25,
     beneficio_renta_ano: int = 1,    # año en que se aplica el beneficio art. 11
     tasa_escalacion_opex: float = 0.0,  # % anual de aumento del O&M (#177)
+    frac_exportada: float = 0.0,
+    tarifa_excedentes_cop_kWh: float | None = None,
 ) -> list[dict]:
     """
     Genera el flujo de caja anual del proyecto (USD).
@@ -131,11 +133,26 @@ def calcular_flujo_caja(
     Año 1: -CAPEX_NETO + ahorro_renta (Art. 11) + ingresos energía - OPEX
     Años 2-N: ingresos energía - OPEX
 
+    frac_exportada : fracción (0.0-1.0) de la energía anual que se exporta/vende
+        como excedente a la red (Res. CREG 174 de 2021) en vez de autoconsumirse.
+        Se calcula típicamente en 🔋 Baterías y Balance como
+        E_exportacion_anual_kWh / (E_autoconsumo_anual_kWh + E_exportacion_anual_kWh).
+        0.0 (default) reproduce el comportamiento anterior: toda la energía se
+        valora a tarifa_cop_kWh, sin distinguir autoconsumo de excedente.
+    tarifa_excedentes_cop_kWh : tarifa de venta/remuneración de excedentes
+        (típicamente menor que la tarifa de compra bajo Ley 1715/CREG 174).
+        None (default) usa la misma tarifa_cop_kWh -- resultado idéntico al
+        comportamiento anterior si frac_exportada también es 0.0.
+
     Retorna lista de dicts con: año, ingreso_kWh, ingreso_usd, opex_usd, flujo_usd,
     flujo_acum_usd, factor_descuento, flujo_desc_usd, flujo_desc_acum_usd
     """
     opex_anual_usd = capex_usd * opex_pct_capex / 100.0
     capex_neto_usd = capex_usd - beneficios_1715_usd   # CAPEX después de todos los beneficios
+    frac_exportada = min(max(frac_exportada, 0.0), 1.0)
+    tarifa_exced_base = (
+        tarifa_excedentes_cop_kWh if tarifa_excedentes_cop_kWh is not None else tarifa_cop_kWh
+    )
 
     flujos = []
 
@@ -143,6 +160,8 @@ def calcular_flujo_caja(
     flujos.append({
         "año":               0,
         "produccion_kWh":    0.0,
+        "autoconsumo_kWh":   0.0,
+        "exportacion_kWh":   0.0,
         "ingreso_energia_usd": 0.0,
         "opex_usd":          0.0,
         "flujo_usd":         -capex_neto_usd,
@@ -155,10 +174,14 @@ def calcular_flujo_caja(
         # Degradación acumulada
         factor_deg   = (1 - tasa_degradacion_pct / 100) ** (t - 1)
         prod_kWh     = e_ac_kWh_anual * factor_deg
+        exportada_kWh    = prod_kWh * frac_exportada
+        autoconsumo_kWh  = prod_kWh - exportada_kWh
 
-        # Tarifa escalada
-        tarifa_t_cop = tarifa_cop_kWh * (1 + tasa_escalacion_tarifa / 100) ** (t - 1)
-        ingreso_cop  = prod_kWh * tarifa_t_cop
+        # Tarifas escaladas -- se asume la misma escalación para ambas (no hay
+        # fuente separada de proyección de precio de excedentes en Colombia).
+        tarifa_t_cop        = tarifa_cop_kWh   * (1 + tasa_escalacion_tarifa / 100) ** (t - 1)
+        tarifa_exced_t_cop  = tarifa_exced_base * (1 + tasa_escalacion_tarifa / 100) ** (t - 1)
+        ingreso_cop  = autoconsumo_kWh * tarifa_t_cop + exportada_kWh * tarifa_exced_t_cop
         ingreso_usd  = ingreso_cop / tipo_cambio
 
         # O&M escalado (#177): el mantenimiento sube con la inflación en USD.
@@ -171,6 +194,8 @@ def calcular_flujo_caja(
         flujos.append({
             "año":               t,
             "produccion_kWh":    round(prod_kWh, 0),
+            "autoconsumo_kWh":   round(autoconsumo_kWh, 0),
+            "exportacion_kWh":   round(exportada_kWh, 0),
             "ingreso_energia_usd": round(ingreso_usd, 0),
             "opex_usd":          round(opex_t_usd, 0),
             "flujo_usd":         round(flujo, 0),
@@ -278,9 +303,15 @@ def comparativo_ley_1715(
     n_anos: int,
     beneficios_1715: dict,
     tasa_escalacion_opex: float = 0.0,  # % anual de aumento del O&M (#177)
+    frac_exportada: float = 0.0,
+    tarifa_excedentes_cop_kWh: float | None = None,
 ) -> dict:
     """
     Calcula métricas SIN y CON beneficios Ley 1715 para comparación.
+
+    frac_exportada / tarifa_excedentes_cop_kWh: ver calcular_flujo_caja().
+    Se aplican igual en ambos escenarios (sin/con Ley 1715) -- solo afectan
+    el CAPEX neto, no la valoración de la energía.
     """
     # Sin Ley 1715 — CAPEX completo
     flujos_sin = calcular_flujo_caja(
@@ -294,6 +325,8 @@ def comparativo_ley_1715(
         opex_pct_capex     = opex_pct,
         n_anos             = n_anos,
         tasa_escalacion_opex = tasa_escalacion_opex,
+        frac_exportada     = frac_exportada,
+        tarifa_excedentes_cop_kWh = tarifa_excedentes_cop_kWh,
     )
     met_sin = calcular_metricas(flujos_sin, tasa_descuento, capex_usd,
                                 e_ac_kWh_anual, tipo_cambio)
@@ -310,6 +343,8 @@ def comparativo_ley_1715(
         opex_pct_capex     = opex_pct,
         n_anos             = n_anos,
         tasa_escalacion_opex = tasa_escalacion_opex,
+        frac_exportada     = frac_exportada,
+        tarifa_excedentes_cop_kWh = tarifa_excedentes_cop_kWh,
     )
     met_con = calcular_metricas(flujos_con, tasa_descuento, capex_usd,
                                 e_ac_kWh_anual, tipo_cambio)

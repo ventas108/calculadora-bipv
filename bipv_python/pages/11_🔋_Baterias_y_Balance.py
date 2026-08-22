@@ -606,17 +606,36 @@ with col_b1:
 with col_b2:
     st.subheader("Parámetros de diseño")
 
-    # Consumo diario — tomarlo de session_state o calcular desde anual
-    consumo_diario_default = round(e_ac_anual / 365, 1) if e_ac_anual > 0 else 30.0
+    # Consumo diario — prioridad: factura real de 🏠 Proyecto (modo "Conozco mi
+    # consumo") > estimado desde la propia producción > default genérico.
+    # Corregido (2026-08-21): antes SIEMPRE se estimaba desde E_ac_anual/365
+    # (un promedio de la PRODUCCIÓN, no del consumo real del usuario), incluso
+    # cuando el usuario ya había declarado su consumo real de la factura en
+    # 🏠 Proyecto -- los dos quedaban desconectados.
+    _consumo_mes_factura_b6 = float(st.session_state.get("consumo_kwh_mes", 0.0))
+    if _consumo_mes_factura_b6 > 0:
+        consumo_diario_default = round(_consumo_mes_factura_b6 * 12 / 365, 1)
+        _fuente_consumo_b6 = "tu factura real (🏠 Proyecto)"
+    elif e_ac_anual > 0:
+        consumo_diario_default = round(e_ac_anual / 365, 1)
+        _fuente_consumo_b6 = "tu propia producción (sin factura registrada en 🏠 Proyecto)"
+    else:
+        consumo_diario_default = 30.0
+        _fuente_consumo_b6 = "un valor genérico (sin datos disponibles)"
     E_consumo_diario = st.number_input(
         "Consumo diario del edificio (kWh/día)",
         min_value=1.0,
         max_value=5000.0,
         value=float(st.session_state.get("consumo_diario_kWh", consumo_diario_default)),
         step=1.0,
-        help="Promedio diario. Si tiene la factura mensual, divida por 30.",
+        help=(
+            f"Promedio diario. Valor sugerido desde {_fuente_consumo_b6}. "
+            "Si tiene la factura mensual, divida por 30."
+        ),
         key="consumo_diario_kWh",
     )
+    if _consumo_mes_factura_b6 > 0:
+        st.caption(f"📄 Sugerido desde {_fuente_consumo_b6}: {consumo_diario_default:.1f} kWh/día.")
 
     autonomia_h = st.slider(
         "Autonomía deseada (horas sin sol / red)",
@@ -879,6 +898,22 @@ modo_consumo = st.radio(
     key="modo_consumo_b7",
 )
 
+# Consumo anual — prioridad: factura real de 🏠 Proyecto > estimado desde
+# producción propia (E_ac × 1.2, supone algo de déficit) > default genérico.
+# Corregido (2026-08-21): antes SIEMPRE se estimaba desde la producción,
+# desconectado del consumo real que el usuario ya declaró en 🏠 Proyecto
+# (modo "Conozco mi consumo/factura") -- mismo hallazgo que en B-6 arriba.
+_consumo_mes_factura_b7 = float(st.session_state.get("consumo_kwh_mes", 0.0))
+_consumo_anual_default_b7 = (
+    round(_consumo_mes_factura_b7 * 12, 0) if _consumo_mes_factura_b7 > 0
+    else max(e_ac_anual * 1.2, 10000.0)
+)
+if _consumo_mes_factura_b7 > 0:
+    st.caption(
+        f"📄 Consumo anual sugerido desde tu factura real (🏠 Proyecto): "
+        f"**{_consumo_anual_default_b7:,.0f} kWh/año**."
+    )
+
 _modo_horario = (modo_consumo == "⏱️ Resolución horaria (más preciso)")
 
 if modo_consumo == "Consumo anual + perfil típico":
@@ -889,7 +924,7 @@ if modo_consumo == "Consumo anual + perfil típico":
             min_value=100.0,
             max_value=10_000_000.0,
             value=float(st.session_state.get("consumo_anual_edificio_kWh",
-                        max(e_ac_anual * 1.2, 10000.0))),
+                        _consumo_anual_default_b7)),
             step=500.0,
             key="consumo_anual_edificio_kWh",
             help="Puede obtenerlo sumando 12 meses de facturas de energía.",
@@ -918,7 +953,7 @@ elif _modo_horario:
             min_value=100.0,
             max_value=10_000_000.0,
             value=float(st.session_state.get("consumo_anual_edificio_kWh",
-                        max(e_ac_anual * 1.2, 10000.0))),
+                        _consumo_anual_default_b7)),
             step=500.0,
             key="consumo_anual_edificio_kWh",
             help="Puede obtenerlo sumando 12 meses de facturas de energía.",
@@ -940,7 +975,7 @@ elif _modo_horario:
     with st.expander("👁️ Perfil horario seleccionado"):
         _p24 = PERFILES_HORARIOS[perfil_horario_sel]
         _diario_ref = float(st.session_state.get("consumo_anual_edificio_kWh",
-                            max(e_ac_anual * 1.2, 10000.0))) / 365.0
+                            _consumo_anual_default_b7)) / 365.0
         _fig_h = go.Figure()
         _fig_h.add_trace(go.Bar(
             x=list(range(24)),
@@ -963,7 +998,7 @@ elif _modo_horario:
         )
     # Para que el flujo de abajo siga funcionando con consumo_anual_input definido
     consumo_anual_input = float(st.session_state.get(
-        "consumo_anual_edificio_kWh", max(e_ac_anual * 1.2, 10000.0)
+        "consumo_anual_edificio_kWh", _consumo_anual_default_b7
     ))
     consumo_mensual_list = distribuir_consumo_anual(consumo_anual_input)
 
@@ -973,7 +1008,7 @@ else:
     consumo_mensual_list = []
     defaults_mens = st.session_state.get(
         "consumo_mensual_manual",
-        [round(max(e_ac_anual * 1.2, 10000) / 12, 0)] * 12
+        [round(_consumo_anual_default_b7 / 12, 0)] * 12
     )
     for i, mes in enumerate(MESES):
         col = cols_mes[i % 6]
@@ -1030,7 +1065,7 @@ if st.button(_btn_label, type="primary", disabled=_btn_disabled):
         # ── Balance horario ───────────────────────────────────────────────────
         try:
             _consumo_anual_h = float(st.session_state.get(
-                "consumo_anual_edificio_kWh", max(e_ac_anual * 1.2, 10000.0)
+                "consumo_anual_edificio_kWh", _consumo_anual_default_b7
             ))
             _perfil_h = st.session_state.get("perfil_horario_sel", "Residencial")
             res_h = balance_horario(
