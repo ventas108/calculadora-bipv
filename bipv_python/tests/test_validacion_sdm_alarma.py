@@ -146,6 +146,32 @@ def test_produccion_lee_la_alarma_y_verifica_que_sea_del_panel_activo():
     assert "explicar_fallo_validacion_sdm(" in src
 
 
+def test_mismatch_lee_la_alarma_y_verifica_que_sea_del_panel_activo():
+    # 🔀 Mismatch depende del SDM solo a través de calculos.mismatch_bypass
+    # (simulación de bypass diodes por sombra parcial) -- la cascada básica
+    # de mismatch.py no lo necesita, pero la alarma se muestra igual porque
+    # no se puede saber de antemano si el usuario va a usar bypass diodes.
+    src = _leer(os.path.join(_ROOT, "pages", "5_🔀_Mismatch.py"))
+    assert 'st.session_state.get("motor_iv_validacion_ok") is False' in src
+    assert (
+        'st.session_state.get("motor_iv_validacion_panel") == '
+        'st.session_state.get("panel_nombre_dim")'
+    ) in src
+    assert "explicar_fallo_validacion_sdm(" in src
+
+
+def test_vista_3d_lee_la_alarma_y_verifica_que_sea_del_panel_activo():
+    # Vista 3D usa mismatch_bypass (sombra) Y mppt_combinado (mismatch de
+    # MPPT compartido) en modo multi-superficie -- ambos dependen del SDM.
+    src = _leer(os.path.join(_ROOT, "pages", "9_🗺️_Vista_3D.py"))
+    assert 'st.session_state.get("motor_iv_validacion_ok") is False' in src
+    assert (
+        'st.session_state.get("motor_iv_validacion_panel") == '
+        'st.session_state.get("panel_nombre_dim")'
+    ) in src
+    assert "explicar_fallo_validacion_sdm(" in src
+
+
 def test_motor_iv_tambien_persiste_las_mismas_claves():
     # El botón manual de Motor IV sigue existiendo (útil para explorar
     # cualquier panel del catálogo, no solo el activo) -- pero debe escribir

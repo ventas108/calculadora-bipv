@@ -35,6 +35,23 @@ st.caption(
     "Fase 3 — Módulo B-5A/B"
 )
 
+# ── Alarma de validación SDM (calculada en 📐 Dimensionamiento) ────────────────
+# El modo multi-superficie de esta página usa calculos.mismatch_bypass (sombra
+# parcial) y calculos.mppt_combinado (mismatch de MPPT compartido entre
+# superficies de distinta orientación) -- ambos escalan los mismos parámetros
+# del modelo de diodo que Motor IV valida (I_L_ref, I_o_ref, R_s, R_sh_ref,
+# a_ref). Si esa validación falló para el panel activo, ambos cálculos
+# heredan el mismo desajuste.
+if (
+    st.session_state.get("motor_iv_validacion_ok") is False
+    and st.session_state.get("motor_iv_validacion_panel") == st.session_state.get("panel_nombre_dim")
+):
+    from calculos.modelo_iv import explicar_fallo_validacion_sdm
+    st.error(explicar_fallo_validacion_sdm(
+        st.session_state.get("motor_iv_validacion_panel", "el panel activo"),
+        st.session_state.get("motor_iv_validacion_detalle", {}),
+    ))
+
 # ── Verificar pydeck disponible ───────────────────────────────────────────────
 try:
     import pydeck as pdk
