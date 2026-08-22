@@ -50,6 +50,24 @@ st.caption(
     "Fabricación · Suciedad · Cableado DC"
 )
 
+# ── Alarma de validación SDM (calculada en 📐 Dimensionamiento) ────────────────
+# La simulación de bypass diodes por sombra parcial (calculos/mismatch_bypass.py,
+# más abajo en esta página) SÍ usa los mismos parámetros del modelo de diodo
+# que Motor IV valida (I_L_ref, I_o_ref, R_s, R_sh_ref, a_ref) -- si esa
+# validación falló para el panel activo, la pérdida por bypass calculada aquí
+# hereda el mismo desajuste. La cascada básica de pérdidas (mismatch.py) NO
+# depende del SDM, pero no se puede saber de antemano si el usuario va a usar
+# también la simulación de bypass diodes en esta misma página.
+if (
+    st.session_state.get("motor_iv_validacion_ok") is False
+    and st.session_state.get("motor_iv_validacion_panel") == st.session_state.get("panel_nombre_dim")
+):
+    from calculos.modelo_iv import explicar_fallo_validacion_sdm
+    st.error(explicar_fallo_validacion_sdm(
+        st.session_state.get("motor_iv_validacion_panel", "el panel activo"),
+        st.session_state.get("motor_iv_validacion_detalle", {}),
+    ))
+
 # ── Prerequisitos ─────────────────────────────────────────────────────────────
 if not st.session_state.get("recurso_solar_ok"):
     st.warning("⚠️ Primero ejecuta ☀️ Recurso Solar para obtener el TMY y la POA del sitio.")
