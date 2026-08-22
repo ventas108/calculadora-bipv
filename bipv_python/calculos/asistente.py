@@ -269,20 +269,26 @@ def responder(pregunta: str, estado: Mapping[str, Any],
 
     # Errores de red/HTTP se traducen a mensajes SIN URL ni encabezados: la URL de
     # una excepción de requests podría contener información sensible.
-    try:
-        if gem:
-            prov = "Gemini"
-            contents = []
-            for h in hist[-6:]:
-                contents.append({"role": "user" if h["rol"] == "usuario" else "model",
-                                 "parts": [{"text": h["texto"]}]})
-            contents.append({"role": "user", "parts": [{"text": contenido_usuario}]})
-            # Modelos en orden de preferencia: si uno no existe (404) o su cuota
-            # está agotada (429), se intenta el siguiente automáticamente.
-            modelos = ("gemini-flash-latest", "gemini-flash-lite-latest",
-                       "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash")
-            r = None
-            for modelo in modelos:
+    if gem:
+        prov = "Gemini"
+        contents = []
+        for h in hist[-6:]:
+            contents.append({"role": "user" if h["rol"] == "usuario" else "model",
+                             "parts": [{"text": h["texto"]}]})
+        contents.append({"role": "user", "parts": [{"text": contenido_usuario}]})
+        # Modelos en orden de preferencia: las variantes "lite" primero -- en el
+        # nivel gratuito tienen cupo por minuto más alto que las variantes "flash"
+        # completas, así que fallan menos seguido con HTTP 429. Si uno no existe
+        # (404), su cuota está agotada (429), o no responde a tiempo, se intenta el
+        # siguiente en vez de abortar toda la pregunta (antes un solo timeout en el
+        # primer modelo cancelaba la respuesta sin probar los demás).
+        modelos = ("gemini-flash-lite-latest", "gemini-2.5-flash-lite",
+                   "gemini-2.0-flash", "gemini-flash-latest", "gemini-2.5-flash")
+        timeout_modelo = max(15, timeout // len(modelos))
+        r = None
+        hubo_timeout = False
+        for modelo in modelos:
+            try:
                 r = requests.post(
                     "https://generativelanguage.googleapis.com/v1beta/models/"
                     f"{modelo}:generateContent",
@@ -291,43 +297,57 @@ def responder(pregunta: str, estado: Mapping[str, Any],
                           "contents": contents,
                           "generationConfig": {"temperature": 0.2,
                                                "maxOutputTokens": 1024}},
+                    timeout=timeout_modelo,
+                )
+            except requests.exceptions.Timeout:
+                hubo_timeout, r = True, None
+                continue
+            except requests.exceptions.RequestException:
+                r = None
+                continue
+            if r.status_code not in (404, 429):
+                break
+        if r is None:
+            if hubo_timeout:
+                raise RuntimeError(f"{prov} no respondió a tiempo en ninguno de sus "
+                                   "modelos disponibles. Intenta de nuevo en un momento.")
+            raise RuntimeError(f"No se pudo conectar con {prov}. Revisa la conexión a "
+                               "internet del servidor e intenta de nuevo.")
+    else:
+        try:
+            if oai:
+                prov = "OpenAI"
+                msgs = [{"role": "system", "content": PROMPT_SISTEMA}]
+                for h in hist[-6:]:
+                    msgs.append({"role": "user" if h["rol"] == "usuario" else "assistant",
+                                 "content": h["texto"]})
+                msgs.append({"role": "user", "content": contenido_usuario})
+                r = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {oai}"},
+                    json={"model": "gpt-4o-mini", "messages": msgs, "temperature": 0.2,
+                          "max_tokens": 1024},
                     timeout=timeout,
                 )
-                if r.status_code not in (404, 429):
-                    break
-        elif oai:
-            prov = "OpenAI"
-            msgs = [{"role": "system", "content": PROMPT_SISTEMA}]
-            for h in hist[-6:]:
-                msgs.append({"role": "user" if h["rol"] == "usuario" else "assistant",
-                             "content": h["texto"]})
-            msgs.append({"role": "user", "content": contenido_usuario})
-            r = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {oai}"},
-                json={"model": "gpt-4o-mini", "messages": msgs, "temperature": 0.2,
-                      "max_tokens": 1024},
-                timeout=timeout,
-            )
-        else:
-            prov = "Anthropic"
-            msgs = []
-            for h in hist[-6:]:
-                msgs.append({"role": "user" if h["rol"] == "usuario" else "assistant",
-                             "content": h["texto"]})
-            msgs.append({"role": "user", "content": contenido_usuario})
-            r = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={"x-api-key": ant, "anthropic-version": "2023-06-01"},
-                json={"model": "claude-3-5-haiku-latest", "system": PROMPT_SISTEMA,
-                      "messages": msgs, "max_tokens": 1024},
-                timeout=timeout,
-            )
-    except requests.exceptions.Timeout:
-        raise RuntimeError(f"{prov} no respondió a tiempo. Intenta de nuevo en un momento.")
-    except requests.exceptions.RequestException:
-        raise RuntimeError(f"No se pudo conectar con {prov}. Revisa la conexión a "
-                           "internet del servidor e intenta de nuevo.")
+            else:
+                prov = "Anthropic"
+                msgs = []
+                for h in hist[-6:]:
+                    msgs.append({"role": "user" if h["rol"] == "usuario" else "assistant",
+                                 "content": h["texto"]})
+                msgs.append({"role": "user", "content": contenido_usuario})
+                r = requests.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={"x-api-key": ant, "anthropic-version": "2023-06-01"},
+                    json={"model": "claude-3-5-haiku-latest", "system": PROMPT_SISTEMA,
+                          "messages": msgs, "max_tokens": 1024},
+                    timeout=timeout,
+                )
+        except requests.exceptions.Timeout:
+            raise RuntimeError(f"{prov} no respondió a tiempo. Intenta de nuevo en un momento.")
+        except requests.exceptions.RequestException:
+            raise RuntimeError(f"No se pudo conectar con {prov}. Revisa la conexión a "
+                               "internet del servidor e intenta de nuevo.")
 
     if r.status_code == 429:
         raise RuntimeError(f"{prov} alcanzó el límite de uso (HTTP 429). Espera un "
