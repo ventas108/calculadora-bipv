@@ -175,13 +175,22 @@ tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))
 _balance_metricas = st.session_state.get("balance_metricas", {}) or {}
 _bateria_dim      = st.session_state.get("bateria_dim", {}) or {}
 _e_autoconsumo    = float(_balance_metricas.get("E_autoconsumo_anual_kWh", 0.0))
+_e_exportacion    = float(_balance_metricas.get("E_exportacion_anual_kWh", 0.0))
 _capex_bat_usd    = float(_bateria_dim.get("costo_total_usd", 0.0))
 _balance_activo   = _e_autoconsumo > 0
 
 # Energía usada en el análisis financiero: autoconsumo total (solar directo +
-# descarga batería) cuando el Balance Energético fue calculado en Página 11;
-# de lo contrario se usa E_ac solar puro (sin storage).
-e_financiero = _e_autoconsumo if _balance_activo else e_ac
+# descarga batería) + excedente exportado, cuando el Balance Energético fue
+# calculado en Página 11; de lo contrario se usa E_ac solar puro (sin storage,
+# sin distinción autoconsumo/excedente -- mismo comportamiento que antes).
+#
+# Corregido (2026-08-21): antes e_financiero = _e_autoconsumo ÚNICAMENTE
+# cuando había balance activo -- el excedente exportado (_e_exportacion)
+# quedaba fuera del cálculo por completo, sin generar NINGÚN ingreso ni
+# siquiera a una tarifa reducida. frac_exportada (abajo) permite valorar ese
+# excedente a una tarifa distinta (Res. CREG 174/2021) en vez de excluirlo.
+e_financiero = (_e_autoconsumo + _e_exportacion) if _balance_activo else e_ac
+frac_exportada = (_e_exportacion / e_financiero) if (_balance_activo and e_financiero > 0) else 0.0
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PANEL PREVIO — Consumo vs Producción estimada
@@ -891,6 +900,34 @@ with col_t3:
         min_value=10, max_value=30, value=25, step=5,
     )
 
+# ── Tarifa de excedentes exportados (Res. CREG 174/2021) ──────────────────────
+# Solo tiene efecto real si hay un balance de Página 11 con excedente
+# calculado (frac_exportada > 0) -- si no, todo se sigue valorando a
+# tarifa_cop (comportamiento idéntico al anterior).
+if frac_exportada > 0:
+    st.markdown("---")
+    st.caption(
+        f"⚡ Tu proyecto exporta un **{frac_exportada * 100:.1f}%** de la energía como "
+        f"excedente (calculado en 🔋 Baterías y Balance: "
+        f"{_e_exportacion:,.0f} kWh/año de {e_financiero:,.0f} kWh/año totales)."
+    )
+    tarifa_excedentes_cop = st.number_input(
+        "Tarifa de excedentes exportados (COP/kWh)",
+        min_value=0.0,
+        value=float(st.session_state.get("tarifa_excedentes_cop_kWh", tarifa_cop)),
+        step=10.0,
+        help=(
+            "Precio al que se remunera la energía exportada a la red bajo medición neta "
+            "(Res. CREG 174 de 2021) -- normalmente MENOR que tu tarifa de compra, ya que "
+            "suele pagarse al componente de generación, no al precio minorista completo. "
+            "Consulta con tu comercializador el valor real de tu contrato. "
+            "Por defecto igual a la tarifa de compra (sin descuento) hasta que lo ajustes."
+        ),
+        key="tarifa_excedentes_cop_kWh",
+    )
+else:
+    tarifa_excedentes_cop = tarifa_cop
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # PANEL DE CONVERSIÓN USD → COP (en tiempo real)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1024,7 +1061,9 @@ if btn_fin or st.session_state.get("financiero_ok"):
     e_ac_p90 = e_financiero * (1.0 - factor_p90 / 100.0)
 
     if btn_fin:
-        # Escenario P50 (base) — usa e_financiero (autoconsumo total si hay batería)
+        # Escenario P50 (base) — usa e_financiero (autoconsumo + excedente
+        # exportado si hay balance de Página 11). frac_exportada/tarifa_excedentes_cop
+        # valoran el excedente a su propia tarifa en vez de a la de compra.
         comp = comparativo_ley_1715(
             capex_usd         = capex_total,
             e_ac_kWh_anual    = e_financiero,
@@ -1037,8 +1076,12 @@ if btn_fin or st.session_state.get("financiero_ok"):
             n_anos            = n_anos,
             beneficios_1715   = ben,
             tasa_escalacion_opex = esc_opex,
+            frac_exportada    = frac_exportada,
+            tarifa_excedentes_cop_kWh = tarifa_excedentes_cop,
         )
-        # Escenario P90 (conservador — mismo CAPEX, menos producción)
+        # Escenario P90 (conservador — mismo CAPEX, menos producción, misma
+        # fracción de exportación que P50 -- no hay forma de recalcular el
+        # balance horario para el escenario P90 sin volver a correr Página 11).
         comp_p90 = comparativo_ley_1715(
             capex_usd         = capex_total,
             e_ac_kWh_anual    = e_ac_p90,
@@ -1051,6 +1094,8 @@ if btn_fin or st.session_state.get("financiero_ok"):
             n_anos            = n_anos,
             beneficios_1715   = ben,
             tasa_escalacion_opex = esc_opex,
+            frac_exportada    = frac_exportada,
+            tarifa_excedentes_cop_kWh = tarifa_excedentes_cop,
         )
         st.session_state["comp_financiero"]    = comp
         st.session_state["comp_financiero_p90"] = comp_p90
@@ -1077,7 +1122,8 @@ if btn_fin or st.session_state.get("financiero_ok"):
     # ── Tabla comparativa: Sin Ley 1715 | Con Ley 1715 (P50) | Con Ley 1715 (P90) ──
     st.subheader("⚖️ Comparativo sin / con Ley 1715  ·  P50 vs P90")
     _e_label = (
-        f"autoconsumo total {e_financiero:,.0f} kWh/año (solar + batería)"
+        f"autoconsumo + excedente {e_financiero:,.0f} kWh/año "
+        f"({frac_exportada * 100:.0f}% exportado a tarifa de excedentes)"
         if _balance_activo
         else f"E_ac solar {e_financiero:,.0f} kWh/año"
     )
