@@ -119,8 +119,34 @@ def test_analista_produccion_no_se_ejecuta_sin_boton_explicito():
 def test_analista_produccion_recibe_el_tipo_de_instalacion_real():
     # Mismo principio que corrigió el sesgo de fachada en los otros agentes
     # -- el contexto que arma esta página debe declarar el tipo real.
+    #
+    # Regresión real (2026-08-21): esta aserción antes verificaba
+    # "formatear_comparacion_paneles(df_cmp, tipo_instalacion)" -- pero
+    # `tipo_instalacion` es la variable del selectbox LOCAL "Perfil de costos
+    # CAPEX" (una de las 3 claves de BENCH, sin relación con el proyecto
+    # real), no el tipo real del proyecto. El test pasaba igual porque solo
+    # verificaba el NOMBRE de la variable, no su origen -- dándole falsa
+    # confianza a un bug real: el selectbox arrancaba en "Granja FV campo"
+    # (primera clave de BENCH) para CUALQUIER proyecto, y ese valor se le
+    # narraba al agente como si fuera el tipo real, incluso sobre una
+    # fachada. Ahora se verifica que el agente reciba una variable derivada
+    # de session_state["tipo_instalacion"] (el dato real), no del selectbox.
     src = _leer(_PAGINA)
-    assert "formatear_comparacion_paneles(df_cmp, tipo_instalacion)" in src
+    assert "formatear_comparacion_paneles(df_cmp, _tipo_para_agente)" in src
+    assert '_tipo_real_proyecto = st.session_state.get("tipo_instalacion"' in src
+    idx_tipo_real = src.index('_tipo_real_proyecto = st.session_state.get("tipo_instalacion"')
+    idx_uso_agente = src.index("formatear_comparacion_paneles(df_cmp, _tipo_para_agente)")
+    assert idx_tipo_real < idx_uso_agente
+
+
+def test_perfil_capex_no_es_el_tipo_real_del_proyecto():
+    # El selectbox de perfil de costos CAPEX y el tipo real del proyecto son
+    # conceptos distintos -- confirma que la página los distingue por
+    # nombre de variable, no que comparta una sola "tipo_instalacion" para
+    # ambos usos (la raíz del bug original).
+    src = _leer(_PAGINA)
+    assert "_MAPA_TIPO_A_CAPEX" in src
+    assert 'tipo_instalacion = st.selectbox(\n        "Perfil de costos CAPEX' in src
 
 
 def test_llama_init_trm_antes_de_leer_tipo_cambio():
