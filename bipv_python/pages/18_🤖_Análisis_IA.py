@@ -58,29 +58,35 @@ st.info(
     "🔋 Baterías y Balance y ⚖️ Comparador de Inversores.",
     icon="🧭",
 )
-col_link1, col_link2, col_link3, col_link4 = st.columns(4)
+# Cuadrícula 2×2 con etiquetas cortas -- 4 columnas con la etiqueta larga
+# original ("Ir al Analista de Producción (...) →") se apretaban tanto que
+# el texto se solapaba visualmente (reportado por el usuario). El contexto
+# "Analista de Producción" ya lo da el st.info() de arriba, así que el
+# label de cada botón no necesita repetirlo.
+col_link1, col_link2 = st.columns(2)
 with col_link1:
     st.page_link(
         "pages/4c_🧩_Comparador_Paneles.py",
-        label="Ir al Analista de Producción (🧩 Comparador de Paneles) →",
+        label="Comparador de Paneles →",
         icon="🧩",
     )
 with col_link2:
     st.page_link(
         "pages/4d_🧭_Comparador_Orientación.py",
-        label="Ir al Analista de Producción (🧭 Comparador de Orientación) →",
+        label="Comparador de Orientación →",
         icon="🧭",
     )
+col_link3, col_link4 = st.columns(2)
 with col_link3:
     st.page_link(
         "pages/11_🔋_Baterias_y_Balance.py",
-        label="Ir al Analista de Producción (🔋 Baterías y Balance) →",
+        label="Baterías y Balance →",
         icon="🔋",
     )
 with col_link4:
     st.page_link(
         "pages/4b_⚖️_Comparador_Inversores.py",
-        label="Ir al Analista de Producción (⚖️ Comparador de Inversores) →",
+        label="Comparador de Inversores →",
         icon="⚖️",
     )
 
