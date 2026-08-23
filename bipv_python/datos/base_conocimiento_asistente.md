@@ -1278,6 +1278,39 @@ Sin fuente, los precios se consideran estimados, no cotizaciones.
 
 ────────────────────────────────────────────────────────────
 
+### 📄 Carga automática de cotizaciones (PDF/Word) — extractor genérico + clasificador  NUEVO (22-ago-2026)
+
+Un único punto de carga, visible en la parte de arriba de la página (arriba de las 8 pestañas, dentro del expansor "📄 Cargar cotización de proveedor"), permite subir la cotización REAL de un proveedor (PDF o Word .docx) y que sus valores lleguen a la pestaña correcta sin transcribirlos a mano. No está atado a un proveedor ni a una plantilla específica — funciona con cualquier layout, en español o inglés.
+
+¿Cómo funciona? (3 pasos automáticos + 1 de confirmación)
+
+- 1️⃣ Extracción: la app lee el texto y las tablas del documento (por encabezado de columna, no por posición fija — reconoce "Capacidad"/"Potencia"/"Install Capacity" o "Precio Unitario"/"Price/Watt" sin importar el orden de las columnas) y saca: proveedor, número de cotización, fecha, descripción del ítem, capacidad (W), precio unitario (USD/W), flete, total FOB, total CIF, incoterm y condiciones de pago.
+- 2️⃣ Respaldo por IA (solo si algo no se encontró): si el servidor tiene una clave de IA configurada (🧭 Asistente usa la misma), se le pide el campo faltante — pero el modelo debe CITAR el fragmento exacto del documento de donde lo sacó; si ese fragmento no existe literalmente en el texto, el campo se descarta. Es una salvaguarda anti-invención: ningún valor de IA se acepta "porque sí".
+- 3️⃣ Clasificación de sección: un contador de palabras clave por categoría (p. ej. "estructura/montaje" → Perfilería; "instalación/RETIE" → Mano de Obra; "cable/monitoreo" → Sistema FV; "tablero/breaker" → Inversor y Equipos Eléctricos; "panel/módulo/batería" → Catálogo; "ingeniería/legal/seguro" → Costos Blandos) SUGIERE a qué de las 6 pestañas de cotización pertenece el documento. Aparece un selector con la sugerencia preseleccionada y el detalle de cuántas coincidencias tuvo cada sección — puedes cambiarla si no es la correcta.
+- 4️⃣ Confirmación (obligatoria): antes de aplicar nada, la app muestra una tabla con cada campo, su valor propuesto, el método (🔤 patrón o 🤖 IA) y el fragmento de evidencia citado del documento. **Nada se aplica a Presupuesto sin que lo confirmes con el botón "✅ Aplicar".**
+
+¿A qué 6 secciones puede dirigir una cotización? Las mismas del listado de pestañas de esta página, EXCEPTO Estimación Rápida (que es paramétrica, no basada en cotizaciones reales): 🔩 Perfilería y Estructura, 👷 Mano de Obra, ⚡ Sistema FV, 🔌 Inversor y Equipos Eléctricos, 📦 Equipos del Catálogo, 🧾 Costos Blandos.
+
+Dos formas de armar la fila de costo (automático según lo que trae el documento):
+
+- Cotización por Watt (típico de estructura o paneles): si el documento trae capacidad (W) Y precio unitario (USD/W), la fila queda como Cantidad = capacidad en W, Unidad = "W", USD/un = precio por watt.
+- Monto global (típico de mano de obra, ingeniería, seguros — casi nunca se cotizan por Watt): si no hay capacidad/precio unitario pero sí un Total, la fila queda como Cantidad = 1, Unidad = "glb", USD/un = el total detectado.
+- Si el documento trae flete marítimo, se agrega una segunda fila aparte ("Flete marítimo — {proveedor}") en la misma sección.
+
+⚠️ Para no cometer errores — verificación cruzada: si el documento trae capacidad, precio unitario Y un total, la app compara Capacidad × Precio unitario contra ese total. Si difieren más de 2%, muestra una advertencia — revisa los valores extraídos antes de aplicar, puede ser un campo mal leído.
+
+Reemplazar o quitar una cotización ya aplicada:
+
+- Volver a cargar la MISMA cotización (mismo número) actualizada: la app reemplaza la fila anterior automáticamente en vez de duplicarla.
+- Quitarla del todo: usa los mecanismos que ya existían en cada tabla — desmarca el checkbox ✔ Activo (la excluye sin borrar), bórrala con Supr, o usa "↺ Resetear" para volver a la plantilla en blanco de esa sección.
+- "🗑️ Descartar cotización cargada": borra la extracción pendiente ANTES de aplicarla, sin tocar ninguna tabla.
+
+¿Se guarda a disco? Solo si la sección destino es una de las persistibles: 🔩 Perfilería, 👷 Mano de Obra, ⚡ Sistema FV, 🔌 Inversor y Equipos Eléctricos. 📦 Equipos del Catálogo y 🧾 Costos Blandos NO se guardan en disco entre sesiones (mismo comportamiento que ya tenían esas dos pestañas antes de esta función) — la app lo avisa en pantalla al aplicar. El campo "Fuente / cotización" de la pestaña destino se autocompleta con "Cotización {proveedor} {número} ({fecha})" para trazabilidad bancaria.
+
+⚠️ Para no cometer errores — moneda: Presupuesto solo trabaja en USD. Si la app detecta que la cotización está en otra moneda (COP, EUR, CNY), lo avisa y NO convierte automáticamente — ajusta los valores a mano antes de aplicar.
+
+────────────────────────────────────────────────────────────
+
 ### 🧾 Pestaña Costos Blandos — soft costs
 
 Los costos blandos son todos los gastos del proyecto que no son materiales
@@ -2242,6 +2275,22 @@ El motor financiero distinguía toda la energía a una sola tarifa; cuando habí
 Manual actualizado el 21 de agosto de 2026
 
 Novedades de esta versión: comparador exhaustivo de TODOS los inversores compatibles, corrección del layout y del tipo de instalación citado en 🤖 Análisis IA, alarma de validación SDM vs ficha técnica propagada a Motor IV/Producción/Mismatch/Vista 3D, sincronización del consumo real (factura) en Baterías y Balance, y tarifa diferenciada de excedentes exportados en Financiero.
+
+────────────────────────────────────────────────────────────
+
+## 22. Anexo — Actualizaciones del 22 de agosto de 2026
+
+22.1 💼 Presupuesto: carga automática de cotizaciones de proveedor (PDF/Word)  NUEVO
+
+Nuevo punto único de carga en 💼 Presupuesto (arriba de las 8 pestañas) que lee la cotización real de un proveedor (PDF o Word), extrae sus valores con evidencia citada del documento, sugiere a cuál de las 6 secciones de cotización pertenece (Perfilería, Mano de Obra, Sistema FV, Inversor y Equipos Eléctricos, Equipos del Catálogo o Costos Blandos) y solo aplica los valores cuando el usuario los confirma. Funciona con cualquier proveedor o layout, no con una plantilla específica. Ver el detalle completo en la sección 11, subsección "📄 Carga automática de cotizaciones (PDF/Word)".
+
+⚠️ Para no cometer errores: la app nunca aplica un valor sin mostrarlo primero junto al fragmento del documento del que salió — si vas a usar esta función para un presupuesto bancable, de todas formas revisa la tabla de campos detectados antes de oprimir "Aplicar", igual que revisarías una cotización transcrita a mano.
+
+────────────────────────────────────────────────────────────
+
+Manual actualizado el 22 de agosto de 2026
+
+Novedades de esta versión: carga automática de cotizaciones de proveedor (PDF/Word) en 💼 Presupuesto, con extracción genérica por patrones + respaldo por IA verificado y clasificador automático de sección destino.
 
 Calculadora BIPV — Innovación Química
 
