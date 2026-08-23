@@ -39,7 +39,7 @@ def test_importa_el_extractor_y_el_clasificador_genericos():
 def test_hay_un_solo_uploader_no_uno_por_pestana():
     src = _leer()
     assert src.count('st.file_uploader(') == 1
-    assert 'key="upl_cotizacion_global"' in src
+    assert "upl_cotizacion_global_v" in src
 
 
 def test_uploader_acepta_pdf_y_word():
@@ -57,7 +57,7 @@ def test_el_uploader_vive_fuera_de_las_pestanas_por_costo():
     # El bloque de carga debe estar ANTES de que se abran las tabs (para que
     # aplique a cualquiera de las 6 secciones, no solo a la que esté activa).
     src = _leer()
-    idx_upload = src.index('key="upl_cotizacion_global"')
+    idx_upload = src.index("upl_cotizacion_global_v")
     idx_tabs = src.index("tabs = st.tabs([")
     assert idx_upload < idx_tabs
 
@@ -135,3 +135,41 @@ def test_inicializa_costos_blandos_con_su_propia_plantilla_por_defecto():
     src = _leer()
     assert 'if key == "soft":' in src
     assert "_df_con_activo(_SOFT_DEFAULT)" in src
+
+
+# ═══════ Auditoría 2026-08-23: el uploader debe soltar el archivo ═══════════
+# Hallazgo: st.file_uploader retiene el archivo cargado entre reruns mientras
+# su `key` no cambie. Aplicar/Descartar borraban el estado de sesión pero NO
+# el archivo del widget -- en el siguiente rerun la app lo volvía a extraer
+# sola, como si el botón no hubiera hecho nada. La corrección versiona el
+# `key` del uploader (y del selector, para resincronizar la sugerencia con
+# cada documento nuevo), mismo patrón que _ver_key en _editar_seccion().
+
+def test_el_uploader_esta_versionado_para_poder_soltar_el_archivo():
+    src = _leer()
+    assert '"_cotiz_ver_uploader"' in src
+    assert 'key=f"upl_cotizacion_global_v{st.session_state[\'_cotiz_ver_uploader\']}"' in src
+
+
+def test_aplicar_y_descartar_incrementan_la_version_del_uploader():
+    src = _leer()
+    assert src.count('st.session_state["_cotiz_ver_uploader"] += 1') == 2
+
+
+def test_el_selector_de_destino_esta_versionado_y_se_resincroniza_por_documento():
+    src = _leer()
+    assert '"_cotiz_ver_selector"' in src
+    assert 'key=f"sel_destino_cotizacion_global_v{st.session_state[\'_cotiz_ver_selector\']}"' in src
+    # Se incrementa SOLO al detectar un hash nuevo (documento distinto), no en
+    # cada rerun mientras se revisa el mismo documento.
+    assert 'st.session_state["_cotiz_ver_selector"] += 1' in src
+
+
+def test_avisa_si_falla_el_guardado_en_disco_de_una_seccion_persistible():
+    src = _leer()
+    assert "No se pudo guardar la tabla en disco" in src
+
+
+def test_avisa_si_no_hay_usuario_de_sesion_para_persistir():
+    src = _leer()
+    assert "No se detectó usuario de sesión" in src

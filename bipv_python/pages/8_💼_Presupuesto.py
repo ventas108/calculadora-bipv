@@ -381,8 +381,25 @@ with st.expander("📄 Cargar cotización de proveedor (PDF o Word) — detecta 
         "de Presupuesto pertenece y te muestra la evidencia citada del documento: "
         "**nada se aplica sin que lo confirmes.**"
     )
+    # ── Versión de los widgets del uploader/selector: igual que _ver_key en
+    # _editar_seccion(), cambiar el `key` fuerza a Streamlit a tratarlos como
+    # NUEVOS. Es necesario porque st.file_uploader retiene el archivo cargado
+    # entre reruns mientras su key no cambie -- sin esto, "Aplicar" o
+    # "Descartar" borraban el estado de sesión pero el archivo seguía
+    # "cargado" en el widget, así que la app lo volvía a extraer solo en el
+    # siguiente rerun (el botón parecía no hacer nada). `_ver_uploader` solo
+    # se incrementa al aplicar/descartar (libera el archivo); `_ver_selector`
+    # solo al detectar un archivo NUEVO (re-sincroniza la sugerencia de
+    # sección con el documento nuevo, sin perder una corrección manual del
+    # usuario mientras sigue revisando el mismo documento).
+    if "_cotiz_ver_uploader" not in st.session_state:
+        st.session_state["_cotiz_ver_uploader"] = 0
+    if "_cotiz_ver_selector" not in st.session_state:
+        st.session_state["_cotiz_ver_selector"] = 0
+
     _archivo_cotiz = st.file_uploader(
-        "Cotización (PDF o Word .docx)", type=["pdf", "docx"], key="upl_cotizacion_global",
+        "Cotización (PDF o Word .docx)", type=["pdf", "docx"],
+        key=f"upl_cotizacion_global_v{st.session_state['_cotiz_ver_uploader']}",
     )
     if _archivo_cotiz is not None:
         _bytes_cotiz = _archivo_cotiz.getvalue()
@@ -397,6 +414,7 @@ with st.expander("📄 Cargar cotización de proveedor (PDF o Word) — detecta 
                 st.session_state["_cotiz_hash_global"] = _hash_cotiz
                 st.session_state["_cotiz_categoria_sugerida_global"] = _cat_sugerida or "perfileria"
                 st.session_state["_cotiz_puntajes_categoria_global"] = _puntajes_cat
+                st.session_state["_cotiz_ver_selector"] += 1
             except Exception as e:
                 st.error(f"No se pudo leer el archivo: {e}")
                 for _k in ("_cotiz_extraido_global", "_cotiz_hash_global",
@@ -423,7 +441,7 @@ with st.expander("📄 Cargar cotización de proveedor (PDF o Word) — detecta 
             options=_opciones_dest,
             index=_opciones_dest.index(_sugerida) if _sugerida in _opciones_dest else 0,
             format_func=lambda k: _CATEGORIA_LABELS.get(k, k),
-            key="sel_destino_cotizacion_global",
+            key=f"sel_destino_cotizacion_global_v{st.session_state['_cotiz_ver_selector']}",
         )
 
         st.markdown("**Campos detectados — revisa contra el documento antes de aplicar:**")
@@ -509,8 +527,14 @@ with st.expander("📄 Cargar cotización de proveedor (PDF o Word) — detecta 
             if _dest_key in pstore.SECCIONES_PERSISTIBLES:
                 _usr = st.session_state.get("auth_email", "")
                 if _usr:
-                    pstore.guardar_seccion(_dest_key, _df_final.to_dict("records"),
-                                            _usr, _fuente_txt)
+                    if not pstore.guardar_seccion(_dest_key, _df_final.to_dict("records"),
+                                                   _usr, _fuente_txt):
+                        st.caption("⚠️ No se pudo guardar la tabla en disco (permisos/espacio) "
+                                   "-- el cambio queda aplicado en esta sesión, pero vuelve a "
+                                   "aplicarlo si recargas la página.")
+                else:
+                    st.caption("⚠️ No se detectó usuario de sesión -- el cambio no se guardó "
+                               "en disco, solo queda aplicado mientras esta pestaña esté abierta.")
             else:
                 st.caption(f"ℹ️ {_CATEGORIA_LABELS.get(_dest_key, _dest_key)} no se guarda en "
                            "disco entre sesiones -- solo dura mientras el proyecto esté abierto.")
@@ -520,12 +544,14 @@ with st.expander("📄 Cargar cotización de proveedor (PDF o Word) — detecta 
             for _k in ("_cotiz_extraido_global", "_cotiz_hash_global",
                       "_cotiz_categoria_sugerida_global", "_cotiz_puntajes_categoria_global"):
                 st.session_state.pop(_k, None)
+            st.session_state["_cotiz_ver_uploader"] += 1  # libera el archivo del uploader
             st.rerun()
 
         if col_desc.button("🗑️ Descartar cotización cargada", key="btn_descartar_cotizacion_global"):
             for _k in ("_cotiz_extraido_global", "_cotiz_hash_global",
                       "_cotiz_categoria_sugerida_global", "_cotiz_puntajes_categoria_global"):
                 st.session_state.pop(_k, None)
+            st.session_state["_cotiz_ver_uploader"] += 1  # libera el archivo del uploader
             st.rerun()
 
     st.caption(

@@ -26,6 +26,7 @@ import pytest
 from calculos.extractor_cotizaciones import (
     CATEGORIA_LABELS,
     _detectar_moneda,
+    _extraer_de_tablas,
     _parsear_numero,
     clasificar_categoria_costo,
     extraer_con_ia,
@@ -327,3 +328,29 @@ def test_todas_las_categorias_tienen_etiqueta_de_pestana():
     for cat in ("perfileria", "mano_obra", "sistema_fv", "inversor", "catalogo", "soft"):
         assert cat in CATEGORIA_LABELS
         assert CATEGORIA_LABELS[cat]
+
+
+# ═══════ Auditoría 2026-08-23: descripción no se toma de una fila resumen ═══
+
+def test_descripcion_no_se_toma_de_una_fila_de_total_cif():
+    # Hallazgo de la auditoría: si una fila resumen ("TOTAL CIF CARTAGENA")
+    # cae en la columna Descripción ANTES que la fila del ítem real, la
+    # descripción quedaba mal asignada al texto del resumen, no al ítem.
+    tabla = [
+        ["Description", "Capacity (W)", "Price/Watt", "Total"],
+        ["TOTAL CIF CARTAGENA", "", "", "US$27,940.33"],
+        ["220.32kw Ground Mounting Structure", "220320", "US$0.09051", "US$19,940.33"],
+    ]
+    r = _extraer_de_tablas([tabla])
+    assert r["descripcion_item"]["valor"] == "220.32kw Ground Mounting Structure"
+    assert r["total_cif"]["valor"] == pytest.approx(27940.33)
+
+
+def test_descripcion_no_se_toma_de_una_fila_de_total_fob():
+    tabla = [
+        ["Description", "Capacity (W)", "Price/Watt", "Total"],
+        ["TOTAL FOB TIANJIN", "", "", "US$19,940.33"],
+        ["220.32kw Ground Mounting Structure", "220320", "US$0.09051", "US$19,940.33"],
+    ]
+    r = _extraer_de_tablas([tabla])
+    assert r["descripcion_item"]["valor"] == "220.32kw Ground Mounting Structure"
