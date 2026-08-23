@@ -200,7 +200,27 @@ _CAMPOS_TEXTO_NO_NUM = {"proveedor", "numero_cotizacion", "fecha_cotizacion",
 # número de la cotización.
 _NUMERO_GENERICO = "no."
 _EXCLUIR_NUMERO_GENERICO = ("swift", "account", "bank", "iban", "phone",
-                            "tel", "fax", "email", "e-mail")
+                            "tel", "fax", "email", "e-mail", "address",
+                            "direccion", "dirección")
+
+# Forma típica de un número de cotización: prefijo de letras + dígitos +
+# dígitos, con guiones (p. ej. "PJ-260807-04 V01", "EC-2026-0731"). Se busca
+# en TODO el texto, no anclado a una etiqueta -- layouts de 2 columnas o
+# tablas angostas a veces mezclan varias etiquetas en una sola línea de
+# texto plano (p. ej. "No.:" queda pegado a "TEL:" del bloque de contacto),
+# lo que puede hacer que el paso basado en líneas descarte por error la
+# línea correcta y caiga en un falso positivo (una dirección con "NO.45").
+_PAT_CODIGO_COTIZACION = re.compile(r"\b[A-Za-z]{1,5}-\d{4,8}-\d{1,4}(?:\s?V\d{1,2})?\b")
+
+
+def _buscar_codigo_cotizacion(texto: str) -> dict | None:
+    m = _PAT_CODIGO_COTIZACION.search(texto)
+    if not m:
+        return None
+    inicio = texto.rfind("\n", 0, m.start()) + 1
+    fin = texto.find("\n", m.end())
+    fin = fin if fin != -1 else len(texto)
+    return {"valor": m.group(0).strip(), "evidencia": texto[inicio:fin].strip()}
 
 
 _PAT_NUM_CON_MONEDA = re.compile(r"(?:US\$|USD|COP|EUR|CNY|RMB|\$|¥|€)\s?[\d][\d.,]*")
@@ -267,6 +287,10 @@ def _extraer_texto(texto: str) -> dict:
         r = _buscar_valor_texto(texto, sinonimos, es_num)
         if r:
             resultado[campo] = {**r, "metodo": "patron"}
+    if "numero_cotizacion" not in resultado:
+        r = _buscar_codigo_cotizacion(texto)
+        if r:
+            resultado["numero_cotizacion"] = {**r, "metodo": "patron"}
     if "numero_cotizacion" not in resultado:
         r = _buscar_valor_texto(texto, [_NUMERO_GENERICO], es_numero=False,
                                  excluir=_EXCLUIR_NUMERO_GENERICO)
