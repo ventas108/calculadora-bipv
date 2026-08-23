@@ -342,7 +342,11 @@ def _extraer_de_tablas(tablas: list) -> dict:
                 if not valor_celda:
                     continue
                 if campo == "descripcion_item":
-                    if "descripcion_item" not in resultado and not es_flete:
+                    # Nunca tomar la descripción de una fila de flete/CIF/FOB --
+                    # esas son resúmenes ("Ocean freight...", "Total Amount (CIF...")
+                    # que a veces caen en la columna Descripción, no el ítem real.
+                    if ("descripcion_item" not in resultado and not es_flete
+                            and not es_cif and not es_fob):
                         resultado["descripcion_item"] = {
                             "valor": valor_celda, "evidencia": fila_txt,
                             "metodo": "patron"}

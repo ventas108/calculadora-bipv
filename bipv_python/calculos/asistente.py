@@ -14,7 +14,6 @@ El asistente NUNCA modifica valores ni ejecuta cálculos.
 """
 from __future__ import annotations
 
-import json
 import os
 import re
 import unicodedata
