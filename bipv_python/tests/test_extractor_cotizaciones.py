@@ -354,3 +354,36 @@ def test_descripcion_no_se_toma_de_una_fila_de_total_fob():
     ]
     r = _extraer_de_tablas([tabla])
     assert r["descripcion_item"]["valor"] == "220.32kw Ground Mounting Structure"
+
+
+# ═══ Auditoría 2026-08-23 (reporte real del usuario, cotización Mibet) ═════
+# El campo "Número de cotización" salió mal: devolvió un pedazo de la
+# dirección del proveedor ("45,Sushan Road,Jimei District,Xiamen,China.")
+# en vez de "PJ-260807-04 V01". Causa real: en el layout de 2 columnas del
+# encabezado, "No.: PJ-260807-04 V01" queda en la MISMA línea de texto plano
+# que "TEL: ..." -- el filtro de exclusión (que descarta líneas con "tel"
+# para no confundir el número de cotización con un teléfono) descartaba esa
+# línea entera, y la búsqueda caía en el siguiente "No." del documento: la
+# dirección del proveedor ("NO.45,Sushan Road...").
+
+def test_numero_de_cotizacion_no_se_confunde_con_la_direccion_del_proveedor():
+    # Reproduce el layout real: "No.:" queda pegado a "TEL:" en la misma
+    # línea de texto plano (típico de encabezados de 2 columnas en PDF), y
+    # la dirección del proveedor con "NO.45" aparece más abajo.
+    texto = (
+        "TEL: +86-592-3754999 ext. 688 TEL:+57 318 7241820 "
+        "Email: irene.li@mbt-energy.com No.: PJ-260807-04 V01    "
+        "Date: Aug 11, 2026\n"
+        "Bank Information\n"
+        "Beneficiary Name: Xiamen Mibet New Energy Co., Ltd\n"
+        "Beneficiary's address: NO.45,Sushan Road,Jimei District,Xiamen,China.\n"
+    )
+    r = extraer_por_patrones(texto, [])
+    assert r["numero_cotizacion"]["valor"] == "PJ-260807-04 V01"
+    assert "Sushan" not in r["numero_cotizacion"]["valor"]
+
+
+def test_numero_de_cotizacion_con_codigo_estandar_se_encuentra_en_cualquier_parte_del_texto():
+    texto = "Documento sin etiqueta de número reconocible.\nRef interna EC-2026-0731 al pie de página.\n"
+    r = extraer_por_patrones(texto, [])
+    assert r["numero_cotizacion"]["valor"] == "EC-2026-0731"
