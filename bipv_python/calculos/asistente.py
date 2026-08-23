@@ -238,7 +238,7 @@ def responder(pregunta: str, estado: Mapping[str, Any],
     Devuelve {"respuesta": str, "fuentes": [títulos], "proveedor": str}.
     Lanza RuntimeError con mensaje claro si no hay clave de API configurada.
     """
-    import requests  # ya está en requirements
+    from calculos.ia_proveedor import llamar_ia
 
     if base is None:
         base = BaseConocimiento.cargar()
@@ -254,122 +254,9 @@ def responder(pregunta: str, estado: Mapping[str, Any],
         f"<pregunta>{pregunta}</pregunta>"
     )
 
-    gem = os.environ.get("GEMINI_API_KEY", "").strip()
-    oai = os.environ.get("OPENAI_API_KEY", "").strip()
-    ant = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-
     hist = historial or []
+    out = llamar_ia(PROMPT_SISTEMA, contenido_usuario, historial=hist, timeout=timeout)
 
-    if not (gem or oai or ant):
-        raise RuntimeError(
-            "No hay clave de API configurada. Define GEMINI_API_KEY (recomendado, "
-            "tiene nivel gratuito), OPENAI_API_KEY o ANTHROPIC_API_KEY como variable "
-            "de entorno en el servidor y reinicia la app."
-        )
-
-    # Errores de red/HTTP se traducen a mensajes SIN URL ni encabezados: la URL de
-    # una excepción de requests podría contener información sensible.
-    if gem:
-        prov = "Gemini"
-        contents = []
-        for h in hist[-6:]:
-            contents.append({"role": "user" if h["rol"] == "usuario" else "model",
-                             "parts": [{"text": h["texto"]}]})
-        contents.append({"role": "user", "parts": [{"text": contenido_usuario}]})
-        # Modelos en orden de preferencia: las variantes "lite" primero -- en el
-        # nivel gratuito tienen cupo por minuto más alto que las variantes "flash"
-        # completas, así que fallan menos seguido con HTTP 429. Si uno no existe
-        # (404), su cuota está agotada (429), o no responde a tiempo, se intenta el
-        # siguiente en vez de abortar toda la pregunta (antes un solo timeout en el
-        # primer modelo cancelaba la respuesta sin probar los demás).
-        modelos = ("gemini-flash-lite-latest", "gemini-2.5-flash-lite",
-                   "gemini-2.0-flash", "gemini-flash-latest", "gemini-2.5-flash")
-        timeout_modelo = max(15, timeout // len(modelos))
-        r = None
-        hubo_timeout = False
-        for modelo in modelos:
-            try:
-                r = requests.post(
-                    "https://generativelanguage.googleapis.com/v1beta/models/"
-                    f"{modelo}:generateContent",
-                    headers={"x-goog-api-key": gem},  # header, nunca en la URL
-                    json={"systemInstruction": {"parts": [{"text": PROMPT_SISTEMA}]},
-                          "contents": contents,
-                          "generationConfig": {"temperature": 0.2,
-                                               "maxOutputTokens": 1024}},
-                    timeout=timeout_modelo,
-                )
-            except requests.exceptions.Timeout:
-                hubo_timeout, r = True, None
-                continue
-            except requests.exceptions.RequestException:
-                r = None
-                continue
-            if r.status_code not in (404, 429):
-                break
-        if r is None:
-            if hubo_timeout:
-                raise RuntimeError(f"{prov} no respondió a tiempo en ninguno de sus "
-                                   "modelos disponibles. Intenta de nuevo en un momento.")
-            raise RuntimeError(f"No se pudo conectar con {prov}. Revisa la conexión a "
-                               "internet del servidor e intenta de nuevo.")
-    else:
-        try:
-            if oai:
-                prov = "OpenAI"
-                msgs = [{"role": "system", "content": PROMPT_SISTEMA}]
-                for h in hist[-6:]:
-                    msgs.append({"role": "user" if h["rol"] == "usuario" else "assistant",
-                                 "content": h["texto"]})
-                msgs.append({"role": "user", "content": contenido_usuario})
-                r = requests.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {oai}"},
-                    json={"model": "gpt-4o-mini", "messages": msgs, "temperature": 0.2,
-                          "max_tokens": 1024},
-                    timeout=timeout,
-                )
-            else:
-                prov = "Anthropic"
-                msgs = []
-                for h in hist[-6:]:
-                    msgs.append({"role": "user" if h["rol"] == "usuario" else "assistant",
-                                 "content": h["texto"]})
-                msgs.append({"role": "user", "content": contenido_usuario})
-                r = requests.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers={"x-api-key": ant, "anthropic-version": "2023-06-01"},
-                    json={"model": "claude-3-5-haiku-latest", "system": PROMPT_SISTEMA,
-                          "messages": msgs, "max_tokens": 1024},
-                    timeout=timeout,
-                )
-        except requests.exceptions.Timeout:
-            raise RuntimeError(f"{prov} no respondió a tiempo. Intenta de nuevo en un momento.")
-        except requests.exceptions.RequestException:
-            raise RuntimeError(f"No se pudo conectar con {prov}. Revisa la conexión a "
-                               "internet del servidor e intenta de nuevo.")
-
-    if r.status_code == 429:
-        raise RuntimeError(f"{prov} alcanzó el límite de uso (HTTP 429). Espera un "
-                           "minuto e intenta de nuevo.")
-    if r.status_code in (401, 403):
-        raise RuntimeError(f"La clave de API de {prov} fue rechazada (HTTP "
-                           f"{r.status_code}). Verifica la variable de entorno.")
-    if r.status_code >= 400:
-        raise RuntimeError(f"{prov} respondió con error HTTP {r.status_code}. "
-                           "Intenta de nuevo más tarde.")
-
-    try:
-        data = r.json()
-        if prov == "Gemini":
-            texto = data["candidates"][0]["content"]["parts"][0]["text"]
-        elif prov == "OpenAI":
-            texto = data["choices"][0]["message"]["content"]
-        else:
-            texto = data["content"][0]["text"]
-    except (ValueError, KeyError, IndexError, TypeError):
-        raise RuntimeError(f"{prov} devolvió una respuesta inesperada. Intenta de nuevo.")
-
-    return {"respuesta": texto.strip(),
+    return {"respuesta": out["texto"],
             "fuentes": [s["titulo"] for s in secciones],
-            "proveedor": prov}
+            "proveedor": out["proveedor"]}
