@@ -15,6 +15,8 @@ from calculos.presupuesto import (
 )
 from calculos.extractor_cotizaciones import (
     CAMPOS_COTIZACION as _CAMPOS_COTIZACION,
+    CATEGORIA_LABELS as _CATEGORIA_LABELS,
+    clasificar_categoria_costo as _clasificar_categoria_costo,
     extraer_cotizacion as _extraer_cotizacion,
 )
 
@@ -347,6 +349,190 @@ def _editar_seccion(key, label, inyectar=None, referencia_mercado=""):
     n_a = int(activos.sum()); n_i = int((~activos).sum())
     st.caption(f"📋 {len(edited)} ítems — {n_a} activos, {n_i} desactivados. ➕ agregar · Supr eliminar")
     return total
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CARGA DE COTIZACIONES DE PROVEEDOR — punto único, clasifica y dirige
+# ══════════════════════════════════════════════════════════════════════════════
+# Un solo uploader para las 6 secciones de cotización (todas menos Estimación
+# Rápida, que es paramétrica). El extractor es genérico (calculos/
+# extractor_cotizaciones.py); un clasificador liviano por palabras clave
+# SUGIERE a qué sección pertenece -- el usuario confirma o corrige el
+# destino antes de aplicar, igual que ya confirma cada valor extraído.
+
+_SECCIONES_CON_CARGA = ("perfileria", "mano_obra", "sistema_fv", "inversor", "catalogo", "soft")
+
+
+def _inicializar_seccion_si_falta(key: str) -> None:
+    ss_key = f"df_sec_{key}"
+    if ss_key in st.session_state:
+        return
+    if key == "soft":
+        st.session_state[ss_key] = _df_con_activo(_SOFT_DEFAULT)
+    else:
+        st.session_state[ss_key] = _plantilla_con_activo(key)
+
+
+with st.expander("📄 Cargar cotización de proveedor (PDF o Word) — detecta la sección automáticamente",
+                  expanded=False):
+    st.caption(
+        "Sube la cotización real de un proveedor (estructura, mano de obra, cableado, "
+        "tableros, paneles, ingeniería/legal...). Funciona con cualquier proveedor o "
+        "layout -- no está atada a una plantilla puntual. La app sugiere a qué sección "
+        "de Presupuesto pertenece y te muestra la evidencia citada del documento: "
+        "**nada se aplica sin que lo confirmes.**"
+    )
+    _archivo_cotiz = st.file_uploader(
+        "Cotización (PDF o Word .docx)", type=["pdf", "docx"], key="upl_cotizacion_global",
+    )
+    if _archivo_cotiz is not None:
+        _bytes_cotiz = _archivo_cotiz.getvalue()
+        _hash_cotiz = hashlib.sha256(_bytes_cotiz).hexdigest()
+        if st.session_state.get("_cotiz_hash_global") != _hash_cotiz:
+            try:
+                with st.spinner("Extrayendo datos de la cotización…"):
+                    _extraido = _extraer_cotizacion(_bytes_cotiz, _archivo_cotiz.name)
+                _cat_sugerida, _puntajes_cat = _clasificar_categoria_costo(
+                    _extraido.get("_texto_crudo", ""))
+                st.session_state["_cotiz_extraido_global"] = _extraido
+                st.session_state["_cotiz_hash_global"] = _hash_cotiz
+                st.session_state["_cotiz_categoria_sugerida_global"] = _cat_sugerida or "perfileria"
+                st.session_state["_cotiz_puntajes_categoria_global"] = _puntajes_cat
+            except Exception as e:
+                st.error(f"No se pudo leer el archivo: {e}")
+                for _k in ("_cotiz_extraido_global", "_cotiz_hash_global",
+                          "_cotiz_categoria_sugerida_global", "_cotiz_puntajes_categoria_global"):
+                    st.session_state.pop(_k, None)
+
+    _extraido = st.session_state.get("_cotiz_extraido_global")
+    if _extraido:
+        for _adv in _extraido.get("_advertencias", []):
+            st.warning(_adv, icon="⚠️")
+
+        _puntajes_cat = st.session_state.get("_cotiz_puntajes_categoria_global", {})
+        _sugerida = st.session_state.get("_cotiz_categoria_sugerida_global", "perfileria")
+        if _puntajes_cat:
+            _detalle = " · ".join(
+                f"{_CATEGORIA_LABELS[c]} ({p})" for c, p in _puntajes_cat.items())
+            st.caption(f"🔎 Coincidencias por sección: {_detalle}")
+        else:
+            st.caption("🔎 No se detectaron palabras clave de ninguna sección — elige manualmente.")
+
+        _opciones_dest = list(_SECCIONES_CON_CARGA)
+        _dest_key = st.selectbox(
+            "Sección de Presupuesto donde se aplicará esta cotización",
+            options=_opciones_dest,
+            index=_opciones_dest.index(_sugerida) if _sugerida in _opciones_dest else 0,
+            format_func=lambda k: _CATEGORIA_LABELS.get(k, k),
+            key="sel_destino_cotizacion_global",
+        )
+
+        st.markdown("**Campos detectados — revisa contra el documento antes de aplicar:**")
+        _metodo_icono = {"patron": "🔤 patrón", "ia": "🤖 IA"}
+        _filas_revision = [
+            {
+                "Campo": _c.replace("_", " ").capitalize(),
+                "Valor propuesto": (_extraido[_c]["valor"] if _c in _extraido
+                                    else "— no encontrado —"),
+                "Método": (_metodo_icono.get(_extraido[_c]["metodo"], "") if _c in _extraido
+                          else ""),
+                "Evidencia citada": _extraido[_c]["evidencia"] if _c in _extraido else "",
+            }
+            for _c in _CAMPOS_COTIZACION
+        ]
+        st.dataframe(pd.DataFrame(_filas_revision), hide_index=True, use_container_width=True)
+
+        _cap      = _extraido.get("capacidad_w", {}).get("valor")
+        _precio_w = _extraido.get("precio_unitario_w", {}).get("valor")
+        _flete    = _extraido.get("flete", {}).get("valor")
+        _tot_fob  = _extraido.get("total_fob", {}).get("valor")
+        _desc     = (_extraido.get("descripcion_item", {}).get("valor")
+                    or f"Ítem cotizado — {_CATEGORIA_LABELS.get(_dest_key, _dest_key)}")
+        _num_cot  = str(_extraido.get("numero_cotizacion", {}).get("valor") or "").strip()[:40]
+        _proveedor = str(_extraido.get("proveedor", {}).get("valor") or "").strip()
+        _fecha_cot = str(_extraido.get("fecha_cotizacion", {}).get("valor") or "").strip()
+        _ref      = _num_cot or "COTIZ"
+
+        # ── Fila principal: cotización tipo $/W (estructura, paneles...) si trae
+        # capacidad Y precio unitario; si no, cae a un ítem de monto total (mano
+        # de obra, ingeniería, seguros... casi siempre se cotizan como un global,
+        # no por Watt). Misma lógica para las 6 secciones -- sin ramas por tipo.
+        _fila_principal = None
+        if _cap and _precio_w:
+            _fila_principal = [_desc, _ref, float(_cap), "W", float(_precio_w)]
+            if _tot_fob:
+                _calc = _cap * _precio_w
+                if abs(_calc - _tot_fob) / max(_tot_fob, 1.0) > 0.02:
+                    st.warning(
+                        f"⚠️ Capacidad × Precio/W da USD {_calc:,.2f}, pero el documento dice "
+                        f"USD {_tot_fob:,.2f} para ese ítem — revisa los valores extraídos "
+                        "antes de aplicar.", icon="⚠️"
+                    )
+        elif _tot_fob:
+            _fila_principal = [_desc, _ref, 1.0, "glb", float(_tot_fob)]
+
+        _puede_aplicar = _fila_principal is not None
+        if not _puede_aplicar:
+            st.info(
+                "No se detectó ni Capacidad+Precio unitario ni un Monto total utilizable "
+                "para aplicar automáticamente. Puedes completar el ítem a mano en la "
+                f"pestaña {_CATEGORIA_LABELS.get(_dest_key, _dest_key)}."
+            )
+
+        col_ap, col_desc = st.columns([1, 1])
+        if col_ap.button(f"✅ Aplicar a {_CATEGORIA_LABELS.get(_dest_key, _dest_key)}",
+                          disabled=not _puede_aplicar, key="btn_aplicar_cotizacion_global"):
+            _fuente_txt = f"Cotización {_proveedor or 'proveedor'} {_num_cot}".strip()
+            if _fecha_cot:
+                _fuente_txt += f" ({_fecha_cot})"
+
+            _filas_nuevas = [_fila_principal]
+            if _flete:
+                _filas_nuevas.append(
+                    [f"Flete marítimo — {_proveedor or 'proveedor'}", _ref, 1.0, "glb",
+                     float(_flete)])
+            _df_nuevas = pd.DataFrame(_filas_nuevas, columns=_BASE_COLS)
+            _df_nuevas.insert(0, "Activo", True)
+
+            ss_key = f"df_sec_{_dest_key}"
+            _inicializar_seccion_si_falta(_dest_key)
+            _df_actual = st.session_state[ss_key]
+            # Reemplaza filas de una carga previa de la MISMA cotización (mismo Ref)
+            # en vez de duplicarlas -- así "reemplazar por otra cotización" es
+            # simplemente volver a cargar el archivo actualizado.
+            if _ref != "COTIZ" and "Ref" in _df_actual.columns:
+                _df_actual = _df_actual[_df_actual["Ref"] != _ref]
+            _df_final = pd.concat([_df_actual, _df_nuevas], ignore_index=True)
+            st.session_state[ss_key] = _df_final
+            st.session_state[f"fuente_inp_{_dest_key}"] = _fuente_txt
+            st.session_state[f"fuente_{_dest_key}"] = _fuente_txt
+
+            if _dest_key in pstore.SECCIONES_PERSISTIBLES:
+                _usr = st.session_state.get("auth_email", "")
+                if _usr:
+                    pstore.guardar_seccion(_dest_key, _df_final.to_dict("records"),
+                                            _usr, _fuente_txt)
+            else:
+                st.caption(f"ℹ️ {_CATEGORIA_LABELS.get(_dest_key, _dest_key)} no se guarda en "
+                           "disco entre sesiones -- solo dura mientras el proyecto esté abierto.")
+
+            st.success(f"✅ Aplicado a {_CATEGORIA_LABELS.get(_dest_key, _dest_key)} — "
+                       f"fuente: {_fuente_txt}")
+            for _k in ("_cotiz_extraido_global", "_cotiz_hash_global",
+                      "_cotiz_categoria_sugerida_global", "_cotiz_puntajes_categoria_global"):
+                st.session_state.pop(_k, None)
+            st.rerun()
+
+        if col_desc.button("🗑️ Descartar cotización cargada", key="btn_descartar_cotizacion_global"):
+            for _k in ("_cotiz_extraido_global", "_cotiz_hash_global",
+                      "_cotiz_categoria_sugerida_global", "_cotiz_puntajes_categoria_global"):
+                st.session_state.pop(_k, None)
+            st.rerun()
+
+    st.caption(
+        "Para quitar o reemplazar una cotización ya aplicada: desactívala con el checkbox "
+        "✔ de la fila en su pestaña, bórrala con Supr, o usa '↺ Resetear' para volver a "
+        "la plantilla en blanco de esa sección."
+    )
 
 # BENCH, ZONA_FACTOR y calcular_parametrico ahora viven en calculos/presupuesto.py
 # ══════════════════════════════════════════════════════════════════════════════
@@ -791,129 +977,6 @@ with t0:
 
 with t1:
     st.markdown("##### Perfilería, estructura BIPV, soportes, fijaciones")
-
-    with st.expander("📄 Cargar cotización de proveedor (PDF o Word) — carga automática de precios",
-                      expanded=False):
-        st.caption(
-            "Sube la cotización real de un proveedor (estructura, montaje, etc.). Funciona "
-            "con cualquier proveedor/layout -- no está atada a una plantilla puntual. La app "
-            "extrae los valores y te muestra la evidencia citada del documento antes de "
-            "aplicarlos: **nada se carga a Presupuesto sin que lo confirmes.**"
-        )
-        _archivo_cotiz = st.file_uploader(
-            "Cotización (PDF o Word .docx)", type=["pdf", "docx"],
-            key="upl_cotizacion_perfileria",
-        )
-        if _archivo_cotiz is not None:
-            _bytes_cotiz = _archivo_cotiz.getvalue()
-            _hash_cotiz = hashlib.sha256(_bytes_cotiz).hexdigest()
-            if st.session_state.get("_cotiz_hash_perfileria") != _hash_cotiz:
-                try:
-                    with st.spinner("Extrayendo datos de la cotización…"):
-                        _extraido = _extraer_cotizacion(_bytes_cotiz, _archivo_cotiz.name)
-                    st.session_state["_cotiz_extraido_perfileria"] = _extraido
-                    st.session_state["_cotiz_hash_perfileria"] = _hash_cotiz
-                except Exception as e:
-                    st.error(f"No se pudo leer el archivo: {e}")
-                    st.session_state.pop("_cotiz_extraido_perfileria", None)
-                    st.session_state.pop("_cotiz_hash_perfileria", None)
-
-        _extraido = st.session_state.get("_cotiz_extraido_perfileria")
-        if _extraido:
-            for _adv in _extraido.get("_advertencias", []):
-                st.warning(_adv, icon="⚠️")
-
-            st.markdown("**Campos detectados — revisa contra el documento antes de aplicar:**")
-            _metodo_icono = {"patron": "🔤 patrón", "ia": "🤖 IA"}
-            _filas_revision = [
-                {
-                    "Campo": _c.replace("_", " ").capitalize(),
-                    "Valor propuesto": (_extraido[_c]["valor"] if _c in _extraido
-                                        else "— no encontrado —"),
-                    "Método": (_metodo_icono.get(_extraido[_c]["metodo"], "") if _c in _extraido
-                              else ""),
-                    "Evidencia citada": _extraido[_c]["evidencia"] if _c in _extraido else "",
-                }
-                for _c in _CAMPOS_COTIZACION
-            ]
-            st.dataframe(pd.DataFrame(_filas_revision), hide_index=True, use_container_width=True)
-
-            _cap      = _extraido.get("capacidad_w", {}).get("valor")
-            _precio_w = _extraido.get("precio_unitario_w", {}).get("valor")
-            _flete    = _extraido.get("flete", {}).get("valor")
-            _tot_fob  = _extraido.get("total_fob", {}).get("valor")
-            _desc     = (_extraido.get("descripcion_item", {}).get("valor")
-                        or "Estructura y montaje — cotización cargada")
-            _num_cot  = str(_extraido.get("numero_cotizacion", {}).get("valor") or "").strip()[:40]
-            _proveedor = str(_extraido.get("proveedor", {}).get("valor") or "").strip()
-            _fecha_cot = str(_extraido.get("fecha_cotizacion", {}).get("valor") or "").strip()
-
-            if _cap and _precio_w and _tot_fob:
-                _calc = _cap * _precio_w
-                if abs(_calc - _tot_fob) / max(_tot_fob, 1.0) > 0.02:
-                    st.warning(
-                        f"⚠️ Capacidad × Precio/W da USD {_calc:,.2f}, pero el documento dice "
-                        f"USD {_tot_fob:,.2f} para ese ítem — revisa los valores extraídos "
-                        "antes de aplicar.", icon="⚠️"
-                    )
-
-            _puede_aplicar = bool(_cap and _precio_w)
-            if not _puede_aplicar:
-                st.info(
-                    "Faltan campos clave (capacidad y/o precio unitario) para aplicar "
-                    "automáticamente. Puedes completarlos a mano en la tabla de abajo."
-                )
-
-            col_ap, col_desc = st.columns([1, 1])
-            if col_ap.button("✅ Aplicar a Perfilería y Estructura", disabled=not _puede_aplicar,
-                              key="btn_aplicar_cotizacion_perfileria"):
-                _fuente_txt = f"Cotización {_proveedor or 'proveedor'} {_num_cot}".strip()
-                if _fecha_cot:
-                    _fuente_txt += f" ({_fecha_cot})"
-                _ref = _num_cot or "COTIZ"
-                _filas_nuevas = [[_desc, _ref, float(_cap), "W", float(_precio_w)]]
-                if _flete:
-                    _filas_nuevas.append(
-                        [f"Flete marítimo — {_proveedor or 'proveedor'}", _ref, 1.0, "glb",
-                         float(_flete)])
-                _df_nuevas = pd.DataFrame(_filas_nuevas, columns=_BASE_COLS)
-                _df_nuevas.insert(0, "Activo", True)
-
-                ss_key = "df_sec_perfileria"
-                if ss_key not in st.session_state:
-                    st.session_state[ss_key] = _plantilla_con_activo("perfileria")
-                _df_actual = st.session_state[ss_key]
-                # Reemplaza filas de una carga previa de la MISMA cotización (mismo Ref)
-                # en vez de duplicarlas -- así "reemplazar por otra cotización" es
-                # simplemente volver a cargar el archivo actualizado.
-                if _ref != "COTIZ" and "Ref" in _df_actual.columns:
-                    _df_actual = _df_actual[_df_actual["Ref"] != _ref]
-                _df_final = pd.concat([_df_actual, _df_nuevas], ignore_index=True)
-                st.session_state[ss_key] = _df_final
-                st.session_state["fuente_inp_perfileria"] = _fuente_txt
-                st.session_state["fuente_perfileria"] = _fuente_txt
-
-                _usr = st.session_state.get("auth_email", "")
-                if _usr:
-                    pstore.guardar_seccion("perfileria", _df_final.to_dict("records"),
-                                            _usr, _fuente_txt)
-                st.success(f"✅ Aplicado a Perfilería y Estructura — fuente: {_fuente_txt}")
-                st.session_state.pop("_cotiz_extraido_perfileria", None)
-                st.session_state.pop("_cotiz_hash_perfileria", None)
-                st.rerun()
-
-            if col_desc.button("🗑️ Descartar cotización cargada",
-                               key="btn_descartar_cotizacion_perfileria"):
-                st.session_state.pop("_cotiz_extraido_perfileria", None)
-                st.session_state.pop("_cotiz_hash_perfileria", None)
-                st.rerun()
-
-        st.caption(
-            "Para quitar o reemplazar una cotización ya aplicada: desactívala con el "
-            "checkbox ✔ de la fila, bórrala con Supr en la tabla de abajo, o usa "
-            "'↺ Resetear' para volver a la plantilla en blanco."
-        )
-
     sub1 = _editar_seccion("perfileria", "Perfilería",
         referencia_mercado="Ej.: Cotización Ternium/Acesco, julio 2026")
 

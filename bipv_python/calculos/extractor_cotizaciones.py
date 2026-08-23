@@ -453,6 +453,82 @@ def extraer_con_ia(texto: str, campos_faltantes: list[str]) -> dict:
 
 # ═══════════════════════════ Punto de entrada ════════════════════════════════
 
+# ═══════════ Clasificador de categoría de costo (Presupuesto) ══════════════
+
+# Sinónimos por CATEGORÍA de costo -- mismo espíritu que _CAMPOS_TEXTO
+# (diccionario extensible, sin ramas de código por proveedor), aplicado a un
+# nivel más grueso: no "qué campo es este número" sino "de qué sección de
+# 💼 Presupuesto es esta cotización". Las claves coinciden EXACTAMENTE con
+# las claves de sección de pages/8_💼_Presupuesto.py (las mismas que usa
+# `pstore.SECCIONES_PERSISTIBLES` para perfileria/mano_obra/sistema_fv/
+# inversor). "inversor"/"inverter" se deja FUERA a propósito: en esa pestaña
+# significa tableros/breakers, no el modelo de inversor (que tiene su propio
+# flujo de precio desde el catálogo de 📐 Dimensionamiento) -- incluir la
+# palabra genérica "inversor" generaría falsos positivos frecuentes.
+_CATEGORIAS_COSTO: dict[str, list[str]] = {
+    "perfileria": [
+        "structure", "mounting", "estructura", "montaje", "perfileria",
+        "perfilería", "racking", "rack", "soporte", "screw foundation",
+        "ground mount", "roof mount", "clamp", "rail", "carril", "anclaje",
+        "cimentacion", "cimentación",
+    ],
+    "mano_obra": [
+        "installation", "instalacion", "instalación", "labor", "mano de obra",
+        "commissioning", "puesta en marcha", "certificacion", "certificación",
+        "retie", "ritel", "contratista", "cuadrilla",
+    ],
+    "sistema_fv": [
+        "cable", "conductor", "combiner box", "caja de conexiones",
+        "puesta a tierra", "grounding", "monitoring", "monitoreo", "conduit",
+        "canalizacion", "canalización", "string box", "conector mc4",
+    ],
+    "inversor": [
+        "breaker", "tablero", "switchgear", "distribution board",
+        "panel electrico", "panel eléctrico", "proteccion ac",
+        "protección ac", "transfer switch",
+    ],
+    "catalogo": [
+        "panel solar", "solar panel", "modulo fotovoltaico",
+        "módulo fotovoltaico", "modulo bipv", "pv module", "bateria",
+        "batería", "battery",
+    ],
+    "soft": [
+        "ingenieria", "ingeniería", "engineering", "diseno", "diseño",
+        "consultoria", "consultoría", "legal", "seguro", "poliza", "póliza",
+        "insurance", "project management", "gerencia de proyecto",
+        "auditoria", "auditoría", "licencia", "tramite", "trámite",
+    ],
+}
+
+CATEGORIA_LABELS: dict[str, str] = {
+    "perfileria": "🔩 Perfilería y Estructura",
+    "mano_obra":  "👷 Mano de Obra",
+    "sistema_fv": "⚡ Sistema FV",
+    "inversor":   "🔌 Inversor y Equipos Eléctricos",
+    "catalogo":   "📦 Equipos del Catálogo",
+    "soft":       "🧾 Costos Blandos",
+}
+
+
+def clasificar_categoria_costo(texto: str) -> tuple[str | None, dict[str, int]]:
+    """Sugiere a qué sección de 💼 Presupuesto pertenece una cotización,
+    contando coincidencias de palabras clave por categoría. Devuelve
+    (categoria_sugerida, {categoria: puntaje, ...}) -- ambos ordenados de
+    mayor a menor puntaje en el dict. `categoria_sugerida` es None si el
+    texto no coincide con ninguna categoría (el usuario elige a mano)."""
+    t = _sin_acentos(texto)
+    puntajes = {}
+    for cat, palabras in _CATEGORIAS_COSTO.items():
+        score = sum(t.count(_sin_acentos(p)) for p in palabras)
+        if score:
+            puntajes[cat] = score
+    if not puntajes:
+        return None, {}
+    puntajes = dict(sorted(puntajes.items(), key=lambda kv: -kv[1]))
+    mejor = next(iter(puntajes))
+    return mejor, puntajes
+
+
 CAMPOS_COTIZACION = (
     "proveedor", "numero_cotizacion", "fecha_cotizacion", "descripcion_item",
     "capacidad_w", "precio_unitario_w", "total_fob", "flete", "total_cif",
