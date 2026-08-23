@@ -24,8 +24,10 @@ import io
 import pytest
 
 from calculos.extractor_cotizaciones import (
+    CATEGORIA_LABELS,
     _detectar_moneda,
     _parsear_numero,
+    clasificar_categoria_costo,
     extraer_con_ia,
     extraer_por_patrones,
     leer_cotizacion,
@@ -261,3 +263,67 @@ def test_leer_docx_real_extrae_texto_y_tabla_correctamente():
 def test_leer_cotizacion_formato_no_soportado_da_error_claro():
     with pytest.raises(ValueError, match="no soportado"):
         leer_cotizacion(b"contenido", "cotizacion.xlsx")
+
+
+# ═══════════════ Clasificador de categoría de costo (Presupuesto) ══════════
+
+def test_clasifica_la_cotizacion_de_mibet_como_perfileria():
+    cat, puntajes = clasificar_categoria_costo(_TEXTO_MIBET)
+    assert cat == "perfileria"
+    assert puntajes["perfileria"] > 0
+
+
+def test_clasifica_una_cotizacion_de_mano_de_obra():
+    texto = (
+        "Propuesta de instalación y montaje eléctrico del sistema fotovoltaico.\n"
+        "Incluye certificación RETIE y puesta en marcha (commissioning) con "
+        "cuadrilla de instalación certificada. Contratista: Electro Andina SAS."
+    )
+    cat, _ = clasificar_categoria_costo(texto)
+    assert cat == "mano_obra"
+
+
+def test_clasifica_una_cotizacion_de_sistema_fv():
+    texto = (
+        "Suministro de cable solar, combiner box, sistema de puesta a tierra "
+        "(grounding) y plataforma de monitoreo remoto para el string fotovoltaico."
+    )
+    cat, _ = clasificar_categoria_costo(texto)
+    assert cat == "sistema_fv"
+
+
+def test_clasifica_una_cotizacion_de_tableros_electricos():
+    texto = (
+        "Cotización de tablero de distribución AC, breakers termomagnéticos y "
+        "protección AC (switchgear) para la interconexión del sistema."
+    )
+    cat, _ = clasificar_categoria_costo(texto)
+    assert cat == "inversor"
+
+
+def test_clasifica_una_cotizacion_de_paneles_como_catalogo():
+    texto = "Cotización de panel solar bifacial 585W, módulo fotovoltaico monocristalino."
+    cat, _ = clasificar_categoria_costo(texto)
+    assert cat == "catalogo"
+
+
+def test_clasifica_una_cotizacion_de_costos_blandos():
+    texto = (
+        "Propuesta de ingeniería y diseño del proyecto, incluye gerencia de "
+        "proyecto (project management), póliza de seguro todo riesgo y "
+        "asesoría legal para el registro UPME."
+    )
+    cat, _ = clasificar_categoria_costo(texto)
+    assert cat == "soft"
+
+
+def test_texto_sin_coincidencias_no_sugiere_categoria():
+    cat, puntajes = clasificar_categoria_costo("Hola, ¿cómo estás? Aquí no hay nada relevante.")
+    assert cat is None
+    assert puntajes == {}
+
+
+def test_todas_las_categorias_tienen_etiqueta_de_pestana():
+    for cat in ("perfileria", "mano_obra", "sistema_fv", "inversor", "catalogo", "soft"):
+        assert cat in CATEGORIA_LABELS
+        assert CATEGORIA_LABELS[cat]
