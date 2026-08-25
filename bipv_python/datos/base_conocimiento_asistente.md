@@ -37,6 +37,8 @@ Versión: Agosto 2026 | URL: calc.innovacionquimica.com.co
 - Página 10 — Reporte PDF  ACTUALIZADO
 - Página 15 — Catálogo de Inversores PDF  NUEVO
 - Catálogo de Baterías — carga robusta del Excel  ACTUALIZADO
+13e. Página 19 — 🔒 Ledger de Auditoría  NUEVO
+
 - Calculadora de Sombreado 3D
 - Cadena completa — bypass y multi-superficie
 - Interpretación de resultados clave
@@ -44,6 +46,8 @@ Versión: Agosto 2026 | URL: calc.innovacionquimica.com.co
 - Anexo — Sombras desde Site Designer / Andrew Marsh (ruta externa, agosto 2026)  NUEVO
 - Anexo — Actualizaciones 6-7 de agosto 2026 (Asistente, cuentas, proyectos y Vista 3D solar)  NUEVO
 - Anexo — Actualizaciones del 21 de agosto de 2026 (comparadores, validación Motor IV, consumo y excedentes)  NUEVO
+- Anexo — Actualizaciones del 22 de agosto de 2026 (carga de cotizaciones PDF/Word en Presupuesto)  NUEVO
+- Anexo — Actualizaciones del 25 de agosto de 2026 (Ledger de Auditoría, cadena de hashes)  NUEVO
 ────────────────────────────────────────────────────────────
 
 ## 1. Descripción general
@@ -1681,6 +1685,20 @@ Esto permite al cliente o a la UPME verificar que los números de TIR y Payback 
 
 Si la simulación bifacial está activa, la sección «Recurso Solar y POA del Sitio» del PDF incluye una tabla adicional con: modelo usado (pvlib infinite_sheds), bifacialidad (%), altura de montaje, albedo trasero y la ganancia bifacial anual (%). Así el cliente y el banco ven de dónde sale la energía extra. Si la simulación bifacial está apagada, el reporte no cambia.
 
+────────────────────────────────────────────────────────────
+
+### 🔒 Sellar el reporte en el Ledger de Auditoría  NUEVO (25-ago-2026)
+
+Justo antes del botón "📄 Generar Reporte" aparece el checkbox **"🔒 Sellar este resultado en el Ledger de Auditoría"**, marcado por defecto (se puede desmarcar). Junto a él hay un selector de tipo — **🏦 Presupuesto bancable (banco/ITA)** o **📋 Verificación presupuestal informativa** — y un campo de nota opcional (ej. "Versión final entregada al cliente").
+
+Si el checkbox está marcado y presionas "Generar Reporte":
+
+- La app sella un eslabón nuevo en la cadena de hashes de este proyecto (ver la sección completa del "🔒 Ledger de Auditoría" más abajo en este manual para el detalle técnico).
+- El propio archivo HTML/PDF entregado queda con un pie de página impreso: **"🔒 ID de verificación del Ledger de Auditoría: `<hash corto>` — sellado `<fecha>` — verificable en la página 🔒 Ledger de Auditoría del proyecto."** Esto significa que el documento que le entregas al cliente o al banco lleva su propia huella digital verificable — no es solo un PDF suelto, es un PDF con una prueba de integridad que se puede cotejar contra tu base local.
+- Si por algún motivo no se pudo sellar (sin sesión activa, o falla de disco), la app avisa con un mensaje explícito y genera el reporte igual, sin ID de verificación — nunca falla en silencio ni bloquea la entrega del reporte.
+
+⚠️ Para no cometer errores: el tipo de sello que elijas aquí (bancable vs. informativo) queda registrado dentro del eslabón — úsalo con criterio, porque de eso depende cómo se etiqueta ese resultado en el historial del Ledger.
+
 ## 13b. Página 15 — Catálogo de Inversores PDF  NUEVO
 
 Propósito: Agregar inversores al catálogo subiendo directamente la ficha técnica del fabricante en PDF. La app extrae automáticamente los parámetros eléctricos y los deja listos para revisar y guardar en el Excel del catálogo, sin transcripción manual.
@@ -1756,6 +1774,51 @@ Al subir la ficha técnica de un panel, el extractor ahora también detecta la b
 Con ese dato guardado, la página 2 activa automáticamente la simulación bifacial al seleccionar el panel — sin ingresar nada a mano.
 
 ⚠️ IMPORTANTE: si el panel es monofacial (vidrio-backsheet), deja el campo vacío o en 0. Poner una bifacialidad inventada infla la producción estimada.
+
+## 13e. Página 19 — 🔒 Ledger de Auditoría  NUEVO (25-ago-2026)
+
+### Por qué existe esta página — el diferenciador real
+
+Res. CREG 174 de 2021, Artículo 6, exige explícitamente que **"los cálculos tengan trazabilidad para determinar si son reales o actualizados"**. Hasta esta versión, la calculadora cumplía ese requisito de forma *declarativa* (campos de "Fuente de precios", banners de trazabilidad de E_ac, fecha de vigencia del presupuesto...), pero nada impedía correr Financiero dos veces con supuestos distintos y quedarte con la versión más favorable, sin que quedara ningún rastro de que existió una corrida anterior diferente.
+
+**Con el Ledger de Auditoría, la calculadora deja de ser solo una herramienta de cálculo y pasa a cumplir ese artículo de forma *verificable*, no solo declarativa** — cada resultado oficial queda sellado con una cadena de hashes que cualquiera puede recorrer y confirmar matemáticamente que no fue alterado después de generarse. Esto es un diferenciador **concreto y citable frente a un banco o un ITA**, no una "buena práctica" genérica: hoy, ningún competidor de esta calculadora ofrece de forma verificable esa trazabilidad exigida por el Art. 6 de la Res. CREG 174/2021. Puedes citar textualmente este artículo al presentar un proyecto ante un banco como respaldo normativo de por qué tu presupuesto trae un Ledger sellado y el de la competencia no.
+
+### Qué es un "eslabón" y cómo funciona la cadena de hashes
+
+Cada vez que sellas un resultado, la app crea un **eslabón**: un registro que contiene los insumos (panel, inversor, degradación, tarifa, TRM, CAPEX y su fuente), los resultados (E_ac, PR, TIR, VPN, LCOE, Payback, o las métricas de un diagnóstico), la fecha, el usuario que lo selló, una nota opcional, y dos hashes SHA-256: el de este mismo eslabón (`hash_propio`) y el del eslabón **anterior** de ese mismo proyecto (`hash_anterior`).
+
+Esa referencia al hash anterior es lo que forma la "cadena": el hash de cada eslabón se calcula incluyendo el hash del que vino antes, así que **alterar cualquier campo de un eslabón ya guardado — incluso un solo carácter de la nota — cambia su hash, y ese cambio se propaga y rompe la cadena de todos los eslabones que le siguen.** No hace falta un sistema externo para detectarlo: basta con recorrer la cadena y recalcular cada hash para ver si sigue coincidiendo con el guardado.
+
+En términos auditables, esto significa concretamente:
+
+- **Detecta alteración retroactiva**: si alguien edita un registro directamente en el archivo del servidor (sin pasar por la app), su hash deja de coincidir con el que usó el siguiente eslabón como referencia — la ruptura es matemáticamente evidente, sin necesitar comparar contra un backup externo.
+- **Prueba de secuencia honesta**: un banco o ITA puede revisar el HISTORIAL completo de corridas de un proyecto, no solo el resultado final. Si el TIR subió de 11% a 14% entre dos sellos, el Ledger muestra exactamente qué insumo cambió y cuándo — no un número final que "apareció así".
+- **Límite honesto (no se oculta)**: el hash-chain protege contra editar UN eslabón sin que se note. No evita que alguien borre el archivo completo del ledger y empiece de cero — eso requeriría un ancla externa (por ejemplo, publicar el hash raíz en otro sistema independiente), decidido explícitamente FUERA de alcance por ahora para no perder el principio de "todo local, sin depender de servicios externos".
+
+### Los 3 tipos de resultado que se pueden sellar
+
+El Ledger no es solo para bancabilidad — cubre 3 escenarios reales, cada uno con su propia etiqueta dentro del eslabón:
+
+Tipo  │  Cuándo se usa  │  Dónde se sella
+
+🏦 Presupuesto bancable  │  El resultado va a un banco o a un Auditor Técnico Independiente (ITA) para financiamiento  │  Checkbox en 📄 Reporte PDF, o manual en esta página
+
+📋 Verificación presupuestal informativa  │  Le entregas un resultado a un cliente SIN fines de financiamiento — igual queda protegido: si en 6 meses el cliente dice "usted me había dicho que esto rendía X", tienes la prueba exacta de qué le mostraste y con qué insumos  │  Checkbox en 📄 Reporte PDF, o manual en esta página
+
+🔍 Diagnóstico de sistema en operación  │  Diagnosticas un sistema YA instalado (🔍 Página 13 — Diagnóstico) — protege la conclusión de un diagnóstico puntual, útil ante una reclamación de garantía al instalador o fabricante  │  Botón "🔒 Sellar en el Ledger de Auditoría" en la propia página 13, independiente del botón de histórico de tendencia que ya existía ahí
+
+### Por qué el sellado es siempre manual, nunca automático
+
+El Ledger NO registra cada cálculo de prueba mientras ajustas un slider — eso llenaría la cadena de ruido y le restaría valor a lo que sí es un resultado oficial. Se sella únicamente cuando presionas un botón explícito ("🔒 Sellar" en esta página, en Diagnóstico, o el checkbox al generar el Reporte PDF). Esto significa que la disciplina de cuándo sellar es tuya: sella cuando el resultado sea el que realmente vas a entregar o defender, no cada intento.
+
+### Qué puedes hacer en esta página
+
+- **🔒 Sellar el resultado actual**: toma un snapshot de los insumos y resultados vigentes en la sesión (panel, inversor, degradación, tarifa, CAPEX, E_ac, PR, TIR, VPN, LCOE) y lo sella como un eslabón nuevo — útil para una verificación presupuestal informativa que no pasa por el Reporte PDF.
+- **✅ Verificar integridad de la cadena**: recorre TODOS los eslabones del proyecto recalculando cada hash. Muestra 🟢 "cadena íntegra" o 🔴 "cadena rota en el eslabón #N" si detecta cualquier alteración — corre esto antes de entregar el historial como evidencia a un banco.
+- **📜 Historial completo**: tabla con fecha, tipo, usuario y nota de cada eslabón, más el detalle completo (insumos y resultados congelados, y ambos hashes) de cualquiera que selecciones.
+- **📤 Exportar para banco/ITA**: descarga el historial completo en JSON o Markdown, para entregárselo a un tercero sin darle acceso directo al servidor de la calculadora.
+
+⚠️ Para no cometer errores: el Ledger es por proyecto Y por cuenta — dos usuarios distintos con un proyecto del mismo nombre tienen cadenas completamente separadas, igual que el resto de los datos privados por cuenta de esta app.
 
 ## 14. Calculadora de Sombreado 3D
 
@@ -2291,6 +2354,26 @@ Nuevo punto único de carga en 💼 Presupuesto (arriba de las 8 pestañas) que 
 Manual actualizado el 22 de agosto de 2026
 
 Novedades de esta versión: carga automática de cotizaciones de proveedor (PDF/Word) en 💼 Presupuesto, con extracción genérica por patrones + respaldo por IA verificado y clasificador automático de sección destino.
+
+────────────────────────────────────────────────────────────
+
+## 23. Anexo — Actualizaciones del 25 de agosto de 2026
+
+23.1 🔒 Ledger de Auditoría: cadena de hashes verificable por proyecto  NUEVO
+
+Nueva página (🔒 Página 19) que sella resultados oficiales del proyecto — bancables, informativos para un cliente, o diagnósticos de un sistema ya instalado — en una cadena de hashes SHA-256 encadenados: alterar cualquier campo de un eslabón ya sellado, aunque sea un carácter de la nota, rompe la cadena de forma matemáticamente detectable. Implementa de forma **verificable** (no solo declarativa) el requisito de trazabilidad de cálculos del Art. 6 de la Res. CREG 174 de 2021 — un diferenciador concreto y citable frente a un banco, no una "buena práctica" genérica. Ver el detalle técnico completo en la sección 13e.
+
+- 📄 Reporte PDF ahora ofrece un checkbox para sellar al generar (marcado por defecto), con el ID de verificación impreso en el propio documento entregado.
+- 🔍 Diagnóstico ahora tiene un botón de sellado independiente del histórico de tendencia que ya existía, para proteger la conclusión de un diagnóstico puntual.
+- El sellado es siempre manual y explícito — nunca automático en cada cálculo de prueba.
+
+⚠️ Para no cometer errores: el Ledger protege contra la edición silenciosa de un eslabón ya guardado; NO protege contra borrar el archivo completo del ledger (eso requeriría un ancla externa, fuera de alcance por decisión explícita para mantener el principio de "todo local").
+
+────────────────────────────────────────────────────────────
+
+Manual actualizado el 25 de agosto de 2026
+
+Novedades de esta versión: 🔒 Ledger de Auditoría — cadena de hashes verificable por proyecto, integrado en 📄 Reporte PDF y 🔍 Diagnóstico, implementando de forma verificable el requisito de trazabilidad del Art. 6 de la Res. CREG 174/2021.
 
 Calculadora BIPV — Innovación Química
 
