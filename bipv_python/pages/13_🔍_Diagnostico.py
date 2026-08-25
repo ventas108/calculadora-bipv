@@ -13,6 +13,7 @@ from calculos.diagnostico_historico import (
     guardar_registro,
     eliminar_registro,
 )
+from calculos import ledger_auditoria as _ledger
 
 st.set_page_config(
     page_title="Diagnóstico — Sistema Instalado",
@@ -725,7 +726,7 @@ st.caption(
 
 _historico = cargar_historico(_nombre_proy_hist)
 
-col_hg1, col_hg2 = st.columns([1, 3])
+col_hg1, col_hg2, col_hg3 = st.columns([1, 1, 2])
 with col_hg1:
     if st.button("💾 Guardar este diagnóstico en el histórico", type="secondary",
                  use_container_width=True):
@@ -757,6 +758,36 @@ with col_hg1:
                 "del servidor en `datos/diagnosticos/`). El registro se muestra abajo "
                 "pero se perderá al recargar."
             )
+
+with col_hg2:
+    # ── 🔒 Ledger de Auditoría — mismo diagnóstico, sellado con hash encadenado.
+    # Independiente del histórico de arriba: el histórico es para ver tendencia
+    # entre visitas; el ledger es para poder probar después que ESTE diagnóstico
+    # puntual no se alteró (útil ante una reclamación de garantía al instalador).
+    if st.button("🔒 Sellar en el Ledger de Auditoría", type="secondary",
+                 use_container_width=True):
+        _usr_diag = st.session_state.get("auth_email", "")
+        _insumos_diag = {
+            "tipo_sistema": tipo_sistema, "potencia_kwp": round(potencia_kWp, 2),
+            "ciudad": ciudad_diag, "ghi_anual_kwh_m2": round(ghi_anual, 1),
+            "num_meses": int(num_meses),
+        }
+        _resultados_diag = {
+            "prod_anual_kwh": round(prod_anual_kwh, 0),
+            "yield_kwh_kwp": round(yield_especifico, 0),
+            "pr_real": round(pr_real, 4), "pr_ref_nominal": pr_ref_nom,
+            "pi_pct": round(pi_pct, 1), "deg_pct_ano": round(deg_pct_año, 2),
+            "pct_autoconsumo": round(pct_autoconsumo, 1),
+            "lcoe_cop_kwh": round(lcoe_cop_kwh, 1), "estado": semaforo_estado,
+        }
+        _eslabon_diag = _ledger.sellar_resultado(
+            _nombre_proy_hist, _usr_diag, "diagnostico_operacion",
+            _insumos_diag, _resultados_diag,
+        ) if _usr_diag else {}
+        if _eslabon_diag:
+            st.success(f"🔒 Diagnóstico sellado — ID {_eslabon_diag['hash_propio'][:16]}")
+        else:
+            st.warning("⚠️ No se pudo sellar (revisa sesión activa y permisos/espacio).")
 
 if not _historico:
     st.info(

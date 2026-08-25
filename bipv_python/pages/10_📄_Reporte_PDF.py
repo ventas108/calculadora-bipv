@@ -1657,12 +1657,64 @@ if not _trm_ok_rep:
     trm_widget("rep")   # 🔄 refrescar, editar o ✔️ confirmar aquí mismo
     _trm_ok_rep, _tc_rep, _ = _trm_confirmada()   # re-evaluar en el mismo rerun
 
+# ── 🔒 Ledger de Auditoría — sellar este resultado al generar el reporte ──────
+# Res. CREG 174/2021 Art. 6 exige trazabilidad de los cálculos. Sellar es
+# opcional y explícito -- no cada corrida de prueba, solo la que se entrega.
+from calculos import ledger_auditoria as _ledger
+
+_sellar_rep = st.checkbox(
+    "🔒 Sellar este resultado en el Ledger de Auditoría",
+    value=True, key="chk_sellar_reporte",
+    help="Registra un eslabón con hash encadenado (insumos + resultados de este "
+         "reporte) en el Ledger de Auditoría del proyecto -- verificable después "
+         "en 🔒 Ledger de Auditoría. No modifica ni bloquea la generación del reporte.",
+)
+_tipo_sello_rep = st.selectbox(
+    "Tipo de resultado",
+    options=["presupuesto_bancable", "presupuesto_informativo"],
+    format_func=lambda k: _ledger.TIPO_LABELS.get(k, k),
+    key="sel_tipo_sello_reporte", disabled=not _sellar_rep,
+)
+_nota_sello_rep = st.text_input(
+    "Nota (opcional)", key="nota_sello_reporte", disabled=not _sellar_rep,
+    placeholder="Ej.: Versión final entregada al cliente",
+)
+
 if st.button("📄 Generar Reporte", type="primary", use_container_width=True,
              key="btn_generar", disabled=not _trm_ok_rep,
              help="La TRM debe estar confirmada antes de generar el reporte."
                   if not _trm_ok_rep else None):
     with st.spinner("Generando reporte…"):
-        html_bytes = generar_html_reporte().encode("utf-8")
+        html_str = generar_html_reporte()
+
+    if _sellar_rep:
+        _usr_rep = st.session_state.get("auth_email", "")
+        _eslabon_rep = _ledger.sellar_resultado(
+            nombre_proyecto, _usr_rep, _tipo_sello_rep,
+            _ledger.construir_snapshot_insumos(st.session_state),
+            _ledger.construir_snapshot_resultados(st.session_state),
+            nota=_nota_sello_rep,
+        ) if _usr_rep else {}
+        if _eslabon_rep:
+            _id_corto = _eslabon_rep["hash_propio"][:16]
+            _pie_ledger = (
+                '<div style="margin-top:2em;padding:0.8em;border-top:2px solid #ccc;'
+                'font-size:0.8em;color:#555;">🔒 ID de verificación del Ledger de '
+                f'Auditoría: <code>{_id_corto}</code> — sellado {_eslabon_rep["timestamp"]} '
+                f'({_ledger.TIPO_LABELS.get(_tipo_sello_rep, _tipo_sello_rep)}) — '
+                'verificable en la página 🔒 Ledger de Auditoría del proyecto.</div>'
+            )
+            html_str = (html_str.replace("</body>", _pie_ledger + "</body>")
+                        if "</body>" in html_str else html_str + _pie_ledger)
+            st.success(f"🔒 Resultado sellado en el Ledger — ID {_id_corto}")
+        else:
+            st.warning(
+                "⚠️ No se pudo sellar en el Ledger de Auditoría (revisa que haya "
+                "sesión activa, permisos/espacio en el servidor) — el reporte se "
+                "generó igual, sin ID de verificación."
+            )
+
+    html_bytes = html_str.encode("utf-8")
     st.session_state["reporte_generado"] = True  # lo lee el 🧭 Asistente
 
     st.download_button(
