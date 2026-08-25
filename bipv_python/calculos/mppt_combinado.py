@@ -33,6 +33,7 @@ import pandas as pd
 import pvlib
 
 from calculos.modelo_iv import (
+    calcular_rsh_cdte,
     obtener_constantes_tecnologia,
     tiene_sdm_completo,
     K_BOLTZMANN,
@@ -59,10 +60,10 @@ def _params_grupo(G, T_cel, panel: dict, n_serie: int, n_paralelo: int):
     Vt_ref     = K_BOLTZMANN * T_REF_K / Q_ELECTRON
     nNsVth_ref = panel["a_ref"] * Vt_ref
 
-    # Rsh exponencial CdTe (Mermoud 2005) a nivel de módulo
-    G_safe = np.where(G > 0, G, 1.0)
-    R_sh_mod = (panel["R_sh_ref"] * np.exp(-constantes["c_Rsh"] * (G_safe / G_REF - 1.0))
-                + panel.get("R_sh_base", 0.0))
+    # Rsh exponencial saturado (Mermoud 2005 / PVsyst) a nivel de módulo
+    R_sh_mod = calcular_rsh_cdte(
+        G, panel["R_sh_ref"], c_Rsh=constantes["c_Rsh"], R_sh_0=panel.get("R_sh_0"),
+    )
 
     _Isc_stc = float(panel.get("Isc_stc") or panel.get("Isc") or 1.0)
     alpha_sc = panel["Tk_alfa"] / 100.0 * _Isc_stc

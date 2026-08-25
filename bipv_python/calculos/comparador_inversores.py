@@ -60,7 +60,7 @@ def filtrar_inversores_compatibles(
     """
     filas = []
     voc = calcular_voc_string(N_serie, panel["Voc_stc"], panel["Tk_beta"], T_frio)
-    vmp = calcular_vmp_string(N_serie, panel["Vmp_stc"], panel["Tk_gamma"], T_real)
+    vmp = calcular_vmp_string(N_serie, panel["Vmp_stc"], panel["Tk_beta"], T_real)
     isc = float(panel["Isc_stc"]) * FS_isc
 
     for nombre, inv in sorted(inversores.items()):

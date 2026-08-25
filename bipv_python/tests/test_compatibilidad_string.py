@@ -34,7 +34,10 @@ def test_economico_sna_12k_detecta_tension_y_mppt_fuera_de_rango() -> None:
     assert resultado["evaluable"] is True
     assert resultado["compatible"] is False
     assert resultado["Voc_frio"] == pytest.approx(1017.4, abs=1.0)
-    assert resultado["Vmp_real"] == pytest.approx(674.0, abs=1.0)
+    # 666.0V, no 674.0V: calcular_vmp_string() usaba Tk_gamma (coef. de
+    # Pmax) en vez de Tk_beta (coef. de Voc) -- corregido 25-ago-2026,
+    # ver tests/test_validacion_vba.py::test_vmp_n8_vs_xlsm.
+    assert resultado["Vmp_real"] == pytest.approx(666.0, abs=1.0)
     assert any("Voc en frío" in m for m in resultado["mensajes"])
     assert any("MPPT máximo" in m for m in resultado["mensajes"])
 
