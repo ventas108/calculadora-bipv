@@ -31,16 +31,42 @@ def obtener_constantes_tecnologia(tecnologia: str) -> dict:
     return CONSTANTES_TECNOLOGIA[tech]
 
 
-def calcular_rsh_cdte(G, R_sh_ref, c_Rsh=5.5, R_sh_base=0.0, G_ref=1000.0):
+def calcular_rsh_cdte(G, R_sh_ref, c_Rsh=5.5, R_sh_0=None, G_ref=1000.0):
     """
-    Rsh exponencial CdTe — Mermoud 2005.
-    Equivalente al bloque interno de TrasladarParametrosGT (VBA).
+    Rsh exponencial SATURADO — Mermoud 2005 / PVsyst (mismo modelo que
+    pvlib.pvsystem.calcparams_pvsyst / _pvsyst_Rsh).
 
-    Rsh(G) = R_sh_ref × exp(−c_Rsh × (G/G_ref − 1)) + R_sh_base
+    Rsh(G) = Rsh_base + (R_sh_0 − Rsh_base) × exp(−c_Rsh × G/G_ref)
+    Rsh_base = (R_sh_ref − R_sh_0 × exp(−c_Rsh)) / (1 − exp(−c_Rsh))
+
+    `R_sh_0` es la resistencia shunt a la que la curva SATURA a muy baja
+    irradiancia (G→0) -- un valor FINITO, a diferencia de la fórmula
+    anterior de un solo término (R_sh_ref × exp(−c_Rsh×(G/Gref−1))), que
+    diverge sin límite cuando G→0 (a G=100 W/m² con c_Rsh=5.5 llegaba a
+    ~245× R_sh_ref, un valor sin sentido físico que hacía que el Fill
+    Factor subiera de forma anómala a baja irradiancia en vez de seguir
+    la curva real "en joroba" documentada para capa delgada (Batzner et
+    al. 2001): sube desde ~100 W/m², hace pico ~150-200 W/m², y BAJA de
+    nuevo hacia irradiancias más altas.
+
+    La corrección Rsh_base ancla la curva para que Rsh(G_ref) = R_sh_ref
+    EXACTO sin importar R_sh_0/c_Rsh (necesario: R_sh_ref ya está
+    calibrado contra la ficha técnica en STC, ver validar_sdm_vs_ficha()).
+
+    Si `R_sh_0` no se especifica (panel sin calibración propia contra una
+    referencia real), cae al comportamiento de la fórmula anterior
+    (R_sh_0 = R_sh_ref × exp(c_Rsh)) -- mismo resultado que antes de esta
+    corrección, sin regresión, hasta que ese panel tenga su propia
+    referencia para calibrar un R_sh_0 real.
     """
     G_arr  = np.atleast_1d(np.asarray(G, dtype=float))
     G_safe = np.where(G_arr > 0, G_arr, 1.0)
-    rsh    = R_sh_ref * np.exp(-c_Rsh * (G_safe / G_ref - 1.0)) + R_sh_base
+    if R_sh_0 is None:
+        R_sh_0 = R_sh_ref * np.exp(c_Rsh)
+    exp_c   = np.exp(-c_Rsh)
+    rsh_base = (R_sh_ref - R_sh_0 * exp_c) / (1.0 - exp_c)
+    rsh_base = max(rsh_base, 0.0)   # nunca negativo (ver pvlib._pvsyst_Rsh)
+    rsh = rsh_base + (R_sh_0 - rsh_base) * np.exp(-c_Rsh * G_safe / G_ref)
     return rsh.item() if rsh.size == 1 else rsh   # .item() compatible numpy 1.x y 2.x
 
 
@@ -58,12 +84,12 @@ def trasladar_parametros_gt(G, T_cel_C, panel: dict):
     Vt_ref      = K_BOLTZMANN * T_REF_K / Q_ELECTRON   # 0.025693 V @ 25°C
     nNsVth_ref  = panel["a_ref"] * Vt_ref               # 154 × 0.025693 = 3.957 V
 
-    # R_sh exponencial CdTe (Mermoud 2005) — reemplaza el lineal de pvlib
+    # R_sh exponencial saturado (Mermoud 2005 / PVsyst) — reemplaza el lineal de pvlib
     R_sh_exp = calcular_rsh_cdte(
         G,
         panel["R_sh_ref"],
-        c_Rsh     = constantes["c_Rsh"],
-        R_sh_base = panel.get("R_sh_base", 0.0),
+        c_Rsh  = constantes["c_Rsh"],
+        R_sh_0 = panel.get("R_sh_0"),   # None → sin regresión si el panel no está calibrado
     )
 
     # pvlib.calcparams_desoto para I_L, I_o, R_s, nNsVth

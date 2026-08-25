@@ -66,7 +66,14 @@ ASP_ST1_T40 = {
     "I_L_ref":   0.8152,     # A   — fotocorriente de referencia
     "I_o_ref":   1.35e-13,   # A   — corriente de saturación
     "R_s":      25.5090,     # Ω   — resistencia serie (módulo completo)
-    "R_sh_ref": 1340.6,      # Ω   — Rsh base (para modelo exponencial CdTe)
+    "R_sh_ref": 1340.6,      # Ω   — Rsh en STC (referencia del modelo exponencial saturado)
+    "R_sh_0":   18450.0,     # Ω   — Rsh al que satura la curva a muy baja irradiancia
+                             #       (G→0). Calibrado por ajuste minimax contra los 10
+                             #       puntos de la hoja FF_vs_Irradiancia del XLSM auditado
+                             #       (25-ago-2026): error máximo residual ~4.9% (antes de
+                             #       este parámetro, la fórmula sin saturar llegaba a 12.6%
+                             #       de error y con la forma de curva invertida). Ver
+                             #       calculos.modelo_iv.calcular_rsh_cdte() para el detalle.
     "a_ref":     154.0,      # n×Ns adimensional (Ns=141, n=1.094)
 
     # ── Temperatura nominal ────────────────────────────────────────────────

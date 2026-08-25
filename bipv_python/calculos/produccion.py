@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 import pvlib
 
-from calculos.modelo_iv import obtener_constantes_tecnologia
+from calculos.modelo_iv import calcular_rsh_cdte, obtener_constantes_tecnologia
 from calculos.temperatura import temperatura_celda_noct
 from calculos.agregador_anual import (
     agregar_anual_8760_poa,
@@ -75,10 +75,10 @@ def _calcular_pmax_vectorizado(
     Vt_ref     = K_BOLTZMANN * T_REF_K / Q_ELECTRON   # 0.025693 V
     nNsVth_ref = panel["a_ref"] * Vt_ref               # 154 × Vt_ref
 
-    # R_sh CdTe exponencial vectorizado
-    G_safe = np.where(G > 0, G, 1.0)
-    R_sh   = (panel["R_sh_ref"] * np.exp(-constantes["c_Rsh"] * (G_safe / G_REF - 1.0))
-              + panel.get("R_sh_base", 0.0))
+    # R_sh exponencial saturado (Mermoud 2005 / PVsyst) — ver calcular_rsh_cdte()
+    R_sh = calcular_rsh_cdte(
+        G, panel["R_sh_ref"], c_Rsh=constantes["c_Rsh"], R_sh_0=panel.get("R_sh_0"),
+    )
 
     I_L, I_o, R_s, _rsh_pvlib, nNsVth = pvlib.pvsystem.calcparams_desoto(
         effective_irradiance = G,

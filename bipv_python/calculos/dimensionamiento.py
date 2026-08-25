@@ -78,8 +78,17 @@ def calcular_voc_string(N, Voc_stc, Tk_beta, T_cel):
     return N * Voc_stc * (1 + Tk_beta / 100.0 * (T_cel - 25.0))
 
 
-def calcular_vmp_string(N, Vmp_stc, Tk_gamma, T_cel):
-    return N * Vmp_stc * (1 + Tk_gamma / 100.0 * (T_cel - 25.0))
+def calcular_vmp_string(N, Vmp_stc, Tk_beta, T_cel):
+    """Vmp del string a temperatura T_cel.
+
+    Usa Tk_beta (coeficiente de VOLTAJE, el de Voc) -- no Tk_gamma (el de
+    POTENCIA, Pmax). Antes del 25-ago-2026 esta función recibía Tk_gamma
+    por error: subestimaba cuánto sube el Voc en frío y cuánto baja el
+    Vmp en calor, justo las dos condiciones extremas que evaluar_compatibilidad_string()
+    usa para decidir si un string es eléctricamente seguro (ver
+    tests/test_validacion_vba.py::test_vmp_n8_vs_xlsm).
+    """
+    return N * Vmp_stc * (1 + Tk_beta / 100.0 * (T_cel - 25.0))
 
 
 def evaluar_compatibilidad_string(
@@ -103,10 +112,10 @@ def evaluar_compatibilidad_string(
             n, float(panel["Voc_stc"]), float(panel["Tk_beta"]), float(T_frio)
         )
         vmp_real = calcular_vmp_string(
-            n, float(panel["Vmp_stc"]), float(panel["Tk_gamma"]), float(T_real)
+            n, float(panel["Vmp_stc"]), float(panel["Tk_beta"]), float(T_real)
         )
         vmp_extremo = calcular_vmp_string(
-            n, float(panel["Vmp_stc"]), float(panel["Tk_gamma"]), float(T_extremo)
+            n, float(panel["Vmp_stc"]), float(panel["Tk_beta"]), float(T_extremo)
         )
         isc_equiv = (
             float(panel["Isc_stc"]) * int(N_strings_tracker) * float(FS_isc)
@@ -343,8 +352,8 @@ def optimizar_n_serie(panel: dict, inversor: dict,
     resultados = []
     for N in range(N_min, N_max + 1):
         Voc_fr  = calcular_voc_string(N, panel["Voc_stc"], panel["Tk_beta"], T_frio)
-        Vmp_re  = calcular_vmp_string(N, panel["Vmp_stc"], panel["Tk_gamma"], T_real)
-        Vmp_ex  = calcular_vmp_string(N, panel["Vmp_stc"], panel["Tk_gamma"], T_extremo)
+        Vmp_re  = calcular_vmp_string(N, panel["Vmp_stc"], panel["Tk_beta"], T_real)
+        Vmp_ex  = calcular_vmp_string(N, panel["Vmp_stc"], panel["Tk_beta"], T_extremo)
         I_equiv = panel["Isc_stc"] * N_strings_tracker * FS_isc
 
         v1 = semaforo(Voc_fr,  inversor["Vdc_max"],          invertir=False)

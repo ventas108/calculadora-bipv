@@ -26,7 +26,7 @@ from calculos.agregacion_fs import (
     normalizar_nombre_columna,
     promedio_fs_por_claves,
 )
-from calculos.modelo_iv import obtener_constantes_tecnologia
+from calculos.modelo_iv import calcular_rsh_cdte, obtener_constantes_tecnologia
 
 # ── Constantes físicas ─────────────────────────────────────────────────────────
 K_BOLTZMANN = 1.380649e-23
@@ -53,10 +53,9 @@ def _sdm_vectorizado(
     Vt_ref      = K_BOLTZMANN * T_REF_K / Q_ELECTRON
     nNsVth_ref  = panel["a_ref"] * Vt_ref
 
-    G_safe = np.where(G > 0, G, 1.0)
-    R_sh   = (panel["R_sh_ref"]
-              * np.exp(-constantes["c_Rsh"] * (G_safe / G_REF - 1.0))
-              + panel.get("R_sh_base", 0.0))
+    R_sh = calcular_rsh_cdte(
+        G, panel["R_sh_ref"], c_Rsh=constantes["c_Rsh"], R_sh_0=panel.get("R_sh_0"),
+    )
 
     I_L, I_o, R_s, _, nNsVth = pvlib.pvsystem.calcparams_desoto(
         effective_irradiance = G,
