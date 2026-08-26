@@ -48,6 +48,7 @@ Versión: Agosto 2026 | URL: calc.innovacionquimica.com.co
 - Anexo — Actualizaciones del 21 de agosto de 2026 (comparadores, validación Motor IV, consumo y excedentes)  NUEVO
 - Anexo — Actualizaciones del 22 de agosto de 2026 (carga de cotizaciones PDF/Word en Presupuesto)  NUEVO
 - Anexo — Actualizaciones del 25 de agosto de 2026 (Ledger de Auditoría, cadena de hashes)  NUEVO
+- Anexo — Actualizaciones del 26 de agosto de 2026 (validación cruzada contra PVsyst, corrección de timezone en TMY de PVGIS)  NUEVO
 ────────────────────────────────────────────────────────────
 
 ## 1. Descripción general
@@ -2374,6 +2375,26 @@ Nueva página (🔒 Página 19) que sella resultados oficiales del proyecto — 
 Manual actualizado el 25 de agosto de 2026
 
 Novedades de esta versión: 🔒 Ledger de Auditoría — cadena de hashes verificable por proyecto, integrado en 📄 Reporte PDF y 🔍 Diagnóstico, implementando de forma verificable el requisito de trazabilidad del Art. 6 de la Res. CREG 174/2021.
+
+## 24. Anexo — Actualizaciones del 26 de agosto de 2026
+
+24.1 Validación cruzada contra PVsyst + corrección de bug de timezone en TMY (proyecto Agrivoltaico Urabá)  NUEVO
+
+Los scripts de análisis del proyecto Agrivoltaico Urabá (220,32 kWp, `bipv_python/scripts/barrido_dcac_uraba.py` y `comparar_alt_b_uraba.py`) descargan su TMY directo de PVGIS con `pvlib.iotools.get_pvgis_tmy()`. Ese TMY viene indexado en UTC. El código re-etiquetaba las filas como si la posición N ya fuera la hora local N, sin convertir — un desfase de 5 horas (Colombia es UTC−5) entre la irradiancia y la posición solar de cada hora. Se detectó con una verificación de cierre físico (GHI = DNI·cosθ + DHI hora por hora: con el bug no cerraba, con el fix sí) y se corrigió con `tz_convert("America/Bogotá")` en vez de reetiquetar. El bug subestimaba la producción anual del script en ~20-25%.
+
+De paso se agregó la pérdida IAM (reflexión angular, ASHRAE + factor difusa IEC 61853-3) a esos mismos scripts, reutilizando `iam_ashrae()` que ya existía en `calculos/motor_optico.py` — antes no la modelaban.
+
+Con ambos fixes, se corrió una validación cruzada real contra PVsyst para el mismo proyecto (mismo TMY de PVGIS, mismo módulo JA Solar JAM66D46-720/LB, mismo inversor Growatt MAX 100KTL3 LV): la calculadora quedó a solo 1,6% de PVsyst en el caso monofacial, y a 1,2% en el caso bifacial (PVsyst con altura de montaje 3,0 m, pitch 6,6 m, GCR≈0,39, albedo 0,20 de pasto verde). Esto también validó el supuesto de ganancia bifacial +8% que usan esos scripts: PVsyst midió +7,6% real con la geometría física del proyecto, muy cerca del supuesto plano.
+
+⚠️ Para no cometer errores: este bug estaba confinado a los 2 scripts de `bipv_python/scripts/` que llaman `get_pvgis_tmy()` directamente — **no afecta** el motor de producción real de la app (Recurso Solar / Página 2 y las páginas aguas abajo), que usa Open-Meteo, no PVGIS. Sí es la misma clase de riesgo que ya advierten la "Nota timezone" de Página 2 y el "Requisito obligatorio: el TMY del proyecto" de Página 5a — cualquier código nuevo que use `get_pvgis_tmy()` (o cualquier fuente de TMY indexada en UTC) directamente debe convertir con `tz_convert()`, nunca reetiquetar el índice a mano.
+
+Entregables generados con las cifras corregidas: `entregables/Ficha_Tecnica_Preliminar_Agrivoltaico_Uraba_v2.docx` (v2.1) e `entregables/Informe_Final_Evaluador_Agrivoltaico_Uraba.pdf`. Detalle técnico completo del hallazgo, la verificación y ambas validaciones (mono y bifacial) en `DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md` (raíz del repo).
+
+────────────────────────────────────────────────────────────
+
+Manual actualizado el 26 de agosto de 2026
+
+Novedades de esta versión: corrección de bug de timezone en TMY de PVGIS + pérdida IAM en los scripts de análisis del proyecto Urabá, y primera validación cruzada documentada de la calculadora contra PVsyst (monofacial y bifacial) con diferencias de 1,2-1,6%.
 
 Calculadora BIPV — Innovación Química
 
