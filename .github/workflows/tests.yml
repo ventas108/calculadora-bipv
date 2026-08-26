@@ -26,7 +26,12 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          # pandas==2.2.2 (fijado en requirements.txt) salió en abril 2024,
+          # antes de Python 3.13 (octubre 2024) -- no tiene binario
+          # precompilado para 3.13 en Linux, así que pip intentaría
+          # compilarlo desde código fuente y el build falla en el runner.
+          # 3.12 sí tiene binario listo para todas las versiones fijadas.
+          python-version: "3.12"
 
       - name: Instalar dependencias
         run: |
