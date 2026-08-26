@@ -82,9 +82,28 @@ Verificado con la suite completa de tests (`pytest tests/`): 636/636 passed sin 
 
 **Nota:** los cambios están en el working tree local, sin commitear ni pushear todavía.
 
+## Validación bifacial (26-ago-2026)
+
+El usuario corrió PVsyst en modo bifacial con los inputs derivados del plano de disposición real
+(`entregables/Plano_Disposicion_Uraba_32x100.pdf`): altura 3,0 m, pitch 6,6 m (huella matriz 2,6 m +
+corredor de cultivo 4,0 m), GCR≈0,39, albedo 0,20 (pasto verde), φ=0,80 (ficha oficial JA Solar).
+
+Resultado PVsyst bifacial: E_ac=339.033 kWh/año, Yield=1.529 kWh/kWp, PR=89,08% (estándar, Yr
+solo-frontal — inflado, efecto conocido en bifaciales), PR Bifacial=81,99% (Yr con GlobEff
+frontal+trasero, comparable a monofacial). Ganancia bifacial real: **+7,60%** sobre el caso
+monofacial de PVsyst (315.074 kWh/año).
+
+Verificación cruzada: Yr implícito de PR=89,08% (1.716,4 kWh/m²) coincide con el POA frontal ya
+validado en la corrida monofacial (1.716,1-1.716,6) — confirma que el lado frontal no cambió entre
+corridas, como debía ser.
+
+Contra la calculadora (mismo caso, 2×Growatt 100kW): 334.846 kWh/año (con el supuesto plano de +8%)
+vs 339.033 kWh/año de PVsyst → diferencia de solo **-1,2%**. El supuesto de +8% bifacial queda
+**validado** (la física real de PVsyst da +7,6%, muy cerca del supuesto plano).
+
 ## Pendiente — decisión del usuario
 
-1. ~~¿Corregir el timezone en los 4 scripts?~~ → Hecho en los 2 que lo tenían.
-2. ¿Recalibrar bifacialidad/pérdidas DC del script para acercarse más a PVsyst, o dejar el +8% bifacial como upside no validado y reportarlo aparte?
-3. ¿Regenerar la Ficha Técnica v2 con las cifras corregidas (310.043-334.846 kWh/año según se decida el punto 2)?
-4. ¿Commitear y pushear estos cambios?
+1. ~~¿Corregir el timezone en los 4 scripts?~~ → Hecho. Commiteado y pusheado (`0fe3edd4`).
+2. ~~¿Recalibrar o validar la bifacialidad +8%?~~ → **Validada contra PVsyst bifacial real**: +7,6% físico vs +8% supuesto, diferencia final -1,2%. Ya no es upside sin confirmar.
+3. ~~¿Regenerar la Ficha Técnica v2?~~ → Hecho, "v2.1", pero con el bifacial todavía marcado como "sin validar" — **hay que actualizar esa nota** ahora que sí está validado. Sin commitear.
+4. ¿Commitear y pushear la Ficha v2.1 (con la nota bifacial actualizada) y este diagnóstico?

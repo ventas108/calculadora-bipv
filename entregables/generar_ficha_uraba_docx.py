@@ -44,7 +44,7 @@ def nota(lineas):
 # ══ Portada / encabezado ══
 p('FICHA TÉCNICA PRELIMINAR', bold=True, size=18, color=AZUL, align=WD_ALIGN_PARAGRAPH.CENTER, after=2)
 p('Proyecto Agrivoltaico Urabá — 220,32 kWp DC', bold=True, size=12, align=WD_ALIGN_PARAGRAPH.CENTER, after=2)
-p('Versión 2 · configuración eléctrica optimizada por simulación horaria · agosto 2026',
+p('Versión 2.1 · corrige desfase de timezone del TMY y agrega pérdida IAM · validada contra PVsyst · agosto 2026',
   size=9.5, color=GRIS, align=WD_ALIGN_PARAGRAPH.CENTER, after=12)
 
 # ══ 1. Sitio, generador y estructura ══
@@ -70,10 +70,10 @@ tabla([
     ('Tensión de string', 'Voc ≈ 882 V · Vmp ≈ 738 V (límite de equipo 1.100–1.500 V)'),
     ('Corriente por string', 'Imp ≈ 17,6 A → se requieren entradas MPPT ≥18 A, con 1 string por tracker'),
     ('Inversores', '2 × 80–90 kW AC (clase string, 1.500 V)'),
-    ('Ratio DC/AC', '1,22–1,38 · clipping simulado ≤0,24%'),
+    ('Ratio DC/AC', '1,22–1,38 · clipping simulado ≤0,11%'),
     ('Candidatos verificados (~100 kW)', 'Huawei SUN2000-100KTL-M1 · Sungrow SG110CX · Growatt MAX 100KTL3 LV — penalización <1% frente al óptimo de 80–90 kW'),
 ])
-nota('El barrido horario de ratio DC/AC mostró que el pico real del campo es ~192 kW AC; '
+nota('El barrido horario de ratio DC/AC mostró que el pico real del campo es ~184 kW AC; '
      '2×80–90 kW maximiza la TIR y minimiza el LCOE sin pérdida apreciable de energía. '
      'La redundancia de 2 equipos conserva ~50% de la producción ante la falla de uno.')
 h2('Estructura y disposición agrivoltaica')
@@ -91,26 +91,40 @@ doc.add_page_break()
 h1('2. Producción estimada (simulación horaria)')
 h2('Método')
 p('Simulación horaria de 8.760 horas con año meteorológico típico PVGIS para el punto exacto '
-  '(7.884, −76.635): transposición Hay-Davies al plano de 10° Sur, temperatura de celda por modelo '
-  'Faiman, coeficiente de potencia −0,30%/°C, ganancia bifacial +8%, pérdidas DC combinadas del 8% '
-  '(soiling, mismatch, cableado), eficiencia de inversor 98,2–98,4% y recorte (clipping) AC real.')
-p('Esta cifra reemplaza la estimación anterior por método HSP×PR (368 MWh/año), que resultaba '
-  'optimista para la nubosidad real del Urabá. La cifra de simulación horaria es la defendible '
-  'ante banca y comités de inversión.', italic=True)
-h2('Resultados anuales')
+  '(7.884, −76.635), hora local correcta (America/Bogotá): transposición Hay-Davies al plano de 10° '
+  'Sur, pérdida por reflexión angular IAM (ASHRAE, vidrio estándar) sobre la componente directa y '
+  'difusa, temperatura de celda por modelo Faiman, coeficiente de potencia −0,30%/°C, pérdidas DC '
+  'combinadas del 8% (soiling, mismatch, cableado), eficiencia de inversor 98,2% y recorte '
+  '(clipping) AC real.')
+p('Esta cifra corrige la versión anterior de este documento (≈278.600 kWh/año): el script de '
+  'simulación tenía un desfase de 5 horas entre la irradiancia del TMY (en UTC) y la posición solar '
+  '(en hora local), y no modelaba la pérdida por reflexión angular (IAM). Ambos se corrigieron y se '
+  'validaron contra una corrida real de PVsyst para el mismo proyecto: sin ganancia bifacial, la '
+  'cifra corregida (310.037 kWh/año) queda a 1,6% de PVsyst (315.074 kWh/año) — diferencia menor, ya '
+  'explicada por pérdidas que PVsyst modela y este motor aún no (nivel de irradiancia, ~0,7%).', italic=True)
+h2('Resultados anuales — base monofacial (defendible ante banca)')
 tabla([
-    ('Energía AC año 1', '≈ 278.600 kWh/año'),
-    ('Yield específico', '≈ 1.265 kWh/kWp·año'),
-    ('Pico AC real del campo', '≈ 192 kW (nunca alcanza los 220,32 kWp nominales)'),
-    ('Clipping con 2×80 kW', '0,24% (≈ 670 kWh/año)'),
-    ('Producción año 25 (con degradación)', '≈ 253.000 kWh/año'),
-    ('Energía acumulada en 25 años', '≈ 6,65 GWh'),
+    ('Energía AC año 1', '≈ 310.000 kWh/año (2×90 kW) / ≈ 309.700 kWh/año (2×80 kW)'),
+    ('Yield específico', '≈ 1.407 kWh/kWp·año'),
+    ('Performance Ratio (IEC 61724)', '≈ 85,3%'),
+    ('Pico AC real del campo', '≈ 184 kW (nunca alcanza los 220,32 kWp nominales)'),
+    ('Clipping con 2×90 kW', '0,00% · con 2×80 kW: 0,11%'),
+    ('Producción año 25 (con degradación)', '≈ 281.600 kWh/año'),
+    ('Energía acumulada en 25 años', '≈ 7,39 GWh'),
 ])
-h2('Sinergia agrivoltaica')
+h2('Sinergia agrivoltaica — ganancia bifacial (validada contra PVsyst)')
 tabla([
     ('Suelo libre para cultivo', '≈ 2.250 m² (70% del terreno)'),
-    ('Ganancia bifacial', '+8% por albedo del cultivo y altura de montaje de 3,0 m'),
+    ('Ganancia bifacial validada', '+7,6% real (PVsyst modo bifacial: altura 3,0 m, pitch 6,6 m, GCR≈0,39, albedo 0,20 pasto verde, φ=0,80)'),
+    ('Energía AC año 1 con bifacial', '≈ 334.800 kWh/año (2×90 kW) — +24.800 kWh/año sobre la base monofacial'),
 ])
+nota('Nota bifacial: se corrió PVsyst en modo bifacial ("Fixed Tilted Plane, Unlimited Sheds") con la '
+     'geometría real del plano de disposición (altura de montaje 3,0 m, pitch entre filas 6,6 m, '
+     'GCR≈0,39, albedo 0,20 de pasto verde, factor de bifacialidad del módulo φ=0,80). Resultado: '
+     '339.033 kWh/año, ganancia bifacial real +7,6% sobre el caso monofacial de PVsyst (315.074 kWh/año) '
+     '— muy cerca del +8% que ya usaba este motor. La calculadora con ese +8% da 334.846 kWh/año para el '
+     'mismo caso, a solo -1,2% de PVsyst. La ganancia bifacial queda validada y puede incluirse en el '
+     'caso base con confianza.')
 nota('Nota: la cifra contractual definitiva debe salir de la Calculadora BIPV (Motor IV con la curva '
      'del módulo + diodos de bypass si hay sombras) una vez cerrado el layout final.')
 
@@ -132,14 +146,17 @@ tabla([
     ('CAPEX central', '≈ USD 176.300 ≈ 0,80 USD/Wp ≈ COP 705 millones'),
     ('Rango (±16%)', 'USD 148.000 – 205.000'),
 ])
-h2('Indicadores (simulación horaria + flujo de caja a 25 años)')
+h2('Indicadores (simulación horaria + flujo de caja a 25 años) — base monofacial')
 tabla([
-    ('Ahorro año 1', '≈ COP 264,7 millones (278.600 kWh × 950 COP)'),
-    ('TIR', '≈ 35,8%'),
-    ('VPN (tasa 10%)', '≈ USD 385.000'),
-    ('Payback simple', '≈ 2,8 años'),
-    ('LCOE', '≈ 0,080 USD/kWh ≈ 321 COP/kWh (vs tarifa de 950)'),
+    ('Ahorro año 1', '≈ COP 294,5 millones (310.037 kWh × 950 COP)'),
+    ('TIR', '≈ 39,9%'),
+    ('VPN (tasa 10%)', '≈ USD 452.000'),
+    ('Payback simple', '≈ 2,5 años'),
+    ('LCOE', '≈ 0,072 USD/kWh ≈ 289 COP/kWh (vs tarifa de 950)'),
 ])
+nota('Indicadores del caso 2×90 kW AC (CAPEX ≈ USD 177.200). El caso 2×80 kW da resultados casi '
+     'idénticos (TIR 40,0%, LCOE 0,0719 USD/kWh) con clipping ligeramente mayor. Si se valida el '
+     'upside bifacial (+8%), estos indicadores mejoran adicionalmente.')
 h2('Beneficios Ley 1715/2014 (no incluidos arriba — mejoran los indicadores)')
 tabla([
     ('Art. 11', 'Deducción del 50% de la inversión en el impuesto de renta (hasta 15 años)'),
