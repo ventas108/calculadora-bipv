@@ -59,6 +59,7 @@ def calcular_rsh_cdte(G, R_sh_ref, c_Rsh=5.5, R_sh_0=None, G_ref=1000.0):
     corrección, sin regresión, hasta que ese panel tenga su propia
     referencia para calibrar un R_sh_0 real.
     """
+    G_era_escalar = np.ndim(G) == 0   # bool/int/float puros, no arrays de 1 elemento
     G_arr  = np.atleast_1d(np.asarray(G, dtype=float))
     G_safe = np.where(G_arr > 0, G_arr, 1.0)
     if R_sh_0 is None:
@@ -67,7 +68,13 @@ def calcular_rsh_cdte(G, R_sh_ref, c_Rsh=5.5, R_sh_0=None, G_ref=1000.0):
     rsh_base = (R_sh_ref - R_sh_0 * exp_c) / (1.0 - exp_c)
     rsh_base = max(rsh_base, 0.0)   # nunca negativo (ver pvlib._pvsyst_Rsh)
     rsh = rsh_base + (R_sh_0 - rsh_base) * np.exp(-c_Rsh * G_safe / G_ref)
-    return rsh.item() if rsh.size == 1 else rsh   # .item() compatible numpy 1.x y 2.x
+    # Solo colapsa a escalar si el LLAMADOR pasó un escalar -- un array de un
+    # solo elemento (G=np.array([100.0]), típico de código vectorizado con
+    # H=1 hora) debe seguir devolviendo un array de 1 elemento, no un float
+    # suelto, para no romper el contrato de forma de quien lo llama
+    # (ver test_consistencia_sdm_entre_modulos.py, que atrapó exactamente
+    # esta inconsistencia en mppt_combinado._params_grupo()).
+    return rsh.item() if G_era_escalar else rsh
 
 
 def trasladar_parametros_gt(G, T_cel_C, panel: dict):
