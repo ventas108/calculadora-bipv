@@ -59,7 +59,22 @@ INVERSORES = {
         "Isc_max_tracker":      32.5, # A — Isc máxima por tracker
         "P_dc_max_W":       130000,   # W — potencia FV máxima
         "P_ac_nom_W":       100000,   # W — potencia AC nominal
-        "eficiencia_max":    0.990,
+        "P_ac_max_VA":      110000,   # VA — potencia AC máxima (sobrecarga)
+        # Lado AC (26-ago-2026) -- verificado contra growatt.tech y
+        # pretapower.com para "MAX 100KTL3-X LV": no había datos AC en el
+        # catálogo hasta ahora. Aún no lo usa ningún validador (el motor de
+        # producción/dimensionamiento no tiene capa de verificación AC).
+        "Vac_nom":             400,   # V — tensión AC nominal trifásica (también opera a 380 V)
+        "Vac_min":             340,   # V — rango de tensión AC mínimo
+        "Vac_max":             440,   # V — rango de tensión AC máximo
+        "I_ac_max_A":        158.8,   # A — corriente AC máxima @400V (167.1 A @380V)
+        "frecuencia_hz":  (50, 60),   # Hz — frecuencias de red soportadas
+        # eficiencia_max corregida 0.990→0.988 (26-ago-2026): el valor previo
+        # no coincidía con la ficha oficial verificada (98.8%, no 99.0%).
+        # eta_inversor (optimization/scenario_generator.py) se sincroniza
+        # directo con este campo, así que la corrección SÍ cambia los kWh AC
+        # estimados para este inversor (~0.2% menos que antes).
+        "eficiencia_max":    0.988,
     },
     "Huawei-SUN2000-100KTL-M1": {
         "fabricante":         "Huawei",

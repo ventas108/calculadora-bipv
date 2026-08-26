@@ -442,3 +442,133 @@ def barrido_dc_ac(
     if lcoes.notna().any():
         df.loc[lcoes.idxmin(), "óptimo"] = "⭐"
     return df
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 4. Compatibilidad AC (punto de conexión)
+# ══════════════════════════════════════════════════════════════════════════════
+def verificar_compatibilidad_ac(
+    inversor: dict,
+    n_unidades: int,
+    v_red_nominal_V: float,
+    frecuencia_red_hz: float = 60.0,
+    capacidad_conexion_A: float | None = None,
+    tolerancia_v_pct: float = 5.0,
+) -> dict:
+    """
+    Verifica compatibilidad AC entre `n_unidades` de `inversor` y el punto
+    de conexión a red del proyecto.
+
+    A diferencia de filtrar_inversores_compatibles() (lado DC: Voc/Vmp/Isc
+    contra el string), esto verifica el lado AC -- tensión de red,
+    frecuencia, y si la corriente AC combinada de todos los inversores cabe
+    en la capacidad del punto de conexión (transformador/tablero). Criterio
+    no verificado en ningún lugar de la app hasta el 26-ago-2026: el
+    catálogo solo traía datos DC (Vdc_max, MPPT, Isc); el lado AC
+    (Vac_nom/min/max, I_ac_max_A, frecuencia_hz) recién se agregó y hoy solo
+    lo tiene poblado Growatt-MAX-100KTL3-LV.
+
+    inversor: dict del catálogo. Campos AC opcionales -- "Vac_nom",
+        "Vac_min", "Vac_max", "I_ac_max_A", "frecuencia_hz" (tupla, ej.
+        (50, 60)), "P_ac_max_VA". Un inversor sin estos campos (la mayoría
+        del catálogo hoy) produce AVISOS, no errores: el dato simplemente no
+        está disponible todavía, eso no es lo mismo que ser incompatible.
+    n_unidades: cuántas unidades de este inversor van en paralelo al mismo
+        punto de conexión (ej. 2 para el proyecto de Apartadó).
+    v_red_nominal_V: tensión nominal de la red del proyecto en el punto de
+        conexión (ej. 400 V lado BT del transformador).
+    frecuencia_red_hz: frecuencia nominal de la red (60 Hz en Colombia).
+    capacidad_conexion_A: corriente máxima admisible en el punto de conexión
+        (capacidad del transformador/tablero), si se conoce. None si aún no
+        se ha definido -- en ese caso ese límite no se verifica (aviso, no
+        error: no es que el proyecto sea incompatible, es que ese dato del
+        proyecto todavía no existe).
+    tolerancia_v_pct: cuánto puede diferir Vac_nom del inversor de
+        v_red_nominal_V antes de aceptarlo, cuando el inversor no publica un
+        rango [Vac_min, Vac_max] explícito (dos estándares IEC distintos,
+        ej. 380 V y 400 V, son ambos válidos para el "mismo" inversor).
+
+    Retorna:
+      {
+        "compatible": bool,             # False SOLO si hay error, no avisos
+        "errores": [str],
+        "avisos": [str],
+        "corriente_ac_total_A": float | None,
+        "potencia_ac_total_kVA": float | None,
+      }
+    """
+    errores: list[str] = []
+    avisos: list[str] = []
+    modelo = inversor.get("modelo", "?")
+
+    vac_nom = inversor.get("Vac_nom")
+    vac_min = inversor.get("Vac_min")
+    vac_max = inversor.get("Vac_max")
+    i_ac_max = inversor.get("I_ac_max_A")
+    freqs = inversor.get("frecuencia_hz")
+    p_ac_max_va = inversor.get("P_ac_max_VA") or inversor.get("P_ac_nom_W")
+
+    # ── Tensión de red ───────────────────────────────────────────────────
+    if vac_min is None and vac_max is None and vac_nom is None:
+        avisos.append(
+            f"{modelo}: sin datos de tensión AC en el catálogo -- no se pudo "
+            "verificar compatibilidad de tensión de red."
+        )
+    else:
+        rango_min = vac_min
+        rango_max = vac_max
+        if rango_min is None and vac_nom is not None:
+            rango_min = vac_nom * (1 - tolerancia_v_pct / 100)
+        if rango_max is None and vac_nom is not None:
+            rango_max = vac_nom * (1 + tolerancia_v_pct / 100)
+        if rango_min is not None and rango_max is not None:
+            if not (rango_min <= v_red_nominal_V <= rango_max):
+                errores.append(
+                    f"Tensión de red del proyecto ({v_red_nominal_V:g} V) fuera del "
+                    f"rango AC del inversor [{rango_min:g}, {rango_max:g}] V."
+                )
+
+    # ── Frecuencia ────────────────────────────────────────────────────────
+    if not freqs:
+        avisos.append(
+            f"{modelo}: sin datos de frecuencia soportada en el catálogo -- no "
+            "se pudo verificar compatibilidad de frecuencia."
+        )
+    elif not any(abs(frecuencia_red_hz - f) <= 0.5 for f in freqs):
+        errores.append(
+            f"Frecuencia de red del proyecto ({frecuencia_red_hz:g} Hz) no está "
+            f"entre las soportadas por el inversor {tuple(freqs)}."
+        )
+
+    # ── Corriente AC combinada vs. capacidad del punto de conexión ───────
+    corriente_total = None
+    if i_ac_max is None:
+        avisos.append(
+            f"{modelo}: sin corriente AC máxima en el catálogo -- no se pudo "
+            "verificar la capacidad del punto de conexión."
+        )
+    else:
+        corriente_total = float(i_ac_max) * n_unidades
+        if capacidad_conexion_A is not None:
+            if corriente_total > capacidad_conexion_A:
+                errores.append(
+                    f"Corriente AC combinada de {n_unidades} inversor(es) "
+                    f"({corriente_total:.1f} A) supera la capacidad del punto de "
+                    f"conexión ({capacidad_conexion_A:.1f} A)."
+                )
+        else:
+            avisos.append(
+                "Capacidad del punto de conexión (transformador/tablero) no "
+                "especificada -- no se verificó contra la corriente AC "
+                f"combinada ({corriente_total:.1f} A)."
+            )
+
+    potencia_total_kva = (p_ac_max_va * n_unidades / 1000.0) if p_ac_max_va else None
+
+    return {
+        "compatible": not errores,
+        "errores": errores,
+        "avisos": avisos,
+        "corriente_ac_total_A": round(corriente_total, 1) if corriente_total is not None else None,
+        "potencia_ac_total_kVA": round(potencia_total_kva, 1) if potencia_total_kva is not None else None,
+    }
