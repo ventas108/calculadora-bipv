@@ -5,25 +5,44 @@ Misma simulación horaria (TMY PVGIS Apartadó) que la comparativa Alt B;
 se varía la capacidad AC instalada y se mide clipping, CAPEX, TIR y LCOE.
 Costo de inversor: ~43 USD/kW AC (referencia Growatt clase 100 kW).
 """
+import os
+import sys
+
 import numpy as np
 import pandas as pd
 import pvlib
 from scipy.optimize import brentq
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from calculos.motor_optico import iam_ashrae  # noqa: E402
+
 LAT, LON, ALT = 7.884, -76.635, 30
 TILT, AZ, ALBEDO = 10, 180, 0.20
 P_DC = 306 * 720.0
 GAMMA, BIFACIAL, PERD_DC, EFF = -0.0030, 0.08, 0.92, 0.982
+B0_VIDRIO, F_IAM_DIFUSA = 0.05, 0.95  # vidrio estándar liso -- mismos valores que motor_optico.cascada_optica
 
 tmy, meta = pvlib.iotools.get_pvgis_tmy(LAT, LON, map_variables=True)[:2]
-tmy.index = pd.date_range("2023-01-01", periods=len(tmy), freq="h", tz="America/Bogota")
+# tmy.index de PVGIS viene en UTC -- convertir (no reetiquetar) a hora local,
+# si no la irradiancia queda desfasada ~5h respecto a la posición solar real
+# (bug encontrado 26-ago-2026, ver DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md).
+tmy.index = tmy.index.tz_convert("America/Bogota")
 solpos = pvlib.solarposition.get_solarposition(tmy.index, LAT, LON, ALT)
 poa = pvlib.irradiance.get_total_irradiance(
     TILT, AZ, solpos.apparent_zenith, solpos.azimuth,
     tmy.dni, tmy.ghi, tmy.dhi,
     dni_extra=pvlib.irradiance.get_extra_radiation(tmy.index),
     model="haydavies", albedo=ALBEDO)
-poa_g = poa.poa_global.fillna(0).clip(lower=0)
+
+# IAM (reflexión angular, ASHRAE) -- directa según AOI real, difusa con factor
+# constante IEC 61853-3. Antes de este fix el script no la modelaba (PVsyst
+# la reporta como -2.43% del POA para este proyecto).
+aoi_deg = pvlib.irradiance.aoi(TILT, AZ, solpos.apparent_zenith, solpos.azimuth)
+f_iam_dir = iam_ashrae(aoi_deg.values, B0_VIDRIO)
+poa_dir_neta = poa.poa_direct.fillna(0) * f_iam_dir
+poa_dif_neta = poa.poa_diffuse.fillna(0) * F_IAM_DIFUSA
+poa_g = (poa_dir_neta + poa_dif_neta).clip(lower=0)
+
 tcell = pvlib.temperature.faiman(poa_g, tmy.temp_air, tmy.wind_speed)
 p_dc = (P_DC * (poa_g / 1000.0) * (1 + GAMMA * (tcell - 25.0))).clip(lower=0) * (1 + BIFACIAL) * PERD_DC
 p_ac_sin_limite = p_dc * EFF

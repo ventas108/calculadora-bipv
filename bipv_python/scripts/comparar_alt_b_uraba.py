@@ -4,9 +4,15 @@
 Simulación horaria (TMY PVGIS Apartadó) con clipping AC real por inversor
 + financiero preliminar con los mismos supuestos de la Ficha Técnica.
 """
+import os
+import sys
+
 import numpy as np
 import pandas as pd
 import pvlib
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from calculos.motor_optico import iam_ashrae  # noqa: E402
 
 LAT, LON, ALT = 7.884, -76.635, 30
 TILT, AZ, ALBEDO = 10, 180, 0.20
@@ -15,6 +21,7 @@ P_DC = N_PAN * P_PAN               # 220 320 W
 GAMMA = -0.0030                    # coef. potencia %/°C JA Solar n-type
 BIFACIAL = 0.08                    # ganancia bifacial (misma de la ficha)
 PERD_DC = 0.92                     # pérdidas DC combinadas (soiling, mismatch, cableado, LID) ≈ 8%
+B0_VIDRIO, F_IAM_DIFUSA = 0.05, 0.95  # IAM vidrio estándar liso -- mismos valores que motor_optico.cascada_optica
 
 # Candidatos: (nombre, Pac unidad W, unidades, eficiencia euro, precio USD/unidad supuesto mercado)
 INVERSORES = [
@@ -26,14 +33,25 @@ INVERSORES = [
 # ── TMY ──────────────────────────────────────────────────────────────────────
 print("Descargando TMY PVGIS para Apartadó...")
 tmy, meta = pvlib.iotools.get_pvgis_tmy(LAT, LON, map_variables=True)[:2]
-tmy.index = pd.date_range("2023-01-01", periods=len(tmy), freq="h", tz="America/Bogota")
+# tmy.index de PVGIS viene en UTC -- convertir (no reetiquetar) a hora local,
+# si no la irradiancia queda desfasada ~5h respecto a la posición solar real
+# (bug encontrado 26-ago-2026, ver DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md).
+tmy.index = tmy.index.tz_convert("America/Bogota")
 
 solpos = pvlib.solarposition.get_solarposition(tmy.index, LAT, LON, ALT)
 dni_extra = pvlib.irradiance.get_extra_radiation(tmy.index)
 poa = pvlib.irradiance.get_total_irradiance(
     TILT, AZ, solpos.apparent_zenith, solpos.azimuth,
     tmy.dni, tmy.ghi, tmy.dhi, dni_extra=dni_extra, model="haydavies", albedo=ALBEDO)
-poa_g = poa.poa_global.fillna(0).clip(lower=0)
+
+# IAM (reflexión angular, ASHRAE) -- directa según AOI real, difusa con factor
+# constante IEC 61853-3. Antes de este fix el script no la modelaba (PVsyst
+# la reporta como -2.43% del POA para este proyecto).
+aoi_deg = pvlib.irradiance.aoi(TILT, AZ, solpos.apparent_zenith, solpos.azimuth)
+f_iam_dir = iam_ashrae(aoi_deg.values, B0_VIDRIO)
+poa_dir_neta = poa.poa_direct.fillna(0) * f_iam_dir
+poa_dif_neta = poa.poa_diffuse.fillna(0) * F_IAM_DIFUSA
+poa_g = (poa_dir_neta + poa_dif_neta).clip(lower=0)
 
 tcell = pvlib.temperature.faiman(poa_g, tmy.temp_air, tmy.wind_speed)
 p_dc = P_DC * (poa_g / 1000.0) * (1 + GAMMA * (tcell - 25.0))
