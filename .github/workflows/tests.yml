@@ -1,0 +1,45 @@
+name: Tests
+
+# Gate de cero tolerancia (25-ago-2026): antes de esto, la suite se corría
+# a mano en cada PR e ignoraba una lista fija de "fallos preexistentes"
+# (llegó a tener 15). Eso permitió que bugs reales del motor de producción
+# (Rsh sin saturar, Vmp con el coeficiente térmico equivocado -- PR #38)
+# quedaran sin detectar durante mucho tiempo, aunque YA tenían un test con
+# datos de referencia auditados: el test estaba en rojo, pero nadie lo veía
+# como una alarma porque no bloqueaba nada. Este workflow corre la suite
+# COMPLETA sin ningún --ignore ni lista de excepciones: si algo falla, el
+# check de GitHub queda en rojo en el PR, punto. Ningún fallo es "normal".
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bipv_python
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # pandas==2.2.2 (fijado en requirements.txt) salió en abril 2024,
+          # antes de Python 3.13 (octubre 2024) -- no tiene binario
+          # precompilado para 3.13 en Linux, así que pip intentaría
+          # compilarlo desde código fuente y el build falla en el runner.
+          # 3.12 sí tiene binario listo para todas las versiones fijadas.
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Correr la suite completa (sin --ignore, sin excepciones)
+        env:
+          PYTHONUTF8: "1"
+        run: python -m pytest tests/ -v
