@@ -16,6 +16,25 @@ on:
     branches: [main]
 
 jobs:
+  # Regla (25-ago-2026): "fórmula física nueva = test de validación
+  # obligatorio en el mismo PR". Job aparte y rápido (sin instalar
+  # dependencias de la app) para que falle en segundos, no minutos, si un
+  # PR toca una fórmula/constante física del SDM sin traer su test de
+  # validación contra una referencia real en el mismo cambio.
+  physics-guard:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verificar que las fórmulas físicas tocadas traen su test
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          python3 bipv_python/scripts/verificar_fisica_tiene_test.py \
+            --base "origin/${{ github.base_ref }}"
+
   test:
     runs-on: ubuntu-latest
     defaults:
