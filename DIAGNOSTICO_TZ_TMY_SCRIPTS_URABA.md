@@ -56,7 +56,57 @@ Busqué `get_pvgis_tmy` en todo el repo. Solo 4 archivos lo usan, todos scripts 
 - `scripts/generar_plan_bipv.py` — mismo patrón, **sin verificar todavía**
 - `scripts/generar_plan_maestro_completo.py` — mismo patrón, **sin verificar todavía**
 
-El motor real usado por el Streamlit app (`bipv_python/calculos/`, `simulation/`, `pages/`) usa Open-Meteo como fuente de TMY, no `get_pvgis_tmy`, y en los lugares donde sí maneja timestamps tz-aware usa `tz_convert` correctamente (`calculos/escenarios_fase4.py`, `calculos/contrato_sombreado.py`, `calculos/sombras_3d.py`, `pages/9_🗺️_Vista_3D.py`). **La app web que ven los clientes no está afectada por este bug.**
+**Corrección (26-ago-2026, verificado corriendo el motor real):** el motor real usado por el Streamlit app (`calculos/solar.py::obtener_tmy_pvgis()`) **sí usa PVGIS** (no Open-Meteo como se dijo antes en esta misma nota — error de esta misma investigación, corregido tras revisar el código). La diferencia importante es CÓMO maneja el tiempo: parsea `time(UTC)` con `utc=True` y solo cambia el año (a 2001) sin tocar hora/tz — el índice queda correctamente tz-aware en UTC. `calcular_poa()` calcula la posición solar sobre ESE MISMO índice UTC (`loc.get_solarposition(tmy.index)`), así que irradiancia y posición solar quedan siempre correctamente emparejadas — **nunca reetiqueta, nunca tiene el desfase de 5h**. Es el mismo patrón correcto que ya usan `calculos/escenarios_fase4.py`, `calculos/contrato_sombreado.py`, `calculos/sombras_3d.py` y `pages/9_🗺️_Vista_3D.py`. **La app web que ven los clientes no tiene este bug**, aunque sí use PVGIS.
+
+## Validación adicional: motor real de la app corrido para este proyecto (26-ago-2026)
+
+Además de los scripts sueltos, se corrió el pipeline real (`calculos/solar.py::calcular_poa()` con el modelo bifacial `infinite_sheds` de pvlib + `calculos/produccion.py::simular_produccion_anual()`) para el mismo proyecto, con los mismos parámetros bifaciales validados contra PVsyst (altura 3,0 m, GCR 0,39, ancho colector 2,606 m, albedo 0,20, φ=0,80), panel sin SDM completo en catálogo (usa el modelo fallback `Pmax=Pmax_stc×G/1000×(1+γΔT)`, `factor_pr_mismatch=0,92` como estimado manual):
+
+| | App real (motor de la calculadora) | PVsyst | Diferencia |
+|---|---|---|---|
+| Bifacial | 349.496 kWh/año | 339.033 kWh/año | **+3,1%** |
+| Monofacial | 320.838 kWh/año | 315.074 kWh/año | **+1,8%** |
+
+Más optimista que los scripts corregidos (334.846/310.037, a −1,2%/−1,6% de PVsyst). Causa: el flujo de trabajo que el propio manual recomienda para proyectos agrivoltaicos (`base_conocimiento_asistente.md`, sección 2) **salta la página 5b Motor Óptico**, así que no se aplica IAM (~−2,35% según el diagrama de PVsyst) ni soiling. Nota positiva: el PR de la app (84,9%) usa como referencia la irradiancia bifacial total (frontal+trasera), por lo que ya es comparable al "PR Bifacial" correcto de PVsyst (81,99%), no al PR estándar inflado (89,08%) — la app no tiene el problema de PR inflado que sí tiene el reporte estándar de PVsyst.
+
+**Pendiente:** decidir si el flujo agrivoltaico recomendado debería incluir Motor Óptico (IAM) para acercarse más a PVsyst, o si se documenta como un piso adicional aparte (similar al piso conservador monofacial del Informe Final).
+
+## Desglose crudo de PVsyst (bifacial) — evidencia de auditoría
+
+Export VC0 (diagrama de pérdidas) de la corrida bifacial de PVsyst, verificado línea por línea (cada etapa se recalculó a partir de la anterior — cierra exacto hasta 339.033 kWh sin ningún salto sin explicar):
+
+```
+GlobHor  1.683,0 kWh/m²  (irradiación horizontal global)
+  +1,979% (incidencia en plano)      → GlobInc  1.716,3 kWh/m²
+  -0,201% (sombreados cercanos)      →          1.713   kWh/m²
+  -2,351% (IAM global)               →          1.673   kWh/m²
+  +0,025% (reflejo frontal)          →          1.673,0 kWh/m²  ← lado frontal final
+
+Lado trasero (bifacial):
+  GlobGnd 1.000,4 kWh/m² (incidente en tierra, área ref. 2.386,5 m²)
+  -80,000% (pérdida reflexión suelo = albedo 0,20)   → 200,1 kWh/m²
+  -63,640% (factor de vista trasero)                  → 181,5 kWh/m²
+  +2,220% (cielo difuso trasero)                       → 185,5 kWh/m²
+  +0,002% (haz directo trasero)                        → 185,5 kWh/m²
+  -5,000% (sombreados posteriores)                     → 176,2 kWh/m²  = GlobBak
+  × 80,0% factor de bifacialidad (φ)                   → 141,0 kWh/m²  usable
+
+GlobEff = 1.673,0 (frontal) + 141,0 (trasero) = 1.814,0 kWh/m²
+Energía en colectores (956,8 m² × 1.814,0 kWh/m² ≈ 1.735.529 kWh) × 23,20% eficiencia STC
+  → EArrNom 402.596 kWh
+  -0,597% (nivel de irradiancia)   → 400.192 kWh
+  -6,517% (temperatura)            → 374.111 kWh
+   0,000% (sombreado eléctrico)    → 374.111 kWh
+  -3,000% (calidad de módulo)      → 362.888 kWh
+  -2,100% (mismatch módulos/strings)→ 355.267 kWh
+  -0,778% (mismatch irradiancia trasera) → 352.505 kWh
+  -0,988% (pérdida óhmica)         → 349.024 kWh  = EArrMPP
+  -2,850% (eficiencia inversor)    → 339.076 kWh
+  -0,007% (Pmax inversor)          → 339.052 kWh
+  -0,006% (umbral de potencia)     → 339.033 kWh  = EOutInv = E_Grid (final)
+```
+
+Verificaciones cruzadas: GlobInc (1.716,3) ≈ POA corregido del script (1.716,1); ReflLss −80,000% confirma exacto el albedo 0,20 usado; factor de bifacialidad 80,0% confirma exacto φ=0,80 de la ficha JA Solar. Ningún salto de la cascada queda sin explicar — el dato es consistente y auditable.
 
 ## Consecuencia concreta
 
@@ -104,6 +154,8 @@ vs 339.033 kWh/año de PVsyst → diferencia de solo **-1,2%**. El supuesto de +
 ## Pendiente — decisión del usuario
 
 1. ~~¿Corregir el timezone en los 4 scripts?~~ → Hecho. Commiteado y pusheado (`0fe3edd4`).
-2. ~~¿Recalibrar o validar la bifacialidad +8%?~~ → **Validada contra PVsyst bifacial real**: +7,6% físico vs +8% supuesto, diferencia final -1,2%. Ya no es upside sin confirmar.
-3. ~~¿Regenerar la Ficha Técnica v2?~~ → Hecho, "v2.1", pero con el bifacial todavía marcado como "sin validar" — **hay que actualizar esa nota** ahora que sí está validado. Sin commitear.
-4. ¿Commitear y pushear la Ficha v2.1 (con la nota bifacial actualizada) y este diagnóstico?
+2. ~~¿Recalibrar o validar la bifacialidad +8%?~~ → Validada contra PVsyst bifacial real: +7,6% físico vs +8% supuesto, -1,2% de diferencia final. Commiteado (`73ff51ad`).
+3. ~~¿Regenerar la Ficha Técnica v2 y el Informe Final?~~ → Hecho, incluyendo corrección de TRM (4.000 hardcodeado → 3.118,24 real, vía la misma fuente que usa `trm_utils.py`). Commiteado (`87f74afa`, `81ca8935`).
+4. **NUEVO** — Se corrió también el motor real de la app (no solo los scripts sueltos): da 349.496 kWh/año bifacial (+3,1% vs PVsyst), más optimista que los 334.846 kWh/año (+1,2%) de los scripts, porque el flujo agrivoltaico recomendado salta Motor Óptico (sin IAM). ¿Se debería incluir Motor Óptico en el flujo recomendado para granjas FV/agrivoltaicas, o documentar esto como una brecha conocida?
+5. Pendiente sin decidir: ¿verificar `generar_plan_bipv.py` y `generar_plan_maestro_completo.py`? (ya se confirmó que el patrón buggy ahí es solo texto de ejemplo en un documento generado, no código ejecutable — no requieren fix, pero no se revisó el resto de esos 2 scripts a fondo).
+6. Este archivo (desglose crudo VC0 + validación del motor real) está sin commitear/pushear todavía.
