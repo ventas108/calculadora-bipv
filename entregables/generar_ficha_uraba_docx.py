@@ -134,7 +134,8 @@ doc.add_page_break()
 h1('3. Estimación financiera preliminar')
 h2('Supuestos declarados')
 tabla([
-    ('TRM / tarifa', 'COP 4.000/USD · 950 COP/kWh (EPM, 100% autoconsumo)'),
+    ('TRM', 'COP 3.118,24/USD — Banco de la República, TRM oficial vigente (datos.gov.co)'),
+    ('Tarifa evitada', '950 COP/kWh (EPM, 100% autoconsumo)'),
     ('Vida útil / degradación', '25 años · 0,4% anual'),
     ('OPEX', '10 USD/kWp·año'),
     ('Precios de inversor', 'Referencia de mercado — pendiente cotización local'),
@@ -143,20 +144,21 @@ h2('Inversión (sin BOM oficial — rangos de mercado)')
 tabla([
     ('Costos duros', '≈ 0,68 USD/Wp — módulos, estructura elevada 3 m, 2 inversores 80–90 kW, BOS y montaje'),
     ('Costos blandos (17%)', 'Ingeniería, trámites UPME/RETIE, interventoría e imprevistos'),
-    ('CAPEX central', '≈ USD 176.300 ≈ 0,80 USD/Wp ≈ COP 705 millones'),
+    ('CAPEX central', '≈ USD 177.200 ≈ 0,80 USD/Wp ≈ COP 552,5 millones (a TRM del día)'),
     ('Rango (±16%)', 'USD 148.000 – 205.000'),
 ])
 h2('Indicadores (simulación horaria + flujo de caja a 25 años) — base monofacial')
 tabla([
     ('Ahorro año 1', '≈ COP 294,5 millones (310.037 kWh × 950 COP)'),
-    ('TIR', '≈ 39,9%'),
-    ('VPN (tasa 10%)', '≈ USD 452.000'),
-    ('Payback simple', '≈ 2,5 años'),
-    ('LCOE', '≈ 0,072 USD/kWh ≈ 289 COP/kWh (vs tarifa de 950)'),
+    ('TIR', '≈ 51,7%'),
+    ('VPN (tasa 10%)', '≈ USD 635.200'),
+    ('Payback simple', '≈ 1,9 años'),
+    ('LCOE', '≈ 0,072 USD/kWh ≈ 225 COP/kWh (vs tarifa de 950)'),
 ])
-nota('Indicadores del caso 2×90 kW AC (CAPEX ≈ USD 177.200). El caso 2×80 kW da resultados casi '
-     'idénticos (TIR 40,0%, LCOE 0,0719 USD/kWh) con clipping ligeramente mayor. Si se valida el '
-     'upside bifacial (+8%), estos indicadores mejoran adicionalmente.')
+nota('Indicadores del caso 2×90 kW AC (CAPEX ≈ USD 177.200), con TRM oficial vigente al generar este '
+     'documento (COP 3.118,24/USD) — al ser una tasa de mercado, reconfirmarla antes de una decisión de '
+     'cierre. El caso 2×80 kW da resultados casi idénticos con clipping ligeramente mayor. Si se valida '
+     'el upside bifacial (+8%), estos indicadores mejoran adicionalmente (ver Informe Final para Evaluador).')
 h2('Beneficios Ley 1715/2014 (no incluidos arriba — mejoran los indicadores)')
 tabla([
     ('Art. 11', 'Deducción del 50% de la inversión en el impuesto de renta (hasta 15 años)'),
