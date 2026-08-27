@@ -1802,9 +1802,9 @@ En términos auditables, esto significa concretamente:
 - **Prueba de secuencia honesta**: un banco o ITA puede revisar el HISTORIAL completo de corridas de un proyecto, no solo el resultado final. Si el TIR subió de 11% a 14% entre dos sellos, el Ledger muestra exactamente qué insumo cambió y cuándo — no un número final que "apareció así".
 - **Límite honesto (no se oculta)**: el hash-chain protege contra editar UN eslabón sin que se note. No evita que alguien borre el archivo completo del ledger y empiece de cero — eso requeriría un ancla externa (por ejemplo, publicar el hash raíz en otro sistema independiente), decidido explícitamente FUERA de alcance por ahora para no perder el principio de "todo local, sin depender de servicios externos".
 
-### Los 4 tipos de resultado que se pueden sellar  ACTUALIZADO (27-ago-2026 — se agregó Diagrama Unifilar)
+### Los 5 tipos de resultado que se pueden sellar  ACTUALIZADO (27-ago-2026 — se agregó Ficha de Validación RETIE)
 
-El Ledger no es solo para bancabilidad — cubre 4 escenarios reales, cada uno con su propia etiqueta dentro del eslabón:
+El Ledger no es solo para bancabilidad — cubre 5 escenarios reales, cada uno con su propia etiqueta dentro del eslabón:
 
 Tipo  │  Cuándo se usa  │  Dónde se sella
 
@@ -1815,6 +1815,8 @@ Tipo  │  Cuándo se usa  │  Dónde se sella
 🔍 Diagnóstico de sistema en operación  │  Diagnosticas un sistema YA instalado (🔍 Página 13 — Diagnóstico) — protege la conclusión de un diagnóstico puntual, útil ante una reclamación de garantía al instalador o fabricante  │  Botón "🔒 Sellar en el Ledger de Auditoría" en la propia página 13, independiente del botón de histórico de tendencia que ya existía ahí
 
 ⚡ Diagrama unifilar (diseño eléctrico)  │  Congelas la configuración eléctrica exacta (generador, inversor(es), batería, superficies, protecciones) que le entregaste al cliente o al instalador como diagrama unifilar — protege contra "eso no fue lo que usted diseñó" si el diseño cambia después  │  Botón "🔒 Sellar en el Ledger de Auditoría" en ⚡ Página 20 — Diagrama Unifilar, único tipo ofrecido ahí (no un selector, a diferencia de Reporte PDF que sí ofrece varios)
+
+📋 Ficha de validación RETIE (dashboard + checklist)  │  Congelas el dashboard ejecutivo y el checklist de validaciones (Voc frío, ventana MPPT, balance de inversores, breaker) que le mostraste al cliente o al revisor — protege contra "el sistema no marcaba ese error/pendiente cuando me lo entregó"  │  Botón "🔒 Sellar en el Ledger de Auditoría" en 📋 Página 21 — Ficha de Validación RETIE, único tipo ofrecido ahí
 
 ### Por qué el sellado es siempre manual, nunca automático
 
