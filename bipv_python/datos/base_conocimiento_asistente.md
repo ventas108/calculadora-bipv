@@ -2399,6 +2399,8 @@ Nueva página (🔒 Página 19) que sella resultados oficiales del proyecto — 
 - 🔍 Diagnóstico ahora tiene un botón de sellado independiente del histórico de tendencia que ya existía, para proteger la conclusión de un diagnóstico puntual.
 - El sellado es siempre manual y explícito — nunca automático en cada cálculo de prueba.
 
+Actualización (27-ago-2026): se sumó un 4º tipo, ⚡ diagrama unifilar (diseño eléctrico) — sellable desde ⚡ Página 20. Ver el listado completo y siempre actualizado de los 4 tipos en la sección 13e, no en este anexo (este anexo queda fijo como registro histórico del 25-ago).
+
 ⚠️ Para no cometer errores: el Ledger protege contra la edición silenciosa de un eslabón ya guardado; NO protege contra borrar el archivo completo del ledger (eso requeriría un ancla externa, fuera de alcance por decisión explícita para mantener el principio de "todo local").
 
 ────────────────────────────────────────────────────────────
