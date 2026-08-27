@@ -162,6 +162,54 @@ if incluir_bateria:
         "entrada DC del mismo inversor, no como un equipo aparte."
     )
 
+st.subheader("🗺️ Multi-superficie (opcional)")
+_multisup_detectado = bool(st.session_state.get("multisup_activo"))
+incluir_multisup = st.checkbox(
+    "Incluir varias superficies en el diagrama (en vez de un solo generador)",
+    value=_multisup_detectado,
+    help="Se preselecciona si ya configuraste multi-superficie en 🗺️ Vista 3D (Página 9).",
+)
+superficies_val: list[dict] = []
+if incluir_multisup:
+    _desglose = st.session_state.get("multisup_desglose", []) or []
+    if _desglose:
+        st.caption(
+            "🗺️ Superficies detectadas desde 🗺️ Vista 3D — el número de módulos por "
+            "superficie no viene de ahí (esa página trabaja con áreas y POA, no con "
+            "conteo de paneles), complétalo abajo."
+        )
+        for sup in _desglose:
+            col_s1, col_s2 = st.columns([3, 1])
+            with col_s1:
+                st.caption(f"**{sup.get('nombre', 'Superficie')}** ({sup.get('tipo', '')}) — {sup.get('area_m2', 0):.0f} m²")
+            with col_s2:
+                n_pan_sup = st.number_input(
+                    "Módulos", min_value=0, step=1, value=0,
+                    key=f"unif_sup_{sup.get('nombre')}",
+                    label_visibility="collapsed",
+                )
+            if n_pan_sup:
+                superficies_val.append({
+                    "nombre": sup.get("nombre"), "tipo": sup.get("tipo"), "n_paneles": int(n_pan_sup),
+                })
+    else:
+        st.info(
+            "ℹ️ No se detectan superficies en 🗺️ Vista 3D. Puedes definirlas manualmente: "
+            "escribe nombre y número de módulos separados por coma, una superficie por línea "
+            "(ej. `Fachada Sur, 40`)."
+        )
+        _texto_manual = st.text_area("Superficies manuales", value="", height=100)
+        for _linea in _texto_manual.splitlines():
+            if "," not in _linea:
+                continue
+            _nombre_s, _n_s = _linea.rsplit(",", 1)
+            try:
+                _n_s = int(_n_s.strip())
+            except ValueError:
+                continue
+            if _n_s > 0:
+                superficies_val.append({"nombre": _nombre_s.strip(), "n_paneles": _n_s})
+
 st.divider()
 
 config = construir_config_unifilar(
@@ -183,7 +231,14 @@ config = construir_config_unifilar(
     bateria=bateria_dict,
     n_baterias=int(n_baterias_val),
     proteccion_bat_A=proteccion_bat_manual or None,
+    superficies=superficies_val or None,
 )
+
+if incluir_multisup and superficies_val and config["superficies"] is None:
+    st.info(
+        "ℹ️ Con menos de 2 superficies con módulos ingresados, el diagrama muestra "
+        "un solo generador (el multi-superficie necesita al menos 2)."
+    )
 
 if config["generador"]["string_incompleto"]:
     st.warning(

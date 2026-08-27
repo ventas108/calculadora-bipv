@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Tests de calculos/diagrama_unifilar.py -- Fase 1 (MVP) + Fase 2 (batería)."""
+"""Tests de calculos/diagrama_unifilar.py -- Fase 1 (MVP) + Fase 2 (batería) + Fase 3 (multi-superficie)."""
 import schemdraw
 
 from calculos.diagrama_unifilar import (
@@ -138,6 +138,102 @@ def test_diagrama_con_bateria_hibrida():
         bateria_nombre="Growatt ARK 10kWh", bateria={"capacidad_kWh": 10.0},
         n_baterias=2, proteccion_bat_A=63,
     )
+    assert cfg["bateria"]["activa"] is True
+    d = generar_diagrama_unifilar(cfg)
+    assert isinstance(d, schemdraw.Drawing)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Fase 3 -- multi-superficie
+# ══════════════════════════════════════════════════════════════════════════
+def test_config_sin_superficies_por_defecto():
+    cfg = construir_config_unifilar(panel={"Pmax_stc": 720.0}, n_paneles=306, n_serie=18)
+    assert cfg["superficies"] is None
+
+
+def test_config_una_sola_superficie_no_activa_modo_multi():
+    # Con menos de 2 superficies activas, se ignora -- se usa el generador
+    # unico (mismo comportamiento que Fase 1/2, sin regresion).
+    cfg = construir_config_unifilar(
+        panel={"Pmax_stc": 720.0}, n_paneles=306, n_serie=18,
+        superficies=[{"nombre": "Techo", "n_paneles": 306}],
+    )
+    assert cfg["superficies"] is None
+
+
+def test_config_multi_superficie_calcula_kwp_por_superficie():
+    cfg = construir_config_unifilar(
+        panel={"Pmax_stc": 200.0}, n_serie=10,
+        superficies=[
+            {"nombre": "Fachada Sur", "n_paneles": 40},
+            {"nombre": "Techo plano", "n_paneles": 60},
+        ],
+    )
+    assert cfg["superficies"] is not None
+    assert len(cfg["superficies"]) == 2
+    assert cfg["superficies"][0]["p_dc_kWp"] == 8.0
+    assert cfg["superficies"][1]["p_dc_kWp"] == 12.0
+
+
+def test_config_superficie_ignora_items_sin_paneles():
+    # Una superficie sin n_paneles (0 o ausente) no cuenta para activar el
+    # modo multi -- evita dibujar una rama vacia por un item mal configurado.
+    cfg = construir_config_unifilar(
+        panel={"Pmax_stc": 200.0}, n_serie=10,
+        superficies=[
+            {"nombre": "Fachada Sur", "n_paneles": 40},
+            {"nombre": "Superficie sin datos", "n_paneles": 0},
+        ],
+    )
+    assert cfg["superficies"] is None  # solo 1 superficie valida -> modo unico
+
+
+def test_diagrama_sin_superficies_no_dibuja_bus_extra():
+    # Regresion: proyecto normal (sin multi-superficie) debe generarse sin
+    # error, sin necesitar ninguno de los parametros de superficies.
+    cfg = construir_config_unifilar(
+        panel={"Pmax_stc": 720.0}, n_paneles=306, n_serie=18,
+        inversor={"P_ac_nom_W": 100_000}, n_inversores=2, tension_red_V=400,
+    )
+    assert cfg["superficies"] is None
+    d = generar_diagrama_unifilar(cfg)
+    assert isinstance(d, schemdraw.Drawing)
+
+
+def test_diagrama_multi_superficie_tres_ramas():
+    cfg = construir_config_unifilar(
+        nombre_proyecto="Edificio Multi-Fachada", panel={"Pmax_stc": 200.0}, n_serie=10,
+        inversor_nombre="Huawei SUN2000-50KTL", inversor={"P_ac_nom_W": 50_000},
+        n_inversores=1, tension_red_V=380,
+        superficies=[
+            {"nombre": "Fachada Sur", "n_paneles": 40},
+            {"nombre": "Techo plano", "n_paneles": 60},
+            {"nombre": "Fachada Este", "n_paneles": 30},
+        ],
+    )
+    d = generar_diagrama_unifilar(cfg)
+    assert isinstance(d, schemdraw.Drawing)
+
+
+def test_diagrama_multi_superficie_con_bateria_combinado():
+    # Fase 2 + Fase 3 juntas -- confirma que componen sin caso especial:
+    # 4 superficies convergiendo en el bus + bateria colgando del mismo
+    # punto DC despues de la proteccion compartida.
+    cfg = construir_config_unifilar(
+        nombre_proyecto="Edificio Multi-Fachada con Bateria",
+        panel={"Pmax_stc": 200.0}, n_serie=10,
+        inversor_nombre="Huawei SUN2000-50KTL Hibrido", inversor={"P_ac_nom_W": 50_000},
+        n_inversores=1, tension_red_V=380,
+        superficies=[
+            {"nombre": "Fachada Sur", "n_paneles": 40},
+            {"nombre": "Techo plano", "n_paneles": 60},
+            {"nombre": "Fachada Este", "n_paneles": 30},
+            {"nombre": "Pergola", "n_paneles": 20},
+        ],
+        bateria_nombre="Growatt ARK", bateria={"capacidad_kWh": 10.0}, n_baterias=3,
+    )
+    assert cfg["superficies"] is not None
+    assert len(cfg["superficies"]) == 4
     assert cfg["bateria"]["activa"] is True
     d = generar_diagrama_unifilar(cfg)
     assert isinstance(d, schemdraw.Drawing)

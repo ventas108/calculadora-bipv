@@ -38,7 +38,7 @@ Versión: Agosto 2026 | URL: calc.innovacionquimica.com.co
 - Página 15 — Catálogo de Inversores PDF  NUEVO
 - Catálogo de Baterías — carga robusta del Excel  ACTUALIZADO
 13e. Página 19 — 🔒 Ledger de Auditoría  NUEVO
-13f. Página 20 — ⚡ Diagrama Unifilar  ACTUALIZADO
+13f. Página 20 — ⚡ Diagrama Unifilar (batería + multi-superficie)  ACTUALIZADO
 
 - Calculadora de Sombreado 3D
 - Cadena completa — bypass y multi-superficie
@@ -1826,9 +1826,9 @@ El Ledger NO registra cada cálculo de prueba mientras ajustas un slider — eso
 
 ⚠️ Para no cometer errores: el Ledger es por proyecto Y por cuenta — dos usuarios distintos con un proyecto del mismo nombre tienen cadenas completamente separadas, igual que el resto de los datos privados por cuenta de esta app.
 
-## 13f. Página 20 — ⚡ Diagrama Unifilar  ACTUALIZADO (27-ago-2026 — ahora incluye batería)
+## 13f. Página 20 — ⚡ Diagrama Unifilar  ACTUALIZADO (27-ago-2026 — ahora incluye multi-superficie)
 
-Generador universal de diagrama unifilar (esquema eléctrico simplificado en una línea) — sirve para cualquier proyecto FV o BIPV, no está atado a un caso particular. Auto-llena módulo, número de paneles, N en serie, inversor y unidades desde lo que ya configuraste en 📐 Dimensionamiento / ⚖️ Comparador de Inversores, y desde 27-ago-2026 también la batería desde 🔋 Baterías y Balance si hay una configurada; lo que no esté disponible se completa a mano (protección DC/AC/batería, tensión de red, tipo de medidor, cliente).
+Generador universal de diagrama unifilar (esquema eléctrico simplificado en una línea) — sirve para cualquier proyecto FV o BIPV, no está atado a un caso particular. Auto-llena módulo, número de paneles, N en serie, inversor y unidades desde lo que ya configuraste en 📐 Dimensionamiento / ⚖️ Comparador de Inversores, batería desde 🔋 Baterías y Balance, y superficies desde 🗺️ Vista 3D (Página 9) si hay multi-superficie activa; lo que no esté disponible se completa a mano.
 
 Si el número de módulos no es múltiplo de los módulos en serie, la página avisa de string incompleto antes de generar el diagrama. La protección AC se estima automáticamente (NEC, factor de seguridad 1,25) si no se ingresa a mano.
 
@@ -1838,9 +1838,13 @@ Exporta PNG, SVG (editable) y PDF.
 
 El checkbox "Incluir batería en el diagrama" se preselecciona solo si ya hay una batería configurada en 🔋 Baterías y Balance (`bateria_ok`). En esta app la batería se conecta al **mismo inversor híbrido** que el generador FV — la compatibilidad se verifica por rango de voltaje en `calculos/compatibilidad_bateria.py`, no hay un inversor separado para la batería. Por eso el diagrama la dibuja como una segunda entrada DC que se une al bus del generador justo antes del inversor (con su propia protección), en vez de un circuito aparte. Si el inversor configurado no tiene "híbrido" en el nombre, la etiqueta del inversor en el diagrama agrega "Híbrido" automáticamente cuando hay batería activa, para dejar explícito ese requisito.
 
-Alcance restante (Fase 3): multi-superficie (varias ramas DC en paralelo) queda para una fase siguiente — reutilizará `multisup_desglose` de Página 9.
+### 🗺️ Multi-superficie (Fase 3, 27-ago-2026)
 
-⚠️ Para no cometer errores: **no es un documento certificado**. Es un borrador técnico auto-poblado — el diagrama unifilar para trámite RETIE formal requiere firma de un ingeniero electricista matriculado. La página lo advierte explícitamente arriba del todo. Con más de 1 inversor, se muestran como un solo bloque con multiplicador ("2 × Growatt...") en vez de ramas paralelas dibujadas — simplificación deliberada, no un error.
+El checkbox "Incluir varias superficies" se preselecciona si `multisup_activo` está activo (Página 9). Con 2 o más superficies, cada una se dibuja como su propio bloque generador con su propia protección DC, todas convergiendo en un **bus horizontal común** antes de la protección DC compartida y el inversor — no como ramas que se repiten literalmente el resto del circuito, sino como fuentes que confluyen. `multisup_desglose` (Página 9) trae nombre/tipo/área por superficie pero NO número de módulos (esa página trabaja con áreas y POA, no con conteo de paneles) — la página pide el número de módulos por superficie a mano, con nombre/área ya auto-llenados como contexto. Si no hay multi-superficie detectada, se puede definir manualmente con una superficie por línea (`nombre, número de módulos`).
+
+Con menos de 2 superficies con módulos ingresados, el diagrama cae automáticamente al generador único (Fase 1/2) — sin romper ni mostrar una rama vacía.
+
+⚠️ Para no cometer errores: **no es un documento certificado**. Es un borrador técnico auto-poblado — el diagrama unifilar para trámite RETIE formal requiere firma de un ingeniero electricista matriculado. La página lo advierte explícitamente arriba del todo. Con más de 1 inversor, se muestran como un solo bloque con multiplicador ("2 × Growatt...") en vez de ramas paralelas dibujadas — simplificación deliberada, no un error. Multi-superficie asume que todas las superficies alimentan el/los mismo(s) inversor(es) — no modela strings de distinta orientación compartiendo un mismo MPPT (eso ya lo resuelve Página 9, sección 6, como cálculo aparte).
 
 ## 14. Calculadora de Sombreado 3D
 
@@ -2425,9 +2429,9 @@ Cambio de código que acompaña esto: en 🔆 Motor Óptico, el selector "Tipo d
 
 Manual actualizado el 27 de agosto de 2026
 
-Novedades de esta versión: ⚡ Diagrama Unifilar (Página 20) ahora incluye batería (Fase 2) — se dibuja como segunda entrada DC del mismo inversor híbrido, auto-llenada desde 🔋 Baterías y Balance. Ver sección 13f para el detalle completo.
+Novedades de esta versión: ⚡ Diagrama Unifilar (Página 20) ahora incluye multi-superficie (Fase 3) — N superficies convergiendo en un bus horizontal común, auto-llenado desde 🗺️ Vista 3D. Ver sección 13f para el detalle completo (también incluye Fase 2: batería, de la versión anterior).
 
-Versión anterior (26 de agosto de 2026): corrección de bug de timezone en TMY de PVGIS + pérdida IAM en los scripts de análisis del proyecto Urabá, primera validación cruzada documentada de la calculadora (scripts y motor real) contra PVsyst (monofacial y bifacial), y Motor Óptico ahora obligatorio en el flujo de Granja fotovoltaica/agrivoltaica con default de montaje "Ventilado libre" corregido para ese tipo de proyecto.
+Versión anterior a esa (26 de agosto de 2026): corrección de bug de timezone en TMY de PVGIS + pérdida IAM en los scripts de análisis del proyecto Urabá, primera validación cruzada documentada de la calculadora (scripts y motor real) contra PVsyst (monofacial y bifacial), y Motor Óptico ahora obligatorio en el flujo de Granja fotovoltaica/agrivoltaica con default de montaje "Ventilado libre" corregido para ese tipo de proyecto.
 
 Calculadora BIPV — Innovación Química
 

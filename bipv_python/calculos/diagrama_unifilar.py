@@ -22,8 +22,12 @@ Alcance:
     por rango de voltaje), no a un inversor separado -- por eso la rama de
     batería cuelga del punto DC justo antes del inversor, como una segunda
     entrada DC del mismo equipo, no como un circuito aparte.
-  Fase 3 (multi-superficie) queda fuera de este módulo por ahora -- ver
-    DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md / progreso.md del proyecto Orangutan.
+  Fase 3 (27-ago-2026): multi-superficie -- cuando el proyecto tiene 2+
+    superficies activas (Página 9 — Vista 3D y Multi-Superficie), cada una
+    se dibuja como su propio bloque generador con su propia protección DC,
+    todas convergiendo en un bus horizontal común antes del inversor. Con 0
+    o 1 superficie (el caso normal) el diagrama sale idéntico a Fase 1/2 --
+    sin regresión.
 
 Limitaciones conocidas (declaradas a propósito, no ocultas):
   - Con más de 1 inversor, se muestra como un solo bloque "N × modelo" en
@@ -32,6 +36,10 @@ Limitaciones conocidas (declaradas a propósito, no ocultas):
   - La rama de batería es una "rama que cuelga" (convención propia de
     diagramas unifilares: no se dibuja el camino de retorno) -- no repite
     todos los símbolos de protección de un diagrama de detalle completo.
+  - Multi-superficie asume que TODAS las superficies convergen en el/los
+    MISMO(S) inversor(es) del proyecto -- no modela strings de distinta
+    orientación compartiendo un mismo MPPT (eso ya lo resuelve Página 9,
+    sección 6, como cálculo aparte e informativo, no como topología física).
   - Este diagrama es un borrador técnico auto-poblado, NO un documento
     certificado para trámite RETIE -- ese trámite requiere firma de
     ingeniero electricista matriculado. Declarar esto siempre al usuario
@@ -72,6 +80,7 @@ def construir_config_unifilar(
     n_baterias: int = 0,
     capacidad_kWh_unidad: float | None = None,
     proteccion_bat_A: float | None = None,
+    superficies: list[dict] | None = None,
 ) -> dict:
     """
     Normaliza los datos de un proyecto a la estructura mínima que necesita
@@ -89,10 +98,21 @@ def construir_config_unifilar(
     n_baterias=0 (default) significa "sin batería en este proyecto" --
     generar_diagrama_unifilar() no dibuja la rama de batería en ese caso,
     el diagrama sale idéntico al de la Fase 1 (sin regresión).
+
+    superficies: lista opcional para multi-superficie (Fase 3). Cada item:
+    {"nombre": str, "n_paneles": int, "p_dc_kWp": float|None, "tipo": str}.
+    Con menos de 2 items activos, se ignora y se usa el generador único
+    (panel/n_paneles/n_serie de arriba) -- sin regresión frente a Fase 1/2.
+    Este parámetro NO reemplaza panel/n_paneles/n_serie: cuando SÍ hay 2+
+    superficies, esos parámetros del generador único se ignoran para el
+    dibujo (cada superficie ya trae su propio kWp), pero conviene seguir
+    pasando n_serie si se quiere seguir viendo el aviso de string incompleto
+    a nivel de proyecto.
     """
     panel = panel or {}
     inversor = inversor or {}
     bateria = bateria or {}
+    superficies = [s for s in (superficies or []) if s.get("n_paneles")]
 
     pmax_stc = float(panel.get("Pmax_stc") or panel.get("PmaxWp") or 0) or None
     p_dc_kWp = round(pmax_stc * n_paneles / 1000, 2) if pmax_stc and n_paneles else None
@@ -121,10 +141,26 @@ def construir_config_unifilar(
         round(cap_unidad * n_baterias, 1) if cap_unidad and n_baterias else None
     )
 
+    superficies_out = None
+    if len(superficies) >= 2:
+        superficies_out = []
+        for s in superficies:
+            n_pan_s = int(s.get("n_paneles") or 0)
+            p_kwp_s = s.get("p_dc_kWp")
+            if p_kwp_s is None and pmax_stc and n_pan_s:
+                p_kwp_s = round(pmax_stc * n_pan_s / 1000, 2)
+            superficies_out.append({
+                "nombre": s.get("nombre") or "Superficie",
+                "tipo": s.get("tipo") or "",
+                "n_paneles": n_pan_s,
+                "p_dc_kWp": p_kwp_s,
+            })
+
     return {
         "nombre_proyecto": nombre_proyecto,
         "cliente": cliente,
         "tipo_instalacion": tipo_instalacion,
+        "superficies": superficies_out,
         "generador": {
             "panel_nombre": panel_nombre,
             "n_paneles": n_paneles,
@@ -186,6 +222,18 @@ def _label_inversor(cfg: dict) -> str:
     return "\n".join(lineas)
 
 
+def _label_superficie(s: dict) -> str:
+    lineas = [s.get("nombre") or "Superficie"]
+    partes = []
+    if s.get("n_paneles"):
+        partes.append(f"{s['n_paneles']} paneles")
+    if s.get("p_dc_kWp"):
+        partes.append(f"{s['p_dc_kWp']:.2f} kWp")
+    if partes:
+        lineas.append(" · ".join(partes))
+    return "\n".join(lineas)
+
+
 def _label_bateria(cfg: dict) -> str:
     b = cfg["bateria"]
     lineas = [b.get("nombre") or "Batería"]
@@ -229,6 +277,45 @@ def _gap(d: schemdraw.Drawing, x: float, y_top: float, largo: float) -> float:
     return y_bottom
 
 
+def _dibujar_generadores(d: schemdraw.Drawing, config: dict, x_main: float) -> float:
+    """
+    Dibuja el/los bloque(s) generador(es) y devuelve la Y desde donde debe
+    continuar el resto de la cadena (Protección DC en adelante).
+
+    Caso normal (0 o 1 superficie): un solo bloque "Generador FV" centrado
+    en x_main -- idéntico a Fase 1/2, sin regresión.
+
+    Caso multi-superficie (2+ superficies activas): N bloques generadores
+    en fila, cada uno con su propia protección DC, todos convergiendo en
+    un bus horizontal común. Geometría validada en /scratchpad antes de
+    integrarla aquí (mismo criterio que la rama de batería en Fase 2) --
+    a diferencia de la batería, las superficies SÍ deben converger (son
+    fuentes que alimentan el mismo inversor, no una rama informativa que
+    cuelga), por eso usan un bus horizontal en vez de líneas colgantes.
+    """
+    superficies = config.get("superficies")
+    if not superficies or len(superficies) < 2:
+        return _caja(d, 2.8, 1.4, x_main, 0.0, _label_generador(config))
+
+    n = len(superficies)
+    ancho_caja = 2.6
+    paso = ancho_caja + 1.3  # separacion centro-a-centro -- deja aire para las etiquetas de 2 lineas
+    x0 = -paso * (n - 1) / 2.0
+    bus_y = None
+    for i, sup in enumerate(superficies):
+        x = x0 + i * paso
+        y = _caja(d, ancho_caja, 1.2, x, 0.0, _label_superficie(sup))
+        y = _gap(d, x, y, 0.5)
+        y0, y1 = y, y - 0.8
+        d += elm.Fuse().at((x, y0)).to((x, y1)).label("Prot.", loc="bottom")
+        d += elm.Dot().at((x, y1))
+        bus_y = y1  # todas las superficies usan la misma altura de caja -> mismo y1
+
+    x_izq, x_der = x0, x0 + paso * (n - 1)
+    d += elm.Line().at((x_izq, bus_y)).to((x_der, bus_y))
+    return bus_y
+
+
 def generar_diagrama_unifilar(config: dict) -> schemdraw.Drawing:
     """
     Dibuja el diagrama unifilar a partir de un config de
@@ -241,7 +328,7 @@ def generar_diagrama_unifilar(config: dict) -> schemdraw.Drawing:
     d = schemdraw.Drawing(fontsize=11)
     X_MAIN, X_BAT = 0.0, -2.8
 
-    Y = _caja(d, 2.8, 1.4, X_MAIN, 0.0, _label_generador(config))
+    Y = _dibujar_generadores(d, config, X_MAIN)
     Y = _gap(d, X_MAIN, Y, 0.9)
     d += elm.Dot().at((X_MAIN, Y))
 
