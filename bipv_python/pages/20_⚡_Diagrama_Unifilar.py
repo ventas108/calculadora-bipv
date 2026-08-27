@@ -1,8 +1,10 @@
 """
-Página 20 — Diagrama Unifilar (Fase 1 + Fase 2: batería)
+Página 20 — Diagrama Unifilar (Fase 1: MVP · Fase 2: batería · Fase 3:
+multi-superficie · Fase 4: sellado en Ledger)
 Generador universal de diagrama unifilar para proyectos FV y BIPV.
-Auto-llenado desde el panel/inversor configurados en Dimensionamiento y la
-batería configurada en 🔋 Baterías y Balance, si existe.
+Auto-llenado desde el panel/inversor configurados en Dimensionamiento, la
+batería configurada en 🔋 Baterías y Balance, y las superficies de 🗺️ Vista
+3D, si existen.
 """
 import streamlit as st
 
@@ -11,6 +13,7 @@ from calculos.diagrama_unifilar import (
     generar_diagrama_unifilar,
     exportar_unifilar_bytes,
 )
+from calculos import ledger_auditoria as _ledger
 
 st.set_page_config(page_title="Diagrama Unifilar", page_icon="⚡", layout="wide")
 
@@ -272,6 +275,42 @@ with col_dl3:
         file_name=f"unifilar_{config['nombre_proyecto'].replace(' ', '_')}.pdf",
         mime="application/pdf",
     )
+
+st.divider()
+# ── 🔒 Ledger de Auditoría — mismo diagrama, sellado con hash encadenado.
+# Botón dedicado (no un selector genérico de tipo) porque para esta página
+# solo hay un tipo que tiene sentido sellar: "diagrama_unifilar" -- mismo
+# patrón que 🔍 Diagnóstico, distinto del selector de 📄 Reporte PDF (que sí
+# ofrece varios tipos porque ahí sí aplica más de uno).
+if st.button("🔒 Sellar en el Ledger de Auditoría", type="secondary", use_container_width=True):
+    _usr_unif = st.session_state.get("auth_email", "")
+    _insumos_unif = {
+        "generador": config["generador"],
+        "inversores": config["inversores"],
+        "bateria": config["bateria"],
+        "superficies": config["superficies"],
+        "tension_red_V": config["tension_red_V"],
+        "medidor": config["medidor"],
+        "proteccion_dc_A": config["proteccion_dc_A"],
+        "proteccion_ac_A": config["proteccion_ac_A"],
+    }
+    _resultados_unif = {
+        "p_dc_total_kWp": (
+            round(sum(s["p_dc_kWp"] or 0 for s in config["superficies"]), 2)
+            if config["superficies"] else config["generador"]["p_dc_kWp"]
+        ),
+        "p_ac_total_kW": config["inversores"]["p_ac_total_kW"],
+        "tiene_bateria": config["bateria"]["activa"],
+        "n_superficies": len(config["superficies"]) if config["superficies"] else 1,
+    }
+    _eslabon_unif = _ledger.sellar_resultado(
+        config["nombre_proyecto"], _usr_unif, "diagrama_unifilar",
+        _insumos_unif, _resultados_unif,
+    ) if _usr_unif else {}
+    if _eslabon_unif:
+        st.success(f"🔒 Diagrama sellado — ID {_eslabon_unif['hash_propio'][:16]}")
+    else:
+        st.warning("⚠️ No se pudo sellar (revisa sesión activa y permisos/espacio).")
 
 with st.expander("📋 Datos usados para este diagrama"):
     st.json(config)

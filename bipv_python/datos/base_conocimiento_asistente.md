@@ -38,7 +38,7 @@ Versión: Agosto 2026 | URL: calc.innovacionquimica.com.co
 - Página 15 — Catálogo de Inversores PDF  NUEVO
 - Catálogo de Baterías — carga robusta del Excel  ACTUALIZADO
 13e. Página 19 — 🔒 Ledger de Auditoría  NUEVO
-13f. Página 20 — ⚡ Diagrama Unifilar (batería + multi-superficie)  ACTUALIZADO
+13f. Página 20 — ⚡ Diagrama Unifilar (batería + multi-superficie + sellado Ledger)  ACTUALIZADO
 
 - Calculadora de Sombreado 3D
 - Cadena completa — bypass y multi-superficie
@@ -1801,9 +1801,9 @@ En términos auditables, esto significa concretamente:
 - **Prueba de secuencia honesta**: un banco o ITA puede revisar el HISTORIAL completo de corridas de un proyecto, no solo el resultado final. Si el TIR subió de 11% a 14% entre dos sellos, el Ledger muestra exactamente qué insumo cambió y cuándo — no un número final que "apareció así".
 - **Límite honesto (no se oculta)**: el hash-chain protege contra editar UN eslabón sin que se note. No evita que alguien borre el archivo completo del ledger y empiece de cero — eso requeriría un ancla externa (por ejemplo, publicar el hash raíz en otro sistema independiente), decidido explícitamente FUERA de alcance por ahora para no perder el principio de "todo local, sin depender de servicios externos".
 
-### Los 3 tipos de resultado que se pueden sellar
+### Los 4 tipos de resultado que se pueden sellar  ACTUALIZADO (27-ago-2026 — se agregó Diagrama Unifilar)
 
-El Ledger no es solo para bancabilidad — cubre 3 escenarios reales, cada uno con su propia etiqueta dentro del eslabón:
+El Ledger no es solo para bancabilidad — cubre 4 escenarios reales, cada uno con su propia etiqueta dentro del eslabón:
 
 Tipo  │  Cuándo se usa  │  Dónde se sella
 
@@ -1812,6 +1812,8 @@ Tipo  │  Cuándo se usa  │  Dónde se sella
 📋 Verificación presupuestal informativa  │  Le entregas un resultado a un cliente SIN fines de financiamiento — igual queda protegido: si en 6 meses el cliente dice "usted me había dicho que esto rendía X", tienes la prueba exacta de qué le mostraste y con qué insumos  │  Checkbox en 📄 Reporte PDF, o manual en esta página
 
 🔍 Diagnóstico de sistema en operación  │  Diagnosticas un sistema YA instalado (🔍 Página 13 — Diagnóstico) — protege la conclusión de un diagnóstico puntual, útil ante una reclamación de garantía al instalador o fabricante  │  Botón "🔒 Sellar en el Ledger de Auditoría" en la propia página 13, independiente del botón de histórico de tendencia que ya existía ahí
+
+⚡ Diagrama unifilar (diseño eléctrico)  │  Congelas la configuración eléctrica exacta (generador, inversor(es), batería, superficies, protecciones) que le entregaste al cliente o al instalador como diagrama unifilar — protege contra "eso no fue lo que usted diseñó" si el diseño cambia después  │  Botón "🔒 Sellar en el Ledger de Auditoría" en ⚡ Página 20 — Diagrama Unifilar, único tipo ofrecido ahí (no un selector, a diferencia de Reporte PDF que sí ofrece varios)
 
 ### Por qué el sellado es siempre manual, nunca automático
 
@@ -1826,7 +1828,7 @@ El Ledger NO registra cada cálculo de prueba mientras ajustas un slider — eso
 
 ⚠️ Para no cometer errores: el Ledger es por proyecto Y por cuenta — dos usuarios distintos con un proyecto del mismo nombre tienen cadenas completamente separadas, igual que el resto de los datos privados por cuenta de esta app.
 
-## 13f. Página 20 — ⚡ Diagrama Unifilar  ACTUALIZADO (27-ago-2026 — ahora incluye multi-superficie)
+## 13f. Página 20 — ⚡ Diagrama Unifilar  ACTUALIZADO (27-ago-2026 — plan de 4 fases completo)
 
 Generador universal de diagrama unifilar (esquema eléctrico simplificado en una línea) — sirve para cualquier proyecto FV o BIPV, no está atado a un caso particular. Auto-llena módulo, número de paneles, N en serie, inversor y unidades desde lo que ya configuraste en 📐 Dimensionamiento / ⚖️ Comparador de Inversores, batería desde 🔋 Baterías y Balance, y superficies desde 🗺️ Vista 3D (Página 9) si hay multi-superficie activa; lo que no esté disponible se completa a mano.
 
@@ -1843,6 +1845,10 @@ El checkbox "Incluir batería en el diagrama" se preselecciona solo si ya hay un
 El checkbox "Incluir varias superficies" se preselecciona si `multisup_activo` está activo (Página 9). Con 2 o más superficies, cada una se dibuja como su propio bloque generador con su propia protección DC, todas convergiendo en un **bus horizontal común** antes de la protección DC compartida y el inversor — no como ramas que se repiten literalmente el resto del circuito, sino como fuentes que confluyen. `multisup_desglose` (Página 9) trae nombre/tipo/área por superficie pero NO número de módulos (esa página trabaja con áreas y POA, no con conteo de paneles) — la página pide el número de módulos por superficie a mano, con nombre/área ya auto-llenados como contexto. Si no hay multi-superficie detectada, se puede definir manualmente con una superficie por línea (`nombre, número de módulos`).
 
 Con menos de 2 superficies con módulos ingresados, el diagrama cae automáticamente al generador único (Fase 1/2) — sin romper ni mostrar una rama vacía.
+
+### 🔒 Sellado en el Ledger (Fase 4, 27-ago-2026)
+
+Botón "🔒 Sellar en el Ledger de Auditoría" al final de la página — mismo patrón que 🔍 Diagnóstico: un botón dedicado con un solo tipo (`diagrama_unifilar`, ver sección 13e), no un selector de varios tipos como en 📄 Reporte PDF. Congela el diseño eléctrico completo (generador, inversor(es), batería, superficies, protecciones) que se muestra en pantalla, con un hash encadenado al eslabón anterior del proyecto — protege contra "eso no fue lo que usted diseñó" si el layout cambia después de entregado. Con esto se completa el plan original de 4 fases del Diagrama Unifilar (MVP → batería → multi-superficie → sellado).
 
 ⚠️ Para no cometer errores: **no es un documento certificado**. Es un borrador técnico auto-poblado — el diagrama unifilar para trámite RETIE formal requiere firma de un ingeniero electricista matriculado. La página lo advierte explícitamente arriba del todo. Con más de 1 inversor, se muestran como un solo bloque con multiplicador ("2 × Growatt...") en vez de ramas paralelas dibujadas — simplificación deliberada, no un error. Multi-superficie asume que todas las superficies alimentan el/los mismo(s) inversor(es) — no modela strings de distinta orientación compartiendo un mismo MPPT (eso ya lo resuelve Página 9, sección 6, como cálculo aparte).
 
@@ -2429,7 +2435,9 @@ Cambio de código que acompaña esto: en 🔆 Motor Óptico, el selector "Tipo d
 
 Manual actualizado el 27 de agosto de 2026
 
-Novedades de esta versión: ⚡ Diagrama Unifilar (Página 20) ahora incluye multi-superficie (Fase 3) — N superficies convergiendo en un bus horizontal común, auto-llenado desde 🗺️ Vista 3D. Ver sección 13f para el detalle completo (también incluye Fase 2: batería, de la versión anterior).
+Novedades de esta versión: ⚡ Diagrama Unifilar (Página 20) completa su plan de 4 fases con el sellado en el Ledger de Auditoría (Fase 4, nuevo tipo `diagrama_unifilar`) — se suma a multi-superficie (Fase 3, misma sesión) y batería (Fase 2, sesión anterior). Ver sección 13f (diagrama) y 13e (Ledger, ahora 4 tipos) para el detalle completo.
+
+Versión anterior (27 de agosto de 2026, más temprano): multi-superficie (Fase 3) — N superficies convergiendo en un bus horizontal común, auto-llenado desde 🗺️ Vista 3D.
 
 Versión anterior a esa (26 de agosto de 2026): corrección de bug de timezone en TMY de PVGIS + pérdida IAM en los scripts de análisis del proyecto Urabá, primera validación cruzada documentada de la calculadora (scripts y motor real) contra PVsyst (monofacial y bifacial), y Motor Óptico ahora obligatorio en el flujo de Granja fotovoltaica/agrivoltaica con default de montaje "Ventilado libre" corregido para ese tipo de proyecto.
 

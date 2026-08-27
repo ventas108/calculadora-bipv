@@ -203,3 +203,36 @@ def test_snapshot_resultados_sin_financiero_no_falla():
     snap = m.construir_snapshot_resultados({})
     assert snap["vpn_usd"] is None
     assert snap["tir_pct"] is None
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Tipo "diagrama_unifilar" (Diagrama Unifilar Fase 4, 27-ago-2026)
+# ══════════════════════════════════════════════════════════════════════════
+def test_diagrama_unifilar_es_tipo_valido():
+    assert "diagrama_unifilar" in m.TIPOS_VALIDOS
+    assert "diagrama_unifilar" in m.TIPO_LABELS
+
+
+def test_sellar_diagrama_unifilar_encadena_correctamente():
+    e = m.sellar_resultado(
+        "Proyecto Unifilar", "ana@test.com", "diagrama_unifilar",
+        {"generador": {"n_paneles": 306, "p_dc_kWp": 220.32}},
+        {"p_dc_total_kWp": 220.32, "p_ac_total_kW": 200.0},
+    )
+    assert e["tipo"] == "diagrama_unifilar"
+    assert e["hash_anterior"] == m.GENESIS
+    v = m.verificar_cadena("Proyecto Unifilar", "ana@test.com")
+    assert v["integra"] is True
+    assert v["eslabones_verificados"] == 1
+
+
+def test_sellar_diagrama_unifilar_coexiste_con_otros_tipos_mismo_proyecto():
+    # Un mismo proyecto puede tener eslabones de distinto tipo encadenados
+    # entre si (ej. primero un diagnostico, luego un unifilar) -- la cadena
+    # no distingue tipo para el encadenamiento, solo para el filtro visual.
+    m.sellar_resultado("Proyecto Mixto", "ana@test.com", "diagnostico_operacion", {}, {})
+    e2 = m.sellar_resultado("Proyecto Mixto", "ana@test.com", "diagrama_unifilar", {}, {})
+    assert e2["id"] == 2
+    v = m.verificar_cadena("Proyecto Mixto", "ana@test.com")
+    assert v["integra"] is True
+    assert v["eslabones_verificados"] == 2

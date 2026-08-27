@@ -60,12 +60,14 @@ def _nombre_a_slug(nombre: str) -> str:
 
 GENESIS = "GENESIS"
 
-TIPOS_VALIDOS = ("presupuesto_bancable", "presupuesto_informativo", "diagnostico_operacion")
+TIPOS_VALIDOS = ("presupuesto_bancable", "presupuesto_informativo", "diagnostico_operacion",
+                  "diagrama_unifilar")
 
 TIPO_LABELS = {
     "presupuesto_bancable": "🏦 Presupuesto bancable (banco/ITA)",
     "presupuesto_informativo": "📋 Verificación presupuestal informativa",
     "diagnostico_operacion": "🔍 Diagnóstico de sistema en operación",
+    "diagrama_unifilar": "⚡ Diagrama unifilar (diseño eléctrico)",
 }
 
 
