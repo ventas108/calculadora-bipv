@@ -55,10 +55,26 @@ def test_uraba_calculos_conocidos():
     assert calc["potencia_ac_kw"] == 200.0
     assert calc["relacion_dc_ac"] == pytest.approx(1.1016, abs=1e-3)
     assert calc["corriente_total_a"] == pytest.approx(288.7, abs=0.1)
-    assert calc["corriente_diseno_total_a"] == pytest.approx(360.8, abs=0.1)
+    assert calc["corriente_diseno_total_a"] == 360.8  # exacto, ver test de doble redondeo abajo
     assert calc["breaker_general_a"] == 400
     assert calc["breaker_inversor_a"] == 200
     assert calc["pdc_por_inversor_kwp"] == [116.64, 103.68]
+
+
+def test_corriente_diseno_no_tiene_doble_redondeo():
+    # Bug real encontrado en auditoria (27-ago-2026): calcular i_diseno
+    # multiplicando el factor por corriente_total_a YA REDONDEADA daba
+    # 360.9 A en vez de 360.8 A -- un numero DISTINTO al que muestra
+    # Pagina 20 (diagrama_unifilar.py) para el mismo proyecto Uraba.
+    # Verificado comparando contra el calculo directo sin redondeo
+    # intermedio (round(1.25 * p_ac_total_kW * 1000 / (sqrt(3) * V), 1),
+    # mismo patron que proteccion_ac_A en diagrama_unifilar.py).
+    from math import sqrt
+    cfg = _config_uraba()
+    calc = calcular_retie(cfg)
+    esperado = round(1.25 * 200.0 * 1000 / (sqrt(3) * 400.0), 1)
+    assert calc["corriente_diseno_total_a"] == esperado
+    assert esperado == 360.8  # confirma que el bug SI cambiaba el resultado
 
 
 def test_uraba_validaciones_balance_pendiente():
@@ -77,6 +93,20 @@ def test_uraba_genera_svg_valido():
     assert svg.startswith("<?xml")
     assert "<svg" in svg
     assert "220,32" in svg or "220.32" in svg  # potencia DC visible en el SVG
+
+
+def test_svg_no_se_titula_diagrama_unifilar():
+    # Bug real encontrado en auditoria (27-ago-2026): el titulo dentro del
+    # SVG decia literalmente "DIAGRAMA UNIFILAR FOTOVOLTAICO" (heredado
+    # sin cambiar del script original), pero este documento NO es el
+    # esquema de linea unica -- eso es Pagina 20. Confundia cual era cual
+    # si se archivaban los dos documentos del mismo proyecto.
+    cfg = _config_uraba()
+    calc = calcular_retie(cfg)
+    checks = validar_retie(cfg, calc)
+    svg = generar_ficha_svg(cfg, calc, checks)
+    assert "DIAGRAMA UNIFILAR" not in svg
+    assert "FICHA DE VALIDACIÓN RETIE" in svg
 
 
 # ══════════════════════════════════════════════════════════════════════════

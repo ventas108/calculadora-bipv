@@ -1895,6 +1895,13 @@ Presentadas 3 opciones al usuario (página nueva + motor reutilizable / solo mot
 
 Verificado end-to-end: 696/696 tests (23 nuevos: 14 en `test_ficha_validacion_retie.py`, 2 en `test_ledger_auditoria.py`, 7 en `test_pagina_ficha_validacion_retie.py`), servidor Streamlit local levantado y la página confirmada respondiendo 200 con el título correcto (sin traceback) antes de dar la tarea por terminada.
 
+### Auditoría de la muestra entregada (27-ago-2026) — 2 bugs reales corregidos
+
+El usuario pidió auditar la imagen de muestra ya entregada. Se encontraron y corrigieron 2 bugs reales:
+
+1. **Título incorrecto dentro del SVG**: decía literalmente "DIAGRAMA UNIFILAR FOTOVOLTAICO" (heredado sin cambiar del script original del usuario) aunque este documento NO es el esquema de línea única (eso es Página 20) — confundía cuál documento era cuál si se archivaban los dos juntos para el mismo proyecto. Corregido a "FICHA DE VALIDACIÓN RETIE".
+2. **Doble redondeo en la corriente de diseño**: `corriente_diseno_total_a` se calculaba multiplicando el factor de continuidad (1,25) por `corriente_total_a` YA REDONDEADA a 1 decimal, en vez de por el valor crudo. Para el proyecto Urabá esto daba **360,9 A**, un número DISTINTO al que muestra Página 20 (`diagrama_unifilar.py`) para el mismo proyecto físico: **360,8 A** (redondeado directo, sin redondeo intermedio). Verificado ejecutando ambas rutas de cálculo antes de corregir. Corregido guardando primero el valor crudo (`i_total_crudo`) y derivando de ahí tanto la cifra a mostrar como la corriente de diseño y el breaker por inversor (mismo tipo de doble redondeo también afectaba a `breaker_inversor_a`, corregido igual aunque sin un documento externo con el que comparar). 2 tests de regresión nuevos (698/698 en la suite completa).
+
 ⚠️ Para no cometer errores: mismo criterio que Página 20 — **no es un documento constructivo**, no sustituye memorias de cálculo, estudio de cortocircuito, coordinación de protecciones, declaración de cumplimiento, inspección ni firma de ingeniero electricista matriculado. Es un tipo de documento DISTINTO al diagrama unifilar (dashboard + checklist, no un esquema de símbolos eléctricos) — no reemplaza a Página 20, la complementa.
 
 ## 14. Calculadora de Sombreado 3D

@@ -175,19 +175,28 @@ def calcular_retie(cfg: dict) -> dict:
     )
     relacion_dc_ac = round(pdc / pac, 3) if pdc and pac else None
 
+    # Corrientes: se guarda primero el valor CRUDO (sin redondear) y de ahí
+    # se derivan tanto la cifra a mostrar (redondeada a 1 decimal) como la
+    # corriente de diseño y el breaker -- calcular la de diseño a partir de
+    # la ya redondeada (doble redondeo) daba un resultado distinto al que
+    # muestra Página 20 (calculos/diagrama_unifilar.py) para el MISMO
+    # proyecto (360,9 A aquí vs 360,8 A allá) -- encontrado en auditoría
+    # (27-ago-2026) comparando ambos documentos del proyecto Urabá.
     tension = inv["tension_salida_v"]
-    i_inversor = (
-        round(inv["potencia_ac_kw_unidad"] * 1000.0 / (sqrt(3) * tension), 1)
+    i_inversor_crudo = (
+        inv["potencia_ac_kw_unidad"] * 1000.0 / (sqrt(3) * tension)
         if inv["potencia_ac_kw_unidad"] and tension else None
     )
-    i_total = (
-        round(pac * 1000.0 / (sqrt(3) * tension), 1)
-        if pac and tension else None
-    )
-    i_diseno = round(i_total * fc, 1) if i_total else None
+    i_total_crudo = pac * 1000.0 / (sqrt(3) * tension) if pac and tension else None
 
-    breaker_inversor = calibre_comercial_superior(i_inversor * fc) if i_inversor else None
-    breaker_general = calibre_comercial_superior(i_diseno) if i_diseno else None
+    i_inversor = round(i_inversor_crudo, 1) if i_inversor_crudo is not None else None
+    i_total = round(i_total_crudo, 1) if i_total_crudo is not None else None
+    i_diseno = round(i_total_crudo * fc, 1) if i_total_crudo is not None else None
+
+    breaker_inversor = (
+        calibre_comercial_superior(i_inversor_crudo * fc) if i_inversor_crudo is not None else None
+    )
+    breaker_general = calibre_comercial_superior(i_diseno) if i_diseno is not None else None
 
     pdc_por_inversor: list[float] = []
     dcac_por_inversor: list[float] = []
@@ -467,8 +476,8 @@ def generar_ficha_svg(cfg: dict, calc: dict, checks: list[dict]) -> str:
     d.rect(0, 0, d.width, d.height, COLORES["fondo"], COLORES["fondo"], 0, 0)
     d.rect(25, 20, d.width - 50, d.height - 45, "#fff", COLORES["texto"], 2, 8)
 
-    d.text(55, 60, "DIAGRAMA UNIFILAR FOTOVOLTAICO", 29, 700)
-    d.text(55, 88, "Lectura ejecutiva para cliente + revisión técnica orientada a RETIE", 15, 400, COLORES["gris"])
+    d.text(55, 60, "FICHA DE VALIDACIÓN RETIE", 29, 700)
+    d.text(55, 88, "Lectura ejecutiva para cliente + checklist de validación técnica orientado a RETIE", 15, 400, COLORES["gris"])
     d.rect(d.width - 430, 40, 365, 65, COLORES["gris_claro"], "#CBD5E1", 1, 5)
     d.text(d.width - 410, 65, f"PLANO: {proy['plano']}", 12, 700)
     d.text(d.width - 410, 88, f"REV. {proy['revision']} · {proy['fecha']} · PARA REVISIÓN", 11, 400, COLORES["gris"])
