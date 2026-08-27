@@ -1,7 +1,8 @@
 """
-Página 20 — Diagrama Unifilar (Fase 1 / MVP)
+Página 20 — Diagrama Unifilar (Fase 1 + Fase 2: batería)
 Generador universal de diagrama unifilar para proyectos FV y BIPV.
-Auto-llenado desde el panel/inversor configurados en Dimensionamiento.
+Auto-llenado desde el panel/inversor configurados en Dimensionamiento y la
+batería configurada en 🔋 Baterías y Balance, si existe.
 """
 import streamlit as st
 
@@ -116,6 +117,51 @@ with col2:
     )
     medidor = st.selectbox("Tipo de medidor", ["Bidireccional", "Unidireccional"], index=0)
 
+st.subheader("🔋 Batería (opcional)")
+_bateria_detectada = bool(st.session_state.get("bateria_ok"))
+incluir_bateria = st.checkbox(
+    "Incluir batería en el diagrama",
+    value=_bateria_detectada,
+    help="Se preselecciona automáticamente si ya configuraste una batería en 🔋 Baterías y Balance.",
+)
+bateria_dict, bateria_nombre_val, n_baterias_val = {}, "", 0
+proteccion_bat_manual = 0.0
+if incluir_bateria:
+    if _bateria_detectada:
+        st.caption("🔋 Batería detectada desde 🔋 Baterías y Balance — revisa y ajusta si hace falta.")
+    bateria_dict = st.session_state.get("bateria_dict", {}) or {}
+    bateria_dim = st.session_state.get("bateria_dim", {}) or {}
+    col_b1, col_b2, col_b3 = st.columns(3)
+    with col_b1:
+        bateria_nombre_val = st.text_input(
+            "Modelo de batería",
+            value=st.session_state.get("bateria_nombre", ""),
+        )
+    with col_b2:
+        n_baterias_val = st.number_input(
+            "Cantidad de unidades",
+            min_value=0, step=1,
+            value=int(bateria_dim.get("N_baterias", 0) or 0),
+        )
+    with col_b3:
+        cap_manual = st.number_input(
+            "Capacidad por unidad (kWh) — solo si no se auto-llenó",
+            min_value=0.0, step=1.0,
+            value=float(bateria_dim.get("cap_unitaria_kWh") or bateria_dict.get("capacidad_kWh") or 0),
+        )
+        if cap_manual:
+            bateria_dict = {**bateria_dict, "capacidad_kWh": cap_manual}
+    proteccion_bat_manual = st.number_input(
+        "Protección DC de la batería (A) — deja en 0 para no mostrar amperaje",
+        min_value=0.0, step=1.0, value=0.0,
+    )
+    st.caption(
+        "ℹ️ En esta app la batería se conecta al **mismo inversor híbrido** que el "
+        "generador FV (verificado por rango de voltaje, ver ⚙️ Compatibilidad en "
+        "🔋 Baterías y Balance) — por eso el diagrama la dibuja como una segunda "
+        "entrada DC del mismo inversor, no como un equipo aparte."
+    )
+
 st.divider()
 
 config = construir_config_unifilar(
@@ -133,6 +179,10 @@ config = construir_config_unifilar(
     proteccion_ac_A=proteccion_ac_manual or None,
     tension_red_V=float(tension_red_V),
     medidor=medidor,
+    bateria_nombre=bateria_nombre_val,
+    bateria=bateria_dict,
+    n_baterias=int(n_baterias_val),
+    proteccion_bat_A=proteccion_bat_manual or None,
 )
 
 if config["generador"]["string_incompleto"]:

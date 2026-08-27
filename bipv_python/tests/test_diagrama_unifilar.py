@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Tests de calculos/diagrama_unifilar.py -- Fase 1 (MVP)."""
+"""Tests de calculos/diagrama_unifilar.py -- Fase 1 (MVP) + Fase 2 (batería)."""
 import schemdraw
 
 from calculos.diagrama_unifilar import (
@@ -81,5 +81,63 @@ def test_genera_diagrama_sin_datos_no_revienta():
     # debe producir un dibujo generico (con textos "Generador FV",
     # "Inversor", etc.) en vez de fallar.
     cfg = construir_config_unifilar()
+    d = generar_diagrama_unifilar(cfg)
+    assert isinstance(d, schemdraw.Drawing)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Fase 2 -- bateria
+# ══════════════════════════════════════════════════════════════════════════
+def test_config_sin_bateria_por_defecto():
+    # n_baterias=0 (default) -- bateria inactiva, mismo comportamiento que
+    # Fase 1 para proyectos sin bateria (sin regresion).
+    cfg = construir_config_unifilar(panel={"Pmax_stc": 720.0}, n_paneles=306, n_serie=18)
+    assert cfg["bateria"]["activa"] is False
+    assert cfg["bateria"]["capacidad_total_kWh"] is None
+
+
+def test_config_bateria_calcula_capacidad_total():
+    cfg = construir_config_unifilar(
+        bateria_nombre="Growatt ARK 10kWh",
+        bateria={"capacidad_kWh": 10.0},
+        n_baterias=2,
+    )
+    assert cfg["bateria"]["activa"] is True
+    assert cfg["bateria"]["capacidad_total_kWh"] == 20.0
+    assert cfg["bateria"]["cantidad"] == 2
+
+
+def test_config_bateria_capacidad_manual_tiene_prioridad():
+    cfg = construir_config_unifilar(
+        bateria={"capacidad_kWh": 10.0},
+        n_baterias=2,
+        capacidad_kWh_unidad=15.0,  # valor manual, distinto al del catalogo
+    )
+    assert cfg["bateria"]["capacidad_total_kWh"] == 30.0
+
+
+def test_diagrama_sin_bateria_no_dibuja_rama_extra():
+    # Regresion: el diagrama de un proyecto SIN bateria debe generarse sin
+    # error y sin necesitar ninguno de los parametros de bateria.
+    cfg = construir_config_unifilar(
+        panel={"Pmax_stc": 720.0}, n_paneles=306, n_serie=18,
+        inversor={"P_ac_nom_W": 100_000}, n_inversores=2, tension_red_V=400,
+    )
+    assert cfg["bateria"]["activa"] is False
+    d = generar_diagrama_unifilar(cfg)
+    assert isinstance(d, schemdraw.Drawing)
+
+
+def test_diagrama_con_bateria_hibrida():
+    cfg = construir_config_unifilar(
+        nombre_proyecto="Fachada BIPV con respaldo", cliente="Cliente Demo",
+        panel_nombre="ASP-ST1-T40", panel={"Pmax_stc": 200.0},
+        n_paneles=40, n_serie=10,
+        inversor_nombre="Growatt SPH 10000TL3 BH-UP",
+        inversor={"P_ac_nom_W": 10_000}, n_inversores=1, tension_red_V=220,
+        bateria_nombre="Growatt ARK 10kWh", bateria={"capacidad_kWh": 10.0},
+        n_baterias=2, proteccion_bat_A=63,
+    )
+    assert cfg["bateria"]["activa"] is True
     d = generar_diagrama_unifilar(cfg)
     assert isinstance(d, schemdraw.Drawing)

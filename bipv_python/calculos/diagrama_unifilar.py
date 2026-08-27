@@ -1,26 +1,42 @@
 # -*- coding: utf-8 -*-
 """
-Diagrama Unifilar — generador universal para proyectos FV/BIPV (Fase 1 / MVP).
+Diagrama Unifilar — generador universal para proyectos FV/BIPV.
 
 Separación deliberada en 2 capas (mismo patrón que comparador_inversores.py):
   1. construir_config_unifilar() — traduce datos del proyecto (panel, inversor,
-     N_serie, N_paneles, etc.) a una estructura neutral. No dibuja nada, no
-     depende de Streamlit ni de schemdraw -- testeable con valores a mano.
+     N_serie, N_paneles, batería, etc.) a una estructura neutral. No dibuja
+     nada, no depende de Streamlit ni de schemdraw -- testeable con valores
+     a mano.
   2. generar_diagrama_unifilar() — dibuja a partir de ese config. No sabe de
      dónde salieron los datos (Urabá, una fachada BIPV, o un test) -- por eso
      es universal: el mismo código sirve para cualquier proyecto.
 
-Alcance Fase 1 (MVP): 1 sola rama DC (una superficie), 1 o más inversores
-(mostrados como un solo bloque con multiplicador "N ×" si son varios -- no
-ramas paralelas dibujadas, ver limitación abajo), sin batería.
-Fase 2 (batería) y Fase 3 (multi-superficie) quedan fuera de este módulo por
-ahora -- ver DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md / plan de implementación.
+Alcance:
+  Fase 1 (26-ago-2026): 1 sola rama DC (una superficie), 1 o más inversores
+    (mostrados como un solo bloque con multiplicador "N ×" si son varios --
+    no ramas paralelas dibujadas para múltiples inversores, ver limitación
+    abajo), sin batería.
+  Fase 2 (27-ago-2026): batería, cuando el proyecto tiene una configurada
+    (Página 11 — Baterías y Balance). Ver calculos/compatibilidad_bateria.py:
+    en esta app la batería se conecta al MISMO inversor híbrido (verificación
+    por rango de voltaje), no a un inversor separado -- por eso la rama de
+    batería cuelga del punto DC justo antes del inversor, como una segunda
+    entrada DC del mismo equipo, no como un circuito aparte.
+  Fase 3 (multi-superficie) queda fuera de este módulo por ahora -- ver
+    DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md / progreso.md del proyecto Orangutan.
 
-Límite importante (declarar siempre al usuario, mismo criterio que el resto
-de la app con "documento preliminar" / "cifra contractual definitiva"): este
-diagrama es un borrador técnico auto-poblado, NO un documento certificado
-para trámite RETIE -- ese trámite requiere firma de ingeniero electricista
-matriculado.
+Limitaciones conocidas (declaradas a propósito, no ocultas):
+  - Con más de 1 inversor, se muestra como un solo bloque "N × modelo" en
+    vez de N ramas paralelas dibujadas -- evita geometría de ramas múltiples
+    frágil para un beneficio principalmente cosmético.
+  - La rama de batería es una "rama que cuelga" (convención propia de
+    diagramas unifilares: no se dibuja el camino de retorno) -- no repite
+    todos los símbolos de protección de un diagrama de detalle completo.
+  - Este diagrama es un borrador técnico auto-poblado, NO un documento
+    certificado para trámite RETIE -- ese trámite requiere firma de
+    ingeniero electricista matriculado. Declarar esto siempre al usuario
+    (mismo criterio que el resto de la app con "documento preliminar" /
+    "cifra contractual definitiva").
 """
 from __future__ import annotations
 
@@ -51,20 +67,32 @@ def construir_config_unifilar(
     proteccion_ac_A: float | None = None,
     tension_red_V: float | None = None,
     medidor: str = "Bidireccional",
+    bateria_nombre: str = "",
+    bateria: dict | None = None,
+    n_baterias: int = 0,
+    capacidad_kWh_unidad: float | None = None,
+    proteccion_bat_A: float | None = None,
 ) -> dict:
     """
     Normaliza los datos de un proyecto a la estructura mínima que necesita
     generar_diagrama_unifilar(). Calcula derivados (kWp, N_strings, P_ac
-    total, corriente AC estimada) -- no dibuja nada.
+    total, corriente AC estimada, capacidad total de batería) -- no dibuja
+    nada.
 
-    panel / inversor: dicts del catálogo (mismo formato que usan
-    comparador_inversores.py y catalogo_inversores.py). Si faltan campos,
-    los derivados quedan en None en vez de reventar -- el llamador decide
-    si avisa al usuario (igual criterio que filtrar_inversores_compatibles:
-    dato faltante no es lo mismo que dato inválido).
+    panel / inversor / bateria: dicts del catálogo (mismo formato que usan
+    comparador_inversores.py, catalogo_inversores.py y baterias_balance.py).
+    Si faltan campos, los derivados quedan en None en vez de reventar -- el
+    llamador decide si avisa al usuario (igual criterio que
+    filtrar_inversores_compatibles: dato faltante no es lo mismo que dato
+    inválido).
+
+    n_baterias=0 (default) significa "sin batería en este proyecto" --
+    generar_diagrama_unifilar() no dibuja la rama de batería en ese caso,
+    el diagrama sale idéntico al de la Fase 1 (sin regresión).
     """
     panel = panel or {}
     inversor = inversor or {}
+    bateria = bateria or {}
 
     pmax_stc = float(panel.get("Pmax_stc") or panel.get("PmaxWp") or 0) or None
     p_dc_kWp = round(pmax_stc * n_paneles / 1000, 2) if pmax_stc and n_paneles else None
@@ -88,6 +116,11 @@ def construir_config_unifilar(
             1.25 * p_ac_total_kW * 1000 / (math.sqrt(3) * tension_red_V), 1
         )
 
+    cap_unidad = capacidad_kWh_unidad or bateria.get("capacidad_kWh") or None
+    cap_total_kWh = (
+        round(cap_unidad * n_baterias, 1) if cap_unidad and n_baterias else None
+    )
+
     return {
         "nombre_proyecto": nombre_proyecto,
         "cliente": cliente,
@@ -110,6 +143,14 @@ def construir_config_unifilar(
         "proteccion_ac_A": proteccion_ac_A,
         "tension_red_V": tension_red_V,
         "medidor": medidor,
+        "bateria": {
+            "activa": bool(n_baterias and n_baterias > 0),
+            "nombre": bateria_nombre,
+            "cantidad": int(n_baterias),
+            "capacidad_kWh_unidad": cap_unidad,
+            "capacidad_total_kWh": cap_total_kWh,
+            "proteccion_bat_A": proteccion_bat_A,
+        },
     }
 
 
@@ -137,52 +178,114 @@ def _label_inversor(cfg: dict) -> str:
     n = inv["cantidad"]
     nombre = inv.get("nombre") or "Inversor"
     prefijo = f"{n} × " if n > 1 else ""
-    lineas = [f"{prefijo}{nombre}"]
+    sufijo_hibrido = " Híbrido" if cfg["bateria"]["activa"] and "híbrido" not in nombre.lower() and "hibrido" not in nombre.lower() else ""
+    lineas = [f"{prefijo}{nombre}{sufijo_hibrido}"]
     if inv.get("p_ac_total_kW"):
         sufijo = " total" if n > 1 else ""
         lineas.append(f"{inv['p_ac_total_kW']:.1f} kW AC{sufijo}")
     return "\n".join(lineas)
 
 
+def _label_bateria(cfg: dict) -> str:
+    b = cfg["bateria"]
+    lineas = [b.get("nombre") or "Batería"]
+    partes = []
+    if b.get("cantidad"):
+        partes.append(f"{b['cantidad']} unidades")
+    if b.get("capacidad_total_kWh"):
+        partes.append(f"{b['capacidad_total_kWh']:.1f} kWh")
+    if partes:
+        lineas.append(" · ".join(partes))
+    return "\n".join(lineas)
+
+
+def _caja(d: schemdraw.Drawing, w: float, h: float, x_centro: float, y_top: float,
+          label: str, loc: str = "top") -> float:
+    """
+    Coloca un Rect (bloque genérico: generador, inversor, batería, medidor)
+    centrado en x_centro con su borde SUPERIOR en y_top. Devuelve y_bottom.
+
+    Nota técnica (por qué existe este helper en vez de encadenar elementos):
+    Rect().at((x, y)) ancla su esquina INFERIOR-IZQUIERDA en (x, y), no el
+    centro ni el borde superior -- verificado empíricamente (ver
+    DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md, sección Diagrama Unifilar Fase 2).
+    Encadenar elementos con .down()/.right() implícito (sin .at()) funciona
+    para una sola columna vertical (Fase 1), pero se vuelve impredecible en
+    cuanto hay una rama lateral (batería) -- por eso desde Fase 2 el módulo
+    usa coordenadas explícitas en toda la función, no solo en la rama nueva.
+    """
+    y_bottom = y_top - h
+    d.add(elm.Rect(w=w, h=h).right().at((x_centro - w / 2, y_bottom)).label(label, loc=loc))
+    return y_bottom
+
+
+def _gap(d: schemdraw.Drawing, x: float, y_top: float, largo: float) -> float:
+    """Línea de separación vertical -- también reserva el espacio que necesita
+    la etiqueta (2-3 líneas) del bloque que viene después. Sin este espacio
+    las etiquetas de bloques consecutivos se superponen (mismo hallazgo que
+    el de _caja: verificado empíricamente, no es una suposición)."""
+    y_bottom = y_top - largo
+    d.add(elm.Line().at((x, y_top)).to((x, y_bottom)))
+    return y_bottom
+
+
 def generar_diagrama_unifilar(config: dict) -> schemdraw.Drawing:
     """
     Dibuja el diagrama unifilar a partir de un config de
-    construir_config_unifilar(). Fase 1: 1 rama DC, inversor(es) como un solo
-    bloque (con multiplicador si son varios -- ver limitación en el
-    docstring del módulo), sin batería.
+    construir_config_unifilar(). Ver docstring del módulo para el alcance
+    exacto por fase y las limitaciones conocidas.
     """
     # Nota: el título del proyecto/cliente NO se dibuja dentro del esquema --
     # lo pinta quien use el diagrama (página Streamlit, PDF), igual que el
     # resto de la app separa encabezados de documento del contenido gráfico.
-    # Ver config["nombre_proyecto"] / config["cliente"] para ese texto.
     d = schemdraw.Drawing(fontsize=11)
+    X_MAIN, X_BAT = 0.0, -2.8
 
-    d += elm.Rect(w=2.8, h=1.4).right().label(_label_generador(config), loc="top")
-    d += elm.Line().down().length(1.1)
-    d += elm.Dot()
+    Y = _caja(d, 2.8, 1.4, X_MAIN, 0.0, _label_generador(config))
+    Y = _gap(d, X_MAIN, Y, 0.9)
+    d += elm.Dot().at((X_MAIN, Y))
 
     dc_A = config.get("proteccion_dc_A")
     etiqueta_dc = f"Protección DC ({dc_A:.0f} A)" if dc_A else "Protección DC"
-    d += elm.Fuse().down().label(etiqueta_dc, loc="right")
-    d += elm.Line().down().length(1.1)
+    y0, Y = Y, Y - 1.1
+    d += elm.Fuse().at((X_MAIN, y0)).to((X_MAIN, Y)).label(etiqueta_dc, loc="right")
+    d += elm.Dot().at((X_MAIN, Y))
+    dc_bus_y = Y  # punto donde la batería (si existe) entra al mismo bus DC
 
-    d += elm.Rect(w=2.8, h=1.3).right().label(_label_inversor(config), loc="top")
-    d += elm.Line().down().length(1.1)
+    bat = config["bateria"]
+    if bat["activa"]:
+        d += elm.Line().at((X_MAIN, dc_bus_y)).to((X_BAT, dc_bus_y))
+        y = _gap(d, X_BAT, dc_bus_y, 0.7)
+
+        bat_A = bat.get("proteccion_bat_A")
+        etiqueta_bat = f"Protección Bat. ({bat_A:.0f} A)" if bat_A else "Protección Bat."
+        y0, y1 = y, y - 1.1
+        d += elm.Fuse().at((X_BAT, y0)).to((X_BAT, y1)).label(etiqueta_bat, loc="left")
+        y1 = _gap(d, X_BAT, y1, 0.5)
+        _caja(d, 2.2, 1.1, X_BAT, y1, _label_bateria(config), loc="left")
+
+    Y = _gap(d, X_MAIN, dc_bus_y, 0.8)
+    Y = _caja(d, 2.8, 1.3, X_MAIN, Y, _label_inversor(config))
+    Y = _gap(d, X_MAIN, Y, 0.9)
 
     ac_A = config.get("proteccion_ac_A")
     etiqueta_ac = f"Protección AC ({ac_A:.0f} A)" if ac_A else "Protección AC"
-    d += elm.Breaker().down().label(etiqueta_ac, loc="right")
-    d += elm.Line().down().length(1.1)
+    y0, Y = Y, Y - 1.1
+    d += elm.Breaker().at((X_MAIN, y0)).to((X_MAIN, Y)).label(etiqueta_ac, loc="right")
 
+    Y = _gap(d, X_MAIN, Y, 0.7)
     medidor_txt = f"Medidor {config.get('medidor') or 'Bidireccional'}"
-    d += elm.Rect(w=2.8, h=1.1).right().label(medidor_txt, loc="top")
-    d += elm.Line().down().length(1.0)
-    d += elm.Dot()
+    Y = _caja(d, 2.8, 1.1, X_MAIN, Y, medidor_txt)
+    Y = _gap(d, X_MAIN, Y, 0.9)
+    d += elm.Dot().at((X_MAIN, Y))
 
     tension = config.get("tension_red_V")
-    etiqueta_red = f"Red / Punto de conexión ({tension:.0f} V)" if tension else "Red / Punto de conexión"
-    d += elm.Line().down().length(0.6).label(etiqueta_red, loc="right")
-    d += elm.Ground()
+    etiqueta_red = (
+        f"Red / Punto de conexión ({tension:.0f} V)" if tension else "Red / Punto de conexión"
+    )
+    y0, Y = Y, Y - 0.6
+    d += elm.Line().at((X_MAIN, y0)).to((X_MAIN, Y)).label(etiqueta_red, loc="right")
+    d += elm.Ground().at((X_MAIN, Y))
 
     return d
 
