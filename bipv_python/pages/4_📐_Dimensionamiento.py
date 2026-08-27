@@ -230,7 +230,13 @@ with col2:
     with col_nm1:
         # Auto-calcular N_min eléctrico desde MPPT del inversor para evitar que
         # un restart resetee a 5 y el optimizador proponga N inviables para el MPPT
-        _vmppt_min  = inversor.get("Vmppt_min") or inversor.get("Vmppt_activo_min") or 0
+        # Vmppt_activo_min primero: es el piso real que evalúa optimizar_n_serie()
+        # (semáforo v2/v3) más abajo -- usar Vmppt_min (arranque, no MPPT típico)
+        # dejaba entrar al barrido configuraciones N que luego salían FALLA de
+        # todos modos, con un N_min sugerido más bajo de lo real. Encontrado en
+        # auditoría (27-ago-2026): para Growatt MAX 100KTL3 LV el N mínimo
+        # eléctrico correcto es 21, no 5.
+        _vmppt_min  = inversor.get("Vmppt_activo_min") or inversor.get("Vmppt_min") or 0
         _vmp_panel  = panel.get("Vmp_stc") or panel.get("Vmp") or 1
         _n_min_elec = max(1, math.ceil(_vmppt_min / _vmp_panel)) if _vmppt_min else 5
         _n_min_guardado = int(

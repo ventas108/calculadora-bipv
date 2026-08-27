@@ -121,9 +121,20 @@ def evaluar_compatibilidad_string(
             float(panel["Isc_stc"]) * int(N_strings_tracker) * float(FS_isc)
         )
         vdc_max = _numero_finito(inversor.get("Vdc_max"))
+        # Vmppt_activo_min PRIMERO -- es el piso de operación recomendado/típico
+        # del inversor (ej. Growatt MAX 100KTL3 LV: 850 V), no el mínimo absoluto
+        # de arranque (Vmppt_min, 200 V). El orden invertido (Vmppt_min primero)
+        # aprobaba configuraciones que optimizar_n_serie() (validado contra el
+        # XLSM original, misma función de este archivo) y
+        # comparador_inversores.filtrar_inversores_compatibles() ya rechazaban
+        # como FALLA/incompatible para la misma config -- encontrado en
+        # auditoría (27-ago-2026) ejecutando las 3 funciones con datos reales
+        # del proyecto Urabá (18 en serie: Vmp=720 V < Vmppt_activo_min=850 V,
+        # pero > Vmppt_min=200 V). Esta función es la que usa el gate
+        # verde/rojo de Página 6 Producción -- daba verde donde debía dar rojo.
         vmppt_min = _numero_finito(
-            inversor.get("Vmppt_min")
-            or inversor.get("Vmppt_activo_min")
+            inversor.get("Vmppt_activo_min")
+            or inversor.get("Vmppt_min")
         )
         vmppt_max = _numero_finito(inversor.get("Vmppt_max"))
         isc_max = _numero_finito(
@@ -307,7 +318,10 @@ def mapear_inversores_catalogo(
             "Isc_tracker_A": round(elegido["Isc_equiv_tracker"], 2) if elegido.get("Isc_equiv_tracker") is not None else None,
             "Vdc_max_V": inversor.get("Vdc_max"),
             "MPPT_V": (
-                f"{inversor.get('Vmppt_min') or inversor.get('Vmppt_activo_min') or '—'}–"
+                # Vmppt_activo_min primero: es el piso que realmente se evalúa
+                # más abajo (semáforo v2/v3) -- mostrar Vmppt_min aquí sería
+                # inconsistente con el umbral que de verdad se aplica.
+                f"{inversor.get('Vmppt_activo_min') or inversor.get('Vmppt_min') or '—'}–"
                 f"{inversor.get('Vmppt_max') or '—'}"
             ),
             "trackers": n_trackers,

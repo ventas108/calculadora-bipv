@@ -860,6 +860,20 @@ Si ejecutaste el modelo de bypass en Página 5, el balance incluye automáticame
 
 una barra "Bypass diodes" mostrando los kWh DC perdidos.
 
+### Auditoría del pipeline de cálculo (27-ago-2026) — bug real en el gate de compatibilidad eléctrica
+
+A pedido explícito del usuario ("audita cada sección de cálculo... basado en cálculos reales como el de Urabá"), se corrió el pipeline real de la app (no solo scripts sueltos) con los datos reales del proyecto Agrivoltaico Urabá (18 módulos JA Solar JAM66D46-720/LB en serie, Growatt MAX 100KTL3 LV — ficha oficial: Voc_stc=49,00 V, Vmp_stc=41,19 V, Isc_stc=18,59 A; inversor: Vdc_max=1500 V, Vmppt_min=200 V, **Vmppt_activo_min=850 V**, Vmppt_max=1300 V).
+
+**Bug real encontrado**: `calculos/dimensionamiento.py::evaluar_compatibilidad_string()` — la función que produce el banner 🟢/🔴 de esta página (Producción) — usaba `Vmppt_min` (piso de arranque, 200 V) en vez de `Vmppt_activo_min` (piso MPPT recomendado, 850 V) como umbral, con la prioridad del `or` invertida respecto a las OTRAS 2 funciones de compatibilidad de la app (`optimizar_n_serie()`, validada contra el Excel VBA original, y `comparador_inversores.filtrar_inversores_compatibles()`), que sí usan `Vmppt_activo_min` primero. El propio docstring de `evaluar_compatibilidad_string()` afirmaba usar "exactamente los mismos límites" que el resto de la app — no era cierto.
+
+**Impacto real, verificado ejecutando las 3 funciones con los datos de Urabá**: con 18 en serie, Vmp string = 720 V. `optimizar_n_serie()` y `comparador_inversores.py` ya lo marcaban como incompatible/FALLA; `evaluar_compatibilidad_string()` decía "compatible", así que Página 6 mostraba el banner 🟢 verde para una configuración que el resto de la app ya rechazaba. Además, en Página 4 — Dimensionamiento, el cálculo del "N mínimo eléctrico" para el barrido de `optimizar_n_serie()` usaba el mismo umbral equivocado: con Vmppt_min dio N≥5 (dejaba entrar 18 sin más), con el umbral correcto es **N≥21** (a temperatura real/extrema, el mínimo verdadero es N=22).
+
+**Corregido**: las 3 apariciones del patrón invertido (`calculos/dimensionamiento.py` líneas ~124 y ~310, `pages/4_📐_Dimensionamiento.py` línea ~233) ahora priorizan `Vmppt_activo_min`. 4 tests de regresión nuevos en `tests/test_compatibilidad_string.py` con los datos reales de Urabá, incluyendo uno que verifica que `evaluar_compatibilidad_string()` y `filtrar_inversores_compatibles()` ya coinciden. 2 tests preexistentes de `tests/test_optimization_fase4.py` necesitaron subir su presupuesto de reintentos (`max_intentos_por_candidato`) porque el espacio eléctrico válido del catálogo real es más angosto con el umbral correcto — comportamiento esperado, no una regresión (el propio docstring de `generar_candidatos()` ya documentaba este trade-off). Suite completa: 701/701 passed.
+
+⚠️ **Implicación real para el proyecto Urabá, no solo de código**: el diseño físico documentado en esta sesión (18 módulos JA Solar por string con el Growatt MAX 100KTL3 LV) opera con Vmp por debajo del piso MPPT recomendado del fabricante (720 V vs 850 V). Esto **NO afecta** los kWh/año ya validados contra PVsyst (esa simulación no pasa por este gate), pero sí es una alerta de diseño eléctrico real que vale la pena que el ingeniero responsable revise — posiblemente aumentando N en serie (≥22) o confirmando con Growatt si operar por debajo de Vmppt_activo_min es aceptable para este modelo específico.
+
+**Hallazgo aparte, NO corregido** (riesgo, no confirmado como bug activo): si un usuario corre 🔀 Página 5 — Mismatch ADEMÁS de 🔆 Motor Óptico (el flujo agrivoltaico recomendado, sección 2, NO incluye Página 5 — así que esto no afecta la validación ya hecha de Urabá), el slider `pct_soiling` de Mismatch (default 2%) podría contar el soiling dos veces junto con el modelo de soiling propio de Motor Óptico, ya que no existe una advertencia explícita como la que sí existe para el confinamiento térmico ("k_bipv → única fuente de corrección térmica"). Pendiente de decidir si se agrega un guard similar.
+
 La E_ac guardada en memoria:
 
 - E_ac_anual_kWh — producción base (sin corrección bypass)

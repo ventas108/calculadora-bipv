@@ -185,9 +185,18 @@ def test_variable_panel_incluye_toda_la_familia_asp_st1_completa():
 
 
 def test_generar_candidatos_con_panel_e_inversor_varia_ambos():
+    # max_intentos_por_candidato=60 (default 20 -> 300 intentos totales no
+    # alcanza): tras corregir evaluar_compatibilidad_string() (27-ago-2026,
+    # auditoría) para usar Vmppt_activo_min en vez de Vmppt_min como piso
+    # -- el umbral correcto, ya usado por optimizar_n_serie() y
+    # comparador_inversores.py -- el espacio eléctrico válido del catálogo
+    # real es más angosto de lo que el presupuesto por defecto asumía. El
+    # propio docstring de generar_candidatos() indica subir el presupuesto
+    # explícitamente en vez de relajar la aserción.
     cfg = _cfg_electricamente_valida()
     candidatos = generar_candidatos(
         cfg, _variables_panel_inversor_completas(), n_candidatos=15, seed=3,
+        max_intentos_por_candidato=60,
     )
     assert len(candidatos) == 15
     inversores = {c.inversor["modelo"] for c in candidatos}
@@ -205,6 +214,7 @@ def test_generar_candidatos_sincroniza_eta_inversor_con_el_inversor_sorteado():
     cfg = _cfg_electricamente_valida()
     candidatos = generar_candidatos(
         cfg, _variables_panel_inversor_completas(), n_candidatos=15, seed=5,
+        max_intentos_por_candidato=60,  # ver comentario en el test anterior
     )
     assert len(candidatos) == 15
     for c in candidatos:
