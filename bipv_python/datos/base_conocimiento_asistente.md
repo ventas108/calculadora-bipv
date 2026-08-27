@@ -38,6 +38,7 @@ Versión: Agosto 2026 | URL: calc.innovacionquimica.com.co
 - Página 15 — Catálogo de Inversores PDF  NUEVO
 - Catálogo de Baterías — carga robusta del Excel  ACTUALIZADO
 13e. Página 19 — 🔒 Ledger de Auditoría  NUEVO
+13f. Página 20 — ⚡ Diagrama Unifilar  NUEVO
 
 - Calculadora de Sombreado 3D
 - Cadena completa — bypass y multi-superficie
@@ -1824,6 +1825,18 @@ El Ledger NO registra cada cálculo de prueba mientras ajustas un slider — eso
 - **📤 Exportar para banco/ITA**: descarga el historial completo en JSON o Markdown, para entregárselo a un tercero sin darle acceso directo al servidor de la calculadora.
 
 ⚠️ Para no cometer errores: el Ledger es por proyecto Y por cuenta — dos usuarios distintos con un proyecto del mismo nombre tienen cadenas completamente separadas, igual que el resto de los datos privados por cuenta de esta app.
+
+## 13f. Página 20 — ⚡ Diagrama Unifilar  NUEVO (26-ago-2026)
+
+Generador universal de diagrama unifilar (esquema eléctrico simplificado en una línea) — sirve para cualquier proyecto FV o BIPV, no está atado a un caso particular. Auto-llena módulo, número de paneles, N en serie, inversor y unidades desde lo que ya configuraste en 📐 Dimensionamiento / ⚖️ Comparador de Inversores; lo que no esté disponible se completa a mano (protección DC/AC, tensión de red, tipo de medidor, cliente).
+
+Alcance de esta primera versión (Fase 1): una sola rama DC (una superficie), uno o más inversores — si son varios se muestran como un solo bloque con multiplicador ("2 × Growatt..."), no como ramas paralelas dibujadas — y sin batería. Multi-superficie y batería quedan para fases siguientes.
+
+Si el número de módulos no es múltiplo de los módulos en serie, la página avisa de string incompleto antes de generar el diagrama. La protección AC se estima automáticamente (NEC, factor de seguridad 1,25) si no se ingresa a mano.
+
+Exporta PNG, SVG (editable) y PDF.
+
+⚠️ Para no cometer errores: **no es un documento certificado**. Es un borrador técnico auto-poblado — el diagrama unifilar para trámite RETIE formal requiere firma de un ingeniero electricista matriculado. La página lo advierte explícitamente arriba del todo.
 
 ## 14. Calculadora de Sombreado 3D
 
