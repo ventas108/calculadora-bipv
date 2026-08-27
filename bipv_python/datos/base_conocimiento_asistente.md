@@ -94,11 +94,15 @@ debes ejecutar el flujo desde el principio.
 
 ────────────────────────────────────────────────────────────
 
-Flujo recomendado para proyectos agrivoltaicos  NUEVO (5-ago-2026)
+Flujo recomendado para proyectos agrivoltaicos  ACTUALIZADO (26-ago-2026 — ahora incluye Motor Óptico)
 
-1 Proyecto (tipo Granja fotovoltaica + factor de ocupación) → 2 Recurso Solar (verificar GCR sincronizado → Calcular POA) → 4 Dimensionamiento (área útil) → 9 Vista 3D (verificación visual de filas y cultivo) → 6 Producción → 7 Financiero → 8 Presupuesto → 10 Reporte PDF.
+1 Proyecto (tipo Granja fotovoltaica + factor de ocupación) → 2 Recurso Solar (verificar GCR sincronizado → Calcular POA) → 4 Dimensionamiento (área útil) → 5b Motor Óptico (IAM — ver nota abajo, montaje "Ventilado libre") → 9 Vista 3D (verificación visual de filas y cultivo) → 6 Producción → 7 Financiero → 8 Presupuesto → 10 Reporte PDF.
 
 Regla de oro agrivoltaica: factor de ocupación (Proyecto) = GCR (Recurso Solar). Si cambias uno, revisa el otro.
+
+Por qué Motor Óptico ahora es obligatorio para Granja FV (26-ago-2026): el flujo anterior lo saltaba, asumiendo que el IAM (pérdida por reflexión angular) era despreciable fuera de fachadas BIPV. Validando el proyecto Agrivoltaico Urabá contra PVsyst se confirmó que NO es despreciable en campo abierto: sin Motor Óptico, la app sobreestimaba producción **+3,1%** frente a PVsyst; corriendo Motor Óptico con IAM, la diferencia bajó a **−0,70%** (mejor incluso que el resto de las validaciones). Detalle completo, cascada de pérdidas de PVsyst y la cuenta que reconcilia el gap en `DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md` del repo.
+
+En Página 1 — Proyecto, cuando el tipo de instalación es "Granja fotovoltaica", Página 5b — Motor Óptico ahora preselecciona automáticamente el montaje **"Ventilado libre (k=1,0)"** en vez del default de fachada confinada (k=1,3) — una granja FV con estructura elevada a campo abierto no tiene el confinamiento térmico de una fachada, y usar k=1,3 ahí penalizaría la temperatura de celda sin motivo físico. El resto de los parámetros de Motor Óptico (vidrio, transparencia, soiling) se dejan en sus defaults — solo el montaje cambia automáticamente por tipo de proyecto.
 
 ────────────────────────────────────────────────────────────
 
@@ -2386,15 +2390,25 @@ De paso se agregó la pérdida IAM (reflexión angular, ASHRAE + factor difusa I
 
 Con ambos fixes, se corrió una validación cruzada real contra PVsyst para el mismo proyecto (mismo TMY de PVGIS, mismo módulo JA Solar JAM66D46-720/LB, mismo inversor Growatt MAX 100KTL3 LV): la calculadora quedó a solo 1,6% de PVsyst en el caso monofacial, y a 1,2% en el caso bifacial (PVsyst con altura de montaje 3,0 m, pitch 6,6 m, GCR≈0,39, albedo 0,20 de pasto verde). Esto también validó el supuesto de ganancia bifacial +8% que usan esos scripts: PVsyst midió +7,6% real con la geometría física del proyecto, muy cerca del supuesto plano.
 
-⚠️ Para no cometer errores: este bug estaba confinado a los 2 scripts de `bipv_python/scripts/` que llaman `get_pvgis_tmy()` directamente — **no afecta** el motor de producción real de la app (Recurso Solar / Página 2 y las páginas aguas abajo), que usa Open-Meteo, no PVGIS. Sí es la misma clase de riesgo que ya advierten la "Nota timezone" de Página 2 y el "Requisito obligatorio: el TMY del proyecto" de Página 5a — cualquier código nuevo que use `get_pvgis_tmy()` (o cualquier fuente de TMY indexada en UTC) directamente debe convertir con `tz_convert()`, nunca reetiquetar el índice a mano.
+⚠️ Para no cometer errores: este bug estaba confinado a los 2 scripts de `bipv_python/scripts/` que llaman `get_pvgis_tmy()` directamente — **no afecta** el motor de producción real de la app. `calculos/solar.py::obtener_tmy_pvgis()` también usa PVGIS (corrección: no es Open-Meteo como se dijo en una nota anterior de este mismo anexo), pero maneja el tiempo correctamente — parsea en UTC y solo cambia el año, sin reetiquetar horas — así que irradiancia y posición solar quedan siempre bien emparejadas. Sí es la misma clase de riesgo que ya advierten la "Nota timezone" de Página 2 y el "Requisito obligatorio: el TMY del proyecto" de Página 5a — cualquier código nuevo que use una fuente de TMY indexada en UTC debe convertir con `tz_convert()`, nunca reetiquetar el índice a mano.
 
 Entregables generados con las cifras corregidas: `entregables/Ficha_Tecnica_Preliminar_Agrivoltaico_Uraba_v2.docx` (v2.1) e `entregables/Informe_Final_Evaluador_Agrivoltaico_Uraba.pdf`. Detalle técnico completo del hallazgo, la verificación y ambas validaciones (mono y bifacial) en `DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md` (raíz del repo).
 
 ────────────────────────────────────────────────────────────
 
+24.2 Motor Óptico (IAM) ahora obligatorio en el flujo de Granja fotovoltaica/agrivoltaica + default de montaje corregido  NUEVO
+
+Corriendo el motor REAL de la app (no solo los scripts) para el proyecto Agrivoltaico Urabá y comparando contra PVsyst, se confirmó que saltar 🔆 Motor Óptico en proyectos de campo abierto (como recomendaba el flujo agrivoltaico hasta ahora) deja fuera la pérdida IAM y sobreestima producción **+3,1%** frente a PVsyst. Corriendo Motor Óptico, la diferencia baja a **−0,70%**. Ver sección 2 ("Flujo recomendado para proyectos agrivoltaicos", ya actualizada) y el detalle numérico completo en `DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md`.
+
+Cambio de código que acompaña esto: en 🔆 Motor Óptico, el selector "Tipo de montaje" tenía como default fijo **"Fachada confinada (k=1,3)"** para todos los proyectos — correcto para el caso BIPV típico, pero físicamente incorrecto para una Granja fotovoltaica (estructura elevada a campo abierto, sin confinamiento térmico). Ahora, cuando el tipo de instalación del proyecto (🏠 Proyecto) es **"Granja fotovoltaica"**, Motor Óptico preselecciona automáticamente **"Ventilado libre (k=1,0)"** en su lugar — el usuario puede cambiarlo manualmente si su caso particular es distinto.
+
+⚠️ Para no cometer errores: esto es un default automático, no un bloqueo — sigue siendo editable. Si tu granja FV tiene alguna condición de montaje más confinada (poco común, pero posible en diseños atípicos), ajusta el selector manualmente. El resto de los parámetros de Motor Óptico (tipo de vidrio/b₀, transparencia, soiling) no cambian automáticamente por tipo de proyecto — solo el montaje/k_BIPV.
+
+────────────────────────────────────────────────────────────
+
 Manual actualizado el 26 de agosto de 2026
 
-Novedades de esta versión: corrección de bug de timezone en TMY de PVGIS + pérdida IAM en los scripts de análisis del proyecto Urabá, y primera validación cruzada documentada de la calculadora contra PVsyst (monofacial y bifacial) con diferencias de 1,2-1,6%.
+Novedades de esta versión: corrección de bug de timezone en TMY de PVGIS + pérdida IAM en los scripts de análisis del proyecto Urabá, primera validación cruzada documentada de la calculadora (scripts y motor real) contra PVsyst (monofacial y bifacial), y Motor Óptico ahora obligatorio en el flujo de Granja fotovoltaica/agrivoltaica con default de montaje "Ventilado libre" corregido para ese tipo de proyecto.
 
 Calculadora BIPV — Innovación Química
 

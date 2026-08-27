@@ -252,10 +252,29 @@ with col1:
 
 with col2:
     st.markdown("**Montaje y temperatura**")
+    # Default consciente del tipo de instalación (26-ago-2026): "Fachada
+    # confinada" (k=1.3) es correcto como default para el caso BIPV típico,
+    # pero para Granja fotovoltaica -- estructura elevada a campo abierto,
+    # sin confinamiento -- ese default penaliza la temperatura de celda sin
+    # motivo físico. Detectado corriendo el proyecto Agrivoltaico Urabá
+    # contra PVsyst: con Motor Óptico + este default sin corregir, el gap
+    # de +3,1% pasaba a subestimar bifacialidad justificadamente por IAM
+    # pero seguía arrastrando un k_bipv de fachada que no aplica a campo
+    # abierto. Ver DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md.
+    _tipo_actual = st.session_state.get("tipo_instalacion", "")
+    _es_campo_abierto = _tipo_actual == "Granja fotovoltaica"
+    _idx_montaje_default = 0 if _es_campo_abierto else 1
+    if _es_campo_abierto and "mo_montaje" not in st.session_state:
+        st.caption(
+            "☀️ Proyecto tipo **Granja fotovoltaica** — se preselecciona "
+            "*Ventilado libre (k=1.0)*, el montaje físicamente correcto para "
+            "estructuras elevadas a campo abierto. Cámbialo si tu proyecto "
+            "tiene una condición de montaje distinta."
+        )
     montaje_sel = st.selectbox(
         "Tipo de montaje",
         options=list(K_BIPV_POR_MONTAJE.keys()),
-        index=1,
+        index=_idx_montaje_default,
         key="mo_montaje",
     )
     k_bipv = K_BIPV_POR_MONTAJE[montaje_sel]
