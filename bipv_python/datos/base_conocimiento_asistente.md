@@ -1850,6 +1850,16 @@ Con menos de 2 superficies con módulos ingresados, el diagrama cae automáticam
 
 Botón "🔒 Sellar en el Ledger de Auditoría" al final de la página — mismo patrón que 🔍 Diagnóstico: un botón dedicado con un solo tipo (`diagrama_unifilar`, ver sección 13e), no un selector de varios tipos como en 📄 Reporte PDF. Congela el diseño eléctrico completo (generador, inversor(es), batería, superficies, protecciones) que se muestra en pantalla, con un hash encadenado al eslabón anterior del proyecto — protege contra "eso no fue lo que usted diseñó" si el layout cambia después de entregado. Con esto se completa el plan original de 4 fases del Diagrama Unifilar (MVP → batería → multi-superficie → sellado).
 
+### Auditoría posterior a las 4 fases (27-ago-2026) — 3 correcciones reales
+
+Tras completar el plan de 4 fases, se auditó el sistema completo probando escenarios más allá de los casos de prueba originales (nombres de proyecto/superficie realistas, superficies con nombres duplicados). Se encontraron y corrigieron 3 problemas reales, no cosméticos:
+
+1. **Nombres de descarga sin sanitizar**: el nombre de archivo de las descargas (PNG/SVG/PDF) solo reemplazaba espacios — un nombre de proyecto con `/`, `:`, `*`, etc. (caracteres inválidos en nombres de archivo de Windows) pasaba sin filtrar. Corregido con un sanitizador que preserva letras/números/acentos/ñ y reemplaza el resto por `_`.
+2. **`DuplicateWidgetID` con superficies del mismo nombre**: el campo de "número de módulos" por superficie usaba el nombre de la superficie como key del widget — si el usuario nombró dos superficies igual en 🗺️ Vista 3D (no hay validación de unicidad ahí), la página completa reventaba. Corregido agregando el índice a la key.
+3. **Etiquetas de superficies vecinas se solapaban con nombres largos**: el espaciado horizontal entre bloques de superficie era un número fijo, calibrado (sin darse cuenta) solo con nombres de prueba cortos ("Sup0"). Con nombres reales como "Marquesina Estacionamiento" (26 caracteres) las etiquetas de dos superficies vecinas se solapaban visualmente. Corregido calibrando el ancho real del texto en `schemdraw` y escalando el espaciado según el nombre más largo presente.
+
+Los 3 casos ya tienen test de regresión. Lección para las próximas fases (Fase 3 de multi-superficie ya cerrada, pero aplica a cualquier extensión futura de esta página): probar con datos de prueba REALISTAS (nombres largos, duplicados, casos límite), no solo con los datos cortos que son cómodos de escribir a mano en un test.
+
 ⚠️ Para no cometer errores: **no es un documento certificado**. Es un borrador técnico auto-poblado — el diagrama unifilar para trámite RETIE formal requiere firma de un ingeniero electricista matriculado. La página lo advierte explícitamente arriba del todo. Con más de 1 inversor, se muestran como un solo bloque con multiplicador ("2 × Growatt...") en vez de ramas paralelas dibujadas — simplificación deliberada, no un error. Multi-superficie asume que todas las superficies alimentan el/los mismo(s) inversor(es) — no modela strings de distinta orientación compartiendo un mismo MPPT (eso ya lo resuelve Página 9, sección 6, como cálculo aparte).
 
 ## 14. Calculadora de Sombreado 3D

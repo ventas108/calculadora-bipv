@@ -277,6 +277,26 @@ def _gap(d: schemdraw.Drawing, x: float, y_top: float, largo: float) -> float:
     return y_bottom
 
 
+def _calcular_paso_superficies(superficies: list[dict], ancho_caja: float) -> float:
+    """
+    Separación centro-a-centro entre bloques de superficies vecinas.
+
+    Un paso fijo (ancho_caja + 1.3) se ve bien con nombres cortos ("Sup0"),
+    pero con nombres reales largos ("Marquesina Estacionamiento", 26
+    caracteres) las etiquetas de dos superficies vecinas se solapan --
+    encontrado en auditoría (27-ago-2026) probando con nombres realistas,
+    no solo nombres de prueba cortos. Se calibró empíricamente el ancho de
+    texto en schemdraw (~0.15-0.18 unidades por carácter a fontsize=11)
+    para escalar el paso según el nombre más largo, en vez de un número
+    fijo que solo funciona para nombres cortos.
+    """
+    max_chars = max(
+        (len(linea) for sup in superficies for linea in _label_superficie(sup).split("\n")),
+        default=0,
+    )
+    return max(ancho_caja + 1.3, max_chars * 0.17 + 1.0)
+
+
 def _dibujar_generadores(d: schemdraw.Drawing, config: dict, x_main: float) -> float:
     """
     Dibuja el/los bloque(s) generador(es) y devuelve la Y desde donde debe
@@ -299,7 +319,7 @@ def _dibujar_generadores(d: schemdraw.Drawing, config: dict, x_main: float) -> f
 
     n = len(superficies)
     ancho_caja = 2.6
-    paso = ancho_caja + 1.3  # separacion centro-a-centro -- deja aire para las etiquetas de 2 lineas
+    paso = _calcular_paso_superficies(superficies, ancho_caja)
     x0 = -paso * (n - 1) / 2.0
     bus_y = None
     for i, sup in enumerate(superficies):

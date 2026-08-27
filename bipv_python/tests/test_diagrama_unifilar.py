@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 """Tests de calculos/diagrama_unifilar.py -- Fase 1 (MVP) + Fase 2 (batería) + Fase 3 (multi-superficie)."""
+import pytest
 import schemdraw
 
 from calculos.diagrama_unifilar import (
     construir_config_unifilar,
     generar_diagrama_unifilar,
+    _calcular_paso_superficies,
 )
 
 
@@ -235,5 +237,53 @@ def test_diagrama_multi_superficie_con_bateria_combinado():
     assert cfg["superficies"] is not None
     assert len(cfg["superficies"]) == 4
     assert cfg["bateria"]["activa"] is True
+    d = generar_diagrama_unifilar(cfg)
+    assert isinstance(d, schemdraw.Drawing)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Auditoría (27-ago-2026) -- bug real encontrado con nombres largos
+# ══════════════════════════════════════════════════════════════════════════
+def test_paso_superficies_escala_con_nombres_largos():
+    # Regresion del bug: con el paso fijo anterior (2.6+1.3=3.9), nombres
+    # largos como "Marquesina Estacionamiento" (26 caracteres) se solapaban
+    # visualmente con la superficie vecina. El paso ahora debe crecer.
+    cortas = [{"nombre": "A", "n_paneles": 10}, {"nombre": "B", "n_paneles": 10}]
+    largas = [
+        {"nombre": "Fachada Sur Principal", "n_paneles": 120},
+        {"nombre": "Marquesina Estacionamiento", "n_paneles": 80},
+    ]
+    paso_corto = _calcular_paso_superficies(cortas, ancho_caja=2.6)
+    paso_largo = _calcular_paso_superficies(largas, ancho_caja=2.6)
+    assert paso_corto == pytest.approx(3.9)  # piso minimo, sin cambios
+    assert paso_largo > paso_corto  # debe crecer para nombres largos
+    assert paso_largo > 5.0  # suficiente para 26 caracteres a ~0.17/caracter
+
+
+def test_diagrama_multi_superficie_nombres_largos_no_revienta():
+    # Caso real que encontro el bug visual (no crash, pero se veia mal) --
+    # aqui solo confirmamos que sigue generando el dibujo correctamente
+    # tras el fix; el chequeo visual se hizo a mano en la auditoria.
+    cfg = construir_config_unifilar(
+        panel={"Pmax_stc": 200.0}, n_serie=10,
+        inversor={"P_ac_nom_W": 100_000}, n_inversores=1, tension_red_V=380,
+        superficies=[
+            {"nombre": "Fachada Sur Principal", "n_paneles": 120},
+            {"nombre": "Techo Plano Sector Norte", "n_paneles": 200},
+            {"nombre": "Marquesina Estacionamiento", "n_paneles": 80},
+        ],
+    )
+    d = generar_diagrama_unifilar(cfg)
+    assert isinstance(d, schemdraw.Drawing)
+
+
+def test_diagrama_muchas_superficies_no_revienta():
+    # 8 superficies -- confirma que la geometria escala sin romper aunque
+    # el diagrama termine siendo ancho.
+    cfg = construir_config_unifilar(
+        panel={"Pmax_stc": 100.0}, n_serie=10,
+        inversor={"P_ac_nom_W": 100_000}, n_inversores=1, tension_red_V=380,
+        superficies=[{"nombre": f"Sup{i}", "n_paneles": 10} for i in range(8)],
+    )
     d = generar_diagrama_unifilar(cfg)
     assert isinstance(d, schemdraw.Drawing)

@@ -6,6 +6,8 @@ Auto-llenado desde el panel/inversor configurados en Dimensionamiento, la
 batería configurada en 🔋 Baterías y Balance, y las superficies de 🗺️ Vista
 3D, si existen.
 """
+import re
+
 import streamlit as st
 
 from calculos.diagrama_unifilar import (
@@ -14,6 +16,16 @@ from calculos.diagrama_unifilar import (
     exportar_unifilar_bytes,
 )
 from calculos import ledger_auditoria as _ledger
+
+
+def _nombre_archivo_seguro(nombre: str) -> str:
+    """Nombre de proyecto -> nombre de archivo válido en cualquier SO.
+    `nombre_proyecto` es texto libre del usuario (puede traer '/', ':',
+    '*', etc., inválidos en Windows/nombres de descarga) -- antes de esta
+    función el código solo reemplazaba espacios, dejando pasar el resto de
+    caracteres inválidos sin sanitizar. Encontrado en auditoría (27-ago-2026)."""
+    s = re.sub(r"[^\w\-]+", "_", (nombre or "proyecto").strip())
+    return s.strip("_") or "proyecto"
 
 st.set_page_config(page_title="Diagrama Unifilar", page_icon="⚡", layout="wide")
 
@@ -181,14 +193,25 @@ if incluir_multisup:
             "superficie no viene de ahí (esa página trabaja con áreas y POA, no con "
             "conteo de paneles), complétalo abajo."
         )
-        for sup in _desglose:
+        for _i_sup, sup in enumerate(_desglose):
             col_s1, col_s2 = st.columns([3, 1])
             with col_s1:
-                st.caption(f"**{sup.get('nombre', 'Superficie')}** ({sup.get('tipo', '')}) — {sup.get('area_m2', 0):.0f} m²")
+                # .get(clave, default) solo aplica el default si la CLAVE
+                # falta -- si viniera presente con valor None (no debería,
+                # pero no se valida en Pagina 9), ".0f" reventaria. `or`
+                # cubre ambos casos. Encontrado en auditoria (27-ago-2026).
+                st.caption(
+                    f"**{sup.get('nombre') or 'Superficie'}** ({sup.get('tipo') or ''}) — "
+                    f"{sup.get('area_m2') or 0:.0f} m²"
+                )
             with col_s2:
                 n_pan_sup = st.number_input(
                     "Módulos", min_value=0, step=1, value=0,
-                    key=f"unif_sup_{sup.get('nombre')}",
+                    # key con índice, no solo nombre: dos superficies pueden
+                    # tener el mismo nombre (Página 9 no exige que sean
+                    # únicos) y una key duplicada rompe la página entera con
+                    # DuplicateWidgetID -- encontrado en auditoría (27-ago-2026).
+                    key=f"unif_sup_{_i_sup}_{sup.get('nombre')}",
                     label_visibility="collapsed",
                 )
             if n_pan_sup:
@@ -252,6 +275,7 @@ if config["generador"]["string_incompleto"]:
 
 drawing = generar_diagrama_unifilar(config)
 png_bytes = exportar_unifilar_bytes(drawing, "png")
+_nombre_archivo = _nombre_archivo_seguro(config["nombre_proyecto"])
 
 st.subheader(f"{config['nombre_proyecto']}" + (f" · {config['cliente']}" if config["cliente"] else ""))
 st.image(png_bytes, use_container_width=False)
@@ -260,19 +284,19 @@ col_dl1, col_dl2, col_dl3 = st.columns(3)
 with col_dl1:
     st.download_button(
         "⬇️ Descargar PNG", data=png_bytes,
-        file_name=f"unifilar_{config['nombre_proyecto'].replace(' ', '_')}.png",
+        file_name=f"unifilar_{_nombre_archivo}.png",
         mime="image/png",
     )
 with col_dl2:
     st.download_button(
         "⬇️ Descargar SVG (editable)", data=exportar_unifilar_bytes(drawing, "svg"),
-        file_name=f"unifilar_{config['nombre_proyecto'].replace(' ', '_')}.svg",
+        file_name=f"unifilar_{_nombre_archivo}.svg",
         mime="image/svg+xml",
     )
 with col_dl3:
     st.download_button(
         "⬇️ Descargar PDF", data=exportar_unifilar_bytes(drawing, "pdf"),
-        file_name=f"unifilar_{config['nombre_proyecto'].replace(' ', '_')}.pdf",
+        file_name=f"unifilar_{_nombre_archivo}.pdf",
         mime="application/pdf",
     )
 
