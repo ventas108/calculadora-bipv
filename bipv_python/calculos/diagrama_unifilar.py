@@ -28,6 +28,18 @@ Alcance:
     todas convergiendo en un bus horizontal común antes del inversor. Con 0
     o 1 superficie (el caso normal) el diagrama sale idéntico a Fase 1/2 --
     sin regresión.
+  Detalle RETIE (27-ago-2026): campos opcionales para enriquecer el
+    contenido del diagrama con anotaciones típicas de una revisión RETIE
+    (fusibles gPV, seccionador DC, DPS, cable solar, equipotencialidad,
+    notas/pendientes) -- inspirado en un generador aparte que el usuario
+    aportó (SVG crudo, sin schemdraw, codificado a mano para un único
+    proyecto de 2 inversores). Se decidió NO adoptar ese motor de dibujo
+    (habría duplicado arquitectura y descartado la geometría ya probada de
+    batería/multi-superficie) -- en cambio se extrajo su CONTENIDO como
+    texto opcional sobre la arquitectura universal existente. Todos los
+    parámetros nuevos son opcionales y sin valor por defecto activo -- un
+    proyecto que no los usa produce el mismo diagrama que antes (sin
+    regresión).
 
 Limitaciones conocidas (declaradas a propósito, no ocultas):
   - Con más de 1 inversor, se muestra como un solo bloque "N × modelo" en
@@ -45,6 +57,14 @@ Limitaciones conocidas (declaradas a propósito, no ocultas):
     ingeniero electricista matriculado. Declarar esto siempre al usuario
     (mismo criterio que el resto de la app con "documento preliminar" /
     "cifra contractual definitiva").
+  - notas_retie / pendientes_retie NO se dibujan dentro de la imagen del
+    esquema -- quedan en config["retie"] como listas de texto para que la
+    página Streamlit las muestre debajo del diagrama (como el resto del
+    contenido de documento, igual que el título/cliente). Se decidió así
+    a propósito: agregar cajas de texto largo dentro del dibujo schemdraw
+    es geometría nueva no probada (mismo tipo de riesgo que costó varias
+    iteraciones en la rama de batería de Fase 2) -- el texto plano fuera
+    del dibujo es la vía de menor riesgo para el mismo contenido.
 """
 from __future__ import annotations
 
@@ -81,6 +101,11 @@ def construir_config_unifilar(
     capacidad_kWh_unidad: float | None = None,
     proteccion_bat_A: float | None = None,
     superficies: list[dict] | None = None,
+    equipotencialidad: bool = False,
+    detalle_proteccion_dc: list[str] | None = None,
+    detalle_proteccion_ac: list[str] | None = None,
+    notas_retie: list[str] | None = None,
+    pendientes_retie: list[str] | None = None,
 ) -> dict:
     """
     Normaliza los datos de un proyecto a la estructura mínima que necesita
@@ -108,6 +133,16 @@ def construir_config_unifilar(
     dibujo (cada superficie ya trae su propio kWp), pero conviene seguir
     pasando n_serie si se quiere seguir viendo el aviso de string incompleto
     a nivel de proyecto.
+
+    equipotencialidad / detalle_proteccion_dc / detalle_proteccion_ac /
+    notas_retie / pendientes_retie: anotaciones opcionales de contenido
+    RETIE (ver docstring del módulo, "Detalle RETIE"). Todas por defecto
+    inactivas -- no cambian el diagrama de un proyecto que no las use.
+    detalle_proteccion_dc/ac son listas de ítems de texto libre (ej.
+    ["Fusibles gPV por string", "Seccionador DC bajo carga", "DPS DC Tipo
+    2"]) que se agregan como líneas extra a la etiqueta de protección
+    correspondiente -- el llamador decide el contenido, este módulo no
+    inventa valores normativos.
     """
     panel = panel or {}
     inversor = inversor or {}
@@ -187,6 +222,13 @@ def construir_config_unifilar(
             "capacidad_total_kWh": cap_total_kWh,
             "proteccion_bat_A": proteccion_bat_A,
         },
+        "retie": {
+            "equipotencialidad": bool(equipotencialidad),
+            "detalle_dc": list(detalle_proteccion_dc) if detalle_proteccion_dc else [],
+            "detalle_ac": list(detalle_proteccion_ac) if detalle_proteccion_ac else [],
+            "notas": list(notas_retie) if notas_retie else [],
+            "pendientes": list(pendientes_retie) if pendientes_retie else [],
+        },
     }
 
 
@@ -206,7 +248,54 @@ def _label_generador(cfg: dict) -> str:
     if g.get("n_strings") and g.get("n_serie"):
         sufijo = "  ⚠ string incompleto" if g.get("string_incompleto") else ""
         lineas.append(f"{g['n_strings']} strings × {g['n_serie']} en serie{sufijo}")
+    if cfg.get("retie", {}).get("equipotencialidad"):
+        # Sin símbolo unicode: "⏚" (earth ground, U+23DA) no está en la
+        # fuente por defecto de matplotlib (DejaVu Sans) -- se renderiza
+        # como glyph faltante. Encontrado renderizando de verdad (no solo
+        # `isinstance(d, Drawing)`, que no detecta esto).
+        lineas.append("Equipotencialidad: estructura y marcos → PE")
     return "\n".join(lineas)
+
+
+def _dibujar_detalle_proteccion(d: schemdraw.Drawing, detalle: list[str], x: float, y_top: float) -> None:
+    """
+    Dibuja los ítems de detalle RETIE de una protección (DC o AC) como un
+    bloque de texto APARTE, a la derecha del símbolo -- NO fusionado con
+    la etiqueta propia del Fuse/Breaker.
+
+    Primer intento (descartado): concatenar todo en una sola etiqueta
+    `.label(texto, loc="right")`. Con una etiqueta de varias líneas,
+    schemdraw la centra sobre el propio símbolo (no la desplaza a la
+    derecha como con una etiqueta corta de 1 línea) -- el bloque quedaba
+    literalmente encima del fusible/breaker. Intentar corregirlo con
+    `halign="left"` + `ofst` no dio un desplazamiento horizontal
+    predecible (probado con varios valores en /scratchpad) y además
+    rompía el caso base (sin detalle) que ya estaba auditado.
+
+    En vez de pelear con el alineado automático, se usa un elemento
+    `elm.Label()` aparte posicionado con coordenadas EXPLÍCITAS -- mismo
+    criterio que `_caja`/`_gap` desde Fase 2. `y_top` es la Y del extremo
+    superior del Fuse/Breaker (y0 en el llamador); el bloque se ancla un
+    poco más abajo y a la derecha, con `valign="top"` para que crezca
+    hacia abajo (el llamador debe reservar espacio de sobra con
+    `_holgura_por_detalle` en el gap que sigue).
+    """
+    if not detalle:
+        return
+    texto = "\n".join(f"• {item}" for item in detalle)
+    d.add(elm.Label().label(texto, halign="left", valign="top").at((x + 0.35, y_top - 0.55)))
+
+
+def _holgura_por_detalle(n_items: int) -> float:
+    """Espacio extra (schemdraw units) a sumar al gap que sigue a un
+    Fuse/Breaker con detalle RETIE, para que el bloque de
+    `_dibujar_detalle_proteccion` (que crece hacia abajo) no invada la
+    siguiente caja. El gap ANTES del Fuse/Breaker no necesita holgura
+    extra -- el detalle empieza a la altura de y_top hacia abajo, no
+    hacia arriba, así que no le quita espacio a la caja anterior
+    (verificado renderizando de verdad en /scratchpad). Constante
+    calibrada empíricamente, mismo método que _calcular_paso_superficies."""
+    return n_items * 0.32
 
 
 def _label_inversor(cfg: dict) -> str:
@@ -348,6 +437,9 @@ def generar_diagrama_unifilar(config: dict) -> schemdraw.Drawing:
     d = schemdraw.Drawing(fontsize=11)
     X_MAIN, X_BAT = 0.0, -2.8
 
+    detalle_dc = config.get("retie", {}).get("detalle_dc", [])
+    holgura_dc = _holgura_por_detalle(len(detalle_dc))
+
     Y = _dibujar_generadores(d, config, X_MAIN)
     Y = _gap(d, X_MAIN, Y, 0.9)
     d += elm.Dot().at((X_MAIN, Y))
@@ -356,6 +448,7 @@ def generar_diagrama_unifilar(config: dict) -> schemdraw.Drawing:
     etiqueta_dc = f"Protección DC ({dc_A:.0f} A)" if dc_A else "Protección DC"
     y0, Y = Y, Y - 1.1
     d += elm.Fuse().at((X_MAIN, y0)).to((X_MAIN, Y)).label(etiqueta_dc, loc="right")
+    _dibujar_detalle_proteccion(d, detalle_dc, X_MAIN, y0)
     d += elm.Dot().at((X_MAIN, Y))
     dc_bus_y = Y  # punto donde la batería (si existe) entra al mismo bus DC
 
@@ -371,7 +464,10 @@ def generar_diagrama_unifilar(config: dict) -> schemdraw.Drawing:
         y1 = _gap(d, X_BAT, y1, 0.5)
         _caja(d, 2.2, 1.1, X_BAT, y1, _label_bateria(config), loc="left")
 
-    Y = _gap(d, X_MAIN, dc_bus_y, 0.8)
+    detalle_ac = config.get("retie", {}).get("detalle_ac", [])
+    holgura_ac = _holgura_por_detalle(len(detalle_ac))
+
+    Y = _gap(d, X_MAIN, dc_bus_y, 0.8 + holgura_dc)
     Y = _caja(d, 2.8, 1.3, X_MAIN, Y, _label_inversor(config))
     Y = _gap(d, X_MAIN, Y, 0.9)
 
@@ -379,8 +475,9 @@ def generar_diagrama_unifilar(config: dict) -> schemdraw.Drawing:
     etiqueta_ac = f"Protección AC ({ac_A:.0f} A)" if ac_A else "Protección AC"
     y0, Y = Y, Y - 1.1
     d += elm.Breaker().at((X_MAIN, y0)).to((X_MAIN, Y)).label(etiqueta_ac, loc="right")
+    _dibujar_detalle_proteccion(d, detalle_ac, X_MAIN, y0)
 
-    Y = _gap(d, X_MAIN, Y, 0.7)
+    Y = _gap(d, X_MAIN, Y, 0.7 + holgura_ac)
     medidor_txt = f"Medidor {config.get('medidor') or 'Bidireccional'}"
     Y = _caja(d, 2.8, 1.1, X_MAIN, Y, medidor_txt)
     Y = _gap(d, X_MAIN, Y, 0.9)
@@ -388,7 +485,8 @@ def generar_diagrama_unifilar(config: dict) -> schemdraw.Drawing:
 
     tension = config.get("tension_red_V")
     etiqueta_red = (
-        f"Red / Punto de conexión ({tension:.0f} V)" if tension else "Red / Punto de conexión"
+        f"Red / Punto de Conexión Común — PCC ({tension:.0f} V)"
+        if tension else "Red / Punto de Conexión Común — PCC"
     )
     y0, Y = Y, Y - 0.6
     d += elm.Line().at((X_MAIN, y0)).to((X_MAIN, Y)).label(etiqueta_red, loc="right")

@@ -7,6 +7,7 @@ from calculos.diagrama_unifilar import (
     construir_config_unifilar,
     generar_diagrama_unifilar,
     _calcular_paso_superficies,
+    _label_generador,
 )
 
 
@@ -285,5 +286,85 @@ def test_diagrama_muchas_superficies_no_revienta():
         inversor={"P_ac_nom_W": 100_000}, n_inversores=1, tension_red_V=380,
         superficies=[{"nombre": f"Sup{i}", "n_paneles": 10} for i in range(8)],
     )
+    d = generar_diagrama_unifilar(cfg)
+    assert isinstance(d, schemdraw.Drawing)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Detalle RETIE (27-ago-2026) -- contenido extraído de un script aparte que
+# aportó el usuario (SVG crudo, hardcodeado a un solo proyecto). No se
+# adoptó ese motor de dibujo -- se extrajo el contenido (protecciones
+# detalladas, equipotencialidad, notas/pendientes) sobre la arquitectura
+# universal existente.
+# ══════════════════════════════════════════════════════════════════════════
+def test_config_retie_inactivo_por_defecto():
+    # Sin parametros RETIE -- mismo comportamiento que antes (sin regresion).
+    cfg = construir_config_unifilar(panel={"Pmax_stc": 720.0}, n_paneles=306, n_serie=18)
+    assert cfg["retie"]["equipotencialidad"] is False
+    assert cfg["retie"]["detalle_dc"] == []
+    assert cfg["retie"]["detalle_ac"] == []
+    assert cfg["retie"]["notas"] == []
+    assert cfg["retie"]["pendientes"] == []
+
+
+def test_config_retie_guarda_detalle_y_notas():
+    cfg = construir_config_unifilar(
+        equipotencialidad=True,
+        detalle_proteccion_dc=["Fusibles gPV por string", "DPS DC Tipo 2"],
+        detalle_proteccion_ac=["Interruptor AC 3P", "DPS AC Tipo 2"],
+        notas_retie=["Verificar Voc a temperatura mínima"],
+        pendientes_retie=["Ficha técnica oficial del inversor"],
+    )
+    assert cfg["retie"]["equipotencialidad"] is True
+    assert cfg["retie"]["detalle_dc"] == ["Fusibles gPV por string", "DPS DC Tipo 2"]
+    assert cfg["retie"]["detalle_ac"] == ["Interruptor AC 3P", "DPS AC Tipo 2"]
+    assert cfg["retie"]["notas"] == ["Verificar Voc a temperatura mínima"]
+    assert cfg["retie"]["pendientes"] == ["Ficha técnica oficial del inversor"]
+
+
+def test_diagrama_sin_detalle_dc_no_dibuja_bloque_extra():
+    # Regresion: sin detalle_proteccion_dc/ac, el diagrama debe generarse
+    # igual que antes (el bloque de texto aparte no se agrega).
+    cfg = construir_config_unifilar(
+        panel={"Pmax_stc": 720.0}, n_paneles=306, n_serie=18,
+        inversor={"P_ac_nom_W": 100_000}, n_inversores=2, tension_red_V=400,
+    )
+    assert cfg["retie"]["detalle_dc"] == []
+    d = generar_diagrama_unifilar(cfg)
+    assert isinstance(d, schemdraw.Drawing)
+
+
+def test_label_generador_agrega_equipotencialidad_solo_si_esta_activa():
+    cfg_sin = construir_config_unifilar(panel={"Pmax_stc": 200.0}, n_paneles=40, n_serie=10)
+    cfg_con = construir_config_unifilar(
+        panel={"Pmax_stc": 200.0}, n_paneles=40, n_serie=10, equipotencialidad=True,
+    )
+    assert "Equipotencialidad" not in _label_generador(cfg_sin)
+    assert "Equipotencialidad" in _label_generador(cfg_con)
+
+
+def test_diagrama_con_detalle_retie_completo_no_revienta():
+    # Caso real Uraba, pero ahora con el detalle RETIE que aportaba el
+    # script del usuario -- confirma que la geometria (probada en Fases
+    # 1-3) sigue intacta con las etiquetas mas largas.
+    cfg = construir_config_unifilar(
+        nombre_proyecto="Agrivoltaico Uraba", cliente="Innovacion Quimica",
+        tipo_instalacion="Granja fotovoltaica",
+        panel_nombre="JA Solar JAM66D46-720/LB", panel={"Pmax_stc": 720.0},
+        n_paneles=306, n_serie=18,
+        inversor_nombre="Growatt MAX 100KTL3 LV",
+        inversor={"P_ac_nom_W": 100_000}, n_inversores=2, tension_red_V=400,
+        equipotencialidad=True,
+        detalle_proteccion_dc=[
+            "Fusibles gPV por string (+/-)",
+            "Seccionador DC bajo carga",
+            "DPS DC Tipo 2, Ucpv >= Voc máx.",
+            "Cable solar Cu H1Z2Z2-K",
+        ],
+        detalle_proteccion_ac=["Interruptor AC 3P", "DPS AC Tipo 2 + seccionamiento"],
+        notas_retie=["Verificar Voc del string a temperatura mínima"],
+        pendientes_retie=["Fichas oficiales del módulo e inversor"],
+    )
+    assert cfg["retie"]["equipotencialidad"] is True
     d = generar_diagrama_unifilar(cfg)
     assert isinstance(d, schemdraw.Drawing)

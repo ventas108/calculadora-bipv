@@ -38,7 +38,8 @@ Versión: Agosto 2026 | URL: calc.innovacionquimica.com.co
 - Página 15 — Catálogo de Inversores PDF  NUEVO
 - Catálogo de Baterías — carga robusta del Excel  ACTUALIZADO
 13e. Página 19 — 🔒 Ledger de Auditoría  NUEVO
-13f. Página 20 — ⚡ Diagrama Unifilar (batería + multi-superficie + sellado Ledger)  ACTUALIZADO
+13f. Página 20 — ⚡ Diagrama Unifilar (batería + multi-superficie + sellado Ledger + detalle RETIE)  ACTUALIZADO
+13g. Página 21 — 📋 Ficha de Validación RETIE (dashboard + motor de validación, universal N inversores)  NUEVO
 
 - Calculadora de Sombreado 3D
 - Cadena completa — bypass y multi-superficie
@@ -1860,7 +1861,39 @@ Tras completar el plan de 4 fases, se auditó el sistema completo probando escen
 
 Los 3 casos ya tienen test de regresión. Lección para las próximas fases (Fase 3 de multi-superficie ya cerrada, pero aplica a cualquier extensión futura de esta página): probar con datos de prueba REALISTAS (nombres largos, duplicados, casos límite), no solo con los datos cortos que son cómodos de escribir a mano en un test.
 
+### Detalle RETIE (27-ago-2026)
+
+El usuario aportó un script Python aparte (SVG crudo, sin schemdraw, codificado a mano para el proyecto Urabá con 2 inversores fijos) con anotaciones típicas de una revisión RETIE. Se decidió **no adoptar ese motor de dibujo** — habría duplicado arquitectura y descartado la geometría de batería/multi-superficie ya probada — y en cambio se **extrajo su contenido** como campos opcionales sobre el sistema universal existente:
+
+- `equipotencialidad` (bool): agrega una línea al bloque generador ("Equipotencialidad: estructura y marcos → PE").
+- `detalle_proteccion_dc` / `detalle_proteccion_ac` (listas de texto libre): ítems de protección (fusibles gPV, seccionador DC, DPS, cable solar, interruptor AC, etc.) que el usuario elige de una lista sugerida (multiselect) en la página, o cualquier texto propio.
+- `notas_retie` / `pendientes_retie` (listas de texto libre): NO se dibujan dentro del esquema — se muestran como listas debajo de la imagen en la página (`st.markdown`), igual que el resto del contenido de documento de esta app.
+- Etiqueta del punto de conexión ahora dice "Red / Punto de Conexión Común — PCC" (antes "Red / Punto de conexión"), siempre, con o sin detalle RETIE.
+
+Todos los campos son opcionales y por defecto inactivos — un proyecto que no los usa produce exactamente el mismo diagrama que antes (verificado renderizando ambos casos lado a lado, no solo con `isinstance(d, Drawing)`).
+
+**3 bugs reales encontrados renderizando de verdad** (no solo corriendo tests, que no detectan overlaps visuales):
+1. El símbolo `⏚` (earth ground, U+23DA) para equipotencialidad no existe en la fuente por defecto de matplotlib (DejaVu Sans) — se veía como un cuadro vacío. Corregido: texto plano sin símbolo.
+2. Primer intento: agregar el detalle como líneas extra dentro de la MISMA etiqueta del Fuse/Breaker (`.label(texto, loc="right")`). Con una etiqueta corta de 1 línea eso ya funcionaba bien (caso base, sin cambios), pero con 2-4 líneas de detalle schemdraw centraba el bloque sobre el propio símbolo en vez de desplazarlo — el texto quedaba encima del fusible/breaker. Intentar arreglarlo con `halign="left"` + `ofst` no dio un desplazamiento horizontal predecible (probado con varios valores) y además rompía el caso base al aplicarse siempre.
+3. Fix final: el detalle se dibuja como un `elm.Label()` **aparte**, con coordenadas explícitas (mismo criterio que `_caja`/`_gap` desde Fase 2) a la derecha del símbolo, separado de la etiqueta corta del Fuse/Breaker (que queda intacta, sin cambios respecto al caso base). El gap que sigue a la protección se agranda solo cuando hay detalle (`_holgura_por_detalle`, ~0,32 unidades por ítem) para que el bloque no invada la caja siguiente.
+
+**Hallazgo aparte, NO corregido en esta sesión** (fuera de alcance de esta tarea): al renderizar el caso combinado multi-superficie + batería + inversor con nombre largo ("Huawei SUN2000-50KTL Hibrido"), la etiqueta del inversor se solapa visualmente con "Protección Bat." — confirmado que este bug **ya existía antes** de este cambio (aparece igual sin ningún dato RETIE), es de la geometría de la rama de batería (Fase 2) con nombres de inversor largos, no algo introducido por el detalle RETIE. Pendiente de una futura sesión si el usuario lo prioriza.
+
 ⚠️ Para no cometer errores: **no es un documento certificado**. Es un borrador técnico auto-poblado — el diagrama unifilar para trámite RETIE formal requiere firma de un ingeniero electricista matriculado. La página lo advierte explícitamente arriba del todo. Con más de 1 inversor, se muestran como un solo bloque con multiplicador ("2 × Growatt...") en vez de ramas paralelas dibujadas — simplificación deliberada, no un error. Multi-superficie asume que todas las superficies alimentan el/los mismo(s) inversor(es) — no modela strings de distinta orientación compartiendo un mismo MPPT (eso ya lo resuelve Página 9, sección 6, como cálculo aparte).
+
+## 13g. Página 21 — 📋 Ficha de Validación RETIE  NUEVO (27-ago-2026)
+
+Segundo aporte del usuario en la misma sesión: un script aparte con dataclasses `frozen` fijas al proyecto Urabá (2 inversores exactos), motor SVG propio sin dependencias, y un TIPO de documento que la app no tenía todavía: no un esquema eléctrico de línea única (eso es ⚡ Diagrama Unifilar, Página 20), sino una **ficha ejecutiva de una sola página** — tarjetas KPI, un flujo simplificado de 5 bloques, una tabla de cargas/protecciones, y sobre todo un **motor de validación eléctrica** que antes no existía en la app: Voc del string en frío vs Vdc máxima del inversor, ventana MPPT, balance DC/AC entre inversores, selección de breaker por calibre comercial, y banderas OK/PENDIENTE/ERROR cuando falta un dato de ficha técnica (nunca inventa el valor).
+
+Presentadas 3 opciones al usuario (página nueva + motor reutilizable / solo motor sin página / no integrar), eligió la primera. El usuario también alertó explícitamente a mitad de la construcción: *"que no quede unicamente harcodeado al proyecto de uraba, verifica que sea universal e iterativo para multiples proyecto FV y BIPV"* — antes de seguir, se generalizó `strings_por_inversor` de 2 campos fijos (`strings_inversor_1`/`strings_inversor_2`) a una **lista de N elementos**, y se verificó ejecutando (no solo leyendo) 2 proyectos completamente distintos a Urabá: una fachada BIPV residencial de 1 solo inversor y una planta comercial de 3 inversores, ambos renderizados y revisados visualmente en el navegador antes de dar por buena la generalización.
+
+`calculos/ficha_validacion_retie.py`, mismo patrón de 3 capas que `diagrama_unifilar.py`: `construir_config_retie()` (datos) → `calcular_retie()`/`validar_retie()` (cálculos y checklist puros) → `generar_ficha_svg()` (dibujo, motor SVG propio sin schemdraw ni dependencias nuevas — no hace falta para una ficha de tarjetas/tabla). Reutiliza `calcular_voc_string()`/`calcular_vmp_string()` de `calculos/dimensionamiento.py` en vez de reimplementar la fórmula (ese módulo ya documenta un bug real de confundir el coeficiente de Voc con el de potencia en este mismo cálculo — reusar la función evita repetirlo). Auto-llena Voc/Vmp/Isc/coeficiente de temperatura del panel y Vdc máx/ventana MPPT del inversor desde los mismos campos que ya usa ⚖️ Comparador de Inversores (`Voc_stc`, `Vmp_stc`, `Isc_stc`, `Tk_beta`, `Vdc_max`, `Vmppt_min`, `Vmppt_max`) — no son campos nuevos inventados para esta página.
+
+`pages/21_📋_Ficha_Validacion_RETIE.py`: auto-llena proyecto/panel/inversor igual que Página 20; pide la distribución de strings por inversor como texto libre separado por comas (ej. `9,8` o `15,15,15`) — opcional, sin eso el balance entre inversores queda sin calcular en vez de asumir una repartición pareja. Exporta SVG siempre (sin dependencias); PNG solo si el servidor tiene CairoSVG instalado (dependencia OPCIONAL, **no** agregada a `requirements.txt` — si falta, la página lo dice y ofrece igual el SVG en vez de fallar). Sellado en el Ledger con tipo propio `ficha_validacion_retie` (ver TIPOS_VALIDOS en `calculos/ledger_auditoria.py`, ahora 5 tipos).
+
+Verificado end-to-end: 696/696 tests (23 nuevos: 14 en `test_ficha_validacion_retie.py`, 2 en `test_ledger_auditoria.py`, 7 en `test_pagina_ficha_validacion_retie.py`), servidor Streamlit local levantado y la página confirmada respondiendo 200 con el título correcto (sin traceback) antes de dar la tarea por terminada.
+
+⚠️ Para no cometer errores: mismo criterio que Página 20 — **no es un documento constructivo**, no sustituye memorias de cálculo, estudio de cortocircuito, coordinación de protecciones, declaración de cumplimiento, inspección ni firma de ingeniero electricista matriculado. Es un tipo de documento DISTINTO al diagrama unifilar (dashboard + checklist, no un esquema de símbolos eléctricos) — no reemplaza a Página 20, la complementa.
 
 ## 14. Calculadora de Sombreado 3D
 
@@ -2447,7 +2480,11 @@ Cambio de código que acompaña esto: en 🔆 Motor Óptico, el selector "Tipo d
 
 Manual actualizado el 27 de agosto de 2026
 
-Novedades de esta versión: ⚡ Diagrama Unifilar (Página 20) completa su plan de 4 fases con el sellado en el Ledger de Auditoría (Fase 4, nuevo tipo `diagrama_unifilar`) — se suma a multi-superficie (Fase 3, misma sesión) y batería (Fase 2, sesión anterior). Ver sección 13f (diagrama) y 13e (Ledger, ahora 4 tipos) para el detalle completo.
+Novedades de esta versión: nueva página 📋 Ficha de Validación RETIE (Página 21) — dashboard ejecutivo + motor de validación eléctrica (Voc frío, ventana MPPT, balance de inversores, breaker por calibre) generalizado a N inversores, verificado con 2 proyectos distintos a Urabá (1 y 3 inversores) tras alerta explícita del usuario sobre no dejarlo hardcodeado. Ver sección 13g.
+
+Versión anterior (27 de agosto de 2026, más temprano): ⚡ Diagrama Unifilar (Página 20) suma **Detalle RETIE** — contenido extraído de un script aparte que aportó el usuario (protecciones detalladas, equipotencialidad, notas/pendientes), sobre la arquitectura universal existente, sin adoptar su motor de dibujo. Ver sección 13f, subsección "Detalle RETIE" para el detalle completo (incluye 3 bugs de renderizado encontrados y corregidos, y 1 bug preexistente encontrado pero no corregido por estar fuera de alcance).
+
+Versión anterior (27 de agosto de 2026, más temprano): ⚡ Diagrama Unifilar (Página 20) completa su plan de 4 fases con el sellado en el Ledger de Auditoría (Fase 4, nuevo tipo `diagrama_unifilar`) — se suma a multi-superficie (Fase 3, misma sesión) y batería (Fase 2, sesión anterior). Ver sección 13f (diagrama) y 13e (Ledger, ahora 4 tipos) para el detalle completo.
 
 Versión anterior (27 de agosto de 2026, más temprano): multi-superficie (Fase 3) — N superficies convergiendo en un bus horizontal común, auto-llenado desde 🗺️ Vista 3D.
 

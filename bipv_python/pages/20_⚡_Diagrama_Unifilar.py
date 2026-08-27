@@ -236,6 +236,58 @@ if incluir_multisup:
             if _n_s > 0:
                 superficies_val.append({"nombre": _nombre_s.strip(), "n_paneles": _n_s})
 
+st.subheader("🧾 Detalle RETIE (opcional)")
+with st.expander(
+    "Agregar anotaciones típicas de una revisión RETIE — protecciones "
+    "detalladas, equipotencialidad, notas y pendientes"
+):
+    equipotencialidad_val = st.checkbox(
+        "Incluir nota de equipotencialidad en el generador (estructura → PE)",
+        value=False,
+    )
+    detalle_dc_val = st.multiselect(
+        "Ítems de protección DC a detallar",
+        options=[
+            "Fusibles gPV por string (+/-)",
+            "Seccionador DC bajo carga",
+            "DPS DC Tipo 2, Ucpv ≥ Voc máx.",
+            "Cable solar Cu H1Z2Z2-K",
+        ],
+    )
+    detalle_ac_val = st.multiselect(
+        "Ítems de protección AC a detallar",
+        options=["Interruptor AC 3P", "DPS AC Tipo 2 + seccionamiento"],
+    )
+    _plantilla_retie = st.checkbox(
+        "Usar plantilla genérica de notas/pendientes RETIE (editable abajo)",
+        value=False,
+    )
+    _notas_default = (
+        "Verificar Voc, Isc y coeficientes térmicos del módulo contra el fusible máximo.\n"
+        "Comprobar Voc del string a temperatura mínima y compatibilidad MPPT del inversor.\n"
+        "Calcular calibres, caída de tensión, Icc, Icu/Ics y selectividad de protecciones."
+        if _plantilla_retie else ""
+    )
+    _pendientes_default = (
+        "Fichas técnicas oficiales del módulo e inversor.\n"
+        "Icc disponible en el punto de conexión y esquema de puesta a tierra.\n"
+        "Datos del operador de red, transformador y medición."
+        if _plantilla_retie else ""
+    )
+    notas_texto = st.text_area(
+        "Notas para revisión RETIE (una por línea)", value=_notas_default, height=90,
+    )
+    pendientes_texto = st.text_area(
+        "Pendientes para versión constructiva (una por línea)", value=_pendientes_default, height=90,
+    )
+    st.caption(
+        "ℹ️ Estas anotaciones son texto libre que aporta quien diligencia el "
+        "formulario -- este módulo no inventa valores normativos ni sustituye "
+        "la memoria de cálculo del ingeniero responsable."
+    )
+notas_retie_val = [l.strip() for l in notas_texto.splitlines() if l.strip()]
+pendientes_retie_val = [l.strip() for l in pendientes_texto.splitlines() if l.strip()]
+
 st.divider()
 
 config = construir_config_unifilar(
@@ -258,6 +310,11 @@ config = construir_config_unifilar(
     n_baterias=int(n_baterias_val),
     proteccion_bat_A=proteccion_bat_manual or None,
     superficies=superficies_val or None,
+    equipotencialidad=equipotencialidad_val,
+    detalle_proteccion_dc=detalle_dc_val or None,
+    detalle_proteccion_ac=detalle_ac_val or None,
+    notas_retie=notas_retie_val or None,
+    pendientes_retie=pendientes_retie_val or None,
 )
 
 if incluir_multisup and superficies_val and config["superficies"] is None:
@@ -279,6 +336,20 @@ _nombre_archivo = _nombre_archivo_seguro(config["nombre_proyecto"])
 
 st.subheader(f"{config['nombre_proyecto']}" + (f" · {config['cliente']}" if config["cliente"] else ""))
 st.image(png_bytes, use_container_width=False)
+
+_retie = config.get("retie", {})
+if _retie.get("notas") or _retie.get("pendientes"):
+    col_n1, col_n2 = st.columns(2)
+    with col_n1:
+        if _retie.get("notas"):
+            st.markdown("**📋 Notas para revisión RETIE**")
+            for _nota in _retie["notas"]:
+                st.markdown(f"- {_nota}")
+    with col_n2:
+        if _retie.get("pendientes"):
+            st.markdown("**🚧 Pendientes para versión constructiva**")
+            for _pend in _retie["pendientes"]:
+                st.markdown(f"- {_pend}")
 
 col_dl1, col_dl2, col_dl3 = st.columns(3)
 with col_dl1:

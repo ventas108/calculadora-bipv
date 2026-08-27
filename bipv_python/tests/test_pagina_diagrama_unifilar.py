@@ -49,3 +49,15 @@ def test_pagina_unifilar_auto_llena_bateria_y_multisuperficie():
     assert "bateria_ok" in src
     assert "multisup_activo" in src
     assert "multisup_desglose" in src
+
+
+def test_pagina_unifilar_expone_detalle_retie():
+    # Contenido extraído (27-ago-2026) del script RETIE que aportó el
+    # usuario -- protecciones detalladas, equipotencialidad, notas y
+    # pendientes, pasados al config universal (no hardcodeados).
+    src = _leer(_PAG_UNIFILAR)
+    assert "equipotencialidad=equipotencialidad_val" in src
+    assert "detalle_proteccion_dc=detalle_dc_val" in src
+    assert "detalle_proteccion_ac=detalle_ac_val" in src
+    assert "notas_retie=notas_retie_val" in src
+    assert "pendientes_retie=pendientes_retie_val" in src

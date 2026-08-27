@@ -61,13 +61,14 @@ def _nombre_a_slug(nombre: str) -> str:
 GENESIS = "GENESIS"
 
 TIPOS_VALIDOS = ("presupuesto_bancable", "presupuesto_informativo", "diagnostico_operacion",
-                  "diagrama_unifilar")
+                  "diagrama_unifilar", "ficha_validacion_retie")
 
 TIPO_LABELS = {
     "presupuesto_bancable": "🏦 Presupuesto bancable (banco/ITA)",
     "presupuesto_informativo": "📋 Verificación presupuestal informativa",
     "diagnostico_operacion": "🔍 Diagnóstico de sistema en operación",
     "diagrama_unifilar": "⚡ Diagrama unifilar (diseño eléctrico)",
+    "ficha_validacion_retie": "📋 Ficha de validación RETIE (dashboard + checklist)",
 }
 
 

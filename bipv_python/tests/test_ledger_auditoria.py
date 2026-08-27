@@ -236,3 +236,24 @@ def test_sellar_diagrama_unifilar_coexiste_con_otros_tipos_mismo_proyecto():
     v = m.verificar_cadena("Proyecto Mixto", "ana@test.com")
     assert v["integra"] is True
     assert v["eslabones_verificados"] == 2
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Tipo "ficha_validacion_retie" (Ficha de Validación RETIE, 27-ago-2026)
+# ══════════════════════════════════════════════════════════════════════════
+def test_ficha_validacion_retie_es_tipo_valido():
+    assert "ficha_validacion_retie" in m.TIPOS_VALIDOS
+    assert "ficha_validacion_retie" in m.TIPO_LABELS
+
+
+def test_sellar_ficha_validacion_retie_encadena_correctamente():
+    e = m.sellar_resultado(
+        "Proyecto Ficha RETIE", "ana@test.com", "ficha_validacion_retie",
+        {"generador": {"n_paneles": 306}},
+        {"potencia_dc_kwp": 220.32, "n_ok": 3, "n_pendiente": 4, "n_error": 0},
+    )
+    assert e["tipo"] == "ficha_validacion_retie"
+    assert e["hash_anterior"] == m.GENESIS
+    v = m.verificar_cadena("Proyecto Ficha RETIE", "ana@test.com")
+    assert v["integra"] is True
+    assert v["eslabones_verificados"] == 1
