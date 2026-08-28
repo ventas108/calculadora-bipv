@@ -1262,6 +1262,69 @@ Rated AC output power: 30000W
         },
     },
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # #182 — Woodward IDS SOLO 500: ficha PVsyst en español exportada del .OND
+    # (central/utility, 500-600 kW, SIN trackers MPPT discretos). Reportado por
+    # el usuario (28-ago-2026): "Voltaje FV máximo absoluto" / "Voltaje MPP
+    # mínimo"+"Voltaje MPP máximo" (filas separadas, no rango combinado) /
+    # "Potencia FV máxima ... kW" no matcheaban ningún patrón existente.
+    #
+    # V_arranque, n_trackers, n_strings_tracker quedan None a propósito: PVsyst
+    # mismo (ver el análisis del usuario) confirma que este .OND no los publica.
+    # I_max_tracker/Isc_max_tracker TAMBIÉN quedan None a propósito -- NO es un
+    # dato ausente que haya que "resolver" con un alias: "Corriente de entrada
+    # máxima" (1140 A) es la corriente TOTAL del equipo (inversor central sin
+    # trackers discretos), no una corriente POR tracker/string. El campo
+    # I_max_tracker se compara en dimensionamiento.py directamente contra la
+    # corriente de UN string -- poblarlo con 1140 A volvería el chequeo de
+    # compatibilidad eléctrica falsamente permisivo para cualquier config
+    # (1140 A nunca lo supera un string real). El guard de plausibilidad
+    # (1-200 A, línea ~1415) rechaza correctamente este valor por ser
+    # implausible como corriente POR TRACKER -- comportamiento correcto, no
+    # un bug a "arreglar" con un alias más permisivo.
+    # ─────────────────────────────────────────────────────────────────────────
+    {
+        "fabricante": "Woodward IDS",
+        "modelo":     "SOLO 500",
+        "arquitectura": "Inversor de red trifásico (central, sin trackers MPPT discretos)",
+        "texto": """\
+Ficha Técnica — Inversor de Red
+Woodward IDS SOLO 500
+Datos extraídos desde la base PVsyst V8.1.5 (Manufacturer 2010)
+
+2. Lado de entrada — Campo FV (CC)
+Voltaje MPP mínimo    500 V
+Voltaje mínimo para Pnom    500 V
+Voltaje MPP nominal    800 V
+Voltaje MPP máximo    1100 V
+Voltaje FV máximo absoluto    1200 V
+Corriente de entrada máxima    1140.0 A
+Umbral de potencia (arranque)    2500 W
+Potencia FV nominal (especificación contractual)    508 kW
+Potencia FV máxima    600 kW  (600,000 W)
+Corriente FV máxima    1140 A
+
+3. Lado de salida — Red (CA)
+Configuración de frecuencia    Trifásico — compatible 50 Hz y 60 Hz
+Voltaje de red    330 V
+Potencia de CA nominal    500 kW
+Potencia CA máxima    550 kW
+Corriente AC nominal    875 A
+Corriente AC máxima    963 A
+""",
+        "esperado": {
+            "Vdc_max":            1200,
+            "Vmppt_min":           500,
+            "Vmppt_max":          1100,
+            "V_arranque":         None,
+            "n_trackers":         None,
+            "n_strings_tracker":  None,
+            "I_max_tracker":      None,
+            "Isc_max_tracker":    None,
+            "P_dc_max_W":       600000,
+        },
+    },
+
 ]
 
 # Campos que se comparan (ordenados para la tabla de cobertura)

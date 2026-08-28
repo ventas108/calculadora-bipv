@@ -262,15 +262,33 @@ def test_generar_candidatos_con_panel_e_inversor_varia_ambos():
     inversores = {c.inversor["modelo"] for c in candidatos}
     assert len(inversores) > 1, "el barrido debería explorar más de un inversor real"
     inversor_var = opt_vars.variable_inversor()
+    # Resolver contra _catalogo_inversores_real() (el catálogo real de 105 del
+    # Excel, ya conectado localmente desde el fix de ruta de
+    # datos/catalogo_inversores_excel.py, 28-ago-2026) -- no contra
+    # INVERSORES (7) a secas: sus claves ("Growatt-MID15KTL3-X") no coinciden
+    # con las del Excel ("MID 15KTL3-X"), mismo patrón de bug ya evitado en
+    # otros lugares esta sesión.
+    catalogo_real = opt_vars._catalogo_inversores_real()
     for c in candidatos:
         assert c.panel["nombre"] in opt_vars.variable_panel().opciones
-        assert any(c.inversor["modelo"] == INVERSORES[k]["modelo"] for k in inversor_var.opciones)
+        assert any(c.inversor["modelo"] == catalogo_real[k]["modelo"] for k in inversor_var.opciones)
 
 
 def test_generar_candidatos_sincroniza_eta_inversor_con_el_inversor_sorteado():
     # Regresión: un candidato con inversor Growatt pero eta_inversor de otra
     # marca sería una config internamente inconsistente. Verificado contra
     # el catálogo real, no un valor inventado.
+    #
+    # El catálogo Excel real (105 modelos, conectado localmente desde el fix
+    # de ruta de datos/catalogo_inversores_excel.py, 28-ago-2026) no trae
+    # "eficiencia_max" para NINGÚN modelo (el datasheet fuente no lo reporta
+    # -- ver docstring de tests/test_catalogo_inversores_real.py). Por eso
+    # aquí, a nivel de generar_candidatos() end-to-end, lo que se puede
+    # verificar con datos reales es la mitad "no inventar": eta_inversor
+    # conserva el de config_base cuando el inversor sorteado no trae el dato.
+    # El caso positivo (sí sincroniza cuando SÍ hay eficiencia_max real) ya
+    # está cubierto a nivel unitario, con un catálogo controlado, en
+    # test_catalogo_inversores_real.py::test_resolver_sincroniza_eta_inversor_cuando_si_hay_dato_real.
     cfg = _cfg_electricamente_valida()
     candidatos = generar_candidatos(
         cfg, _variables_panel_inversor_completas(), n_candidatos=15, seed=5,
@@ -278,7 +296,11 @@ def test_generar_candidatos_sincroniza_eta_inversor_con_el_inversor_sorteado():
     )
     assert len(candidatos) == 15
     for c in candidatos:
-        assert c.eta_inversor == pytest.approx(c.inversor["eficiencia_max"])
+        _efic = c.inversor.get("eficiencia_max")
+        if _efic is not None:
+            assert c.eta_inversor == pytest.approx(_efic)
+        else:
+            assert c.eta_inversor == cfg.eta_inversor
 
 
 def test_generar_candidatos_panel_inversor_es_reproducible_con_seed():

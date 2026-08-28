@@ -12,10 +12,22 @@ inventar datos: el Excel no trae "eficiencia_max" (el datasheet fuente no lo
 reporta) ni un campo "modelo" propio (solo "nombre").
 
 datos.catalogo_inversores_excel importa streamlit a nivel de módulo (para
-@st.cache_data), que NO está instalado en este entorno de pruebas -- así que
-estos tests inyectan un módulo falso en sys.modules antes de que
-_catalogo_inversores_real() haga su import perezoso, en vez de importar el
-módulo real.
+@st.cache_data) -- estos tests inyectan un módulo falso en sys.modules antes
+de que _catalogo_inversores_real() haga su import perezoso, en vez de
+importar el módulo real. Esto es deliberado incluso cuando streamlit SÍ está
+instalado (como en este entorno, verificado 28-ago-2026): permite probar
+catálogos controlados (con/sin eficiencia_max, vacío, etc.) sin depender del
+contenido real y cambiante de inversores_catalogo.xlsx (105 modelos, ninguno
+con eficiencia_max real -- el datasheet fuente no la reporta).
+
+Nota histórica: hasta el 27-ago-2026, `_EXCEL` en catalogo_inversores_excel.py
+estaba hardcodeado solo a la ruta del servidor (sin el mismo fallback local
+que catalogo_paneles_excel.py sí tenía) -- en cualquier entorno de desarrollo,
+cargar_catalogo_inversores() fallaba con FileNotFoundError y
+_catalogo_inversores_real() caía en silencio al Python (INVERSORES, 7
+modelos). Corregido 28-ago-2026: algunos tests de este archivo dependían sin
+saberlo de ese fallback "por accidente de entorno" en vez de por mock
+explícito -- ver test_resolver_sincroniza_eta_inversor_cuando_si_hay_dato_real.
 """
 import sys
 import types
@@ -97,10 +109,11 @@ def test_cae_a_python_si_excel_lanza_excepcion(monkeypatch):
 
 
 def test_cae_a_python_si_el_modulo_excel_no_se_puede_importar():
-    # Camino real de este entorno de pruebas: streamlit no está instalado,
-    # así que el import perezoso de datos.catalogo_inversores_excel falla de
-    # verdad (no simulado) -- confirma que el fallback no rompe nada cuando
-    # streamlit falta, sin necesitar ningún mock.
+    # Simula streamlit ausente bloqueando el import a propósito (streamlit SÍ
+    # está instalado en este entorno, verificado 28-ago-2026) -- confirma que
+    # el fallback no rompe nada en un entorno donde streamlit de verdad falte
+    # (p.ej. un venv más minimalista), sin depender de que este entorno
+    # particular lo tenga o no lo tenga instalado.
     import builtins
     real_import = builtins.__import__
 
@@ -146,10 +159,23 @@ def test_resolver_no_sincroniza_eta_inversor_sin_dato_real_de_eficiencia(monkeyp
     assert resuelto["inversor"]["modelo"] == "SOLIS-60K"
 
 
-def test_resolver_sincroniza_eta_inversor_cuando_si_hay_dato_real():
-    # Catálogo Python real (con eficiencia_max) -- camino normal en este
-    # entorno, sin necesidad de mock.
-    resuelto = _resolver_categoricas_de_catalogo({"inversor": "Growatt-MID15KTL3-X"})
+def test_resolver_sincroniza_eta_inversor_cuando_si_hay_dato_real(monkeypatch):
+    # Antes (hasta 27-ago-2026) este test no necesitaba mock: la ruta del
+    # Excel estaba hardcodeada solo al servidor (sin el fallback local que sí
+    # tenía catalogo_paneles_excel.py), así que en este entorno de pruebas
+    # cargar_catalogo_inversores() siempre fallaba y _catalogo_inversores_real()
+    # caía en silencio al Python (INVERSORES, con eficiencia_max) -- "camino
+    # normal" por accidente de entorno, no por diseño. Corregido el fallback
+    # de ruta el 28-ago-2026 (mismo patrón que ya tenía el de paneles): ahora
+    # el Excel real (105 modelos) SÍ carga aquí, y NINGUNO de esos 105 trae
+    # eficiencia_max (el datasheet fuente no la reporta). El caso "sí hay dato
+    # real" solo puede probarse con un catálogo controlado -- mismo patrón que
+    # el resto de los tests de este archivo, no un accidente de entorno.
+    catalogo_con_eficiencia = {
+        "MID 15KTL3-X": {"nombre": "MID 15KTL3-X", "modelo": "MID15KTL3-X", "eficiencia_max": 0.985},
+    }
+    monkeypatch.setitem(sys.modules, "datos.catalogo_inversores_excel", _modulo_excel_falso(catalogo_con_eficiencia))
+    resuelto = _resolver_categoricas_de_catalogo({"inversor": "MID 15KTL3-X"})
     assert resuelto["eta_inversor"] == pytest.approx(0.985)
     assert resuelto["inversor"]["modelo"] == "MID15KTL3-X"
 

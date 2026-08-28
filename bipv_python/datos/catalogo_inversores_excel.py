@@ -5,7 +5,18 @@ import os as _os
 import pandas as pd
 import streamlit as st
 
-_EXCEL = "/var/www/bipv/calculadora-bipv/bipv_python/datos/inversores_catalogo.xlsx"
+# Ruta relativa al propio módulo (funciona en el servidor y en desarrollo);
+# fallback a la ruta histórica del servidor por si el archivo se movió. Antes
+# hardcodeada solo a /var/www/... (sin el mismo fallback que ya tenía
+# catalogo_paneles_excel.py) -- en cualquier entorno de desarrollo local esto
+# hacía que cargar_catalogo_inversores()/guardar_inversor_excel() reventaran
+# con FileNotFoundError, y optimization.variables._catalogo_inversores_real()
+# caía en silencio al catálogo Python chico de 7 inversores en vez del Excel
+# real de 105 -- encontrado 28-ago-2026 al intentar guardar un inversor real
+# desde este entorno.
+_EXCEL = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "inversores_catalogo.xlsx")
+if not _os.path.exists(_EXCEL):
+    _EXCEL = "/var/www/bipv/calculadora-bipv/bipv_python/datos/inversores_catalogo.xlsx"
 _SHEET = "Catalogo_Inversores"
 
 def _f(val, default=None):
