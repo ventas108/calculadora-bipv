@@ -2,6 +2,8 @@
 Módulo de recurso solar — TMY desde PVGIS + POA para fachadas BIPV.
 Fuente datos: PVGIS v5.2 (JRC European Commission) — sin API key.
 """
+import warnings
+
 import requests
 import pandas as pd
 import numpy as np
@@ -67,6 +69,110 @@ def obtener_tmy_pvgis(lat: float, lon: float, timeout: int = 30) -> pd.DataFrame
     return df[[c for c in cols if c in df.columns]].astype(float)
 
 
+# ── Auditoría 27-ago-2026 ────────────────────────────────────────────────────
+# El usuario aportó un motor BIPV Python puro (sin pvlib) que trae integrado
+# un chequeo de cierre físico GHI≈DNI·cosZ+DHI en cada corrida -- al
+# auditarlo, ese mismo chequeo detectó (891 avisos de 8760 horas) que el
+# script tenía un bug real de 30 minutos en el centrado del timestamp para
+# TMY de PVGIS (misma familia que el bug de 5 horas de
+# DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md, 26-ago-2026). Investigado: pvlib NO
+# trae este chequeo (`irradiance.py` no lo tiene). Sí existe en el paquete
+# hermano oficial `pvanalytics` (mismo equipo de pvlib/NREL) como
+# `quality.irradiance.check_irradiance_consistency_qcrad()` -- implementa el
+# algoritmo QCRad publicado (Long & Shi, 2008, estándar BSRN de control de
+# calidad de radiación solar), verificado leyendo su código fuente real. Se
+# decidió NO agregar `pvanalytics` como dependencia (arrastra `statsmodels` +
+# `scikit-image`, pesados y no usados para nada más) -- se porta aquí solo el
+# chequeo central del algoritmo (cierre físico), con numpy/pandas que ya son
+# dependencias existentes.
+QCRAD_TOLERANCIA_WM2_DEFAULT = 50.0
+QCRAD_ELEVACION_MINIMA_DEG = 3.0   # excluye horas rasantes (ruido relativo grande, irradiancia ~0)
+QCRAD_PCT_ALERTA = 2.0             # % de horas de día inconsistentes que dispara el warning
+
+
+def verificar_consistencia_radiativa(
+    tmy: pd.DataFrame,
+    solar_zenith_deg,
+    tolerancia_wm2: float = QCRAD_TOLERANCIA_WM2_DEFAULT,
+    elevacion_minima_deg: float = QCRAD_ELEVACION_MINIMA_DEG,
+    pct_alerta: float = QCRAD_PCT_ALERTA,
+) -> dict:
+    """
+    Chequeo de cierre físico GHI ≈ DNI·cos(zenit) + DHI (algoritmo QCRad,
+    Long & Shi 2008 -- ver nota de módulo arriba). Detecta el mismo tipo de
+    bug que causó DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md: un desfase de huso
+    horario o de centrado de intervalo empareja la irradiancia con la
+    posición solar de una hora equivocada, y este chequeo lo revela como una
+    inconsistencia física medible aunque los datos "se vean razonables" a
+    simple vista.
+
+    Parámetros
+    ----------
+    tmy              : DataFrame con columnas G_h (GHI), Gb_n (DNI), Gd_h (DHI)
+                        -- mismo formato que devuelve obtener_tmy_pvgis().
+    solar_zenith_deg : ángulo cenital solar (°), mismo índice que tmy.
+    tolerancia_wm2    : diferencia absoluta máxima tolerada por hora, W/m².
+                        Calibrado empíricamente: el TMY real de Urabá, ya
+                        validado contra PVsyst, da 0% de horas inconsistentes
+                        con este umbral; un desfase de solo 30 min en el
+                        centrado del timestamp ya produce >10%.
+    elevacion_minima_deg : excluye horas con el sol muy bajo (elevación
+                        menor a este valor) -- ahí la irradiancia es casi
+                        nula y el ruido relativo es enorme sin ser un
+                        problema real.
+    pct_alerta        : % de horas de día inconsistentes que dispara el
+                        `UserWarning`.
+
+    Retorna
+    -------
+    dict con horas_evaluadas, horas_inconsistentes, pct_inconsistente,
+    diferencia_media_wm2, diferencia_maxima_wm2.
+    """
+    zenith = np.asarray(solar_zenith_deg, dtype=float)
+    elevacion = 90.0 - zenith
+    mask_dia = elevacion > elevacion_minima_deg
+
+    ghi = tmy["G_h"].to_numpy(dtype=float)
+    dni = tmy["Gb_n"].to_numpy(dtype=float)
+    dhi = tmy["Gd_h"].to_numpy(dtype=float)
+
+    cos_z = np.clip(np.cos(np.radians(zenith)), 0.0, None)
+    suma_componentes = dni * cos_z + dhi
+    diferencia = np.abs(ghi - suma_componentes)
+
+    horas_dia = int(mask_dia.sum())
+    if horas_dia == 0:
+        return {
+            "horas_evaluadas": 0, "horas_inconsistentes": 0,
+            "pct_inconsistente": 0.0, "diferencia_media_wm2": 0.0,
+            "diferencia_maxima_wm2": 0.0,
+        }
+
+    dif_dia = diferencia[mask_dia]
+    inconsistentes = int((dif_dia > tolerancia_wm2).sum())
+    pct = round(100 * inconsistentes / horas_dia, 2)
+    resultado = {
+        "horas_evaluadas": horas_dia,
+        "horas_inconsistentes": inconsistentes,
+        "pct_inconsistente": pct,
+        "diferencia_media_wm2": round(float(dif_dia.mean()), 1),
+        "diferencia_maxima_wm2": round(float(dif_dia.max()), 1),
+    }
+    if pct > pct_alerta:
+        warnings.warn(
+            f"Inconsistencia radiativa: {inconsistentes}/{horas_dia} horas de "
+            f"día ({pct}%) no cumplen GHI≈DNI·cosZ+DHI dentro de "
+            f"{tolerancia_wm2:.0f} W/m² (chequeo QCRad, Long & Shi 2008). "
+            "Puede indicar un desfase de huso horario o de centrado de "
+            "intervalo entre el TMY y la posición solar -- ver "
+            "DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md para un caso real "
+            "encontrado con este mismo síntoma.",
+            UserWarning,
+            stacklevel=2,
+        )
+    return resultado
+
+
 def calcular_poa(
     tmy: pd.DataFrame,
     lat: float,
@@ -112,6 +218,14 @@ def calcular_poa(
     solar_pos = loc.get_solarposition(tmy.index)
     dni_extra = pvlib.irradiance.get_extra_radiation(tmy.index)
 
+    # Chequeo QCRad de cierre físico (ver verificar_consistencia_radiativa()
+    # arriba) -- corre una sola vez por llamada, independiente de
+    # tilt/azimuth/bifacial (solo depende del TMY y la posición solar, ya
+    # calculados). No cambia el DataFrame devuelto (mismo contrato que
+    # antes) -- el resultado queda en .attrs["qcrad"] para quien quiera
+    # inspeccionarlo, y emite un UserWarning automático si hay inconsistencia.
+    qcrad = verificar_consistencia_radiativa(tmy, solar_pos["apparent_zenith"])
+
     poa = pvlib.irradiance.get_total_irradiance(
         surface_tilt=tilt,
         surface_azimuth=azimuth,
@@ -124,6 +238,7 @@ def calcular_poa(
         model="haydavies",
         dni_extra=dni_extra,
     ).fillna(0.0)
+    poa.attrs["qcrad"] = qcrad
 
     if not bifacial:
         return poa

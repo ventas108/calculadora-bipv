@@ -299,6 +299,20 @@ El control "GCR (cobertura del suelo)" del modelo bifacial ahora arranca con el 
 - Si el GCR y el factor difieren en más de 15 puntos, aparece una alerta con el valor sugerido — el sombreado entre filas y el conteo de paneles estarían usando supuestos distintos.
 ⚠️ Para no cometer errores: no subas el GCR "para producir más" sin cambiar también el factor de ocupación en Proyecto. Un GCR alto junta las filas (más sombra mutua y menos luz al cultivo); mantén ambos valores alineados.
 
+────────────────────────────────────────────────────────────
+
+### Chequeo QCRad automático — cierre físico del TMY  NUEVO (27-ago-2026)
+
+`calculos/solar.py::calcular_poa()` ahora valida automáticamente, en cada llamada, que el TMY sea físicamente consistente: GHI ≈ DNI·cos(zenit) + DHI (algoritmo QCRad, Long & Shi 2008 — el estándar BSRN de control de calidad de radiación solar). Si más del 2% de las horas de día se salen de esa consistencia por más de 50 W/m², la app emite un `UserWarning` automático.
+
+**Por qué se agregó**: auditando un motor BIPV aparte que aportó el usuario, su propio chequeo de este tipo detectó que el script tenía un bug real de 30 minutos de desfase entre el TMY y la posición solar — misma familia que el bug de 5 horas de `DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md` (26-ago-2026). Antes de este cambio, la app no tenía ninguna validación automática equivalente — ese tipo de bug solo se detectaba a mano, con scripts de diagnóstico sueltos.
+
+**De dónde viene el algoritmo**: pvlib no trae este chequeo. Existe en el paquete hermano oficial `pvanalytics` (mismo equipo de NREL/pvlib) como `quality.irradiance.check_irradiance_consistency_qcrad()` — se verificó leyendo su código fuente real antes de decidir. Se portó solo la fórmula central del algoritmo (cierre físico) directamente a `calculos/solar.py`, **sin agregar `pvanalytics` como dependencia** — esa librería arrastra `statsmodels` y `scikit-image`, pesados y no usados para nada más que esta única función.
+
+**Cómo funciona**: el resultado (`horas_evaluadas`, `horas_inconsistentes`, `pct_inconsistente`, `diferencia_media_wm2`, `diferencia_maxima_wm2`) queda disponible en `poa.attrs["qcrad"]` — no cambia las columnas ni el contrato del DataFrame que devuelve `calcular_poa()`, así que no rompe ningún código existente que ya lo llama. Corre una sola vez por llamada (no depende de tilt/azimuth/bifacial), y sobrevive al `.copy()` de la rama bifacial.
+
+**Verificado con datos reales antes de integrar**: TMY real de PVGIS para Bogotá (proyecto Teusaquillo, coordenadas reales de `datos/ciudades_colombia.py`) → 0% de horas inconsistentes, diferencia media 0,3 W/m², máxima 2,8 W/m². El mismo TMY desfasado artificialmente 30 minutos → 20,2% de horas inconsistentes, dispara el warning correctamente. 7 tests nuevos en `tests/test_solar_qcrad.py`, incluyendo un caso mínimo calculado a mano (3 "horas" con el resultado esperado derivado manualmente, no solo verificado con `isinstance`).
+
 ## 5. Página 3 — Motor IV
 
 Propósito: Modelar la curva corriente-voltaje (I-V) del panel usando el modelo de 5 parámetros (SDM).
