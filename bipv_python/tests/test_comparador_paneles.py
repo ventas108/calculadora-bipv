@@ -33,30 +33,48 @@ def test_paneles_excluidos_por_ficha_incompleta_refleja_el_catalogo_real():
 
 
 def test_comparar_paneles_no_crashea_y_devuelve_todos_los_simulables():
+    # Desde que variable_panel() se conectó al catálogo Excel (27-ago-2026,
+    # ver optimization/variables.py::_catalogo_paneles_real()) comparar_paneles()
+    # ya no compara solo los 7 ASP-ST1 -- compara el catálogo real unido
+    # completo (72: 7 + 65 del Excel). Este test verifica eso, no un
+    # conjunto fijo de 7 nombres que ya no refleja el catálogo real.
+    from optimization.variables import variable_panel
     tmy = _tmy_sintetico_offline(LAT, LON, ALT_M)
     df = comparar_paneles(
         _cfg_base(), tmy, "BIPV fachada/pérgola",
         tarifa_cop_kWh=750.0, tipo_cambio=4000.0,
     )
     assert not df.empty
-    # Ahora los 7 de la familia ASP-ST1 son simulables (ver nota "2026-08-21"
-    # en datos/tecnologias_bipv.py) -- ya no solo T40.
-    assert set(df["Panel"]) == {f"ASP-ST1-T{n}" for n in (10, 20, 30, 40, 50, 60, 70)}
+    assert set(df["Panel"]) == set(variable_panel().opciones)
+    # La familia ASP-ST1 completa (SDM calibrado) sigue simulable dentro del
+    # catálogo unido -- no la perdió la unión con el Excel.
+    assert {f"ASP-ST1-T{n}" for n in (10, 20, 30, 40, 50, 60, 70)} <= set(df["Panel"])
 
 
 def test_comparar_paneles_columnas_esperadas_y_valores_positivos():
+    # Con el catálogo unido (72 paneles) la mejor LCOE (df.iloc[0]) ya no es
+    # necesariamente ASP-ST1-T40 -- N_serie/N_strings_tracker quedan FIJOS en
+    # _cfg_base() para los 72, así que un panel con Voc/Vmp muy distinto
+    # puede terminar eléctricamente incompatible (❌) con esa config aunque
+    # tenga buena LCOE simulada. Se busca la fila T40 explícitamente -- es
+    # el único candidato de este archivo ya auditado contra el XLSM como
+    # compatible con N_serie=8/Growatt (ver FICHA_PVSYST_TEUSAQUILLO.md) --
+    # en vez de asumir que la primera fila lo es.
     tmy = _tmy_sintetico_offline(LAT, LON, ALT_M)
     df = comparar_paneles(
         _cfg_base(), tmy, "BIPV fachada/pérgola",
         tarifa_cop_kWh=750.0, tipo_cambio=4000.0,
     )
-    fila = df.iloc[0]
-    assert fila["N° módulos"] > 0
-    assert fila["P_dc (kWp)"] > 0
-    assert fila["E_ac (kWh/año)"] > 0
-    assert 0.0 < fila["PR"] < 1.5
-    assert fila["CAPEX (USD)"] > 0
-    assert fila["Compatible"] == "✅"   # N_serie=8 con Growatt ya validado contra el XLSM
+    assert not df.empty
+    for _, fila in df.iterrows():
+        assert fila["N° módulos"] > 0
+        assert fila["P_dc (kWp)"] > 0
+        assert fila["E_ac (kWh/año)"] > 0
+        assert 0.0 < fila["PR"] < 1.5
+        assert fila["CAPEX (USD)"] > 0
+
+    fila_t40 = df[df["Panel"] == "ASP-ST1-T40"].iloc[0]
+    assert fila_t40["Compatible"] == "✅"   # N_serie=8 con Growatt ya validado contra el XLSM
 
 
 def test_comparar_paneles_ordena_por_lcoe_ascendente():

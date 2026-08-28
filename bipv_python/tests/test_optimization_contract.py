@@ -58,9 +58,16 @@ def test_variable_panel_opciones_coincide_con_catalogo_real_simulable():
     # dimensionar_sistema()). Ver docstring de variable_panel() y
     # tests/test_optimization_fase4.py::test_variable_panel_excluye_fichas_incompletas_del_catalogo_real
     # para el hallazgo completo.
-    from datos.tecnologias_bipv import MODULOS_BIPV
+    #
+    # Desde que variable_panel() se conectó al catálogo Excel (27-ago-2026),
+    # el catálogo real ya no es solo MODULOS_BIPV -- es la unión con los 65
+    # paneles del Excel (ver optimization.variables._catalogo_paneles_real()).
+    # "esperado" debe construirse contra esa misma unión, no contra
+    # MODULOS_BIPV a secas, o este test volvería a fallar por diseño cada
+    # vez que el catálogo Excel aporte una clave nueva.
+    from optimization.variables import _catalogo_paneles_real
     var = opt_vars.variable_panel()
-    esperado = {k for k, v in MODULOS_BIPV.items() if v.get("Pmax_stc") is not None}
+    esperado = {k for k, v in _catalogo_paneles_real().items() if v.get("Pmax_stc") is not None}
     assert set(var.opciones) == esperado
 
 

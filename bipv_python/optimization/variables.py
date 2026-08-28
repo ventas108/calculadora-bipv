@@ -69,33 +69,96 @@ def variables_geometria(tipo_superficie: str | None = None) -> list[Optimization
     ]
 
 
+def _catalogo_paneles_real() -> dict:
+    """Catálogo de paneles real más completo disponible -- UNIÓN (no solo
+    preferencia) de dos fuentes, con prioridad explícita:
+
+    1. datos.tecnologias_bipv.MODULOS_BIPV (7 variantes ASP-ST1, T10-T70):
+       parámetros SDM De Soto 2006 calibrados por ajuste de curva contra la
+       hoja FF_vs_Irradiancia del XLSM auditado, validados contra Batzner
+       et al. 2001 -- la fuente de mayor precisión para las variantes que
+       cubre.
+    2. datos.catalogo_paneles_excel.cargar_catalogo_excel() (65 paneles
+       reales, catálogo editable desde 📋 Catálogo Paneles / usado por
+       📐 Dimensionamiento) -- cobertura mucho más amplia, pero ninguna
+       entrada trae los 5 parámetros SDM completos (I_L_ref/I_o_ref/R_s/
+       R_sh_ref/a_ref) -- solo ficha de placa (Voc/Isc/Vmp/Imp/Pmax) y, para
+       algunos, un NsA/n_idealidad ESTIMADO (no curve-fit) que no equivale
+       al a_ref calibrado.
+
+    A diferencia de _catalogo_inversores_real() (que solo PREFIERE el
+    catálogo grande y no tiene fuente pequeña que perder), aquí se hace una
+    UNIÓN con el catálogo chico ganando los conflictos: verificado
+    (27-ago-2026) que las 7 claves "ASP-ST1-T10".."ASP-ST1-T70" existen en
+    AMBAS fuentes con el MISMO nombre -- para esas 7, el Excel trae
+    I_L_ref/I_o_ref/R_s/R_sh_ref en None (solo un NsA=196,1 estimado, no
+    calibrado) mientras MODULOS_BIPV trae los 5 parámetros SDM reales. Si se
+    prefiriera el Excel a secas (como con inversores), el proyecto
+    Teusaquillo -- el único ya auditado contra el XLSM esta sesión -- perdería
+    su modelo de diodo único sin necesidad y caería al modelo simplificado.
+
+    Los ~58 paneles del Excel sin equivalente en el catálogo chico se
+    agregan tal cual -- se simularán con el modelo lineal simplificado (ver
+    calculos.produccion.panel_tiene_sdm_completo()), no con SDM; esa
+    distinción ya la reporta simular_produccion_anual() (clave
+    "uso_modelo_simplificado") -- no es un caso nuevo que este módulo tenga
+    que inventar cómo manejar, ya existe en el resto de la app.
+
+    Import perezoso con fallback silencioso, mismo criterio que
+    _catalogo_inversores_real(): optimization/ se mantiene sin depender de
+    streamlit -- si el Excel no carga, se usa solo el catálogo chico
+    (comportamiento anterior a esta función, sin romper nada).
+    """
+    from datos.tecnologias_bipv import MODULOS_BIPV
+    catalogo = dict(MODULOS_BIPV)
+    try:
+        from datos.catalogo_paneles_excel import cargar_catalogo_excel
+        excel = cargar_catalogo_excel() or {}
+    except Exception:
+        excel = {}
+    for clave, panel in excel.items():
+        if clave not in catalogo:
+            catalogo[clave] = panel
+    return catalogo
+
+
 def variable_panel(catalogo: dict | None = None) -> OptimizationVariable:
-    """Elección de panel — categórica sobre el catálogo real MODULOS_BIPV.
+    """Elección de panel — categórica sobre el catálogo real más completo
+    disponible (ver _catalogo_paneles_real()): unión de las 7 variantes
+    ASP-ST1 (T10-T70, con SDM calibrado) y el catálogo Excel de paneles
+    reales (65 modelos, sin SDM propio).
 
     `opciones` guarda las CLAVES del catálogo (str), no los dicts completos
     — mantiene el contrato liviano y legible para un agente. La resolución
     clave→dict real la hace optimization.scenario_generator al armar el
-    candidato, no este módulo (aquí solo se define el vocabulario).
+    candidato (contra el MISMO catálogo unido, no MODULOS_BIPV a secas —
+    ver el comentario en _resolver_categoricas_de_catalogo(), mismo tipo de
+    bug ya evitado para inversor).
 
-    Filtro real, no arbitrario: por defecto se excluyen los paneles sin
-    Pmax_stc -- calculos.dimensionamiento.dimensionar_sistema() revienta con
-    TypeError (N_paneles * None) si se les intenta dimensionar. Hallazgo al
-    construir esta función: de los 7 paneles de MODULOS_BIPV, solo
-    ASP-ST1-T40 tiene ficha completa (Pmax_stc/Imp_stc) -- los otros 6
-    (T10/T20/T30/T50/T60/T70) son entradas de catálogo incompletas,
-    preexistentes, nunca ejercitadas porque el proyecto real usa T40. Esto
-    también afecta hoy a 📐 Dimensionamiento si alguien selecciona uno de
-    esos paneles manualmente -- no es un problema nuevo de este módulo, solo
-    el primer lugar que lo detecta y lo evita en vez de ofrecerlo como si
-    fuera una opción válida.
+    Filtro real, no arbitrario: cuando se usa el catálogo por defecto (sin
+    pasar `catalogo`), se excluyen los paneles sin Pmax_stc --
+    calculos.dimensionamiento.dimensionar_sistema() revienta con TypeError
+    (N_paneles * None) si se les intenta dimensionar. Verificado 27-ago-2026:
+    los 65 paneles del catálogo Excel real SÍ traen Pmax_stc (ninguno se
+    excluye por este filtro hoy); no es SDM lo que este filtro exige, ver
+    docstring de _catalogo_paneles_real() para esa distinción.
+
+    Si se pasa un `catalogo` explícito, NO se filtra -- contrato preexistente
+    del que depende calculos.comparador_paneles.paneles_excluidos_por_ficha_incompleta()
+    para poder mostrarle al usuario, con un catálogo propio, cuáles paneles
+    quedarían excluidos (necesita ver las entradas sin Pmax_stc, no que ya
+    vengan quitadas). Regresión real que se coló al conectar el catálogo
+    Excel (el filtro había quedado aplicándose siempre, incluso con catálogo
+    explícito) -- encontrada releyendo esa función antes de darla por no
+    afectada, corregida en el mismo commit.
     """
     if catalogo is None:
-        from datos.tecnologias_bipv import MODULOS_BIPV as catalogo
+        catalogo = _catalogo_paneles_real()
         catalogo = {k: v for k, v in catalogo.items() if v.get("Pmax_stc") is not None}
     return OptimizationVariable(
         "panel", "categorica", opciones=tuple(catalogo.keys()),
-        descripcion="Referencia del catálogo de paneles BIPV (datos.tecnologias_bipv.MODULOS_BIPV, "
-                    "solo entradas con ficha completa).",
+        descripcion="Referencia del catálogo real de paneles (unión de datos.tecnologias_bipv.MODULOS_BIPV "
+                    "y el catálogo Excel real, solo entradas con Pmax_stc).",
     )
 
 

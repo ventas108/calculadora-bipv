@@ -63,8 +63,16 @@ def _calcular_pmax_vectorizado(
     # ── Fallback para paneles sin parámetros SDM completos ───────────────────
     # (paneles del catálogo Excel que no tienen a_ref, I_L_ref, etc.)
     if not panel_tiene_sdm_completo(panel):
-        gamma = float(panel.get("Tk_gamma", -0.45)) / 100.0   # %/°C → 1/°C
-        pmax_stc = float(panel.get("Pmax_stc", 0))
+        # panel.get("Tk_gamma", -0.45) NO cubre el caso real: en el catálogo
+        # Excel la clave existe pero vale None (no está ausente) -- .get()
+        # con default solo aplica si la clave falta, así que quedaba
+        # float(None) y TypeError. Bug preexistente, alcanzable recién ahora
+        # que variable_panel() expone el catálogo Excel completo (27-ago-2026)
+        # -- encontrado corriendo comparar_paneles() sobre los 65 paneles
+        # reales. Mismo idiom `or` que ya usan NOCT (línea ~171) y Tk_alfa
+        # (línea ~86) en este archivo para el mismo problema.
+        gamma = float(panel.get("Tk_gamma") or -0.45) / 100.0   # %/°C → 1/°C
+        pmax_stc = float(panel.get("Pmax_stc") or 0)
         pmax = pmax_stc * np.where(G > 5.0, G / 1000.0, 0.0) * (1.0 + gamma * (T_cel - 25.0))
         pmax = np.maximum(pmax, 0.0)
         return pmax

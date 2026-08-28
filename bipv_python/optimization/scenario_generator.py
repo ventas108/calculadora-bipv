@@ -33,8 +33,19 @@ from optimization.constraints import evaluar_factibilidad_previa, todas_cumplida
 def _resolver_categoricas_de_catalogo(cambios: dict) -> dict:
     resuelto = dict(cambios)
     if "panel" in resuelto:
-        from datos.tecnologias_bipv import MODULOS_BIPV
-        resuelto["panel"] = MODULOS_BIPV[resuelto["panel"]]
+        # Debe resolver contra el MISMO catálogo del que variable_panel()
+        # sacó las opciones -- si aquí se usara MODULOS_BIPV a secas (7)
+        # mientras variable_panel() sortea del catálogo unido (65: los 7
+        # ASP-ST1 están DENTRO de los 65 del Excel, no se suman aparte --
+        # ver _catalogo_paneles_real()), cualquier clave del Excel sorteada
+        # que no sea ASP-ST1 no existiría en
+        # MODULOS_BIPV y esto reventaría con KeyError. Mismo bug que ya se
+        # había evitado para "inversor" aquí abajo -- encontrado en
+        # auditoría (27-ago-2026) antes de conectar variable_panel() al
+        # catálogo Excel, no después. Ver
+        # optimization.variables._catalogo_paneles_real().
+        from optimization.variables import _catalogo_paneles_real
+        resuelto["panel"] = _catalogo_paneles_real()[resuelto["panel"]]
     if "inversor" in resuelto:
         # Debe resolver contra el MISMO catálogo del que variable_inversor()
         # sacó las opciones -- si aquí se usara el INVERSORES angosto (7)

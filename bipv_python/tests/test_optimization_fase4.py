@@ -176,12 +176,72 @@ def test_variable_panel_incluye_toda_la_familia_asp_st1_completa():
     # los 7 tienen ficha completa y variable_panel() ya no excluye ninguno.
     # Si el catálogo vuelve a crecer con una ficha incompleta, este test debe
     # fallar para que se note, no pasar en silencio.
+    # Desde que variable_panel() se conectó al catálogo Excel (27-ago-2026),
+    # var.opciones ya NO es igual a MODULOS_BIPV.keys() -- es un superconjunto
+    # (las 7 + hasta 65 del Excel). La comprobación de regresión que importa
+    # sigue siendo "los 7 ASP-ST1 completos están todos adentro", ahora como
+    # subconjunto, no como igualdad exacta.
     from datos.tecnologias_bipv import MODULOS_BIPV
     var = opt_vars.variable_panel()
     assert "ASP-ST1-T40" in var.opciones
     incompletos = {k for k, v in MODULOS_BIPV.items() if v.get("Pmax_stc") is None}
     assert not incompletos, f"hay fichas incompletas de nuevo en el catálogo: {sorted(incompletos)}"
-    assert set(var.opciones) == set(MODULOS_BIPV.keys())
+    assert set(MODULOS_BIPV.keys()) <= set(var.opciones)
+
+
+def test_catalogo_paneles_real_prioriza_sdm_calibrado_sobre_excel_para_asp_st1():
+    # _catalogo_paneles_real() hace una UNIÓN (no una preferencia lisa como
+    # con inversores) -- para las 7 claves que existen en AMBAS fuentes
+    # (ASP-ST1-T10..T70), debe ganar MODULOS_BIPV (SDM calibrado por curve-fit
+    # contra el XLSM), no la versión del Excel (sin a_ref/I_L_ref/etc, solo
+    # un NsA/n_idealidad estimado). Si esto se rompiera, el proyecto
+    # Teusaquillo (el único auditado contra el XLSM) perdería su modelo de
+    # diodo único sin que ningún test lo notara.
+    from datos.tecnologias_bipv import MODULOS_BIPV
+    from optimization.variables import _catalogo_paneles_real
+    from calculos.produccion import panel_tiene_sdm_completo
+
+    union = _catalogo_paneles_real()
+    for clave in MODULOS_BIPV:
+        assert union[clave] is MODULOS_BIPV[clave] or union[clave] == MODULOS_BIPV[clave]
+        assert panel_tiene_sdm_completo(union[clave])
+        assert union[clave].get("a_ref") == MODULOS_BIPV[clave].get("a_ref")
+
+
+def test_catalogo_paneles_real_incluye_paneles_exclusivos_del_excel():
+    # Verifica la parte nueva de la unión: un panel que NO está en
+    # MODULOS_BIPV (solo en el catálogo Excel de 65) debe aparecer en
+    # variable_panel().opciones y resolverse sin KeyError vía
+    # generar_candidatos() -- exactamente el bug de tercera aparición
+    # encontrado y corregido el 27-ago-2026 en
+    # optimization.scenario_generator._resolver_categoricas_de_catalogo() y
+    # calculos.comparador_paneles.comparar_paneles().
+    from datos.tecnologias_bipv import MODULOS_BIPV
+    from optimization.variables import _catalogo_paneles_real, OptimizationVariable
+    from optimization.scenario_generator import _resolver_categoricas_de_catalogo
+
+    union = _catalogo_paneles_real()
+    solo_excel = [k for k in union if k not in MODULOS_BIPV]
+    assert solo_excel, "el catálogo Excel debería aportar paneles que MODULOS_BIPV no tiene"
+    clave_excel = solo_excel[0]
+    assert clave_excel in opt_vars.variable_panel().opciones
+
+    # No se compara el dict completo con == -- varias columnas del Excel
+    # (Voc/Isc/Imp/Isc_stc) traen NaN, y NaN != NaN en Python (IEEE754), así
+    # que dos dicts idénticos en contenido fallarían la igualdad por eso, no
+    # por ningún bug real. "nombre" y Pmax_stc alcanzan para confirmar que
+    # se resolvió al panel correcto del catálogo Excel.
+    resuelto = _resolver_categoricas_de_catalogo({"panel": clave_excel})
+    assert resuelto["panel"]["nombre"] == union[clave_excel]["nombre"]
+    assert resuelto["panel"]["Pmax_stc"] == union[clave_excel]["Pmax_stc"]
+
+    cfg = _cfg_electricamente_valida()
+    var_panel_fijo = OptimizationVariable("panel", "categorica", opciones=(clave_excel,))
+    candidatos = generar_candidatos(
+        cfg, [var_panel_fijo], n_candidatos=1, seed=1, requerir_evaluables=False,
+    )
+    if candidatos:
+        assert candidatos[0].panel["nombre"] == union[clave_excel]["nombre"]
 
 
 def test_generar_candidatos_con_panel_e_inversor_varia_ambos():

@@ -56,7 +56,18 @@ def comparar_paneles(
     """
     var_panel = variable_panel(catalogo)
     if catalogo is None:
-        from datos.tecnologias_bipv import MODULOS_BIPV as catalogo
+        # Debe resolver contra el MISMO catálogo del que variable_panel()
+        # sacó las opciones -- si aquí se usara MODULOS_BIPV a secas (7)
+        # mientras variable_panel() ya sortea del catálogo unido (65: los 7
+        # ASP-ST1 están DENTRO de los 65 del Excel, no se suman aparte --
+        # conectado 27-ago-2026), cualquier clave del Excel que no sea
+        # ASP-ST1 reventaría con KeyError más abajo. Mismo bug ya encontrado y
+        # corregido el mismo día en optimization.scenario_generator
+        # ._resolver_categoricas_de_catalogo() -- tercera aparición del
+        # mismo patrón, encontrada auditando este módulo antes de darlo
+        # por corregido en los otros dos.
+        from optimization.variables import _catalogo_paneles_real
+        catalogo = _catalogo_paneles_real()
 
     filas = []
     for nombre in var_panel.opciones:
@@ -135,7 +146,18 @@ def paneles_excluidos_por_ficha_incompleta(catalogo: dict | None = None) -> list
     Pmax_stc solo se aplica cuando NO se le pasa un catálogo explícito (ver
     su código) -- pasarle este mismo `catalogo` lo desactivaría. Se repite
     el mismo criterio directamente, autocontenido.
+
+    El catálogo por defecto debe ser el MISMO que usa variable_panel()/
+    comparar_paneles() cuando no se pasa uno explícito -- antes de conectar
+    el catálogo Excel (27-ago-2026) este default era MODULOS_BIPV (7) a
+    secas, porque era el único catálogo que existía para variable_panel().
+    Dejarlo así tras la conexión sería inconsistente con lo que el usuario
+    ve realmente comparado (65 paneles: los 7 ASP-ST1 con SDM calibrado
+    están dentro de esos 65, no se suman aparte) y, aunque hoy no cambia el
+    resultado (los 65 del Excel sí traen Pmax_stc), subreportaría en
+    silencio el día que el catálogo Excel gane una ficha incompleta.
     """
     if catalogo is None:
-        from datos.tecnologias_bipv import MODULOS_BIPV as catalogo
+        from optimization.variables import _catalogo_paneles_real
+        catalogo = _catalogo_paneles_real()
     return [k for k, v in catalogo.items() if v.get("Pmax_stc") is None]
