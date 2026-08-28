@@ -1007,6 +1007,22 @@ Antes de este cambio, si había un balance de baterías activo, el excedente exp
 
 ────────────────────────────────────────────────────────────
 
+### Auditoría del pipeline financiero/CO2/TRM (27-ago-2026) — módulo financiero validado, bug real de TRM corregido
+
+Continuación de la auditoría del pipeline de cálculo con datos reales de Urabá (ver sección 9, Página 6 Producción, para el bug del gate de compatibilidad eléctrica encontrado antes).
+
+**`calculos/financiero.py` — validado, sin bugs encontrados**: se reprodujeron INDEPENDIENTEMENTE, ejecutando el módulo real con los insumos declarados en `entregables/generar_informe_final_evaluador_uraba.py` (CAPEX≈USD 177.200, tarifa 950 COP/kWh EPM, TRM 3.118,24, degradación 0,4%/año, OPEX 10 USD/kWp/año, sin beneficios Ley 1715), las cifras oficiales YA entregadas a un evaluador externo — coinciden casi exactamente en ambos escenarios (caso base bifacial: TIR 55,91%≈55,9%, VPN USD 701.692≈701.820, LCOE 208,4≈208 COP/kWh; piso conservador monofacial: TIR 51,65%≈51,7%, VPN USD 635.184≈635.213, LCOE 225,1≈225 COP/kWh). El motor financiero es correcto y consistente con lo entregado. 3 tests de regresión nuevos (`tests/test_financiero_uraba.py`) anclados a estas cifras del informe real.
+
+**Cabo suelto real, sin corregir (decisión pendiente del usuario, ya documentada desde el 26-ago)**: el informe entregado usa E_ac=334.805 kWh/año (supuesto "+8% bifacial fijo", sin el ajuste fino de Motor Óptico/IAM), no los 336.662 kWh/año ya validados como más precisos con el motor real de la app. Diferencia pequeña y no material (TIR 55,9%→56,2%, +0,32 pp; VPN +USD ~5.000) pero real — sigue sin decidirse si se regeneran los entregables oficiales con el número más preciso.
+
+**`calculos/co2.py` — validado, sin bugs**: fórmulas de equivalencias (árboles, hogares, km, vuelos, barriles, cilindros GLP) verificadas contra las etiquetas de `pages/12_🌿_Impacto_CO2.py` — todas consistentes en unidades (ej. `km_vehiculo` está en MILES de km a propósito, coincide con el label "mil km"). El uso de `factor_activo` (metodología elegida por el usuario) vs `factor_marginal` (0,300 kg/kWh, CDM) para bonos de carbono es una elección de diseño transparente y bien etiquetada, no un bug — la página muestra explícitamente ambos y recomienda el marginal para bonos reales.
+
+**Bug real encontrado y corregido, verificado en vivo**: `calculos/trm_utils.py` — el umbral `_ALERTA_BAJA` (3.800) y el mensaje de referencia ("ref. 2025-2026: ~4.000–4.500") estaban desactualizados frente al mercado real: la TRM oficial del 27-ago-2026, **verificada en vivo contra la API real de datos.gov.co durante esta auditoría** (no un supuesto), es 3.118,24 — por debajo del umbral, así que el widget de TRM en 💰 Financiero / 💼 Presupuesto mostraba una advertencia FALSA de "TRM parece baja" para la tasa oficial correcta. `TRM_DEFAULT` (respaldo si ambas APIs fallan) también bajó de 4.200 a 3.900 por la misma razón. Nuevos valores: `TRM_DEFAULT=3.900`, `_ALERTA_BAJA=2.600` (con margen para no quedar obsoleto de nuevo con una fluctuación normal del peso). 4 tests de regresión nuevos (`tests/test_trm_utils.py`), anclados al valor real verificado en vivo ese día. **Nota explícita**: a diferencia de los demás bugs de esta auditoría (lógica invertida, redondeo doble), este es un valor de referencia de mercado que se desactualiza con el tiempo por diseño — si vuelve a quedar desalineado en el futuro, es una fluctuación normal del peso que hay que resubir, no un error de lógica.
+
+Suite completa tras estos cambios: **708/708 passed**.
+
+────────────────────────────────────────────────────────────
+
 ## 11. Página 8 — Presupuesto Bancable
 
 Propósito: Construir el presupuesto completo del proyecto con estructura

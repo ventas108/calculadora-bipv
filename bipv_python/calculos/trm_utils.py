@@ -24,11 +24,20 @@ except ImportError:
     _REQUESTS_OK = False
 
 # ── Constantes ────────────────────────────────────────────────────────────────
-TRM_DEFAULT    = 4_200.0
+# TRM_DEFAULT / _ALERTA_* son una referencia de mercado que se desactualiza con
+# el tiempo (no un límite físico) -- auditoría 27-ago-2026: la TRM oficial real
+# de ese día (verificada en vivo contra datos.gov.co) era 3.118,24, por debajo
+# del _ALERTA_BAJA anterior (3.800) y muy por debajo del TRM_DEFAULT anterior
+# (4.200) y del rango citado en el mensaje ("ref. 2025-2026: ~4.000-4.500") --
+# el widget mostraba una alerta falsa de "TRM parece baja" para la tasa oficial
+# correcta. Bajados con margen para no quedar obsoletos de nuevo con una
+# fluctuación normal del peso; si vuelven a quedar desalineados con la TRM real,
+# es un problema de mercado (hay que resubir el número), no de lógica.
+TRM_DEFAULT    = 3_900.0
 _KEY_VALOR     = "tipo_cambio"
 _KEY_FECHA     = "tipo_cambio_fecha"
 _KEY_FUENTE    = "tipo_cambio_fuente"
-_ALERTA_BAJA   = 3_800.0
+_ALERTA_BAJA   = 2_600.0
 _ALERTA_ALTA   = 6_000.0
 
 
@@ -230,7 +239,7 @@ def trm_widget(page_key: str = "default") -> float:
     # ── Alertas ───────────────────────────────────────────────────────────────
     if nuevo < _ALERTA_BAJA:
         st.warning(
-            f"⚠️ TRM {nuevo:,.0f} COP/USD parece baja (ref. 2025-2026: ~4.000–4.500). "
+            f"⚠️ TRM {nuevo:,.0f} COP/USD parece baja. "
             "Clica 🔄 para obtener el valor oficial del Banco de la República."
         )
     elif nuevo > _ALERTA_ALTA:
