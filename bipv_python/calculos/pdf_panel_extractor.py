@@ -317,7 +317,10 @@ _TABLE_LABEL_RE: dict = {
         r'|peak\s+power|rated\s+power'
         r'|maximum\s+power(?!\s+(?:volt|curr))', re.I | re.UNICODE),
     # Transparencia: para vidrio BIPV (fila puede venir reparada CON etiqueta)
-    "Transparencia": re.compile(r'transparen', re.I | re.UNICODE),
+    # "transp\." cubre el encabezado abreviado "Transp." (Solar First, tabla
+    # multi-modelo por fila) -- exige el punto para no matchear otras
+    # palabras que empiecen "transp" (p.ej. "transporte").
+    "Transparencia": re.compile(r'transparen|transp\.', re.I | re.UNICODE),
 }
 
 
@@ -496,14 +499,108 @@ def _dedupe_model_names(model_names: list, por_columna: list) -> list:
     return nuevos
 
 
+def _detectar_tabla_modelos_por_fila(table: list) -> dict:
+    """
+    Extrae modelos y parámetros de una tabla en orientación "por fila": cada
+    FILA es un modelo distinto (no cada COLUMNA, como en
+    _extract_multimodel_from_tables() Paso 1) -- formato típico de fichas de
+    familia con muchas variantes en una sola tabla vertical, p.ej.:
+        Modelo   | Transp. | Pmax | Voc   | Vmpp   | Isc    | Impp
+        ST1-72   | 10%     | 72 W | 116 V | 90.5 V | 0.88 A | 0.8 A
+        ST1-64   | 20%     | 64 W | 116 V | 90.5 V | 0.78 A | 0.71 A
+        ...
+
+    A diferencia del Paso 1 (que exige códigos de modelo "largos" vía
+    _MODEL_CODE_RE, ≥3 caracteres tras el guion -- pensado para nombres tipo
+    "CS6R-400MS"), aquí el nombre de modelo se toma literalmente de la
+    primera columna bajo el encabezado "Modelo"/"Model", sin exigir ningún
+    formato de código -- el propio encabezado ya desambigua cuál columna es
+    el nombre. Cubre códigos cortos como "ST1-72" (Solar First, solo 2
+    caracteres tras el guion) que _MODEL_CODE_RE rechaza.
+
+    Encontrado auditando por qué el extractor no identificaba NINGÚN
+    parámetro en la ficha Solar First ST1/ST2 (28-ago-2026, reportado por el
+    usuario con el CSV de verificación de la UI, los 5 campos obligatorios en
+    rojo): pdfplumber SÍ parseaba la tabla perfecto (confirmado con
+    _dump_tables_pdfplumber -- 11 filas limpias, columnas correctas), el bug
+    era que ningún criterio existente la reconocía como tabla multi-modelo
+    (ni el de Paso 1, por los códigos cortos; ni el heurístico de texto plano
+    de _extract_multimodel_panel(), porque la etiqueta "Pmax" vive en la fila
+    de encabezado, separada de los valores por N filas -- no en la misma
+    línea que exige ese heurístico).
+    """
+    EMPTY: dict = {"modelos_detectados": [], "valores_por_modelo": {}}
+    if not table or len(table) < 3:
+        return EMPTY
+
+    header_idx = -1
+    col_field: dict = {}   # índice de columna -> nombre de campo
+    for ri, row in enumerate(table):
+        if not row:
+            continue
+        cells = [unicodedata.normalize("NFC", str(c or "")).strip() for c in row]
+        if not cells or cells[0].lower() not in ("modelo", "model"):
+            continue
+        _map: dict = {}
+        for ci, cell in enumerate(cells[1:], start=1):
+            for field, pat in _TABLE_LABEL_RE.items():
+                if pat.search(cell):
+                    _map[ci] = field
+                    break
+        if len(_map) >= 2:   # al menos 2 campos reconocidos además de "Modelo"
+            header_idx = ri
+            col_field = _map
+            break
+
+    if header_idx == -1:
+        return EMPTY
+
+    model_names: list = []
+    valores_list: list = []
+    for row in table[header_idx + 1:]:
+        if not row:
+            break
+        cells = [unicodedata.normalize("NFC", str(c or "")).strip() for c in row]
+        if not cells or not cells[0]:
+            break   # fila vacía = fin de la tabla (siguiente sección de la ficha)
+        valores: dict = {}
+        for ci, field in col_field.items():
+            if ci >= len(cells):
+                continue
+            lo, hi = _MULTIMODEL_PLAUSIBLE.get(field, (0.0, 1e9))
+            for v in _nums_in(cells[ci]):
+                if lo <= v <= hi:
+                    valores[field] = v
+                    break
+        if "Pmax" not in valores:
+            continue   # fila sin Pmax reconocible no es un modelo real
+        model_names.append(cells[0])
+        valores_list.append(valores)
+
+    if len(model_names) < 2:
+        return EMPTY
+
+    model_names = _dedupe_model_names(model_names, valores_list)
+    return {
+        "modelos_detectados": model_names,
+        "valores_por_modelo": dict(zip(model_names, valores_list)),
+    }
+
+
 def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
     """
     Extrae modelos y parámetros directamente de tablas estructuradas con pdfplumber.
-    
+
     Estrategia: busca la fila donde ≥2 celdas son códigos de modelo.
     Luego asigna a cada columna el valor de las filas de parámetros (Pmax, Voc, …).
-    Este método es más robusto que el basado en texto plano cuando pdfplumber 
+    Este método es más robusto que el basado en texto plano cuando pdfplumber
     fragmenta columnas en líneas separadas.
+
+    Si esa estrategia (orientación "por columna": modelos en el encabezado,
+    campos en las filas) no encuentra nada, se intenta la orientación "por
+    fila" (modelos en las filas, campos en el encabezado) vía
+    _detectar_tabla_modelos_por_fila() -- ver su docstring para el caso real
+    que la motivó.
     """
     EMPTY: dict = {"modelos_detectados": [], "valores_por_modelo": {}, "shared_values": {}}
     if not _HAS_PDF:
@@ -537,6 +634,12 @@ def _extract_multimodel_from_tables(pdf_bytes: bytes) -> dict:
                             model_names = [c for _, c in codes]
 
                     if model_row_idx == -1 or len(model_names) < 2:
+                        # Orientación "por columna" no encontró nada -- intentar
+                        # "por fila" (ver _detectar_tabla_modelos_por_fila()).
+                        por_fila = _detectar_tabla_modelos_por_fila(table)
+                        if len(por_fila["modelos_detectados"]) >= 2:
+                            por_fila["shared_values"] = _extract_aux_table_shared(pdf_bytes)
+                            return por_fila
                         continue
 
                     n = len(model_names)
@@ -827,11 +930,17 @@ def _extract_brand(text: str) -> str:
         "CSUN", "Seraphim", "SunPower", "Panasonic", "LG", "BYD",
         "Hyundai", "Mitsubishi", "Sharp", "Kyocera", "GreenBrilliance",
         "Solartech Universal", "Vikram", "Waaree", "Adani", "Axitec",
-        "Aleo", "IBC Solar", "Solarwatt", "SolTech", "NCL",
+        "Aleo", "IBC Solar", "Solarwatt", "SolTech", "NCL", "Solar First",
+        "Suntech", "Hiitio",
     ]
     snippet = "\n".join(text.splitlines()[:20])
     for b in BRANDS:
-        if re.search(re.escape(b), snippet, re.IGNORECASE):
+        # \b...\b: sin límites de palabra, marcas cortas (LG, REC, NCL) hacen
+        # falso positivo dentro de palabras españolas que las contienen como
+        # substring (p.ej. "película delgada" -> "LG" via "de-LG-ada").
+        # Encontrado auditando la ficha Solar First (28-ago-2026): CdTe
+        # "película delgada" se detectaba como marca "LG".
+        if re.search(r'\b' + re.escape(b) + r'\b', snippet, re.IGNORECASE):
             return b
     return ""
 

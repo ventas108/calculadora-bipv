@@ -1,4 +1,5 @@
 """Loader Catalogo_Paneles_FV — estructura unificada con costos y parámetros IV."""
+import math
 import re
 import pandas as pd
 import streamlit as st
@@ -12,8 +13,21 @@ if not _os.path.exists(_EXCEL):
 _SHEET = "Catalogo_Paneles_FV"
 
 def _f(val, default=None):
-    try:    return float(val)
-    except: return default
+    # float(val) NO lanza excepción para NaN -- una celda vacía en una
+    # columna numérica pandas la lee como NaN (no None), así que sin el
+    # isfinite() de abajo esta función devolvía NaN en vez de `default`.
+    # Bug real encontrado el 28-ago-2026 insertando paneles nuevos vía
+    # guardar_panel_excel() con campos en None (Tk_gamma entre ellos):
+    # nan or -0.45 (idiom usado en calculos.produccion) da NaN, no -0.45,
+    # porque NaN es truthy en Python -- causaba
+    # "P_dc_kW contiene valores no finitos" en cualquier simulación con esos
+    # paneles. Mismo patrón que ya usa correctamente
+    # datos/catalogo_inversores_excel.py::_f(), aplicado aquí también.
+    try:
+        v = float(val)
+        return v if math.isfinite(v) else default
+    except (TypeError, ValueError):
+        return default
 
 def _parse_area(dims):
     if not dims or str(dims).strip() in ('', 'N/D', 'Variable'):

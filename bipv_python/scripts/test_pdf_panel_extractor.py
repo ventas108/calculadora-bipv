@@ -456,5 +456,70 @@ check("Multi-modelo real (sin ✓) sigue detectándose: 4 variantes",
       f"(obtuvo {_mm_real['modelos_detectados']})")
 
 # ═════════════════════════════════════════════════════════════════════════════
+# 9. Solar First ST1/ST2 — tabla multi-modelo "por fila" (10 variantes, código
+#    corto tipo "ST1-72" que _MODEL_CODE_RE rechaza) + falso positivo de marca
+#    "LG" dentro de "película delgada" (falló ago-2026)
+# ═════════════════════════════════════════════════════════════════════════════
+print("── Ficha 9: Solar First ST1/ST2 (tabla por fila + falso positivo de marca) ──")
+
+# 9.a Unitario: _detectar_tabla_modelos_por_fila() contra una tabla sintética
+# con la MISMA estructura real (encabezado "Modelo" + columnas, códigos
+# cortos de 2 caracteres tras el guion).
+_tabla_por_fila = [
+    ["Modelo", "Transp.", "Pmax", "Voc", "Vmpp", "Isc", "Impp", "Dimensiones"],
+    ["ST1-72", "10%", "72 W", "116 V", "90.5 V", "0.88 A", "0.8 A", "1200x600x6.8mm"],
+    ["ST1-64", "20%", "64 W", "116 V", "90.5 V", "0.78 A", "0.71 A", "1200x600x6.8mm"],
+    ["ST2-80", "No (opaco)", "80 W", "58.8 V", "47.4 V", "1.90 A", "1.68 A", "1200x600x6.8mm"],
+]
+_mm_fila = ex._detectar_tabla_modelos_por_fila(_tabla_por_fila)
+check("Tabla por fila: detecta las 3 filas como modelos",
+      _mm_fila["modelos_detectados"] == ["ST1-72", "ST1-64", "ST2-80"],
+      f"(obtuvo {_mm_fila['modelos_detectados']})")
+_v_st1_72 = _mm_fila["valores_por_modelo"].get("ST1-72", {})
+check("Tabla por fila: ST1-72 Pmax=72, Voc=116, Isc=0.88, Transp=10",
+      approx(_v_st1_72.get("Pmax"), 72.0) and approx(_v_st1_72.get("Voc"), 116.0)
+      and approx(_v_st1_72.get("Isc"), 0.88) and approx(_v_st1_72.get("Transparencia"), 10.0),
+      f"(obtuvo {_v_st1_72})")
+
+# 9.b Falso positivo de marca "LG" dentro de "película delgada"
+check("'película delgada' NO se detecta como marca 'LG'",
+      ex._extract_brand("Tecnología: CdTe, película delgada") == "",
+      f"(obtuvo {ex._extract_brand('Tecnología: CdTe, película delgada')!r})")
+# Control: "LG" como marca real (palabra propia, con límites) sigue detectándose
+check("'Panel LG NeON' sí detecta marca 'LG'",
+      ex._extract_brand("Panel LG NeON 2 400W") == "LG",
+      f"(obtuvo {ex._extract_brand('Panel LG NeON 2 400W')!r})")
+
+# 9.c E2E con el PDF real (aportado por el usuario, con el CSV de verificación
+# de la UI mostrando los 5 campos obligatorios en rojo -- 0 datos extraídos).
+_solarfirst_pdf = os.path.join(_FIXTURES, "panel_solarfirst_st1_st2.pdf")
+if os.path.exists(_solarfirst_pdf):
+    with open(_solarfirst_pdf, "rb") as f:
+        r_sf = ex.extraer_parametros_panel(f.read())
+    check("Solar First e2e (PDF real): marca = 'Solar First' (no 'LG')",
+          r_sf.get("marca") == "Solar First", f"(obtuvo {r_sf.get('marca')!r})")
+    check("Solar First e2e (PDF real): 10 modelos detectados",
+          set(r_sf["modelos_detectados"]) == {
+              "ST1-72", "ST1-64", "ST1-56", "ST1-48", "ST1-40",
+              "ST1-32", "ST1-24", "ST1-16", "ST2-80", "ST2-85",
+          }, f"(obtuvo {r_sf['modelos_detectados']})")
+    _vpm_sf = r_sf["valores_por_modelo"]
+    check("Solar First e2e: ST1-72 Pmax=72, Voc=116, Vmp=90.5, Isc=0.88, Imp=0.80",
+          approx(_vpm_sf.get("ST1-72", {}).get("Pmax"), 72.0)
+          and approx(_vpm_sf.get("ST1-72", {}).get("Voc"), 116.0)
+          and approx(_vpm_sf.get("ST1-72", {}).get("Vmp"), 90.5)
+          and approx(_vpm_sf.get("ST1-72", {}).get("Isc"), 0.88)
+          and approx(_vpm_sf.get("ST1-72", {}).get("Imp"), 0.80),
+          f"(obtuvo {_vpm_sf.get('ST1-72')})")
+    check("Solar First e2e: ST2-85 Pmax=85, Voc=60.2, Isc=1.97 (opaco, sin Transparencia)",
+          approx(_vpm_sf.get("ST2-85", {}).get("Pmax"), 85.0)
+          and approx(_vpm_sf.get("ST2-85", {}).get("Voc"), 60.2)
+          and approx(_vpm_sf.get("ST2-85", {}).get("Isc"), 1.97)
+          and "Transparencia" not in _vpm_sf.get("ST2-85", {}),
+          f"(obtuvo {_vpm_sf.get('ST2-85')})")
+else:
+    print("  (fixture panel_solarfirst_st1_st2.pdf ausente — e2e omitido)")
+
+# ═════════════════════════════════════════════════════════════════════════════
 print(f"\n{'='*60}\nRESULTADO: {PASS} OK · {FAIL} FALLOS")
 sys.exit(1 if FAIL else 0)
