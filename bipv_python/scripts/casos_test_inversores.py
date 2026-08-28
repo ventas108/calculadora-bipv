@@ -1263,14 +1263,14 @@ Rated AC output power: 30000W
     },
 
     # ─────────────────────────────────────────────────────────────────────────
-    # #182 — Woodward IDS SOLO 500: ficha PVsyst en español exportada del .OND
+    # #182 — Woodward IDS SOLO 500: ficha en formato INNOVAQ en español
     # (central/utility, 500-600 kW, SIN trackers MPPT discretos). Reportado por
     # el usuario (28-ago-2026): "Voltaje FV máximo absoluto" / "Voltaje MPP
     # mínimo"+"Voltaje MPP máximo" (filas separadas, no rango combinado) /
     # "Potencia FV máxima ... kW" no matcheaban ningún patrón existente.
     #
-    # V_arranque, n_trackers, n_strings_tracker quedan None a propósito: PVsyst
-    # mismo (ver el análisis del usuario) confirma que este .OND no los publica.
+    # V_arranque, n_trackers, n_strings_tracker quedan None a propósito: la
+    # ficha original (ver el análisis del usuario) confirma que no se publican.
     # I_max_tracker/Isc_max_tracker TAMBIÉN quedan None a propósito -- NO es un
     # dato ausente que haya que "resolver" con un alias: "Corriente de entrada
     # máxima" (1140 A) es la corriente TOTAL del equipo (inversor central sin

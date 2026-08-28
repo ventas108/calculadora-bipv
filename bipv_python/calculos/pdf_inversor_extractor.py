@@ -148,17 +148,18 @@ _UMAX_RE = re.compile(
     r"U_?(?:MPP|mpp|DC|dc),?\s*max\.?\s*[:\(=]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",
     re.IGNORECASE,
 )
-# PVsyst español (ficha exportada del .OND): "Voltaje MPP mínimo 500 V" /
-# "Voltaje MPP máximo 1100 V" -- filas SEPARADAS, no un rango "X ~ Y V" en una
-# sola línea, así que _RANGE_RE nunca las captura. Reportado por el usuario
-# (28-ago-2026), ficha Woodward IDS SOLO 500. La palabra "MPP" entre "Voltaje"
-# y "mínimo/máximo" evita cruzarse con "Voltaje mínimo para Pnom" (campo
-# distinto, mismo valor numérico en esta ficha pero otro significado).
-_PVSYST_MPPMIN_RE = re.compile(
+# Formato INNOVAQ (ficha en español con voltaje MPP en filas separadas):
+# "Voltaje MPP mínimo 500 V" / "Voltaje MPP máximo 1100 V" -- filas
+# SEPARADAS, no un rango "X ~ Y V" en una sola línea, así que _RANGE_RE nunca
+# las captura. Reportado por el usuario (28-ago-2026), ficha Woodward IDS
+# SOLO 500. La palabra "MPP" entre "Voltaje" y "mínimo/máximo" evita
+# cruzarse con "Voltaje mínimo para Pnom" (campo distinto, mismo valor
+# numérico en esta ficha pero otro significado).
+_INNOVAQ_MPPMIN_RE = re.compile(
     r"Voltaje\s+MPP\s+m[ií]nimo\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",
     re.IGNORECASE,
 )
-_PVSYST_MPPMAX_RE = re.compile(
+_INNOVAQ_MPPMAX_RE = re.compile(
     r"Voltaje\s+MPP\s+m[aá]ximo\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",
     re.IGNORECASE,
 )
@@ -200,15 +201,15 @@ def _find_range(label_patterns, text, use_sma_fallback=True):
     if not use_sma_fallback:
         return (None, None)
 
-    # Gap 2: fallback para fichas SMA/Fronius/PVsyst-español con min y max en
-    # líneas separadas (ver _PVSYST_MPPMIN_RE/_PVSYST_MPPMAX_RE)
+    # Gap 2: fallback para fichas SMA/Fronius/formato INNOVAQ con min y max
+    # en líneas separadas (ver _INNOVAQ_MPPMIN_RE/_INNOVAQ_MPPMAX_RE)
     lo_sep = hi_sep = None
-    for pat in (_SMA_MIN_RE, _UMIN_RE, _PVSYST_MPPMIN_RE):
+    for pat in (_SMA_MIN_RE, _UMIN_RE, _INNOVAQ_MPPMIN_RE):
         m = pat.search(text)
         if m:
             lo_sep = _num(m.group(1))
             break
-    for pat in (_SMA_MAX_RE, _UMAX_RE, _PVSYST_MPPMAX_RE):
+    for pat in (_SMA_MAX_RE, _UMAX_RE, _INNOVAQ_MPPMAX_RE):
         m = pat.search(text)
         if m:
             hi_sep = _num(m.group(1))
@@ -261,7 +262,7 @@ _PAT_VDCMAX = [
     # Huawei español: "Tensión máxima de entrada 1 1100 V" (el '1' suelto es nota al pie)
     (r"Tensi[oó]n\s+m[aá]xima\s+de\s+entrada(?:\s+\d)?\s+([0-9]{3,4})\s*V",       1),
     (r"Tensi[oó]n\s+M[aá]xima?\s+(?:FV|PV|Entrada)\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
-    # PVsyst español (ficha exportada del .OND, Woodward/otros): "Voltaje FV
+    # Formato INNOVAQ (ficha en español, Woodward/otros): "Voltaje FV
     # máximo absoluto 1200 V" -- reportado por el usuario (28-ago-2026), ficha
     # Woodward IDS SOLO 500, verificado que ninguna variante Vdc_max existente
     # matcheaba este orden de palabras ("FV máximo absoluto" vs "máxima de
@@ -1350,7 +1351,7 @@ def _extraer_campos(texto: str) -> dict:
             if v and 0 < v < 10000:  # sanity: valor razonable en kW
                 p_kw_converted = v * 1000
 
-    # Intento 2b: PVsyst español (ficha exportada del .OND): "Potencia FV
+    # Intento 2b: formato INNOVAQ (ficha en español): "Potencia FV
     # máxima 600 kW" -- reportado por el usuario (28-ago-2026), ficha Woodward
     # IDS SOLO 500. Distinto de "Potencia FV nominal (especificación
     # contractual)" (508 kW en esa misma ficha, otro campo) -- el patrón exige
