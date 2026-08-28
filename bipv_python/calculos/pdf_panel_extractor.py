@@ -223,12 +223,51 @@ _MULTIMODEL_PLAUSIBLE: dict = {
 }
 
 
+# Un número seguido (con o sin unidad corta de por medio: mA, mV, %, ...) de
+# "/°C", "/℃" (glifo único, visto en fichas SolTech reales) o "/K" es un
+# COEFICIENTE de temperatura, nunca el valor absoluto de un modelo -- aunque
+# caiga dentro del rango numérico plausible de Pmax/Voc/Isc/Vmp/Imp. Ver el
+# uso en _extract_row_numbers().
+_COEF_UNIT_AHEAD_RE = re.compile(r'^\s*[a-zA-Z%µμ]{0,3}\s*(?:/\s*[°ºoO]?\s*[CK]\b|℃)')
+
+
 def _extract_row_numbers(line: str, from_pos: int = 0) -> list:
     """
     Extrae todos los números de una línea a partir de `from_pos`.
     Maneja valores con unidades embebidas: '327.8W', '124.2V', '3.74A', '1A'.
+
+    Dos filtros para no confundir anotaciones/coeficientes con columnas de
+    modelo real -- generalizados a partir de un bug real reportado por el
+    usuario con la ficha Suntech STP-410-A72-Pnh-Bifacial (28-ago-2026),
+    donde la fila "Coeficiente de temperatura µIsc  5.2 mA/°C  (+0.050 %/°C)"
+    se leyó como si fueran 2 columnas de modelo con Isc=5.2 y Isc=0.05,
+    sobrescribiendo el Isc real (10.49 A) ya extraído correctamente:
+
+    1. Corta el segmento en el primer '✓' -- fichas con auto-verificación
+       cruzada (p.ej. "Potencia máxima calculada (Vmpp × Impp) 410.18 W
+       ✓ coincide con 410.0 Wp") re-citan el mismo valor dentro de la nota.
+
+    2. Descarta cualquier número seguido de una unidad de coeficiente por
+       grado ("mA/°C", "V/°C", "%/°C", "/K", con o sin el símbolo de grado,
+       con o sin unidad corta antepuesta) -- no es específico del caso ✓:
+       una fila de coeficiente SIN checkmark ("Isc temp. coefficient 5.2
+       mA/°C") tiene el mismo riesgo si alguna vez queda dentro del barrido
+       de una tabla multi-modelo detectada por códigos de modelo reales (no
+       por el fallback numérico que ya corta en ✓). Pedido explícito del
+       usuario tras el hallazgo: "revisa la lógica del extractor para que
+       no confunda coeficientes de temperatura con valores absolutos... es
+       un error que se puede repetir con cualquier otra ficha".
     """
-    return [float(m) for m in re.findall(r'([0-9]+(?:\.[0-9]+)?)', line[from_pos:])]
+    segmento = line[from_pos:]
+    corte = segmento.find("✓")
+    if corte != -1:
+        segmento = segmento[:corte]
+    numeros = []
+    for m in re.finditer(r'([0-9]+(?:\.[0-9]+)?)', segmento):
+        if _COEF_UNIT_AHEAD_RE.match(segmento[m.end():]):
+            continue
+        numeros.append(float(m.group(1)))
+    return numeros
 
 
 # Reconocimiento de campo por abreviatura entre paréntesis — máxima prioridad,

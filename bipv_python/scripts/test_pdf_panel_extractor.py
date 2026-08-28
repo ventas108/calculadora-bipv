@@ -369,5 +369,92 @@ check("Dedupe sin Pmax → numeración", _nombres == ["AA-1 (var. 1)", "AA-1 (va
       f"(obtuvo {_nombres})")
 
 # ═════════════════════════════════════════════════════════════════════════════
+# 8. Suntech STP-410-A72-Pnh-Bifacial — falso "multi-modelo" por auto-verificación
+#    (falló ago-2026: 1 solo panel detectado como "2 modelos" 410.18Wp/410Wp)
+# ═════════════════════════════════════════════════════════════════════════════
+print("── Ficha 8: Suntech STP-410 (falso multi-modelo por nota ✓) ──")
+
+# La ficha real trae, en la MISMA línea del valor de Pmax, una nota de
+# auto-verificación cruzada que re-cita el mismo valor redondeado:
+# "Potencia máxima calculada (Vmpp × Impp) 410.18 W ✓ coincide con 410.0 Wp".
+# Antes del fix, _extract_row_numbers() tomaba TODOS los números de la línea
+# (410.18 Y el 410.0 de la nota) como si fueran 2 columnas de modelo distinto.
+_texto_suntech = """
+Ficha Técnica — Módulo Fotovoltaico Bifacial
+Suntech STP-410-A72-Pnh-Bifacial
+1. Identificación del producto
+Potencia nominal (STC)    410.0 Wp  (tolerancia -0.0% / +3.0%)
+2. Parámetros eléctricos en condiciones STC
+Corriente de cortocircuito (Isc)    10.490 A
+Voltaje de circuito abierto (Voc)    48.90 V
+Corriente en punto de máxima potencia (Impp)    9.980 A
+Voltaje en punto de máxima potencia (Vmpp)    41.10 V
+Potencia máxima calculada (Vmpp × Impp)    410.18 W  ✓ coincide con 410.0 Wp
+4. Eficiencia (verificación cruzada)
+Eficiencia sobre área de módulo    20.19 %  ✓ (410 W / 2.032 m² / 10)
+"""
+_mm_suntech = ex._extract_multimodel_panel(_texto_suntech)
+check("Suntech: NO detecta multi-modelo falso (ficha de 1 solo panel)",
+      _mm_suntech["modelos_detectados"] == [], f"(obtuvo {_mm_suntech['modelos_detectados']})")
+
+# E2E con el PDF real (aportado por el usuario tras reportar el bug, con Isc
+# también corrompido -- ver abajo). Antes del fix: modelos_detectados =
+# ['410.18Wp', '410Wp'] y, al elegir "410Wp" en la UI, el merge de la página
+# sobrescribía el Isc YA correcto (10.49 A) con el 0.05 A falso que salía de
+# la MISMA línea de coeficiente de temperatura ("µIsc 5.2 mA/°C (+0.050
+# %/°C)") mal interpretada como 2 columnas de Isc -- reportado por el usuario
+# como "Isc = 0.05 A" en el formulario. Verificado con el PDF real que el fix
+# de _extract_row_numbers() resuelve TODO el cascade (Pmax e Isc), no solo Pmax.
+_suntech_pdf = os.path.join(_FIXTURES, "panel_suntech_stp410_bifacial.pdf")
+if os.path.exists(_suntech_pdf):
+    with open(_suntech_pdf, "rb") as f:
+        r_suntech = ex.extraer_parametros_panel(f.read())
+    check("Suntech e2e (PDF real): NO detecta multi-modelo falso",
+          r_suntech["modelos_detectados"] == [], f"(obtuvo {r_suntech['modelos_detectados']})")
+    check("Suntech e2e (PDF real): Isc = 10.49 (no 0.05 del coef. de temperatura)",
+          approx(r_suntech.get("Isc"), 10.49), f"(obtuvo {r_suntech.get('Isc')})")
+    check("Suntech e2e (PDF real): Pmax = 410.0",
+          approx(r_suntech.get("Pmax"), 410.0), f"(obtuvo {r_suntech.get('Pmax')})")
+    check("Suntech e2e (PDF real): Voc = 48.9",
+          approx(r_suntech.get("Voc"), 48.9), f"(obtuvo {r_suntech.get('Voc')})")
+    check("Suntech e2e (PDF real): Vmp = 41.1",
+          approx(r_suntech.get("Vmp"), 41.1), f"(obtuvo {r_suntech.get('Vmp')})")
+    check("Suntech e2e (PDF real): Imp = 9.98",
+          approx(r_suntech.get("Imp"), 9.98), f"(obtuvo {r_suntech.get('Imp')})")
+else:
+    print("  (fixture panel_suntech_stp410_bifacial.pdf ausente — e2e omitido)")
+
+# Generalización pedida explícitamente por el usuario: "revisa la lógica del
+# extractor para que no confunda coeficientes de temperatura con valores
+# absolutos... es un error que se puede repetir con cualquier otra ficha".
+# El fix inicial solo cortaba en '✓'; esto prueba el caso SIN checkmark: una
+# fila de coeficiente de temperatura (mA/°C, V/°C) que aparece ANTES de la
+# fila real en una tabla multi-modelo genuina (2 modelos con códigos reales,
+# no el fallback numérico) no debe robarle la asignación a la fila correcta.
+_texto_coef_sin_check = """
+CS6R-400MS  CS6R-410MS
+Pmax  400  410
+Isc temperature coefficient 5.2 mA/°C 6.1 mA/°C
+Isc  10.20  10.45
+"""
+_mm_coef = ex._extract_multimodel_panel(_texto_coef_sin_check)
+_isc_400 = _mm_coef["valores_por_modelo"].get("CS6R-400MS", {}).get("Isc")
+_isc_410 = _mm_coef["valores_por_modelo"].get("CS6R-410MS", {}).get("Isc")
+check("Coeficiente sin ✓ (mA/°C) no roba la fila real de Isc",
+      approx(_isc_400, 10.20) and approx(_isc_410, 10.45),
+      f"(obtuvo CS6R-400MS={_isc_400}, CS6R-410MS={_isc_410})")
+
+# Control: una ficha multi-modelo REAL (sin notas ✓) debe seguir detectándose
+# por la misma vía de fallback numérico -- el fix no debe volverse tan
+# agresivo que rompa el caso legítimo que la vía existe para cubrir.
+_texto_multi_real = """
+Potencia nominal (Pm)  108W  95W  83W  60W
+"""
+_mm_real = ex._extract_multimodel_panel(_texto_multi_real)
+check("Multi-modelo real (sin ✓) sigue detectándose: 4 variantes",
+      set(_mm_real["modelos_detectados"]) == {"108Wp", "95Wp", "83Wp", "60Wp"},
+      f"(obtuvo {_mm_real['modelos_detectados']})")
+
+# ═════════════════════════════════════════════════════════════════════════════
 print(f"\n{'='*60}\nRESULTADO: {PASS} OK · {FAIL} FALLOS")
 sys.exit(1 if FAIL else 0)
