@@ -301,6 +301,17 @@ with col1:
         st.session_state.pop("densidad_Wm2", None)
         st.session_state.pop("PR", None)
         st.session_state.pop("tilt_default", None)
+        # Bug real (29-ago-2026): el factor de ocupación (<100%, "resto queda
+        # libre para el cultivo") NO se reseteaba al cambiar de tipo -- un
+        # valor dejado de una Granja fotovoltaica (donde <100% es normal)
+        # sobrevivía al cambiar a Fachada BIPV u otro tipo de techo/fachada
+        # dedicado, mostrando el mensaje de "cultivo" en un proyecto que no
+        # tiene nada de agrícola. Solo "Granja fotovoltaica" usa <100% de
+        # forma habitual (ver ayuda del campo abajo); cualquier otro tipo se
+        # resetea a 100% al cambiar.
+        if tipo_instalacion != "Granja fotovoltaica":
+            st.session_state["factor_ocupacion_pct"] = 100.0
+            st.session_state.pop("area_util_m2", None)
 
     area = st.number_input(
         "Área de instalación disponible (m²)",
@@ -330,11 +341,23 @@ with col1:
     area_util = area * factor_ocupacion / 100.0
     st.session_state["area_util_m2"] = area_util
     if factor_ocupacion < 100.0:
-        st.caption(
-            f"🌱 Área efectiva de paneles: **{area_util:,.0f} m²** "
-            f"({factor_ocupacion:.0f}% de {area:,.0f} m²) — "
-            f"el {100 - factor_ocupacion:.0f}% restante queda libre para el cultivo."
-        )
+        # El mensaje de "cultivo" solo aplica a Granja fotovoltaica -- ver el
+        # bug real corregido arriba (reset al cambiar de tipo). Para
+        # cualquier otro tipo con <100% (ej. el usuario lo bajó a mano para
+        # una fachada con ventanas/obstáculos), texto neutro sin agricultura.
+        if tipo_instalacion == "Granja fotovoltaica":
+            st.caption(
+                f"🌱 Área efectiva de paneles: **{area_util:,.0f} m²** "
+                f"({factor_ocupacion:.0f}% de {area:,.0f} m²) — "
+                f"el {100 - factor_ocupacion:.0f}% restante queda libre para el cultivo."
+            )
+        else:
+            st.caption(
+                f"ℹ️ Área efectiva de paneles: **{area_util:,.0f} m²** "
+                f"({factor_ocupacion:.0f}% de {area:,.0f} m²) — "
+                f"el {100 - factor_ocupacion:.0f}% restante no se cubre con paneles "
+                f"(huecos, elementos estructurales u obstáculos de la instalación)."
+            )
 
     # ── Inputs adicionales Modo Consumo ──────────────────────────────────────
     consumo_mes   = 0.0

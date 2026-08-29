@@ -108,7 +108,7 @@ En Página 1 — Proyecto, cuando el tipo de instalación es "Granja fotovoltaic
 
 ────────────────────────────────────────────────────────────
 
-## 3. Página 1 — Proyecto
+## 3. Página 1 — Proyecto  ACTUALIZADO
 
 Propósito: Registrar los datos básicos del proyecto y configurar el tipo de instalación que determina los parámetros por defecto del sistema.
 
@@ -191,6 +191,10 @@ Nuevo campo "Factor de ocupación con paneles (%)" (rango 5–100, por defecto 1
 - Ejemplo: terreno de 3 000 m² con factor 30% → 900 m² útiles para paneles (~340 paneles en vez de ~1 040) y 2 100 m² libres para el cultivo.
 - El factor se guarda en el proyecto (proyecto_actual.json) y se restaura al recargarlo.
 ⚠️ Para no cometer errores: si tu proyecto es una granja con cultivo, ajusta el factor ANTES de pasar a Dimensionamiento. Si lo dejas en 100%, el conteo de paneles, el presupuesto y el USD/m² se calcularán como si todo el terreno llevara paneles.
+
+**Bug real corregido: el factor de ocupación no se reseteaba al cambiar de tipo de instalación (29-ago-2026)**: el usuario notó, validando la fachada Teusaquillo (97 m²), que el mensaje de "el resto queda libre para el cultivo" aparecía ahí — una fachada BIPV no tiene absolutamente nada que ver con agricultura. Causa: al cambiar "Tipo de instalación" (ej. de una Granja fotovoltaica ya explorada, donde 90% de ocupación es un valor razonable, a Fachada BIPV), el reset de defaults al cambiar de tipo (línea ~300) solo limpiaba `densidad_Wm2`/`PR`/`tilt_default` — **nunca** `factor_ocupacion_pct`, que quedaba pegado al valor del tipo anterior. Además, el mensaje siempre usaba lenguaje de "cultivo" sin importar el tipo, aunque el propio tooltip del campo ya documentaba 3 significados distintos según tipo (🌱 agrivoltaica 25–35% / ☀️ granja FV convencional 40–60% / 🏠 techo-fachada dedicados 100%).
+
+**Corregido**: (1) cambiar de tipo ahora también resetea `factor_ocupacion_pct` a 100% para cualquier tipo que NO sea "Granja fotovoltaica" (el único tipo de la lista donde <100% es habitual); (2) el mensaje/caption de "cultivo" solo se muestra si el tipo activo es "Granja fotovoltaica" — para cualquier otro tipo con <100% (ej. el usuario lo bajó a mano por ventanas/obstáculos de una fachada), se muestra un texto neutro ("el resto no se cubre con paneles"), sin mencionar agricultura. Aplicado en 🏠 Proyecto (origen del campo) y en 📐 Dimensionamiento (que repite el aviso al calcular). La visualización 3D dedicada de granja agrivoltaica en 🗺️ Vista 3D (corredores de cultivo, suelo verde) es un renderer aparte, específico de ese modo -- no se tocó, no tiene este bug.
 
 ────────────────────────────────────────────────────────────
 
@@ -2697,7 +2701,9 @@ Tests: se actualizaron 2 aserciones que asumían el catálogo viejo de 7 paneles
 
 Manual actualizado el 29 de agosto de 2026
 
-Novedades de esta versión: 📐 Dimensionamiento — corregido bug real, propio, en la sugerencia de "N total de cadenas" agregada hace un momento: `N_paneles_granja` no se invalidaba al cambiar de inversor, así que un total viejo (ej. 126 paneles de un SNA-3K ya explorado) se combinaba con el N/string del inversor NUEVO (ej. 7 de un TriP 6K-HV), dando una "sugerencia real" que no correspondía a ningún diseño real. Corregido con `N_paneles_granja_inversor_ref` -- la fuente real solo se usa si ese inversor sigue siendo el seleccionado; si no, cae al respaldo por área y avisa que hay un total guardado pero de otro inversor. Ver sección 6.
+Novedades de esta versión: 🏠 Proyecto/📐 Dimensionamiento — corregido bug real: el mensaje "el resto queda libre para el cultivo" (factor de ocupación <100%) aparecía para CUALQUIER tipo de instalación, incluida una fachada BIPV (Teusaquillo) sin nada de agrícola -- porque `factor_ocupacion_pct` no se reseteaba al cambiar "Tipo de instalación" (solo se reseteaban densidad/PR/tilt), y el mensaje nunca distinguía el tipo. Corregido: se resetea a 100% al cambiar a cualquier tipo que no sea "Granja fotovoltaica", y el texto de "cultivo" solo se muestra para ese tipo -- el resto usa un mensaje neutro. Ver sección 3.
+
+Versión anterior (29 de agosto de 2026): 📐 Dimensionamiento — corregido bug real, propio, en la sugerencia de "N total de cadenas" agregada hace un momento: `N_paneles_granja` no se invalidaba al cambiar de inversor, así que un total viejo (ej. 126 paneles de un SNA-3K ya explorado) se combinaba con el N/string del inversor NUEVO (ej. 7 de un TriP 6K-HV), dando una "sugerencia real" que no correspondía a ningún diseño real. Corregido con `N_paneles_granja_inversor_ref` -- la fuente real solo se usa si ese inversor sigue siendo el seleccionado; si no, cae al respaldo por área y avisa que hay un total guardado pero de otro inversor. Ver sección 6.
 
 Versión anterior (29 de agosto de 2026): 📐 Dimensionamiento — "N total de cadenas para el proyecto" no tenía NINGUNA orientación hasta que el usuario, probando un inversor pequeño (SNA-3K), preguntó explícitamente si algo debía guiar ese número. Agregada una sugerencia informativa (caption + tooltip, nunca se autocompleta) con 2 fuentes por prioridad: (1) idea del propio usuario — reusar `N_paneles_granja // N_serie`, el MISMO cálculo real que ya usa ⚡ Diagrama Unifilar, disponible tras correr "▶️ Optimizar N paneles/string"; (2) respaldo por área (`área útil ÷ área del panel ÷ N/string`) cuando (1) todavía no existe. Ver sección 6.
 
