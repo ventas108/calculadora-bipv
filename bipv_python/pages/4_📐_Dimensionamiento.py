@@ -228,8 +228,32 @@ with col2:
     T_extr   = st.number_input("T_celda caliente extremo (°C)", key="T_cel_extremo",
                 help="T_amb máxima histórica + (NOCT-20)/800×1000 W/m². Determina Vmp mínimo (peor caso MPPT).")
     # N_strings/tracker: dos mecanismos posibles, ver docstring de
-    # resolver_n_strings_tracker() para la comparación honesta contra PVsyst
-    # que motivó agregar el mecanismo "total" (29-ago-2026).
+    # resolver_n_strings_tracker() para la comparación honesta contra la
+    # referencia estándar internacional que motivó agregar el mecanismo
+    # "total" (29-ago-2026).
+    #
+    # Sugerencia orientativa del total a partir del área disponible -- antes
+    # este campo no tenía NINGUNA orientación (ni el área, ni ningún otro
+    # dato del proyecto lo sugería), había que escribir un número a ciegas.
+    # Usa el N/string ya confirmado si existe (de una corrida anterior de
+    # "Optimizar N paneles/string" o del mapeo), o si no, la misma
+    # estimación eléctrica mínima que calcula "N mínimo a explorar" más
+    # abajo. Es solo orientativo (no considera un layout físico real de
+    # paneles en la fachada) -- NO se autocompleta en el campo, es
+    # puramente informativo para no partir de cero sin ninguna pista.
+    _area_bruta_sug = float(st.session_state.get("area_fachada_m2", 97.34))
+    _f_ocup_sug = float(st.session_state.get("factor_ocupacion_pct", 100.0))
+    _area_util_sug = _area_bruta_sug * _f_ocup_sug / 100.0
+    _vmppt_min_sug = inversor.get("Vmppt_activo_min") or inversor.get("Vmppt_min") or 0
+    _vmp_panel_sug = panel.get("Vmp_stc") or panel.get("Vmp") or 1
+    _n_serie_elec_sug = max(1, math.ceil(_vmppt_min_sug / _vmp_panel_sug)) if _vmppt_min_sug else 8
+    _n_serie_sug = int(st.session_state.get("N_serie") or _n_serie_elec_sug)
+    _area_panel_sug = float(panel.get("area_m2") or 0)
+    _total_cadenas_sug = (
+        int(_area_util_sug / _area_panel_sug / _n_serie_sug)
+        if _area_panel_sug and _n_serie_sug else 0
+    )
+
     N_total_cadenas = st.number_input(
         "N total de cadenas para el proyecto (opcional — referencia estándar internacional)",
         min_value=0, value=int(st.session_state.get("N_total_cadenas_proyecto", 0)),
@@ -242,8 +266,22 @@ with col2:
             "Déjalo en 0 para que la app siga sugiriendo el máximo que "
             "soporta el inversor según el catálogo (mejor cuando aún estás "
             "explorando cuánto cabe, no verificando un diseño ya decidido)."
+            + (
+                f"  \n💡 Orientación desde el área disponible ({_area_util_sug:.0f} m²) "
+                f"con ≈{_n_serie_sug} módulos/string: un total de ~{_total_cadenas_sug} "
+                "cadenas llenaría aproximadamente esa área -- no es un cálculo de "
+                "layout físico exacto, solo una referencia para no partir de un "
+                "número a ciegas."
+                if _total_cadenas_sug > 0 else ""
+            )
         ),
     )
+    if _total_cadenas_sug > 0 and int(N_total_cadenas) == 0:
+        st.caption(
+            f"💡 Orientación (no vinculante): con {_area_util_sug:.0f} m² disponibles "
+            f"y ≈{_n_serie_sug} módulos/string, un total de **~{_total_cadenas_sug} "
+            "cadenas** llenaría aproximadamente esa área."
+        )
     _res_n_str_tr = resolver_n_strings_tracker(
         inversor, inversor_nombre, st.session_state, N_total_cadenas=int(N_total_cadenas)
     )
