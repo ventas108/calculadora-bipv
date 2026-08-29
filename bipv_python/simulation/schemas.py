@@ -225,6 +225,16 @@ class FinancialResult:
     beneficios_1715: dict | None   # None si aplicar_ley_1715=False
     flujos: list[dict]             # calculos.financiero.calcular_flujo_caja()
     metricas: dict                 # calculos.financiero.calcular_metricas()
+    # None si no aplica; string de advertencia si P_dc_stc_kW supera
+    # datos.ciudades_colombia.LEY_1715["potencia_maxima_autoconsumo_kW"]
+    # (1.000 kW) con aplicar_ley_1715=True -- ver run_financial_simulation().
+    # Ese umbral existía en el repo desde antes de esta sesión pero no se
+    # usaba en ningún lado (hallazgo real, verificado con `grep`, 28-ago-2026):
+    # un proyecto de varios MW podía calcular sus beneficios de Ley 1715 con
+    # el régimen de "autoconsumo a pequeña escala" sin ninguna advertencia,
+    # aunque el régimen fiscal/regulatorio real para generación a gran escala
+    # puede ser distinto.
+    advertencia_ley_1715: str | None = None
 
     @property
     def npv_usd(self) -> float:

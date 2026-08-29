@@ -197,8 +197,49 @@ def test_run_financial_simulation_sin_ley_1715(tmy_bogota):
     )
     r = run_financial_simulation(energy, fin_config)
     assert r.beneficios_1715 is None
+    assert r.advertencia_ley_1715 is None
     # Sin beneficios, el desembolso neto del año 0 es el CAPEX completo.
     assert r.flujos[0]["flujo_usd"] == pytest.approx(-50_000.0)
+
+
+def test_advertencia_ley_1715_umbral_autoconsumo_pequena_escala(tmy_bogota):
+    # Hallazgo real (28-ago-2026): datos.ciudades_colombia.LEY_1715 ya traía
+    # "potencia_maxima_autoconsumo_kW"=1000 desde antes, pero ningún cálculo
+    # lo usaba -- un proyecto de varios MW podía mostrar beneficios Ley 1715
+    # calculados con el modelo de autoconsumo a pequeña escala sin ninguna
+    # advertencia de que el régimen real para generación a gran escala puede
+    # ser distinto. No se bloquea ni se recalcula con otro régimen (esta app
+    # no lo modela) -- solo se advierte.
+    from datos.ciudades_colombia import LEY_1715
+    umbral_kW = LEY_1715["potencia_maxima_autoconsumo_kW"]
+    assert umbral_kW == 1000
+
+    # Config pequeña (muy por debajo del umbral) -- NO debe advertir.
+    energy_chico = run_bipv_simulation(_config_base(), tmy=tmy_bogota)
+    assert energy_chico.P_dc_stc_kW < umbral_kW
+    r_chico = run_financial_simulation(
+        energy_chico,
+        FinancialConfiguration(capex_usd=50_000.0, tarifa_cop_kWh=750.0, tipo_cambio=4000.0),
+    )
+    assert r_chico.advertencia_ley_1715 is None
+
+    # Config de mega-proyecto (N_inversores alto, mismo patrón que el test de
+    # multi-inversor de arriba) -- SÍ debe superar el umbral y advertir.
+    config_mega = dataclasses.replace(
+        _config_base(), tilt=20.0, area_m2=2100.0,
+        N_serie=8, N_strings_tracker=10, N_inversores=600,   # ~1.2 MWp
+    )
+    energy_mega = run_bipv_simulation(config_mega, tmy=tmy_bogota)
+    assert energy_mega.P_dc_stc_kW > umbral_kW
+    r_mega = run_financial_simulation(
+        energy_mega,
+        FinancialConfiguration(capex_usd=energy_mega.P_dc_stc_kW * 1000 * 0.6, tarifa_cop_kWh=650.0, tipo_cambio=4000.0),
+    )
+    assert r_mega.advertencia_ley_1715 is not None
+    assert "1,000 kW" in r_mega.advertencia_ley_1715 or "1000" in r_mega.advertencia_ley_1715
+    assert f"{energy_mega.P_dc_stc_kW:,.0f}" in r_mega.advertencia_ley_1715
+    # Los beneficios siguen calculándose -- la advertencia no bloquea nada.
+    assert r_mega.beneficios_1715 is not None
 
 
 def test_mayor_capex_empeora_payback_pero_no_cambia_produccion(tmy_bogota):

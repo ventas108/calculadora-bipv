@@ -15,6 +15,7 @@ from calculos.financiero import (
 )
 from calculos.trm_utils import init_trm, trm_widget
 from calculos.tarifa_utils import init_tarifa, tarifa_widget
+from datos.ciudades_colombia import LEY_1715
 
 st.set_page_config(page_title="Financiero — BIPV", page_icon="💰", layout="wide")
 
@@ -1003,6 +1004,22 @@ with col_l2:
         tipo_cambio      = tipo_cambio,
         tasa_descuento   = tasa_desc / 100,
     )
+
+    # Umbral regulatorio real de "autoconsumo a pequeña escala" (dato ya
+    # existente en datos.ciudades_colombia.LEY_1715, sin usar en ningún
+    # cálculo hasta ahora -- hallazgo real, 28-ago-2026). No se bloquea ni
+    # se recalculan los beneficios con otro régimen -- solo se advierte.
+    _umbral_kW_1715 = LEY_1715["potencia_maxima_autoconsumo_kW"]
+    if p_stc > _umbral_kW_1715:
+        st.warning(
+            f"⚠️ Proyecto de **{p_stc:,.0f} kW DC** supera el umbral de "
+            f"**{_umbral_kW_1715:,.0f} kW** de autoconsumo a pequeña escala (Ley 1715). "
+            "Los beneficios fiscales de abajo se calcularon con el mismo modelo de "
+            "autoconsumo -- el régimen real para generación a gran escala puede ser "
+            "distinto. Verifica con un asesor tributario/regulatorio antes de usar "
+            "estas cifras como definitivas.",
+            icon="⚠️",
+        )
 
     b1, b2, b3, b4 = st.columns(2), st.columns(2), None, None
     bb1, bb2 = st.columns(2)
