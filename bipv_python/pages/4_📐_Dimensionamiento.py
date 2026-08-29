@@ -232,27 +232,52 @@ with col2:
     # referencia estándar internacional que motivó agregar el mecanismo
     # "total" (29-ago-2026).
     #
-    # Sugerencia orientativa del total a partir del área disponible -- antes
-    # este campo no tenía NINGUNA orientación (ni el área, ni ningún otro
-    # dato del proyecto lo sugería), había que escribir un número a ciegas.
-    # Usa el N/string ya confirmado si existe (de una corrida anterior de
-    # "Optimizar N paneles/string" o del mapeo), o si no, la misma
-    # estimación eléctrica mínima que calcula "N mínimo a explorar" más
-    # abajo. Es solo orientativo (no considera un layout físico real de
-    # paneles en la fachada) -- NO se autocompleta en el campo, es
-    # puramente informativo para no partir de cero sin ninguna pista.
-    _area_bruta_sug = float(st.session_state.get("area_fachada_m2", 97.34))
-    _f_ocup_sug = float(st.session_state.get("factor_ocupacion_pct", 100.0))
-    _area_util_sug = _area_bruta_sug * _f_ocup_sug / 100.0
+    # Sugerencia orientativa del total -- antes este campo no tenía NINGUNA
+    # orientación (ni el área, ni ningún otro dato del proyecto lo sugería),
+    # había que escribir un número a ciegas. Dos fuentes posibles, en orden
+    # de prioridad (idea del usuario, 29-ago-2026: reusar el mismo cálculo
+    # que ya usa ⚡ Diagrama Unifilar):
+    #   1) REAL -- calculos/diagrama_unifilar.py::normalizar_proyecto_unifilar()
+    #      calcula n_strings = N_paneles_granja // N_serie -- el conteo real
+    #      del "Proyecto completo" (ya incorpora cuántos inversores hacen
+    #      falta), no una aproximación. Se usa si ya se corrió "▶️ Optimizar
+    #      N paneles/string" al menos una vez (N_paneles_granja existe).
+    #   2) ÁREA (respaldo) -- si todavía no existe ese dato (sesión nueva,
+    #      optimizador no corrido aún): área útil ÷ área del panel ÷ N/string
+    #      ya confirmado o estimado eléctricamente. Menos exacto (no
+    #      considera cuántos inversores hacen falta), pero disponible desde
+    #      el primer render.
+    # Ninguna se autocompleta en el campo -- son puramente informativas.
     _vmppt_min_sug = inversor.get("Vmppt_activo_min") or inversor.get("Vmppt_min") or 0
     _vmp_panel_sug = panel.get("Vmp_stc") or panel.get("Vmp") or 1
     _n_serie_elec_sug = max(1, math.ceil(_vmppt_min_sug / _vmp_panel_sug)) if _vmppt_min_sug else 8
     _n_serie_sug = int(st.session_state.get("N_serie") or _n_serie_elec_sug)
-    _area_panel_sug = float(panel.get("area_m2") or 0)
-    _total_cadenas_sug = (
-        int(_area_util_sug / _area_panel_sug / _n_serie_sug)
-        if _area_panel_sug and _n_serie_sug else 0
-    )
+
+    _n_paneles_granja_sug = int(st.session_state.get("N_paneles_granja") or 0)
+    _fuente_sug = None
+    if _n_paneles_granja_sug > 0 and _n_serie_sug > 0:
+        _total_cadenas_sug = _n_paneles_granja_sug // _n_serie_sug
+        _fuente_sug = "real"
+        _detalle_sug = (
+            f"{_n_paneles_granja_sug} paneles del Proyecto completo ÷ "
+            f"{_n_serie_sug} módulos/string (mismo cálculo que usa ⚡ Diagrama Unifilar)"
+        )
+    else:
+        _area_bruta_sug = float(st.session_state.get("area_fachada_m2", 97.34))
+        _f_ocup_sug = float(st.session_state.get("factor_ocupacion_pct", 100.0))
+        _area_util_sug = _area_bruta_sug * _f_ocup_sug / 100.0
+        _area_panel_sug = float(panel.get("area_m2") or 0)
+        _total_cadenas_sug = (
+            int(_area_util_sug / _area_panel_sug / _n_serie_sug)
+            if _area_panel_sug and _n_serie_sug else 0
+        )
+        if _total_cadenas_sug > 0:
+            _fuente_sug = "area"
+            _detalle_sug = (
+                f"{_area_util_sug:.0f} m² de área disponible con ≈{_n_serie_sug} "
+                "módulos/string (aproximado por área -- corre '▶️ Optimizar N "
+                "paneles/string' más abajo para una cifra más exacta)"
+            )
 
     N_total_cadenas = st.number_input(
         "N total de cadenas para el proyecto (opcional — referencia estándar internacional)",
@@ -267,20 +292,16 @@ with col2:
             "soporta el inversor según el catálogo (mejor cuando aún estás "
             "explorando cuánto cabe, no verificando un diseño ya decidido)."
             + (
-                f"  \n💡 Orientación desde el área disponible ({_area_util_sug:.0f} m²) "
-                f"con ≈{_n_serie_sug} módulos/string: un total de ~{_total_cadenas_sug} "
-                "cadenas llenaría aproximadamente esa área -- no es un cálculo de "
-                "layout físico exacto, solo una referencia para no partir de un "
-                "número a ciegas."
-                if _total_cadenas_sug > 0 else ""
+                f"  \n💡 Orientación: ~{_total_cadenas_sug} cadenas, desde {_detalle_sug}."
+                if _fuente_sug else ""
             )
         ),
     )
-    if _total_cadenas_sug > 0 and int(N_total_cadenas) == 0:
+    if _fuente_sug and int(N_total_cadenas) == 0:
+        _icono_sug = "📐" if _fuente_sug == "real" else "💡"
         st.caption(
-            f"💡 Orientación (no vinculante): con {_area_util_sug:.0f} m² disponibles "
-            f"y ≈{_n_serie_sug} módulos/string, un total de **~{_total_cadenas_sug} "
-            "cadenas** llenaría aproximadamente esa área."
+            f"{_icono_sug} Orientación (no vinculante): **~{_total_cadenas_sug} cadenas**, "
+            f"desde {_detalle_sug}."
         )
     _res_n_str_tr = resolver_n_strings_tracker(
         inversor, inversor_nombre, st.session_state, N_total_cadenas=int(N_total_cadenas)
