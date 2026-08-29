@@ -15,7 +15,7 @@ Versión: Agosto 2026 | URL: calc.innovacionquimica.com.co
 - Página 1 — Proyecto  ACTUALIZADO
 - Página 2 — Recurso Solar  ACTUALIZADO
 - Página 3 — Motor IV  ACTUALIZADO
-- Página 4 — Dimensionamiento
+- Página 4 — Dimensionamiento  ACTUALIZADO
 6b. Página 4b — Comparador de Inversores ⚖️  ACTUALIZADO
 
 6c. Página 4c — Comparador de Paneles 🧩  NUEVO
@@ -356,7 +356,7 @@ El Motor IV (modelo De Soto/pvlib de 5 parámetros) es el motor de cálculo detr
 
 ────────────────────────────────────────────────────────────
 
-## 6. Página 4 — Dimensionamiento
+## 6. Página 4 — Dimensionamiento  ACTUALIZADO
 
 Propósito: Calcular cuántos paneles caben en la fachada y seleccionar el inversor óptimo.
 
@@ -384,6 +384,18 @@ Resultados:
 - N° de paneles instalables
 - Potencia instalada (kWp)
 - Inversor recomendado con alertas de compatibilidad
+
+### N_strings/tracker ahora se autocalcula del catálogo, y ⚠️ advertencia sobre inversores duplicados en el catálogo  NUEVO (29-ago-2026)
+
+El usuario pidió validar el proyecto real Teusaquillo (128 módulos SOLTECH ASP-ST1-T40, Growatt MID15KTL3-X) contra PVsyst 8.1.5. Al reproducirlo en la app, el campo **"N_strings por tracker (vía combinadoras)"** (arriba, junto a las temperaturas de diseño) quedaba fijo en su default duro (**1**) sin importar el inversor elegido — el Growatt MID15KTL3-X real soporta **8** strings/tracker. Con el default en 1, la app calculaba "Paneles/inversor = 8×1×2 = 16" en vez de 128, y de ahí "necesitas 8 inversores" para cubrir el área, en vez de 1 — un error de dimensionamiento real, no cosmético. PVsyst no tiene este problema: nunca pide este dato aparte, reparte automáticamente el total de cadenas del generador entre los MPPT del inversor.
+
+**Corregido**: `calculos/dimensionamiento.py::resolver_n_strings_tracker_autocalculado()` — autocalcula `N_str_tr` desde `inversor["n_strings_tracker"]` del catálogo cada vez que CAMBIA el inversor seleccionado; si el usuario ajusta el valor a mano para el MISMO inversor (ej. una combinadora real con menos strings que el máximo de fábrica), se respeta entre reruns. 4 tests nuevos en `tests/test_compatibilidad_string.py`.
+
+⚠️ **Advertencia real, no resuelta — verificar SIEMPRE qué inversor exacto quedó cargado**: el catálogo tiene una familia genérica **"MID 15KTL3-X" / "MID 17KTL3-X" / "MID 20KTL3-X" / "MID 22KTL3-X" / "MID 25KTL3-X"** (sin marca, specs redondeadas — `N_strings/tracker=1` fijo en las 5, `Vmppt_min=200V` en las 5) que es casi con certeza el MISMO producto físico que **"Growatt MID15KTL3-X"** (con datos reales verificados contra PVsyst: `N_strings/tracker=8`, `Vmppt_min=140V`). La herramienta de "🧭 Mapeo de inversores compatibles" de esta página **auto-sugiere la entrada genérica primero** (aparece antes alfabéticamente / en el orden del Excel) — seguirla sin revisar llevó exactamente al error descrito arriba (16 paneles/inversor, 8 inversores, ratio DC/AC 0,42 en vez de 0,538) hasta notar y corregir la selección manualmente. **Antes de confiar en un match de "compatible" del mapeo, confirma el nombre EXACTO del inversor cargado** (mostrado en "✅ *nombre* cargado desde el mapeo") contra la ficha real del fabricante — no asumas que dos nombres parecidos son el mismo dato. Esta familia genérica NO se corrigió esta sesión (fuera de alcance); queda pendiente para una limpieza de catálogo futura.
+
+**Otros 2 bugs de catálogo encontrados y corregidos en la misma auditoría**: (1) faltaba la columna **"Potencia AC nominal (kW)"** en TODO `datos/inversores_catalogo.xlsx` — sin ella, los ~106 inversores del catálogo calculaban su potencia CA nominal vía un respaldo `P_dc_max_W × 0,96` en vez del dato real del fabricante (para el Growatt MID15KTL3-X eso daba 21.600W en vez de 15.000W reales); columna agregada (retrocompatible, al final de la hoja) y valor real cargado para este inversor — los otros 105 siguen con el respaldo hasta que se cargue su dato real. (2) La corriente máxima por tracker del Growatt MID15KTL3-X se había derivado mal en un primer intento (de lo que produce el arreglo — 8 strings × 0,80A del módulo — no de lo que soporta el inversor), lo que marcaba el inversor como "no compatible" pese a que PVsyst no reporta ningún problema eléctrico con ese mismo diseño; corregido a 27,5A/33,5A tomando el dato real de la entrada genérica hermana.
+
+Ficha de auditoría completa, con capturas reales de PVsyst y la verificación paso a paso: `DIAGNOSTICO_VALIDACION_TEUSAQUILLO_PVSYST.md` (raíz del repo). Suite completa: **730/730 passed**.
 ────────────────────────────────────────────────────────────
 
 ## 6b. Página 4b — Comparador de Inversores ⚖️  NUEVO
@@ -953,6 +965,16 @@ El usuario reportó un error de PVsyst ("inversor sobredimensionado") en el proy
 ⚠️ **Limitación real, declarada, NO resuelta**: en proyectos multi-superficie donde varias superficies comparten el MISMO inversor físico (bus horizontal común, Fase 3), el recorte se sigue aplicando por superficie — cada una "vería" la capacidad completa del Pnom compartido en vez del recorte agregado real del bus. Modelarlo bien requiere sumar la potencia pre-recorte de todas las superficies activas hora a hora y recortar una sola vez a nivel de sistema — un rediseño de `run_bipv_simulation_multisuperficie()` fuera de alcance de este fix puntual. Documentado en su docstring.
 
 Regresión: 3 tests nuevos en `tests/test_simulation_pipeline.py` (recorte real con inversor pequeño, sin recorte cuando no se pasa `P_ac_nom_W` — verifica retrocompatibilidad total —, y exactitud matemática del atajo multi-inversor con recorte activo). Suite pytest completa: **721/721 passed**.
+
+### Nueva alarma: relación DC/AC (Proporción Pnom, homóloga al aviso real de PVsyst)  NUEVO (29-ago-2026)
+
+Verificando el proyecto real Teusaquillo contra PVsyst 8.1.5 se confirmó algo importante: con la config real (128 módulos, 8,064 kWp, Growatt MID15KTL3-X 15 kW CA), PVsyst muestra *"La potencia del inversor está muy sobredimensionada"* y el indicador **"Sistema"** queda en 🔴 — el botón **"Ejecutar simulación"** se deshabilita. **No es una advertencia cosmética: PVsyst bloquea la simulación por completo** hasta resolver el sobredimensionamiento. Proporción Pnom real de PVsyst para este caso: 8,064/15 = **0,538**.
+
+**Nueva función** `calculos/dimensionamiento.py::evaluar_relacion_dc_ac(P_dc_stc_kW, P_ac_nom_W)`: clasifica la relación DC/AC en 5 niveles — 🔴 muy sobredimensionado (<0,75) · 🟠 sobredimensionado (<1,0) · 🟢 óptimo (0,95–1,35) · 🟠 alto (≤1,6) · 🔴 muy alto (>1,6), anclada al dato real de PVsyst (0,538 → mismo aviso "muy sobredimensionado", verificado idéntico). Se muestra en **📊 Producción** (antes de simular, junto a la compatibilidad eléctrica) y en **📐 Dimensionamiento** (tras presionar "▶️ Optimizar N paneles/string", a nivel de proyecto completo).
+
+**Diferencia deliberada respecto a PVsyst**: la app **avisa pero NO bloquea** la simulación — permite evaluar diseños BIPV con relaciones DC/AC atípicas (habituales en fachadas de baja potencia con inversor reutilizado o sobredimensionado a propósito por el cliente) en vez de rechazarlos de plano como hace PVsyst.
+
+5 tests nuevos en `tests/test_compatibilidad_string.py`, incluyendo uno anclado al pantallazo real de PVsyst (Teusaquillo, ratio 0,538 exacto) y otro con el proyecto Urabá ya validado (0,883). Ver también la subsección de "N_strings/tracker" en la sección 6 (Dimensionamiento) — **incluye una advertencia importante sobre inversores duplicados en el catálogo** encontrada al validar este mismo caso. Ficha de auditoría completa: `DIAGNOSTICO_VALIDACION_TEUSAQUILLO_PVSYST.md` (raíz del repo).
 
 ## 10. Página 7 — Análisis Financiero  ACTUALIZADO
 
@@ -2649,7 +2671,7 @@ Tests: se actualizaron 2 aserciones que asumían el catálogo viejo de 7 paneles
 
 Manual actualizado el 29 de agosto de 2026
 
-Novedades de esta versión: 📐 Dimensionamiento/📊 Producción — nueva alarma `evaluar_relacion_dc_ac()` homóloga al aviso real de PVsyst 8.1.5 ("La potencia del inversor está muy sobredimensionada", Proporción Pnom) para el proyecto real Teusaquillo (ratio 0,538 verificado idéntico contra una captura real de PVsyst, que además reveló que PVsyst bloquea DURO la simulación en ese caso — no es solo advertencia; la app avisa pero no bloquea, a propósito). Al intentar reproducir el caso real se encontraron y corrigieron 3 bugs reales de catálogo: el Growatt MID15KTL3-X ni siquiera estaba en el catálogo Excel real (solo en un catálogo Python viejo sin uso); faltaba la columna "Potencia AC nominal (kW)" en TODO el catálogo (~106 inversores calculaban su potencia CA vía un respaldo `P_dc_max×0,96` en vez del dato real del fabricante — para este inversor daba 21.600W en vez de 15.000W reales); y la corriente máxima por tracker se había derivado mal (de lo que produce el arreglo, no de lo que soporta el inversor). Además, `N_strings/tracker` (Dimensionamiento) ahora se autocalcula desde `inversor["n_strings_tracker"]` del catálogo en vez de quedar fijo en 1 por defecto — ese default duro había hecho que el mismo proyecto Teusaquillo se calculara como "128 módulos → 8 inversores necesarios" en vez de 1 (`resolver_n_strings_tracker_autocalculado()`, respeta un ajuste manual del usuario mientras no cambie de inversor). Ficha completa en `DIAGNOSTICO_VALIDACION_TEUSAQUILLO_PVSYST.md`. Suite completa: 730/730. Ver sección 9.
+Novedades de esta versión: 📐 Dimensionamiento/📊 Producción — nueva alarma `evaluar_relacion_dc_ac()` homóloga al aviso real de PVsyst 8.1.5 ("La potencia del inversor está muy sobredimensionada", Proporción Pnom) para el proyecto real Teusaquillo (ratio 0,538 verificado idéntico contra una captura real de PVsyst, que además reveló que PVsyst bloquea DURO la simulación en ese caso — no es solo advertencia; la app avisa pero no bloquea, a propósito). Al intentar reproducir el caso real se encontraron y corrigieron 3 bugs reales de catálogo: el Growatt MID15KTL3-X ni siquiera estaba en el catálogo Excel real (solo en un catálogo Python viejo sin uso); faltaba la columna "Potencia AC nominal (kW)" en TODO el catálogo (~106 inversores calculaban su potencia CA vía un respaldo `P_dc_max×0,96` en vez del dato real del fabricante — para este inversor daba 21.600W en vez de 15.000W reales); y la corriente máxima por tracker se había derivado mal (de lo que produce el arreglo, no de lo que soporta el inversor). Además, `N_strings/tracker` (Dimensionamiento) ahora se autocalcula desde `inversor["n_strings_tracker"]` del catálogo en vez de quedar fijo en 1 por defecto — ese default duro había hecho que el mismo proyecto Teusaquillo se calculara como "128 módulos → 8 inversores necesarios" en vez de 1 (`resolver_n_strings_tracker_autocalculado()`, respeta un ajuste manual del usuario mientras no cambie de inversor). ⚠️ **Pendiente sin resolver, léelo antes de tocar el catálogo de inversores**: existe una familia genérica "MID 15/17/20/22/25KTL3-X" (sin marca) casi con certeza duplicada del "Growatt MID15KTL3-X" real, con specs distintas (N_strings/tracker=1 vs 8 real) — el "mapeo de inversores compatibles" tiende a sugerir la genérica primero; ver detalle y advertencia completa en la sección 6. Ficha completa en `DIAGNOSTICO_VALIDACION_TEUSAQUILLO_PVSYST.md`. Suite completa: 730/730. Ver secciones 6 y 9.
 
 Versión anterior (29 de agosto de 2026): 📊 Producción — corregido bug real donde la app NUNCA recortaba (clipping) la producción al Pnom del inversor: `P_ac = P_dc × η` sin ningún tope, así que cualquier proyecto con relación DC/AC > 1 (el diseño estándar de la industria) sobreestimaba producción sin límite (cuantificado: +10,8% en un caso típico DC/AC=1.3). Nunca apareció en las validaciones contra PVsyst ya hechas (Urabá y Teusaquillo tienen DC/AC < 1). Corregido en ambos motores (modelo simplificado y curva IV real), con nueva fila "Recorte inversor" en la cascada de pérdidas, igual que hace PVsyst. Limitación real declarada: multi-superficie con inversor compartido entre superficies no modela el recorte agregado del bus todavía. Ver sección 9.
 
