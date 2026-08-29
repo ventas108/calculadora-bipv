@@ -637,6 +637,11 @@ with st.container(border=True):
                 )
                 # Resultado (sobrevive F5, a diferencia de la key del widget)
                 st.session_state["N_str_tr_usado"] = int(N_str_tr)
+                # Clave PROPIA del prorrateo (distinta de N_str_tr_usado, que
+                # también escribe el botón "Optimizar N paneles/string" más
+                # abajo para su propio propósito) -- evita que ese otro botón
+                # "refresque" por accidente la validez de este cálculo.
+                st.session_state["prorrateo_preliminar_n_str_tr"] = int(N_str_tr)
                 st.session_state["prorrateo_preliminar_modelo"] = _modelo_compatible
                 st.session_state["prorrateo_preliminar_N"] = int(
                     _fila_compatible["N_string_recomendado"]
@@ -665,19 +670,28 @@ with st.container(border=True):
 # ── Prorrateo preliminar desde un inversor compatible del mapeo ───────────────
 _prelim_modelo = st.session_state.get("prorrateo_preliminar_modelo")
 _prelim_n = st.session_state.get("prorrateo_preliminar_N")
-if (
-    _prelim_modelo
-    and _prelim_modelo != inversor_nombre
-) or (
-    _prelim_modelo
-    and st.session_state.get("prorrateo_preliminar_panel") != panel_nombre
+if _prelim_modelo and (
+    _prelim_modelo != inversor_nombre
+    or st.session_state.get("prorrateo_preliminar_panel") != panel_nombre
+    # Bug real (29-ago-2026): el N recomendado se guardaba en el momento del
+    # clic y NUNCA se invalidaba si el usuario cambiaba después "N total de
+    # cadenas para el proyecto" o ajustaba N_strings/tracker a mano -- el N
+    # (viejo) se combinaba con el N_str_tr (nuevo) en dimensionar_sistema()
+    # más abajo, dando un "Paneles/inversor" que no correspondía a NINGUNA
+    # recomendación real (encontrado con TriP 6K-HV: 128 paneles/inversor
+    # usando N=8 viejo × N_str_tr=8 nuevo, cuando el N recomendado real para
+    # N_str_tr=8 es 7, no 8). Invalida también si N_str_tr cambió desde el
+    # último cálculo.
+    or st.session_state.get("prorrateo_preliminar_n_str_tr") != int(N_str_tr)
 ):
-    # Evita presentar un cálculo anterior después de una selección manual o
-    # al cambiar de panel, donde el N recomendado podría ya no aplicar.
+    # Evita presentar un cálculo anterior después de una selección manual,
+    # al cambiar de panel, o al cambiar N_strings/tracker (catálogo o total
+    # declarado) -- el N recomendado podría ya no aplicar.
     st.session_state.pop("prorrateo_preliminar_modelo", None)
     st.session_state.pop("prorrateo_preliminar_N", None)
     st.session_state.pop("prorrateo_preliminar_panel", None)
     st.session_state.pop("prorrateo_preliminar_alerta_margen", None)
+    st.session_state.pop("prorrateo_preliminar_n_str_tr", None)
     _prelim_modelo = None
     _prelim_n = None
 if _prelim_modelo and _prelim_n:
