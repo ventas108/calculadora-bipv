@@ -819,8 +819,24 @@ with col_t3:
                  "%CAPEX es útil cuando no se conoce el detalle.",
         )
         if _opex_modo == "USD/kWp·año":
+            # Bug real (29-ago-2026, misma clase que el de "cultivo" en
+            # factor_ocupacion_pct): "opex_kw_guardado" nunca se invalidaba al
+            # cambiar "Tipo de instalación" -- una vez guardado (línea de
+            # abajo, en CADA render), el .get() de más abajo siempre lo
+            # devolvía, así que el default recién calculado por tipo
+            # (líneas siguientes) nunca volvía a aplicarse. Caso real: el
+            # usuario configura una Granja fotovoltaica (OPEX≈10 USD/kWp·año),
+            # luego cambia a Fachada BIPV -- el slider seguía en 10 en vez del
+            # default correcto (20), subestimando el OPEX real (inspección
+            # estructural, seguro sobre CAPEX alto) e inflando la TIR/VPN en
+            # silencio. Se invalida aquí cada vez que cambia el tipo activo.
+            _tipo_inst_fin_ref = st.session_state.get("tipo_instalacion", "")
+            if st.session_state.get("opex_kw_guardado_tipo_ref") != _tipo_inst_fin_ref:
+                st.session_state.pop("opex_kw_guardado", None)
+                st.session_state["opex_kw_guardado_tipo_ref"] = _tipo_inst_fin_ref
+
             # ── Default OPEX según tipo de instalación ───────────────────────
-            _tipo_inst_fin = str(st.session_state.get("tipo_instalacion", "")).lower()
+            _tipo_inst_fin = str(_tipo_inst_fin_ref).lower()
             if any(x in _tipo_inst_fin for x in ["bipv", "fachada", "pergola", "pérgola", "marquesina"]):
                 _opex_kw_default = 20.0
                 _opex_kw_help = (

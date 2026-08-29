@@ -264,6 +264,18 @@ with col2:
     _tipo_actual = st.session_state.get("tipo_instalacion", "")
     _es_campo_abierto = _tipo_actual == "Granja fotovoltaica"
     _idx_montaje_default = 0 if _es_campo_abierto else 1
+    # Bug real (29-ago-2026, misma clase que el de arriba): "mo_montaje"
+    # (key= del selectbox) solo se preseleccionaba la PRIMERA vez, cuando la
+    # clave no existía todavía. Si el usuario cambiaba "Tipo de instalación"
+    # DESPUÉS de ya haber visitado esta página, Streamlit ignora `index=` en
+    # reruns posteriores (el widget con key= ya tiene estado propio) -- el
+    # montaje del tipo ANTERIOR sobrevivía (ej. "Ventilado libre" de una
+    # Granja fotovoltaica al cambiar a Fachada BIPV), subestimando la
+    # temperatura de celda real (debería ser "Fachada confinada", k=1.3) y
+    # sobreestimando producción en silencio. Se invalida al cambiar de tipo.
+    if st.session_state.get("mo_montaje_tipo_ref") != _tipo_actual:
+        st.session_state.pop("mo_montaje", None)
+        st.session_state["mo_montaje_tipo_ref"] = _tipo_actual
     if _es_campo_abierto and "mo_montaje" not in st.session_state:
         st.caption(
             "☀️ Proyecto tipo **Granja fotovoltaica** — se preselecciona "

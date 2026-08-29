@@ -24,7 +24,7 @@ Versión: Agosto 2026 | URL: calc.innovacionquimica.com.co
 
 6e. Página 18 — 🤖 Análisis IA y los Analistas de Producción  NUEVO
 
-- Página 5b — Motor Óptico
+- Página 5b — Motor Óptico  ACTUALIZADO
 - Página 5 — Mismatch y Bypass Diodes  NUEVO
 8a. Página 5a — Sombras desde SketchUp 🌳  NUEVO
 
@@ -505,7 +505,7 @@ Página central que reúne los accesos directos a los 4 Analistas de Producción
 - Todos son llamadas de IA bajo demanda (requieren clave configurada en el servidor y se activan solo al oprimir su botón) — no corren automáticamente ni tienen costo si no los usas.
 ⚠️ Para no cometer errores: cada Analista de Producción solo conoce los resultados de SU propia página de comparación (la tabla que ves en pantalla en ese momento) — no tiene memoria de comparaciones anteriores ni de otras páginas. Si cambias algo (panel, string, inversor), vuelve a generar la comparación antes de volver a pedirle la recomendación.
 
-## 7. Página 5b — Motor Óptico
+## 7. Página 5b — Motor Óptico  ACTUALIZADO
 
 Propósito: Aplicar las correcciones ópticas específicas de BIPV sobre la POA bruta.
 
@@ -547,6 +547,8 @@ Al detectar el panel del proyecto, el Motor Óptico verifica ahora que la ficha 
 ✅ Nota verde: la ficha es coherente. Ejemplo: ASP-ST1-T40 (63 W, 0,72 m², τ = 40%) → η módulo 8,75% → η activa 14,6%, dentro del rango CdTe.
 
 Si la ficha no trae Pmax o área, la app lo indica en lugar de emitir un veredicto. El chequeo reconoce variantes de nombre de tecnología ('MonoSi', 'N-Type', 'TOPCon', etc.) y no bloquea ningún cálculo: es una alerta de calidad de datos.
+
+**Bug real corregido: "Tipo de montaje" no se invalidaba al cambiar de Tipo de instalación (29-ago-2026)**: encontrado en la auditoría de coherencia disparada por el fix de "cultivo" (ver sección 3). El default de "Tipo de montaje" (26-ago-2026) ya distinguía correctamente Granja fotovoltaica (preselecciona "Ventilado libre", k=1.0) de otros tipos (preselecciona "Fachada confinada", k=1.3) — **pero solo la PRIMERA vez**, cuando la clave `mo_montaje` (con `key=` del selectbox) todavía no existía. Si el usuario cambiaba "Tipo de instalación" DESPUÉS de ya haber visitado esta página, Streamlit ignora `index=` en reruns posteriores (el widget con `key=` ya tiene su propio estado) — el montaje del tipo ANTERIOR sobrevivía (ej. "Ventilado libre" de una Granja fotovoltaica seguía activo al cambiar a Fachada BIPV), subestimando la temperatura de celda real y sobreestimando producción en silencio. Corregido con `mo_montaje_tipo_ref` (mismo patrón ya usado en Dimensionamiento/Financiero): resetea `mo_montaje` cada vez que cambia el tipo activo.
 
 ────────────────────────────────────────────────────────────
 
@@ -1114,6 +1116,8 @@ Verificando si la calculadora está lista para mega-proyectos (varios MW, zona d
 **Corregido**: `run_financial_simulation()` (`simulation/financial_simulator.py`) ahora compara `P_dc_stc_kW` contra ese umbral cuando `aplicar_ley_1715=True`, y si lo supera, deja el mensaje en el nuevo campo `FinancialResult.advertencia_ley_1715` (`None` si no aplica). **No bloquea ni recalcula** los beneficios con otro régimen — esta app no lo modela — solo advierte, para que el proyecto se revise con un asesor tributario/regulatorio antes de presentar esas cifras como definitivas. La misma advertencia se agregó directamente en 💰 Página 7 — Financiero (que calcula los beneficios con su propio llamado directo a `calcular_beneficios_ley_1715()`, no a través de `run_financial_simulation()`) usando la potencia ya disponible en sesión (`p_stc`).
 
 Verificado con 4 casos reales: Urabá (220 kWp) → sin advertencia; exactamente 1.000 kW → sin advertencia (el umbral es estrictamente "supera", no "alcanza"); un mega-proyecto sintético de ~1,2 MWp (mismo patrón de `N_inversores` ya validado) → advertencia con la cifra exacta del proyecto; `aplicar_ley_1715=False` → ni beneficios ni advertencia. Test de regresión nuevo en `tests/test_simulation_pipeline.py`. Suite completa: **718/718 passed**.
+
+**Bug real corregido: el OPEX/kWp guardado no se invalidaba al cambiar de Tipo de instalación (29-ago-2026)**: encontrado en la auditoría de coherencia disparada por el fix de "cultivo" (ver sección 3). El slider "O&M anual (USD/kWp·año)" calcula un default correcto por tipo cada render (20 USD/kWp·año para BIPV/fachada/pérgola/marquesina, 12 para techo, 10 para Granja FV/utility-scale) — pero como el slider no usa `key=`, la persistencia entre reruns se maneja a mano con `st.session_state["opex_kw_guardado"]`, y una vez que esa clave existe (se escribe en CADA render), el `.get()` que provee el `value=` del slider siempre la devolvía, sin importar si el default recién calculado había cambiado. **Caso real**: usuario configura una Granja fotovoltaica (OPEX≈10 USD/kWp·año), luego cambia a Fachada BIPV — el slider seguía en 10 en vez del default correcto (20), subestimando el OPEX real (inspección estructural, seguro sobre CAPEX alto) e inflando la TIR/VPN en silencio, sin ningún aviso. Corregido con `opex_kw_guardado_tipo_ref` (mismo patrón ya usado en Dimensionamiento y ahora en Motor Óptico): invalida `opex_kw_guardado` cada vez que cambia el tipo activo.
 
 ────────────────────────────────────────────────────────────
 
@@ -2701,7 +2705,9 @@ Tests: se actualizaron 2 aserciones que asumían el catálogo viejo de 7 paneles
 
 Manual actualizado el 29 de agosto de 2026
 
-Novedades de esta versión: 🏠 Proyecto/📐 Dimensionamiento — corregido bug real: el mensaje "el resto queda libre para el cultivo" (factor de ocupación <100%) aparecía para CUALQUIER tipo de instalación, incluida una fachada BIPV (Teusaquillo) sin nada de agrícola -- porque `factor_ocupacion_pct` no se reseteaba al cambiar "Tipo de instalación" (solo se reseteaban densidad/PR/tilt), y el mensaje nunca distinguía el tipo. Corregido: se resetea a 100% al cambiar a cualquier tipo que no sea "Granja fotovoltaica", y el texto de "cultivo" solo se muestra para ese tipo -- el resto usa un mensaje neutro. Ver sección 3.
+Novedades de esta versión: auditoría proactiva de coherencia de "Tipo de instalación" (pedida explícitamente por el usuario tras el fix de "cultivo") en los 19 archivos que lo referencian. 2 bugs reales más de la MISMA clase (dato que depende del tipo, nunca invalidado al cambiar de tipo), ambos afectando cálculos reales, no solo texto: (1) 💰 Financiero — `opex_kw_guardado` no se invalidaba, un OPEX de Granja FV (10 USD/kWp·año) sobrevivía al cambiar a Fachada BIPV (debería ser 20), inflando TIR/VPN en silencio; (2) 🔆 Motor Óptico — `mo_montaje` (afecta k_bipv, temperatura de celda) solo se preseleccionaba correctamente la PRIMERA vez por tipo; cambios posteriores de tipo no lo recalculaban, subestimando temperatura y sobreestimando producción. Ambos corregidos con el mismo patrón (`*_tipo_ref`, invalida al cambiar). Resto de los 19 archivos auditados sin hallazgos (ya usan el tipo de forma fresca o como parámetro explícito). Ver secciones 7 y 10.
+
+Versión anterior (29 de agosto de 2026): 🏠 Proyecto/📐 Dimensionamiento — corregido bug real: el mensaje "el resto queda libre para el cultivo" (factor de ocupación <100%) aparecía para CUALQUIER tipo de instalación, incluida una fachada BIPV (Teusaquillo) sin nada de agrícola -- porque `factor_ocupacion_pct` no se reseteaba al cambiar "Tipo de instalación" (solo se reseteaban densidad/PR/tilt), y el mensaje nunca distinguía el tipo. Corregido: se resetea a 100% al cambiar a cualquier tipo que no sea "Granja fotovoltaica", y el texto de "cultivo" solo se muestra para ese tipo -- el resto usa un mensaje neutro. Ver sección 3.
 
 Versión anterior (29 de agosto de 2026): 📐 Dimensionamiento — corregido bug real, propio, en la sugerencia de "N total de cadenas" agregada hace un momento: `N_paneles_granja` no se invalidaba al cambiar de inversor, así que un total viejo (ej. 126 paneles de un SNA-3K ya explorado) se combinaba con el N/string del inversor NUEVO (ej. 7 de un TriP 6K-HV), dando una "sugerencia real" que no correspondía a ningún diseño real. Corregido con `N_paneles_granja_inversor_ref` -- la fuente real solo se usa si ese inversor sigue siendo el seleccionado; si no, cae al respaldo por área y avisa que hay un total guardado pero de otro inversor. Ver sección 6.
 
