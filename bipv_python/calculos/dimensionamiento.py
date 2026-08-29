@@ -294,6 +294,43 @@ def evaluar_relacion_dc_ac(P_dc_stc_kW: float, P_ac_nom_W: float | None) -> dict
     }
 
 
+def resolver_n_strings_tracker_autocalculado(
+    inversor: dict,
+    session_state,
+    inversor_nombre: str,
+) -> tuple[int, bool]:
+    """
+    Autocalcula N_strings/tracker desde el catálogo del inversor seleccionado,
+    respetando un ajuste manual del usuario mientras siga con el MISMO inversor.
+
+    Antes (29-ago-2026) el widget de Dimensionamiento/Producción quedaba fijo
+    en 1 (default duro) sin importar el inversor elegido -- eso hacía que la
+    app calculara "paneles/inversor" muy por debajo del real (ej. 16 en vez de
+    128 para el Growatt MID15KTL3-X, que soporta 8 strings/tracker) y de ahí
+    "necesitas 8 inversores" en vez de 1 para el mismo proyecto. PVsyst no
+    tiene este problema: nunca pide este dato aparte, reparte automáticamente
+    el total de cadenas del generador entre los MPPT del inversor.
+
+    `session_state` es cualquier objeto dict-like con `.get()` y asignación
+    por índice (`st.session_state` en producción; un `dict` plano en tests).
+    Guarda dos claves: `N_str_tr` (el valor efectivo, mismo nombre que ya
+    usan pages/4 y pages/6) y `N_str_tr_inversor_ref` (qué inversor produjo
+    ese valor -- permite detectar el cambio de inversor entre reruns).
+
+    Retorna (valor, autocalculado): `autocalculado=True` solo en el render
+    donde se detectó un inversor nuevo/distinto y se reseteó al valor del
+    catálogo; en cualquier otro render (mismo inversor, con o sin ajuste
+    manual del usuario) retorna `False` y respeta lo que ya haya en
+    `session_state["N_str_tr"]`.
+    """
+    catalogo = int(inversor.get("n_strings_tracker") or 1)
+    if session_state.get("N_str_tr_inversor_ref") != inversor_nombre:
+        session_state["N_str_tr"] = catalogo
+        session_state["N_str_tr_inversor_ref"] = inversor_nombre
+        return catalogo, True
+    return int(session_state.get("N_str_tr", catalogo) or catalogo), False
+
+
 def mapear_inversores_catalogo(
     panel: dict,
     inversores: dict,

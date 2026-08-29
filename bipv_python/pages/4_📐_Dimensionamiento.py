@@ -8,6 +8,7 @@ from calculos.dimensionamiento import (
     optimizar_n_serie,
     dimensionar_sistema,
     evaluar_relacion_dc_ac,
+    resolver_n_strings_tracker_autocalculado,
 )
 from calculos.modelo_iv import (
     preparar_panel_iv, resolver_curva_iv, resolver_panel_calibrado,
@@ -226,7 +227,31 @@ with col2:
                 help="T_amb P95 + (NOCT-20)/800×800 W/m². Determina Vmp de operación habitual.")
     T_extr   = st.number_input("T_celda caliente extremo (°C)", key="T_cel_extremo",
                 help="T_amb máxima histórica + (NOCT-20)/800×1000 W/m². Determina Vmp mínimo (peor caso MPPT).")
-    N_str_tr = st.number_input("N_strings por tracker (via combinadoras)", value=int(st.session_state.get("N_str_tr", 1)), min_value=1, key="N_str_tr")
+    # Autocalcular N_strings/tracker desde el catálogo del inversor -- ver
+    # docstring de resolver_n_strings_tracker_autocalculado() para el porqué.
+    _n_str_tr_catalogo = int(inversor.get("n_strings_tracker") or 1)
+    _, _n_str_tr_autocalculado = resolver_n_strings_tracker_autocalculado(
+        inversor, st.session_state, inversor_nombre
+    )
+    N_str_tr = st.number_input(
+        "N_strings por tracker (vía combinadoras)",
+        min_value=1, key="N_str_tr",
+        help=(
+            f"Autocalculado del catálogo: {inversor_nombre} soporta "
+            f"{_n_str_tr_catalogo} strings/tracker. Ajústalo si tu diseño "
+            "real usa una combinadora con menos strings que el máximo de fábrica."
+        ),
+    )
+    if _n_str_tr_autocalculado:
+        st.caption(
+            f"🔄 Autocalculado desde el catálogo: **{_n_str_tr_catalogo}** "
+            f"strings/tracker para **{inversor_nombre}**."
+        )
+    elif int(N_str_tr) != _n_str_tr_catalogo:
+        st.caption(
+            f"ℹ️ Ajuste manual — el catálogo sugiere **{_n_str_tr_catalogo}** "
+            f"strings/tracker para **{inversor_nombre}**."
+        )
     col_nm1, col_nm2 = st.columns(2)
     with col_nm1:
         # Auto-calcular N_min eléctrico desde MPPT del inversor para evitar que

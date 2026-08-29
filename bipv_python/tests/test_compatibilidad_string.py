@@ -6,6 +6,7 @@ from calculos.dimensionamiento import (
     evaluar_compatibilidad_string,
     evaluar_relacion_dc_ac,
     mapear_inversores_catalogo,
+    resolver_n_strings_tracker_autocalculado,
 )
 from datos.tecnologias_bipv import ASP_ST1_T40
 
@@ -257,4 +258,78 @@ def test_relacion_dc_ac_muy_alto_sugiere_revisar_clipping():
 
 def test_relacion_dc_ac_sin_potencia_ac_nominal_no_es_evaluable():
     assert evaluar_relacion_dc_ac(P_dc_stc_kW=10.0, P_ac_nom_W=None)["evaluable"] is False
+
+
+# ---------------------------------------------------------------------------
+# resolver_n_strings_tracker_autocalculado() -- antes N_strings/tracker
+# quedaba fijo en 1 (default duro de pages/4) sin importar el inversor
+# seleccionado, lo que llevo a un calculo real erroneo con el proyecto
+# Teusaquillo (16 paneles/inversor en vez de 128, "necesitas 8 inversores"
+# en vez de 1). Casos anclados a esa investigacion real -- ver docstring de
+# la funcion en calculos/dimensionamiento.py para el detalle completo.
+# ---------------------------------------------------------------------------
+
+
+def test_n_strings_tracker_autocalcula_desde_el_catalogo_al_elegir_inversor():
+    # Growatt MID15KTL3-X real (proyecto Teusaquillo): 8 strings/tracker.
+    inversor = {"n_strings_tracker": 8}
+    session_state: dict = {}
+
+    valor, autocalculado = resolver_n_strings_tracker_autocalculado(
+        inversor, session_state, "Growatt MID15KTL3-X"
+    )
+
+    assert valor == 8
+    assert autocalculado is True
+    assert session_state["N_str_tr"] == 8
+    assert session_state["N_str_tr_inversor_ref"] == "Growatt MID15KTL3-X"
+
+
+def test_n_strings_tracker_respeta_ajuste_manual_del_mismo_inversor():
+    inversor = {"n_strings_tracker": 8}
+    session_state: dict = {}
+    resolver_n_strings_tracker_autocalculado(inversor, session_state, "Growatt MID15KTL3-X")
+
+    # El usuario ajusta a mano (ej. combinadora real con menos strings)
+    session_state["N_str_tr"] = 4
+
+    # Mismo inversor en el siguiente rerun -> no debe pisar el ajuste manual
+    valor, autocalculado = resolver_n_strings_tracker_autocalculado(
+        inversor, session_state, "Growatt MID15KTL3-X"
+    )
+
+    assert valor == 4
+    assert autocalculado is False
+
+
+def test_n_strings_tracker_resetea_al_cambiar_de_inversor():
+    # El generico "MID 15KTL3-X" (sin marca) tiene solo 1 string/tracker en
+    # el catalogo real -- caso real que causo la confusion original: quedaba
+    # en 8 (arrastrado del Growatt) en vez de resetear al valor de este otro
+    # inversor.
+    growatt = {"n_strings_tracker": 8}
+    generico = {"n_strings_tracker": 1}
+    session_state: dict = {}
+    resolver_n_strings_tracker_autocalculado(growatt, session_state, "Growatt MID15KTL3-X")
+    session_state["N_str_tr"] = 4  # ajuste manual que no debe sobrevivir el cambio
+
+    valor, autocalculado = resolver_n_strings_tracker_autocalculado(
+        generico, session_state, "MID 15KTL3-X"
+    )
+
+    assert valor == 1
+    assert autocalculado is True
+    assert session_state["N_str_tr_inversor_ref"] == "MID 15KTL3-X"
+
+
+def test_n_strings_tracker_sin_dato_en_catalogo_cae_a_1():
+    inversor: dict = {}  # ficha incompleta, sin "n_strings_tracker"
+    session_state: dict = {}
+
+    valor, autocalculado = resolver_n_strings_tracker_autocalculado(
+        inversor, session_state, "Inversor sin ficha completa"
+    )
+
+    assert valor == 1
+    assert autocalculado is True
     assert evaluar_relacion_dc_ac(P_dc_stc_kW=10.0, P_ac_nom_W=0)["evaluable"] is False
