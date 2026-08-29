@@ -8,7 +8,7 @@ from calculos.dimensionamiento import (
     optimizar_n_serie,
     dimensionar_sistema,
     evaluar_relacion_dc_ac,
-    resolver_n_strings_tracker_autocalculado,
+    resolver_n_strings_tracker,
 )
 from calculos.modelo_iv import (
     preparar_panel_iv, resolver_curva_iv, resolver_panel_calibrado,
@@ -227,30 +227,54 @@ with col2:
                 help="T_amb P95 + (NOCT-20)/800×800 W/m². Determina Vmp de operación habitual.")
     T_extr   = st.number_input("T_celda caliente extremo (°C)", key="T_cel_extremo",
                 help="T_amb máxima histórica + (NOCT-20)/800×1000 W/m². Determina Vmp mínimo (peor caso MPPT).")
-    # Autocalcular N_strings/tracker desde el catálogo del inversor -- ver
-    # docstring de resolver_n_strings_tracker_autocalculado() para el porqué.
-    _n_str_tr_catalogo = int(inversor.get("n_strings_tracker") or 1)
-    _, _n_str_tr_autocalculado = resolver_n_strings_tracker_autocalculado(
-        inversor, st.session_state, inversor_nombre
+    # N_strings/tracker: dos mecanismos posibles, ver docstring de
+    # resolver_n_strings_tracker() para la comparación honesta contra PVsyst
+    # que motivó agregar el mecanismo "total" (29-ago-2026).
+    N_total_cadenas = st.number_input(
+        "N total de cadenas para el proyecto (opcional — estilo PVsyst)",
+        min_value=0, value=int(st.session_state.get("N_total_cadenas_proyecto", 0)),
+        key="N_total_cadenas_proyecto",
+        help=(
+            "Si ya sabes cuántas cadenas quieres en TOTAL para todo el "
+            "generador, ponlas aquí — se reparten solas entre los trackers "
+            "del inversor, igual que el campo 'Núm. cadenas' de PVsyst. "
+            "Déjalo en 0 para que la app siga sugiriendo el máximo que "
+            "soporta el inversor según el catálogo (mejor cuando aún estás "
+            "explorando cuánto cabe, no verificando un diseño ya decidido)."
+        ),
+    )
+    _res_n_str_tr = resolver_n_strings_tracker(
+        inversor, inversor_nombre, st.session_state, N_total_cadenas=int(N_total_cadenas)
     )
     N_str_tr = st.number_input(
         "N_strings por tracker (vía combinadoras)",
         min_value=1, key="N_str_tr",
         help=(
-            f"Autocalculado del catálogo: {inversor_nombre} soporta "
-            f"{_n_str_tr_catalogo} strings/tracker. Ajústalo si tu diseño "
-            "real usa una combinadora con menos strings que el máximo de fábrica."
+            f"{'Calculado desde el total declarado arriba' if _res_n_str_tr['fuente'] == 'total' else f'Autocalculado del catálogo: {inversor_nombre} soporta'} "
+            f"{_res_n_str_tr['sugerido']} strings/tracker. Ajústalo si tu "
+            "diseño real usa una combinadora con menos strings."
         ),
     )
-    if _n_str_tr_autocalculado:
+    if _res_n_str_tr["recalculado"] and _res_n_str_tr["fuente"] == "total":
         st.caption(
-            f"🔄 Autocalculado desde el catálogo: **{_n_str_tr_catalogo}** "
+            f"🧮 Estilo PVsyst: **{int(N_total_cadenas)}** cadenas totales ÷ "
+            f"**{_res_n_str_tr['n_trackers']}** trackers = "
+            f"**{_res_n_str_tr['sugerido']}** strings/tracker."
+        )
+    elif _res_n_str_tr["recalculado"]:
+        st.caption(
+            f"🔄 Autocalculado desde el catálogo: **{_res_n_str_tr['sugerido']}** "
             f"strings/tracker para **{inversor_nombre}**."
         )
-    elif int(N_str_tr) != _n_str_tr_catalogo:
+    elif int(N_str_tr) != _res_n_str_tr["sugerido"]:
+        _origen = (
+            f"el total declarado ({int(N_total_cadenas)} cadenas)"
+            if _res_n_str_tr["fuente"] == "total"
+            else f"el catálogo de {inversor_nombre}"
+        )
         st.caption(
-            f"ℹ️ Ajuste manual — el catálogo sugiere **{_n_str_tr_catalogo}** "
-            f"strings/tracker para **{inversor_nombre}**."
+            f"ℹ️ Ajuste manual — {_origen} sugiere "
+            f"**{_res_n_str_tr['sugerido']}** strings/tracker."
         )
     col_nm1, col_nm2 = st.columns(2)
     with col_nm1:

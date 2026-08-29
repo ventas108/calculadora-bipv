@@ -294,41 +294,85 @@ def evaluar_relacion_dc_ac(P_dc_stc_kW: float, P_ac_nom_W: float | None) -> dict
     }
 
 
-def resolver_n_strings_tracker_autocalculado(
+def resolver_n_strings_tracker(
     inversor: dict,
-    session_state,
     inversor_nombre: str,
-) -> tuple[int, bool]:
+    session_state,
+    N_total_cadenas: int = 0,
+) -> dict:
     """
-    Autocalcula N_strings/tracker desde el catálogo del inversor seleccionado,
-    respetando un ajuste manual del usuario mientras siga con el MISMO inversor.
+    Resuelve N_strings/tracker con DOS mecanismos posibles -- comparación
+    honesta pedida explícitamente por el usuario (29-ago-2026) contra cómo
+    lo hace PVsyst, tras validar el proyecto real Teusaquillo:
 
-    Antes (29-ago-2026) el widget de Dimensionamiento/Producción quedaba fijo
-    en 1 (default duro) sin importar el inversor elegido -- eso hacía que la
-    app calculara "paneles/inversor" muy por debajo del real (ej. 16 en vez de
-    128 para el Growatt MID15KTL3-X, que soporta 8 strings/tracker) y de ahí
-    "necesitas 8 inversores" en vez de 1 para el mismo proyecto. PVsyst no
-    tiene este problema: nunca pide este dato aparte, reparte automáticamente
-    el total de cadenas del generador entre los MPPT del inversor.
+    1) MECANISMO PVsyst (si `N_total_cadenas` > 0): el usuario declara el
+       TOTAL de cadenas que quiere para todo el generador -- lo mismo que
+       PVsyst pide en su campo "Núm. cadenas" -- y esta función reparte ese
+       total entre los trackers/MPPT del inversor:
+           N_str_tr = ceil(N_total_cadenas / n_trackers)
+       Es el mecanismo que PVsyst usa siempre: parte de lo que el usuario
+       QUIERE instalar, no de la capacidad del equipo.
+
+    2) MECANISMO CATÁLOGO (si `N_total_cadenas` es 0/None, default): el
+       comportamiento anterior de esta función -- autocalcula desde la
+       capacidad MÁXIMA que soporta el inversor en el catálogo
+       (`inversor["n_strings_tracker"]`). Sigue siendo el default porque
+       esta página es de EXPLORACIÓN ("¿cuánto cabe?"), no de verificación
+       de un diseño que el usuario ya decidió -- PVsyst asume lo segundo,
+       por eso siempre pide el total primero. Antes (29-ago-2026) el widget
+       quedaba fijo en 1 sin importar el inversor elegido, lo que llevó a
+       calcular "16 paneles/inversor, 8 inversores necesarios" en vez de
+       "128 paneles/inversor, 1 inversor" para el proyecto real Teusaquillo.
+
+    En ambos casos se respeta un ajuste manual posterior del usuario
+    mientras la fuente activa no cambie (mismo inversor y mismo total
+    declarado -- para el mecanismo 1 --, o mismo inversor sin total -- para
+    el 2). Cambiar de un mecanismo a otro, de inversor, o de total declarado
+    SIEMPRE resetea al valor recién calculado esa vez.
 
     `session_state` es cualquier objeto dict-like con `.get()` y asignación
     por índice (`st.session_state` en producción; un `dict` plano en tests).
-    Guarda dos claves: `N_str_tr` (el valor efectivo, mismo nombre que ya
-    usan pages/4 y pages/6) y `N_str_tr_inversor_ref` (qué inversor produjo
-    ese valor -- permite detectar el cambio de inversor entre reruns).
+    Guarda `N_str_tr` (el valor efectivo, mismo nombre que ya usan pages/4 y
+    pages/6) y `N_str_tr_fuente_ref` (firma de qué combinación de
+    mecanismo/inversor/total produjo ese valor -- permite detectar el
+    cambio entre reruns).
 
-    Retorna (valor, autocalculado): `autocalculado=True` solo en el render
-    donde se detectó un inversor nuevo/distinto y se reseteó al valor del
-    catálogo; en cualquier otro render (mismo inversor, con o sin ajuste
-    manual del usuario) retorna `False` y respeta lo que ya haya en
-    `session_state["N_str_tr"]`.
+    Retorna dict:
+      valor       : N_strings/tracker efectivo (int)
+      fuente      : "total" | "catalogo"
+      recalculado : True solo en el render donde se detectó un cambio de
+                    fuente/inversor/total y se reseteó al valor calculado
+                    esa vez; en cualquier otro render retorna False y
+                    respeta lo que ya haya en `session_state["N_str_tr"]`
+      n_trackers  : trackers/MPPT del inversor usados para el reparto
+                    (solo relevante -- y no None -- cuando fuente=="total")
     """
-    catalogo = int(inversor.get("n_strings_tracker") or 1)
-    if session_state.get("N_str_tr_inversor_ref") != inversor_nombre:
-        session_state["N_str_tr"] = catalogo
-        session_state["N_str_tr_inversor_ref"] = inversor_nombre
-        return catalogo, True
-    return int(session_state.get("N_str_tr", catalogo) or catalogo), False
+    n_trackers = int(inversor.get("n_trackers") or inversor.get("N_mppt") or 1)
+
+    if N_total_cadenas:
+        N_total_cadenas = int(N_total_cadenas)
+        derivado = math.ceil(N_total_cadenas / n_trackers) if n_trackers > 0 else N_total_cadenas
+        firma = ("total", inversor_nombre, N_total_cadenas, n_trackers)
+        fuente, default_valor = "total", derivado
+    else:
+        firma = ("catalogo", inversor_nombre)
+        fuente, default_valor = "catalogo", int(inversor.get("n_strings_tracker") or 1)
+
+    if session_state.get("N_str_tr_fuente_ref") != firma:
+        session_state["N_str_tr"] = default_valor
+        session_state["N_str_tr_fuente_ref"] = firma
+        return {
+            "valor": default_valor, "sugerido": default_valor,
+            "fuente": fuente, "recalculado": True, "n_trackers": n_trackers,
+        }
+
+    return {
+        "valor": int(session_state.get("N_str_tr", default_valor) or default_valor),
+        "sugerido": default_valor,
+        "fuente": fuente,
+        "recalculado": False,
+        "n_trackers": n_trackers,
+    }
 
 
 def mapear_inversores_catalogo(

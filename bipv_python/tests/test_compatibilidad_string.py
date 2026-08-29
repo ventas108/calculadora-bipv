@@ -6,7 +6,7 @@ from calculos.dimensionamiento import (
     evaluar_compatibilidad_string,
     evaluar_relacion_dc_ac,
     mapear_inversores_catalogo,
-    resolver_n_strings_tracker_autocalculado,
+    resolver_n_strings_tracker,
 )
 from datos.tecnologias_bipv import ASP_ST1_T40
 
@@ -258,15 +258,20 @@ def test_relacion_dc_ac_muy_alto_sugiere_revisar_clipping():
 
 def test_relacion_dc_ac_sin_potencia_ac_nominal_no_es_evaluable():
     assert evaluar_relacion_dc_ac(P_dc_stc_kW=10.0, P_ac_nom_W=None)["evaluable"] is False
+    assert evaluar_relacion_dc_ac(P_dc_stc_kW=10.0, P_ac_nom_W=0)["evaluable"] is False
 
 
 # ---------------------------------------------------------------------------
-# resolver_n_strings_tracker_autocalculado() -- antes N_strings/tracker
+# resolver_n_strings_tracker() -- dos mecanismos posibles, comparacion
+# honesta pedida por el usuario contra como lo hace PVsyst (29-ago-2026).
+# Mecanismo "catalogo" (default, N_total_cadenas=0): antes N_strings/tracker
 # quedaba fijo en 1 (default duro de pages/4) sin importar el inversor
 # seleccionado, lo que llevo a un calculo real erroneo con el proyecto
 # Teusaquillo (16 paneles/inversor en vez de 128, "necesitas 8 inversores"
-# en vez de 1). Casos anclados a esa investigacion real -- ver docstring de
-# la funcion en calculos/dimensionamiento.py para el detalle completo.
+# en vez de 1). Mecanismo "total" (N_total_cadenas>0): replica el mecanismo
+# real de PVsyst -- el usuario declara el total de cadenas del generador y
+# se reparte entre los trackers/MPPT del inversor. Ver docstring de la
+# funcion en calculos/dimensionamiento.py para el detalle completo.
 # ---------------------------------------------------------------------------
 
 
@@ -275,31 +280,29 @@ def test_n_strings_tracker_autocalcula_desde_el_catalogo_al_elegir_inversor():
     inversor = {"n_strings_tracker": 8}
     session_state: dict = {}
 
-    valor, autocalculado = resolver_n_strings_tracker_autocalculado(
-        inversor, session_state, "Growatt MID15KTL3-X"
-    )
+    r = resolver_n_strings_tracker(inversor, "Growatt MID15KTL3-X", session_state)
 
-    assert valor == 8
-    assert autocalculado is True
+    assert r["valor"] == 8
+    assert r["sugerido"] == 8
+    assert r["fuente"] == "catalogo"
+    assert r["recalculado"] is True
     assert session_state["N_str_tr"] == 8
-    assert session_state["N_str_tr_inversor_ref"] == "Growatt MID15KTL3-X"
 
 
 def test_n_strings_tracker_respeta_ajuste_manual_del_mismo_inversor():
     inversor = {"n_strings_tracker": 8}
     session_state: dict = {}
-    resolver_n_strings_tracker_autocalculado(inversor, session_state, "Growatt MID15KTL3-X")
+    resolver_n_strings_tracker(inversor, "Growatt MID15KTL3-X", session_state)
 
     # El usuario ajusta a mano (ej. combinadora real con menos strings)
     session_state["N_str_tr"] = 4
 
     # Mismo inversor en el siguiente rerun -> no debe pisar el ajuste manual
-    valor, autocalculado = resolver_n_strings_tracker_autocalculado(
-        inversor, session_state, "Growatt MID15KTL3-X"
-    )
+    r = resolver_n_strings_tracker(inversor, "Growatt MID15KTL3-X", session_state)
 
-    assert valor == 4
-    assert autocalculado is False
+    assert r["valor"] == 4
+    assert r["sugerido"] == 8  # la formula sigue sugiriendo 8 -- permite avisar del ajuste
+    assert r["recalculado"] is False
 
 
 def test_n_strings_tracker_resetea_al_cambiar_de_inversor():
@@ -310,26 +313,78 @@ def test_n_strings_tracker_resetea_al_cambiar_de_inversor():
     growatt = {"n_strings_tracker": 8}
     generico = {"n_strings_tracker": 1}
     session_state: dict = {}
-    resolver_n_strings_tracker_autocalculado(growatt, session_state, "Growatt MID15KTL3-X")
+    resolver_n_strings_tracker(growatt, "Growatt MID15KTL3-X", session_state)
     session_state["N_str_tr"] = 4  # ajuste manual que no debe sobrevivir el cambio
 
-    valor, autocalculado = resolver_n_strings_tracker_autocalculado(
-        generico, session_state, "MID 15KTL3-X"
-    )
+    r = resolver_n_strings_tracker(generico, "MID 15KTL3-X", session_state)
 
-    assert valor == 1
-    assert autocalculado is True
-    assert session_state["N_str_tr_inversor_ref"] == "MID 15KTL3-X"
+    assert r["valor"] == 1
+    assert r["recalculado"] is True
+    assert session_state["N_str_tr_fuente_ref"] == ("catalogo", "MID 15KTL3-X")
 
 
 def test_n_strings_tracker_sin_dato_en_catalogo_cae_a_1():
     inversor: dict = {}  # ficha incompleta, sin "n_strings_tracker"
     session_state: dict = {}
 
-    valor, autocalculado = resolver_n_strings_tracker_autocalculado(
-        inversor, session_state, "Inversor sin ficha completa"
+    r = resolver_n_strings_tracker(inversor, "Inversor sin ficha completa", session_state)
+
+    assert r["valor"] == 1
+    assert r["recalculado"] is True
+
+
+def test_n_strings_tracker_mecanismo_total_replica_pvsyst():
+    # Mismo caso real Teusaquillo, pero declarando el TOTAL como en PVsyst
+    # (16 cadenas, 2 trackers) en vez de partir de la capacidad del catalogo.
+    inversor = {"n_strings_tracker": 8, "n_trackers": 2}
+    session_state: dict = {}
+
+    r = resolver_n_strings_tracker(
+        inversor, "Growatt MID15KTL3-X", session_state, N_total_cadenas=16
     )
 
-    assert valor == 1
-    assert autocalculado is True
-    assert evaluar_relacion_dc_ac(P_dc_stc_kW=10.0, P_ac_nom_W=0)["evaluable"] is False
+    assert r["fuente"] == "total"
+    assert r["n_trackers"] == 2
+    assert r["valor"] == 8  # 16 / 2 -- coincide con el mecanismo "catalogo" en este caso
+    assert r["recalculado"] is True
+
+
+def test_n_strings_tracker_mecanismo_total_redondea_hacia_arriba():
+    # PVsyst tambien tendria que resolver un reparto no exacto -- 17 cadenas
+    # entre 2 trackers no da entero; ceil() es la unica division que no deja
+    # cadenas sin asignar.
+    inversor = {"n_trackers": 2}
+    session_state: dict = {}
+
+    r = resolver_n_strings_tracker(inversor, "Inversor X", session_state, N_total_cadenas=17)
+
+    assert r["valor"] == 9  # ceil(17/2)
+
+
+def test_n_strings_tracker_total_tiene_prioridad_sobre_catalogo():
+    # Si el usuario declara un total, debe ganar sobre la capacidad maxima
+    # del catalogo aunque sean distintos -- es la eleccion explicita del
+    # usuario, el mecanismo real de PVsyst.
+    inversor = {"n_strings_tracker": 8, "n_trackers": 2}
+    session_state: dict = {}
+
+    r = resolver_n_strings_tracker(
+        inversor, "Growatt MID15KTL3-X", session_state, N_total_cadenas=10
+    )
+
+    assert r["fuente"] == "total"
+    assert r["valor"] == 5  # ceil(10/2), NO el 8 del catalogo
+
+
+def test_n_strings_tracker_volver_a_0_regresa_al_mecanismo_catalogo():
+    inversor = {"n_strings_tracker": 8, "n_trackers": 2}
+    session_state: dict = {}
+    resolver_n_strings_tracker(inversor, "Growatt MID15KTL3-X", session_state, N_total_cadenas=10)
+
+    # El usuario borra el total declarado (vuelve a 0) -- debe volver al
+    # mecanismo de catalogo, no quedarse pegado en el ultimo total.
+    r = resolver_n_strings_tracker(inversor, "Growatt MID15KTL3-X", session_state, N_total_cadenas=0)
+
+    assert r["fuente"] == "catalogo"
+    assert r["valor"] == 8
+    assert r["recalculado"] is True
