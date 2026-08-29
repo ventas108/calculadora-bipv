@@ -168,31 +168,64 @@ def evaluar_compatibilidad_string(
             "N_serie": n,
         }
 
+    # `compatible` usa exactamente las mismas comparaciones de siempre (sin
+    # margen) -- no cambia para nadie que ya dependa de este booleano (incluye
+    # proyectos reales ya entregados, ej. Urabá). `alerta_margen` es un dato
+    # NUEVO, puramente informativo, agregado el 29-ago-2026 al armonizar esta
+    # función con optimizar_n_serie()/semaforo(): esa función SÍ aplica un
+    # margen de seguridad del 7,5% (UMBRAL_ALERTA_PCT, heredado de la hoja
+    # Excel original Optimizacion_String celda L14) antes de considerar un N
+    # "seguro" -- esta función, hasta ahora, no lo aplicaba en absoluto. Eso
+    # hacía que el mismo N pudiera salir "✅ Compatible" aquí (usada por
+    # mapear_inversores_catalogo() / "🧭 Mapeo de inversores") y a la vez
+    # "🟡 ALERTA" en optimizar_n_serie() (el botón "▶️ Optimizar N paneles/
+    # string") -- encontrado con datos reales (TriP 6K-HV, N=8: Voc frío
+    # 987,6V a solo 1,24% del Vdc_max de 1000V -- "compatible" aquí, pero
+    # "ALERTA" allá, dando recomendaciones de N distintas para el mismo
+    # inversor real). `alerta_margen=True` NO cambia `compatible`; solo marca
+    # que al menos una condición pasó por muy poco margen -- ver su uso en
+    # mapear_inversores_catalogo() para preferir configuraciones con margen
+    # real sobre las que solo raspan el límite.
     mensajes = []
+    alerta_margen = False
+
     if voc_frio > vdc_max:
         mensajes.append(f"Voc en frío {voc_frio:.0f} V > Vdc máximo {vdc_max:.0f} V")
+    elif semaforo(voc_frio, vdc_max, invertir=False) == "ALERTA":
+        alerta_margen = True
 
     if vmp_real < vmppt_min:
         mensajes.append(f"Vmp real {vmp_real:.0f} V < MPPT mínimo {vmppt_min:.0f} V")
+    elif semaforo(vmp_real, vmppt_min, invertir=True) == "ALERTA":
+        alerta_margen = True
     if vmp_extremo < vmppt_min:
         mensajes.append(
             f"Vmp extremo {vmp_extremo:.0f} V < MPPT mínimo {vmppt_min:.0f} V"
         )
+    elif semaforo(vmp_extremo, vmppt_min, invertir=True) == "ALERTA":
+        alerta_margen = True
 
     if vmp_real > vmppt_max:
         mensajes.append(f"Vmp real {vmp_real:.0f} V > MPPT máximo {vmppt_max:.0f} V")
+    elif semaforo(vmp_real, vmppt_max, invertir=False) == "ALERTA":
+        alerta_margen = True
     if vmp_extremo > vmppt_max:
         mensajes.append(
             f"Vmp extremo {vmp_extremo:.0f} V > MPPT máximo {vmppt_max:.0f} V"
         )
+    elif semaforo(vmp_extremo, vmppt_max, invertir=False) == "ALERTA":
+        alerta_margen = True
 
     if isc_equiv > isc_max:
         mensajes.append(
             f"Isc de strings {isc_equiv:.2f} A > límite por tracker {isc_max:.2f} A"
         )
+    elif semaforo(isc_equiv, isc_max, invertir=False) == "ALERTA":
+        alerta_margen = True
 
     return {
         "compatible": not mensajes,
+        "alerta_margen": alerta_margen,
         "evaluable": True,
         "mensajes": mensajes,
         "N_serie": n,
@@ -457,10 +490,18 @@ def mapear_inversores_catalogo(
             )
         elif compatibles:
             # Igual criterio que el optimizador: aprovechar al máximo el techo
-            # MPPT, sin introducir una preferencia comercial arbitraria.
+            # MPPT, sin introducir una preferencia comercial arbitraria. Desde
+            # el 29-ago-2026, también prioriza `not alerta_margen` PRIMERO
+            # (evita recomendar un N que solo "compatible" técnicamente pero
+            # raspando el límite físico por <7,5%) -- antes este `max()`
+            # podía recomendar un N distinto al que elige optimizar_n_serie()
+            # para el MISMO inversor real (ver docstring de
+            # evaluar_compatibilidad_string() para el caso real que expuso
+            # esto: TriP 6K-HV, N=8 vs N=7).
             elegido = max(
                 compatibles,
                 key=lambda r: (
+                    not r.get("alerta_margen", False),
                     r["Vmp_real"] / vmppt_max if vmppt_max else 0.0,
                     r["N_serie"],
                 ),
@@ -484,6 +525,7 @@ def mapear_inversores_catalogo(
             "estado": estado,
             "compatible": bool(compatibles),
             "N_string_recomendado": elegido.get("N_serie"),
+            "recomendado_con_margen_ajustado": bool(elegido.get("alerta_margen", False)),
             "N_viables": _resumir_rango(sorted(r["N_serie"] for r in compatibles)),
             "Voc_frio_V": round(elegido["Voc_frio"], 1) if elegido.get("Voc_frio") is not None else None,
             "Vmp_real_V": round(elegido["Vmp_real"], 1) if elegido.get("Vmp_real") is not None else None,

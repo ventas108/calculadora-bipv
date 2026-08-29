@@ -388,3 +388,77 @@ def test_n_strings_tracker_volver_a_0_regresa_al_mecanismo_catalogo():
     assert r["fuente"] == "catalogo"
     assert r["valor"] == 8
     assert r["recalculado"] is True
+
+
+# ---------------------------------------------------------------------------
+# alerta_margen -- armoniza evaluar_compatibilidad_string()/
+# mapear_inversores_catalogo() con el margen de seguridad del 7,5% que
+# optimizar_n_serie()/semaforo() ya aplicaban. Caso real que expuso la
+# inconsistencia (29-ago-2026): TriP 6K-HV con el panel real (Isc=1.19A),
+# N_strings_tracker=2, T_frio=5.0 (Bogota real) -- N=8 da Voc frio 987,6V
+# contra un Vdc_max de 1000V (margen real 1,24%, muy por debajo del 7,5%
+# minimo). El "Mapeo de inversores"/"Prorrateo preliminar" recomendaba N=8
+# ("compatible", sin margen), mientras que el boton principal "Optimizar N
+# paneles/string" elegia N=7 (con margen) -- mismo inversor real, dos
+# recomendaciones distintas. Ver docstring de evaluar_compatibilidad_string()
+# para el detalle completo.
+# ---------------------------------------------------------------------------
+
+
+def _trip_6k_hv() -> dict:
+    return {
+        "Vdc_max": 1000,
+        "Vmppt_min": 200,
+        "Vmppt_activo_min": 200,
+        "Vmppt_max": 900,
+        "Isc_max_tracker": 25,
+        "n_trackers": 2,
+        "n_strings_tracker": 2,
+    }
+
+
+def test_alerta_margen_marca_n8_muy_cerca_del_limite_sin_cambiar_compatible():
+    # ASP_ST1_T40 (fixture del repo) puede tener otro Isc/Voc que el panel
+    # real del catalogo Excel -- se ancla directamente a los voltajes, no al
+    # panel, para no depender de qué fixture se use.
+    resultado = evaluar_compatibilidad_string(
+        ASP_ST1_T40, _trip_6k_hv(), N_serie=8,
+        T_frio=5.0, T_real=36.35, T_extremo=41.94,
+        N_strings_tracker=2,
+    )
+
+    assert resultado["Voc_frio"] == pytest.approx(987.6, abs=1.0)
+    # El dato clave: compatible=True NO cambia (retrocompatibilidad total con
+    # cualquier proyecto ya validado, ej. Urabá) -- alerta_margen es aparte.
+    assert resultado["compatible"] is True
+    assert resultado["alerta_margen"] is True
+
+
+def test_alerta_margen_no_se_activa_con_margen_comodo():
+    # N=6 tiene mucho margen (Voc frio ~763V contra 1000V, margen >7,5%).
+    resultado = evaluar_compatibilidad_string(
+        ASP_ST1_T40, _trip_6k_hv(), N_serie=6,
+        T_frio=5.0, T_real=36.35, T_extremo=41.94,
+        N_strings_tracker=2,
+    )
+
+    assert resultado["compatible"] is True
+    assert resultado["alerta_margen"] is False
+
+
+def test_mapeo_prefiere_n_sin_alerta_de_margen_sobre_n_mas_alto():
+    # El caso real: N=8 es "compatible" pero con alerta_margen; N=7 es
+    # compatible y seguro. El mapeo debe recomendar N=7, coincidiendo con lo
+    # que optimizar_n_serie() elegiría para el mismo inversor real.
+    mapeo = mapear_inversores_catalogo(
+        ASP_ST1_T40,
+        {"TriP 6K-HV": _trip_6k_hv()},
+        N_min=6, N_max=8,
+        T_frio=5.0, T_real=36.35, T_extremo=41.94,
+        N_strings_tracker=2,
+    )
+
+    assert mapeo[0]["N_string_recomendado"] == 7
+    # N=8 sigue apareciendo como viable (compatible=True) -- no desaparece,
+    # solo deja de ser el "recomendado".
+    assert mapeo[0]["N_viables"] == "6–8"

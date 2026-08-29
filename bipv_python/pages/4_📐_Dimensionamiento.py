@@ -530,7 +530,8 @@ with st.container(border=True):
     )
     if not _df_mapeo.empty:
         _cols_mapeo = [
-            "modelo", "estado", "N_string_recomendado", "N_viables",
+            "modelo", "estado", "N_string_recomendado",
+            "recomendado_con_margen_ajustado", "N_viables",
             "Voc_frio_V", "Vmp_real_V", "Isc_tracker_A", "Vdc_max_V",
             "MPPT_V", "trackers", "strings_tracker", "P_ac_nom_kW",
             "costo_usd", "motivo",
@@ -542,6 +543,17 @@ with st.container(border=True):
             on_select="rerun",
             selection_mode="single-row",
             key="tabla_mapeo_inversores",
+            column_config={
+                "recomendado_con_margen_ajustado": st.column_config.CheckboxColumn(
+                    "⚠️ Margen ajustado",
+                    help=(
+                        "El N recomendado pasa los límites eléctricos, pero con menos "
+                        "del 7,5% de margen de seguridad (mismo umbral que usa "
+                        "'▶️ Optimizar N paneles/string') -- considera un N menor si "
+                        "quieres más colchón."
+                    ),
+                ),
+            },
         )
         st.caption(
             "💡 Haz clic en una fila de la tabla para llevar ese modelo "
@@ -604,6 +616,11 @@ with st.container(border=True):
                 format_func=lambda modelo: (
                     f"{modelo} · N/string recomendado: "
                     f"{_compatibles_por_nombre[modelo]['N_string_recomendado']}"
+                    + (
+                        " ⚠️ margen ajustado"
+                        if _compatibles_por_nombre[modelo].get("recomendado_con_margen_ajustado")
+                        else ""
+                    )
                 ),
                 key="selector_inversor_compatible_mapeo",
             )
@@ -623,6 +640,9 @@ with st.container(border=True):
                 st.session_state["prorrateo_preliminar_modelo"] = _modelo_compatible
                 st.session_state["prorrateo_preliminar_N"] = int(
                     _fila_compatible["N_string_recomendado"]
+                )
+                st.session_state["prorrateo_preliminar_alerta_margen"] = bool(
+                    _fila_compatible.get("recomendado_con_margen_ajustado")
                 )
                 st.session_state["prorrateo_preliminar_panel"] = panel_nombre
                 # #225 — persistir también al cargar un compatible
@@ -657,6 +677,7 @@ if (
     st.session_state.pop("prorrateo_preliminar_modelo", None)
     st.session_state.pop("prorrateo_preliminar_N", None)
     st.session_state.pop("prorrateo_preliminar_panel", None)
+    st.session_state.pop("prorrateo_preliminar_alerta_margen", None)
     _prelim_modelo = None
     _prelim_n = None
 if _prelim_modelo and _prelim_n:
@@ -695,6 +716,14 @@ if _prelim_modelo and _prelim_n:
             f"**{_prelim_n} módulos/string** · "
             f"{_prelim_n_mppt} tracker(s)"
         )
+        if st.session_state.get("prorrateo_preliminar_alerta_margen"):
+            st.warning(
+                "⚠️ Este N/string es eléctricamente compatible, pero pasa "
+                "los límites del inversor con **menos del 7,5% de margen de "
+                "seguridad** (mismo umbral que usa '▶️ Optimizar N paneles/"
+                "string' más abajo). Considera bajar un N/string si prefieres "
+                "más colchón para el proyecto real."
+            )
         _pc1, _pc2, _pc3, _pc4 = st.columns(4)
         _pc1.metric("Paneles / inversor", _prelim_dim["N_paneles"])
         _pc2.metric("P_DC / inversor", f"{_prelim_dim['P_dc_stc_kW']:.2f} kW")
