@@ -253,9 +253,19 @@ with col2:
     _n_serie_elec_sug = max(1, math.ceil(_vmppt_min_sug / _vmp_panel_sug)) if _vmppt_min_sug else 8
     _n_serie_sug = int(st.session_state.get("N_serie") or _n_serie_elec_sug)
 
+    # Bug real (29-ago-2026): N_paneles_granja no se invalidaba al cambiar de
+    # inversor -- quedaba pegado al total del inversor ANTERIOR (ej. 126
+    # paneles de un SNA-3K ya explorado) mientras N_serie ya reflejaba el
+    # inversor NUEVO (ej. 7 del TriP 6K-HV), dando una "sugerencia real" que
+    # en verdad mezclaba dos diseños distintos y no correspondía a ninguno.
+    # Se usa solo si el inversor que produjo ese total sigue siendo el
+    # actualmente seleccionado.
     _n_paneles_granja_sug = int(st.session_state.get("N_paneles_granja") or 0)
+    _n_paneles_granja_vigente = (
+        st.session_state.get("N_paneles_granja_inversor_ref") == inversor_nombre
+    )
     _fuente_sug = None
-    if _n_paneles_granja_sug > 0 and _n_serie_sug > 0:
+    if _n_paneles_granja_sug > 0 and _n_serie_sug > 0 and _n_paneles_granja_vigente:
         _total_cadenas_sug = _n_paneles_granja_sug // _n_serie_sug
         _fuente_sug = "real"
         _detalle_sug = (
@@ -303,6 +313,13 @@ with col2:
             f"{_icono_sug} Orientación (no vinculante): **~{_total_cadenas_sug} cadenas**, "
             f"desde {_detalle_sug}."
         )
+        if _fuente_sug == "area" and _n_paneles_granja_sug > 0 and not _n_paneles_granja_vigente:
+            st.caption(
+                "ℹ️ Hay un total de Proyecto completo guardado, pero es de "
+                f"**{st.session_state.get('N_paneles_granja_inversor_ref', 'otro inversor')}** "
+                f"(no de **{inversor_nombre}**) -- corre \"▶️ Optimizar N paneles/string\" "
+                "de nuevo con este inversor para una sugerencia real."
+            )
     _res_n_str_tr = resolver_n_strings_tracker(
         inversor, inversor_nombre, st.session_state, N_total_cadenas=int(N_total_cadenas)
     )
@@ -833,6 +850,7 @@ if _prelim_modelo and _prelim_n:
             st.session_state["N_inv_total"] = _prelim_n_inv
             st.session_state["P_dc_total_kWp"] = round(_prelim_total_kwp, 2)
             st.session_state["N_paneles_granja"] = _prelim_total_panels
+            st.session_state["N_paneles_granja_inversor_ref"] = _prelim_modelo
     else:
         st.warning(
             f"El inversor **{_prelim_modelo}** no tiene un número válido de "
@@ -997,5 +1015,6 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
             st.session_state["N_inv_total"]      = N_inv
             st.session_state["P_dc_total_kWp"]  = round(total_kWp, 2)
             st.session_state["N_paneles_granja"] = total_panels
+            st.session_state["N_paneles_granja_inversor_ref"] = inversor_nombre
     else:
         st.error("❌ Ningún N válido en el rango. Revisar parámetros del inversor o temperaturas.")
