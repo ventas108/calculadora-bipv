@@ -4,6 +4,7 @@ import pytest
 
 from calculos.dimensionamiento import (
     evaluar_compatibilidad_string,
+    evaluar_relacion_dc_ac,
     mapear_inversores_catalogo,
 )
 from datos.tecnologias_bipv import ASP_ST1_T40
@@ -202,3 +203,58 @@ def test_evaluar_compatibilidad_string_coincide_con_filtrar_inversores_compatibl
 
     assert r1["compatible"] is False
     assert bool(df2.iloc[0]["compatible"]) is False
+
+
+# ---------------------------------------------------------------------------
+# evaluar_relacion_dc_ac() -- aviso homólogo a "Proporción Pnom" de PVsyst.
+# Casos anclados a proyectos reales ya validados este mismo repo, incluyendo
+# una captura real de PVsyst 8.1.5 (Teusaquillo) -- ver docstring de la
+# función en calculos/dimensionamiento.py para el detalle completo.
+# ---------------------------------------------------------------------------
+
+
+def test_relacion_dc_ac_teusaquillo_coincide_con_pantallazo_real_pvsyst():
+    # Proyecto real Teusaquillo: 128 módulos ASP-ST1-T40 (8.064 kWp) +
+    # Growatt MID15KTL3-X (15 kW CA). PVsyst 8.1.5 muestra en su propia
+    # UI "Proporción Pnom: 0.538" y el aviso rojo "La potencia del inversor
+    # está muy sobredimensionada" -- confirmado idéntico aquí.
+    resultado = evaluar_relacion_dc_ac(P_dc_stc_kW=8.064, P_ac_nom_W=15_000)
+
+    assert resultado["evaluable"] is True
+    assert resultado["ratio"] == pytest.approx(0.538, abs=0.001)
+    assert resultado["estado"] == "muy_sobredimensionado"
+    assert resultado["nivel"] == "🔴"
+
+
+def test_relacion_dc_ac_uraba_sobredimensionado_pero_no_critico():
+    # Proyecto real Urabá: 220.32 kWp + 2x Growatt MAX 100KTL3 LV
+    # (249.6 kW CA total) -- ratio 0.883, por debajo del rango típico
+    # (0.95-1.35) pero no en el rango "muy sobredimensionado" (<0.75).
+    resultado = evaluar_relacion_dc_ac(P_dc_stc_kW=220.32, P_ac_nom_W=249_600)
+
+    assert resultado["evaluable"] is True
+    assert resultado["ratio"] == pytest.approx(0.883, abs=0.001)
+    assert resultado["estado"] == "sobredimensionado"
+    assert resultado["nivel"] == "🟠"
+
+
+def test_relacion_dc_ac_rango_optimo_no_genera_alerta():
+    resultado = evaluar_relacion_dc_ac(P_dc_stc_kW=13.0, P_ac_nom_W=10_000)  # ratio 1.30
+
+    assert resultado["evaluable"] is True
+    assert resultado["estado"] == "optimo"
+    assert resultado["nivel"] == "🟢"
+
+
+def test_relacion_dc_ac_muy_alto_sugiere_revisar_clipping():
+    resultado = evaluar_relacion_dc_ac(P_dc_stc_kW=18.0, P_ac_nom_W=10_000)  # ratio 1.80
+
+    assert resultado["evaluable"] is True
+    assert resultado["estado"] == "muy_alto"
+    assert resultado["nivel"] == "🔴"
+    assert "clipping" in resultado["mensaje"].lower() or "recorte" in resultado["mensaje"].lower()
+
+
+def test_relacion_dc_ac_sin_potencia_ac_nominal_no_es_evaluable():
+    assert evaluar_relacion_dc_ac(P_dc_stc_kW=10.0, P_ac_nom_W=None)["evaluable"] is False
+    assert evaluar_relacion_dc_ac(P_dc_stc_kW=10.0, P_ac_nom_W=0)["evaluable"] is False

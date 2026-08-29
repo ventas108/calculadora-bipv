@@ -203,6 +203,97 @@ def evaluar_compatibilidad_string(
     }
 
 
+def evaluar_relacion_dc_ac(P_dc_stc_kW: float, P_ac_nom_W: float | None) -> dict:
+    """
+    Evalúa si la relación DC/AC (potencia FV instalada / potencia CA nominal
+    del inversor -- PVsyst la llama "Proporción Pnom") es un acople de diseño
+    coherente, más allá de la compatibilidad eléctrica pura (Voc/Vmppt/Isc,
+    ver evaluar_compatibilidad_string()). Complementa esa función: un string
+    puede ser eléctricamente válido (tensión y corriente dentro de ventana)
+    y aun así estar mal dimensionado en POTENCIA -- inversor de más (capital
+    desperdiciado) o de menos (recorte/clipping real, ver
+    calculos.produccion.simular_produccion_anual, parámetro P_ac_nom_W).
+
+    Pedido explícito del usuario (29-ago-2026) tras verificar en PVsyst 8.1.5
+    que el proyecto Teusaquillo (128 módulos, 8,1 kWp, Growatt MID15KTL3-X
+    15 kW CA) muestra el aviso real "La potencia del inversor está muy
+    sobredimensionada" con "Proporción Pnom: 0.538" -- confirmado idéntico
+    al 0.538 que calcula esta misma fórmula. La app no tenía ningún aviso
+    equivalente; solo `calculos.comparador_inversores` reportaba el ratio
+    como dato informativo, sin evaluarlo.
+
+    Umbrales usados (criterio propio de esta app, NO el algoritmo interno de
+    PVsyst -- no hay forma de verificar ese algoritmo desde aquí): anclados
+    al dato real de PVsyst (0.538 → "muy sobredimensionado") por el lado
+    bajo, y a la convención general de la industria para el "Inverter
+    Loading Ratio" (rango típico de diseño 1.10–1.35, NREL/SAM) por el lado
+    alto. Son un umbral de ORIENTACIÓN para el usuario, no una certificación
+    -- cada proyecto real puede tener razones válidas para salirse de este
+    rango (ej. reutilizar un inversor ya comprado, como el propio Teusaquillo).
+
+    Retorna
+    -------
+    dict con:
+      evaluable  : False si P_ac_nom_W es None/0 -- no hay con qué comparar.
+      ratio      : P_dc_stc_kW*1000 / P_ac_nom_W (None si no evaluable).
+      estado     : "muy_sobredimensionado" | "sobredimensionado" | "optimo"
+                   | "alto" | "muy_alto" | None (si no evaluable).
+      nivel      : "🔴" | "🟠" | "🟢" | None.
+      mensaje    : texto listo para mostrar al usuario.
+    """
+    if not P_ac_nom_W or P_ac_nom_W <= 0:
+        return {
+            "evaluable": False,
+            "ratio": None,
+            "estado": None,
+            "nivel": None,
+            "mensaje": "El inversor no tiene potencia CA nominal registrada -- no se puede evaluar la relación DC/AC.",
+        }
+
+    ratio = round(P_dc_stc_kW * 1000.0 / P_ac_nom_W, 3)
+
+    if ratio < 0.75:
+        estado, nivel = "muy_sobredimensionado", "🔴"
+        mensaje = (
+            f"Inversor MUY sobredimensionado (relación DC/AC = {ratio:.2f}). "
+            f"El array FV ({P_dc_stc_kW:.2f} kWp) usa menos de tres cuartos de la "
+            f"capacidad del inversor ({P_ac_nom_W/1000:.1f} kW CA) -- capital de inversor "
+            "sin aprovechar. Mismo tipo de aviso que da PVsyst (\"La potencia del inversor "
+            "está muy sobredimensionada\") para relaciones en este rango."
+        )
+    elif ratio < 1.0:
+        estado, nivel = "sobredimensionado", "🟠"
+        mensaje = (
+            f"Inversor sobredimensionado (relación DC/AC = {ratio:.2f}) -- por debajo del "
+            "rango típico de diseño (0.95–1.35). Verifica si es una decisión deliberada "
+            "(ej. inversor ya disponible/reutilizado) o si conviene un equipo más pequeño."
+        )
+    elif ratio <= 1.35:
+        estado, nivel = "optimo", "🟢"
+        mensaje = f"Relación DC/AC = {ratio:.2f} -- dentro del rango típico de diseño (0.95–1.35)."
+    elif ratio <= 1.6:
+        estado, nivel = "alto", "🟠"
+        mensaje = (
+            f"Relación DC/AC alta ({ratio:.2f}). Revisa `perdida_clipping_kWh` tras simular "
+            "producción -- es probable que haya recorte real en las horas de mayor irradiancia."
+        )
+    else:
+        estado, nivel = "muy_alto", "🔴"
+        mensaje = (
+            f"Relación DC/AC MUY alta ({ratio:.2f}). Se espera recorte (clipping) "
+            "significativo -- confirma el % de energía recortada tras simular producción "
+            "antes de dar este diseño por bueno."
+        )
+
+    return {
+        "evaluable": True,
+        "ratio": ratio,
+        "estado": estado,
+        "nivel": nivel,
+        "mensaje": mensaje,
+    }
+
+
 def mapear_inversores_catalogo(
     panel: dict,
     inversores: dict,

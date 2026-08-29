@@ -8,7 +8,7 @@ import numpy as np
 from calculos.produccion import simular_produccion_anual, perdidas_desglosadas, panel_tiene_sdm_completo
 from calculos.produccion_iv import simular_produccion_iv, panel_apto_para_iv, preparar_para_iv
 from calculos.modelo_iv import resolver_panel_calibrado
-from calculos.dimensionamiento import evaluar_compatibilidad_string
+from calculos.dimensionamiento import evaluar_compatibilidad_string, evaluar_relacion_dc_ac
 from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_inversores import INVERSORES
 from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
@@ -284,6 +284,23 @@ elif _compat_inversor_evaluable:
         f"{_n_serie_cfg} módulos/string y {_n_strings_tracker_cfg} string(s)/tracker."
     )
 
+# ── Relación DC/AC (acople de POTENCIA, distinto de la compatibilidad de
+# tensión/corriente de arriba) — homóloga al aviso real de PVsyst 8.1.5
+# ("La potencia del inversor está muy sobredimensionada", "Proporción Pnom")
+# verificado por el usuario en el proyecto Teusaquillo (29-ago-2026). Ver
+# calculos.dimensionamiento.evaluar_relacion_dc_ac() para los umbrales y su
+# justificación -- son un criterio propio de la app, no el algoritmo interno
+# de PVsyst, anclado al único dato real disponible (0.538 → PVsyst avisa).
+_dcac = evaluar_relacion_dc_ac(P_stc_kW, inversor.get("P_ac_nom_W") if inversor else None)
+if _dcac["evaluable"]:
+    _dcac_texto = f"**Relación DC/AC = {_dcac['ratio']:.2f}**  \n{_dcac['mensaje']}"
+    if _dcac["nivel"] == "🔴":
+        st.error(f"{_dcac['nivel']} {_dcac_texto}")
+    elif _dcac["nivel"] == "🟠":
+        st.warning(f"{_dcac['nivel']} {_dcac_texto}")
+    else:
+        st.success(f"{_dcac['nivel']} {_dcac_texto}")
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 2 — SIMULACIÓN
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -441,6 +458,26 @@ if btn_sim or st.session_state.get("produccion_ok"):
 
     if not res:
         st.stop()
+
+    # ── Recorte (clipping) real, medido hora a hora — cierra el círculo con el
+    # aviso estático de relación DC/AC de arriba. 0 kWh es lo esperado y
+    # correcto cuando la relación DC/AC está en el rango típico o por debajo
+    # (como Teusaquillo, DC/AC=0.54 → 0 horas recortadas, verificado también
+    # en PVsyst: "Pérdida sobrecarga: 0.0%" para ese mismo proyecto).
+    _clip_kWh = res.get("perdida_clipping_kWh", 0.0) or 0.0
+    if _clip_kWh > 0:
+        _clip_horas = res.get("horas_con_clipping", 0)
+        _clip_pct = (
+            _clip_kWh / res["E_ac_sin_recorte_kWh"] * 100
+            if res.get("E_ac_sin_recorte_kWh") else 0.0
+        )
+        st.warning(
+            f"✂️ **Recorte por inversor (clipping): {_clip_kWh:,.0f} kWh/año "
+            f"({_clip_pct:.1f}% de la energía disponible) en {_clip_horas:,} horas del año.**  \n"
+            "El array FV superó la potencia CA nominal del inversor en esas horas — "
+            "la producción ya lo tiene en cuenta (no es un valor que se pueda recuperar "
+            "sin cambiar el diseño). Coherente con el aviso de relación DC/AC de arriba."
+        )
 
     # ── Comparación modelo IV vs modelo base (solo si IV está activo) ──────────
     if res_iv is not None and res_base:

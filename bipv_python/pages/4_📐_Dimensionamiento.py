@@ -7,6 +7,7 @@ from calculos.dimensionamiento import (
     mapear_inversores_catalogo,
     optimizar_n_serie,
     dimensionar_sistema,
+    evaluar_relacion_dc_ac,
 )
 from calculos.modelo_iv import (
     preparar_panel_iv, resolver_curva_iv, resolver_panel_calibrado,
@@ -809,6 +810,20 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
         c3.metric("Área / inversor",    f"{dim['area_ocupada_m2']} m²")
         c4.metric("Cobertura unitaria", f"{dim['cobertura_pct']}%")
 
+        # Relación DC/AC por inversor -- homóloga al aviso real de PVsyst 8.1.5
+        # ("La potencia del inversor está muy sobredimensionada", "Proporción
+        # Pnom") verificado por el usuario en Teusaquillo (29-ago-2026). Ver
+        # calculos.dimensionamiento.evaluar_relacion_dc_ac() para los umbrales.
+        _dcac_granja = evaluar_relacion_dc_ac(dim["P_dc_stc_kW"], inversor.get("P_ac_nom_W"))
+        if _dcac_granja["evaluable"]:
+            _dcac_g_texto = f"**Relación DC/AC = {_dcac_granja['ratio']:.2f}**  \n{_dcac_granja['mensaje']}"
+            if _dcac_granja["nivel"] == "🔴":
+                st.error(f"{_dcac_granja['nivel']} {_dcac_g_texto}")
+            elif _dcac_granja["nivel"] == "🟠":
+                st.warning(f"{_dcac_granja['nivel']} {_dcac_g_texto}")
+            else:
+                st.success(f"{_dcac_granja['nivel']} {_dcac_g_texto}")
+
         # ── Escalado a la granja completa ─────────────────────────────────────
         if dim["area_ocupada_m2"] > 0:
             N_inv        = math.ceil(area / dim["area_ocupada_m2"])
@@ -816,7 +831,6 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
             total_kWp    = N_inv * dim["P_dc_stc_kW"]
             total_area   = N_inv * dim["area_ocupada_m2"]
             cobert_total = min(round(total_area / area * 100, 1), 100.0) if area > 0 else 0
-            P_ac_inv_kW  = (inversor.get("P_ac_nom_W") or inversor.get("P_dc_max_W") or 0) / 1000
             _tit_area = ("área útil para paneles" if _f_ocup < 100.0 else "toda el área")
             st.markdown(f"### 🏭 Proyecto completo ({_tit_area})")
             g1, g2, g3, g4, g5 = st.columns(5)
