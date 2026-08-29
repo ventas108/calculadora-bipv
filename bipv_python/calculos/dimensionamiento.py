@@ -289,10 +289,10 @@ def evaluar_relacion_dc_ac(P_dc_stc_kW: float, P_ac_nom_W: float | None) -> dict
         estado, nivel = "muy_sobredimensionado", "🔴"
         mensaje = (
             f"Inversor MUY sobredimensionado (relación DC/AC = {ratio:.2f}). "
-            f"El array FV ({P_dc_stc_kW:.2f} kWp) usa menos de tres cuartos de la "
+            f"El array FV ({P_dc_stc_kW:.2f} kWp) usa solo el {ratio * 100:.0f}% de la "
             f"capacidad del inversor ({P_ac_nom_W/1000:.1f} kW CA) -- capital de inversor "
-            "sin aprovechar. Mismo tipo de aviso que da PVsyst (\"La potencia del inversor "
-            "está muy sobredimensionada\") para relaciones en este rango."
+            "sin aprovechar. Mismo tipo de aviso que dan los software de simulación de "
+            "referencia estándar internacional para relaciones en este rango."
         )
     elif ratio < 1.0:
         estado, nivel = "sobredimensionado", "🟠"

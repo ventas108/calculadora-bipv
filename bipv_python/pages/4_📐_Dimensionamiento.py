@@ -231,13 +231,14 @@ with col2:
     # resolver_n_strings_tracker() para la comparación honesta contra PVsyst
     # que motivó agregar el mecanismo "total" (29-ago-2026).
     N_total_cadenas = st.number_input(
-        "N total de cadenas para el proyecto (opcional — estilo PVsyst)",
+        "N total de cadenas para el proyecto (opcional — referencia estándar internacional)",
         min_value=0, value=int(st.session_state.get("N_total_cadenas_proyecto", 0)),
         key="N_total_cadenas_proyecto",
         help=(
             "Si ya sabes cuántas cadenas quieres en TOTAL para todo el "
             "generador, ponlas aquí — se reparten solas entre los trackers "
-            "del inversor, igual que el campo 'Núm. cadenas' de PVsyst. "
+            "del inversor, igual que en los software de simulación de "
+            "referencia estándar internacional. "
             "Déjalo en 0 para que la app siga sugiriendo el máximo que "
             "soporta el inversor según el catálogo (mejor cuando aún estás "
             "explorando cuánto cabe, no verificando un diseño ya decidido)."
@@ -257,7 +258,7 @@ with col2:
     )
     if _res_n_str_tr["recalculado"] and _res_n_str_tr["fuente"] == "total":
         st.caption(
-            f"🧮 Estilo PVsyst: **{int(N_total_cadenas)}** cadenas totales ÷ "
+            f"🧮 Referencia estándar internacional: **{int(N_total_cadenas)}** cadenas totales ÷ "
             f"**{_res_n_str_tr['n_trackers']}** trackers = "
             f"**{_res_n_str_tr['sugerido']}** strings/tracker."
         )

@@ -225,6 +225,22 @@ def test_relacion_dc_ac_teusaquillo_coincide_con_pantallazo_real_pvsyst():
     assert resultado["ratio"] == pytest.approx(0.538, abs=0.001)
     assert resultado["estado"] == "muy_sobredimensionado"
     assert resultado["nivel"] == "🔴"
+    # El mensaje cita el % de uso REAL de esta corrida (54%), no una frase
+    # fija tipo "menos de tres cuartos" -- pedido explicito del usuario
+    # (29-ago-2026) tras notar que el mensaje decia siempre lo mismo sin
+    # importar si el ratio real era 0.54, 0.20 o 0.13.
+    assert "54%" in resultado["mensaje"]
+
+
+def test_relacion_dc_ac_mensaje_muestra_porcentaje_real_no_frase_fija():
+    # Dos ratios distintos, ambos "muy_sobredimensionado" (<0.75) -- el
+    # mensaje debe reflejar CADA porcentaje real, no un texto identico.
+    r1 = evaluar_relacion_dc_ac(P_dc_stc_kW=1.76, P_ac_nom_W=8_640)   # ratio 0.204
+    r2 = evaluar_relacion_dc_ac(P_dc_stc_kW=16.63, P_ac_nom_W=129_600)  # ratio 0.128
+
+    assert "20%" in r1["mensaje"]
+    assert "13%" in r2["mensaje"]
+    assert r1["mensaje"] != r2["mensaje"]
 
 
 def test_relacion_dc_ac_uraba_sobredimensionado_pero_no_critico():
