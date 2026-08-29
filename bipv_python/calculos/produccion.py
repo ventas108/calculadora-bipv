@@ -127,6 +127,7 @@ def simular_produccion_anual(
     factor_pr_mismatch: float,
     P_dc_stc_kW: float | None = None,
     k_bipv: float = 1.0,
+    P_ac_nom_W: float | None = None,
 ) -> dict:
     """
     Simulación de producción anual hora a hora — IEC 61724.
@@ -144,21 +145,38 @@ def simular_produccion_anual(
     k_bipv              : factor de confinamiento térmico BIPV (IEA-PVPS T15).
                           1.0 = ventilado libre, 1.3 = fachada confinada (defecto BIPV),
                           1.5 = sellado total. Aumenta T_celda y reduce eficiencia.
+    P_ac_nom_W          : potencia AC nominal del inversor (W) -- tope físico real de
+                          salida (PVsyst la llama "Pnom" y SIEMPRE recorta con ella).
+                          Si None (default, retrocompatible), NO se aplica ningún tope
+                          -- comportamiento histórico de esta función. Bug real
+                          encontrado el 29-ago-2026: sin este parámetro, P_ac = P_dc ×
+                          eta_inversor sin límite, así que un array DC más grande que
+                          el inversor (relación DC/AC > 1 -- el diseño ESTÁNDAR de la
+                          industria, típicamente 1.1-1.3, no un caso raro) hacía que la
+                          app sobreestimara producción -- verificado con un caso
+                          sintético DC/AC=1.3: +10.8% en un día despejado, 5 de 24 h
+                          recortadas. Nunca se detectó en los proyectos ya validados
+                          contra PVsyst esta sesión (Urabá 0.88, Teusaquillo 0.54)
+                          porque AMBOS tienen relación DC/AC < 1 -- el recorte nunca se
+                          disparaba en esos casos, no porque no hiciera falta.
 
     Retorna dict
     ────────────
-    E_dc_anual_kWh    : energía DC anual (kWh)
-    E_ac_anual_kWh    : energía AC anual (kWh)
-    P_stc_kW          : potencia instalada (kWp)
-    Y_f               : Final yield (kWh/kWp)
-    Y_r               : Reference yield (h = kWh/m²)
-    Y_a               : Array yield (kWh/kWp)
-    PR                : Performance Ratio IEC 61724
-    CF_pct            : Capacity Factor (%)
-    perdida_temp_kWh  : energía perdida por temperatura
-    perdida_inv_kWh   : energía perdida en inversor
-    df_horario        : DataFrame horario (G_eff, T_cel, Pmax, P_dc, P_ac)
-    df_mensual        : DataFrame mensual con E_dc, E_ac, kWh/kWp
+    E_dc_anual_kWh       : energía DC anual (kWh)
+    E_ac_anual_kWh       : energía AC anual (kWh) -- YA recortada si P_ac_nom_W se pasó
+    P_stc_kW             : potencia instalada (kWp)
+    Y_f                  : Final yield (kWh/kWp)
+    Y_r                  : Reference yield (h = kWh/m²)
+    Y_a                  : Array yield (kWh/kWp)
+    PR                   : Performance Ratio IEC 61724
+    CF_pct               : Capacity Factor (%)
+    perdida_temp_kWh     : energía perdida por temperatura
+    perdida_inv_kWh      : energía perdida en inversor por eficiencia (SIN recorte)
+    perdida_clipping_kWh : energía perdida por recorte al Pnom del inversor (0 si no
+                          se pasó P_ac_nom_W, o si el array nunca superó el inversor)
+    horas_con_clipping   : nº de horas del año con recorte activo (0-8760)
+    df_horario           : DataFrame horario (G_eff, T_cel, Pmax, P_dc, P_ac, clipping_kW)
+    df_mensual           : DataFrame mensual con E_dc, E_ac, kWh/kWp
     """
     if P_dc_stc_kW is None:
         P_dc_stc_kW = round(panel.get("Pmax_stc", 60) * N_paneles / 1000, 3)
@@ -194,14 +212,26 @@ def simular_produccion_anual(
     perdida_temp_por_modulo = np.maximum(pmax_stc_g - pmax_mod, 0.0)
 
     # ── Escalar al sistema ─────────────────────────────────────────────────────
-    P_dc_W  = pmax_mod * N_paneles
-    P_ac_W  = P_dc_W * eta_inversor
+    P_dc_W       = pmax_mod * N_paneles
+    P_ac_sin_recorte_W = P_dc_W * eta_inversor
+    # Recorte al Pnom del inversor (PVsyst: siempre activo) -- ver docstring
+    # "P_ac_nom_W" de esta función para el hallazgo real que motivó esto.
+    if P_ac_nom_W is not None and P_ac_nom_W > 0:
+        P_ac_W = np.minimum(P_ac_sin_recorte_W, P_ac_nom_W)
+    else:
+        P_ac_W = P_ac_sin_recorte_W
+    clipping_W = P_ac_sin_recorte_W - P_ac_W   # siempre >= 0
 
     # ── Energías anuales (Wh → kWh) ───────────────────────────────────────────
     E_dc_anual  = float(P_dc_W.sum()) / 1000.0
     E_ac_anual  = float(P_ac_W.sum()) / 1000.0
+    E_ac_sin_recorte_anual = float(P_ac_sin_recorte_W.sum()) / 1000.0
     perdida_temp_kWh = float(perdida_temp_por_modulo.sum()) * N_paneles / 1000.0
-    perdida_inv_kWh  = E_dc_anual - E_ac_anual
+    # Pérdida de eficiencia PURA (sin recorte) -- separada del recorte para que
+    # cada pérdida se pueda reportar por su causa real, como hace PVsyst.
+    perdida_inv_kWh      = E_dc_anual - E_ac_sin_recorte_anual
+    perdida_clipping_kWh = E_ac_sin_recorte_anual - E_ac_anual
+    horas_con_clipping   = int(np.sum(clipping_W > 1e-6))
 
     # ── Métricas IEC 61724 ────────────────────────────────────────────────────
     H_i  = float(G_raw.sum()) / 1000.0          # POA bruta kWh/m²
@@ -222,6 +252,7 @@ def simular_produccion_anual(
         "P_dc_kW":      P_dc_W  / 1000.0,
         "P_ac_kW":      P_ac_W  / 1000.0,
         "perdida_T_kW": perdida_temp_por_modulo * N_paneles / 1000.0,
+        "clipping_kW":  clipping_W / 1000.0,
     }, index=idx)
 
     # ── Contrato anual oficial: suma directa de las 8760 horas ───────────────
@@ -229,18 +260,19 @@ def simular_produccion_anual(
     anual_8760 = agregar_anual_8760_poa(
         resultado_horario=df_h,
         poa_horaria=poa_base,
-        columnas_energia=("P_dc_kW", "P_ac_kW", "perdida_T_kW"),
+        columnas_energia=("P_dc_kW", "P_ac_kW", "perdida_T_kW", "clipping_kW"),
     )["annual_8760"]
 
     # ── DataFrame mensual ─────────────────────────────────────────────────────
     meses_es = {1:"Ene",2:"Feb",3:"Mar",4:"Abr",5:"May",6:"Jun",
                 7:"Jul",8:"Ago",9:"Sep",10:"Oct",11:"Nov",12:"Dic"}
-    df_m = (df_h[["P_dc_kW","P_ac_kW","perdida_T_kW"]]
+    df_m = (df_h[["P_dc_kW","P_ac_kW","perdida_T_kW","clipping_kW"]]
             .resample("ME").sum()
             .rename(columns={
                 "P_dc_kW":      "E_dc (kWh)",
                 "P_ac_kW":      "E_ac (kWh)",
                 "perdida_T_kW": "Pérdida T° (kWh)",
+                "clipping_kW":  "Recorte inversor (kWh)",
             }))
     df_m["Producción (kWh/kWp)"] = df_m["E_ac (kWh)"] / P_dc_stc_kW if P_dc_stc_kW > 0 else 0
     df_m.index = [meses_es[m] for m in df_m.index.month]
@@ -256,6 +288,9 @@ def simular_produccion_anual(
         "CF_pct":                 round(CF * 100, 1),
         "perdida_temp_kWh":       round(perdida_temp_kWh, 0),
         "perdida_inv_kWh":        round(perdida_inv_kWh, 0),
+        "perdida_clipping_kWh":   round(perdida_clipping_kWh, 0),
+        "horas_con_clipping":     horas_con_clipping,
+        "E_ac_sin_recorte_kWh":   round(E_ac_sin_recorte_anual, 0),
         "H_i_kWh_m2":             round(H_i, 1),
         "H_ef_kWh_m2":            round(H_ef, 1),
         "df_horario":             df_h,
@@ -316,10 +351,20 @@ def perdidas_desglosadas(res: dict, poa_bruta_kWh_m2: float) -> pd.DataFrame:
             "Nota":      "",
         },
         {
-            "Etapa":     "④ Pérdida inversor",
-            "kWh":       round(res["E_ac_anual_kWh"], 0),
+            "Etapa":     "④ Pérdida inversor (eficiencia)",
+            "kWh":       round(res.get("E_ac_sin_recorte_kWh", res["E_ac_anual_kWh"]), 0),
             "Δ kWh":     round(delta_inv, 0),
-            "Nota":      f"η_inv = {round(res['E_ac_anual_kWh'] / res['E_dc_anual_kWh'] * 100, 1) if res['E_dc_anual_kWh'] > 0 else '—'}%",
+            "Nota":      f"η_inv = {round(res.get('E_ac_sin_recorte_kWh', res['E_ac_anual_kWh']) / res['E_dc_anual_kWh'] * 100, 1) if res['E_dc_anual_kWh'] > 0 else '—'}%",
+        },
+        {
+            "Etapa":     "④b Recorte inversor (Pnom, clipping)",
+            "kWh":       round(res["E_ac_anual_kWh"], 0),
+            "Δ kWh":     round(-res.get("perdida_clipping_kWh", 0.0), 0),
+            "Nota":      (
+                f"{res.get('horas_con_clipping', 0):,} h/año recortadas"
+                if res.get("perdida_clipping_kWh", 0.0) > 0
+                else "Sin recorte -- DC/AC dentro del rango del inversor"
+            ),
         },
         {
             "Etapa":     "⑤ E_ac  (energía a la red / edificio)",

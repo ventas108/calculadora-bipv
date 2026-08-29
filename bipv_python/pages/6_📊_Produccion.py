@@ -383,6 +383,11 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 factor_pr_mismatch= factor_pr,
                 P_dc_stc_kW       = P_stc_kW,
                 k_bipv            = _k_bipv_sim,
+                # Recorte real al Pnom del inversor (PVsyst siempre lo aplica) --
+                # ver docstring de "P_ac_nom_W" en calculos.produccion. None si
+                # la ficha del inversor no trae el dato -- no recorta, igual que
+                # el comportamiento histórico.
+                P_ac_nom_W        = inversor.get("P_ac_nom_W"),
             )
             try:
                 res_base = simular_produccion_anual(**_sim_kwargs)

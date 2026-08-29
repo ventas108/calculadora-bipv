@@ -155,6 +155,76 @@ def test_multi_inversor_con_n_inversores_1_es_identico_al_comportamiento_previo(
     assert "N_inversores" not in dim_directo
 
 
+def test_clipping_recorta_produccion_cuando_inversor_es_pequeno(tmy_bogota):
+    # Bug real (29-ago-2026): P_ac_W = P_dc_W * eta_inversor sin ningún tope
+    # -- un array DC más grande que el inversor (relación DC/AC > 1, el
+    # diseño ESTÁNDAR de la industria, típicamente 1.1-1.3) hacía que la app
+    # sobreestimara producción sin límite. Ninguno de los proyectos ya
+    # validados contra PVsyst esta sesión lo detectó porque ambos tienen
+    # DC/AC < 1 (Urabá 0.88, Teusaquillo 0.54) -- el recorte nunca se
+    # disparaba en esos casos, no porque no hiciera falta.
+    inversor_chico = {"modelo": "TEST-INV-CHICO", "P_ac_nom_W": 3000.0, "eficiencia_max": 0.97}
+    config_sin = dataclasses.replace(
+        _config_base(), tilt=10.0, area_m2=90.0,
+        N_serie=8, N_strings_tracker=14, inversor=None,
+    )
+    config_con = dataclasses.replace(config_sin, inversor=inversor_chico)
+
+    r_sin = run_bipv_simulation(config_sin, tmy=tmy_bogota)   # sin inversor -> sin recorte
+    r_con = run_bipv_simulation(config_con, tmy=tmy_bogota)   # con Pnom=3kW -> DC/AC > 2
+
+    assert r_sin.produccion["perdida_clipping_kWh"] == 0.0
+    assert r_con.produccion["perdida_clipping_kWh"] > 0.0
+    assert r_con.produccion["horas_con_clipping"] > 0
+    # El recorte reduce E_ac y PR frente al caso sin tope, con el MISMO array físico.
+    assert r_con.E_ac_anual_kWh < r_sin.E_ac_anual_kWh
+    assert r_con.PR < r_sin.PR
+    # Ninguna hora del año debe superar el Pnom declarado (tope físico real).
+    assert r_con.produccion["df_horario"]["P_ac_kW"].max() <= 3.0 + 1e-6
+    # Balance exacto (sin redondeo intermedio): lo recortado = lo que se
+    # habría generado sin tope menos lo que realmente sale.
+    df = r_con.produccion["df_horario"]
+    assert df["clipping_kW"].sum() == pytest.approx(
+        (df["P_ac_kW"] + df["clipping_kW"]).sum() - df["P_ac_kW"].sum(), rel=1e-9
+    )
+
+
+def test_clipping_sin_P_ac_nom_w_no_cambia_nada_retrocompatible(tmy_bogota):
+    # Sin inversor.P_ac_nom_W (o sin inversor del todo) el comportamiento debe
+    # ser IDÉNTICO al de antes de este fix -- ningún proyecto ya validado
+    # (Urabá, Teusaquillo) debe cambiar de resultado por este cambio.
+    config = _config_base()
+    assert config.inversor is None
+    r = run_bipv_simulation(config, tmy=tmy_bogota)
+    assert r.produccion["perdida_clipping_kWh"] == 0.0
+    assert r.produccion["horas_con_clipping"] == 0
+    assert r.produccion["E_ac_sin_recorte_kWh"] == r.produccion["E_ac_anual_kWh"]
+
+
+def test_multi_inversor_con_clipping_preserva_pr_exacto(tmy_bogota):
+    # El atajo de escalar N_paneles/P_dc_stc_kW por N_inversores (ver el
+    # comentario "Multi-inversor" en bipv_simulator.py) sigue siendo exacto
+    # con recorte activo SOLO SI P_ac_nom_W también se escala por
+    # N_inversores -- run_bipv_simulation() ya lo hace. Verificado aquí que
+    # PR y horas_con_clipping quedan EXACTAMENTE iguales entre 1 y 7
+    # inversores idénticos (para N unidades bajo la misma irradiancia,
+    # N×min(a,b) = min(N×a, N×b) -- el mínimo conmuta con un escalar positivo).
+    inversor_chico = {"modelo": "TEST-INV-CHICO", "P_ac_nom_W": 3000.0, "eficiencia_max": 0.97}
+    config_1 = dataclasses.replace(
+        _config_base(), tilt=10.0, area_m2=90.0,
+        N_serie=8, N_strings_tracker=14, inversor=inversor_chico, N_inversores=1,
+    )
+    config_7 = dataclasses.replace(config_1, N_inversores=7)
+
+    r1 = run_bipv_simulation(config_1, tmy=tmy_bogota)
+    r7 = run_bipv_simulation(config_7, tmy=tmy_bogota)
+
+    assert r1.produccion["perdida_clipping_kWh"] > 0.0   # confirma que este caso SÍ recorta
+    assert r7.PR == r1.PR
+    assert r7.produccion["horas_con_clipping"] == r1.produccion["horas_con_clipping"]
+    assert r7.E_ac_anual_kWh == pytest.approx(r1.E_ac_anual_kWh * 7, rel=1e-3)
+
+
 def test_sombreado_horizonte_reduce_produccion_nunca_la_aumenta(tmy_bogota):
     sin_sombra = run_bipv_simulation(_config_base(puntos_horizonte=[]), tmy=tmy_bogota)
     assert sin_sombra.sombreado["factor_sombra_anual"] == 0.0

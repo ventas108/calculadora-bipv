@@ -141,6 +141,7 @@ def simular_produccion_iv(
     factor_pr_mismatch: float,
     P_dc_stc_kW: float | None = None,
     k_bipv: float = 1.0,
+    P_ac_nom_W: float | None = None,
 ) -> dict:
     """
     Simulación de producción anual hora a hora usando la curva IV real (Motor IV).
@@ -158,8 +159,15 @@ def simular_produccion_iv(
     eta_inversor        : eficiencia del inversor (0.90–0.99)
     factor_pr_mismatch  : factor de pérdidas cascada (poa_efectiva / poa_bruta)
     P_dc_stc_kW         : potencia pico instalada kWp; si None → N_paneles × Pmax_stc
+    P_ac_nom_W          : potencia AC nominal del inversor (W) -- tope físico real de
+                          salida (recorte/clipping, PVsyst: "Pnom"). None (default)
+                          = sin recorte, retrocompatible. Ver el mismo parámetro en
+                          calculos.produccion.simular_produccion_anual() para el
+                          hallazgo real que lo motivó (29-ago-2026) -- este módulo
+                          tenía el mismo hueco.
 
-    Retorna dict con las mismas claves que simular_produccion_anual más:
+    Retorna dict con las mismas claves que simular_produccion_anual (incluye
+    perdida_clipping_kWh, horas_con_clipping, E_ac_sin_recorte_kWh) más:
       metodo : "curva_iv" (para trazabilidad)
 
     Lanza ValueError si el panel no tiene ficha completa para el Motor IV.
@@ -207,13 +215,21 @@ def simular_produccion_iv(
 
     # ── Escalar al sistema ─────────────────────────────────────────────────────
     P_dc_W = pmp_mod * N_paneles
-    P_ac_W = P_dc_W * eta_inversor
+    P_ac_sin_recorte_W = P_dc_W * eta_inversor
+    if P_ac_nom_W is not None and P_ac_nom_W > 0:
+        P_ac_W = np.minimum(P_ac_sin_recorte_W, P_ac_nom_W)
+    else:
+        P_ac_W = P_ac_sin_recorte_W
+    clipping_W = P_ac_sin_recorte_W - P_ac_W
 
     # ── Energías anuales (Wh → kWh) ───────────────────────────────────────────
     E_dc_anual       = float(P_dc_W.sum()) / 1000.0
     E_ac_anual       = float(P_ac_W.sum()) / 1000.0
+    E_ac_sin_recorte_anual = float(P_ac_sin_recorte_W.sum()) / 1000.0
     perdida_temp_kWh = float(perdida_temp_por_modulo.sum()) * N_paneles / 1000.0
-    perdida_inv_kWh  = E_dc_anual - E_ac_anual
+    perdida_inv_kWh      = E_dc_anual - E_ac_sin_recorte_anual
+    perdida_clipping_kWh = E_ac_sin_recorte_anual - E_ac_anual
+    horas_con_clipping   = int(np.sum(clipping_W > 1e-6))
 
     # ── Métricas IEC 61724 (idénticas al modelo simple) ───────────────────────
     H_i  = float(G_raw.sum()) / 1000.0
@@ -232,6 +248,7 @@ def simular_produccion_iv(
         "P_dc_kW":      P_dc_W / 1000.0,
         "P_ac_kW":      P_ac_W / 1000.0,
         "perdida_T_kW": perdida_temp_por_modulo * N_paneles / 1000.0,
+        "clipping_kW":  clipping_W / 1000.0,
     }, index=idx)
 
     # ── Contrato anual oficial: suma directa de las 8760 horas ───────────────
@@ -240,18 +257,19 @@ def simular_produccion_iv(
     anual_8760 = agregar_anual_8760_poa(
         resultado_horario=df_h,
         poa_horaria=poa_base,
-        columnas_energia=("P_dc_kW", "P_ac_kW", "perdida_T_kW"),
+        columnas_energia=("P_dc_kW", "P_ac_kW", "perdida_T_kW", "clipping_kW"),
     )["annual_8760"]
 
     # ── DataFrame mensual ─────────────────────────────────────────────────────
     meses_es = {1:"Ene",2:"Feb",3:"Mar",4:"Abr",5:"May",6:"Jun",
                 7:"Jul",8:"Ago",9:"Sep",10:"Oct",11:"Nov",12:"Dic"}
-    df_m = (df_h[["P_dc_kW","P_ac_kW","perdida_T_kW"]]
+    df_m = (df_h[["P_dc_kW","P_ac_kW","perdida_T_kW","clipping_kW"]]
             .resample("ME").sum()
             .rename(columns={
                 "P_dc_kW":      "E_dc (kWh)",
                 "P_ac_kW":      "E_ac (kWh)",
                 "perdida_T_kW": "Pérdida T° (kWh)",
+                "clipping_kW":  "Recorte inversor (kWh)",
             }))
     df_m["Producción (kWh/kWp)"] = df_m["E_ac (kWh)"] / P_dc_stc_kW if P_dc_stc_kW > 0 else 0
     df_m.index = [meses_es[m] for m in df_m.index.month]
@@ -267,6 +285,9 @@ def simular_produccion_iv(
         "CF_pct":                  round(CF * 100, 1),
         "perdida_temp_kWh":        round(perdida_temp_kWh, 0),
         "perdida_inv_kWh":         round(perdida_inv_kWh, 0),
+        "perdida_clipping_kWh":    round(perdida_clipping_kWh, 0),
+        "horas_con_clipping":      horas_con_clipping,
+        "E_ac_sin_recorte_kWh":    round(E_ac_sin_recorte_anual, 0),
         "H_i_kWh_m2":              round(H_i, 1),
         "H_ef_kWh_m2":             round(H_ef, 1),
         "df_horario":              df_h,

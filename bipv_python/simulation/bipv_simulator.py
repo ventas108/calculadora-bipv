@@ -88,6 +88,11 @@ def run_bipv_simulation(
     # (absolutos) escalan correctamente con ellos, mientras que PR/Y_f/Y_a/
     # CF_pct (razones) quedan EXACTAMENTE iguales porque el factor se
     # cancela en numerador y denominador -- no es una aproximación.
+    # Esto SIGUE siendo exacto con recorte de inversor (29-ago-2026) siempre
+    # que P_ac_nom_W también se escale por N_inversores (ver más abajo):
+    # para N unidades IDÉNTICAS bajo la misma irradiancia,
+    # N×min(P_dc×η, Pnom) = min(N×P_dc×η, N×Pnom) -- el mínimo conmuta con un
+    # escalar positivo, así que la unidad de referencia sigue siendo válida.
     if config.N_inversores != 1:
         dim = dict(dim)
         dim["N_paneles"] = dim["N_paneles"] * config.N_inversores
@@ -99,9 +104,25 @@ def run_bipv_simulation(
         )
         dim["N_inversores"] = config.N_inversores
 
+    # Potencia AC nominal TOTAL del bloque de inversores -- tope físico real
+    # de salida (PVsyst: "Pnom", siempre activo). Bug real encontrado
+    # 29-ago-2026: sin esto, simular_produccion_anual() nunca recortaba la
+    # producción aunque el array DC superara al inversor (relación DC/AC>1,
+    # el diseño ESTÁNDAR de la industria, típicamente 1.1-1.3) -- ver
+    # docstring completo de "P_ac_nom_W" en calculos.produccion.
+    # config.inversor es opcional (ver su comentario en schemas.py) -- si no
+    # se pasó, o no trae P_ac_nom_W, se sigue sin recortar (comportamiento
+    # histórico, backward-compatible).
+    _p_ac_nom_unidad = (config.inversor or {}).get("P_ac_nom_W")
+    P_ac_nom_W_total = (
+        _p_ac_nom_unidad * config.N_inversores
+        if _p_ac_nom_unidad is not None else None
+    )
+
     prod = produccion_calc.simular_produccion_anual(
         tmy, poa, config.panel, dim["N_paneles"], config.eta_inversor,
         factor_pr_mismatch, dim["P_dc_stc_kW"], config.k_bipv,
+        P_ac_nom_W=P_ac_nom_W_total,
     )
 
     return SimulationResult(
@@ -133,6 +154,21 @@ def run_bipv_simulation_multisuperficie(
     Lanza ValueError si no hay ninguna superficie activa — no tiene sentido
     devolver un resultado vacío silenciosamente para un proyecto que se
     pidió simular.
+
+    ⚠️ Limitación real conocida, NO resuelta (29-ago-2026): el recorte al
+    Pnom del inversor (ver "P_ac_nom_W" en calculos.produccion) se aplica
+    aquí POR SUPERFICIE, vía run_bipv_simulation() -- correcto cuando cada
+    superficie tiene su propio inversor dedicado, pero INCORRECTO si varias
+    superficies comparten el MISMO inversor físico (el bus horizontal común
+    documentado en Fase 3 de multi-superficie): cada superficie "vería" la
+    capacidad COMPLETA del Pnom compartido, en vez del recorte agregado real
+    del bus. Modelarlo bien requiere sumar la potencia AC pre-recorte de
+    TODAS las superficies activas hora a hora y recortar una sola vez a
+    nivel de sistema -- un rediseño no trivial de esta función, fuera de
+    alcance del fix puntual que lo encontró. Mientras tanto: si cada
+    superficie de un proyecto real trae su propio `config.inversor` con
+    `P_ac_nom_W`, verifica que sea el inversor REAL dedicado a esa
+    superficie, no una copia del inversor compartido del proyecto.
     """
     activas = [s for s in proyecto.superficies if s.activa]
     if not activas:

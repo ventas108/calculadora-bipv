@@ -936,6 +936,24 @@ Además del modelo hora a hora estándar, la página 6 puede calcular la producc
 
 ✅ Regla: usa el modo curva IV cuando el panel tenga ficha completa verificada — es más preciso en horas de baja irradiancia y en climas fríos, donde el modelo lineal subestima o sobreestima.
 
+### Bug real corregido: la producción nunca se recortaba (clipping) al Pnom del inversor  NUEVO (29-ago-2026)
+
+El usuario reportó un error de PVsyst ("inversor sobredimensionado") en el proyecto Teusaquillo y preguntó, honestamente, si esa misma restricción existía en la app. Se investigó y la respuesta fue: no existía ningún filtro — pero al preguntarse si eso era un riesgo real, se encontró algo más serio que una advertencia faltante.
+
+**Root-caused verificando el código real**: `calculos/produccion.py` calculaba `P_ac_W = P_dc_W * eta_inversor` **sin ningún tope** — la función ni siquiera recibía la potencia AC nominal del inversor como parámetro. Cualquier proyecto con relación DC/AC > 1 (el diseño ESTÁNDAR de la industria, típicamente 1.1-1.3, no un caso raro) hacía que la app sobreestimara producción sin límite, exactamente lo que PVsyst SÍ modela con su recorte ("Pnom") siempre activo.
+
+**Cuantificado con un caso real** (inversor 100 kW AC, array 130 kWp DC, ratio 1.3): un solo día despejado — la app reportaría 967,7 kWh cuando lo real con clipping sería 873,5 kWh, **10,8% de sobreestimación**, 5 de 24 horas realmente recortadas. Impacto en cascada: E_ac, PR, Y_f inflados → TIR/VPN/Payback optimistas en cualquier proyecto financiero con ese tipo de diseño.
+
+**Por qué nunca apareció en las 2 validaciones contra PVsyst ya hechas esta sesión**: Urabá (220,32 kWp / 249,6 kW CA = ratio 0,88) y Teusaquillo (8,064 kWp / 15 kW CA = ratio 0,54) — **ambos por debajo de 1,0**, así que el DC nunca se acercó a superar al inversor. El hueco estuvo presente todo este tiempo sin que ninguna validación lo expusiera.
+
+**Corregido, con el mismo rigor que PVsyst**: `calculos/produccion.py::simular_produccion_anual()` y `calculos/produccion_iv.py::simular_produccion_iv()` (ambos motores, modelo simplificado y curva IV real) reciben ahora `P_ac_nom_W` opcional y aplican `P_ac = min(P_dc × η, Pnom)` hora a hora. Nuevos campos en el resultado: `perdida_clipping_kWh`, `horas_con_clipping`, `E_ac_sin_recorte_kWh`. La cascada de pérdidas (`perdidas_desglosadas()`) ahora tiene una fila nueva "④b Recorte inversor (Pnom, clipping)" separada de "④ Pérdida inversor (eficiencia)" — igual que PVsyst separa ambas causas en su propio diagrama de pérdidas.
+
+`simulation/bipv_simulator.py::run_bipv_simulation()` extrae `P_ac_nom_W` de `config.inversor` automáticamente (ya existía ese campo en el contrato, simplemente nunca se usaba para esto) y lo escala por `N_inversores` para proyectos multi-inversor — verificado matemáticamente y con ejecución real que el atajo de escalar N_paneles/P_dc_stc_kW por N_inversores **sigue siendo exacto** con recorte activo (PR y horas_con_clipping idénticos entre 1 y 7 inversores, porque `N×min(a,b) = min(N×a, N×b)`). `pages/6_📊_Producción.py` pasa el mismo dato desde el inversor seleccionado en pantalla. Retrocompatible: si no se pasa `P_ac_nom_W` (o el inversor no lo trae), el comportamiento es idéntico al de antes — ningún proyecto ya validado (Urabá, Teusaquillo) cambia de resultado.
+
+⚠️ **Limitación real, declarada, NO resuelta**: en proyectos multi-superficie donde varias superficies comparten el MISMO inversor físico (bus horizontal común, Fase 3), el recorte se sigue aplicando por superficie — cada una "vería" la capacidad completa del Pnom compartido en vez del recorte agregado real del bus. Modelarlo bien requiere sumar la potencia pre-recorte de todas las superficies activas hora a hora y recortar una sola vez a nivel de sistema — un rediseño de `run_bipv_simulation_multisuperficie()` fuera de alcance de este fix puntual. Documentado en su docstring.
+
+Regresión: 3 tests nuevos en `tests/test_simulation_pipeline.py` (recorte real con inversor pequeño, sin recorte cuando no se pasa `P_ac_nom_W` — verifica retrocompatibilidad total —, y exactitud matemática del atajo multi-inversor con recorte activo). Suite pytest completa: **721/721 passed**.
+
 ## 10. Página 7 — Análisis Financiero  ACTUALIZADO
 
 Propósito: Calcular TIR, VPN, Payback y LCOE del proyecto bajo la Ley 1715/2014.
@@ -2629,9 +2647,11 @@ Tests: se actualizaron 2 aserciones que asumían el catálogo viejo de 7 paneles
 
 ────────────────────────────────────────────────────────────
 
-Manual actualizado el 28 de agosto de 2026
+Manual actualizado el 29 de agosto de 2026
 
-Novedades de esta versión: 💰 Financiero — nueva advertencia cuando un proyecto supera el umbral de 1 MW de "autoconsumo a pequeña escala" (Ley 1715): el dato ya existía en `datos/ciudades_colombia.py` pero ningún cálculo lo usaba, así que un mega-proyecto podía mostrar beneficios fiscales sin avisar que el régimen real a esa escala puede ser distinto. No bloquea ni recalcula, solo advierte (`FinancialResult.advertencia_ley_1715` + banner en Página 7). Verificado con un caso sintético de ~1,2 MWp y con Urabá (220 kWp, sin advertencia). Suite completa: 718/718. Ver sección 10.
+Novedades de esta versión: 📊 Producción — corregido bug real donde la app NUNCA recortaba (clipping) la producción al Pnom del inversor: `P_ac = P_dc × η` sin ningún tope, así que cualquier proyecto con relación DC/AC > 1 (el diseño estándar de la industria) sobreestimaba producción sin límite (cuantificado: +10,8% en un caso típico DC/AC=1.3). Nunca apareció en las validaciones contra PVsyst ya hechas (Urabá y Teusaquillo tienen DC/AC < 1). Corregido en ambos motores (modelo simplificado y curva IV real), con nueva fila "Recorte inversor" en la cascada de pérdidas, igual que hace PVsyst. Limitación real declarada: multi-superficie con inversor compartido entre superficies no modela el recorte agregado del bus todavía. Ver sección 9.
+
+Versión anterior (28 de agosto de 2026): 💰 Financiero — nueva advertencia cuando un proyecto supera el umbral de 1 MW de "autoconsumo a pequeña escala" (Ley 1715): el dato ya existía en `datos/ciudades_colombia.py` pero ningún cálculo lo usaba, así que un mega-proyecto podía mostrar beneficios fiscales sin avisar que el régimen real a esa escala puede ser distinto. No bloquea ni recalcula, solo advierte (`FinancialResult.advertencia_ley_1715` + banner en Página 7). Verificado con un caso sintético de ~1,2 MWp y con Urabá (220 kWp, sin advertencia). Suite completa: 718/718. Ver sección 10.
 
 Versión anterior (28 de agosto de 2026, más temprano): 📋 Catálogo de Paneles — 3 bugs reales más encontrados con la ficha de familia Solar First (10 variantes, serie ST1/ST2): (1) la tabla multi-modelo "por fila" (modelos en filas, no en columnas) no se reconocía por códigos de modelo cortos («ST1-72») — nueva `_detectar_tabla_modelos_por_fila()` la resuelve; (2) falso positivo real de marca: "película delgada" se detectaba como marca "LG" (substring sin límite de palabra) — corregido con `\b...\b`, riesgo genérico para cualquier marca corta; (3) `datos/catalogo_paneles_excel.py::_f()` no manejaba `NaN` de celdas vacías (pandas), causando `ValueError: P_dc_kW contiene valores no finitos` al simular paneles con campos opcionales vacíos — corregido con el mismo patrón `isfinite()` que ya usaba correctamente el `_f()` de inversores. 10 modelos Solar First ingresados al catálogo real (66→76), coeficientes de temperatura dejados en blanco a propósito por instrucción explícita de la propia ficha ("no confirmado, no cargar como dato oficial"). Ver sección 13d.
 
