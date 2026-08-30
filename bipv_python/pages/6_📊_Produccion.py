@@ -14,6 +14,7 @@ from calculos.dimensionamiento import (
     curva_electrica_temperatura,
     interpretar_curva_electrica,
 )
+from calculos.graficos_compatibilidad import figura_compatibilidad_electrica
 from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_inversores import INVERSORES
 from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
@@ -311,54 +312,8 @@ if (
         "⚡ Compatibilidad eléctrica string–inversor vs. temperatura",
         expanded=not _compat_inversor_ok,
     ):
-        _temps = _curva_electrica["temps"]
-        _voc_c = _curva_electrica["voc_curva"]
-        _vmp_c = _curva_electrica["vmp_curva"]
-        _vdc_max_g = _curva_electrica.get("vdc_max")
-        _vmppt_min_g = _curva_electrica.get("vmppt_min")
-        _vmppt_max_g = _curva_electrica.get("vmppt_max")
-        _ev_g = _curva_electrica["evaluacion"]
-
-        fig_c = go.Figure()
-        if _vmppt_min_g is not None and _vmppt_max_g is not None:
-            fig_c.add_hrect(
-                y0=_vmppt_min_g, y1=_vmppt_max_g,
-                fillcolor="#2E7D32", opacity=0.08, line_width=0,
-            )
-            fig_c.add_hline(
-                y=_vmppt_min_g, line_dash="dash", line_color="#2E7D32",
-                annotation_text=f"MPPT mín {_vmppt_min_g:.0f} V", annotation_position="bottom right",
-            )
-            fig_c.add_hline(
-                y=_vmppt_max_g, line_dash="dash", line_color="#2E7D32",
-                annotation_text=f"MPPT máx {_vmppt_max_g:.0f} V", annotation_position="top right",
-            )
-        if _vdc_max_g is not None:
-            fig_c.add_hline(
-                y=_vdc_max_g, line_dash="dot", line_color="#C62828", line_width=2,
-                annotation_text=f"Vdc máx {_vdc_max_g:.0f} V", annotation_position="top left",
-            )
-        fig_c.add_trace(go.Scatter(
-            x=_temps, y=_voc_c, name="Voc(T)",
-            line=dict(color="#1565C0", width=2.5),
-        ))
-        fig_c.add_trace(go.Scatter(
-            x=_temps, y=_vmp_c, name="Vmp(T)",
-            line=dict(color="#EF6C00", width=2.5),
-        ))
-        _color_pts = "#2E7D32" if _compat_inversor_ok else "#C62828"
-        fig_c.add_trace(go.Scatter(
-            x=[_T_frio_prod, _T_real_prod, _T_extremo_prod],
-            y=[_ev_g.get("Voc_frio"), _ev_g.get("Vmp_real"), _ev_g.get("Vmp_extremo")],
-            name="Puntos de diseño", mode="markers",
-            marker=dict(size=11, color=_color_pts, line=dict(width=1.5, color="white")),
-        ))
-        fig_c.update_layout(
-            xaxis_title="Temperatura de celda (°C)",
-            yaxis_title="Tensión (V)",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            height=360,
-            margin=dict(l=10, r=10, t=30, b=10),
+        fig_c = figura_compatibilidad_electrica(
+            _curva_electrica, _T_frio_prod, _T_real_prod, _T_extremo_prod
         )
         st.plotly_chart(fig_c, use_container_width=True)
 

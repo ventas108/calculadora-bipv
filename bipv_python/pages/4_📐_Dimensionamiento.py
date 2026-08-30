@@ -9,7 +9,10 @@ from calculos.dimensionamiento import (
     dimensionar_sistema,
     evaluar_relacion_dc_ac,
     resolver_n_strings_tracker,
+    curva_electrica_temperatura,
+    interpretar_curva_electrica,
 )
+from calculos.graficos_compatibilidad import figura_compatibilidad_electrica
 from calculos.modelo_iv import (
     preparar_panel_iv, resolver_curva_iv, resolver_panel_calibrado,
     validar_sdm_vs_ficha, explicar_fallo_validacion_sdm,
@@ -995,6 +998,44 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
         )
         st.session_state["N_serie"] = mejor.N_serie
         st.session_state["N_str_tr_usado"] = int(N_str_tr)
+
+        # ── Gráfico Voc/Vmp vs. temperatura + interpretación del N elegido ────
+        # Visibilizado también aquí (pedido explícito del usuario, 30-ago-2026,
+        # tras agregarlo primero al Reporte PDF y luego a 📊 Producción): este
+        # es el módulo donde el usuario elige el N/string, así que ver de una
+        # vez el comportamiento eléctrico completo del N óptimo (no solo el
+        # semáforo OK/ALERTA/FALLA de la tabla de arriba) evita tener que ir
+        # a otra página para confirmar el margen real de cada punto.
+        _curva_dim = curva_electrica_temperatura(
+            panel, inversor, mejor.N_serie,
+            T_frio=T_frio, T_real=T_real, T_extremo=T_extr,
+            N_strings_tracker=int(N_str_tr),
+        )
+        if _curva_dim.get("voc_curva") and _curva_dim.get("vmp_curva"):
+            with st.expander(
+                "⚡ Compatibilidad eléctrica string–inversor vs. temperatura "
+                f"(N={mejor.N_serie})",
+                expanded=False,
+            ):
+                fig_dim = figura_compatibilidad_electrica(
+                    _curva_dim, T_frio, T_real, T_extr
+                )
+                st.plotly_chart(fig_dim, use_container_width=True)
+                st.caption(
+                    "Voc y Vmp son funciones lineales de la temperatura de celda: los 3 "
+                    "puntos de diseño (frío, real, extremo) cubren con certeza matemática "
+                    "toda la curva continua entre ellos — este gráfico visualiza el mismo "
+                    "resultado de la tabla de arriba, no evalúa nada distinto."
+                )
+                for _p in interpretar_curva_electrica(_curva_dim):
+                    _icono = {"ok": "🟢", "ajustado": "🟠", "critico": "🔴"}[_p["nivel"]]
+                    _texto_p = f"{_icono} **{_p['punto']}** — {_p['texto']}"
+                    if _p["nivel"] == "critico":
+                        st.error(_texto_p)
+                    elif _p["nivel"] == "ajustado":
+                        st.warning(_texto_p)
+                    else:
+                        st.caption(_texto_p)
 
         # Dimensionamiento del sistema — respeta el factor de ocupación
         # (Granja fotovoltaica: los paneles solo cubren un % del terreno; el

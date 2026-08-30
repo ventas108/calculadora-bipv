@@ -120,6 +120,36 @@ el banner de compatibilidad eléctrica que existía antes de este cambio.
   excepciones (`fig.to_json()` fuerza la validación completa) y las interpretaciones impresas
   coinciden exactamente con los casos ya documentados arriba.
 
+## Segunda actualización (30 de agosto de 2026, mismo día): visibilizada también en 📐 Dimensionamiento
+
+El usuario pidió "agrégala también en Dimensionamiento" tras verla en Producción. Dimensionamiento
+es donde el usuario realmente **elige** el N/string (botón "▶️ Optimizar N paneles/string"), así
+que este es el módulo donde más temprano en el flujo conviene ver el comportamiento eléctrico
+completo del N óptimo — no solo el semáforo OK/ALERTA/FALLA de la tabla de candidatos.
+
+**Refactor hecho antes de duplicar el código**: como la misma gráfica ahora vive en dos páginas, se
+extrajo la construcción de la figura Plotly a `calculos/graficos_compatibilidad.py::figura_compatibilidad_electrica()`
+(sin lógica de verificación, solo dibuja lo que `curva_electrica_temperatura()` ya calculó) — evita
+el riesgo real de que las dos páginas terminen mostrando el mismo caso de forma distinta si una se
+edita y la otra no (la misma clase de bug de coherencia entre módulos que ya se corrigió antes en
+esta app, ver `bipv_tipo_instalacion_coherencia` en la memoria del asistente). `pages/6_📊_Produccion.py`
+se migró a usar la función compartida en el mismo cambio (comportamiento idéntico, verificado con la
+suite completa).
+
+**Dónde quedó en Dimensionamiento**: dentro del bloque `if sin_riesgos:` del botón "▶️ Optimizar N
+paneles/string", justo después de fijar `N_serie` en session_state y antes de calcular el
+dimensionamiento del sistema — usa exactamente los mismos `T_frio`/`T_real`/`T_extr`/`N_str_tr` que
+ya se le pasaron a `optimizar_n_serie()` unas líneas arriba, así que el gráfico corresponde
+exactamente al `N óptimo` que la tabla acaba de recomendar. Como `mejor` siempre viene de
+`sin_riesgos` (riesgos == 0), el panel queda colapsado por defecto (a diferencia de Producción, que
+se auto-expande si la config es incompatible — aquí ese caso no puede darse por construcción).
+
+Suite completa tras el cambio: **797 passed** (sin tests nuevos: `figura_compatibilidad_electrica()`
+es un paso a través puramente visual de datos ya cubiertos por los tests de
+`curva_electrica_temperatura()`/`interpretar_curva_electrica()`). Smoke-test real del módulo
+compartido con Plotly 5.22.0 instalado en un entorno aislado, para N=18 y N=28 de Urabá — la figura
+se construye sin excepciones para ambos casos.
+
 ## Nota aparte (no corregida, fuera de alcance)
 
 Se detectó que el checkbox "Incluir sección Dimensionamiento" (`key="rep_inc_dim"`) del Reporte PDF
