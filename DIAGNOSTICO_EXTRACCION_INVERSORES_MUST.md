@@ -26,7 +26,9 @@ Comparado con los otros 2 archivos (que sí son PV3500 TLV Series real, con MPPT
 
 **Los 2 archivos correctos SÍ traen los 3 modelos PV35 reales** (8048/10048/12048 TLV) en una sola ficha combinada de familia — de hecho `Inversor-Hibrido-8000W-...pdf` e `Inversor-Hibrido-10000W-...pdf` son la MISMA ficha de 3 modelos, solo descargada/guardada dos veces con nombres distintos (contenido de texto extraído idéntico, 6.049 caracteres en ambos). Así que el PV35-12048 TLV real **sí está disponible** — solo que en el archivo "8000W" o "10000W", no en el "12000W".
 
-**Qué hacer**: no cargar el archivo "12000W" al catálogo como si fuera PV35-12048 TLV. Si en algún momento se necesita la ficha PV36 real, ese archivo sirve para eso — pero con su nombre correcto.
+**Corregido (30-ago-2026)**: el archivo se renombró en el escritorio del usuario, de
+`Inversor-Hibrido-12000W-48V-PV35-Fase-Dividida-TLV-Must.pdf` a
+`Inversor-Hibrido-12000W-48V-PV36-Fase-Dividida-TLV-Must.pdf` — mismo contenido (verificado tras el rename: `modelos_detectados` sigue dando `['PV36-8048', 'PV36-10048', 'PV36-12048']`, Vdc_max=250V), solo el nombre ahora coincide con lo que realmente hay adentro. El PV35-12048 TLV real sigue disponible en cualquiera de los otros dos archivos ("8000W"/"10000W", ficha combinada de familia).
 
 ## Valores reales extraídos (tras los 2 fixes de esta auditoría)
 
@@ -77,4 +79,4 @@ Antes de esta auditoría, `calculos/pdf_inversor_extractor.py` (~1.500 líneas, 
 
 ## Resultado final
 
-Suite completa: **767/767**. Los 2 bugs de código corregidos y verificados contra las 3 fichas reales; el hallazgo del archivo mal nombrado documentado para que no se cargue por error PV36 como si fuera PV35-12048 TLV.
+Suite completa: **767/767**. Los 2 bugs de código corregidos y verificados contra las 3 fichas reales; el archivo mal nombrado ya se corrigió en el escritorio (renombrado a PV36) para que no se vuelva a cargar por error como PV35-12048 TLV.
