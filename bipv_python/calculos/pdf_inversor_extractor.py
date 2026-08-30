@@ -466,6 +466,15 @@ _PAT_ISC = [
 # P_dc_max_W — Potencia FV máxima recomendada (W)
 # ─────────────────────────────────────────────────────────────────────────────
 _PAT_PDCMAX = [
+    # MUST (ficha real PV3500/PV3600 TLV Series, verificado 30-ago-2026): la
+    # propia ficha del fabricante trae el typo "Maximim" en vez de "Maximum"
+    # ("Maximim PV array power 5000W(10000W for 200A optional)") -- ninguno
+    # de los patrones "Max(?:imum)?" de abajo lo cubre porque "Maximim" no es
+    # "Max" + "imum" opcional, es una palabra distinta letra por letra. Sin
+    # este patrón, P_dc_max_W queda en None pese a que el valor SÍ está
+    # impreso con claridad. Toma solo el primer número (el límite base sin el
+    # upgrade opcional entre paréntesis, ej. 5000 de "5000W(10000W...)").
+    (r"Maxim(?:um|im)\.?\s+PV\s+(?:array\s+)?[Pp]ower\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*[Ww]\b", 1),
     # SAJ español: "Potencia máxima FV [Wp]@STC 30000 37500 45000" → 1er valor
     (r"Potencia\s+m[aá]xima\s+FV\s*\[\s*Wp?\s*\]\s*(?:@\s*STC)?\s*([0-9]{4,6})\b", 1),
     # Voltronic/InfiniSolar: "Maximum PV Input Power 14850W"
@@ -620,6 +629,24 @@ def _extract_brand(text: str) -> str:
     return ""
 
 
+# Encabezados de sección/tabla genéricos que aparecen como línea aislada en
+# MUCHAS fichas de inversores (no solo MUST) tras la extracción de pdfplumber
+# -- pdfplumber a veces separa el label de una fila de tabla en su propia
+# línea. Sin esta lista, _extract_model() los confunde con un código de
+# modelo real porque cumplen la forma "todo mayúsculas, 5-35 caracteres".
+# Bug real (30-ago-2026): ficha MUST PV3600 TLV Series -- "INVERTER" (label
+# de sección, no modelo) se devolvía como `modelo`, mientras que el modelo
+# real (PV36-12048 TLV) sólo aparecía correctamente en `modelos_detectados`
+# (detector multi-modelo). Encontrado auditando el extractor real con las 3
+# fichas MUST PV35-8048/10048/12048 TLV pedidas por el usuario.
+_SECCION_HEADERS_GENERICAS = {
+    "INVERTER", "OUTPUT", "INPUT", "BATTERY", "PROTECTION", "MECHANICAL",
+    "SPECIFICATIONS", "SOLAR", "CHARGER", "BYPASS", "GENERATOR", "OTHER",
+    "AC INPUT", "AC CHARGER", "AC OUTPUT", "DC INPUT", "INTRODUCTION",
+    "FEATURES", "MODEL",
+}
+
+
 def _extract_model(text: str, brand: str) -> str:
     lines = text.split("\n")[:40]
     # Patrón 1: línea completa que parece un modelo (alfanumérica con guiones)
@@ -629,6 +656,7 @@ def _extract_model(text: str, brand: str) -> str:
         if re.fullmatch(r"[A-Z0-9][A-Z0-9\-\._ ]{3,35}", line):
             if (len(line) >= 5
                     and line.lower() not in ("datasheet", "technical", "specifications")
+                    and line.upper() not in _SECCION_HEADERS_GENERICAS
                     and "SERIES" not in line.upper()  # "HYBRID SERIES" = título de gama, no modelo
                     and not re.match(r"^MPPT?\b|^MPPT?\d", line)  # "MPPT 1"/"MPPT1"/"MPPT 10 N" del diagrama unifilar
                     and not re.fullmatch(r"\d+\s*K?[VW]A?", line, re.IGNORECASE)):  # "50KVA" = potencia, no modelo
