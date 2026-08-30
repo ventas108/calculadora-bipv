@@ -10,6 +10,14 @@ Campos extraídos (13 columnas del catálogo):
   n_trackers, n_strings_tracker, I_max_tracker, Isc_max_tracker,
   P_dc_max_W, es_hibrido, bat_voltaje_min, bat_voltaje_max
 
+Además, `salida_depende_bateria` (bool): True cuando la ficha declara
+explícitamente que la salida/umbrales de un inversor híbrido dependen del
+tipo de batería instalada (plomo-ácido/AGM/gel/litio) -- no del modelo del
+inversor. En ese caso `bat_voltaje_min`/`bat_voltaje_max` se fuerzan a
+`None` (nunca se adivina cuál de los puntos de corte configurables aplica)
+y la UI debe avisar que se completan a mano según la batería real del
+proyecto.
+
 Referencia de alias: Mapa_de_Alias_Catalogo_Inversores (INNOVAQ/EINNOVA 2026).
 """
 
@@ -552,6 +560,24 @@ _PAT_BAT_MIN = [
     (r"[Bb]attery\s+[Vv]oltage\s*\(?\s*[Mm]in\.?\s*\)?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"[Mm]in(?:imum)?\s+[Bb]attery\s+[Vv]oltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",       1),
 ]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Inversores híbridos: salida/umbrales que dependen del TIPO de batería
+# instalada (plomo-ácido/AGM/gel/litio), no del modelo del inversor.
+# ─────────────────────────────────────────────────────────────────────────────
+# Idea real del usuario (30-ago-2026), verificada contra el texto exacto de
+# las fichas MUST: en un inversor híbrido, el instalador conecta la batería
+# que quiera -- el fabricante del INVERSOR no puede publicar un voltaje de
+# batería fijo, así que da un rango configurable en el propio LCD del
+# equipo ("Low battery voltage cutoff 40-48VDC for 48VDC mode" es un RANGO,
+# no un valor único) y lo dice explícitamente: "Output voltage Depends on
+# battery type". Si el extractor (o uno futuro) llegara a rellenar
+# bat_voltaje_min/max con alguno de esos valores, sería un dato inventado
+# -- el correcto depende de la batería real del proyecto, no de la ficha.
+_HIBRIDO_DEPENDE_BATERIA_RE = re.compile(
+    r"[Dd]epends?\s+on\s+battery\s+type"
+    r"|[Dd]epende\s+del\s+tipo\s+de\s+bater[íi]a",
+)
 _PAT_BAT_MAX = [
     (r"[Bb]attery\s+[Vv]oltage\s*\(?\s*[Mm]ax\.?\s*\)?\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"[Mm]ax(?:imum)?\s+[Bb]attery\s+[Vv]oltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",       1),
@@ -1525,6 +1551,17 @@ def _extraer_campos(texto: str) -> dict:
     bat_voltaje_min = _first(bat_min_r, _find(_PAT_BAT_MIN, texto))
     bat_voltaje_max = _first(bat_max_r, _find(_PAT_BAT_MAX, texto))
 
+    # Híbridos donde la ficha declara explícitamente que la salida "depende
+    # del tipo de batería" (ver _HIBRIDO_DEPENDE_BATERIA_RE arriba): ningún
+    # valor de bat_voltaje_min/max puede ser correcto de forma genérica --
+    # depende de qué batería real instale el usuario, no del inversor.
+    # Override defensivo: aunque algún patrón hubiera capturado un número
+    # (ninguno lo hace hoy, pero un patrón futuro sí podría), se descarta.
+    salida_depende_bateria = bool(_HIBRIDO_DEPENDE_BATERIA_RE.search(texto))
+    if salida_depende_bateria:
+        bat_voltaje_min = None
+        bat_voltaje_max = None
+
     # ── Sanity checks ─────────────────────────────────────────────────────────
     # Vdc_max: típico 50–1500 V
     if Vdc_max is not None and not (50 <= Vdc_max <= 1500):
@@ -1568,6 +1605,10 @@ def _extraer_campos(texto: str) -> dict:
         "P_dc_estimado":    P_dc_estimado,
         "bat_voltaje_min":  bat_voltaje_min,
         "bat_voltaje_max":  bat_voltaje_max,
+        # True si la ficha declara que la salida/umbrales dependen del tipo
+        # de batería instalada (no del modelo del inversor) -- la UI debe
+        # avisar que bat_voltaje_min/max se completan a mano, no adivinar.
+        "salida_depende_bateria": salida_depende_bateria,
     }
 
 

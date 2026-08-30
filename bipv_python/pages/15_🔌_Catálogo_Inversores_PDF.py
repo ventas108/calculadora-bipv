@@ -125,6 +125,25 @@ with tab1:
     else:
         st.success("✅ PDF digital procesado correctamente.", icon="✅")
 
+    # Inversor híbrido cuya salida/umbrales dependen del tipo de batería
+    # instalada (plomo-ácido/AGM/gel/litio) -- idea del usuario (30-ago-2026):
+    # el fabricante del INVERSOR no puede publicar un voltaje de batería fijo
+    # (el instalador conecta la que quiera), así que bat_voltaje_min/max
+    # quedan intencionalmente en blanco (ver salida_depende_bateria en
+    # calculos/pdf_inversor_extractor.py) -- avisar por qué, aparte de la
+    # alerta genérica de campos vacíos, para que no se confunda con un fallo
+    # del extractor.
+    if res.get("salida_depende_bateria"):
+        st.info(
+            "🔋 **Esta ficha indica que la salida depende del tipo de batería instalada** "
+            "(plomo-ácido/AGM/gel/litio) — el fabricante del inversor no puede fijar un "
+            "voltaje de batería único, el equipo se configura en su propio LCD según la "
+            "batería real que conectes. Por eso **Voltaje Batería Mín/Máx quedan en blanco "
+            "a propósito**: complétalos manualmente según la batería de tu proyecto, no "
+            "según un valor de la ficha del inversor.",
+            icon="🔋",
+        )
+
     # ── #139: alerta de campos críticos vacíos (fallo silencioso) ─────────────
     # Se omite si el PDF es escaneado sin OCR: ese caso ya tiene su propio error.
     from calculos.pdf_inversor_extractor import contar_campos_vacios

@@ -105,6 +105,18 @@ Dos veces en esta auditoría (con la ficha PV3300 completa y con la ficha aislad
 
 **Recomendación al usuario para la próxima vez que esto pase**: recargar la página completa (F5) antes de volver a subir el archivo, o probar en una ventana de navegación privada, para descartar caché del navegador.
 
+## Mejora real #9 (idea del usuario, implementada) — inversores híbridos: distinguir "submodelo por potencia" de "voltaje que depende de la batería instalada"
+
+El usuario hizo una corrección conceptual importante sobre este tipo de ficha (inversor híbrido): lo que esta auditoría venía llamando "submodelos" (PV35-8048/10048/12048) son 3 **productos físicos distintos por potencia** (distinta electrónica, peso, corriente máxima) — eso está bien modelado. Pero **dentro de cada uno**, el inversor es agnóstico de química de batería: el instalador conecta la batería real (plomo-ácido/AGM/gel/litio) y el equipo se configura en su propio LCD con los puntos de corte según esa batería. El fabricante del **inversor** no puede publicar un voltaje de batería fijo — y la ficha lo dice explícitamente: `"Output voltage Depends on battery type"`, y los puntos de corte se publican como **rangos** ("Low battery voltage cutoff 40-48VDC for 48VDC mode"), no valores únicos.
+
+**Estado antes**: `bat_voltaje_min`/`bat_voltaje_max` ya quedaban en `None` para estas fichas (ningún patrón existente los capturaba) — correcto por casualidad, pero sin ninguna explicación visible: indistinguible de "el extractor falló" para el usuario.
+
+**Implementado**: nueva detección `_HIBRIDO_DEPENDE_BATERIA_RE` (ancla el texto real `"Depends on battery type"` / equivalente español) → nuevo campo `salida_depende_bateria` en el resultado de extracción. Cuando es `True`:
+1. **Override defensivo**: `bat_voltaje_min`/`bat_voltaje_max` se fuerzan a `None` sin importar si algún patrón (actual o futuro) capturó un número — el valor correcto depende de la batería real del proyecto, nunca de la ficha del inversor.
+2. **Aviso visible propio** en `pages/15_🔌_Catálogo_Inversores_PDF.py` (`st.info`, distinto de la alerta genérica de campos vacíos): explica por qué esos 2 campos quedan en blanco a propósito y qué debe hacer el usuario (completarlos según su batería real).
+
+3 tests nuevos, anclados al texto real. Suite completa: **776/776**.
+
 ## Bug real #8 (corregido) — el campo singular `modelo` devolvía el encabezado multi-modelo completo
 
 Confirmado el fix del bug #6 con una recarga limpia (la advertencia de nombre de archivo del hallazgo anterior mostró correctamente `Inversor-Hibrido-PV33-5048-6048-TLV-Must-SUBMODELO.pdf`, 1,8KB — el archivo correcto esta vez), los valores numéricos salieron bien (Vdc_max=145, Vmppt=60-130, I_max=80, P_dc=5000 — todos correctos). Pero el campo **"Modelo \*"** del formulario mostraba `"MODEL PV33-5048 TLV PV33-6048 TLV"` — la fila de encabezado multi-modelo completa, no un nombre de modelo.
@@ -172,8 +184,8 @@ Con los 11 modelos ya bien detectados, se verificó que `valores_por_modelo` seg
 
 ## Cobertura de tests — hallazgo aparte
 
-Antes de esta auditoría, `calculos/pdf_inversor_extractor.py` (~1.500 líneas, el motor completo de extracción de fichas de inversores) **no tenía ningún test que llamara a `extraer_parametros_inversor()` ni a sus funciones internas directamente** — toda la cobertura de "inversor" existente prueba lógica de catálogo/compatibilidad con diccionarios ya armados a mano, no el motor de regex en sí. Se creó `tests/test_pdf_inversor_extractor.py` (12 tests en total, incluidos los de las secciones anteriores) anclado al texto real de estas fichas MUST, como primer test directo del motor de extracción.
+Antes de esta auditoría, `calculos/pdf_inversor_extractor.py` (~1.500 líneas, el motor completo de extracción de fichas de inversores) **no tenía ningún test que llamara a `extraer_parametros_inversor()` ni a sus funciones internas directamente** — toda la cobertura de "inversor" existente prueba lógica de catálogo/compatibilidad con diccionarios ya armados a mano, no el motor de regex en sí. Se creó `tests/test_pdf_inversor_extractor.py` (15 tests en total, incluidos los de las secciones anteriores) anclado al texto real de estas fichas MUST, como primer test directo del motor de extracción.
 
 ## Resultado final
 
-Suite completa: **773/773**. Los 8 bugs de código corregidos y verificados contra las fichas reales (PV35 ×3, PV36, PV3300 ×2 + ficha aislada PV33-5048/6048); el archivo mal nombrado ya se corrigió en el escritorio (renombrado a PV36); el detector multi-modelo con la ficha de familia completa (11 modelos) ya no produce entradas basura ni modelos fusionados — corregido de raíz, no solo mitigado; el campo `modelo` singular ya no confunde un encabezado multi-modelo con un nombre real.
+Suite completa: **776/776**. Los 8 bugs de código corregidos y verificados contra las fichas reales (PV35 ×3, PV36, PV3300 ×2 + ficha aislada PV33-5048/6048); el archivo mal nombrado ya se corrigió en el escritorio (renombrado a PV36); el detector multi-modelo con la ficha de familia completa (11 modelos) ya no produce entradas basura ni modelos fusionados — corregido de raíz, no solo mitigado; el campo `modelo` singular ya no confunde un encabezado multi-modelo con un nombre real; y, a partir de una idea real del usuario, los inversores híbridos ahora avisan explícitamente cuándo la salida/umbrales de batería dependen de la batería instalada, en vez de dejar esos campos en blanco sin explicación.

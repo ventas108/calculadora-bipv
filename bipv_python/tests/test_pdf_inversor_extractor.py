@@ -161,6 +161,35 @@ def test_vdc_max_lee_fraseo_maximum_solar_input_voltage_con_tolerancia():
     assert valor == 100.0  # toma el primer valor de la lista (submodelo más chico)
 
 
+def test_hibrido_con_salida_dependiente_de_bateria_se_detecta():
+    # Idea real del usuario (30-ago-2026): en un inversor híbrido, la ficha
+    # del FABRICANTE DEL INVERSOR no puede fijar un voltaje de batería único
+    # -- el instalador conecta la batería que quiera y el equipo se
+    # configura en su propio LCD. La ficha MUST lo dice explícitamente.
+    texto = "AC CHARGER Output voltage Depends on battery type\nLow battery voltage cutoff 40-48VDC for 48VDC mode"
+    campos = ext._extraer_campos(texto)
+    assert campos["salida_depende_bateria"] is True
+
+
+def test_hibrido_dependiente_de_bateria_fuerza_bat_voltaje_a_none():
+    # Aunque algún patrón futuro llegara a capturar un número de battery
+    # voltage range, debe descartarse -- el valor correcto depende de la
+    # batería real, no es un dato de la ficha del inversor.
+    texto = (
+        "Output voltage Depends on battery type\n"
+        "Battery Voltage Range 40 V - 60 V\n"
+    )
+    campos = ext._extraer_campos(texto)
+    assert campos["bat_voltaje_min"] is None
+    assert campos["bat_voltaje_max"] is None
+
+
+def test_inversor_no_hibrido_no_activa_el_aviso_de_bateria():
+    texto = "Grid-tied inverter. Max. PV input voltage: 1100 V"
+    campos = ext._extraer_campos(texto)
+    assert campos["salida_depende_bateria"] is False
+
+
 def test_campos_extraidos_completos_para_ficha_must_pv3500():
     campos = ext._extraer_campos(TEXTO_MUST_PV3500)
     assert campos["Vdc_max"] == 145.0
