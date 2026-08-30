@@ -5,6 +5,7 @@ import pytest
 from calculos.dimensionamiento import (
     evaluar_compatibilidad_string,
     evaluar_relacion_dc_ac,
+    escalar_p_ac_nom_por_inversores,
     mapear_inversores_catalogo,
     optimizar_n_serie,
     resolver_n_strings_tracker,
@@ -513,3 +514,63 @@ def test_optimizar_n_serie_con_n_min_mayor_a_n_max_retorna_lista_vacia():
     resultados = optimizar_n_serie(panel_ja_solar, solis_60k, N_min=21, N_max=20)
 
     assert resultados == []
+
+
+# ---------------------------------------------------------------------------
+# escalar_p_ac_nom_por_inversores() -- bug real en 📊 Producción (29-ago-2026,
+# proyecto Urabá): esa pagina toma N_paneles del "Proyecto completo" (varios
+# inversores) pero comparaba/recortaba contra la potencia CA de UN SOLO
+# inversor, sin escalar. Caso real: 840 paneles (604.8 kWp, 3x Growatt MAX
+# 100KTL3 LV, N_serie=28, N_strings_tracker=1, 10 trackers) daba DC/AC=4.85
+# en vez de 1.61.
+# ---------------------------------------------------------------------------
+
+
+def test_escalar_p_ac_nom_caso_real_uraba_840_paneles_3_inversores():
+    r = escalar_p_ac_nom_por_inversores(
+        N_paneles=840, N_serie=28, N_strings_tracker=1, n_trackers=10,
+        P_ac_nom_W_unidad=124_800,
+    )
+
+    assert r["paneles_por_inversor"] == 280
+    assert r["n_inversores"] == 3
+    assert r["p_ac_nom_w_total"] == pytest.approx(374_400)
+
+    # El DC/AC con el total escalado debe coincidir con el ratio por-inversor
+    # (604.8/124.8 == 1814.4/374.4), no con el 4.85 que daba el bug.
+    dcac = evaluar_relacion_dc_ac(P_dc_stc_kW=840 * 0.720, P_ac_nom_W=r["p_ac_nom_w_total"])
+    assert dcac["ratio"] == pytest.approx(1.615, abs=0.01)
+
+
+def test_escalar_p_ac_nom_un_solo_inversor_no_cambia_nada():
+    # Proyecto de un solo inversor (280 paneles) -- retrocompatible, mismo
+    # comportamiento que sin escalar.
+    r = escalar_p_ac_nom_por_inversores(
+        N_paneles=280, N_serie=28, N_strings_tracker=1, n_trackers=10,
+        P_ac_nom_W_unidad=124_800,
+    )
+
+    assert r["n_inversores"] == 1
+    assert r["p_ac_nom_w_total"] == pytest.approx(124_800)
+
+
+def test_escalar_p_ac_nom_sin_config_de_string_retorna_1_inversor():
+    # N_serie=None (todavia no se corrio Optimizar N paneles/string) -- no
+    # se puede derivar inversores, cae a 1 en vez de reventar.
+    r = escalar_p_ac_nom_por_inversores(
+        N_paneles=840, N_serie=None, N_strings_tracker=1, n_trackers=10,
+        P_ac_nom_W_unidad=124_800,
+    )
+
+    assert r["n_inversores"] == 1
+    assert r["paneles_por_inversor"] == 0
+    assert r["p_ac_nom_w_total"] == pytest.approx(124_800)
+
+
+def test_escalar_p_ac_nom_sin_potencia_ac_retorna_none():
+    r = escalar_p_ac_nom_por_inversores(
+        N_paneles=840, N_serie=28, N_strings_tracker=1, n_trackers=10,
+        P_ac_nom_W_unidad=None,
+    )
+
+    assert r["p_ac_nom_w_total"] is None

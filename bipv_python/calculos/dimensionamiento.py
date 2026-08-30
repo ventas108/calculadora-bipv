@@ -408,6 +408,59 @@ def resolver_n_strings_tracker(
     }
 
 
+def escalar_p_ac_nom_por_inversores(
+    N_paneles: int,
+    N_serie: int | None,
+    N_strings_tracker: int,
+    n_trackers: int,
+    P_ac_nom_W_unidad: float | None,
+) -> dict:
+    """
+    Escala la potencia CA nominal de UN inversor al total de inversores que
+    hacen falta para `N_paneles` -- necesario en cualquier lugar que compare
+    la potencia DC de un "Proyecto completo" (varios inversores) contra la
+    potencia CA de la ficha del inversor (que es de una sola unidad).
+
+    Bug real encontrado en 📊 Producción (29-ago-2026, proyecto Urabá): esa
+    página toma `N_paneles` por defecto del "Proyecto completo" de
+    Dimensionamiento (varios inversores), pero pasaba
+    `inversor.get("P_ac_nom_W")` (una sola unidad) tanto a la alarma DC/AC
+    como al recorte (clipping) real de `simular_produccion_anual()` -- sin
+    escalar. Caso real: 840 paneles (604,8 kWp, 3× Growatt MAX 100KTL3 LV)
+    daba DC/AC=4,85 en vez de 1,61 (604,8÷124,8 en vez de 604,8÷374,4), y el
+    recorte real de la simulación habría limitado TODO el proyecto a la
+    salida de un solo inversor en vez del total real.
+
+    El número de inversores se DERIVA de `N_paneles` y la configuración de
+    string activa (paneles/inversor = N_serie × N_strings_tracker ×
+    n_trackers) -- no de un valor guardado aparte que podría no corresponder
+    al `N_paneles` actual (mismo principio que ya se aplicó para
+    `N_paneles_granja_inversor_ref` en Dimensionamiento).
+
+    Retorna dict:
+      n_inversores        : inversores derivados (≥1; 1 si no se puede
+                            derivar -- ej. N_serie no definido todavía)
+      paneles_por_inversor: N_serie × N_strings_tracker × n_trackers (0 si
+                            no se puede calcular)
+      p_ac_nom_w_total     : P_ac_nom_W_unidad × n_inversores (None si
+                            P_ac_nom_W_unidad es None/0 -- no hay con qué
+                            escalar, igual que el comportamiento histórico
+                            sin este dato)
+    """
+    paneles_por_inversor = int(N_serie or 0) * int(N_strings_tracker or 0) * int(n_trackers or 0)
+    n_inversores = (
+        max(1, round(N_paneles / paneles_por_inversor)) if paneles_por_inversor > 0 else 1
+    )
+    p_ac_nom_w_total = (
+        P_ac_nom_W_unidad * n_inversores if P_ac_nom_W_unidad else None
+    )
+    return {
+        "n_inversores": n_inversores,
+        "paneles_por_inversor": paneles_por_inversor,
+        "p_ac_nom_w_total": p_ac_nom_w_total,
+    }
+
+
 def mapear_inversores_catalogo(
     panel: dict,
     inversores: dict,

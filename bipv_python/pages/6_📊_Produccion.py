@@ -8,7 +8,11 @@ import numpy as np
 from calculos.produccion import simular_produccion_anual, perdidas_desglosadas, panel_tiene_sdm_completo
 from calculos.produccion_iv import simular_produccion_iv, panel_apto_para_iv, preparar_para_iv
 from calculos.modelo_iv import resolver_panel_calibrado
-from calculos.dimensionamiento import evaluar_compatibilidad_string, evaluar_relacion_dc_ac
+from calculos.dimensionamiento import (
+    evaluar_compatibilidad_string,
+    evaluar_relacion_dc_ac,
+    escalar_p_ac_nom_por_inversores,
+)
 from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_inversores import INVERSORES
 from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
@@ -284,6 +288,23 @@ elif _compat_inversor_evaluable:
         f"{_n_serie_cfg} módulos/string y {_n_strings_tracker_cfg} string(s)/tracker."
     )
 
+# Bug real (29-ago-2026, proyecto Urabá): N_paneles en esta página se toma
+# por defecto del "Proyecto completo" (varios inversores), pero
+# inversor.get("P_ac_nom_W") es la potencia de UN SOLO inversor -- ver
+# docstring de escalar_p_ac_nom_por_inversores() para el caso real completo
+# (840 paneles/3 inversores daba DC/AC=4,85 en vez de 1,61).
+_p_ac_nom_w_unidad = inversor.get("P_ac_nom_W") if inversor else None
+_escala_ac_dcac = escalar_p_ac_nom_por_inversores(
+    N_paneles=N_paneles,
+    N_serie=_n_serie_cfg,
+    N_strings_tracker=_n_strings_tracker_cfg,
+    n_trackers=int((inversor or {}).get("n_trackers") or (inversor or {}).get("N_mppt") or 0),
+    P_ac_nom_W_unidad=_p_ac_nom_w_unidad,
+)
+_n_inversores_dcac = _escala_ac_dcac["n_inversores"]
+_paneles_por_inversor_dcac = _escala_ac_dcac["paneles_por_inversor"]
+_p_ac_nom_w_total = _escala_ac_dcac["p_ac_nom_w_total"]
+
 # ── Relación DC/AC (acople de POTENCIA, distinto de la compatibilidad de
 # tensión/corriente de arriba) — homóloga al aviso real de PVsyst 8.1.5
 # ("La potencia del inversor está muy sobredimensionada", "Proporción Pnom")
@@ -291,7 +312,13 @@ elif _compat_inversor_evaluable:
 # calculos.dimensionamiento.evaluar_relacion_dc_ac() para los umbrales y su
 # justificación -- son un criterio propio de la app, no el algoritmo interno
 # de PVsyst, anclado al único dato real disponible (0.538 → PVsyst avisa).
-_dcac = evaluar_relacion_dc_ac(P_stc_kW, inversor.get("P_ac_nom_W") if inversor else None)
+_dcac = evaluar_relacion_dc_ac(P_stc_kW, _p_ac_nom_w_total)
+if _n_inversores_dcac > 1 and _p_ac_nom_w_total:
+    st.caption(
+        f"ℹ️ DC/AC calculado para **{_n_inversores_dcac} inversores** "
+        f"({N_paneles} paneles ÷ {_paneles_por_inversor_dcac} paneles/inversor) — "
+        f"{_p_ac_nom_w_total/1000:.1f} kW CA total, no solo {_p_ac_nom_w_unidad/1000:.1f} kW de una unidad."
+    )
 if _dcac["evaluable"]:
     _dcac_texto = f"**Relación DC/AC = {_dcac['ratio']:.2f}**  \n{_dcac['mensaje']}"
     if _dcac["nivel"] == "🔴":
@@ -403,8 +430,14 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 # Recorte real al Pnom del inversor (PVsyst siempre lo aplica) --
                 # ver docstring de "P_ac_nom_W" en calculos.produccion. None si
                 # la ficha del inversor no trae el dato -- no recorta, igual que
-                # el comportamiento histórico.
-                P_ac_nom_W        = inversor.get("P_ac_nom_W"),
+                # el comportamiento histórico. Escalado por el número real de
+                # inversores (_p_ac_nom_w_total, calculado arriba junto a la
+                # alarma DC/AC) -- bug real corregido 29-ago-2026: sin esto,
+                # un "Proyecto completo" de varios inversores (ej. 840 paneles/
+                # 3× Growatt MAX 100KTL3 LV) recortaba TODA la producción a la
+                # capacidad de UN SOLO inversor (124,8kW) en vez del total real
+                # (374,4kW), subestimando la energía drásticamente.
+                P_ac_nom_W        = _p_ac_nom_w_total,
             )
             try:
                 res_base = simular_produccion_anual(**_sim_kwargs)
