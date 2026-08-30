@@ -95,6 +95,18 @@ def test_multimodelo_no_confunde_palabras_sueltas_con_sufijos_de_modelo():
     ]
 
 
+def test_modelo_singular_no_devuelve_encabezado_multimodelo_completo():
+    # Bug real (ficha aislada MUST PV33-5048/6048): la fila de encabezado
+    # multi-modelo ("MODEL PV33-5048 TLV PV33-6048 TLV") cumplía la forma
+    # genérica de línea candidata y se devolvía entera como si fuera UN
+    # modelo -- confundía al usuario en el campo "Modelo *" del formulario
+    # mientras no elegía uno del selector multi-modelo real.
+    texto = "MODEL PV33-5048 TLV PV33-6048 TLV\nRated power 5KW 6KW\n"
+    modelo = ext._extract_model(texto, "")
+    assert modelo != "MODEL PV33-5048 TLV PV33-6048 TLV"
+    assert modelo == ""
+
+
 def test_multimodelo_lee_p_dc_max_por_columna_con_fraseo_maximum_pv_array_power():
     # Bug real: ningún patrón de la fila P_dc_max por columna reconocía
     # "Maximum PV Array Power" (fraseo real de MUST) -- todas las columnas

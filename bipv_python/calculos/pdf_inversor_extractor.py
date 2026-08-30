@@ -688,7 +688,16 @@ def _extract_model(text: str, brand: str) -> str:
                     and line.upper() not in _SECCION_HEADERS_GENERICAS
                     and "SERIES" not in line.upper()  # "HYBRID SERIES" = título de gama, no modelo
                     and not re.match(r"^MPPT?\b|^MPPT?\d", line)  # "MPPT 1"/"MPPT1"/"MPPT 10 N" del diagrama unifilar
-                    and not re.fullmatch(r"\d+\s*K?[VW]A?", line, re.IGNORECASE)):  # "50KVA" = potencia, no modelo
+                    and not re.fullmatch(r"\d+\s*K?[VW]A?", line, re.IGNORECASE)  # "50KVA" = potencia, no modelo
+                    # Bug real (30-ago-2026, ficha aislada MUST PV33-5048/6048):
+                    # una fila de encabezado multi-modelo ("MODEL PV33-5048 TLV
+                    # PV33-6048 TLV") también cumple la forma genérica de línea
+                    # candidata -- se devolvía entera como si fuera UN modelo.
+                    # Un modelo real tiene un solo código con dígito/guion; si
+                    # la línea trae 2+ tokens con esa forma, es un encabezado de
+                    # tabla multi-modelo, no un nombre -- déjaselo al detector
+                    # multi-modelo (`modelos_detectados`), que sí los separa bien.
+                    and len(_MODEL_COL_RE.findall(line)) < 2):
                 return line
     # Patrón 2: buscar código de modelo típico
     m = re.search(r"\b([A-Z]{2,8}[-_][A-Z0-9\-\.]{3,25})\b", text[:1500])

@@ -105,6 +105,18 @@ Dos veces en esta auditoría (con la ficha PV3300 completa y con la ficha aislad
 
 **Recomendación al usuario para la próxima vez que esto pase**: recargar la página completa (F5) antes de volver a subir el archivo, o probar en una ventana de navegación privada, para descartar caché del navegador.
 
+## Bug real #8 (corregido) — el campo singular `modelo` devolvía el encabezado multi-modelo completo
+
+Confirmado el fix del bug #6 con una recarga limpia (la advertencia de nombre de archivo del hallazgo anterior mostró correctamente `Inversor-Hibrido-PV33-5048-6048-TLV-Must-SUBMODELO.pdf`, 1,8KB — el archivo correcto esta vez), los valores numéricos salieron bien (Vdc_max=145, Vmppt=60-130, I_max=80, P_dc=5000 — todos correctos). Pero el campo **"Modelo \*"** del formulario mostraba `"MODEL PV33-5048 TLV PV33-6048 TLV"` — la fila de encabezado multi-modelo completa, no un nombre de modelo.
+
+**Causa raíz**: `_extract_model()` (el campo singular `modelo`, distinto del detector multi-modelo `modelos_detectados` ya corregido) tiene un "Patrón 1" que acepta cualquier línea que cumpla la forma genérica "todo mayúsculas, 5-35 caracteres" como candidato a nombre de modelo — la fila `"MODEL PV33-5048 TLV PV33-6048 TLV"` cumple esa forma, así que se devolvía completa.
+
+**Corregido**: se excluyen las líneas con 2 o más tokens con forma de código de modelo (usando el mismo patrón `_MODEL_COL_RE` que ya usa el detector multi-modelo) — un nombre de modelo real trae un solo código; 2+ es un encabezado de tabla multi-modelo, no un nombre. Verificado: para las 4 fichas MUST de esta auditoría (PV35, PV36, PV3300 completa, PV33-5048/6048 aislada) `modelo` ahora da `""` consistentemente (correcto — todas son multi-modelo, el usuario elige del selector real) en vez de basura ocasional. Sin impacto en el `modelo` singular de fichas de un solo modelo real (no se tocó esa ruta).
+
+⚠️ **Nota importante**: este campo NUNCA se guarda directamente sin pasar por el selector multi-modelo — `pages/15_🔌_Catálogo_Inversores_PDF.py` bloquea el botón "Guardar" hasta elegir un modelo real del desplegable (`debe_bloquear_guardado()`), así que el bug era de presentación/confusión, no de integridad de datos: no había riesgo de que "MODEL PV33-5048 TLV PV33-6048 TLV" terminara guardado en el catálogo.
+
+1 test nuevo. Suite completa: **773/773**.
+
 ## Verificación del submodelo PV33-5048/6048 con ficha aislada
 
 El usuario no podía elegir el submodelo PV33-5048 TLV desde el selector de la app (la ficha de familia completa, 11 modelos, produce un `modelos_detectados` corrupto: entradas basura `PV33-Features`/`PV33-MODEL` y modelos fusionados `PV33-3024 3048`/`PV33-5048 6048` — ver hallazgo aparte más abajo). Pidió generar una ficha PDF aislada para ese par de submodelos y correr la extracción sobre ella.
@@ -160,8 +172,8 @@ Con los 11 modelos ya bien detectados, se verificó que `valores_por_modelo` seg
 
 ## Cobertura de tests — hallazgo aparte
 
-Antes de esta auditoría, `calculos/pdf_inversor_extractor.py` (~1.500 líneas, el motor completo de extracción de fichas de inversores) **no tenía ningún test que llamara a `extraer_parametros_inversor()` ni a sus funciones internas directamente** — toda la cobertura de "inversor" existente prueba lógica de catálogo/compatibilidad con diccionarios ya armados a mano, no el motor de regex en sí. Se creó `tests/test_pdf_inversor_extractor.py` (11 tests en total, incluidos los de las secciones anteriores) anclado al texto real de estas fichas MUST, como primer test directo del motor de extracción.
+Antes de esta auditoría, `calculos/pdf_inversor_extractor.py` (~1.500 líneas, el motor completo de extracción de fichas de inversores) **no tenía ningún test que llamara a `extraer_parametros_inversor()` ni a sus funciones internas directamente** — toda la cobertura de "inversor" existente prueba lógica de catálogo/compatibilidad con diccionarios ya armados a mano, no el motor de regex en sí. Se creó `tests/test_pdf_inversor_extractor.py` (12 tests en total, incluidos los de las secciones anteriores) anclado al texto real de estas fichas MUST, como primer test directo del motor de extracción.
 
 ## Resultado final
 
-Suite completa: **772/772**. Los 7 bugs de código corregidos y verificados contra las fichas reales (PV35 ×3, PV36, PV3300 ×2 + ficha aislada PV33-5048/6048); el archivo mal nombrado ya se corrigió en el escritorio (renombrado a PV36); el detector multi-modelo con la ficha de familia completa (11 modelos) ya no produce entradas basura ni modelos fusionados — corregido de raíz, no solo mitigado.
+Suite completa: **773/773**. Los 8 bugs de código corregidos y verificados contra las fichas reales (PV35 ×3, PV36, PV3300 ×2 + ficha aislada PV33-5048/6048); el archivo mal nombrado ya se corrigió en el escritorio (renombrado a PV36); el detector multi-modelo con la ficha de familia completa (11 modelos) ya no produce entradas basura ni modelos fusionados — corregido de raíz, no solo mitigado; el campo `modelo` singular ya no confunde un encabezado multi-modelo con un nombre real.
