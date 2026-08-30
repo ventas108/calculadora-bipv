@@ -731,7 +731,7 @@ with col_t2:
             f"| **Factor P90** | **{_f_p90_auto:.1f}%** | z₉₀ × σ_total = 1.28 × {_sigma_tot_fin:.1f}% |\n\n"
             f"**P90 = {e_ac:,.0f} × (1 − {_f_p90_auto/100:.3f}) = "
             f"{e_ac*(1-_f_p90_auto/100):,.0f} kWh/año**\n\n"
-            f"*PVsyst aplica un factor P90 manual fijo sin diferenciación regional. "
+            f"*Una referencia estándar internacional aplica un factor P90 manual fijo sin diferenciación regional. "
             f"Este modelo ajusta automáticamente σ_irr según la zona climática colombiana "
             f"y reduce σ_PR a medida que se activan el Motor Óptico y los Bypass Diodes, "
             f"premiando la profundidad de la simulación.*"

@@ -971,7 +971,7 @@ if multi_orient:
                            delta=f"-{res_mismatch_or['factor_mismatch_pct']:.2f}%",
                            delta_color="inverse")
                 mc3.metric("Factor mismatch",      f"{res_mismatch_or['factor_mismatch_pct']:.2f}%",
-                           help="σ²/(2μ²) — PVsyst 1er orden")
+                           help="σ²/(2μ²) — aproximación de 1er orden, referencia estándar internacional")
 
                 # Tabla POA por orientación
                 df_poas = pd.DataFrame(res_mismatch_or["poas"])

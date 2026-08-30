@@ -126,9 +126,47 @@ texto con:
 3. El preset Uc/Uv sugerido según la tabla de (b), a partir del `k_BIPV`
    elegido en 🔆 Motor Óptico para ese proyecto.
 
-Tests: `tests/test_ficha_pvsyst.py` (11 tests: 7 con el panel JA Solar
+Tests: `tests/test_ficha_pvsyst.py` (12 tests: 7 con el panel JA Solar
 JAM66D46-720/LB de Urabá, incluida la equivalencia del nivel semi-ventilado,
-4 anclados al panel real de Teusaquillo ASP-ST1-T40, ver (d)).
+4 anclados al panel real de Teusaquillo ASP-ST1-T40, 1 que ancla la
+redacción legal de (e)).
+
+## (e) Redacción legal: "PVsyst" no se nombra en NINGÚN texto visible (30-ago-2026)
+
+Por instrucción explícita del usuario ("por cuestiones legales"), se extendió
+la política ya vigente en el resto de la app (nunca nombrar "PVsyst" en
+texto visible al usuario, solo en comentarios/docstrings internos) con dos
+correcciones:
+
+1. **3 fugas reales encontradas en páginas ya desplegadas**, que se habían
+   quedado fuera del fix original del 29-ago-2026 (que solo cubrió la
+   alarma DC/AC):
+   - `pages/5a_🌳_Sombras_SketchUp.py` — `st.caption()` decía "la brecha que
+     nos separaba de PVsyst, con un modelador mejor".
+   - `pages/5_🔀_Mismatch.py` — tooltip (`help=`) de la métrica "Factor
+     mismatch" decía "PVsyst 1er orden".
+   - `pages/7_💰_Financiero.py` — texto del expander "Modelo P90" (visible,
+     no un comentario) decía "PVsyst aplica un factor P90 manual fijo...".
+
+   Las 3 corregidas reemplazando "PVsyst" por "referencia estándar
+   internacional". Ningún test las cubría (eran texto de UI, no lógica), así
+   que no rompieron ninguna aserción — hallazgo puramente por auditoría
+   manual con `grep`, no por fallo de test.
+
+2. **`ficha_pvsyst.py` decidido explícitamente que SÍ debe redactarse**,
+   pese a no ser visible dentro de la app en ejecución (solo se genera bajo
+   demanda para el propio usuario). Se preguntó explícitamente porque
+   redactarlo tiene un costo funcional real: la ficha citaba rutas de menú
+   específicas del software de referencia (ej. "Détails du système") que
+   identifican el producto sin necesidad de nombrarlo por marca. El usuario
+   eligió redactar de todos modos, **aceptando la pérdida de precisión
+   operativa** — el texto generado ya no dice en qué pestaña exacta hacer
+   clic, solo que existe una sección de pérdidas térmicas del sistema donde
+   introducir Uc/Uv manualmente. Nuevo test de regresión
+   (`test_ficha_no_menciona_pvsyst_por_nombre`) verifica que la palabra
+   "PVsyst" nunca aparece en el texto generado, para cualquier panel/tipo/k.
+
+Suite completa tras este fix: **760/760**.
 
 ## (d) Auto-auditoría contra el plan original (30-ago-2026)
 

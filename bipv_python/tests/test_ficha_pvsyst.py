@@ -93,6 +93,22 @@ def test_ficha_semiventilado_usa_uc_interpolado_sin_preset_oficial():
     assert "Sin preset oficial" in ficha
 
 
+def test_ficha_no_menciona_pvsyst_por_nombre():
+    # Decisión explícita del usuario (30-ago-2026, cuestiones legales): esta
+    # ficha es un documento de trabajo interno (nunca visible dentro de la
+    # app en ejecución), pero igual no debe nombrar el software de
+    # referencia por marca -- se reemplaza por "referencia estándar
+    # internacional" en TODO el texto generado, aceptando pérdida de
+    # precisión operativa (ya no cita rutas de menú específicas).
+    for panel, tipo, k in (
+        (PANEL_JASOLAR, "Fachada BIPV", 1.3),
+        (PANEL_JASOLAR, "Pérgola / sombreadero", 1.15),
+        (PANEL_TEUSAQUILLO, "Fachada BIPV", 1.3),
+    ):
+        ficha = generar_ficha_conversion_pvsyst(panel, tipo, k)
+        assert "PVsyst" not in ficha, f"'PVsyst' no debería aparecer en la ficha: {ficha!r}"
+
+
 def test_ficha_maneja_campos_faltantes_sin_reventar():
     panel_incompleto = {"nombre": "Panel sin datos"}
     ficha = generar_ficha_conversion_pvsyst(panel_incompleto, "Granja fotovoltaica", 1.0)

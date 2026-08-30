@@ -110,14 +110,15 @@ def generar_ficha_conversion_pvsyst(
         f"se usó el más cercano, k={k_cercano:.2f}, para la equivalencia)"
     )
 
+    _titulo = f"FICHA DE CONVERSIÓN — referencia estándar internacional — {nombre}"
     lineas = [
-        f"FICHA DE CONVERSIÓN A PVsyst — {nombre}",
-        "=" * (26 + len(nombre)),
+        _titulo,
+        "=" * len(_titulo),
         "",
-        "── 1. Módulo custom en PVsyst (\"PV module\" → \"New\") ──",
+        "── 1. Módulo custom en el software de referencia (\"PV module\" → \"New\") ──",
         f"  Fabricante / modelo   : {marca} / {nombre}",
         f"  Tecnología            : {tecnologia}  "
-        f"(clasificar en PVsyst como 'Si-mono' si es célula c-Si, "
+        f"(clasificar como 'Si-mono' si es célula c-Si, "
         f"aunque el laminado sea vidrio-vidrio BIPV)",
         f"  Pnom (STC)            : {_fmt(Pmax, 'W')}",
         f"  Vmp (STC)             : {_fmt(Vmp, 'V')}",
@@ -142,19 +143,21 @@ def generar_ficha_conversion_pvsyst(
         "── 3. Ajuste térmico de montaje (Uc/Uv) ──",
         f"  Tipo de instalación   : {tipo_instalacion}",
         f"  k_BIPV usado en la app: {k_bipv:.2f}{nota_k}",
-        f"  Preset PVsyst sugerido: {eq['preset_pvsyst']}",
+        f"  Preset sugerido (referencia estándar): {eq['preset_pvsyst']}",
         f"  Uc (constante)        : {eq['Uc_W_m2K']:.1f} W/m²K",
         f"  Uv (dependiente viento): {eq['Uv_W_m2K_por_ms']:.1f} W/m²K por m/s",
-        "  Ruta en PVsyst: \"Détails du système\" → pestaña de pérdidas "
-        "térmicas → introducir Uc/Uv manualmente (no dejar el default de "
-        "montaje libre si el proyecto es una fachada/techo confinado).",
+        "  Ruta en el software de referencia: pestaña de pérdidas "
+        "térmicas del sistema → introducir Uc/Uv manualmente (no dejar el "
+        "default de montaje libre si el proyecto es una fachada/techo "
+        "confinado).",
         "",
         "⚠️ Esta equivalencia es aproximada: el modelo de esta app (NOCT × "
-        "k_BIPV) es un multiplicador de un solo parámetro; el de PVsyst "
-        "(Faiman, Uc+Uv·viento) es un balance térmico de dos parámetros con "
-        "dependencia real de la velocidad del viento del sitio. Útil para "
-        "partir de un supuesto físico coherente entre ambas herramientas, "
-        "no como igualdad numérica exacta. Ver DIAGNOSTICO_MODELO_TERMICO_UC_UV.md.",
+        "k_BIPV) es un multiplicador de un solo parámetro; el de la "
+        "referencia estándar internacional (Faiman, Uc+Uv·viento) es un "
+        "balance térmico de dos parámetros con dependencia real de la "
+        "velocidad del viento del sitio. Útil para partir de un supuesto "
+        "físico coherente entre ambas herramientas, no como igualdad "
+        "numérica exacta. Ver DIAGNOSTICO_MODELO_TERMICO_UC_UV.md.",
     ]
     return "\n".join(lineas)
 

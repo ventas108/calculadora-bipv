@@ -41,7 +41,7 @@ st.title("🌳 Sombras desde tu modelo de SketchUp")
 st.caption(
     "Modela el sitio en SketchUp (edificios vecinos, árboles, tu estructura), expórtalo "
     "y aquí se calcula el sombreado de las 8.760 horas automáticamente — la brecha que "
-    "nos separaba de PVsyst, con un modelador mejor."
+    "nos separaba de una referencia estándar internacional, con un modelador mejor."
 )
 
 if not TRIMESH_OK:
