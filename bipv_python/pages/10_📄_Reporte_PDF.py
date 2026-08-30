@@ -357,6 +357,113 @@ def _flujo_caja_svg(acum, payback=None, titulo="Flujo de caja acumulado (USD)",
     return "".join(p)
 
 
+def _curva_electrica_svg(curva: dict, N_serie: int, T_frio: float, T_real: float,
+                         T_extremo: float, W=680, H=300):
+    """
+    #? — Curva Voc/Vmp del string vs. temperatura + ventana MPPT del
+    inversor, equivalente al gráfico "Array behavior" de PVsyst (pedido
+    explícito del usuario, 30-ago-2026). Dibuja exactamente los datos que
+    devuelve `calculos.dimensionamiento.curva_electrica_temperatura()` —
+    esta función NO evalúa compatibilidad ni recalcula física, solo grafica.
+    """
+    voc_curva = curva.get("voc_curva") or []
+    vmp_curva = curva.get("vmp_curva") or []
+    temps = curva.get("temps") or []
+    if not temps or not voc_curva or not vmp_curva:
+        return ""
+    vdc_max    = curva.get("vdc_max")
+    vmppt_min  = curva.get("vmppt_min")
+    vmppt_max  = curva.get("vmppt_max")
+    ev         = curva.get("evaluacion") or {}
+
+    ml, mr, mt, mb = 56, 14, 26, 34
+    cw, ch = W - ml - mr, H - mt - mb
+
+    t_lo, t_hi = temps[0], temps[-1]
+    v_candidatos = list(voc_curva) + list(vmp_curva)
+    if vdc_max:   v_candidatos.append(vdc_max)
+    if vmppt_min: v_candidatos.append(vmppt_min)
+    if vmppt_max: v_candidatos.append(vmppt_max)
+    v_lo = min(v_candidatos) * 0.92
+    v_hi = max(v_candidatos) * 1.06
+    if v_hi <= v_lo:
+        return ""
+
+    def _x(t): return ml + cw * (t - t_lo) / (t_hi - t_lo) if t_hi > t_lo else ml
+    def _y(v): return mt + ch * (1 - (v - v_lo) / (v_hi - v_lo))
+
+    compatible = ev.get("compatible")
+    color_estado = "#2E7D32" if compatible else ("#C62828" if compatible is False else "#999")
+    titulo = f"Compatibilidad eléctrica string–inversor (N={N_serie} en serie)"
+
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" '
+         f'style="max-width:100%;height:auto;font-family:Arial,sans-serif;">',
+         f'<text x="{ml}" y="15" font-size="12" font-weight="bold" fill="#333">{_esc_html(titulo)}</text>']
+
+    # Banda MPPT (verde clara) — la ventana operativa del inversor
+    if vmppt_min is not None and vmppt_max is not None:
+        y_top, y_bot = _y(vmppt_max), _y(vmppt_min)
+        p.append(f'<rect x="{ml}" y="{y_top:.1f}" width="{cw:.1f}" '
+                 f'height="{(y_bot - y_top):.1f}" fill="#2E7D32" fill-opacity="0.08"/>')
+        for v, etiqueta in ((vmppt_min, "MPPT mín"), (vmppt_max, "MPPT máx")):
+            y = _y(v)
+            p.append(f'<line x1="{ml}" y1="{y:.1f}" x2="{W-mr}" y2="{y:.1f}" '
+                     f'stroke="#2E7D32" stroke-width="1" stroke-dasharray="3,3"/>')
+            p.append(f'<text x="{W-mr-4}" y="{y-3:.1f}" font-size="8.5" fill="#2E7D32" '
+                     f'text-anchor="end">{etiqueta} {v:.0f}V</text>')
+
+    # Límite absoluto Vdc_max (rojo)
+    if vdc_max is not None:
+        y = _y(vdc_max)
+        p.append(f'<line x1="{ml}" y1="{y:.1f}" x2="{W-mr}" y2="{y:.1f}" '
+                 f'stroke="#C62828" stroke-width="1.4" stroke-dasharray="5,3"/>')
+        p.append(f'<text x="{ml+4}" y="{y-3:.1f}" font-size="8.5" fill="#C62828">'
+                 f'Vdc máx {vdc_max:.0f}V</text>')
+
+    # Grid horizontal ligera
+    for gi in range(1, 4):
+        gv = v_lo + (v_hi - v_lo) * gi / 4
+        gy = _y(gv)
+        p.append(f'<text x="{ml-4}" y="{gy+3:.1f}" font-size="8.5" fill="#aaa" '
+                 f'text-anchor="end">{gv:,.0f}</text>')
+
+    # Curvas Voc(T) y Vmp(T)
+    pts_voc = " ".join(f"{_x(t):.1f},{_y(v):.1f}" for t, v in zip(temps, voc_curva))
+    pts_vmp = " ".join(f"{_x(t):.1f},{_y(v):.1f}" for t, v in zip(temps, vmp_curva))
+    p.append(f'<polyline points="{pts_voc}" fill="none" stroke="#1565C0" stroke-width="2"/>')
+    p.append(f'<polyline points="{pts_vmp}" fill="none" stroke="#EF6C00" stroke-width="2"/>')
+
+    # Puntos clave evaluados (mismos que usa el gate real de compatibilidad)
+    for t, v, etiqueta in (
+        (T_frio, ev.get("Voc_frio"), "Voc frío"),
+        (T_real, ev.get("Vmp_real"), "Vmp real"),
+        (T_extremo, ev.get("Vmp_extremo"), "Vmp extremo"),
+    ):
+        if v is None:
+            continue
+        cx, cy = _x(t), _y(v)
+        p.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="3.5" fill="{color_estado}" '
+                 f'stroke="#fff" stroke-width="1"/>')
+
+    # Eje X (temperatura)
+    p.append(f'<line x1="{ml}" y1="{mt+ch}" x2="{W-mr}" y2="{mt+ch}" stroke="#ccc" stroke-width="1"/>')
+    for t, etiqueta in ((T_frio, "T mín"), (T_real, "T real"), (T_extremo, "T extremo")):
+        x = _x(t)
+        p.append(f'<text x="{x:.1f}" y="{mt+ch+14}" font-size="8.5" fill="#666" '
+                 f'text-anchor="middle">{etiqueta} {t:.0f}°C</text>')
+    p.append(f'<text x="{W/2:.0f}" y="{H-4}" font-size="9" fill="#999" '
+             f'text-anchor="middle">Temperatura de celda (°C)</text>')
+
+    # Leyenda
+    ly = mt + 2
+    for color, etiqueta, lx in ((("#1565C0"), "Voc(T)", W - 210), (("#EF6C00"), "Vmp(T)", W - 130)):
+        p.append(f'<line x1="{lx}" y1="{ly}" x2="{lx+16}" y2="{ly}" stroke="{color}" stroke-width="2.5"/>')
+        p.append(f'<text x="{lx+20}" y="{ly+3}" font-size="9" fill="#555">{etiqueta}</text>')
+
+    p.append('</svg>')
+    return "".join(p)
+
+
 def generar_html_reporte() -> str:
     # Colectar datos de session_state
     ciudad          = st.session_state.get("tmy_ciudad", st.session_state.get("ciudad", "—"))
@@ -606,6 +713,62 @@ def generar_html_reporte() -> str:
                  "calculado por pvlib (infinite_sheds). La ganancia anual mostrada indica cuánta "
                  "irradiación adicional aporta la cara posterior respecto a un módulo monofacial.")
         html += cierre()
+
+    # ── 2b. Compatibilidad Eléctrica String–Inversor ──────────────────────────
+    # Pedido explícito del usuario (30-ago-2026): equivalente al gráfico
+    # "Array behavior" de PVsyst. NO reimplementa la verificación eléctrica --
+    # llama a la misma curva_electrica_temperatura() que envuelve
+    # evaluar_compatibilidad_string(), el gate real ya usado en
+    # Dimensionamiento y Producción, así que el veredicto del gráfico nunca
+    # puede contradecir al resto de la app.
+    _N_serie_pdf = st.session_state.get("N_serie")
+    _panel_dim_pdf = st.session_state.get("panel_dict")
+    _inv_dim_pdf = st.session_state.get("inversor_dict_dim")
+    if _N_serie_pdf and _panel_dim_pdf and _inv_dim_pdf:
+        try:
+            from calculos.dimensionamiento import curva_electrica_temperatura
+            _T_frio_pdf = st.session_state.get("T_min_diseno", -5.0)
+            _T_real_pdf = st.session_state.get("T_cel_realista", 36.35)
+            _T_extr_pdf = st.session_state.get("T_cel_extremo", 41.94)
+            _n_str_tr_pdf = int(st.session_state.get("N_str_tr_usado", 1) or 1)
+            _curva_pdf = curva_electrica_temperatura(
+                _panel_dim_pdf, _inv_dim_pdf, int(_N_serie_pdf),
+                _T_frio_pdf, _T_real_pdf, _T_extr_pdf,
+                N_strings_tracker=_n_str_tr_pdf,
+            )
+            _svg_curva = _curva_electrica_svg(
+                _curva_pdf, int(_N_serie_pdf), _T_frio_pdf, _T_real_pdf, _T_extr_pdf
+            )
+        except Exception:
+            _svg_curva = ""
+        if _svg_curva:
+            _ev_pdf = _curva_pdf["evaluacion"]
+            _compat_pdf = _ev_pdf.get("compatible")
+            _estado_pdf = (
+                "🟢 Compatible" if _compat_pdf
+                else ("🔴 Incompatible" if _compat_pdf is False else "⚪ No evaluable")
+            )
+            html += seccion("Compatibilidad Eléctrica String–Inversor", "⚡")
+            html += _bloque_grafica(
+                _svg_curva,
+                "Voc(T) y Vmp(T) del string frente a la ventana MPPT y el límite Vdc máximo "
+                "del inversor, en las 3 temperaturas de diseño del sitio. Los puntos marcados "
+                "son los mismos valores que evalúa el gate de compatibilidad de Dimensionamiento "
+                "y Producción — este gráfico no verifica nada distinto, solo lo visualiza."
+            )
+            html += tabla_kv([
+                ("Estado", _estado_pdf, "", "Veredicto real del gate de compatibilidad eléctrica"),
+                ("N° módulos en serie", str(int(_N_serie_pdf)), "", ""),
+                ("Voc en frío", _fmt(_ev_pdf.get("Voc_frio"), 0), "V", f"a T mín {_T_frio_pdf:.1f}°C"),
+                ("Vmp en condición real", _fmt(_ev_pdf.get("Vmp_real"), 0), "V", f"a T real {_T_real_pdf:.1f}°C"),
+                ("Vmp en condición extrema", _fmt(_ev_pdf.get("Vmp_extremo"), 0), "V", f"a T extremo {_T_extr_pdf:.1f}°C"),
+            ] + ([("Observaciones", "; ".join(_ev_pdf.get("mensajes", [])), "", "")]
+                 if _ev_pdf.get("mensajes") else []),
+            nota="Voc y Vmp son funciones lineales de la temperatura de celda: verificar los "
+                 "3 puntos de diseño (frío, real, extremo) cubre con certeza matemática toda la "
+                 "curva continua entre ellos — el gráfico es para verificación visual, no agrega "
+                 "precisión sobre el cálculo ya validado.")
+            html += cierre()
 
     # ── 3. Motor Óptico ───────────────────────────────────────────────────────
     if motor_optico and incluir_motor and mo_sum:

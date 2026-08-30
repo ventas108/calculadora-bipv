@@ -9,6 +9,7 @@ from calculos.dimensionamiento import (
     mapear_inversores_catalogo,
     optimizar_n_serie,
     resolver_n_strings_tracker,
+    curva_electrica_temperatura,
 )
 from datos.tecnologias_bipv import ASP_ST1_T40
 
@@ -206,6 +207,83 @@ def test_evaluar_compatibilidad_string_coincide_con_filtrar_inversores_compatibl
 
     assert r1["compatible"] is False
     assert bool(df2.iloc[0]["compatible"]) is False
+
+
+# ---------------------------------------------------------------------------
+# curva_electrica_temperatura() -- gráfico de compatibilidad eléctrica para
+# el Reporte PDF (pedido explícito del usuario, 30-ago-2026), equivalente al
+# gráfico "Array behavior" de PVsyst. Casos anclados al proyecto real Urabá
+# (N=18 histórico incompatible con el clima real, N=28 electricamente
+# correcto -- ver DIAGNOSTICO_NSERIE_URABA_TEMPERATURA_REAL.md).
+# ---------------------------------------------------------------------------
+
+
+def test_curva_electrica_no_reimplementa_la_fisica_coincide_con_evaluar_compatibilidad():
+    # La evaluación embebida debe ser BIT A BIT la misma que llamar
+    # evaluar_compatibilidad_string() por separado -- es la garantía de que
+    # el gráfico nunca puede mostrar un veredicto distinto al resto de la app.
+    panel = _ja_solar_jam66d46_720lb()
+    inv = _growatt_max_100ktl3_lv()
+    directo = evaluar_compatibilidad_string(
+        panel, inv, N_serie=18, T_frio=-5.0, T_real=36.35, T_extremo=41.94,
+        N_strings_tracker=1,
+    )
+    r = curva_electrica_temperatura(
+        panel, inv, N_serie=18, T_frio=-5.0, T_real=36.35, T_extremo=41.94,
+        N_strings_tracker=1,
+    )
+    assert r["evaluacion"] == directo
+
+
+def test_curva_electrica_uraba_n18_muestra_incompatibilidad_real():
+    # Caso real ya documentado: N=18 (17x18=306 módulos, diseño histórico)
+    # reprueba el piso Vmppt_activo_min=850V con clima real de Urabá.
+    r = curva_electrica_temperatura(
+        _ja_solar_jam66d46_720lb(), _growatt_max_100ktl3_lv(), N_serie=18,
+        T_frio=22.1, T_real=54.5, T_extremo=66.0, N_strings_tracker=1,
+    )
+    assert r["evaluacion"]["compatible"] is False
+    assert r["vmppt_min"] == pytest.approx(850.0)
+    assert r["vdc_max"] == pytest.approx(1500.0)
+    # La curva de Vmp a la temperatura más caliente debe caer bajo el piso
+    # MPPT -- es justo lo que el gráfico tiene que poder mostrar visualmente.
+    assert min(r["vmp_curva"]) < r["vmppt_min"]
+
+
+def test_curva_electrica_uraba_n28_es_compatible():
+    # N=28 -- el valor eléctricamente correcto encontrado en esta misma
+    # auditoría para el clima real de Urabá.
+    r = curva_electrica_temperatura(
+        _ja_solar_jam66d46_720lb(), _growatt_max_100ktl3_lv(), N_serie=28,
+        T_frio=22.1, T_real=54.5, T_extremo=66.0, N_strings_tracker=1,
+    )
+    assert r["evaluacion"]["compatible"] is True
+    assert min(r["vmp_curva"]) >= r["vmppt_min"]
+    assert max(r["voc_curva"]) <= r["vdc_max"]
+
+
+def test_curva_electrica_temps_van_de_menor_a_mayor_y_cubren_las_3_de_diseno():
+    r = curva_electrica_temperatura(
+        _ja_solar_jam66d46_720lb(), _growatt_max_100ktl3_lv(), N_serie=28,
+        T_frio=22.1, T_real=54.5, T_extremo=66.0, N_strings_tracker=1,
+        n_puntos=10,
+    )
+    temps = r["temps"]
+    assert temps == sorted(temps)
+    assert temps[0] == pytest.approx(22.1)
+    assert temps[-1] == pytest.approx(66.0)
+    assert len(temps) == len(r["voc_curva"]) == len(r["vmp_curva"]) == 10
+
+
+def test_curva_electrica_sin_limites_del_inversor_devuelve_none_no_cero():
+    # Un inversor sin Vdc_max publicado no debe dibujar una banda falsa en 0.
+    r = curva_electrica_temperatura(
+        _ja_solar_jam66d46_720lb(), {}, N_serie=18,
+        T_frio=-5.0, T_real=36.35, T_extremo=41.94,
+    )
+    assert r["vdc_max"] is None
+    assert r["vmppt_min"] is None
+    assert r["vmppt_max"] is None
 
 
 # ---------------------------------------------------------------------------

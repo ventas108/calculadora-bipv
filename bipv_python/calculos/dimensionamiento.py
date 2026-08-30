@@ -236,6 +236,76 @@ def evaluar_compatibilidad_string(
     }
 
 
+def curva_electrica_temperatura(
+    panel: dict,
+    inversor: dict,
+    N_serie: int,
+    T_frio: float = -5.0,
+    T_real: float = 36.35,
+    T_extremo: float = 41.94,
+    N_strings_tracker: int = 1,
+    FS_isc: float = 1.25,
+    n_puntos: int = 40,
+) -> dict:
+    """
+    Curva Voc/Vmp del string vs. temperatura de celda + ventana MPPT del
+    inversor -- el mismo gráfico que PVsyst muestra al verificar
+    compatibilidad eléctrica ("Array behavior"). Pedido explícito del
+    usuario (30-ago-2026) para el Reporte PDF.
+
+    Deliberadamente NO reimplementa la física de verificación: reutiliza
+    `evaluar_compatibilidad_string()` para el veredicto real (mismo que ya
+    usan Producción y el gate de Dimensionamiento) y `calcular_voc_string`/
+    `calcular_vmp_string` para muestrear la curva continua entre T_frio y
+    T_extremo -- Voc/Vmp son funciones lineales de la temperatura, así que
+    la curva es solo para visualización: los 2-3 puntos extremos ya
+    verifican la compatibilidad con certeza matemática (ver
+    DIAGNOSTICO correspondiente en la base de conocimiento del asistente).
+
+    Returns
+    -------
+    dict con:
+      temps            : lista de temperaturas muestreadas (°C), de la más
+                          fría a la más caliente de las 3 de diseño.
+      voc_curva/vmp_curva : Voc(T)/Vmp(T) del string en cada temperatura.
+      vdc_max, vmppt_min, vmppt_max : límites del inversor (o None si el
+                          inversor no los publica).
+      evaluacion       : resultado completo de evaluar_compatibilidad_string().
+    """
+    n = int(N_serie)
+    t_lo = min(T_frio, T_real, T_extremo)
+    t_hi = max(T_frio, T_real, T_extremo)
+    if t_hi <= t_lo:
+        t_hi = t_lo + 1.0  # evita división por cero si los 3 vinieran iguales
+    paso = (t_hi - t_lo) / max(1, n_puntos - 1)
+    temps = [t_lo + i * paso for i in range(n_puntos)]
+
+    evaluacion = evaluar_compatibilidad_string(
+        panel, inversor, n, T_frio, T_real, T_extremo, N_strings_tracker, FS_isc
+    )
+
+    try:
+        Voc_stc = float(panel["Voc_stc"])
+        Vmp_stc = float(panel["Vmp_stc"])
+        Tk_beta = float(panel["Tk_beta"])
+        voc_curva = [calcular_voc_string(n, Voc_stc, Tk_beta, t) for t in temps]
+        vmp_curva = [calcular_vmp_string(n, Vmp_stc, Tk_beta, t) for t in temps]
+    except (KeyError, TypeError, ValueError):
+        voc_curva = vmp_curva = []
+
+    return {
+        "temps": temps,
+        "voc_curva": voc_curva,
+        "vmp_curva": vmp_curva,
+        "vdc_max": _numero_finito(inversor.get("Vdc_max")) or None,
+        "vmppt_min": _numero_finito(
+            inversor.get("Vmppt_activo_min") or inversor.get("Vmppt_min")
+        ) or None,
+        "vmppt_max": _numero_finito(inversor.get("Vmppt_max")) or None,
+        "evaluacion": evaluacion,
+    }
+
+
 def evaluar_relacion_dc_ac(P_dc_stc_kW: float, P_ac_nom_W: float | None) -> dict:
     """
     Evalúa si la relación DC/AC (potencia FV instalada / potencia CA nominal
