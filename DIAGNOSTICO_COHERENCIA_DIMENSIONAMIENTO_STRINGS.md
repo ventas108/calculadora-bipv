@@ -67,4 +67,4 @@ N=7 coincide exactamente con la última fila 🟢 (0 riesgos) del barrido de com
 - `c4e0650e` — `alerta_margen`: armoniza el margen de seguridad del 7,5% entre `optimizar_n_serie()` y `evaluar_compatibilidad_string()`
 - `f70928a8` — invalida el prorrateo preliminar cuando cambia N_strings/tracker
 
-Ver también `DIAGNOSTICO_VALIDACION_TEUSAQUILLO_PVSYST.md` para el contexto original (bloqueo de PVsyst, alarma de relación DC/AC, bugs de catálogo de inversores).
+Ver también `DIAGNOSTICO_VALIDACION_TEUSAQUILLO_REFERENCIA_ESTANDAR.md` para el contexto original (bloqueo de PVsyst, alarma de relación DC/AC, bugs de catálogo de inversores).
