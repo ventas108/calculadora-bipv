@@ -20,13 +20,23 @@ dependencia real del viento — la equivalencia es aproximada, no exacta).
 from __future__ import annotations
 
 # k_BIPV (factor de confinamiento, ver calculos/temperatura.py y
-# calculos/motor_optico.py) → preset más cercano de PVsyst y su Uc/Uv típico.
-# Uv=0 en los tres casos: PVsyst permite ajustarlo si se tiene velocidad de
-# viento de sitio, pero el preset base que se compara aquí es Uc solamente.
+# calculos/motor_optico.py::K_BIPV_POR_MONTAJE) → preset más cercano de
+# PVsyst y su Uc/Uv típico. Uv=0 en los 4 casos: PVsyst permite ajustarlo si
+# se tiene velocidad de viento de sitio, pero el preset base que se compara
+# aquí es Uc solamente.
 EQUIVALENCIA_K_BIPV_UC_UV = {
     1.0: {
         "preset_pvsyst": "Free standing (montaje libre)",
         "Uc_W_m2K": 29.0,
+        "Uv_W_m2K_por_ms": 0.0,
+    },
+    # k=1.15 (30-ago-2026): no existe preset oficial de PVsyst para este
+    # nivel intermedio (Pérgola/Marquesina) -- Uc interpolado linealmente
+    # entre Free standing (29.0) y Semi-integrated (20.0). Sin calibración
+    # propia, igual que el propio k=1.15 -- ver la nota en K_BIPV_POR_MONTAJE.
+    1.15: {
+        "preset_pvsyst": "Sin preset oficial — interpolado entre Free standing y Semi-integrated",
+        "Uc_W_m2K": 24.5,
         "Uv_W_m2K_por_ms": 0.0,
     },
     1.3: {
@@ -57,31 +67,47 @@ def generar_ficha_conversion_pvsyst(
 
     Parameters
     ----------
-    panel : dict con la estructura de datos/catalogo_paneles_excel.py
-            (Voc_stc, Vmp_stc, Isc_stc, Imp, Pmax_stc, NOCT, Tk_beta,
-             Tk_gamma, tecnologia, marca, nombre, area_m2).
+    panel : dict — acepta CUALQUIERA de los dos esquemas reales del repo, que
+            usan nombres de campo distintos para lo mismo:
+              - datos/catalogo_paneles_excel.py  (105 paneles del Excel):
+                marca, Imp, sin coeficiente de Isc (alpha_sc=None siempre).
+              - datos/tecnologias_bipv.py MODULOS_BIPV (familia ASP-ST1,
+                incluido el panel real de Teusaquillo ASP-ST1-T40):
+                fabricante, Imp_stc, Tk_alfa (coef. Isc, sí disponible).
+            Bug real corregido (30-ago-2026): la primera versión de esta
+            función solo leía las claves del esquema del catálogo Excel —
+            con un panel de MODULOS_BIPV (ej. el propio Teusaquillo)
+            imprimía "—" en Fabricante/Imp pese a que el dato existe, y
+            "μIsc no disponible" pese a que Tk_alfa sí está. Encontrado
+            auditando la Fase 3 del plan (que pedía anclar el test al caso
+            real de Teusaquillo) — el test original usaba el panel de
+            Urabá (esquema Excel), lo que ocultó el bug. Mismo patrón de
+            fallback `Tk_alfa or alpha_sc` que ya usa modelo_iv.py:449.
     tipo_instalacion : uno de los 6 tipos de pages/1_🏠_Proyecto.py
                         (solo informativo en la ficha).
     k_bipv : factor de confinamiento térmico elegido en 🔆 Motor Óptico.
     """
     nombre = panel.get("nombre", "—")
-    marca = panel.get("marca", "—")
+    marca = panel.get("marca") or panel.get("fabricante") or "—"
     tecnologia = panel.get("tecnologia", "—") or "—"
 
     Pmax = panel.get("Pmax_stc")
     Voc = panel.get("Voc_stc")
     Vmp = panel.get("Vmp_stc")
     Isc = panel.get("Isc_stc")
-    Imp = panel.get("Imp")
+    Imp = panel.get("Imp") or panel.get("Imp_stc")
     NOCT = panel.get("NOCT")
     Tk_beta = panel.get("Tk_beta")    # coef. temp. Voc (%/°C)
     Tk_gamma = panel.get("Tk_gamma")  # coef. temp. Pmax (%/°C)
+    Tk_alfa = panel.get("Tk_alfa")
+    if Tk_alfa is None:
+        Tk_alfa = panel.get("alpha_sc")
     area = panel.get("area_m2")
 
     k_cercano, eq = _equivalencia_mas_cercana(k_bipv)
     nota_k = "" if abs(k_cercano - k_bipv) < 1e-9 else (
-        f" (k_BIPV={k_bipv:.2f} no es uno de los 3 presets estándar — "
-        f"se usó el más cercano, k={k_cercano:.1f}, para la equivalencia)"
+        f" (k_BIPV={k_bipv:.2f} no es uno de los 4 presets estándar — "
+        f"se usó el más cercano, k={k_cercano:.2f}, para la equivalencia)"
     )
 
     lineas = [
@@ -103,9 +129,14 @@ def generar_ficha_conversion_pvsyst(
         "── 2. Coeficientes de temperatura ──",
         f"  μVoc                  : {_fmt(Tk_beta, '%/°C')}",
         f"  μPmax (γ)             : {_fmt(Tk_gamma, '%/°C')}",
-        "  μIsc                  : NO disponible en el catálogo de esta app "
-        "— pedir al fabricante o usar default típico c-Si (~+0.04 %/°C). "
-        "No lo completes con un valor inventado sin marcarlo como supuesto.",
+        (
+            f"  μIsc                  : {_fmt(Tk_alfa, '%/°C')}"
+            if Tk_alfa is not None else
+            "  μIsc                  : NO disponible en el catálogo de esta "
+            "app — pedir al fabricante o usar default típico c-Si "
+            "(~+0.04 %/°C). No lo completes con un valor inventado sin "
+            "marcarlo como supuesto."
+        ),
         f"  NOCT/NMOT             : {_fmt(NOCT, '°C')}",
         "",
         "── 3. Ajuste térmico de montaje (Uc/Uv) ──",

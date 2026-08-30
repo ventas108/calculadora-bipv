@@ -45,31 +45,69 @@ B0_POR_VIDRIO = {
     "Personalizado":                            None,
 }
 
-# Factor de confinamiento k_BIPV por tipo de montaje
+# Factor de confinamiento k_BIPV por tipo de montaje.
+# k=1.15 (30-ago-2026): nivel intermedio sin calibración propia todavía —
+# estimado por interpolación lineal entre ventilado libre (1.0) y fachada
+# confinada (1.3), NO un valor medido. Úsalo como punto de partida razonable
+# para Pérgola/Marquesina, ajustable manualmente por proyecto; si aparece
+# evidencia real (medición de campo o comparación contra PVsyst) que lo
+# contradiga, se debe recalibrar aquí, no solo en el selector de una página.
 K_BIPV_POR_MONTAJE = {
-    "Ventilado libre (k=1.0) — espacio > 10 cm": 1.0,
-    "Fachada confinada (k=1.3) — montaje típico": 1.3,
-    "Sin ventilación (k=1.5) — sellado total":    1.5,
+    "Ventilado libre (k=1.0) — espacio > 10 cm":         1.0,
+    "Semi-ventilado (k=1.15) — un lado parcial. cerrado": 1.15,
+    "Fachada confinada (k=1.3) — montaje típico":        1.3,
+    "Sin ventilación (k=1.5) — sellado total":            1.5,
 }
 
-# Tipos de instalación (ver TIPOS_INSTALACION en pages/1_🏠_Proyecto.py) cuyo
-# montaje real es cerrado/confinado -- cámara de aire restringida detrás del
-# panel -- y por tanto el default físicamente correcto es "Fachada confinada"
-# (k=1.3). Cualquier tipo que NO esté en este set usa "Ventilado libre"
-# (k=1.0) como default: estructura elevada con flujo de aire libre en ambas
-# caras (soporte de techo plano, pérgola, marquesina, granja).
+# Tipos de instalación (ver TIPOS_INSTALACION en pages/1_🏠_Proyecto.py)
+# clasificados por su montaje térmico real para elegir el default de
+# K_BIPV_POR_MONTAJE. Tres grupos:
+#   - TIPOS_MONTAJE_CONFINADO   → Fachada confinada (k=1.3): cámara de aire
+#     restringida detrás del panel.
+#   - TIPOS_MONTAJE_SEMIVENTILADO → Semi-ventilado (k=1.15): estructura
+#     elevada pero con un lado más expuesto a obstrucción de flujo (pérgola
+#     con cerramiento parcial, marquesina adosada a una edificación) que un
+#     campo abierto, sin llegar al confinamiento de una fachada sellada.
+#   - Cualquier otro tipo (Techo plano con soporte, Granja fotovoltaica) →
+#     Ventilado libre (k=1.0): estructura elevada con flujo de aire libre en
+#     ambas caras del panel.
 #
-# Antes de este cambio (30-ago-2026) el default era binario -- solo "Granja
-# fotovoltaica" recibía k=1.0, y los otros 5 tipos (incluidos Techo plano con
-# soporte, Pérgola/sombreadero y Marquesina/voladizo, que son estructuras
-# elevadas y ventiladas, no fachadas selladas) heredaban k=1.3 sin
-# justificación física -- mismo patrón de incoherencia por tipo_instalacion
-# ya documentado para otros módulos (mo_montaje_tipo_ref, opex_kw_guardado,
-# factor_ocupacion_pct). Ver DIAGNOSTICO_MODELO_TERMICO_UC_UV.md.
+# Antes de este cambio (30-ago-2026, primera versión) el default era binario
+# -- solo "Granja fotovoltaica" recibía k=1.0, los otros 5 tipos heredaban
+# k=1.3 sin justificación física. Se corrigió primero a un mapeo de 2 grupos
+# (reutilizando solo los 3 valores ya existentes, con Pérgola/Marquesina en
+# el mismo grupo que Granja) y luego, a pedido explícito del usuario tras
+# auditar el plan original, se agregó este 3er grupo intermedio -- mismo
+# patrón de incoherencia por tipo_instalacion ya documentado para otros
+# módulos (mo_montaje_tipo_ref, opex_kw_guardado, factor_ocupacion_pct). Ver
+# DIAGNOSTICO_MODELO_TERMICO_UC_UV.md.
 TIPOS_MONTAJE_CONFINADO = {
     "Fachada BIPV",
     "Techo inclinado (BIPV)",
 }
+TIPOS_MONTAJE_SEMIVENTILADO = {
+    "Pérgola / sombreadero",
+    "Marquesina / voladizo",
+}
+
+
+def indice_montaje_default(tipo_instalacion: str) -> int:
+    """
+    Índice (en list(K_BIPV_POR_MONTAJE.keys())) del montaje default para un
+    tipo de instalación. Busca por VALOR de k_BIPV, no por posición fija en
+    el dict -- así no se rompe si alguna vez se reordena K_BIPV_POR_MONTAJE.
+    """
+    if tipo_instalacion in TIPOS_MONTAJE_CONFINADO:
+        objetivo = 1.3
+    elif tipo_instalacion in TIPOS_MONTAJE_SEMIVENTILADO:
+        objetivo = 1.15
+    else:
+        objetivo = 1.0
+    claves = list(K_BIPV_POR_MONTAJE.keys())
+    for i, clave in enumerate(claves):
+        if abs(K_BIPV_POR_MONTAJE[clave] - objetivo) < 1e-9:
+            return i
+    return 0
 
 
 # ─── Funciones de cálculo (puras, vectorizadas) ────────────────────────────────

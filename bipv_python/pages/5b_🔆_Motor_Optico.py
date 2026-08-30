@@ -12,7 +12,7 @@ from calculos.motor_optico import (
     cascada_optica,
     B0_POR_VIDRIO,
     K_BIPV_POR_MONTAJE,
-    TIPOS_MONTAJE_CONFINADO,
+    indice_montaje_default,
     SOILING_COLOMBIA,
 )
 
@@ -254,19 +254,17 @@ with col1:
 with col2:
     st.markdown("**Montaje y temperatura**")
     # Default consciente del tipo de instalación (26-ago-2026, extendido a
-    # los 6 tipos el 30-ago-2026): "Fachada confinada" (k=1.3) es correcta
-    # como default solo para tipos con cámara de aire restringida detrás del
-    # panel (Fachada BIPV, Techo inclinado BIPV). Para el resto -- Techo
-    # plano con soporte, Pérgola/sombreadero, Marquesina/voladizo, Granja
-    # fotovoltaica -- son estructuras elevadas con flujo de aire libre en
-    # ambas caras, y ese default penaliza la temperatura de celda sin motivo
-    # físico. El caso Granja se detectó corriendo Agrivoltaico Urabá contra
-    # PVsyst (ver DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md); el resto de tipos
-    # tenía el mismo problema sin haberse corrido aún un caso real que lo
-    # expusiera -- ver DIAGNOSTICO_MODELO_TERMICO_UC_UV.md.
+    # los 6 tipos y a 3 niveles de k_BIPV el 30-ago-2026, tras auditoría
+    # pedida por el usuario): "Fachada confinada" (k=1.3) solo para tipos con
+    # cámara de aire restringida (Fachada BIPV, Techo inclinado BIPV);
+    # "Semi-ventilado" (k=1.15) para Pérgola/sombreadero y
+    # Marquesina/voladizo (elevadas pero con un lado más expuesto a
+    # obstrucción que un campo abierto); "Ventilado libre" (k=1.0) para el
+    # resto (Techo plano con soporte, Granja fotovoltaica). Ver
+    # `indice_montaje_default()` en calculos/motor_optico.py y
+    # DIAGNOSTICO_MODELO_TERMICO_UC_UV.md para la justificación completa.
     _tipo_actual = st.session_state.get("tipo_instalacion", "")
-    _es_campo_abierto = _tipo_actual not in TIPOS_MONTAJE_CONFINADO
-    _idx_montaje_default = 0 if _es_campo_abierto else 1
+    _idx_montaje_default = indice_montaje_default(_tipo_actual)
     # Bug real (29-ago-2026, misma clase que el de arriba): "mo_montaje"
     # (key= del selectbox) solo se preseleccionaba la PRIMERA vez, cuando la
     # clave no existía todavía. Si el usuario cambiaba "Tipo de instalación"
@@ -279,12 +277,13 @@ with col2:
     if st.session_state.get("mo_montaje_tipo_ref") != _tipo_actual:
         st.session_state.pop("mo_montaje", None)
         st.session_state["mo_montaje_tipo_ref"] = _tipo_actual
-    if _es_campo_abierto and "mo_montaje" not in st.session_state:
+    if "mo_montaje" not in st.session_state:
+        _montaje_default_nombre = list(K_BIPV_POR_MONTAJE.keys())[_idx_montaje_default]
         st.caption(
-            f"☀️ Proyecto tipo **{_tipo_actual}** — se preselecciona "
-            "*Ventilado libre (k=1.0)*, el montaje físicamente correcto para "
-            "estructuras elevadas con flujo de aire libre en ambas caras. "
-            "Cámbialo si tu proyecto tiene una condición de montaje distinta."
+            f"ℹ️ Proyecto tipo **{_tipo_actual}** — se preselecciona "
+            f"*{_montaje_default_nombre}*, el montaje físicamente típico para "
+            "este tipo de instalación. Cámbialo si tu proyecto real tiene una "
+            "condición de montaje distinta."
         )
     montaje_sel = st.selectbox(
         "Tipo de montaje",
