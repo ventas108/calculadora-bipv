@@ -105,6 +105,21 @@ Dos veces en esta auditoría (con la ficha PV3300 completa y con la ficha aislad
 
 **Recomendación al usuario para la próxima vez que esto pase**: recargar la página completa (F5) antes de volver a subir el archivo, o probar en una ventana de navegación privada, para descartar caché del navegador.
 
+## 🔴 Hallazgo más grave de toda la auditoría — 8 columnas del catálogo real nunca existieron; datos de híbrido/batería descartados en silencio en cada guardado
+
+El usuario pidió "una estructura lógica para el descargue de fichas técnicas de inversores híbridos... que matemática y electrónicamente se descarguen de forma coherente". Diseñando esa estructura (ver más abajo) se encontró, verificando contra el catálogo real (no solo el código), un bug de persistencia que llevaba tiempo activo:
+
+`guardar_inversor_excel()` solo escribe columnas que **ya existen** en el encabezado real del Excel — nunca crea columnas nuevas. `pages/15_🔌_Catálogo_Inversores_PDF.py` construye desde hace tiempo un `_row` con `"Marca"`, `"Arquitectura"`, `"Inversor Híbrido (Si/No)"`, `"Voltaje Batería Min/Max (V)"`, `"Notas"`, `"Confianza"` — pero **ninguna de esas 6 columnas existía realmente** en `inversores_catalogo.xlsx` (verificado leyendo el encabezado real con pandas, exactamente como lo hace el loader). Cada vez que alguien guardaba un inversor con esos datos, se descartaban en silencio.
+
+**Confirmado con los 17 inversores MUST reales ya guardados en el catálogo de producción**: los 17 son híbridos verdaderos (confirmado por esta misma auditoría, extrayendo directamente de sus fichas), pero los 17 mostraban `es_hibrido=False` y `bat_voltaje_min/max=None` al cargarlos — no porque el extractor fallara, sino porque el dato correcto nunca llegó a persistirse.
+
+**Corregido**:
+1. Se agregaron las 6 columnas faltantes al Excel real (`Marca`, `Arquitectura`, `Inversor Híbrido (Si/No)`, `Voltaje Batería Min (V)`, `Voltaje Batería Max (V)`, `Confianza`, `Notas`), más `Corriente Máxima Carga Batería (A)` (columna nueva de esta sesión, ver más abajo) — 8 en total. Cambio puramente aditivo: no se tocó ninguna columna ni valor existente de los 107 inversores ya catalogados.
+2. `cargar_catalogo_inversores()` actualizado para leer también `marca`, `arquitectura`, `bat_corriente_carga_max`, `confianza`, `notas` (antes solo leía 2 de las 8).
+3. **Backfill de los 17 registros MUST reales**: `Marca="MUST"`, `Arquitectura="Híbrido / Off-grid"`, `Inversor Híbrido="Si"` para los 17; `Corriente Máxima Carga Batería` con el valor real verificado por familia (60/70/80 A para PV35 y PV36, según el submodelo; en blanco para los 11 PV33 — ver el hallazgo de la tabla multinivel más abajo, no es un dato confiable para esa familia). Ningún otro inversor del catálogo (los otros 90) se tocó.
+
+Verificado tras el fix: los 17 MUST ahora cargan `es_hibrido=True` correctamente.
+
 ## Mejora real #9 (idea del usuario, implementada) — inversores híbridos: distinguir "submodelo por potencia" de "voltaje que depende de la batería instalada"
 
 El usuario hizo una corrección conceptual importante sobre este tipo de ficha (inversor híbrido): lo que esta auditoría venía llamando "submodelos" (PV35-8048/10048/12048) son 3 **productos físicos distintos por potencia** (distinta electrónica, peso, corriente máxima) — eso está bien modelado. Pero **dentro de cada uno**, el inversor es agnóstico de química de batería: el instalador conecta la batería real (plomo-ácido/AGM/gel/litio) y el equipo se configura en su propio LCD con los puntos de corte según esa batería. El fabricante del **inversor** no puede publicar un voltaje de batería fijo — y la ficha lo dice explícitamente: `"Output voltage Depends on battery type"`, y los puntos de corte se publican como **rangos** ("Low battery voltage cutoff 40-48VDC for 48VDC mode"), no valores únicos.
@@ -182,10 +197,34 @@ Con los 11 modelos ya bien detectados, se verificó que `valores_por_modelo` seg
 
 2 tests nuevos, anclados al texto real de la línea de encabezado + continuación de esta ficha. Suite completa: **772/772**.
 
+## 🏗️ Estructura lógica de coherencia (pedida explícitamente por el usuario, 30-ago-2026)
+
+El usuario pidió una "estructura lógica para el descargue de fichas técnicas de inversores híbridos... que matemática y electrónicamente se descarguen de forma coherente, para evitar errores en los datos descargados que afecten los cálculos de producción y diseño". Esto es lo que quedó implementado, en 4 capas — reutilizando y extendiendo `calculos/validador_inversor.py`, no reinventando desde cero:
+
+**Capa 1 — Extracción correcta por campo** (`calculos/pdf_inversor_extractor.py`): cada patrón regex ancla a texto real verificado, con guards defensivos (grupos atómicos contra backtracking, enmascarado de paréntesis con tolerancias, exigir coincidencia 1:1 antes de repartir por posición). Cubre los bugs #1-#8 de este documento.
+
+**Capa 2 — Coherencia física de UN inversor** (`validador_inversor.py::validar_inversor()`, ya existía, extendida esta sesión): invariantes eléctricos universales — Vmppt_min < Vmppt_max ≤ Vdc_max, Isc ≥ I_max, y el techo de potencia FV **P_dc_max_W ≤ Vmppt_min × I_max × n_trackers** (corregido esta sesión: antes usaba Vdc_max, el límite MÁS generoso posible, en vez de Vmppt_min, el peor caso real de mayor corriente — P=V×I, a igual potencia la corriente sube cuando baja el voltaje). Para híbridos sin `n_trackers` publicado (el caso más común en esta familia de productos), se asume 1 tracker en vez de omitir el chequeo por completo.
+
+**Capa 3 — Coherencia entre submodelos de una misma familia** (`validador_inversor.py::validar_coherencia_familia()`, nueva): para fichas multi-modelo, verifica que los campos numéricos por columna (potencia FV, corrientes) sean monótonos no decrecientes en el mismo orden en que el fabricante lista la familia (siempre de menor a mayor potencia, verificado en las 3 familias MUST de esta auditoría). No intenta parsear la potencia del nombre del modelo (varía por fabricante) — es un chequeo genérico, no específico de MUST. Si un campo baja donde otro sube entre el mismo par de modelos, avisa que hay una columna probablemente mal alineada, antes de que el usuario elija ese modelo para guardar.
+
+**Capa 4 — Persistencia íntegra** (`datos/catalogo_inversores_excel.py`): de nada sirven las 3 capas anteriores si el dato ya validado se descarta al guardar — el hallazgo más grave de esta ronda (arriba) fue exactamente eso. Corregido: las 8 columnas que la UI ya intentaba escribir ahora existen realmente en el Excel.
+
+### Nuevo campo: `bat_corriente_carga_max` (idea original del usuario)
+
+Corriente máxima con la que el inversor puede **cargar la batería** (sección "AC CHARGER" de la ficha) — distinta de `I_max_tracker` (corriente máxima del lado FV, sección "SOLAR CHARGER"). Es un dato **fijo del hardware** (no depende de qué batería se instale, a diferencia del voltaje), así que se extrae normalmente. Habilita, a futuro, verificar manualmente si la corriente máxima de carga real de la batería del proyecto es compatible con lo que el inversor puede entregarle — el caso concreto que motivó esta sección (usuario preguntó por una batería de "63A").
+
+⚠️ **Límite real, descubierto verificando contra las 3 familias MUST, no solo una**: para la familia PV3300, esta etiqueta encabeza una tabla de 3 filas (una por nivel de voltaje de batería: 12V/24V/48V), cada una cubriendo solo un subconjunto de los 11 modelos — no una fila 1:1. El extractor detecta este caso (menos valores que modelos) y **deja el campo en blanco en vez de adivinar por posición** — a diferencia de otros campos por columna (P_dc_max_W, I_max_tracker) donde el reparto posicional sí es confiable porque esas filas SÍ son 1:1 con los modelos. Mejor vacío que un dato de seguridad de batería mal asignado a otro submodelo.
+
+### Bug real de paso — `_extract_arch()` clasificaba PV3300 como "trifásico"
+
+La ficha PV3300 se titula literalmente "**Split Phase** Solar Inverter" (monofásico dividido, NO trifásico) — pero el patrón `3P\b` (parte de la detección de "Inversor de red trifásico") matcheaba "3P" en `"Capable of starting electric motor 1P 1P 1.5P 1.5P 2P 3P"` — una lista de potencia de motor en HP abreviada sin la "H", no un indicador de fase. Corregido: `3P\b` → `3P\s*\d+K\b` (exige un código de potencia detrás, patrón real de la familia Deye TriP2 que sí es trifásica genuina — "3P 5K 3P 6K..." — sin romper ese caso). Riesgo genérico: cualquier ficha de cualquier fabricante con una lista de potencia de motor en HP corría el mismo riesgo.
+
+Tests nuevos: `tests/test_validador_inversor.py` (9 tests, primer test directo de este módulo) + 5 tests más en `test_pdf_inversor_extractor.py`. Suite completa: **789/789**.
+
 ## Cobertura de tests — hallazgo aparte
 
-Antes de esta auditoría, `calculos/pdf_inversor_extractor.py` (~1.500 líneas, el motor completo de extracción de fichas de inversores) **no tenía ningún test que llamara a `extraer_parametros_inversor()` ni a sus funciones internas directamente** — toda la cobertura de "inversor" existente prueba lógica de catálogo/compatibilidad con diccionarios ya armados a mano, no el motor de regex en sí. Se creó `tests/test_pdf_inversor_extractor.py` (15 tests en total, incluidos los de las secciones anteriores) anclado al texto real de estas fichas MUST, como primer test directo del motor de extracción.
+Antes de esta auditoría, `calculos/pdf_inversor_extractor.py` (~1.500 líneas, el motor completo de extracción de fichas de inversores) **no tenía ningún test que llamara a `extraer_parametros_inversor()` ni a sus funciones internas directamente** — toda la cobertura de "inversor" existente prueba lógica de catálogo/compatibilidad con diccionarios ya armados a mano, no el motor de regex en sí. Se creó `tests/test_pdf_inversor_extractor.py` (19 tests en total, incluidos los de las secciones anteriores) anclado al texto real de estas fichas MUST, como primer test directo del motor de extracción. También `tests/test_validador_inversor.py` (9 tests) — primer test directo de `validador_inversor.py`.
 
 ## Resultado final
 
-Suite completa: **776/776**. Los 8 bugs de código corregidos y verificados contra las fichas reales (PV35 ×3, PV36, PV3300 ×2 + ficha aislada PV33-5048/6048); el archivo mal nombrado ya se corrigió en el escritorio (renombrado a PV36); el detector multi-modelo con la ficha de familia completa (11 modelos) ya no produce entradas basura ni modelos fusionados — corregido de raíz, no solo mitigado; el campo `modelo` singular ya no confunde un encabezado multi-modelo con un nombre real; y, a partir de una idea real del usuario, los inversores híbridos ahora avisan explícitamente cuándo la salida/umbrales de batería dependen de la batería instalada, en vez de dejar esos campos en blanco sin explicación.
+Suite completa: **789/789**. Resumen final de esta auditoría: 8 bugs reales de extracción corregidos; el hallazgo más grave (8 columnas del catálogo real que nunca existieron, datos de híbrido/batería descartados en silencio) corregido con backfill de los 17 registros MUST afectados; estructura lógica de coherencia en 4 capas (extracción → un inversor → familia de submodelos → persistencia); 1 campo nuevo (`bat_corriente_carga_max`); 1 bug de clasificación de arquitectura (3P de caballos de fuerza vs trifásico real).

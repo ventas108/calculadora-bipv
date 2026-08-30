@@ -18,6 +18,15 @@ inversor. En ese caso `bat_voltaje_min`/`bat_voltaje_max` se fuerzan a
 y la UI debe avisar que se completan a mano según la batería real del
 proyecto.
 
+Y `bat_corriente_carga_max` (A): corriente máxima con la que el inversor
+puede CARGAR la batería (lado AC/cargador) -- a diferencia de
+`bat_voltaje_min`/`max`, este SÍ es un dato fijo del hardware (no depende
+de qué batería se instale), así que se extrae normalmente. Sirve para
+verificar, comparando manualmente contra la ficha de la batería real del
+proyecto, si su corriente máxima de carga es compatible con lo que el
+inversor puede entregarle -- no confundir con `I_max_tracker`, que es la
+corriente máxima del lado FV (paneles), un concepto distinto.
+
 Referencia de alias: Mapa_de_Alias_Catalogo_Inversores (INNOVAQ/EINNOVA 2026).
 """
 
@@ -65,7 +74,14 @@ _BRANDS = [
 # Arquitecturas reconocidas (para campo tecnologia / tipo)
 _ARCH_PATTERNS = [
     ("Híbrido / Off-grid",    r"(?:hybrid|h[íi]brido|HES|ESS|storage|all[- ]in[- ]one)",         re.IGNORECASE),
-    ("Inversor de red trifásico", r"(?:3[- ]?phase|tri[- ]?f[aá]sico|3ph|3-ph|TL3|3P\b)",         re.IGNORECASE),
+    # Bug real (30-ago-2026, ficha MUST PV3300 -- "Split Phase Solar Inverter",
+    # monofásico/bifásico, NO trifásico): "3P\b" suelto matcheaba "3P" en
+    # "Capable of starting electric motor 1P 1P 1.5P 1.5P 2P 3P" -- una lista
+    # de potencia de motor en HP abreviada sin la "H" (no un indicador de
+    # fase). Se restringe "3P" a solo cuando trae un código de potencia
+    # detrás ("3P 5K", patrón real de la familia Deye TriP2 -- ver
+    # scripts/casos_test_inversores.py), que sí es un indicador de fase real.
+    ("Inversor de red trifásico", r"(?:3[- ]?phase|tri[- ]?f[aá]sico|3ph|3-ph|TL3|3P\s*\d+K\b)", re.IGNORECASE),
     ("Inversor de red monofásico", r"(?:1[- ]?phase|mono[- ]?f[aá]sico|1ph|1-ph|TL(?!3))",         re.IGNORECASE),
     ("Cargador off-grid puro", r"(?:off[- ]?grid|stand[- ]?alone|PV\s*charger|UPS|charge\s*controller)", re.IGNORECASE),
 ]
@@ -583,6 +599,22 @@ _PAT_BAT_MAX = [
     (r"[Mm]ax(?:imum)?\s+[Bb]attery\s+[Vv]oltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",       1),
 ]
 
+# ─────────────────────────────────────────────────────────────────────────────
+# bat_corriente_carga_max — Corriente máxima de CARGA de batería (lado AC/
+# cargador), NO confundir con I_max_tracker (lado FV). Idea real del usuario
+# (30-ago-2026): permite verificar, a futuro, si la corriente máxima de carga
+# real de la batería que se va a instalar es compatible con lo que el
+# inversor puede entregarle -- sin ese dato el inversor solo carga limitado
+# por SU propio máximo, no por el de la batería.
+# El lookahead negativo "(?!PV\s)" evita capturar "Maximum PV charge
+# current" (I_max_tracker, lado FV) -- ambas etiquetas coexisten en la
+# misma ficha MUST bajo secciones distintas (AC CHARGER vs SOLAR CHARGER).
+# ─────────────────────────────────────────────────────────────────────────────
+_PAT_BAT_CARGA_MAX = [
+    (r"Max(?:imum)?\s+(?!PV\s)charge\s+current\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A", 1),
+    (r"Corriente\s+m[aá]xima\s+de\s+carga\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*A",       1),
+]
+
 # ── Detección de inversor híbrido ─────────────────────────────────────────────
 _HYBRID_RE = re.compile(
     r"(?:hybrid|h[íi]brido|HES\b|ESS\b|all[- ]in[- ]one|storage|bateria|battery)",
@@ -895,7 +927,8 @@ def _extract_multimodel_values(text: str) -> dict:
         'modelos': model_names,
         'por_modelo': {
             m: {'P_dc_max_W': None, 'n_trackers': None, 'n_strings_tracker': None,
-                'I_max_tracker': None, 'Isc_max_tracker': None}
+                'I_max_tracker': None, 'Isc_max_tracker': None,
+                'bat_corriente_carga_max': None}
             for m in model_names
         },
     }
@@ -1075,6 +1108,50 @@ def _extract_multimodel_values(text: str) -> dict:
                     if i in by_idx:
                         result['por_modelo'][model][campo] = by_idx[i]
             break
+
+    # ── 3c. Corriente máxima de carga de BATERÍA por columna (inversores híbridos) ──
+    # Idea real del usuario (30-ago-2026): en un híbrido, "Maximum charge
+    # current 60A 70A 80A" (bajo "AC CHARGER") es la corriente máxima con la
+    # que el inversor puede cargar la batería -- un dato DISTINTO de
+    # I_max_tracker ("Maximum PV charge current", bajo "SOLAR CHARGER", la
+    # corriente del lado FV). El lookahead negativo "(?!PV\s)" evita
+    # confundir ambas etiquetas, que coexisten en la misma ficha MUST.
+    # Sirve para verificar, a futuro, compatibilidad contra la corriente
+    # máxima de carga REAL de la batería que el usuario vaya a instalar
+    # (dato que esta ficha no puede conocer de antemano).
+    for line in lines:
+        m_lab = re.search(r'Max(?:imum)?\s+(?!PV\s)charge\s+current', line, re.IGNORECASE)
+        if not m_lab:
+            continue
+        resto_ini = m_lab.end()
+        # Bug real (30-ago-2026, ficha MUST PV3300): esta etiqueta a veces
+        # trae una tolerancia pegada entre paréntesis -- "Max charge current
+        # (±5A) 24V 20A 25A..." -- el "5" de "±5A" se colaba como si fuera
+        # el primer valor real por modelo. Enmascarar paréntesis igual que
+        # ya hace el bloque de P_dc_max_W (línea ~943) para el mismo problema.
+        line_m = re.sub(r'\([^)]*\)', lambda mm: ' ' * len(mm.group()), line)
+        found = [
+            (float(m.group(1).replace(',', '.')), m.start())
+            for m in re.finditer(r'([0-9]+(?:[.,][0-9]+)?)\s*A\b', line_m)
+            if m.start() >= resto_ini
+        ]
+        if not found:
+            continue
+        # Bug real (mismo caso PV3300): esta etiqueta también puede
+        # encabezar una tabla de VARIAS filas (una por nivel de voltaje de
+        # batería: 12V/24V/48V), cada una cubriendo solo un SUBCONJUNTO de
+        # modelos -- ninguna fila trae un valor por cada uno de los n
+        # modelos, y la reconstrucción por posición horizontal (que sí
+        # funciona bien para P_dc_max_W/I_max_tracker, donde una fila
+        # incompleta sí corresponde 1:1 a columnas reales) aquí adivinaría
+        # mal: asignaría el valor de la fila 24V a columnas que en realidad
+        # son 12V o 48V. Para este campo, solo se confía en el valor cuando
+        # la fila trae EXACTAMENTE uno por modelo -- mejor dejarlo vacío que
+        # asignarlo a un submodelo equivocado (dato de seguridad de batería).
+        if len(found) == n:
+            for (v, _), model in zip(found, model_names):
+                result['por_modelo'][model]['bat_corriente_carga_max'] = v
+        break
 
     # ── 4. n_trackers por columna, formato SAJ español: "No. de MPPT 3 4 4" ────
     if all(result['por_modelo'][m]['n_trackers'] is None for m in model_names):
@@ -1562,6 +1639,15 @@ def _extraer_campos(texto: str) -> dict:
         bat_voltaje_min = None
         bat_voltaje_max = None
 
+    # bat_corriente_carga_max SÍ es un dato fijo del hardware del inversor
+    # (el máximo que su cargador puede entregar), no depende de qué batería
+    # se instale -- por eso NO se descarta con salida_depende_bateria (eso
+    # solo aplica a los puntos de corte de VOLTAJE, que sí son configurables
+    # según la química de la batería).
+    bat_corriente_carga_max = _find(_PAT_BAT_CARGA_MAX, texto)
+    if bat_corriente_carga_max is not None and not (1 <= bat_corriente_carga_max <= 500):
+        bat_corriente_carga_max = None
+
     # ── Sanity checks ─────────────────────────────────────────────────────────
     # Vdc_max: típico 50–1500 V
     if Vdc_max is not None and not (50 <= Vdc_max <= 1500):
@@ -1609,6 +1695,10 @@ def _extraer_campos(texto: str) -> dict:
         # de batería instalada (no del modelo del inversor) -- la UI debe
         # avisar que bat_voltaje_min/max se completan a mano, no adivinar.
         "salida_depende_bateria": salida_depende_bateria,
+        # Corriente máxima con la que el inversor puede CARGAR la batería
+        # (lado AC/cargador) -- dato fijo del hardware, distinto de
+        # I_max_tracker (lado FV). Ver _PAT_BAT_CARGA_MAX arriba.
+        "bat_corriente_carga_max": bat_corriente_carga_max,
     }
 
 

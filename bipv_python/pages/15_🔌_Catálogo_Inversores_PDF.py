@@ -173,6 +173,26 @@ with tab1:
     _guardado_bloqueado = False
     _modelo_sel = None
     if len(_modelos_det) >= 2:
+        # Estructura lógica de coherencia entre submodelos (idea del usuario,
+        # 30-ago-2026): no intenta adivinar la potencia del nombre del
+        # modelo -- verifica que los campos extraídos por columna sean
+        # monótonos en el mismo orden en que el fabricante lista la familia
+        # (siempre de menor a mayor potencia). Si un campo baja donde otro
+        # sube entre el mismo par de modelos, es indicio de una columna mal
+        # alineada durante la extracción (la misma clase de bug real ya
+        # encontrada y corregida esta sesión), no un dato real.
+        from calculos.validador_inversor import validar_coherencia_familia
+        _coherencia_familia = validar_coherencia_familia(
+            _modelos_det, res.get("valores_por_modelo") or {}
+        )
+        if not _coherencia_familia["ok"]:
+            with _slot_multi:
+                st.warning(
+                    "⚠️ **Posible columna mal alineada entre submodelos** — "
+                    "verifica estos valores contra la ficha original antes de "
+                    "elegir un modelo:\n\n"
+                    + "\n".join(f"- {a}" for a in _coherencia_familia["avisos"])
+                )
         with _slot_multi:
             # Placeholder como primera opción → obliga a una elección explícita.
             # Sin esto, el selectbox tomaría el primer modelo por defecto y el
@@ -272,6 +292,7 @@ with tab1:
         "n_strings_tracker": "Strings por tracker", "I_max_tracker": "I máx tracker (A)",
         "Isc_max_tracker": "Isc máx tracker (A)", "P_dc_max_W": "P FV máx (W)",
         "bat_voltaje_min": "Batería mín (V)", "bat_voltaje_max": "Batería máx (V)",
+        "bat_corriente_carga_max": "I carga batería máx (A)",
     }
     _n_err  = sum(1 for c in _val_ext["campos"].values() if c["estado"] == "error")
     _n_warn = sum(1 for c in _val_ext["campos"].values() if c["estado"] == "warn")
@@ -429,7 +450,7 @@ with tab1:
         # ── Batería (solo si híbrido) ─────────────────────────────────────────
         if es_hibrido_val:
             st.markdown("##### 🔋 Parámetros de Batería")
-            cb1, cb2 = st.columns(2)
+            cb1, cb2, cb3 = st.columns(3)
             with cb1:
                 bat_min_val = st.number_input(
                     "Voltaje Batería Mín (V)", min_value=0.0, max_value=1200.0, step=1.0,
@@ -440,8 +461,18 @@ with tab1:
                     "Voltaje Batería Máx (V)", min_value=0.0, max_value=1200.0, step=1.0,
                     value=float(res.get("bat_voltaje_max") or 0.0),
                 )
+            with cb3:
+                bat_carga_val = st.number_input(
+                    "I carga batería máx (A)", min_value=0.0, max_value=500.0, step=1.0,
+                    value=float(res.get("bat_corriente_carga_max") or 0.0),
+                    help="Corriente máxima con la que el inversor puede CARGAR la "
+                         "batería (lado AC/cargador) — dato del inversor, no de la "
+                         "batería. Distinto de 'Corriente Máxima Tracker', que es del "
+                         "lado FV. Compárala manualmente contra la corriente máxima "
+                         "de carga real de tu batería antes de dar por compatible.",
+                )
         else:
-            bat_min_val = bat_max_val = 0.0
+            bat_min_val = bat_max_val = bat_carga_val = 0.0
 
         # ── Costo y notas ─────────────────────────────────────────────────────
         st.markdown("##### 💲 Precio y notas")
@@ -479,6 +510,7 @@ with tab1:
             "Isc_max_tracker": Isc_max_val, "P_dc_max_W": P_dc_val,
             "es_hibrido": es_hibrido_val,
             "bat_voltaje_min": bat_min_val, "bat_voltaje_max": bat_max_val,
+            "bat_corriente_carga_max": bat_carga_val or None,
         }))["ok"]:
             st.error(
                 "🔴 **No se guardó** — corrige estos errores y vuelve a presionar Guardar:\n\n"
@@ -510,6 +542,7 @@ with tab1:
                 "Inversor Híbrido (Si/No)":           "Si" if es_hibrido_val else "No",
                 "Voltaje Batería Min (V)":            bat_min_val or None,
                 "Voltaje Batería Max (V)":            bat_max_val or None,
+                "Corriente Máxima Carga Batería (A)": bat_carga_val or None,
                 "Notas":                              notas_val.strip() or None,
                 "Confianza":                          _confianza,
                 "Marca":                              marca_val.strip() or None,
@@ -529,6 +562,7 @@ with tab1:
                 "n_strings_tracker": n_strings_val, "I_max_tracker": I_max_val,
                 "Isc_max_tracker": Isc_max_val, "P_dc_max_W": P_dc_val,
                 "bat_voltaje_min": bat_min_val, "bat_voltaje_max": bat_max_val,
+                "bat_corriente_carga_max": bat_carga_val,
                 "costo_usd": costo_val,
             }
             # Auditoría: también los campos NO numéricos que el guardado pisa

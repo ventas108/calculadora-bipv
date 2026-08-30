@@ -190,6 +190,55 @@ def test_inversor_no_hibrido_no_activa_el_aviso_de_bateria():
     assert campos["salida_depende_bateria"] is False
 
 
+def test_multimodelo_bat_corriente_carga_max_lee_fila_1a1_completa():
+    # Extracto real de la ficha MUST PV3500 -- la sección AC CHARGER trae
+    # "Maximum charge current 60A 70A 80A" (batería), distinta de "Maximum
+    # PV charge current 100A" (lado FV, I_max_tracker) del mismo documento.
+    texto = TEXTO_MUST_PV3500 + "\nAC CHARGER Maximum charge current 60A 70A 80A\n"
+    resultado = ext._extraer_multimodelo(texto)
+    assert resultado["por_modelo"]["PV35-8048"]["bat_corriente_carga_max"] == 60.0
+    assert resultado["por_modelo"]["PV35-10048"]["bat_corriente_carga_max"] == 70.0
+    assert resultado["por_modelo"]["PV35-12048"]["bat_corriente_carga_max"] == 80.0
+
+
+def test_multimodelo_bat_corriente_carga_max_no_adivina_tabla_multinivel():
+    # Bug real (ficha PV3300 real): "Max charge current (±5A) 24V 20A 25A
+    # 30A 40A 60A / /" es la fila de SOLO el nivel 24V (5 valores para un
+    # subconjunto de los 11 modelos, no una fila 1:1). Antes de este fix se
+    # reconstruía por posición y asignaba mal (ej. el "5" de la tolerancia
+    # "±5A" se colaba como si fuera el primer modelo). Ahora, si no hay
+    # exactamente un valor por modelo, se deja en None -- mejor vacío que
+    # un dato de seguridad de batería mal asignado a otro submodelo.
+    texto = (
+        "MODEL PV33-1012 PV33-1512 PV33-1524 PV33-2012 PV33-2024 PV33-3024 "
+        "PV33-3048 PV33-4024 PV33-4048 PV33-5048 PV33-6048\n"
+        "Max charge current (±5A) 24V 20A 25A 30A 40A 60A / /\n"
+    )
+    resultado = ext._extraer_multimodelo(texto)
+    if resultado["modelos"]:
+        for m in resultado["modelos"]:
+            assert resultado["por_modelo"][m]["bat_corriente_carga_max"] is None
+
+
+def test_arquitectura_no_confunde_3p_de_caballos_de_fuerza_con_trifasico():
+    # Bug real (ficha MUST PV3300 -- "Split Phase Solar Inverter", NO
+    # trifásico): "Capable of starting electric motor 1P 1P 1.5P 1.5P 2P 3P"
+    # es una lista de potencia de MOTOR en HP abreviada sin la "H" -- el
+    # patrón "3P\b" suelto la confundía con un indicador de fase real.
+    texto = "Low Frequency Split Phase Solar Inverter\nCapable of starting electric motor 1P 1P 1.5P 1.5P 2P 3P\n"
+    arquitectura = ext._extract_arch(texto)
+    assert arquitectura != "Inversor de red trifásico"
+
+
+def test_arquitectura_si_reconoce_3p_real_con_codigo_de_potencia_deye():
+    # No debe romper el caso real Deye TriP2 ("3P 5K 3P 6K...") que sí es
+    # un inversor trifásico genuino -- "3P" seguido de un código de
+    # potencia tipo "5K" sigue reconociéndose.
+    texto = "TriP2-LB-3P 5K\n3P 5K 3P 6K 3P 8K 3P 10K\n"
+    arquitectura = ext._extract_arch(texto)
+    assert arquitectura == "Inversor de red trifásico"
+
+
 def test_campos_extraidos_completos_para_ficha_must_pv3500():
     campos = ext._extraer_campos(TEXTO_MUST_PV3500)
     assert campos["Vdc_max"] == 145.0

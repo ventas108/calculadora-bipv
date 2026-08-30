@@ -12,7 +12,7 @@ CAMPOS_CRITICOS = [
     "Vdc_max", "Vmppt_min", "Vmppt_max", "V_mppt_activo",
     "V_arranque", "n_trackers", "n_strings_tracker",
     "I_max_tracker", "Isc_max_tracker", "P_dc_max_W",
-    "bat_voltaje_min", "bat_voltaje_max",
+    "bat_voltaje_min", "bat_voltaje_max", "bat_corriente_carga_max",
 ]
 
 # Subconjunto imprescindible para dimensionar: si varios de estos quedan en None,
@@ -37,4 +37,5 @@ CAMPO_LABELS = {
     "P_dc_max_W":        "P FV máx (W)",
     "bat_voltaje_min":   "Bat mín (V)",
     "bat_voltaje_max":   "Bat máx (V)",
+    "bat_corriente_carga_max": "I carga batería máx (A)",
 }

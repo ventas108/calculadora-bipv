@@ -86,6 +86,23 @@ def _cargar_catalogo_inversores_cached(mtime: float) -> dict:
             "es_hibrido":       str(r.get("Inversor Híbrido (Si/No)", "")).strip().lower() == "si",
             "bat_voltaje_min":  _f(r.get("Voltaje Batería Min (V)")),
             "bat_voltaje_max":  _f(r.get("Voltaje Batería Max (V)")),
+            # Bug real corregido (30-ago-2026): estas 8 columnas (Marca,
+            # Arquitectura, Inversor Híbrido, Voltaje Batería Min/Max,
+            # Corriente Máxima Carga Batería, Confianza, Notas) las escribe
+            # pages/15_Catálogo_Inversores_PDF.py desde hace tiempo, pero
+            # NUNCA existieron como columnas reales en inversores_catalogo.xlsx
+            # -- guardar_inversor_excel() solo escribe columnas que ya
+            # existen en el encabezado, así que estos 8 campos se descartaban
+            # en silencio en cada guardado. Confirmado con los 17 inversores
+            # MUST reales ya guardados: los 17 son híbridos verdaderos, pero
+            # los 17 mostraban es_hibrido=False. Columnas agregadas al Excel
+            # y los 17 registros MUST corregidos -- ver
+            # DIAGNOSTICO_EXTRACCION_INVERSORES_MUST.md.
+            "marca":            str(r.get("Marca", "")).strip() or None,
+            "arquitectura":     str(r.get("Arquitectura", "")).strip() or None,
+            "bat_corriente_carga_max": _f(r.get("Corriente Máxima Carga Batería (A)")),
+            "confianza":        str(r.get("Confianza", "")).strip() or None,
+            "notas":            str(r.get("Notas", "")).strip() or None,
         }
     return inversores
 
