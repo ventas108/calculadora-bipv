@@ -555,6 +555,28 @@ Si la ficha no trae Pmax o área, la app lo indica en lugar de emitir un veredic
 
 **Bug real corregido: "Tipo de montaje" no se invalidaba al cambiar de Tipo de instalación (29-ago-2026)**: encontrado en la auditoría de coherencia disparada por el fix de "cultivo" (ver sección 3). El default de "Tipo de montaje" (26-ago-2026) ya distinguía correctamente Granja fotovoltaica (preselecciona "Ventilado libre", k=1.0) de otros tipos (preselecciona "Fachada confinada", k=1.3) — **pero solo la PRIMERA vez**, cuando la clave `mo_montaje` (con `key=` del selectbox) todavía no existía. Si el usuario cambiaba "Tipo de instalación" DESPUÉS de ya haber visitado esta página, Streamlit ignora `index=` en reruns posteriores (el widget con `key=` ya tiene su propio estado) — el montaje del tipo ANTERIOR sobrevivía (ej. "Ventilado libre" de una Granja fotovoltaica seguía activo al cambiar a Fachada BIPV), subestimando la temperatura de celda real y sobreestimando producción en silencio. Corregido con `mo_montaje_tipo_ref` (mismo patrón ya usado en Dimensionamiento/Financiero): resetea `mo_montaje` cada vez que cambia el tipo activo.
 
+### Bug real corregido: default de k_BIPV binario, no por los 6 tipos de instalación (30-ago-2026)  NUEVO
+
+El default de "Tipo de montaje" del 26-ago-2026 (ver arriba) solo distinguía **dos** casos: Granja fotovoltaica → Ventilado libre (k=1,0); **cualquier otro tipo** → Fachada confinada (k=1,3). Eso dejaba mal clasificados 3 de los otros 5 tipos: **Techo plano (con soporte)**, **Pérgola/sombreadero** y **Marquesina/voladizo** son estructuras elevadas con flujo de aire libre en ambas caras del panel, no fachadas selladas — con el default anterior sobreestimaban la temperatura de celda y subestimaban producción en silencio, mismo patrón de incoherencia por `tipo_instalacion` que ya se había cazado en Financiero/Dimensionamiento. Encontrado auditando el flujo completo al intentar armar una comparación rigurosa contra PVsyst en proyectos BIPV.
+
+Corregido con `calculos/motor_optico.py::TIPOS_MONTAJE_CONFINADO = {"Fachada BIPV", "Techo inclinado (BIPV)"}` — solo estos dos tipos defaultean a k=1,3 (cámara de aire restringida real); el resto (Techo plano con soporte, Pérgola/sombreadero, Marquesina/voladizo, Granja fotovoltaica) defaultea a k=1,0. Sigue siendo editable manualmente; el default solo aplica si el usuario no fijó ya un montaje para el tipo activo. 4 tests nuevos (`tests/test_motor_optico.py`).
+
+### Comparación BIPV contra PVsyst: el catálogo de PVsyst no trae paneles BIPV — cómo resolverlo  NUEVO
+
+PVsyst 8.1.5 no tiene módulos BIPV vidrio-vidrio en su catálogo (solo silicio cristalino o amorfo "de fábrica"), lo que bloqueaba una comparación manzanas-con-manzanas para proyectos BIPV reales. El bloqueo no es real: PVsyst permite crear un **módulo custom** ("PV module" → "New") con los parámetros exactos del datasheet — lo que sí cambia el resultado de forma significativa es igualar el **modelo térmico de montaje**, porque un BIPV confinado a fachada opera más caliente que un panel en estructura libre.
+
+Ambas herramientas modelan el mismo fenómeno físico con distinto nivel de detalle: PVsyst usa el modelo de Faiman de dos parámetros (`T_cel = T_amb + G_poa/(Uc + Uv·viento)`, configurable en "Détails du système"); esta app usa el multiplicador `k_BIPV` de un solo parámetro sobre NOCT (ver arriba). Nueva tabla de equivalencia aproximada para arrancar ambas herramientas del mismo supuesto de montaje:
+
+| k_BIPV (app) | Preset PVsyst | Uc (W/m²K) |
+|---|---|---|
+| 1,0 — Ventilado libre | Free standing | 29,0 |
+| 1,3 — Fachada confinada | Semi-integrated | 20,0 |
+| 1,5 — Sin ventilación | Integrated | 15,0 |
+
+⚠️ No es una igualdad numérica exacta (nuestro modelo no depende del viento real, el de PVsyst sí) — es un punto de partida físicamente coherente, no un reemplazo del ajuste fino manual en PVsyst.
+
+Nueva función `calculos/ficha_pvsyst.py::generar_ficha_conversion_pvsyst(panel, tipo_instalacion, k_bipv)`: genera, para cualquier panel del catálogo, una ficha de texto con los parámetros eléctricos STC en el orden que pide el diálogo de PVsyst, los coeficientes de temperatura disponibles (con advertencia explícita si falta μIsc, que no está en el catálogo de esta app — nunca se rellena con un valor inventado), y el preset Uc/Uv sugerido según la tabla de arriba. 6 tests nuevos (`tests/test_ficha_pvsyst.py`). Se evaluó y **se pospuso a pedido explícito del usuario** implementar el modelo de Faiman completo con viento real del TMY como modo alternativo — el k_BIPV actual, ya corregido para los 6 tipos, se consideró suficiente por ahora. Detalle completo en `DIAGNOSTICO_MODELO_TERMICO_UC_UV.md` (raíz del repo).
+
 ────────────────────────────────────────────────────────────
 
 ## 8. Página 5 — Mismatch y Bypass Diodes
@@ -2712,9 +2734,11 @@ Tests: se actualizaron 2 aserciones que asumían el catálogo viejo de 7 paneles
 
 ────────────────────────────────────────────────────────────
 
-Manual actualizado el 29 de agosto de 2026
+Manual actualizado el 30 de agosto de 2026
 
-Novedades de esta versión: 🔴 📊 Producción — corregido bug real de escalado multi-inversor: `N_paneles` se toma por defecto del "Proyecto completo" (varios inversores), pero la alarma DC/AC y el recorte (clipping) REAL de la simulación comparaban/limitaban contra la potencia CA de UN SOLO inversor sin escalar. Caso real Urabá: 840 paneles/3× Growatt MAX 100KTL3 LV daba DC/AC=4,85 en vez de 1,61 -- y más grave, el recorte real habría limitado TODA la producción del proyecto a la salida de un solo inversor (124,8kW) en vez del total real (374,4kW). Corregido con `escalar_p_ac_nom_por_inversores()`, que deriva el número de inversores del `N_paneles` actual y la config de string activa. 4 tests nuevos. Suite completa: **743/743**. Ver sección 9.
+Novedades de esta versión: 🔆 Motor Óptico — corregido default binario de "Tipo de montaje"/k_BIPV: antes solo "Granja fotovoltaica" defaulteaba a Ventilado libre (k=1,0); los otros 5 tipos, incluidos Techo plano con soporte, Pérgola/sombreadero y Marquesina/voladizo (estructuras elevadas y ventiladas, no fachadas selladas), heredaban Fachada confinada (k=1,3) sin justificación física. Ahora solo Fachada BIPV y Techo inclinado (BIPV) defaultean a k=1,3. Además, para poder validar proyectos BIPV contra PVsyst (cuyo catálogo no trae paneles BIPV): nueva tabla de equivalencia k_BIPV↔Uc/Uv y `calculos/ficha_pvsyst.py::generar_ficha_conversion_pvsyst()`, que genera por panel los parámetros de datasheet + el ajuste térmico Uc/Uv sugerido para crear el módulo custom equivalente en PVsyst. 10 tests nuevos. Suite completa: **753/753**. Ver sección 7 y `DIAGNOSTICO_MODELO_TERMICO_UC_UV.md`.
+
+Versión anterior (29 de agosto de 2026): 🔴 📊 Producción — corregido bug real de escalado multi-inversor: `N_paneles` se toma por defecto del "Proyecto completo" (varios inversores), pero la alarma DC/AC y el recorte (clipping) REAL de la simulación comparaban/limitaban contra la potencia CA de UN SOLO inversor sin escalar. Caso real Urabá: 840 paneles/3× Growatt MAX 100KTL3 LV daba DC/AC=4,85 en vez de 1,61 -- y más grave, el recorte real habría limitado TODA la producción del proyecto a la salida de un solo inversor (124,8kW) en vez del total real (374,4kW). Corregido con `escalar_p_ac_nom_por_inversores()`, que deriva el número de inversores del `N_paneles` actual y la config de string activa. 4 tests nuevos. Suite completa: **743/743**. Ver sección 9.
 
 Versión anterior (29 de agosto de 2026): 🔴 📐 Dimensionamiento — corregido un CRASH real (no solo un número incorrecto): preparando la corrida de Urabá, cambiar de Growatt MAX 100KTL3 LV a SOLIS-60K tumbaba "▶️ Optimizar N paneles/string" con `KeyError` de pandas. Causa: `N_min_scan` se calcula con `max(N_min_eléctrico_del_inversor_actual, N_min_guardado)`, que nunca baja -- el 21 (mínimo eléctrico del Growatt con el panel real de Urabá) sobrevivía al cambiar de inversor, y con `N_max_scan` en su default (20), `optimizar_n_serie()` recorría un rango vacío y devolvía `[]`, reventando al estilizar un DataFrame sin columnas. Corregido en 3 capas: reset de `N_min_scan` al cambiar de inversor, aviso temprano si min>max, y guard defensivo en el botón (`st.error` + `st.stop()` en vez de dejar que reviente). Ver sección 6.
 

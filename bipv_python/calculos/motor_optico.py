@@ -52,6 +52,25 @@ K_BIPV_POR_MONTAJE = {
     "Sin ventilación (k=1.5) — sellado total":    1.5,
 }
 
+# Tipos de instalación (ver TIPOS_INSTALACION en pages/1_🏠_Proyecto.py) cuyo
+# montaje real es cerrado/confinado -- cámara de aire restringida detrás del
+# panel -- y por tanto el default físicamente correcto es "Fachada confinada"
+# (k=1.3). Cualquier tipo que NO esté en este set usa "Ventilado libre"
+# (k=1.0) como default: estructura elevada con flujo de aire libre en ambas
+# caras (soporte de techo plano, pérgola, marquesina, granja).
+#
+# Antes de este cambio (30-ago-2026) el default era binario -- solo "Granja
+# fotovoltaica" recibía k=1.0, y los otros 5 tipos (incluidos Techo plano con
+# soporte, Pérgola/sombreadero y Marquesina/voladizo, que son estructuras
+# elevadas y ventiladas, no fachadas selladas) heredaban k=1.3 sin
+# justificación física -- mismo patrón de incoherencia por tipo_instalacion
+# ya documentado para otros módulos (mo_montaje_tipo_ref, opex_kw_guardado,
+# factor_ocupacion_pct). Ver DIAGNOSTICO_MODELO_TERMICO_UC_UV.md.
+TIPOS_MONTAJE_CONFINADO = {
+    "Fachada BIPV",
+    "Techo inclinado (BIPV)",
+}
+
 
 # ─── Funciones de cálculo (puras, vectorizadas) ────────────────────────────────
 
