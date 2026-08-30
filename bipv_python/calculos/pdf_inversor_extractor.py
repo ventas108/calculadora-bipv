@@ -241,7 +241,20 @@ _PAT_VDCMAX = [
     #   · "Max. PV input voltage ① 1100 V"          (X3-FORTH pdfplumber, misma línea)
     # NO cruza salto de línea ([^\d\n]), por lo que falla limpiamente cuando el valor
     # está en la línea siguiente (pdftotext -layout) → cae al patrón multilinea.
-    (r"Max(?:imum)?\.?\s*(?:PV\s+)?(?:Input|Array|DC)\s+(?:Open\s+Circuit\s+)?[Vv]oltage[^\d\n]{0,15}([0-9]+(?:[.,][0-9]+)?)\s*V?(?!\s*/)", 1),
+    # Bug real (30-ago-2026, ficha MUST PV3300 TLV Series): "(?:Input|Array|DC)"
+    # acepta "Input" a secas, sin exigir "PV"/"DC" -- la ficha trae, en la
+    # sección de ENTRADA DE RED (AC), la línea "Max input voltage 270Vac MAX"
+    # (tensión AC máxima de red/generador), que este patrón capturaba como si
+    # fuera Vdc_max=270V. El guard de plausibilidad (50-1500V) no lo filtra
+    # porque 270 es un voltaje DC perfectamente creíble -- el error es de
+    # ORIGEN (AC vs DC), no de rango. Verificado con el texto real: el
+    # Vdc_max/Voc real de esta ficha es 100V o 145V según el submodelo
+    # ("Maximum Solar Input Voltage 100±2Vdc / 145±2Vdc..."), nunca 270.
+    # Corregido excluyendo explícitamente cualquier match donde el número
+    # venga seguido de "ac"/"AC" (voltaje de corriente alterna) -- riesgo
+    # genérico, no exclusivo de MUST, para cualquier ficha con una sección
+    # de entrada AC fraseada como "Max ... input voltage".
+    (r"Max(?:imum)?\.?\s*(?:PV\s+)?(?:Input|Array|DC)\s+(?:Open\s+Circuit\s+)?[Vv]oltage[^\d\n]{0,15}([0-9]+(?:[.,][0-9]+)?)(?![Vv]?[Aa][Cc]\b)\s*V?(?!\s*/)", 1),
     # Gap 7 (X3-PRO) mantenido como seguridad — ya cubierto arriba
     (r"Max(?:imum)?\.?\s*(?:PV\s+)?[Ii]nput\s+[Vv]oltage\s*\[V\]\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)", 1),
     # Multilinea pdftotext -layout: label en línea N (con notas ①②③), valor en línea N+1
@@ -250,7 +263,8 @@ _PAT_VDCMAX = [
     # Con pdfplumber el valor ya está en la misma línea que el label → el patrón
     # primario lo captura y NUNCA llega aquí; así se evita capturar "580 V@220 V"
     # (tensión nominal con red 220 V) que aparece en la línea inmediatamente siguiente.
-    (r"Max(?:imum)?\.?\s+(?:DC\s+)?(?:PV\s+)?[Ii]nput\s+[Vv]oltage[^\n]*\n\s*([0-9]+(?:[.,][0-9]+)?)\s*[Vv]?", 1),
+    # Mismo guard AC/DC que el patrón primario de arriba, por la misma clase de riesgo.
+    (r"Max(?:imum)?\.?\s+(?:DC\s+)?(?:PV\s+)?[Ii]nput\s+[Vv]oltage[^\n]*\n\s*([0-9]+(?:[.,][0-9]+)?)(?![Vv]?[Aa][Cc]\b)\s*[Vv]?", 1),
     (r"Max(?:imum)?\s+PV\s+VOC\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"Max\.\s*DC\s+[Ii]nput\s+[Vv]oltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"PV\s+input\s+voltage\s*\(max\.?\)\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",  1),

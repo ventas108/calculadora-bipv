@@ -73,10 +73,28 @@ Este patrón de encabezado de sección en mayúsculas ("INVERTER", "OUTPUT", "BA
 
 ⚠️ **Impacto real en el flujo de la app antes de este fix**: bajo — `pages/15_🔌_Catálogo_Inversores_PDF.py` ya obliga a elegir explícitamente el modelo real desde `modelos_detectados` cuando una ficha cubre varios modelos (no usa el campo `modelo` singular en ese caso), y muestra una alerta 🚨 cuando ninguna columna por modelo se pudo leer. El campo `modelo="INVERTER"` nunca se habría guardado en el catálogo real sin que el usuario lo notara y corrigiera manualmente en el selector — pero seguía siendo un dato incorrecto en la salida cruda del extractor, y valía la pena corregirlo en la fuente.
 
+## 🔴 Bug real #3 (más serio) — confusión AC/DC, encontrado con las fichas PV3300
+
+El usuario corrió el extractor sobre las 2 fichas PV3300 TLV Series (3000W/24V) y pegó el resultado del formulario real de la app. Comparado contra una extracción fresca del PDF real, **los valores no coincidían**: el formulario mostraba `Vdc_max=145`, `Vmppt_min=64`, `I_max_tracker=100` — pero la ficha PV3300 real, verificada línea por línea, dice `I_max_tracker=80A±4A` (nunca 100A) y no tiene ningún voltaje MPPT que empiece en 64V. Esos números (145/64/100) son exactamente los de la ficha PV3500 auditada antes en esta misma sesión — indicio fuerte de que el formulario mostraba el resultado de una carga anterior, no de la ficha PV3300 recién subida (no se pudo confirmar la causa exacta del lado de la sesión de Streamlit del usuario; se recomienda repetir la carga verificando que aparezca el banner "✅ PDF digital procesado correctamente" para la ficha correcta antes de guardar).
+
+Investigando esa discrepancia se encontró un **bug real y potencialmente amplio** en la extracción de `Vdc_max`, no exclusivo de MUST: la ficha PV3300 trae, en su sección de **entrada AC** (red/generador), la línea:
+
+```
+Max input voltage 270Vac MAX
+```
+
+El patrón genérico de `Vdc_max` (`(?:Input|Array|DC)\s+...[Vv]oltage`) acepta la palabra "Input" sin exigir que venga calificada como "PV" o "DC" — así que capturaba **270 como si fuera el voltaje DC máximo del array FV**, cuando en realidad es el voltaje AC máximo de la red eléctrica. El guard de plausibilidad (50-1500V) no lo detecta porque 270V es un voltaje DC perfectamente creíble — el error es de **origen** (AC confundido con DC), no de rango. El Vdc_max/Voc real de esta ficha es 100V o 145V según el submodelo (`"Maximum Solar Input Voltage 100±2Vdc / 145±2Vdc..."`), nunca 270.
+
+**Por qué esto es más serio que los otros 2 bugs**: `Vdc_max` alimenta directamente el gate de seguridad eléctrica de la app (`Voc_frío ≤ Vdc_max`) — un valor AC confundido con DC podría marcar como "compatible" un diseño de string que en realidad excede el límite físico real del inversor, o viceversa. Y el patrón que falló es genérico (`Max ... input voltage` sin calificador DC), presente en la mayoría de fabricantes — cualquier ficha con una sección de entrada AC fraseada así puede tener el mismo riesgo, no solo MUST.
+
+**Corregido**: ambos patrones vulnerables (`_PAT_VDCMAX`, el primario y su fallback multilínea) ahora excluyen explícitamente cualquier coincidencia donde el número venga seguido de "ac"/"AC" (voltaje de corriente alterna). Verificado tras el fix: `Vdc_max` para PV3300 ahora da `None` (correcto: el dato real varía por submodelo — 100V o 145V — y no hay un único valor global que reportar con certeza, así que dejarlo en blanco es más honesto que adivinar) en vez del 270 fabricado; `I_max_tracker` ahora da 80.0 (el valor real). 1 test nuevo anclado al texto real de la sección AC de esta ficha.
+
+⚠️ **Limitación real que queda, no corregida esta sesión**: PV3300 TLV Series no es una familia "columna por modelo" simple como PV3500 — agrupa 11 submodelos (1012 a 6048) por **voltaje de batería** (12V/24V/48V), cada tier con su propia ventana MPPT (16~95V @12V · 30~130V @24V · 60~130V @48V) y su propia potencia FV máxima (1250W a 5000W). El extractor actual reporta el primer valor de la lista (el del submodelo más pequeño, 12V/1250W) como si fuera el valor "global" de la ficha — no es un dato fabricado (es un valor real, textual, de la ficha), pero sí puede ser el submodelo equivocado si lo que se necesita es un PV33-5048/6048 (24V/48V). Para esos submodelos, verificar manualmente contra la tabla de la sección "Solar MPPT Range @ Operating Voltage" antes de guardar.
+
 ## Cobertura de tests — hallazgo aparte
 
-Antes de esta auditoría, `calculos/pdf_inversor_extractor.py` (~1.500 líneas, el motor completo de extracción de fichas de inversores) **no tenía ningún test que llamara a `extraer_parametros_inversor()` ni a sus funciones internas directamente** — toda la cobertura de "inversor" existente prueba lógica de catálogo/compatibilidad con diccionarios ya armados a mano, no el motor de regex en sí. Se creó `tests/test_pdf_inversor_extractor.py` (6 tests) anclado al texto real de esta ficha MUST, como primer test directo del motor de extracción.
+Antes de esta auditoría, `calculos/pdf_inversor_extractor.py` (~1.500 líneas, el motor completo de extracción de fichas de inversores) **no tenía ningún test que llamara a `extraer_parametros_inversor()` ni a sus funciones internas directamente** — toda la cobertura de "inversor" existente prueba lógica de catálogo/compatibilidad con diccionarios ya armados a mano, no el motor de regex en sí. Se creó `tests/test_pdf_inversor_extractor.py` (7 tests, incluido el de la sección anterior) anclado al texto real de esta ficha MUST, como primer test directo del motor de extracción.
 
 ## Resultado final
 
-Suite completa: **767/767**. Los 2 bugs de código corregidos y verificados contra las 3 fichas reales; el archivo mal nombrado ya se corrigió en el escritorio (renombrado a PV36) para que no se vuelva a cargar por error como PV35-12048 TLV.
+Suite completa: **768/768**. Los 3 bugs de código corregidos y verificados contra las 5 fichas reales (PV35 ×3, PV36, PV3300 ×2); el archivo mal nombrado ya se corrigió en el escritorio (renombrado a PV36) para que no se vuelva a cargar por error como PV35-12048 TLV.

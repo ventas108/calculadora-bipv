@@ -69,6 +69,28 @@ def test_multimodelo_detecta_los_3_modelos_reales_pv35():
     assert resultado["modelos"] == ["PV35-8048", "PV35-10048", "PV35-12048"]
 
 
+# Extracto real de la ficha MUST PV3300 TLV Series -- la sección de entrada
+# AC (red/generador) trae "Max input voltage 270Vac MAX", un voltaje de
+# CORRIENTE ALTERNA, en una línea con la misma forma "Max ... input voltage"
+# que usan las fichas DC reales -- root cause del bug real de Vdc_max=270.
+TEXTO_MUST_PV3300_SECCION_AC = """
+AC Input Nominal input voltage 200Vac / 220Vac / 240Vac
+Max input voltage 270Vac MAX
+Input frequency 50Hz / 60Hz (auto sensing)
+Maximum Solar Input Voltage 100±2Vdc / 145±2Vdc 145±2Vdc 145±2Vdc
+Solar MPPT Range @ Operating Voltage 16~95VDC @ 12V / 30~130VDC @ 24V
+"""
+
+
+def test_vdc_max_no_confunde_voltaje_ac_de_red_con_voltaje_dc_fv():
+    # Bug real (ficha MUST PV3300): "Max input voltage 270Vac MAX" es la
+    # tensión AC máxima de red/generador -- NO debe leerse como Vdc_max. El
+    # patrón anterior no distinguía "Input voltage" AC de DC y devolvía 270.
+    valor = ext._find(ext._PAT_VDCMAX, TEXTO_MUST_PV3300_SECCION_AC)
+    assert valor != 270.0
+    assert valor is None or valor != 270
+
+
 def test_campos_extraidos_completos_para_ficha_must_pv3500():
     campos = ext._extraer_campos(TEXTO_MUST_PV3500)
     assert campos["Vdc_max"] == 145.0
