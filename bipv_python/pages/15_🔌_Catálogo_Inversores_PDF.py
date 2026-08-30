@@ -84,6 +84,24 @@ with tab1:
 
     pdf_bytes = uploaded.read()
 
+    # #167 — mostrar SIEMPRE qué archivo se está procesando, con tamaño y huella.
+    # Encontrado (30-ago-2026): el usuario reportó, dos veces con archivos
+    # distintos, que el formulario mostraba valores de una ficha DIFERENTE a
+    # la recién subida (ej. subió PV3300 y vio los números de PV3500 ya
+    # cargada antes en la misma sesión del navegador) -- verificado con el
+    # motor de extracción llamado directamente sobre el PDF real: el
+    # resultado era correcto, así que el problema no está en la extracción.
+    # No se pudo reproducir ni aislar la causa exacta del lado de la sesión
+    # de Streamlit/navegador del usuario. Esta línea no soluciona esa causa
+    # (desconocida) pero hace el síntoma detectable a simple vista: si el
+    # nombre/tamaño de archivo mostrado aquí no es el que el usuario acaba
+    # de seleccionar, sabe de inmediato que debe recargar la página (no
+    # confiar en el formulario de abajo) en vez de reportar datos que en
+    # realidad pertenecen a una carga anterior.
+    st.caption(f"📄 Procesando: **{uploaded.name}** ({len(pdf_bytes):,} bytes). "
+               f"Si este NO es el archivo que acabas de elegir, recarga la página "
+               f"(F5) antes de continuar — los datos de abajo pertenecen a una carga anterior.")
+
     with st.spinner("🔍 Extrayendo parámetros del PDF…"):
         res = extraer_parametros_inversor(pdf_bytes)
 

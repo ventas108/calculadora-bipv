@@ -91,6 +91,20 @@ El patrón genérico de `Vdc_max` (`(?:Input|Array|DC)\s+...[Vv]oltage`) acepta 
 
 ⚠️ **Limitación real que queda, no corregida esta sesión**: PV3300 TLV Series no es una familia "columna por modelo" simple como PV3500 — agrupa 11 submodelos (1012 a 6048) por **voltaje de batería** (12V/24V/48V), cada tier con su propia ventana MPPT (16~95V @12V · 30~130V @24V · 60~130V @48V) y su propia potencia FV máxima (1250W a 5000W). El extractor actual reporta el primer valor de la lista (el del submodelo más pequeño, 12V/1250W) como si fuera el valor "global" de la ficha — no es un dato fabricado (es un valor real, textual, de la ficha), pero sí puede ser el submodelo equivocado si lo que se necesita es un PV33-5048/6048 (24V/48V). Para esos submodelos, verificar manualmente contra la tabla de la sección "Solar MPPT Range @ Operating Voltage" antes de guardar.
 
+## ⚠️ Hallazgo real, causa NO encontrada — el formulario mostró datos de una carga anterior (dos veces, con archivos distintos)
+
+Dos veces en esta auditoría (con la ficha PV3300 completa y con la ficha aislada PV33-5048/6048), el usuario subió un archivo real a la app y el formulario mostró valores que **no pueden venir de ese archivo** — coinciden exactamente con los de una ficha PV3500 cargada antes en la misma sesión (`Vdc_max=145`, `Vmppt_min=64`, `I_max_tracker=100`, y en la segunda vez además `Modelo *: PV35-8048`).
+
+**Verificado, ambas veces, que el motor de extracción en sí es correcto**: llamando a `extraer_parametros_inversor()` directamente sobre el PDF real (fuera de la app, el mismo código que usa la página) da los valores correctos de PV3300 (`Vdc_max=100`, `I_max_tracker=80`, `modelos_detectados` con los 11 modelos reales). El problema no está en las funciones de `calculos/pdf_inversor_extractor.py`.
+
+**Se revisó a fondo `pages/15_🔌_Catálogo_Inversores_PDF.py` buscando la causa**: no hay ningún `@st.cache_data`/`@st.cache_resource` en el flujo de subida, y las 3 únicas referencias a `st.session_state` de todo el archivo están en la pestaña "Editar/Eliminar" (confirmación de sobrescritura), completamente fuera de la ruta de "Agregar desde PDF". `res = extraer_parametros_inversor(pdf_bytes)` se recalcula desde cero en cada ejecución del script, a partir de `pdf_bytes = uploaded.read()`. No se encontró ningún mecanismo de caché a nivel de código de la página que explique por qué se mostrarían datos de un archivo distinto.
+
+**No se pudo reproducir ni aislar la causa exacta** — es probablemente un comportamiento del lado de la sesión de Streamlit/navegador del usuario (posible caché del navegador, o alguna interacción con el widget `st.file_uploader` sin `key=` fija), no algo verificable desde el código sin acceso a esa sesión en vivo.
+
+**Mitigación aplicada, no una solución de la causa raíz**: `pages/15_🔌_Catálogo_Inversores_PDF.py` ahora muestra siempre, justo después de subir el archivo, el nombre y tamaño exacto del PDF que se está procesando (`st.caption("📄 Procesando: {nombre} ({tamaño} bytes)...")`), con una advertencia explícita de recargar la página si no coincide con lo que el usuario acaba de elegir. Esto no corrige la causa (desconocida), pero hace el síntoma detectable a simple vista antes de reportar un "bug" que en realidad es una carga anterior mostrándose por error.
+
+**Recomendación al usuario para la próxima vez que esto pase**: recargar la página completa (F5) antes de volver a subir el archivo, o probar en una ventana de navegación privada, para descartar caché del navegador.
+
 ## Verificación del submodelo PV33-5048/6048 con ficha aislada
 
 El usuario no podía elegir el submodelo PV33-5048 TLV desde el selector de la app (la ficha de familia completa, 11 modelos, produce un `modelos_detectados` corrupto: entradas basura `PV33-Features`/`PV33-MODEL` y modelos fusionados `PV33-3024 3048`/`PV33-5048 6048` — ver hallazgo aparte más abajo). Pidió generar una ficha PDF aislada para ese par de submodelos y correr la extracción sobre ella.
