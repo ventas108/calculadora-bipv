@@ -366,6 +366,19 @@ with col2:
         _vmppt_min  = inversor.get("Vmppt_activo_min") or inversor.get("Vmppt_min") or 0
         _vmp_panel  = panel.get("Vmp_stc") or panel.get("Vmp") or 1
         _n_min_elec = max(1, math.ceil(_vmppt_min / _vmp_panel)) if _vmppt_min else 5
+        # Bug real (29-ago-2026): el max(_n_min_elec, _n_min_guardado) de abajo
+        # nunca BAJA -- si un inversor con Vmppt_activo_min alto (ej. Growatt
+        # MAX 100KTL3 LV, 850V → N_min_elec=21) dejó N_min_scan=21 guardado, y
+        # el usuario cambia a un inversor que necesita mucho menos (ej.
+        # SOLIS-60K), el 21 sobrevive -- si N_max_scan sigue en su default
+        # (20), N_min(21) > N_max(20) y optimizar_n_serie() devuelve una lista
+        # vacía, haciendo TRONAR la página más abajo (KeyError de pandas al
+        # estilizar un DataFrame sin columnas). Se resetea al valor eléctrico
+        # fresco cada vez que cambia el inversor -- un ajuste manual posterior
+        # para ESE MISMO inversor se sigue respetando igual que antes.
+        if st.session_state.get("N_min_scan_inversor_ref") != inversor_nombre:
+            st.session_state["N_min_scan"] = _n_min_elec
+            st.session_state["N_min_scan_inversor_ref"] = inversor_nombre
         _n_min_guardado = int(
             st.session_state.get("N_min_scan", _n_min_elec)
         )
@@ -387,6 +400,14 @@ with col2:
             )
     with col_nm2:
         N_max_scan = st.number_input("N máximo a explorar", value=int(st.session_state.get("N_max_scan", 20)), min_value=2, max_value=40, key="N_max_scan")
+
+if N_min_scan > N_max_scan:
+    st.warning(
+        f"⚠️ N mínimo a explorar (**{int(N_min_scan)}**) es mayor que N máximo "
+        f"(**{int(N_max_scan)}**) -- no hay ningún N que evaluar en ese rango. "
+        "Sube el N máximo o baja el N mínimo antes de correr \"▶️ Optimizar N "
+        "paneles/string\"."
+    )
 
 # ── Banner Motor Óptico ───────────────────────────────────────────────────────
 _motor_ok_dim   = st.session_state.get("motor_optico_ok", False)
@@ -907,6 +928,24 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
         N_strings_tracker=int(N_str_tr),
         N_min=int(N_min_scan), N_max=int(N_max_scan),
     )
+
+    # Bug real (29-ago-2026): con N_min_scan > N_max_scan, optimizar_n_serie()
+    # recorre un range() vacío y retorna una lista vacía -- pd.DataFrame([])
+    # sale sin columnas, y el .style.map(subset=[...]) más abajo revienta con
+    # KeyError ("None of [...] are in the [columns]"), tumbando la página con
+    # un traceback crudo. Encontrado con Growatt MAX 100KTL3 LV → SOLIS-60K:
+    # N_min_scan había quedado pegado en 21 (el mínimo eléctrico del Growatt,
+    # ver comentario de "N_min eléctrico" arriba) por el max() que nunca baja
+    # el valor guardado al cambiar de inversor, mientras N_max_scan seguía en
+    # el default 20 -- 21 > 20, rango vacío. Guard explícito en vez de dejar
+    # que pandas/Streamlit revienten con un traceback ilegible para el usuario.
+    if not resultados:
+        st.error(
+            f"🔴 No hay ningún N/string que evaluar: **N mínimo a explorar "
+            f"({int(N_min_scan)})** es mayor que **N máximo ({int(N_max_scan)})**. "
+            "Sube el N máximo o baja el N mínimo arriba, y vuelve a intentar."
+        )
+        st.stop()
 
     filas = []
     for r in resultados:

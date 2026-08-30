@@ -6,6 +6,7 @@ from calculos.dimensionamiento import (
     evaluar_compatibilidad_string,
     evaluar_relacion_dc_ac,
     mapear_inversores_catalogo,
+    optimizar_n_serie,
     resolver_n_strings_tracker,
 )
 from datos.tecnologias_bipv import ASP_ST1_T40
@@ -478,3 +479,37 @@ def test_mapeo_prefiere_n_sin_alerta_de_margen_sobre_n_mas_alto():
     # N=8 sigue apareciendo como viable (compatible=True) -- no desaparece,
     # solo deja de ser el "recomendado".
     assert mapeo[0]["N_viables"] == "6–8"
+
+
+# ---------------------------------------------------------------------------
+# optimizar_n_serie() con N_min > N_max -- crash real reproducido (29-ago-2026)
+# cambiando de Growatt MAX 100KTL3 LV (N_min_elec=21 con el panel JA Solar
+# JAM66D46-720/LB real de Urabá) a SOLIS-60K en pages/4_Dimensionamiento.py:
+# el N_min_scan quedaba pegado en 21 (el max() de la pagina nunca lo baja al
+# cambiar de inversor), mientras N_max_scan seguia en su default (20).
+# optimizar_n_serie(N_min=21, N_max=20) recorre un range() vacio y retorna
+# [] -- pd.DataFrame([]) sale sin columnas, y el .style.map(subset=[...])
+# de la pagina revienta con KeyError, tumbando la pagina con un traceback
+# crudo para el usuario. La pagina ahora tiene un guard explicito (if not
+# resultados: st.error(...); st.stop()) Y ya no deja que N_min quede pegado
+# al cambiar de inversor -- este test ancla el comportamiento de la funcion
+# pura que hizo evidente el bug real.
+# ---------------------------------------------------------------------------
+
+
+def test_optimizar_n_serie_con_n_min_mayor_a_n_max_retorna_lista_vacia():
+    panel_ja_solar = {
+        "Voc_stc": 49.00, "Vmp_stc": 41.19, "Isc_stc": 18.59, "Tk_beta": -0.250,
+    }
+    solis_60k = {
+        "Vdc_max": 1100, "Vmppt_min": 180, "Vmppt_activo_min": 180,
+        "Vmppt_max": 1000, "Isc_max_tracker": 50,
+        "n_trackers": 4, "n_strings_tracker": 1,
+    }
+
+    # N_min=21 es el minimo electrico real del Growatt MAX 100KTL3 LV con
+    # este panel (ceil(850/41.19)=21) -- pegado por error al cambiar a un
+    # inversor distinto (SOLIS-60K) cuyo N_max_scan seguia en el default 20.
+    resultados = optimizar_n_serie(panel_ja_solar, solis_60k, N_min=21, N_max=20)
+
+    assert resultados == []
