@@ -306,6 +306,101 @@ def curva_electrica_temperatura(
     }
 
 
+def interpretar_curva_electrica(curva: dict) -> list[dict]:
+    """
+    Traduce el resultado de `curva_electrica_temperatura()` a una
+    interpretación en lenguaje natural, punto por punto -- para mostrar en
+    📊 Producción junto al gráfico, adaptada al caso real del proyecto
+    evaluado (pedido explícito del usuario, 30-ago-2026: "con las respectivas
+    interpretaciones según el caso del proyecto evaluado").
+
+    NO evalúa nada nuevo: identifica cuál límite del inversor (Vdc_max o la
+    ventana MPPT) es el que manda en cada uno de los 3 puntos de diseño ya
+    calculados por `evaluar_compatibilidad_string()`, y con qué margen —
+    igual que haría un ingeniero leyendo el mismo gráfico a mano.
+
+    Returns
+    -------
+    Lista de dicts ``{"punto", "nivel", "texto"}`` en orden Voc frío / Vmp
+    real / Vmp extremo (calor). ``nivel`` es "ok" | "ajustado" | "critico".
+    Solo incluye un punto si hay datos suficientes (valor del string y
+    límite del inversor) para interpretarlo.
+    """
+    ev = curva.get("evaluacion") or {}
+    vdc_max = curva.get("vdc_max")
+    vmppt_min = curva.get("vmppt_min")
+    vmppt_max = curva.get("vmppt_max")
+    resultado: list[dict] = []
+
+    voc_frio = ev.get("Voc_frio")
+    if voc_frio is not None and vdc_max:
+        margen_pct = (vdc_max - voc_frio) / vdc_max * 100
+        if voc_frio > vdc_max:
+            nivel, texto = "critico", (
+                f"Voc en frío ({voc_frio:.0f} V) SUPERA el límite Vdc máximo del "
+                f"inversor ({vdc_max:.0f} V) en {voc_frio - vdc_max:.0f} V — riesgo "
+                f"real de daño al inversor en la mañana más fría del año."
+            )
+        elif margen_pct < 3:
+            nivel, texto = "ajustado", (
+                f"Voc en frío ({voc_frio:.0f} V) queda a solo {margen_pct:.1f}% del "
+                f"límite Vdc máximo ({vdc_max:.0f} V) — margen de seguridad estrecho."
+            )
+        else:
+            nivel, texto = "ok", (
+                f"Voc en frío ({voc_frio:.0f} V) queda {margen_pct:.1f}% por debajo "
+                f"del límite Vdc máximo ({vdc_max:.0f} V) — margen saludable."
+            )
+        resultado.append({"punto": "Voc frío", "nivel": nivel, "texto": texto})
+
+    vmp_real = ev.get("Vmp_real")
+    if vmp_real is not None and vmppt_min and vmppt_max and vmppt_max > vmppt_min:
+        if vmp_real < vmppt_min:
+            nivel, texto = "critico", (
+                f"Vmp en condición real ({vmp_real:.0f} V) cae por DEBAJO del mínimo "
+                f"MPPT ({vmppt_min:.0f} V) — el inversor no podrá seguir el punto de "
+                f"máxima potencia en operación normal."
+            )
+        elif vmp_real > vmppt_max:
+            nivel, texto = "critico", (
+                f"Vmp en condición real ({vmp_real:.0f} V) supera el máximo MPPT "
+                f"({vmppt_max:.0f} V)."
+            )
+        else:
+            margen_pct = (
+                min(vmp_real - vmppt_min, vmppt_max - vmp_real)
+                / (vmppt_max - vmppt_min) * 100
+            )
+            nivel = "ajustado" if margen_pct < 10 else "ok"
+            texto = (
+                f"Vmp en condición real ({vmp_real:.0f} V) está dentro de la ventana "
+                f"MPPT ({vmppt_min:.0f}–{vmppt_max:.0f} V)"
+                + (", con margen estrecho." if nivel == "ajustado" else ".")
+            )
+        resultado.append({"punto": "Vmp real", "nivel": nivel, "texto": texto})
+
+    vmp_extremo = ev.get("Vmp_extremo")
+    if vmp_extremo is not None and vmppt_min:
+        if vmp_extremo < vmppt_min:
+            nivel, texto = "critico", (
+                f"Vmp en el momento más caluroso del año ({vmp_extremo:.0f} V) cae "
+                f"por debajo del mínimo MPPT ({vmppt_min:.0f} V) en "
+                f"{vmppt_min - vmp_extremo:.0f} V — el inversor perderá seguimiento "
+                f"del punto de máxima potencia justo en las horas de mayor producción."
+            )
+        else:
+            margen_pct = (vmp_extremo - vmppt_min) / vmppt_min * 100
+            nivel = "ajustado" if margen_pct < 5 else "ok"
+            texto = (
+                f"Vmp en el momento más caluroso ({vmp_extremo:.0f} V) queda "
+                f"{margen_pct:.1f}% por encima del mínimo MPPT ({vmppt_min:.0f} V)"
+                + (" — margen estrecho." if nivel == "ajustado" else ".")
+            )
+        resultado.append({"punto": "Vmp extremo (calor)", "nivel": nivel, "texto": texto})
+
+    return resultado
+
+
 def evaluar_relacion_dc_ac(P_dc_stc_kW: float, P_ac_nom_W: float | None) -> dict:
     """
     Evalúa si la relación DC/AC (potencia FV instalada / potencia CA nominal

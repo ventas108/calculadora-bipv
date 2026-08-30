@@ -70,6 +70,56 @@ curva siempre cae en uno de los extremos ya evaluados.
   — mismo patrón ya existente para sus funciones hermanas. Se verificó por extracción de AST +
   `exec` en un namespace aislado, sin excepciones, para N=18 y N=28.
 
+## Actualización (30 de agosto de 2026, mismo día): visibilizada también en 📊 Producción
+
+El usuario pidió explícitamente que la gráfica "esté visibilizada en el módulo correspondiente y
+con las respectivas interpretaciones según el caso del proyecto evaluado" — no solo en el Reporte
+PDF. `pages/6_📊_Produccion.py` es ese módulo: ya calculaba `evaluar_compatibilidad_string()` para
+el banner de compatibilidad eléctrica que existía antes de este cambio.
+
+**Qué se agregó:**
+
+1. **`calculos/dimensionamiento.py::interpretar_curva_electrica()`** (función pura, nueva). Traduce
+   `curva_electrica_temperatura()` a una interpretación en lenguaje natural, punto por punto (Voc
+   frío / Vmp real / Vmp extremo), identificando cuál límite del inversor manda en cada uno y con
+   qué margen (`nivel`: "ok" / "ajustado" / "critico"). No evalúa nada nuevo — traduce a texto lo
+   que `evaluar_compatibilidad_string()` ya calculó, igual que haría un ingeniero leyendo el mismo
+   gráfico a mano.
+
+2. En `pages/6_📊_Produccion.py`, la llamada directa a `evaluar_compatibilidad_string()` se
+   reemplazó por `curva_electrica_temperatura()` (que internamente sigue llamando a la misma
+   función para el veredicto — mismo resultado bit a bit, verificado por
+   `test_curva_electrica_no_reimplementa_la_fisica_coincide_con_evaluar_compatibilidad`). El
+   banner de compatibilidad (🟢/🔴) queda idéntico a como estaba.
+
+3. Justo debajo del banner, un `st.expander` (expandido automáticamente cuando la configuración es
+   incompatible, colapsado cuando es sana) con:
+   - El mismo gráfico Voc(T)/Vmp(T) vs. banda MPPT y límite Vdc máximo, ahora interactivo
+     (Plotly, en vez de SVG estático — consistente con el patrón ya usado en 🔬 Motor IV de esta
+     misma página para la curva I-V).
+   - Los 3 puntos de diseño coloreados en verde o rojo según el veredicto real.
+   - Las interpretaciones de `interpretar_curva_electrica()`, cada una como `st.error` (crítico),
+     `st.warning` (ajustado) o `st.caption` (ok) — adaptadas al caso real del proyecto cargado en
+     ese momento, no un texto genérico.
+
+**Verificado con los casos reales de Urabá:**
+- N=18: Voc frío 🟢 sano (40.8% de margen bajo Vdc máx), Vmp real 🔴 crítico (687V bajo el piso
+  MPPT de 850V), Vmp extremo 🔴 crítico (665V, 185V bajo el piso — pierde MPPT en las horas de
+  mayor producción).
+- N=28: los 3 puntos 🟢 sanos (Vmp extremo con 21.8% de margen sobre el piso MPPT).
+
+**Cobertura:**
+- 3 tests nuevos para `interpretar_curva_electrica()` en `test_compatibilidad_string.py` (críticos
+  en N=18, ninguno crítico en N=28, lista vacía sin límites del inversor). Suite completa:
+  **797 passed**.
+- El bloque Plotly de `pages/6_📊_Produccion.py` no tiene cobertura pytest directa (mismo motivo
+  que las funciones SVG del Reporte PDF: el módulo llama `st.set_page_config()` en tiempo de
+  import). Se hizo smoke-test real: se instaló Plotly 5.22.0 (la versión fijada en
+  `requirements.txt`) en un entorno aislado y se ejecutó el bloque de construcción de la figura
+  extraído tal cual, con los datos reales de Urabá para N=18 y N=28 — la figura se construye sin
+  excepciones (`fig.to_json()` fuerza la validación completa) y las interpretaciones impresas
+  coinciden exactamente con los casos ya documentados arriba.
+
 ## Nota aparte (no corregida, fuera de alcance)
 
 Se detectó que el checkbox "Incluir sección Dimensionamiento" (`key="rep_inc_dim"`) del Reporte PDF

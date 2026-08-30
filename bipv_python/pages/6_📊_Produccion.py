@@ -9,9 +9,10 @@ from calculos.produccion import simular_produccion_anual, perdidas_desglosadas, 
 from calculos.produccion_iv import simular_produccion_iv, panel_apto_para_iv, preparar_para_iv
 from calculos.modelo_iv import resolver_panel_calibrado
 from calculos.dimensionamiento import (
-    evaluar_compatibilidad_string,
     evaluar_relacion_dc_ac,
     escalar_p_ac_nom_por_inversores,
+    curva_electrica_temperatura,
+    interpretar_curva_electrica,
 )
 from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_inversores import INVERSORES
@@ -242,6 +243,10 @@ _n_strings_tracker_cfg = int(st.session_state.get("N_str_tr", 1) or 1)
 _compat_inversor_ok = True
 _compat_inversor_mensajes = []
 _compat_inversor_evaluable = bool(_n_serie_cfg and inversor)
+_curva_electrica = None
+_T_frio_prod = float(st.session_state.get("T_min_diseno", -5.0))
+_T_real_prod = float(st.session_state.get("T_cel_realista", 36.35))
+_T_extremo_prod = float(st.session_state.get("T_cel_extremo", 41.94))
 if not _n_serie_cfg:
     _compat_inversor_ok = False
     _compat_inversor_mensajes.append(
@@ -255,15 +260,19 @@ elif not inversor:
     )
 else:
     try:
-        _compat_resultado = evaluar_compatibilidad_string(
+        # curva_electrica_temperatura() reutiliza evaluar_compatibilidad_string()
+        # para el veredicto (mismo resultado, sin reimplementar la física) y
+        # además muestrea Voc(T)/Vmp(T) para el gráfico de abajo.
+        _curva_electrica = curva_electrica_temperatura(
             panel=panel,
             inversor=inversor,
             N_serie=int(_n_serie_cfg),
-            T_frio=float(st.session_state.get("T_min_diseno", -5.0)),
-            T_real=float(st.session_state.get("T_cel_realista", 36.35)),
-            T_extremo=float(st.session_state.get("T_cel_extremo", 41.94)),
+            T_frio=_T_frio_prod,
+            T_real=_T_real_prod,
+            T_extremo=_T_extremo_prod,
             N_strings_tracker=_n_strings_tracker_cfg,
         )
+        _compat_resultado = _curva_electrica["evaluacion"]
         _compat_inversor_ok = _compat_resultado["compatible"]
         _compat_inversor_mensajes.extend(_compat_resultado["mensajes"])
     except (TypeError, ValueError):
@@ -287,6 +296,88 @@ elif _compat_inversor_evaluable:
         f"🟢 **Compatibilidad eléctrica preliminar:** {inversor_nombre} con "
         f"{_n_serie_cfg} módulos/string y {_n_strings_tracker_cfg} string(s)/tracker."
     )
+
+# ── Gráfico Voc/Vmp vs. temperatura + interpretación del caso real ───────────
+# Visibilizado aquí (pedido explícito del usuario, 30-ago-2026) porque este
+# es el módulo donde ya se evalúa evaluar_compatibilidad_string() -- mismo
+# veredicto que el banner de arriba y que 📄 Reporte PDF, solo que aquí queda
+# a la vista sin tener que generar el reporte.
+if (
+    _curva_electrica is not None
+    and _curva_electrica.get("voc_curva")
+    and _curva_electrica.get("vmp_curva")
+):
+    with st.expander(
+        "⚡ Compatibilidad eléctrica string–inversor vs. temperatura",
+        expanded=not _compat_inversor_ok,
+    ):
+        _temps = _curva_electrica["temps"]
+        _voc_c = _curva_electrica["voc_curva"]
+        _vmp_c = _curva_electrica["vmp_curva"]
+        _vdc_max_g = _curva_electrica.get("vdc_max")
+        _vmppt_min_g = _curva_electrica.get("vmppt_min")
+        _vmppt_max_g = _curva_electrica.get("vmppt_max")
+        _ev_g = _curva_electrica["evaluacion"]
+
+        fig_c = go.Figure()
+        if _vmppt_min_g is not None and _vmppt_max_g is not None:
+            fig_c.add_hrect(
+                y0=_vmppt_min_g, y1=_vmppt_max_g,
+                fillcolor="#2E7D32", opacity=0.08, line_width=0,
+            )
+            fig_c.add_hline(
+                y=_vmppt_min_g, line_dash="dash", line_color="#2E7D32",
+                annotation_text=f"MPPT mín {_vmppt_min_g:.0f} V", annotation_position="bottom right",
+            )
+            fig_c.add_hline(
+                y=_vmppt_max_g, line_dash="dash", line_color="#2E7D32",
+                annotation_text=f"MPPT máx {_vmppt_max_g:.0f} V", annotation_position="top right",
+            )
+        if _vdc_max_g is not None:
+            fig_c.add_hline(
+                y=_vdc_max_g, line_dash="dot", line_color="#C62828", line_width=2,
+                annotation_text=f"Vdc máx {_vdc_max_g:.0f} V", annotation_position="top left",
+            )
+        fig_c.add_trace(go.Scatter(
+            x=_temps, y=_voc_c, name="Voc(T)",
+            line=dict(color="#1565C0", width=2.5),
+        ))
+        fig_c.add_trace(go.Scatter(
+            x=_temps, y=_vmp_c, name="Vmp(T)",
+            line=dict(color="#EF6C00", width=2.5),
+        ))
+        _color_pts = "#2E7D32" if _compat_inversor_ok else "#C62828"
+        fig_c.add_trace(go.Scatter(
+            x=[_T_frio_prod, _T_real_prod, _T_extremo_prod],
+            y=[_ev_g.get("Voc_frio"), _ev_g.get("Vmp_real"), _ev_g.get("Vmp_extremo")],
+            name="Puntos de diseño", mode="markers",
+            marker=dict(size=11, color=_color_pts, line=dict(width=1.5, color="white")),
+        ))
+        fig_c.update_layout(
+            xaxis_title="Temperatura de celda (°C)",
+            yaxis_title="Tensión (V)",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            height=360,
+            margin=dict(l=10, r=10, t=30, b=10),
+        )
+        st.plotly_chart(fig_c, use_container_width=True)
+
+        st.caption(
+            "Voc y Vmp son funciones lineales de la temperatura de celda: los 3 puntos "
+            "de diseño (frío, real, extremo) cubren con certeza matemática toda la curva "
+            "continua entre ellos — este gráfico visualiza el mismo veredicto de arriba, "
+            "no evalúa nada distinto."
+        )
+
+        for _p in interpretar_curva_electrica(_curva_electrica):
+            _icono = {"ok": "🟢", "ajustado": "🟠", "critico": "🔴"}[_p["nivel"]]
+            _texto_p = f"{_icono} **{_p['punto']}** — {_p['texto']}"
+            if _p["nivel"] == "critico":
+                st.error(_texto_p)
+            elif _p["nivel"] == "ajustado":
+                st.warning(_texto_p)
+            else:
+                st.caption(_texto_p)
 
 # Bug real (29-ago-2026, proyecto Urabá): N_paneles en esta página se toma
 # por defecto del "Proyecto completo" (varios inversores), pero

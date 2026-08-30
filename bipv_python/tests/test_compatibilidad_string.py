@@ -10,6 +10,7 @@ from calculos.dimensionamiento import (
     optimizar_n_serie,
     resolver_n_strings_tracker,
     curva_electrica_temperatura,
+    interpretar_curva_electrica,
 )
 from datos.tecnologias_bipv import ASP_ST1_T40
 
@@ -284,6 +285,43 @@ def test_curva_electrica_sin_limites_del_inversor_devuelve_none_no_cero():
     assert r["vdc_max"] is None
     assert r["vmppt_min"] is None
     assert r["vmppt_max"] is None
+
+
+# ---------------------------------------------------------------------------
+# interpretar_curva_electrica() -- interpretación en lenguaje natural del
+# gráfico, adaptada al caso real del proyecto (pedido explícito del usuario,
+# 30-ago-2026, para visibilizarla en 📊 Producción). Mismos fixtures Urabá.
+# ---------------------------------------------------------------------------
+
+
+def test_interpretacion_uraba_n18_marca_critico_en_vmp_extremo():
+    r = curva_electrica_temperatura(
+        _ja_solar_jam66d46_720lb(), _growatt_max_100ktl3_lv(), N_serie=18,
+        T_frio=22.1, T_real=54.5, T_extremo=66.0, N_strings_tracker=1,
+    )
+    puntos = interpretar_curva_electrica(r)
+    por_punto = {p["punto"]: p for p in puntos}
+    assert por_punto["Vmp extremo (calor)"]["nivel"] == "critico"
+    assert "MPPT" in por_punto["Vmp extremo (calor)"]["texto"]
+    # Debe interpretar los 3 puntos, no solo el que falla.
+    assert set(por_punto) == {"Voc frío", "Vmp real", "Vmp extremo (calor)"}
+
+
+def test_interpretacion_uraba_n28_no_marca_ningun_punto_critico():
+    r = curva_electrica_temperatura(
+        _ja_solar_jam66d46_720lb(), _growatt_max_100ktl3_lv(), N_serie=28,
+        T_frio=22.1, T_real=54.5, T_extremo=66.0, N_strings_tracker=1,
+    )
+    puntos = interpretar_curva_electrica(r)
+    assert all(p["nivel"] != "critico" for p in puntos)
+
+
+def test_interpretacion_sin_limites_del_inversor_no_genera_puntos():
+    r = curva_electrica_temperatura(
+        _ja_solar_jam66d46_720lb(), {}, N_serie=18,
+        T_frio=-5.0, T_real=36.35, T_extremo=41.94,
+    )
+    assert interpretar_curva_electrica(r) == []
 
 
 # ---------------------------------------------------------------------------
