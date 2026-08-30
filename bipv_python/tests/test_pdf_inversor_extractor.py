@@ -69,6 +69,42 @@ def test_multimodelo_detecta_los_3_modelos_reales_pv35():
     assert resultado["modelos"] == ["PV35-8048", "PV35-10048", "PV35-12048"]
 
 
+# Extracto real de la ficha MUST PV3300 TLV Series (11 modelos, texto tal
+# como lo devuelve pdfplumber): el encabezado es el mismo token "PV33-"
+# repetido 11 veces (sin sufijo), con el sufijo real en la línea de
+# continuación -- pero esa línea trae "Features"/"MODEL" pegados delante
+# (palabras arrastradas de otra columna/fila del PDF original).
+TEXTO_MUST_PV3300_HEADER = """
+PV33- PV33- PV33- PV33- PV33- PV33- PV33- PV33- PV33- PV33- PV33-
+Features MODEL 1012 1512 1524 2012 2024 3024 3048 4024 4048 5048 6048
+TLV TLV TLV TLV TLV TLV TLV TLV TLV TLV TLV
+Maximum PV Array Power 1250W 1250W 2500W 1250W 2500W 2500W 5000W 2500W 5000W 5000W 5000W
+"""
+
+
+def test_multimodelo_no_confunde_palabras_sueltas_con_sufijos_de_modelo():
+    # Bug real: "Features"/"MODEL" (sin dígito) se repartían por posición
+    # como si fueran sufijos de modelo -- devoraban las 2 primeras columnas
+    # y fusionaban pares de modelos reales ("PV33-3024 3048", "PV33-5048
+    # 6048") en vez de darlos por separado.
+    resultado = ext._extraer_multimodelo(TEXTO_MUST_PV3300_HEADER)
+    assert resultado["modelos"] == [
+        "PV33-1012", "PV33-1512", "PV33-1524", "PV33-2012", "PV33-2024",
+        "PV33-3024", "PV33-3048", "PV33-4024", "PV33-4048", "PV33-5048",
+        "PV33-6048",
+    ]
+
+
+def test_multimodelo_lee_p_dc_max_por_columna_con_fraseo_maximum_pv_array_power():
+    # Bug real: ningún patrón de la fila P_dc_max por columna reconocía
+    # "Maximum PV Array Power" (fraseo real de MUST) -- todas las columnas
+    # quedaban en None pese a que el valor real está en el texto.
+    resultado = ext._extraer_multimodelo(TEXTO_MUST_PV3300_HEADER)
+    assert resultado["por_modelo"]["PV33-5048"]["P_dc_max_W"] == 5000.0
+    assert resultado["por_modelo"]["PV33-6048"]["P_dc_max_W"] == 5000.0
+    assert resultado["por_modelo"]["PV33-1012"]["P_dc_max_W"] == 1250.0
+
+
 # Extracto real de la ficha MUST PV3300 TLV Series -- la sección de entrada
 # AC (red/generador) trae "Max input voltage 270Vac MAX", un voltaje de
 # CORRIENTE ALTERNA, en una línea con la misma forma "Max ... input voltage"

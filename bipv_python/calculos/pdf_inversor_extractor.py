@@ -809,6 +809,21 @@ def _extract_multimodel_values(text: str) -> dict:
         cont = lines[header_line_idx + 1]
         cols_x = [pos for _, pos in header_positions]
         toks = re.findall(r"\S+", cont)
+        # Bug real (30-ago-2026, ficha MUST PV3300 TLV Series, 11 modelos):
+        # cuando el encabezado es el mismo token repetido sin sufijo
+        # ("PV33-" × 11, con el número real en la línea de continuación),
+        # pdfplumber a veces linealiza en esa misma línea palabras sueltas
+        # arrastradas de otra columna/fila del PDF ("Features", "MODEL" —
+        # bullets/etiquetas cercanas en el layout original). Sin filtrarlas,
+        # se reparten por posición como si fueran sufijos de modelo:
+        # devoraban las 2 primeras columnas ("PV33-Features"/"PV33-MODEL")
+        # y desplazaban los sufijos reales, fusionando pares de modelos
+        # verdaderos en una sola entrada ("PV33-3024 3048", "PV33-5048
+        # 6048") en vez de darlos por separado. Un sufijo real de variante
+        # SIEMPRE trae un dígito (potencia, corriente, etc.) — misma
+        # condición que ya exige la rama de "grupos iguales" de abajo — así
+        # que se descartan aquí los tokens sin dígito antes de repartir.
+        toks = [t for t in toks if re.search(r"\d", t)]
         n_m = len(model_names)
         sufijos: dict = {i: [] for i in range(n_m)}
         if toks and len(toks) % n_m == 0:
@@ -823,7 +838,13 @@ def _extract_multimodel_values(text: str) -> dict:
             if not all(any(re.search(r"\d", t_) for t_ in sufijos[i]) for i in range(n_m)):
                 sufijos = {i: [] for i in range(n_m)}
         if not any(sufijos.values()):
+            # Mismo filtro "solo tokens con dígito" que arriba, aplicado
+            # aquí también (no solo a la rama de grupos iguales) para que
+            # ninguna de las dos rutas de reparto cuele palabras sueltas
+            # sin dígito como si fueran sufijo de un modelo real.
             for m_tok in re.finditer(r"\S+", cont):
+                if not re.search(r"\d", m_tok.group()):
+                    continue
                 idx = min(range(n_m), key=lambda i: abs(cols_x[i] - m_tok.start()))
                 sufijos[idx].append(m_tok.group())
         nuevos = [
@@ -878,7 +899,11 @@ def _extract_multimodel_values(text: str) -> dict:
                          r'|M[aá]xima\s+potencia\s+FV'
                          r'|Potencia\s+m[aá]xima\s+FV'
                          r'|Max\.?\s*PV\s+input\s+power'
-                         r'|Max\.?\s*DC\s+Input\s+Power', line, re.IGNORECASE):
+                         r'|Max\.?\s*DC\s+Input\s+Power'
+                         # MUST (verificado 30-ago-2026, familia PV3300 TLV):
+                         # "Maximum PV Array Power 1250W 1250W 2500W ..." con
+                         # un valor real por columna/modelo.
+                         r'|Max(?:imum)?\.?\s*PV\s+Array\s+Power', line, re.IGNORECASE):
             continue
         # Enmascarar contenido entre paréntesis conservando posiciones:
         # "18000 (9000/9000) 24000 (12000/12000)" → los desgloses por MPPT

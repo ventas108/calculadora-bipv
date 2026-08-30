@@ -123,16 +123,31 @@ La familia PV3300 usa un fraseo de Vdc_max **distinto** al resto de la familia M
 
 Con ambos fixes, `Vdc_max` de la ficha aislada PV33-5048/6048 pasó de `None` a **145.0** (correcto). Suite completa tras estos 2 fixes: **770/770**.
 
-## ⚠️ Hallazgo aparte, no corregido — detector multi-modelo produce entradas basura con la ficha de familia completa (11 modelos)
+## 🟢 Bug real #6 (corregido de raíz) — detector multi-modelo producía entradas basura con la ficha de familia completa (11 modelos)
 
-Sobre la ficha ORIGINAL de 11 modelos (no la aislada), `modelos_detectados` da: `['PV33-Features', 'PV33-MODEL', 'PV33-1012', 'PV33-1512', 'PV33-1524', 'PV33-2012', 'PV33-2024', 'PV33-3024 3048', 'PV33-4024', 'PV33-4048', 'PV33-5048 6048']` — 11 entradas, pero 2 son basura (`Features`/`MODEL`, palabras de otra columna/fila que pdfplumber linealizó junto a los nombres reales) y 2 son pares fusionados (`3024 3048`, `5048 6048`) en vez de 4 entradas separadas. Causa raíz: la línea de encabezado de esta ficha es 11 veces el mismo token literal `"PV33-"` (sin sufijo, el sufijo numérico vive en la línea SIGUIENTE) — el algoritmo de completado por línea de continuación asigna cada token de esa segunda línea (incluidas las palabras sueltas "Features"/"MODEL" que la preceden, arrastradas de otra columna) al nombre de columna más cercano por posición horizontal, en vez de reconocerlas como ruido.
+Sobre la ficha ORIGINAL de 11 modelos (no la aislada), `modelos_detectados` daba: `['PV33-Features', 'PV33-MODEL', 'PV33-1012', 'PV33-1512', 'PV33-1524', 'PV33-2012', 'PV33-2024', 'PV33-3024 3048', 'PV33-4024', 'PV33-4048', 'PV33-5048 6048']` — 11 entradas, pero 2 basura (`Features`/`MODEL`, palabras de otra columna/fila que pdfplumber linealizó junto a los nombres reales) y 2 pares fusionados (`3024 3048`, `5048 6048`) en vez de 4 entradas separadas.
 
-**No corregido esta sesión** — el fix seguro requeriría filtrar palabras no-numéricas conocidas ("Features", "MODEL", "Specification", etc.) del algoritmo de completado por posición, con riesgo de afectar otros fabricantes que ya dependen de esa misma ruta de código (Deye TriP2, mencionado en los comentarios del propio archivo). **Mitigación aplicada en su lugar**: la ficha aislada de 2 columnas de arriba, que evita el problema por construcción (sin ruido de columnas ajenas).
+**Causa raíz**: la línea de encabezado de esta ficha es 11 veces el mismo token literal `"PV33-"` (sin sufijo, el sufijo numérico vive en la línea SIGUIENTE de continuación). El algoritmo de completado (tanto la rama de "grupos iguales" como el *fallback* por posición horizontal) repartía TODOS los tokens de esa línea de continuación entre las columnas — incluidas las palabras sueltas "Features"/"MODEL" que la preceden (arrastradas de otra columna/fila del PDF original por la linealización de pdfplumber), en vez de reconocerlas como ruido y descartarlas.
+
+**Corregido, en las 2 rutas de reparto**: se filtran los tokens de la línea de continuación para quedarse solo con los que traen al menos un dígito — un sufijo real de variante de modelo (potencia, corriente, código de submodelo) **siempre** trae un dígito; "Features"/"MODEL"/cualquier palabra suelta similar, no. Es la misma condición de forma que la rama de "grupos iguales" ya exigía para *validar* un reparto (línea `~838`), ahora aplicada también para *filtrar* antes de repartir, en ambas rutas (grupos iguales y posición). No afecta el caso Deye/TriP2 documentado en el propio código (`"3P 5K 3P 6K..."` — todos los tokens ya traen dígito, pasan el filtro sin cambios).
+
+Verificado: `modelos_detectados` para la ficha completa PV3300 ahora da los 11 modelos reales, limpios, en el orden correcto:
+```
+['PV33-1012', 'PV33-1512', 'PV33-1524', 'PV33-2012', 'PV33-2024',
+ 'PV33-3024', 'PV33-3048', 'PV33-4024', 'PV33-4048', 'PV33-5048', 'PV33-6048']
+```
+Y las fichas PV35/PV36 (que ya funcionaban bien) siguen funcionando igual — sin regresión.
+
+### Bug hermano encontrado de paso — `P_dc_max_W` por columna no reconocía "Maximum PV Array Power"
+
+Con los 11 modelos ya bien detectados, se verificó que `valores_por_modelo` seguía dando `P_dc_max_W=None` para los 11 — el extractor de la fila de potencia por columna (`_extraer_multimodelo`) no reconocía el fraseo real de MUST ("Maximum PV Array Power 1250W 1250W 2500W..."), solo fraseos de otros fabricantes (SolaX "recommended PV array power", Growatt "for module STC", español "Potencia máxima FV"). **Corregido**: agregado el fraseo "Maximum PV Array Power" a la lista reconocida. Verificado contra la ficha real completa — los 11 valores por columna ahora coinciden exactamente con el texto del fabricante (1250W ×3, 2500W ×4, 5000W ×4, incluidos los 5000W/5000W reales de PV33-5048/6048).
+
+2 tests nuevos, anclados al texto real de la línea de encabezado + continuación de esta ficha. Suite completa: **772/772**.
 
 ## Cobertura de tests — hallazgo aparte
 
-Antes de esta auditoría, `calculos/pdf_inversor_extractor.py` (~1.500 líneas, el motor completo de extracción de fichas de inversores) **no tenía ningún test que llamara a `extraer_parametros_inversor()` ni a sus funciones internas directamente** — toda la cobertura de "inversor" existente prueba lógica de catálogo/compatibilidad con diccionarios ya armados a mano, no el motor de regex en sí. Se creó `tests/test_pdf_inversor_extractor.py` (9 tests en total, incluidos los de las secciones anteriores) anclado al texto real de estas fichas MUST, como primer test directo del motor de extracción.
+Antes de esta auditoría, `calculos/pdf_inversor_extractor.py` (~1.500 líneas, el motor completo de extracción de fichas de inversores) **no tenía ningún test que llamara a `extraer_parametros_inversor()` ni a sus funciones internas directamente** — toda la cobertura de "inversor" existente prueba lógica de catálogo/compatibilidad con diccionarios ya armados a mano, no el motor de regex en sí. Se creó `tests/test_pdf_inversor_extractor.py` (11 tests en total, incluidos los de las secciones anteriores) anclado al texto real de estas fichas MUST, como primer test directo del motor de extracción.
 
 ## Resultado final
 
-Suite completa: **770/770**. Los 5 bugs de código corregidos y verificados contra las fichas reales (PV35 ×3, PV36, PV3300 ×2, más la ficha aislada PV33-5048/6048); el archivo mal nombrado ya se corrigió en el escritorio (renombrado a PV36); 1 limitación real documentada y mitigada (no corregida de raíz) sobre el detector multi-modelo con la ficha de familia completa.
+Suite completa: **772/772**. Los 7 bugs de código corregidos y verificados contra las fichas reales (PV35 ×3, PV36, PV3300 ×2 + ficha aislada PV33-5048/6048); el archivo mal nombrado ya se corrigió en el escritorio (renombrado a PV36); el detector multi-modelo con la ficha de familia completa (11 modelos) ya no produce entradas basura ni modelos fusionados — corregido de raíz, no solo mitigado.
