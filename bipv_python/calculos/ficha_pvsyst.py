@@ -117,9 +117,7 @@ def generar_ficha_conversion_pvsyst(
         "",
         "── 1. Módulo custom en el software de referencia (\"PV module\" → \"New\") ──",
         f"  Fabricante / modelo   : {marca} / {nombre}",
-        f"  Tecnología            : {tecnologia}  "
-        f"(clasificar como 'Si-mono' si es célula c-Si, "
-        f"aunque el laminado sea vidrio-vidrio BIPV)",
+        f"  Tecnología            : {tecnologia}  ({_sugerencia_tecnologia(tecnologia)})",
         f"  Pnom (STC)            : {_fmt(Pmax, 'W')}",
         f"  Vmp (STC)             : {_fmt(Vmp, 'V')}",
         f"  Imp (STC)             : {_fmt(Imp, 'A')}",
@@ -160,6 +158,32 @@ def generar_ficha_conversion_pvsyst(
         "numérica exacta. Ver DIAGNOSTICO_MODELO_TERMICO_UC_UV.md.",
     ]
     return "\n".join(lineas)
+
+
+def _sugerencia_tecnologia(tecnologia: str | None) -> str:
+    """
+    Sugerencia de clasificación en el software de referencia, a partir del
+    campo `tecnologia` real del panel -- no asume c-Si por defecto.
+
+    Bug real corregido (30-ago-2026): la primera versión de la ficha
+    imprimía siempre "clasificar como 'Si-mono' si es célula c-Si" sin
+    mirar la tecnología real del panel. Para el propio panel de Teusaquillo
+    (ASP-ST1-T40, CdTe) esa nota es engañosa -- CdTe no es c-Si y el
+    laminado vidrio-vidrio no cambia eso. Detectado generando la ficha real
+    de Teusaquillo con esta función.
+    """
+    t = (tecnologia or "").lower()
+    if "cdte" in t:
+        return "clasificar como CdTe -- NO es célula c-Si, aunque el laminado sea vidrio-vidrio BIPV"
+    if "cigs" in t:
+        return "clasificar como CIGS"
+    if "amorfo" in t or "a-si" in t or "thin" in t:
+        return "clasificar como a-Si (silicio amorfo/película delgada)"
+    if "mono" in t or "perc" in t or "topcon" in t or "n-type" in t:
+        return "clasificar como Si-mono"
+    if "poli" in t or "multi" in t:
+        return "clasificar como Si-poli"
+    return "verificar la tecnología exacta en la ficha del fabricante antes de elegir la clasificación en el software"
 
 
 def _fmt(valor, unidad: str) -> str:

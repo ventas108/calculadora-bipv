@@ -243,6 +243,24 @@ rondas:
 
 Suite completa tras este fix: **760/760**.
 
+## (f) Bug real encontrado generando la ficha real de Teusaquillo (30-ago-2026)
+
+Al generar por fin la ficha real para el panel de Teusaquillo (`ASP_ST1_T40`,
+tecnología **CdTe**) se vio que la nota de clasificación decía siempre
+*"clasificar como 'Si-mono' si es célula c-Si"* — texto fijo, sin mirar la
+tecnología real del panel. Para un panel CdTe esa nota es engañosa: CdTe no
+es c-Si, y el laminado vidrio-vidrio no cambia eso.
+
+Corregido con `_sugerencia_tecnologia(tecnologia)`, que clasifica por
+palabra clave real (CdTe, CIGS, a-Si, mono/PERC/TOPCon → Si-mono, poli/multi
+→ Si-poli) y, si no reconoce ninguna, pide verificar en vez de asumir c-Si
+por defecto. 1 test nuevo anclado al panel real de Teusaquillo. Suite
+completa: **761/761**.
+
+Es la segunda vez en esta auditoría que generar la ficha con el panel REAL
+(no un fixture sintético) expone un defecto que los tests con datos
+genéricos no habían detectado — mismo patrón que el bug de esquema de (d).
+
 ## Alcance de esta sesión
 
 Se hizo (a) el fix de coherencia de default por los 6 tipos, con 4 niveles

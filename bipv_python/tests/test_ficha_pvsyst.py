@@ -140,6 +140,15 @@ def test_ficha_teusaquillo_reporta_coeficiente_isc_real_no_disponible():
     assert "NO disponible" not in ficha
 
 
+def test_ficha_teusaquillo_no_sugiere_si_mono_para_panel_cdte():
+    # Bug real: la ficha sugería siempre "Si-mono" sin mirar la tecnología
+    # real del panel. ASP-ST1-T40 es CdTe -- generando la ficha real se vio
+    # la nota engañosa antes de entregarla al usuario.
+    ficha = generar_ficha_conversion_pvsyst(PANEL_TEUSAQUILLO, "Fachada BIPV", 1.3)
+    assert "clasificar como CdTe" in ficha
+    assert "Si-mono" not in ficha
+
+
 def test_ficha_teusaquillo_usa_preset_fachada_confinada():
     # Teusaquillo es una fachada BIPV vertical real -- k=1.3, no montaje libre.
     ficha = generar_ficha_conversion_pvsyst(PANEL_TEUSAQUILLO, "Fachada BIPV", 1.3)
