@@ -91,10 +91,48 @@ El patrón genérico de `Vdc_max` (`(?:Input|Array|DC)\s+...[Vv]oltage`) acepta 
 
 ⚠️ **Limitación real que queda, no corregida esta sesión**: PV3300 TLV Series no es una familia "columna por modelo" simple como PV3500 — agrupa 11 submodelos (1012 a 6048) por **voltaje de batería** (12V/24V/48V), cada tier con su propia ventana MPPT (16~95V @12V · 30~130V @24V · 60~130V @48V) y su propia potencia FV máxima (1250W a 5000W). El extractor actual reporta el primer valor de la lista (el del submodelo más pequeño, 12V/1250W) como si fuera el valor "global" de la ficha — no es un dato fabricado (es un valor real, textual, de la ficha), pero sí puede ser el submodelo equivocado si lo que se necesita es un PV33-5048/6048 (24V/48V). Para esos submodelos, verificar manualmente contra la tabla de la sección "Solar MPPT Range @ Operating Voltage" antes de guardar.
 
+## Verificación del submodelo PV33-5048/6048 con ficha aislada
+
+El usuario no podía elegir el submodelo PV33-5048 TLV desde el selector de la app (la ficha de familia completa, 11 modelos, produce un `modelos_detectados` corrupto: entradas basura `PV33-Features`/`PV33-MODEL` y modelos fusionados `PV33-3024 3048`/`PV33-5048 6048` — ver hallazgo aparte más abajo). Pidió generar una ficha PDF aislada para ese par de submodelos y correr la extracción sobre ella.
+
+Se generó `Inversor-Hibrido-PV33-5048-6048-TLV-Must-SUBMODELO.pdf` (entregado en el escritorio del usuario) con **únicamente datos reales**, verificados línea por línea contra el texto completo del PDF original del fabricante (no un fixture inventado) y aislados a solo 2 columnas en vez de 11:
+
+| Campo | PV33-5048 TLV | PV33-6048 TLV |
+|---|---|---|
+| Rated power (CA) | 5 kW | 6 kW |
+| Surge rating | 15.000 VA | 18.000 VA |
+| Battery voltage | 48 VDC | 48 VDC |
+| Vdc_max (Voc máx.) | 145 V | 145 V |
+| Vmppt_min / Vmppt_max | 60 V / 130 V | 60 V / 130 V |
+| I_max_tracker (carga PV) | 80 A | 80 A |
+| P_dc_max_W | 5.000 W | 5.000 W |
+
+Corriendo el extractor real sobre esta ficha aislada se encontraron **2 bugs más**, ambos corregidos:
+
+### Bug real #4 — el guard AC/DC del bug #3 se podía esquivar por backtracking, truncando el número en vez de rechazarlo
+
+El fix del bug #3 (`(?![Vv]?[Aa][Cc]\b)` tras el número) tenía un defecto propio: cuando el motor de regex de Python no puede satisfacer la aserción con el número completo, **retrocede un dígito y reintenta** — para `"270Vac"`, al fallar con `"270"` (seguido de "Vac"), retrocedía a `"27"` y comprobaba el guard contra el dígito sobrante `"0Vac"`, que **sí pasa** (el `"0"` no es "ac") — capturando **27** en vez de rechazar el match por completo. Encontrado auditando el propio fix de esta misma sesión contra la ficha aislada real.
+
+**Corregido**: grupo atómico `(?>...)` alrededor de la captura de dígitos en ambos patrones del bug #3 — impide que el motor de regex retroceda dentro del número ya matcheado, así el guard se evalúa una sola vez contra el valor completo. 1 test nuevo.
+
+### Bug real #5 — fraseo "Maximum Solar Input Voltage" (con tolerancia "±N") no se leía
+
+La familia PV3300 usa un fraseo de Vdc_max **distinto** al resto de la familia MUST (PV3500/PV3600 usan "Maximum PV array open circuit voltage", ya cubierto): `"Maximum Solar Input Voltage 100±2Vdc / 145±2Vdc..."`. Ningún patrón existente lo cubría — ni por el fraseo ("Solar Input Voltage" en vez de "PV array open circuit voltage"), ni por la tolerancia "±N" pegada al valor, que rompe la adyacencia número→V de los demás patrones.
+
+**Corregido**: nuevo patrón que reconoce el fraseo "Maximum Solar Input Voltage" y tolera el sufijo "±N" (o su variante ASCII "+/-"). 1 test nuevo.
+
+Con ambos fixes, `Vdc_max` de la ficha aislada PV33-5048/6048 pasó de `None` a **145.0** (correcto). Suite completa tras estos 2 fixes: **770/770**.
+
+## ⚠️ Hallazgo aparte, no corregido — detector multi-modelo produce entradas basura con la ficha de familia completa (11 modelos)
+
+Sobre la ficha ORIGINAL de 11 modelos (no la aislada), `modelos_detectados` da: `['PV33-Features', 'PV33-MODEL', 'PV33-1012', 'PV33-1512', 'PV33-1524', 'PV33-2012', 'PV33-2024', 'PV33-3024 3048', 'PV33-4024', 'PV33-4048', 'PV33-5048 6048']` — 11 entradas, pero 2 son basura (`Features`/`MODEL`, palabras de otra columna/fila que pdfplumber linealizó junto a los nombres reales) y 2 son pares fusionados (`3024 3048`, `5048 6048`) en vez de 4 entradas separadas. Causa raíz: la línea de encabezado de esta ficha es 11 veces el mismo token literal `"PV33-"` (sin sufijo, el sufijo numérico vive en la línea SIGUIENTE) — el algoritmo de completado por línea de continuación asigna cada token de esa segunda línea (incluidas las palabras sueltas "Features"/"MODEL" que la preceden, arrastradas de otra columna) al nombre de columna más cercano por posición horizontal, en vez de reconocerlas como ruido.
+
+**No corregido esta sesión** — el fix seguro requeriría filtrar palabras no-numéricas conocidas ("Features", "MODEL", "Specification", etc.) del algoritmo de completado por posición, con riesgo de afectar otros fabricantes que ya dependen de esa misma ruta de código (Deye TriP2, mencionado en los comentarios del propio archivo). **Mitigación aplicada en su lugar**: la ficha aislada de 2 columnas de arriba, que evita el problema por construcción (sin ruido de columnas ajenas).
+
 ## Cobertura de tests — hallazgo aparte
 
-Antes de esta auditoría, `calculos/pdf_inversor_extractor.py` (~1.500 líneas, el motor completo de extracción de fichas de inversores) **no tenía ningún test que llamara a `extraer_parametros_inversor()` ni a sus funciones internas directamente** — toda la cobertura de "inversor" existente prueba lógica de catálogo/compatibilidad con diccionarios ya armados a mano, no el motor de regex en sí. Se creó `tests/test_pdf_inversor_extractor.py` (7 tests, incluido el de la sección anterior) anclado al texto real de esta ficha MUST, como primer test directo del motor de extracción.
+Antes de esta auditoría, `calculos/pdf_inversor_extractor.py` (~1.500 líneas, el motor completo de extracción de fichas de inversores) **no tenía ningún test que llamara a `extraer_parametros_inversor()` ni a sus funciones internas directamente** — toda la cobertura de "inversor" existente prueba lógica de catálogo/compatibilidad con diccionarios ya armados a mano, no el motor de regex en sí. Se creó `tests/test_pdf_inversor_extractor.py` (9 tests en total, incluidos los de las secciones anteriores) anclado al texto real de estas fichas MUST, como primer test directo del motor de extracción.
 
 ## Resultado final
 
-Suite completa: **768/768**. Los 3 bugs de código corregidos y verificados contra las 5 fichas reales (PV35 ×3, PV36, PV3300 ×2); el archivo mal nombrado ya se corrigió en el escritorio (renombrado a PV36) para que no se vuelva a cargar por error como PV35-12048 TLV.
+Suite completa: **770/770**. Los 5 bugs de código corregidos y verificados contra las fichas reales (PV35 ×3, PV36, PV3300 ×2, más la ficha aislada PV33-5048/6048); el archivo mal nombrado ya se corrigió en el escritorio (renombrado a PV36); 1 limitación real documentada y mitigada (no corregida de raíz) sobre el detector multi-modelo con la ficha de familia completa.

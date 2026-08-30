@@ -82,6 +82,18 @@ Solar MPPT Range @ Operating Voltage 16~95VDC @ 12V / 30~130VDC @ 24V
 """
 
 
+def test_vdc_max_no_trunca_el_valor_ac_por_backtracking_del_guard():
+    # Bug real (encontrado auditando el propio fix anterior): sin el grupo
+    # atómico, el guard "no seguido de ac" se esquivaba por backtracking --
+    # el motor de regex retrocedía un dígito ("270"->"27") y reintentaba el
+    # guard contra el dígito sobrante ("0Vac"), que sí pasaba, truncando el
+    # valor a 27 en vez de rechazar el match completo.
+    texto = "Max input voltage 270Vac MAX"
+    valor = ext._find(ext._PAT_VDCMAX, texto)
+    assert valor != 27.0
+    assert valor is None
+
+
 def test_vdc_max_no_confunde_voltaje_ac_de_red_con_voltaje_dc_fv():
     # Bug real (ficha MUST PV3300): "Max input voltage 270Vac MAX" es la
     # tensión AC máxima de red/generador -- NO debe leerse como Vdc_max. El
@@ -89,6 +101,16 @@ def test_vdc_max_no_confunde_voltaje_ac_de_red_con_voltaje_dc_fv():
     valor = ext._find(ext._PAT_VDCMAX, TEXTO_MUST_PV3300_SECCION_AC)
     assert valor != 270.0
     assert valor is None or valor != 270
+
+
+def test_vdc_max_lee_fraseo_maximum_solar_input_voltage_con_tolerancia():
+    # Bug real: la ficha MUST PV3300 usa "Maximum Solar Input Voltage
+    # 100±2Vdc / 145±2Vdc..." -- fraseo distinto al resto de la familia MUST
+    # ("Maximum PV array open circuit voltage"), y la tolerancia "±2" pegada
+    # al valor rompía la adyacencia número→V de los demás patrones.
+    texto = "Maximum Solar Input Voltage 100±2Vdc / 145±2Vdc 145±2Vdc 145±2Vdc"
+    valor = ext._find(ext._PAT_VDCMAX, texto)
+    assert valor == 100.0  # toma el primer valor de la lista (submodelo más chico)
 
 
 def test_campos_extraidos_completos_para_ficha_must_pv3500():

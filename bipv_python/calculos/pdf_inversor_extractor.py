@@ -254,7 +254,13 @@ _PAT_VDCMAX = [
     # venga seguido de "ac"/"AC" (voltaje de corriente alterna) -- riesgo
     # genérico, no exclusivo de MUST, para cualquier ficha con una sección
     # de entrada AC fraseada como "Max ... input voltage".
-    (r"Max(?:imum)?\.?\s*(?:PV\s+)?(?:Input|Array|DC)\s+(?:Open\s+Circuit\s+)?[Vv]oltage[^\d\n]{0,15}([0-9]+(?:[.,][0-9]+)?)(?![Vv]?[Aa][Cc]\b)\s*V?(?!\s*/)", 1),
+    # (?>...) atómico (30-ago-2026): sin esto, cuando el guard AC de abajo
+    # rechaza el número completo ("270" seguido de "Vac"), el motor de regex
+    # retrocede UN dígito ("27") y reintenta el guard contra "0Vac" -- que sí
+    # pasa (el "0" sobrante no es "ac") -- truncando 270→27 en vez de
+    # rechazar el match entero. Encontrado auditando el propio fix anterior
+    # con la ficha real MUST PV3300 (línea "Max input voltage 270Vac MAX").
+    (r"Max(?:imum)?\.?\s*(?:PV\s+)?(?:Input|Array|DC)\s+(?:Open\s+Circuit\s+)?[Vv]oltage[^\d\n]{0,15}((?>[0-9]+(?:[.,][0-9]+)?))(?![Vv]?[Aa][Cc]\b)\s*V?(?!\s*/)", 1),
     # Gap 7 (X3-PRO) mantenido como seguridad — ya cubierto arriba
     (r"Max(?:imum)?\.?\s*(?:PV\s+)?[Ii]nput\s+[Vv]oltage\s*\[V\]\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)", 1),
     # Multilinea pdftotext -layout: label en línea N (con notas ①②③), valor en línea N+1
@@ -263,8 +269,10 @@ _PAT_VDCMAX = [
     # Con pdfplumber el valor ya está en la misma línea que el label → el patrón
     # primario lo captura y NUNCA llega aquí; así se evita capturar "580 V@220 V"
     # (tensión nominal con red 220 V) que aparece en la línea inmediatamente siguiente.
-    # Mismo guard AC/DC que el patrón primario de arriba, por la misma clase de riesgo.
-    (r"Max(?:imum)?\.?\s+(?:DC\s+)?(?:PV\s+)?[Ii]nput\s+[Vv]oltage[^\n]*\n\s*([0-9]+(?:[.,][0-9]+)?)(?![Vv]?[Aa][Cc]\b)\s*[Vv]?", 1),
+    # Mismo guard AC/DC que el patrón primario de arriba, por la misma clase
+    # de riesgo -- y mismo fix de grupo atómico (?>...) para que el guard no
+    # pueda esquivarse por backtracking truncando el número.
+    (r"Max(?:imum)?\.?\s+(?:DC\s+)?(?:PV\s+)?[Ii]nput\s+[Vv]oltage[^\n]*\n\s*((?>[0-9]+(?:[.,][0-9]+)?))(?![Vv]?[Aa][Cc]\b)\s*[Vv]?", 1),
     (r"Max(?:imum)?\s+PV\s+VOC\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"Max\.\s*DC\s+[Ii]nput\s+[Vv]oltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"PV\s+input\s+voltage\s*\(max\.?\)\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",  1),
@@ -283,6 +291,13 @@ _PAT_VDCMAX = [
     # entrada"/"Máxima FV") antes de agregar este patrón.
     (r"Voltaje\s+FV\s+M[aá]ximo\s+[Aa]bsoluto\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
     (r"Max\.\s*PV\s+array\s+open\s+circuit\s+voltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V", 1),
+    # MUST PV3300 TLV Series (verificado 30-ago-2026, submodelo PV33-5048/6048):
+    # fraseo distinto al resto de la familia MUST ("Maximum PV array open
+    # circuit voltage" arriba) -- esta ficha dice "Maximum Solar Input Voltage
+    # 100±2Vdc / 145±2Vdc..." con tolerancia "±N" pegada al valor base, que
+    # rompe la adyacencia número→V de los demás patrones. Acepta "±" y su
+    # variante ASCII "+/-" (algunos extractores de texto la degradan así).
+    (r"Max(?:imum)?\.?\s*Solar\s+Input\s+Voltage\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*(?:(?:±|\+/-)\s*[0-9]+(?:[.,][0-9]+)?)?\s*V", 1),
     # SMA / Fronius style
     (r"DC\s+voltage\s+range,\s*max\.\s*[:\(]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",     1),
     (r"U_PV,max\s*[:\(=]?\s*([0-9]+(?:[.,][0-9]+)?)\s*V",                         1),
