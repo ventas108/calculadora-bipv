@@ -2888,6 +2888,14 @@ Al entregar el mapa "Coherencia Aguas Abajo" de los 12 módulos y sus blindajes 
 
 El usuario pidió, tras el blindaje y la alerta de vigencia de los días anteriores: "entrégame el procedimiento por módulos aguas abajo correcto, iniciando desde el módulo proyecto con las alertas respectivas... enunciar las alertas en el caso si el usuario se devuelve a algún módulo anterior si altera la simulación" y luego, explícitamente: "actualiza al asistente con la aplicación del manual en el orden que me entregas y documéntalo respecto de las alertas para que informe al usuario de múltiples formas comprensibles". Esta guía consolidada complementa las secciones de cada página (arriba, con el detalle operativo completo) con la vista de conjunto del RECORRIDO: qué confirma cada módulo y, si vuelves a uno anterior y cambias algo, qué se revalida solo y qué exige tu acción.
 
+**Respuesta directa a "¿qué alertas nuevas se instalaron para no cometer errores aguas abajo en los módulos?" (para que el asistente no dé una respuesta genérica ni cite alertas viejas de otras fechas por error)**: la alerta genuinamente NUEVA de esta semana (31-ago-2026) es UNA sola, instalada en 6 páginas a la vez:
+
+- **🆕 Alerta de vigencia del diseño confirmado** (📐 Dimensionamiento, y propagada a 📊 Producción, 📄 Reporte PDF, 🤖 Análisis IA, 🧩 Comparador Paneles, 🧭 Comparador Orientación). Se dispara si cambias de panel o inversor en Dimensionamiento y sigues navegando SIN volver a presionar "▶️ Optimizar N paneles/string" (o recargar el Prorrateo preliminar) — avisa con un mensaje explícito de qué panel/inversor quedó desactualizado y qué botón presionar. Ver el punto "4. 📐 Dimensionamiento" más abajo en esta misma guía para el detalle completo con ejemplo.
+
+No confundir con estas 2, relacionadas pero DISTINTAS de "alerta nueva":
+- La corrección de 📊 Producción (leía N_strings/tracker desalineado) NO fue instalar una alerta — fue arreglar un dato que se mostraba mal. Ver sección "25d.".
+- Las alertas reactivas de densidad/PR (🏠 Proyecto) y la alarma SDM vs ficha técnica (📐 Dimensionamiento) son de fechas ANTERIORES (5-ago y 21-ago respectivamente), no de esta semana — siguen activas y son válidas, pero no son "lo nuevo" si la pregunta es sobre el blindaje de coherencia aguas abajo de este 31-ago-2026.
+
 ### 0. El principio y los 2 mecanismos de alerta que usa la app
 
 Regla: todo dato que un módulo posterior reutiliza debe leerse en vivo, o invalidarse explícitamente cuando su origen cambia — nunca quedar cacheado en silencio. Un valor "fantasma" aparece cuando guardas un resultado derivado de una elección (un panel, un inversor, un tipo de instalación) y luego esa elección cambia sin que nadie le avise al valor guardado.
