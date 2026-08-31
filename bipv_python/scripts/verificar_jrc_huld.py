@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Verificación cruzada CdTe (power-rating model de Huld/JRC) -- generalizado
-(31-ago-2026, pedido explícito del usuario) para leer CUALQUIER proyecto
-guardado en `datos/proyectos/*.json`, no solo Teusaquillo.
+"""Verificación cruzada CdTe/CIS (power-rating model de Huld/JRC) -- lee
+CUALQUIER proyecto guardado en `datos/proyectos/*.json` (generalizado
+31-ago-2026), y soporta tanto CdTe como CIS (generalizado el mismo día,
+pedido explícito del usuario: "los sistemas BIPV necesitan también este
+tipo de tecnología").
 
 Lee el JSON del proyecto DIRECTAMENTE del disco, sin pasar por
 `calculos.proyectos_manager` (esa API exige una sesión de Streamlit activa
@@ -10,13 +12,13 @@ página de la app; ver `DIAGNOSTICO_VERIFICACION_JRC_CDTE_TEUSAQUILLO.md`
 para el contexto completo de por qué existe esta verificación).
 
 Uso:
-    python scripts/verificar_jrc_cdte.py --listar
-    python scripts/verificar_jrc_cdte.py <slug_del_proyecto>
+    python scripts/verificar_jrc_huld.py --listar
+    python scripts/verificar_jrc_huld.py <slug_del_proyecto>
 
 El slug es el nombre del archivo sin ".json" (ver la salida de --listar).
-Solo aplica a proyectos con panel de tecnología CdTe -- para cualquier otro
-panel, el script se detiene con un mensaje claro (los coeficientes de este
-modelo no aplican a otras tecnologías).
+La tecnología del panel del proyecto se detecta sola -- si no es CdTe ni
+CIS, el script se detiene con un mensaje claro (los coeficientes de este
+modelo no aplican a otras tecnologías todavía).
 """
 import json
 import os
@@ -25,14 +27,22 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from calculos.solar import obtener_tmy_pvgis, calcular_poa  # noqa: E402
-from calculos.modelo_jrc_cdte import (  # noqa: E402
-    calcular_pr_jrc_cdte,
+from calculos.modelo_jrc_huld import (  # noqa: E402
+    calcular_pr_jrc,
     extraer_parametros_proyecto,
 )
 
 DIR_PROYECTOS = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "datos", "proyectos"
 )
+
+# Rangos de PR reportados en la literatura real (Kumar et al., mismo grupo de
+# autores, clima tropical de Malasia), verificados contra el texto completo
+# de ambos papers -- ver docstring de calculos/modelo_jrc_huld.py.
+REFERENCIA_LITERATURA_PR = {
+    "CdTe": {"techo": (74.92, 77.36), "fachada": (66.42, 76.26)},
+    "CIS": {"BIPV": (72.21, 73.92), "BAPV": (73.68, 75.46)},
+}
 
 
 def listar_proyectos_en_disco() -> list[str]:
@@ -73,8 +83,9 @@ def main() -> None:
         print(f"⚠️  No se puede correr la verificación JRC/Huld para '{slug}':\n    {e}")
         return
 
+    tecnologia = params["tecnologia"]
     print(f"Proyecto: {params['nombre_proyecto']} ({slug})")
-    print(f"  Panel: {params['panel_nombre']} ({params['tecnologia']}) · "
+    print(f"  Panel: {params['panel_nombre']} ({tecnologia}) · "
           f"{params['n_paneles']} módulos · {params['p_stc_total_w'] / 1000:.3f} kWp")
     print(f"  Sitio: {params['ciudad']} ({params['lat']}, {params['lon']}, {params['alt_m']:.0f} m)")
     print(f"  Geometría: tilt={params['tilt']:.0f}°, azimuth={params['azimuth']:.0f}°, "
@@ -92,16 +103,17 @@ def main() -> None:
     poa_global = poa["poa_global"]
     print(f"  POA anual: {poa_global.sum() / 1000.0:.1f} kWh/m²/año")
 
-    print("\nCorriendo power-rating model de Huld/JRC para CdTe...")
-    r = calcular_pr_jrc_cdte(
+    print(f"\nCorriendo power-rating model de Huld/JRC para {tecnologia}...")
+    r = calcular_pr_jrc(
         poa_wm2=poa_global.to_numpy(),
         t_ambiente_c=tmy["T2m"].to_numpy(),
         viento_ms=tmy["WS10m"].to_numpy(),
         p_stc_w=params["p_stc_total_w"],
+        tecnologia=tecnologia,
     )
 
     print("\n" + "=" * 70)
-    print("RESULTADO -- power-rating model JRC/Huld (CdTe), sobre POA BRUTA")
+    print(f"RESULTADO -- power-rating model JRC/Huld ({tecnologia}), sobre POA BRUTA")
     print("(sin Motor Óptico -- verificación cruzada del motor SDM principal,")
     print(" no un reemplazo; ver DIAGNOSTICO_VERIFICACION_JRC_CDTE_TEUSAQUILLO.md)")
     print("=" * 70)
@@ -109,9 +121,9 @@ def main() -> None:
     print(f"E_dc anual (JRC) : {r['E_anual_kWh']:.0f} kWh/año")
     print(f"PR (JRC)         : {r['PR_pct']:.2f}%")
     print()
-    print("Referencia -- literatura CdTe BIPV bajo clima tropical (Kumar et al.):")
-    print("  PR techo   : 74,92% a 77,36%")
-    print("  PR fachada : 66,42% a 76,26%")
+    print(f"Referencia -- literatura {tecnologia} BIPV bajo clima tropical (Kumar et al.):")
+    for etiqueta, (lo, hi) in REFERENCIA_LITERATURA_PR[tecnologia].items():
+        print(f"  PR {etiqueta:8s}: {lo:.2f}% a {hi:.2f}%")
 
 
 if __name__ == "__main__":

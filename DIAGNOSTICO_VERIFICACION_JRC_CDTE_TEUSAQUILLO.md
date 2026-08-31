@@ -133,3 +133,45 @@ que la versión original fija: POA 807,8 kWh/m²/año, E_dc 5.825 kWh/año, PR 8
 Teusaquillo, prioridad `N_paneles_granja` > `N_paneles_dim`, rechazo de panel no-CdTe, rechazo sin
 panel/ciudad/Dimensionamiento, defaults razonables si faltan tilt/azimuth/albedo). Suite completa:
 **834/834**.
+
+## Actualización 31-ago-2026 — generalizado también a CIS, módulo renombrado
+
+Pedido explícito del usuario: *"puedo tambien tener esta auditoría puntual proyecto por proyecto
+con paneles CIS... recuerda que los sistemas BIPV necesitan tambien este tipo de tecnologia"*.
+
+**Verificación real antes de implementar** (mismo rigor que con CdTe, nunca coeficientes
+inventados): se descargó y leyó el texto completo (no el resumen) del segundo paper de la familia
+Kumar/Sudhakar/Samykano — "Performance comparison of BAPV and BIPV systems with c-Si, CIS and CdTe
+photovoltaic technologies under tropical weather conditions", *Case Studies in Thermal Engineering*
+13:100374, DOI 10.1016/j.csite.2018.100374 (repositorio institucional CityU HK, mismo mecanismo que
+dio acceso al primer paper). Su Tabla 4 trae los coeficientes de Faiman + power-rating model para
+las 3 tecnologías (Crystalline, CIS, CdTe) — **la fila de CdTe coincide EXACTA con la ya
+implementada** (23,37/5,44/-0,046689/-0,072844/-0,002262/0,000276/0,000159/-0,000006), confirmando
+que ambas fuentes son consistentes entre sí, no solo internamente.
+
+⚠️ **Nota honesta**: un resumen automático de búsqueda web había sugerido coeficientes CIS
+distintos (u0=22,64, u1=3,60) antes de conseguir el texto completo — NO se usaron. Los coeficientes
+reales de la Tabla 4 son u0=22,19, u1=4,09 (temperatura) y t1=-0,005554, t2=-0,038724,
+t3=-0,003723, t4=-0,000905, t5=-0,001256, t6=0,000001 (potencia). Este episodio confirma la regla
+ya establecida en esta sesión: nunca confiar en un número específico de un resumen de búsqueda sin
+verificarlo contra la fuente primaria real.
+
+**Módulo renombrado** `calculos/modelo_jrc_cdte.py` → `calculos/modelo_jrc_huld.py` (ya no es
+específico de CdTe): `COEFICIENTES_JRC` es ahora un dict por tecnología (`CdTe`, `CIS`), y las
+funciones (`potencia_jrc()`, `calcular_pr_jrc()`, `temperatura_modulo_faiman_jrc()`) reciben un
+parámetro `tecnologia`. `extraer_parametros_proyecto()` acepta CdTe o CIS, rechazando con mensaje
+claro cualquier otra tecnología (ej. c-Si, mayoría real del catálogo, todavía sin coeficientes
+verificados aquí). Script renombrado igual: `scripts/verificar_jrc_huld.py <slug>`, que ahora
+detecta la tecnología del proyecto sola y muestra el rango de referencia de la literatura correcto
+para cada una (CdTe: 66,4%-77,4%; CIS: 72,2%-75,5%).
+
+**Verificado end-to-end con datos reales para ambas tecnologías**: corrido contra un proyecto
+sintético CdTe (mismos valores de Teusaquillo) → reproduce el resultado ya conocido exacto
+(PR=89,41%); corrido contra un proyecto sintético CIS (100 Wp × 50 módulos, mismo sitio Bogotá) →
+PR=91,50% (dentro de un rango físicamente razonable, más alto que el 72-75% de la literatura
+tropical por la misma razón climática ya discutida para CdTe: Bogotá es mucho más fría que Malasia).
+
+11 tests en `tests/test_modelo_jrc_huld.py` (4 nuevos: coeficientes CdTe y CIS anclados a las 2
+tablas citadas, CIS y CdTe dan potencias distintas para el mismo input, tecnología no soportada
+lanza error claro) + 2 tests actualizados en `tests/test_extraer_parametros_proyecto_jrc.py`
+(acepta CIS, rechaza tecnología sin coeficientes). Suite completa: **840/840**.

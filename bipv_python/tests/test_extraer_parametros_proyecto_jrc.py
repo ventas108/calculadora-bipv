@@ -6,7 +6,7 @@ usuario). Casos anclados al proyecto real Teusaquillo (mismos valores que
 verificado al generalizar."""
 import pytest
 
-from calculos.modelo_jrc_cdte import extraer_parametros_proyecto
+from calculos.modelo_jrc_huld import extraer_parametros_proyecto
 
 
 def _estado_teusaquillo() -> dict:
@@ -47,7 +47,20 @@ def test_prefiere_n_paneles_granja_sobre_n_paneles_dim():
     assert params["n_paneles"] == 256
 
 
-def test_rechaza_panel_no_cdte_con_mensaje_claro():
+def test_acepta_panel_cis_con_los_mismos_criterios_que_cdte():
+    # Generalizado el mismo día a CIS (pedido explícito del usuario) --
+    # coeficientes verificados contra Kumar, Sudhakar, Samykano (2019),
+    # Tabla 4. Ya no debe rechazarse.
+    estado = _estado_teusaquillo()
+    estado["panel_dict"] = {"tecnologia": "CIS", "Pmax_stc": 100.0}
+    params = extraer_parametros_proyecto(estado)
+    assert params["tecnologia"] == "CIS"
+
+
+def test_rechaza_panel_tecnologia_sin_coeficientes_verificados():
+    # c-Si (mayoría del catálogo real) todavía no tiene coeficientes
+    # verificados en este módulo -- solo CdTe y CIS -- debe rechazarse con
+    # mensaje claro, no dar un número inventado.
     estado = _estado_teusaquillo()
     estado["panel_dict"] = {"tecnologia": "c-Si", "Pmax_stc": 450.0}
     with pytest.raises(ValueError, match="c-Si"):
