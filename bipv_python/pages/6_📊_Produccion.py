@@ -239,8 +239,21 @@ with col_c3:
 # ── Compatibilidad eléctrica de la configuración seleccionada ────────────────
 # Producción aplica la eficiencia del inversor, pero no debe ocultar que un
 # inversor puede ser eléctricamente incompatible con los strings dimensionados.
+#
+# Bug real (31-ago-2026, encontrado revisando capturas reales de Teusaquillo):
+# esta línea leía "N_str_tr" -- la clave del WIDGET de 📐 Dimensionamiento,
+# que resolver_n_strings_tracker() puede recalcular en cualquier render
+# posterior de esa página (ej. si la "firma" mecanismo/inversor/total ya no
+# coincide) -- en vez de "N_str_tr_usado", la foto fija que se guarda SOLO
+# cuando el usuario confirma un diseño con "▶️ Optimizar N paneles/string" o
+# "Prorrateo preliminar". Los otros 4 consumidores de este mismo dato
+# (Reporte PDF, Análisis IA, Comparador Paneles, Comparador Orientación) ya
+# usaban "N_str_tr_usado" -- Producción era el único desalineado. Caso real
+# observado: Dimensionamiento confirmó N=8 con 8 strings/tracker (128
+# paneles/inversor, 2 inversores), pero Producción mostraba 1 string/tracker
+# (16 paneles/inversor, 16 inversores) para la MISMA sesión.
 _n_serie_cfg = st.session_state.get("N_serie")
-_n_strings_tracker_cfg = int(st.session_state.get("N_str_tr", 1) or 1)
+_n_strings_tracker_cfg = int(st.session_state.get("N_str_tr_usado", 1) or 1)
 _compat_inversor_ok = True
 _compat_inversor_mensajes = []
 _compat_inversor_evaluable = bool(_n_serie_cfg and inversor)
