@@ -419,9 +419,13 @@ El usuario pidió validar el proyecto real Teusaquillo (128 módulos SOLTECH ASP
 
 ⚠️ **Advertencia real, no resuelta — verificar SIEMPRE qué inversor exacto quedó cargado**: el catálogo tiene una familia genérica **"MID 15KTL3-X" / "MID 17KTL3-X" / "MID 20KTL3-X" / "MID 22KTL3-X" / "MID 25KTL3-X"** (sin marca, specs redondeadas — `N_strings/tracker=1` fijo en las 5, `Vmppt_min=200V` en las 5) que es casi con certeza el MISMO producto físico que **"Growatt MID15KTL3-X"** (con datos reales verificados contra una referencia estándar internacional: `N_strings/tracker=8`, `Vmppt_min=140V`). La herramienta de "🧭 Mapeo de inversores compatibles" de esta página **auto-sugiere la entrada genérica primero** (aparece antes alfabéticamente / en el orden del Excel) — seguirla sin revisar llevó exactamente al error descrito arriba (16 paneles/inversor, 8 inversores, ratio DC/AC 0,42 en vez de 0,538) hasta notar y corregir la selección manualmente. **Antes de confiar en un match de "compatible" del mapeo, confirma el nombre EXACTO del inversor cargado** (mostrado en "✅ *nombre* cargado desde el mapeo") contra la ficha real del fabricante — no asumas que dos nombres parecidos son el mismo dato. Esta familia genérica NO se corrigió esta sesión (fuera de alcance); queda pendiente para una limpieza de catálogo futura.
 
-**Otros 2 bugs de catálogo encontrados y corregidos en la misma auditoría**: (1) faltaba la columna **"Potencia AC nominal (kW)"** en TODO `datos/inversores_catalogo.xlsx` — sin ella, los ~106 inversores del catálogo calculaban su potencia CA nominal vía un respaldo `P_dc_max_W × 0,96` en vez del dato real del fabricante (para el Growatt MID15KTL3-X eso daba 21.600W en vez de 15.000W reales); columna agregada (retrocompatible, al final de la hoja) y valor real cargado para este inversor — los otros 105 siguen con el respaldo hasta que se cargue su dato real. (2) La corriente máxima por tracker del Growatt MID15KTL3-X se había derivado mal en un primer intento (de lo que produce el arreglo — 8 strings × 0,80A del módulo — no de lo que soporta el inversor), lo que marcaba el inversor como "no compatible" pese a que esa referencia estándar internacional no reporta ningún problema eléctrico con ese mismo diseño; corregido a 27,5A/33,5A tomando el dato real de la entrada genérica hermana.
+### Otros 2 bugs de catálogo de inversores encontrados validando Teusaquillo  NUEVO (29-ago-2026)
 
-**Sugerencia orientativa del total, con 2 fuentes en orden de prioridad (29-ago-2026)**: probando un inversor pequeño (SNA-3K, clase residencial/híbrida) el usuario notó que "N total de cadenas para el proyecto" no tenía NINGUNA orientación — ni el área, ni ningún otro dato del proyecto sugería un valor, había que escribirlo a ciegas. Agregado un cálculo informativo (mostrado como caption y en el tooltip, **nunca se autocompleta**) con dos fuentes:
+(1) faltaba la columna **"Potencia AC nominal (kW)"** en TODO `datos/inversores_catalogo.xlsx` — sin ella, los ~106 inversores del catálogo calculaban su potencia CA nominal vía un respaldo `P_dc_max_W × 0,96` en vez del dato real del fabricante (para el Growatt MID15KTL3-X eso daba 21.600W en vez de 15.000W reales); columna agregada (retrocompatible, al final de la hoja) y valor real cargado para este inversor — los otros 105 siguen con el respaldo hasta que se cargue su dato real. (2) La corriente máxima por tracker del Growatt MID15KTL3-X se había derivado mal en un primer intento (de lo que produce el arreglo — 8 strings × 0,80A del módulo — no de lo que soporta el inversor), lo que marcaba el inversor como "no compatible" pese a que esa referencia estándar internacional no reporta ningún problema eléctrico con ese mismo diseño; corregido a 27,5A/33,5A tomando el dato real de la entrada genérica hermana.
+
+### Sugerencia orientativa de "N total de cadenas" con 2 fuentes en orden de prioridad  NUEVO (29-ago-2026)
+
+Probando un inversor pequeño (SNA-3K, clase residencial/híbrida) el usuario notó que "N total de cadenas para el proyecto" no tenía NINGUNA orientación — ni el área, ni ningún otro dato del proyecto sugería un valor, había que escribirlo a ciegas. Agregado un cálculo informativo (mostrado como caption y en el tooltip, **nunca se autocompleta**) con dos fuentes:
 
 1. **📐 REAL** (prioritaria, si ya existe): idea del propio usuario — reusar el mismo cálculo que ya usa ⚡ Diagrama Unifilar (`calculos/diagrama_unifilar.py::normalizar_proyecto_unifilar()`, `n_strings = N_paneles_granja // N_serie`). Es el conteo REAL del "Proyecto completo" (ya incorpora cuántos inversores hacen falta), disponible solo después de correr "▶️ Optimizar N paneles/string" al menos una vez.
 2. **💡 Área** (respaldo, si (1) no existe todavía): `área útil ÷ área del panel ÷ N/string`. Menos exacto (no sabe cuántos inversores harán falta), pero disponible desde el primer render, antes de correr el optimizador.
@@ -441,7 +445,9 @@ Probando otro inversor real (TriP 6K-HV, 2 strings/tracker) con el mismo panel, 
 
 **Visible en la UI**: nueva columna "⚠️ Margen ajustado" en la tabla del mapeo, marca "⚠️ margen ajustado" en el desplegable "Inversor compatible", y una advertencia nueva bajo "⚡ Prorrateo preliminar del inversor cargado" cuando el N cargado tiene el margen justo. 3 tests nuevos en `tests/test_compatibilidad_string.py`, anclados al caso real TriP 6K-HV. Suite completa: **737/737**.
 
-⚠️ **Segundo bug real, distinto, encontrado probando el fix de arriba**: repitiendo el mismo TriP 6K-HV pero además declarando `N_total_cadenas=16` (mecanismo estilo referencia estándar internacional), "Por inversor" e "⚡ Prorrateo preliminar" volvieron a discrepar (112 vs 128 paneles/inversor) — pero esta vez NO era la inconsistencia de arriba (ambas herramientas, verificado con los datos reales, ya coincidían en recomendar N=7). La causa: **"Prorrateo preliminar" guarda el N recomendado en `session_state` en el momento del clic del botón "⚡ Cargar y recalcular", y nunca se invalidaba si el usuario cambiaba después "N total de cadenas" o ajustaba `N_strings/tracker`** — solo se invalidaba al cambiar de inversor o panel. El resultado combinaba un N=8 viejo (recomendado ANTES de declarar el total) con el `N_str_tr=8` nuevo (derivado del total recién declarado), dando 128 paneles/inversor que no correspondía a ninguna recomendación real vigente. **Corregido**: nueva clave `prorrateo_preliminar_n_str_tr` (separada de `N_str_tr_usado`, que ya escribe también el botón "Optimizar N paneles/string" con otro propósito, para no cruzarse) que invalida el prorrateo preliminar cada vez que `N_strings/tracker` cambia desde el último cálculo, igual que ya invalidaba al cambiar de inversor/panel.
+### Invalidación del "Prorrateo preliminar" al cambiar N_strings/tracker, y crash real de "N mínimo a explorar"  NUEVO (29-ago-2026)
+
+⚠️ **Segundo bug real, distinto, encontrado probando el fix de `alerta_margen`**: repitiendo el mismo TriP 6K-HV pero además declarando `N_total_cadenas=16` (mecanismo estilo referencia estándar internacional), "Por inversor" e "⚡ Prorrateo preliminar" volvieron a discrepar (112 vs 128 paneles/inversor) — pero esta vez NO era la inconsistencia de arriba (ambas herramientas, verificado con los datos reales, ya coincidían en recomendar N=7). La causa: **"Prorrateo preliminar" guarda el N recomendado en `session_state` en el momento del clic del botón "⚡ Cargar y recalcular", y nunca se invalidaba si el usuario cambiaba después "N total de cadenas" o ajustaba `N_strings/tracker`** — solo se invalidaba al cambiar de inversor o panel. El resultado combinaba un N=8 viejo (recomendado ANTES de declarar el total) con el `N_str_tr=8` nuevo (derivado del total recién declarado), dando 128 paneles/inversor que no correspondía a ninguna recomendación real vigente. **Corregido**: nueva clave `prorrateo_preliminar_n_str_tr` (separada de `N_str_tr_usado`, que ya escribe también el botón "Optimizar N paneles/string" con otro propósito, para no cruzarse) que invalida el prorrateo preliminar cada vez que `N_strings/tracker` cambia desde el último cálculo, igual que ya invalidaba al cambiar de inversor/panel.
 
 Ficha de auditoría completa, con capturas reales de esa referencia estándar internacional y la verificación paso a paso: `DIAGNOSTICO_VALIDACION_TEUSAQUILLO_REFERENCIA_ESTANDAR.md` (raíz del repo). Suite completa: **730/730 passed**.
 
@@ -1078,7 +1084,9 @@ Verificando el proyecto real Teusaquillo contra una referencia estándar interna
 
 5 tests nuevos en `tests/test_compatibilidad_string.py`, incluyendo uno anclado al pantallazo real de esa referencia estándar internacional (Teusaquillo, ratio 0,538 exacto) y otro con el proyecto Urabá ya validado (0,883). Ver también la subsección de "N_strings/tracker" en la sección 6 (Dimensionamiento) — **incluye una advertencia importante sobre inversores duplicados en el catálogo** encontrada al validar este mismo caso. Ficha de auditoría completa: `DIAGNOSTICO_VALIDACION_TEUSAQUILLO_REFERENCIA_ESTANDAR.md` (raíz del repo).
 
-**Mensaje con el % real de cada corrida, y sin mencionar la marca de la referencia en el texto de usuario (29-ago-2026)**: el mensaje del estado 🔴 "muy_sobredimensionado" decía siempre la misma frase fija ("usa menos de tres cuartos de la capacidad del inversor") sin importar si el ratio real de esa corrida era 0,54, 0,20 o 0,13 — el usuario lo notó tras ver el mismo texto en 3 proyectos distintos. Corregido: ahora cita el porcentaje real (`ratio*100`) de esa corrida específica ("usa solo el 20%/13%/54%..."). Además, por pedido explícito, se quitó la mención visible al nombre de esa referencia del texto que ve el usuario en pantalla (este mensaje, el widget "N total de cadenas...", su tooltip, y el caption del mecanismo "total") — reemplazada por "referencia estándar internacional". Los comentarios y docstrings internos del código SÍ conservan el nombre de esa referencia (trazabilidad de ingeniería hacia el equipo; nunca se muestran al usuario final, y el 30-ago-2026 se extendió esta misma redacción también al texto del asistente 🧭 y a la ficha de conversión generada bajo demanda — ver más abajo). 2 tests nuevos/actualizados.
+### Mensaje de relación DC/AC con el % real de cada corrida, sin mencionar la marca de la referencia  ACTUALIZADO (29-ago-2026)
+
+El mensaje del estado 🔴 "muy_sobredimensionado" decía siempre la misma frase fija ("usa menos de tres cuartos de la capacidad del inversor") sin importar si el ratio real de esa corrida era 0,54, 0,20 o 0,13 — el usuario lo notó tras ver el mismo texto en 3 proyectos distintos. Corregido: ahora cita el porcentaje real (`ratio*100`) de esa corrida específica ("usa solo el 20%/13%/54%..."). Además, por pedido explícito, se quitó la mención visible al nombre de esa referencia del texto que ve el usuario en pantalla (este mensaje, el widget "N total de cadenas...", su tooltip, y el caption del mecanismo "total") — reemplazada por "referencia estándar internacional". Los comentarios y docstrings internos del código SÍ conservan el nombre de esa referencia (trazabilidad de ingeniería hacia el equipo; nunca se muestran al usuario final, y el 30-ago-2026 se extendió esta misma redacción también al texto del asistente 🧭 y a la ficha de conversión generada bajo demanda — ver más abajo). 2 tests nuevos/actualizados.
 
 🔴 **Bug real corregido: DC/AC (y el recorte real de la simulación) no escalaba por el número de inversores del "Proyecto completo" (29-ago-2026, proyecto Urabá)**: `N_paneles` en esta página se toma por defecto del "Proyecto completo" de 📐 Dimensionamiento (varios inversores), pero tanto la alarma DC/AC como el propio recorte (clipping) real de `simular_produccion_anual()` pasaban `inversor.get("P_ac_nom_W")` — la potencia de **UN SOLO** inversor — sin escalar por cuántos inversores hacen falta. Caso real: 840 paneles (604,8 kWp, 3× Growatt MAX 100KTL3 LV) daba **DC/AC=4,85** en vez de 1,61 (604,8÷124,8 en vez de 604,8÷374,4) — y más grave: el recorte real de la simulación habría limitado TODA la producción del proyecto a la salida de un solo inversor (124,8kW) en vez del total real (374,4kW), subestimando la energía drásticamente para cualquier proyecto multi-inversor.
 
@@ -1217,7 +1225,7 @@ Esta estructura cumple ese estándar.
 
 ────────────────────────────────────────────────────────────
 
-🧮 Estimación Rápida — Escalamiento Paramétrico de Rentabilidad  NUEVO
+### 🧮 Estimación Rápida — Escalamiento Paramétrico de Rentabilidad  NUEVO
 
 Propósito: Obtener un CAPEX y OPEX de referencia en menos de dos minutos, con benchmarks del mercado colombiano calibrados por tipo de instalación, escenario económico y zona geográfica. El resultado alimenta directamente el Análisis Financiero (Página 7) para calcular TIR, VPN y Payback sin necesidad de ingresar cotizaciones reales.
 
@@ -1239,7 +1247,7 @@ Para estructurar un crédito bancario o presentar ante inversionistas formales. 
 
 ────────────────────────────────────────────────────────────
 
-Paso a paso — Cómo usar la Estimación Rápida
+### Estimación Rápida: Paso a paso (1 — Auto-detección, 2 — Tipo/escenario/zona)
 
 Paso 1 — Auto-detección de parámetros del proyecto
 
@@ -1293,6 +1301,8 @@ Llanos Orientales  │  ×1.12  │  Transporte en temporada de lluvias, acceso 
 
 Otra zona remota  │  ×1.15  │  Aplica a cualquier zona sin vía pavimentada o con acceso estacional
 
+### Estimación Rápida: Paso a paso (3 — Desglose, 4 — Comparativo de escenarios, 5 — OPEX)
+
 Paso 3 — Ejecutar y leer el desglose
 
 Clic en " Calcular Estimación Rápida". La app produce un desglose en cuatro categorías:
@@ -1332,6 +1342,8 @@ OPEX anual (USD/año)  │  ───  │  ───  │  ───
 OPEX por kWp (USD/kWp·año)  │  ───  │  ───  │  ───
 
 Este comparativo permite al promotor comunicar la incertidumbre al cliente de forma honesta: 'el proyecto cuesta entre USD X (optimista) y USD Z (conservador), con escenario base de USD Y.'
+
+### Estimación Rápida: Paso a paso (5 — OPEX anual)
 
 Paso 5 — Revisar el OPEX anual
 
@@ -1513,6 +1525,8 @@ Dos formas de armar la fila de costo (automático según lo que trae el document
 - Si el documento trae flete marítimo, se agrega una segunda fila aparte ("Flete marítimo — {proveedor}") en la misma sección.
 
 ⚠️ Para no cometer errores — verificación cruzada: si el documento trae capacidad, precio unitario Y un total, la app compara Capacidad × Precio unitario contra ese total. Si difieren más de 2%, muestra una advertencia — revisa los valores extraídos antes de aplicar, puede ser un campo mal leído.
+
+### Carga automática de cotizaciones: reemplazar, quitar y guardar
 
 Reemplazar o quitar una cotización ya aplicada:
 
@@ -1999,7 +2013,9 @@ El usuario pidió correr el motor real (no una simulación) contra 3 fichas téc
 
 El resto de campos vacíos (`marca`, `V_arranque`, `n_trackers`, `n_strings_tracker`, `Isc_max_tracker`) se verificaron uno por uno contra el texto real: **ninguno es un bug** — el fabricante genuinamente no publica esos datos en esta ficha (marca solo como logo/imagen, sin trackers discretos declarados, sin tensión de arranque ni Isc separados de la corriente de carga). El extractor hace lo correcto dejándolos en blanco.
 
-🔴 **Bug real #3, el más serio — confusión AC/DC en `Vdc_max`**: corriendo el extractor sobre las 2 fichas PV3300 TLV Series (3000W/24V), el usuario pegó un resultado del formulario real que no coincidía con una extracción fresca del mismo PDF (indicio de sesión/formulario con datos de una carga anterior, no confirmado del lado del navegador). Investigando esa discrepancia se encontró el bug real: la sección de entrada AC de la ficha PV3300 trae `"Max input voltage 270Vac MAX"` (voltaje AC de red/generador) — el patrón genérico de `Vdc_max` aceptaba "Input" sin exigir calificador PV/DC, así que capturaba 270 como si fuera el Vdc_max del array FV (el real es 100V o 145V según submodelo). El guard de plausibilidad (50-1500V) no lo detecta porque 270V es un voltaje DC creíble — el error es de origen (AC≠DC), no de rango. Riesgo genérico para cualquier fabricante con una sección de entrada AC fraseada así, no exclusivo de MUST — y `Vdc_max` alimenta directamente el gate de seguridad eléctrica de la app (Voc_frío ≤ Vdc_max). Corregido excluyendo explícitamente cualquier coincidencia seguida de "ac"/"AC" en ambos patrones vulnerables de `_PAT_VDCMAX`.
+### Bug real más serio de la auditoría MUST: confusión AC/DC en `Vdc_max`  NUEVO (30-ago-2026)
+
+🔴 corriendo el extractor sobre las 2 fichas PV3300 TLV Series (3000W/24V), el usuario pegó un resultado del formulario real que no coincidía con una extracción fresca del mismo PDF (indicio de sesión/formulario con datos de una carga anterior, no confirmado del lado del navegador). Investigando esa discrepancia se encontró el bug real: la sección de entrada AC de la ficha PV3300 trae `"Max input voltage 270Vac MAX"` (voltaje AC de red/generador) — el patrón genérico de `Vdc_max` aceptaba "Input" sin exigir calificador PV/DC, así que capturaba 270 como si fuera el Vdc_max del array FV (el real es 100V o 145V según submodelo). El guard de plausibilidad (50-1500V) no lo detecta porque 270V es un voltaje DC creíble — el error es de origen (AC≠DC), no de rango. Riesgo genérico para cualquier fabricante con una sección de entrada AC fraseada así, no exclusivo de MUST — y `Vdc_max` alimenta directamente el gate de seguridad eléctrica de la app (Voc_frío ≤ Vdc_max). Corregido excluyendo explícitamente cualquier coincidencia seguida de "ac"/"AC" en ambos patrones vulnerables de `_PAT_VDCMAX`.
 
 ⚠️ **Limitación real, no corregida**: PV3300 agrupa 11 submodelos por voltaje de batería (12V/24V/48V), cada uno con su propia ventana MPPT y potencia FV máxima — el extractor reporta el valor del submodelo más pequeño (12V/1250W) como "global" cuando no hay columnas separadas por modelo. No es un dato inventado, pero puede ser el submodelo equivocado para variantes 24V/48V — verificar manualmente contra la tabla antes de guardar.
 
@@ -2053,7 +2069,9 @@ El usuario reportó que al subir una ficha de un **solo** panel (Suntech STP-410
 
 **El mismo bug también corrompía Isc, no solo Pmax** — descubierto en una segunda vuelta, con el PDF real que el usuario aportó después de guardar el panel manualmente y notar el semáforo en rojo ("Imp debe ser menor que Isc", con Isc=0.05 A e Imp=9.98 A). La MISMA línea de la ficha que causaba el falso multi-modelo en Pmax («Coeficiente de temperatura µIsc 5.2 mA/°C (+0.050 %/°C)») coincide también con el patrón de detección de Isc — el heurístico de respaldo extraía 5.2 y 0.050 como si fueran los valores de Isc (en A, no mA/°C) de las 2 columnas falsas: `valores_por_modelo = {'410.18Wp': {'Pmax': 410.18, 'Isc': 5.2}, '410Wp': {'Pmax': 410.0, 'Isc': 0.05}}`. Al elegir "410Wp" en el selector de la UI, el merge de la página (líneas ~120-124) sobrescribía el Isc YA correctamente extraído de la base (10.49 A) con ese 0.05 A falso. Verificado con el PDF real (no solo texto sintético) que el MISMO fix de `_extract_row_numbers()` resuelve todo el cascade (Pmax, Isc y cualquier otro campo variable), no solo Pmax — la corrección era genérica desde el principio, no hacía falta un segundo fix.
 
-**Generalización pedida explícitamente por el usuario** ("revisa la lógica del extractor para que no confunda coeficientes de temperatura con valores absolutos... es un error que se puede repetir con cualquier otra ficha"): el fix del `✓` solo cubría ESTA ficha exacta. Se auditó primero el camino base de un solo valor (`_apply_patterns()`/`_find_first()`, el que usa CUALQUIER ficha) con casos adversariales — está bien protegido por diseño, exige que el número aparezca casi pegado a la etiqueta, sin poder saltar sobre texto como "temperature coefficient:". El riesgo real está solo en el heurístico multi-modelo, que toma "todos los números plausibles de la línea" de forma más laxa. Se agregó una segunda capa, independiente del `✓`: `_COEF_UNIT_AHEAD_RE` descarta cualquier número seguido de una unidad de coeficiente por grado (`/°C`, `/℃` — glifo único visto en fichas SolTech reales —, `/K`, con o sin unidad corta antepuesta: mA, mV, %). Verificado con un caso SIN checkmark (tabla multi-modelo real de 2 códigos, con una fila de coeficiente en `mA/°C` intercalada antes de la fila real de Isc) que la fila de coeficiente ya no le roba la asignación a la fila correcta.
+### Generalización del fix de multi-modelo falso, más allá de esta ficha  ACTUALIZADO (28-ago-2026, mismo día)
+
+Pedida explícitamente por el usuario ("revisa la lógica del extractor para que no confunda coeficientes de temperatura con valores absolutos... es un error que se puede repetir con cualquier otra ficha"): el fix del `✓` solo cubría ESTA ficha exacta. Se auditó primero el camino base de un solo valor (`_apply_patterns()`/`_find_first()`, el que usa CUALQUIER ficha) con casos adversariales — está bien protegido por diseño, exige que el número aparezca casi pegado a la etiqueta, sin poder saltar sobre texto como "temperature coefficient:". El riesgo real está solo en el heurístico multi-modelo, que toma "todos los números plausibles de la línea" de forma más laxa. Se agregó una segunda capa, independiente del `✓`: `_COEF_UNIT_AHEAD_RE` descarta cualquier número seguido de una unidad de coeficiente por grado (`/°C`, `/℃` — glifo único visto en fichas SolTech reales —, `/K`, con o sin unidad corta antepuesta: mA, mV, %). Verificado con un caso SIN checkmark (tabla multi-modelo real de 2 códigos, con una fila de coeficiente en `mA/°C` intercalada antes de la fila real de Isc) que la fila de coeficiente ya no le roba la asignación a la fila correcta.
 
 **Limitación residual, declarada honestamente, no corregida**: el algoritmo de asignación por campo (`_extract_multimodel_panel`, Paso 2) toma la PRIMERA línea que matchea la etiqueta del campo Y tiene ≥2 números plausibles, y deja de buscar — no seguiría intentando si esa primera línea resultara ser la incorrecta por una razón distinta a un coeficiente de temperatura (p.ej. una nota con exactamente 2 números coincidentes que no sea ni `✓` ni un coeficiente por grado). El filtro de esta sesión cierra la clase de bug real que se reportó (coeficientes de temperatura y notas de auto-verificación); no es una garantía de robustez universal contra cualquier anotación futura no vista todavía.
 
@@ -2452,6 +2470,8 @@ correcciones ópticas se aplican sobre la POA y el PR resultante se recalcula en
 
 Página 6 con mayor precisión.
 
+### Preguntas frecuentes (continuación): Vista 3D, multi-superficie, degradación, catálogos
+
 P: ¿Cómo funciona la Página 9 (Vista 3D) con un proyecto de una sola superficie?
 
 R: Para proyectos de una sola superficie (ej. solo fachada sur), la Página 9 no es
@@ -2577,6 +2597,8 @@ Consejo: igual conviene oprimir los botones de guardar del Presupuesto después 
 
 ────────────────────────────────────────────────────────────
 
+## 18b. Anexo — Actualizaciones del 6 y 7 de agosto de 2026 (Baterías, Motor Óptico, Financiero, Presupuesto)
+
 18.5 Página 11 — Baterías: perfil de carga horario real  NUEVO
 
 El balance energético con batería ahora puede usar un perfil de consumo hora a hora (8 760 valores) en lugar de un promedio plano. Esto cambia mucho el resultado en edificios con consumo concentrado en el día o en la noche: el autoconsumo, los ciclos de la batería y el ahorro se calculan contra el consumo real de cada hora.
@@ -2607,6 +2629,8 @@ El sobrecalentamiento típico de los paneles integrados a fachada (k_bipv) ahora
 - El total en USD de la cotización (Excel y PDF) ahora se deriva exactamente del mismo total en COP de los ítems, con la TRM vigente — ya no pueden salir dos cifras de bases distintas en el mismo documento.
 - El Excel exportado neutraliza textos que empiecen con símbolos de fórmula (=, +, -, @): protección estándar contra archivos maliciosos al compartir cotizaciones.
 ────────────────────────────────────────────────────────────
+
+## 18c. Anexo — Actualizaciones del 6 y 7 de agosto de 2026 (Reporte PDF, Catálogo de Inversores, Vista 3D, Mismatch)
 
 18.9 Página 10 — Reporte PDF: gráficas, logo y trazabilidad  ACTUALIZADO
 
@@ -2781,6 +2805,8 @@ Entregables generados con las cifras corregidas: `entregables/Ficha_Tecnica_Prel
 
 ────────────────────────────────────────────────────────────
 
+## 24b. Anexo — Actualizaciones del 26 de agosto de 2026 (Motor Óptico obligatorio en el flujo agrivoltaico)
+
 24.2 Motor Óptico (IAM) ahora obligatorio en el flujo de Granja fotovoltaica/agrivoltaica + default de montaje corregido  NUEVO
 
 Corriendo el motor REAL de la app (no solo los scripts) para el proyecto Agrivoltaico Urabá y comparando contra una referencia estándar internacional, se confirmó que saltar 🔆 Motor Óptico en proyectos de campo abierto (como recomendaba el flujo agrivoltaico hasta ahora) deja fuera la pérdida IAM y sobreestima producción **+3,1%** frente a esa referencia. Corriendo Motor Óptico, la diferencia baja a **−0,70%**. Ver sección 2 ("Flujo recomendado para proyectos agrivoltaicos", ya actualizada) y el detalle numérico completo en `DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md`.
@@ -2791,6 +2817,8 @@ Cambio de código que acompaña esto: en 🔆 Motor Óptico, el selector "Tipo d
 
 ────────────────────────────────────────────────────────────
 
+## 24c. Anexo — Actualizaciones del 26-27 de agosto de 2026 (variable_panel conectado al catálogo real de 65 paneles, 4 bugs reales)
+
 24.3 optimization/variable_panel() conectado al catálogo Excel real de paneles (65)  NUEVO
 
 Hasta ahora `optimization/variables.py::variable_panel()` (Fase 3, el vocabulario de variables que consume el optimizador de Fase 4) solo sorteaba entre los 7 paneles de `datos.tecnologias_bipv.MODULOS_BIPV` (familia ASP-ST1) — nunca se conectó al catálogo Excel real de 65 paneles (`datos.catalogo_paneles_excel`, el que usa 📐 Dimensionamiento y 📋 Catálogo Paneles), a diferencia de `variable_inversor()`, que sí prioriza su catálogo Excel de 105 inversores desde antes. Esto limitaba a 7 opciones cualquier barrido de optimización (📊 comparación panel/geometría/inversor para mejorar TIR) que un agente o la página de optimización quisiera correr.
@@ -2799,7 +2827,9 @@ Hasta ahora `optimization/variables.py::variable_panel()` (Fase 3, el vocabulari
 
 `variable_panel()` sigue excluyendo por defecto los paneles sin `Pmax_stc` (ninguno de los 65 lo tiene hoy, así que no se excluye nada en la práctica) — ese filtro solo se aplica cuando se usa el catálogo por defecto, no cuando se pasa un `catalogo` explícito (contrato preexistente, ver docstring de la función).
 
-**4 bugs reales encontrados y corregidos en la misma auditoría** (rigor pedido explícitamente por el usuario — verificar con ejecución real, correr la suite completa, no asumir):
+### 4 bugs reales encontrados conectando variable_panel() al catálogo real  NUEVO (26-27-ago-2026)
+
+Rigor pedido explícitamente por el usuario — verificar con ejecución real, correr la suite completa, no asumir:
 
 1. `optimization.scenario_generator._resolver_categoricas_de_catalogo()` resolvía la clave sorteada de "panel" contra `MODULOS_BIPV` a secas — cualquier clave del Excel sorteada (58 de las 65 opciones) reventaba con `KeyError`. Mismo patrón que ya se había evitado para "inversor" en la misma función. Corregido: ahora resuelve contra `_catalogo_paneles_real()`.
 2. `calculos.comparador_paneles.comparar_paneles()` tenía el mismo bug — tercera aparición del mismo patrón, encontrada corriendo la suite completa tras el fix de (1) (`KeyError: 'ASP-LAM3-T0 (1200x1200mm)'`). Corregido igual.
@@ -2812,13 +2842,30 @@ Tests: se actualizaron 2 aserciones que asumían el catálogo viejo de 7 paneles
 
 ────────────────────────────────────────────────────────────
 
+## 25. Anexo — Actualizaciones del 31 de agosto de 2026 (auditoría de retrieval del asistente 🧭)
+
 Manual actualizado el 31 de agosto de 2026
 
-Novedades de esta versión: 📋 Catálogo de Paneles — el usuario pidió agregar N_s a los paneles reales que lo necesitaran para activar Motor IV, tras la auditoría de "qué más quedó afectado" por los 2 bugs de la versión anterior. Antes de escribir nada se encontró un conflicto real: los 10 paneles Solar First (ST1/ST2) ya tenían documentada en su propio campo Notas una decisión explícita de rigor de una sesión anterior — "Ns no especificado en la ficha -- no se infiere" — la misma política aplicada ahí para no cargar coeficientes de temperatura no oficiales. Presentado el conflicto, el usuario decidió: sí estimarlo, claramente marcado como tal.
+Novedades de esta versión: 🧭 Asistente — el usuario pidió confirmar que el asistente citaba bien las secciones nuevas del día ("confirma que el asistente cita bien estas secciones") y, tras confirmarlo, pidió auditar "qué otras páginas citan mal secciones viejas". La auditoría encontró un bug real bastante más grande de lo esperado: el mecanismo de búsqueda del asistente (`calculos/asistente.py::BaseConocimiento`) parte este mismo archivo por encabezados `##`/`###` y le corta el texto a cada sección a 4.000 caracteres antes de mandarlo al modelo. El patrón de changelog usado desde el 27-ago-2026 (`Manual actualizado`/`Novedades`/`Versión anterior`) nunca usa esos encabezados entre entradas — así que **las 30 entradas de changelog del 27 al 31 de agosto (prácticamente todo el trabajo de las últimas 3 sesiones) quedaron atrapadas dentro de una sola sección de 49.419 caracteres**, titulada "Actualizaciones del 26 de agosto" — de la cual el modelo solo llegaba a leer el primer 8% (el contenido original del 26-ago), y citaba esa fecha equivocada como fuente incluso cuando la pregunta era sobre algo de días después.
+
+Auditando el archivo completo se encontraron **15 secciones en total** por encima del límite de 4.000 caracteres, no solo esa — incluidas secciones antiguas de alto tráfico esperado como "Página 8 — Presupuesto Bancable" (perdía 6.086 caracteres) y "Preguntas frecuentes" (perdía 3.808) — el bug probablemente lleva desde el origen del archivo, no solo desde el 27-ago.
+
+**Corregido sin reescribir ni resumir ningún contenido**: se insertaron encabezados `##`/`###` nuevos en los puntos de quiebre temático/temporal naturales de cada sección sobredimensionada — 14 secciones nuevas para la cadena de changelog reciente (numeradas `## 25.` a `## 38.`, continuando la numeración de "Anexo" existente) + 7 secciones antiguas más divididas en sus propios puntos de quiebre. De 15 secciones excedidas, quedan 7, todas con pérdida marginal (6 a 1.430 caracteres, ninguna arriba de ~1.400) frente a las pérdidas originales de hasta 45.419.
+
+**Verificado contra el mecanismo real, no en teoría**: 15 preguntas realistas probadas directamente contra `BaseConocimiento.buscar()` (lo que usa `responder()` en producción), incluyendo preguntas dirigidas al contenido que antes estaba enterrado (fit_desoto, bug de unidades a_ref, alerta_margen, inversores duplicados, clipping, confusión AC/DC en Vdc_max, Estimación Rápida paso a paso). Las 15 recuperan la sección correcta, con el título correcto, sin texto truncado a mitad de una idea. Suite completa: **806/806** (archivo de datos, no código — la verificación fue directamente contra el mecanismo de búsqueda real, documentada en `DIAGNOSTICO_RETRIEVAL_ASISTENTE_TRUNCAMIENTO.md`).
+
+## 25b. Anexo — Actualizaciones del 31 de agosto de 2026 (N_s estimado para Solar First)
+
+Versión anterior (31 de agosto de 2026): 📋 Catálogo de Paneles — el usuario pidió agregar N_s a los paneles reales que lo necesitaran para activar Motor IV, tras la auditoría de "qué más quedó afectado" por los 2 bugs de la versión anterior. Antes de escribir nada se encontró un conflicto real: los 10 paneles Solar First (ST1/ST2) ya tenían documentada en su propio campo Notas una decisión explícita de rigor de una sesión anterior — "Ns no especificado en la ficha -- no se infiere" — la misma política aplicada ahí para no cargar coeficientes de temperatura no oficiales. Presentado el conflicto, el usuario decidió: sí estimarlo, claramente marcado como tal.
 
 Método real (no arbitrario): el propio panel de referencia ya validado (ASP-ST1-T40, Teusaquillo) tampoco tiene N_s -- se calibró directo sin necesitarlo. Se derivó N_s para ST1 de ese mismo a_ref validado (154/1,09≈141), justificado por compartir con ASP-ST1-T40 las mismas dimensiones físicas (1200x600mm) y el mismo Voc (~116V). Para ST2 (mismas dimensiones, Voc≈mitad) se usó la mitad (≈72). Nota importante: el N_s en sí no es lo que activa Motor IV aquí -- el método que realmente calibra estos paneles es fit_desoto_batzelis() (de la versión anterior), que no necesita N_s en absoluto; N_s solo destraba la puerta de entrada de preparar_panel_iv().
 
 Guardado en el Excel real (Ns, NsA, Confianza="Estimado -- no confirmado por fabricante", Fuente NsA, y la frase de Notas reemplazada por la explicación completa del método -- nunca se tocaron los demás campos). Resultado: de 76 paneles reales, 72/76 ahora activan Motor IV (antes 62/76). Los 4 restantes no tienen relación con N_s (2 con ficha eléctrica incompleta, 2 con el caso límite de Rsh negativo de Batzelis ya documentado). 1 test nuevo + umbral del test de catálogo subido de ≥50 a ≥65. Suite completa: **806/806**. Ver `DIAGNOSTICO_GRAFICA_COMPATIBILIDAD_ELECTRICA.md`.
+
+
+────────────────────────────────────────────────────────────
+
+## 26. Anexo — Actualizaciones del 30 de agosto de 2026 (Motor IV: por qué fallaba fit_desoto, respaldo Batzelis)
 
 Versión anterior (30 de agosto de 2026): 🔬 Motor IV — investigación pedida por el usuario ("investiga por qué falla fit_desoto para paneles reales"), siguiendo el hallazgo de la versión anterior. Causa raíz de la no-convergencia entendida (sistema de 5 ecuaciones del SDM mal escalado -- I_o~10⁻¹⁴ vs I_L~10-20, 16 órdenes de magnitud -- fragiliza el solver Newton/MINPACK sin escalar que usa `pvlib.fit_desoto()`; confirmado reproducible/determinista con un init_guess fijo, no ruido aleatorio; debilidad conocida del método clásico con módulos modernos de alta potencia, no un bug de esta app). Se agregó un respaldo cerrado (`fit_desoto_batzelis()`, sin iteración, no puede fallar por convergencia) como segundo escalón en `estimar_sdm_desde_ficha()`.
 
@@ -2828,6 +2875,11 @@ Versión anterior (30 de agosto de 2026): 🔬 Motor IV — investigación pedid
 
 3 tests nuevos + 2 reescritos (antes comparaban la fórmula interna de a_ref -- ahora comparan que la ficha STC se reproduce, más robusto). Suite completa: **805/805**. Ver `DIAGNOSTICO_GRAFICA_COMPATIBILIDAD_ELECTRICA.md`.
 
+
+────────────────────────────────────────────────────────────
+
+## 27. Anexo — Actualizaciones del 30 de agosto de 2026 (Motor IV: bug de unidades en a_ref)
+
 Versión anterior (30 de agosto de 2026): 🔬 Motor IV — auditoría de coherencia pedida por el usuario ("confírmalo en Motor IV también") entre el modelo lineal que usa la gráfica de compatibilidad eléctrica (Voc_stc/Vmp_stc escalados por Tk_beta) y el modelo físico completo del propio Motor IV (SDM De Soto 2006). 🔴 **Bug real encontrado y corregido, bloqueaba la comprobación**: `datos/catalogo_paneles_excel.py` fijaba los alias `Voc_stc`/`Vmp_stc`/`Isc_stc` para cada panel del catálogo real pero nunca `Imp_stc` (aunque el dato sí existía) — y `calculos/modelo_iv.py::validar_sdm_vs_ficha()` accedía a esa clave con subíndice directo, así que **todo panel real del catálogo Excel sin SDM precalibrado** lanzaba un `KeyError` silencioso dentro de `preparar_panel_iv()`, convertido en "datos insuficientes" sin ningún aviso al usuario. Corregido en dos capas: se agregó el alias que faltaba, y se blindaron los 5 campos de `validar_sdm_vs_ficha()` con `.get()` con respaldo, para que la misma clase de bug no reaparezca con otra fuente de paneles.
 
 🟠 **Segundo hallazgo real, separado, NO corregido (fuera del código de esta app)**: con ese bug corregido, se auditaron los 76 paneles del catálogo Excel real — ninguno logra activar hoy el ajuste SDM on-demand (`pvlib.fit_desoto()`), porque esa función da resultados NO deterministas en este entorno para los mismos parámetros de entrada (a veces converge, a veces falla con errores distintos entre corridas). El auto-chequeo que ya existía en `preparar_panel_iv()` protege al usuario de ver una curva inválida, pero el mensaje "🟢 Motor IV se activará automáticamente" en 📐 Dimensionamiento puede prometer algo que luego no aparece, sin explicación. Pendiente de decisión del usuario si se prioriza en una sesión futura.
@@ -2835,6 +2887,11 @@ Versión anterior (30 de agosto de 2026): 🔬 Motor IV — auditoría de cohere
 **Confirmación de coherencia lograda** (con ASP-ST1-T40, el único panel con SDM ya calibrado y auditado contra VBA, sin depender de `fit_desoto`): Voc coincide dentro de ~2.2% en las 3 temperaturas de diseño; Vmp diverge más (hasta 6.4% en frío, 4.0% en el extremo caliente) porque el modelo lineal reutiliza el coeficiente de Voc también para Vmp — aproximación ya aceptada por el usuario al descartar la Fase 2 (Faiman completo). El sesgo es direccional: en calor extremo (el punto más crítico del gate), el modelo lineal sobreestima Vmp ~4% frente al SDM real — cubierto hoy por el margen de alerta del 7.5% ya existente, pero ahora cuantificado, no solo teórico.
 
 Primeros tests directos de `calculos/modelo_iv.py` (`tests/test_modelo_iv.py`, 5 tests, sin cobertura previa). Suite completa: **802/802**. Ver `DIAGNOSTICO_GRAFICA_COMPATIBILIDAD_ELECTRICA.md`.
+
+
+────────────────────────────────────────────────────────────
+
+## 28. Anexo — Actualizaciones del 30 de agosto de 2026 (gráfica de compatibilidad eléctrica en Dimensionamiento y Producción)
 
 Versión anterior (30 de agosto de 2026): 📐 Dimensionamiento — la gráfica de compatibilidad eléctrica string–inversor, agregada horas antes a Reporte PDF y Producción, ahora también está visibilizada aquí ("agrégala también en Dimensionamiento"): dentro del botón "▶️ Optimizar N paneles/string", justo después de fijar el N óptimo, un panel muestra el mismo gráfico y las mismas interpretaciones para exactamente el N que la tabla de candidatos acaba de recomendar — sin tener que ir a otra página para confirmar el margen real. Como el `mejor` candidato siempre viene del subconjunto sin riesgos, el panel queda colapsado por defecto.
 
@@ -2844,11 +2901,21 @@ Versión anterior (30 de agosto de 2026): 📊 Producción — la gráfica de co
 
 Verificado con Urabá: N=18 marca 🔴 crítico en Vmp real y Vmp extremo (caen bajo el piso MPPT de 850V); N=28 marca 🟢 sano en los 3 puntos. 3 tests nuevos. Suite completa: **797/797**. Ver `DIAGNOSTICO_GRAFICA_COMPATIBILIDAD_ELECTRICA.md`.
 
+
+────────────────────────────────────────────────────────────
+
+## 29. Anexo — Actualizaciones del 30 de agosto de 2026 (gráfica de compatibilidad eléctrica en el Reporte PDF)
+
 Versión anterior (30 de agosto de 2026): 📄 Reporte PDF — nueva sección "⚡ Compatibilidad Eléctrica String–Inversor", pedida explícitamente por el usuario tras preguntar la ventaja de integrar, para cada inversor, un gráfico de compatibilidad eléctrica como el que muestra una referencia estándar internacional. Nueva función pura `calculos/dimensionamiento.py::curva_electrica_temperatura()` + gráfico SVG en el reporte (mismo estilo hand-built que las gráficas existentes de Producción/Financiero) que dibuja Voc(T) y Vmp(T) del string contra la ventana MPPT y el límite Vdc máximo del inversor, en las 3 temperaturas de diseño del sitio.
 
 ⚠️ **Framing honesto, confirmado explícitamente con el usuario antes de implementar**: esto es una mejora de presentación/comunicación, no una nueva verificación matemática. Voc y Vmp son funciones lineales de la temperatura de celda, así que los 3 puntos de diseño (frío, real, extremo) que ya evalúa `evaluar_compatibilidad_string()` cubren con certeza matemática toda la curva continua entre ellos — el gráfico nuevo reutiliza esa misma función para el veredicto real (no la reimplementa, no agrega ni quita rigor) y solo la visualiza. La nota al pie de la sección en el reporte lo deja explícito también para el usuario final.
 
 Verificado con los casos reales de Urabá ya validados en esta base: N=18 en serie (incompatible — Vmp extremo ≈665V cae por debajo del piso MPPT de 850V, visible en el gráfico como el punto rojo bajo la banda verde) y N=28 (compatible, toda la curva dentro de la banda). Geometría del SVG verificada a mano (coordenadas píxel recalculadas independientemente y contrastadas con la salida real). 5 tests nuevos en `test_compatibilidad_string.py`. Suite completa: **794/794**.
+
+
+────────────────────────────────────────────────────────────
+
+## 30. Anexo — Actualizaciones del 30 de agosto de 2026 (Catálogo de Inversores PDF: 8 columnas que nunca se guardaban)
 
 Versión anterior (30 de agosto de 2026): 🔌 Catálogo de Inversores PDF — el usuario pidió "una estructura lógica para que las fichas de inversores híbridos se descarguen de forma coherente, matemática y electrónicamente, y no afecten los cálculos de producción y diseño". 🔴 **Hallazgo más grave de toda esta auditoría, encontrado diseñando esa estructura**: 8 columnas que la UI intenta escribir desde hace tiempo (`Marca`, `Arquitectura`, `Inversor Híbrido (Si/No)`, `Voltaje Batería Min/Max (V)`, `Confianza`, `Notas`) **nunca existieron realmente en el Excel del catálogo** — `guardar_inversor_excel()` solo escribe columnas que ya existen en el encabezado, así que esos datos se descartaban en silencio en cada guardado. Confirmado con los 17 inversores MUST reales ya catalogados: los 17 son híbridos verdaderos, pero los 17 mostraban `es_hibrido=False` al cargarlos. Corregido: columnas agregadas al Excel real (cambio puramente aditivo, sin tocar los otros 90 inversores), loader actualizado, y los 17 registros MUST corregidos con backfill (Marca, Arquitectura, Inversor Híbrido, y corriente de carga de batería por submodelo donde el dato es confiable).
 
@@ -2856,11 +2923,25 @@ Con eso resuelto, se implementó la **estructura lógica en 4 capas** pedida: (1
 
 28 tests nuevos (`test_pdf_inversor_extractor.py` + primer test directo de `test_validador_inversor.py`). Suite completa: **789/789**. Ver sección 13b y `DIAGNOSTICO_EXTRACCION_INVERSORES_MUST.md`.
 
+
+────────────────────────────────────────────────────────────
+
+## 31. Anexo — Actualizaciones del 30 de agosto de 2026 (Catálogo de Inversores PDF: mitigación de caché y bug del detector multi-modelo)
+
 Versión anterior (30 de agosto de 2026): 🔌 Catálogo de Inversores PDF — ⚠️ **hallazgo real sin causa encontrada**: dos veces, con archivos MUST distintos, el formulario mostró valores que no pueden venir del PDF recién subido (coincidían exactamente con una ficha diferente cargada antes en la misma sesión). Verificado ambas veces que el motor de extracción llamado directamente sobre el PDF real da el resultado correcto — el problema no está en `calculos/pdf_inversor_extractor.py`. Revisada a fondo `pages/15_🔌_Catálogo_Inversores_PDF.py`: sin `@st.cache_data`, sin `session_state` en la ruta de subida — no se encontró mecanismo de caché que lo explique; probablemente un comportamiento del lado de la sesión de Streamlit/navegador del usuario, no reproducible desde el código. Mitigación aplicada (no corrige la causa, la hace detectable): la página ahora muestra siempre el nombre y tamaño del archivo que está procesando justo después de subirlo, con aviso de recargar si no coincide. **Confirmado con una recarga limpia** que era justo eso: al recargar, el aviso de archivo mostró el PDF correcto y los valores numéricos extraídos también fueron correctos — pero expuso un bug real más: el campo singular `modelo` mostraba la fila de encabezado multi-modelo completa ("MODEL PV33-5048 TLV PV33-6048 TLV") en vez de quedar vacío, porque `_extract_model()` aceptaba cualquier línea con la forma genérica de candidato sin excluir filas con 2+ códigos de modelo. Corregido reutilizando el mismo patrón que ya usa el detector multi-modelo para contar códigos por línea. Sin riesgo real de guardado incorrecto (el botón "Guardar" ya estaba bloqueado hasta elegir un modelo real del selector), pero sí de confusión visual.
+
+## 31b. Anexo — Actualizaciones del 30 de agosto de 2026 (Catálogo de Inversores: voltaje que depende de la batería instalada)
 
 🔋 **Mejora real, a partir de una idea del usuario**: distinción entre "submodelo por potencia" (PV35-8048/10048/12048 son 3 productos físicos distintos — bien modelado) y "voltaje que depende de la batería instalada" (dentro de cada inversor híbrido, el instalador conecta la batería real — plomo-ácido/AGM/gel/litio — y el equipo se configura en su propio LCD; el fabricante del inversor no puede fijar ese voltaje, y la ficha lo dice explícitamente: "Output voltage Depends on battery type"). Nuevo campo `salida_depende_bateria`: cuando la ficha lo declara, `bat_voltaje_min`/`bat_voltaje_max` se fuerzan a `None` (override defensivo, aunque algún patrón futuro capturara un número) y la página muestra un aviso propio explicando por qué esos campos quedan en blanco a propósito, en vez de dejarlo indistinguible de un fallo del extractor. 3 tests nuevos.
 
-Además, auditoría real con fichas MUST (PV3500/PV3600/PV3300 TLV Series) pedidas por el usuario, **8 bugs reales de código** encontrados y corregidos. 🔴 Más serios: (1) `Vdc_max` confundía un voltaje AC de red ("Max input voltage 270Vac MAX") con el voltaje DC máximo del array FV — riesgo genérico, no exclusivo de MUST, ya que `Vdc_max` alimenta el gate de seguridad eléctrica de toda la app; corregido con un guard que excluye coincidencias seguidas de "ac"/"AC". (2) Ese mismo guard se podía esquivar por backtracking del propio motor de regex (Python retrocedía un dígito y reintentaba contra el sobrante, truncando 270→27 en vez de rechazar) — corregido con un grupo atómico `(?>...)`. (3) **El detector multi-modelo, corregido de raíz**: con fichas de familia donde el encabezado es el mismo token repetido sin sufijo (ej. "PV33-" ×11), el reparto de la línea de continuación colaba palabras sueltas sin dígito ("Features"/"MODEL", arrastradas de otra columna del PDF) como si fueran sufijo de modelo real, fusionando pares de modelos verdaderos en una sola entrada — corregido filtrando a solo tokens con dígito en ambas rutas de reparto; verificado con la ficha real de 11 modelos (antes 2 entradas basura + 2 fusionadas, ahora 11 modelos limpios) sin afectar el caso Deye/TriP2 ya soportado. De paso, `P_dc_max_W` por columna tampoco reconocía el fraseo real de MUST ("Maximum PV Array Power") — agregado. Además: archivo del escritorio mal nombrado (nombrado "PV35-12048 TLV" pero contenía en realidad la serie PV3600) — ya renombrado; `P_dc_max_W` global no se extraía por un typo real del fabricante ("Maximim" en vez de "Maximum"); el campo `modelo` confundía el encabezado "INVERTER" con un código de modelo; y un fraseo distinto de Vdc_max ("Maximum Solar Input Voltage" con tolerancia "±N") que ninguna otra ficha MUST usa. Primer test directo del motor de extracción de inversores (`tests/test_pdf_inversor_extractor.py`, 15 tests) — antes no tenía ninguno. Suite completa: **776/776**. Ver sección 13b y `DIAGNOSTICO_EXTRACCION_INVERSORES_MUST.md`.
+## 31c. Anexo — Actualizaciones del 30 de agosto de 2026 (Catálogo de Inversores: auditoría MUST, 8 bugs reales)
+
+Auditoría real con fichas MUST (PV3500/PV3600/PV3300 TLV Series) pedidas por el usuario, **8 bugs reales de código** encontrados y corregidos. 🔴 Más serios: (1) `Vdc_max` confundía un voltaje AC de red ("Max input voltage 270Vac MAX") con el voltaje DC máximo del array FV — riesgo genérico, no exclusivo de MUST, ya que `Vdc_max` alimenta el gate de seguridad eléctrica de toda la app; corregido con un guard que excluye coincidencias seguidas de "ac"/"AC". (2) Ese mismo guard se podía esquivar por backtracking del propio motor de regex (Python retrocedía un dígito y reintentaba contra el sobrante, truncando 270→27 en vez de rechazar) — corregido con un grupo atómico `(?>...)`. (3) **El detector multi-modelo, corregido de raíz**: con fichas de familia donde el encabezado es el mismo token repetido sin sufijo (ej. "PV33-" ×11), el reparto de la línea de continuación colaba palabras sueltas sin dígito ("Features"/"MODEL", arrastradas de otra columna del PDF) como si fueran sufijo de modelo real, fusionando pares de modelos verdaderos en una sola entrada — corregido filtrando a solo tokens con dígito en ambas rutas de reparto; verificado con la ficha real de 11 modelos (antes 2 entradas basura + 2 fusionadas, ahora 11 modelos limpios) sin afectar el caso Deye/TriP2 ya soportado. De paso, `P_dc_max_W` por columna tampoco reconocía el fraseo real de MUST ("Maximum PV Array Power") — agregado. Además: archivo del escritorio mal nombrado (nombrado "PV35-12048 TLV" pero contenía en realidad la serie PV3600) — ya renombrado; `P_dc_max_W` global no se extraía por un typo real del fabricante ("Maximim" en vez de "Maximum"); el campo `modelo` confundía el encabezado "INVERTER" con un código de modelo; y un fraseo distinto de Vdc_max ("Maximum Solar Input Voltage" con tolerancia "±N") que ninguna otra ficha MUST usa. Primer test directo del motor de extracción de inversores (`tests/test_pdf_inversor_extractor.py`, 15 tests) — antes no tenía ninguno. Suite completa: **776/776**. Ver sección 13b y `DIAGNOSTICO_EXTRACCION_INVERSORES_MUST.md`.
+
+
+────────────────────────────────────────────────────────────
+
+## 32. Anexo — Actualizaciones del 30 de agosto de 2026 (Motor Óptico: default de montaje k_BIPV; ficha de conversión a referencia estándar)
 
 Versión anterior (30 de agosto de 2026): 🔆 Motor Óptico — corregido default binario de "Tipo de montaje"/k_BIPV: antes solo "Granja fotovoltaica" defaulteaba a Ventilado libre (k=1,0); los otros 5 tipos, incluidos Techo plano con soporte, Pérgola/sombreadero y Marquesina/voladizo (estructuras elevadas y ventiladas, no fachadas selladas), heredaban Fachada confinada (k=1,3) sin justificación física. Ahora solo Fachada BIPV y Techo inclinado (BIPV) defaultean a k=1,3. Además, para poder validar proyectos BIPV contra una referencia estándar internacional (cuyo catálogo no trae paneles BIPV): nueva tabla de equivalencia k_BIPV↔Uc/Uv y `calculos/ficha_pvsyst.py::generar_ficha_conversion_pvsyst()`, que genera por panel los parámetros de datasheet + el ajuste térmico Uc/Uv sugerido para crear el módulo custom equivalente en esa referencia.
 
@@ -2870,11 +2951,23 @@ Además, la auditoría encontró 1 desviación real (no un bug, una decisión de
 
 19 tests nuevos en total entre ambas rondas de esta auditoría. Suite completa: **759/759**. Ver sección 7 y `DIAGNOSTICO_MODELO_TERMICO_UC_UV.md`.
 
-🟣 **Redacción legal ampliada, pedida explícitamente por el usuario ("por cuestiones legales")**: al preguntar si `ficha_pvsyst.py` era visible en algún módulo, se auditó TODA la app con `grep` (no solo el archivo preguntado) y se encontraron **3 fugas reales del nombre de la referencia estándar en texto de UI** que el fix del 29-ago-2026 (solo cubrió la alarma DC/AC) había dejado pasar: caption de 🌳 Sombras SketchUp, tooltip de "Factor mismatch" en 🔀 Mismatch, y texto del expander "Modelo P90" en 💰 Financiero — las 3 corregidas a "referencia estándar internacional". Además, el usuario decidió explícitamente que `ficha_pvsyst.py` (que no es visible en la app, solo se genera bajo demanda) también debe redactar ese nombre en TODO el texto que genera, pese al costo funcional real: ya no cita la ruta de menú exacta del software de referencia, solo indica que existe una sección de pérdidas térmicas donde introducir Uc/Uv. **Se encontró además que este mismo archivo (`base_conocimiento_asistente.md`) es el corpus que lee el chatbot 🧭 Asistente y puede citarlo textualmente a un cliente real** — no es documentación puramente interna como los `DIAGNOSTICO_*.md` de la raíz del repo. Se redactaron las ~40 apariciones acumuladas de varias sesiones en este archivo, y se renombró `DIAGNOSTICO_VALIDACION_TEUSAQUILLO_PVSYST.md` → `DIAGNOSTICO_VALIDACION_TEUSAQUILLO_REFERENCIA_ESTANDAR.md` (era citado por nombre desde aquí). 1 test nuevo ancla que la ficha generada nunca nombra la referencia. Suite completa: **760/760**. Ver `DIAGNOSTICO_MODELO_TERMICO_UC_UV.md`, sección (e).
+## 32b. Anexo — Actualizaciones del 30 de agosto de 2026 (redacción legal ampliada: nombre de la referencia estándar quitado del texto de usuario en 3 páginas más y en la ficha generada)
+
+🟣 Pedida explícitamente por el usuario ("por cuestiones legales"): al preguntar si `ficha_pvsyst.py` era visible en algún módulo, se auditó TODA la app con `grep` (no solo el archivo preguntado) y se encontraron **3 fugas reales del nombre de la referencia estándar en texto de UI** que el fix del 29-ago-2026 (solo cubrió la alarma DC/AC) había dejado pasar: caption de 🌳 Sombras SketchUp, tooltip de "Factor mismatch" en 🔀 Mismatch, y texto del expander "Modelo P90" en 💰 Financiero — las 3 corregidas a "referencia estándar internacional". Además, el usuario decidió explícitamente que `ficha_pvsyst.py` (que no es visible en la app, solo se genera bajo demanda) también debe redactar ese nombre en TODO el texto que genera, pese al costo funcional real: ya no cita la ruta de menú exacta del software de referencia, solo indica que existe una sección de pérdidas térmicas donde introducir Uc/Uv. **Se encontró además que este mismo archivo (`base_conocimiento_asistente.md`) es el corpus que lee el chatbot 🧭 Asistente y puede citarlo textualmente a un cliente real** — no es documentación puramente interna como los `DIAGNOSTICO_*.md` de la raíz del repo. Se redactaron las ~40 apariciones acumuladas de varias sesiones en este archivo, y se renombró `DIAGNOSTICO_VALIDACION_TEUSAQUILLO_PVSYST.md` → `DIAGNOSTICO_VALIDACION_TEUSAQUILLO_REFERENCIA_ESTANDAR.md` (era citado por nombre desde aquí). 1 test nuevo ancla que la ficha generada nunca nombra la referencia. Suite completa: **760/760**. Ver `DIAGNOSTICO_MODELO_TERMICO_UC_UV.md`, sección (e).
+
+
+────────────────────────────────────────────────────────────
+
+## 33. Anexo — Actualizaciones del 29 de agosto de 2026 (Producción: escalado multi-inversor; Dimensionamiento: crash de N mínimo a explorar)
 
 Versión anterior (29 de agosto de 2026): 🔴 📊 Producción — corregido bug real de escalado multi-inversor: `N_paneles` se toma por defecto del "Proyecto completo" (varios inversores), pero la alarma DC/AC y el recorte (clipping) REAL de la simulación comparaban/limitaban contra la potencia CA de UN SOLO inversor sin escalar. Caso real Urabá: 840 paneles/3× Growatt MAX 100KTL3 LV daba DC/AC=4,85 en vez de 1,61 -- y más grave, el recorte real habría limitado TODA la producción del proyecto a la salida de un solo inversor (124,8kW) en vez del total real (374,4kW). Corregido con `escalar_p_ac_nom_por_inversores()`, que deriva el número de inversores del `N_paneles` actual y la config de string activa. 4 tests nuevos. Suite completa: **743/743**. Ver sección 9.
 
 Versión anterior (29 de agosto de 2026): 🔴 📐 Dimensionamiento — corregido un CRASH real (no solo un número incorrecto): preparando la corrida de Urabá, cambiar de Growatt MAX 100KTL3 LV a SOLIS-60K tumbaba "▶️ Optimizar N paneles/string" con `KeyError` de pandas. Causa: `N_min_scan` se calcula con `max(N_min_eléctrico_del_inversor_actual, N_min_guardado)`, que nunca baja -- el 21 (mínimo eléctrico del Growatt con el panel real de Urabá) sobrevivía al cambiar de inversor, y con `N_max_scan` en su default (20), `optimizar_n_serie()` recorría un rango vacío y devolvía `[]`, reventando al estilizar un DataFrame sin columnas. Corregido en 3 capas: reset de `N_min_scan` al cambiar de inversor, aviso temprano si min>max, y guard defensivo en el botón (`st.error` + `st.stop()` en vez de dejar que reviente). Ver sección 6.
+
+
+────────────────────────────────────────────────────────────
+
+## 34. Anexo — Actualizaciones del 29 de agosto de 2026 (coherencia de Tipo de instalación; sugerencia de N total de cadenas)
 
 Versión anterior (29 de agosto de 2026): auditoría proactiva de coherencia de "Tipo de instalación" (pedida explícitamente por el usuario tras el fix de "cultivo") en los 19 archivos que lo referencian. 2 bugs reales más de la MISMA clase (dato que depende del tipo, nunca invalidado al cambiar de tipo), ambos afectando cálculos reales, no solo texto: (1) 💰 Financiero — `opex_kw_guardado` no se invalidaba, un OPEX de Granja FV (10 USD/kWp·año) sobrevivía al cambiar a Fachada BIPV (debería ser 20), inflando TIR/VPN en silencio; (2) 🔆 Motor Óptico — `mo_montaje` (afecta k_bipv, temperatura de celda) solo se preseleccionaba correctamente la PRIMERA vez por tipo; cambios posteriores de tipo no lo recalculaban, subestimando temperatura y sobreestimando producción. Ambos corregidos con el mismo patrón (`*_tipo_ref`, invalida al cambiar). Resto de los 19 archivos auditados sin hallazgos (ya usan el tipo de forma fresca o como parámetro explícito). Ver secciones 7 y 10.
 
@@ -2884,6 +2977,11 @@ Versión anterior (29 de agosto de 2026): 📐 Dimensionamiento — corregido bu
 
 Versión anterior (29 de agosto de 2026): 📐 Dimensionamiento — "N total de cadenas para el proyecto" no tenía NINGUNA orientación hasta que el usuario, probando un inversor pequeño (SNA-3K), preguntó explícitamente si algo debía guiar ese número. Agregada una sugerencia informativa (caption + tooltip, nunca se autocompleta) con 2 fuentes por prioridad: (1) idea del propio usuario — reusar `N_paneles_granja // N_serie`, el MISMO cálculo real que ya usa ⚡ Diagrama Unifilar, disponible tras correr "▶️ Optimizar N paneles/string"; (2) respaldo por área (`área útil ÷ área del panel ÷ N/string`) cuando (1) todavía no existe. Ver sección 6.
 
+
+────────────────────────────────────────────────────────────
+
+## 35. Anexo — Actualizaciones del 29 de agosto de 2026 (mensaje DC/AC con % real; invalidación de prorrateo preliminar; alerta_margen; N_strings/tracker con mecanismo de total)
+
 Versión anterior (29 de agosto de 2026): 📊 Producción/📐 Dimensionamiento — el mensaje de la alarma DC/AC 🔴 "muy_sobredimensionado" decía siempre la misma frase fija ("usa menos de tres cuartos...") sin importar el ratio real de cada corrida (0,54, 0,20, 0,13 daban el mismo texto) -- corregido para citar el % real. Además se quitó la mención visible al nombre de esa referencia del texto que ve el usuario (queda solo en comentarios internos del código, nunca visible al usuario final) -- reemplazada por "referencia estándar internacional". Ver sección 9.
 
 Versión anterior (29 de agosto de 2026): 📐 Dimensionamiento — el panel "⚡ Prorrateo preliminar del inversor cargado" guardaba el N recomendado en el momento del clic y nunca se invalidaba si después el usuario cambiaba "N total de cadenas para el proyecto" o `N_strings/tracker` -- solo se invalidaba al cambiar de inversor/panel. Combinaba un N viejo con un `N_str_tr` nuevo, dando un "Paneles/inversor" que no correspondía a ninguna recomendación real (caso real: TriP 6K-HV, 128 paneles/inversor con N=8 viejo × N_str_tr=8 nuevo, cuando el N recomendado real para ese N_str_tr es 7). Corregido con una clave dedicada (`prorrateo_preliminar_n_str_tr`, separada de `N_str_tr_usado` que ya usa otro botón para otro fin) que invalida el prorrateo cada vez que cambia N_strings/tracker. Ver sección 6.
@@ -2892,9 +2990,19 @@ Versión anterior (29 de agosto de 2026): 📐 Dimensionamiento — nuevo campo 
 
 Versión anterior (29 de agosto de 2026): 📐 Dimensionamiento — `N_strings/tracker` ahora soporta el mismo mecanismo que una referencia estándar internacional, no solo el autocálculo del catálogo. Nuevo campo opcional *"N total de cadenas para el proyecto (estilo referencia estándar internacional)"*: si se declara un total, `calculos/dimensionamiento.py::resolver_n_strings_tracker()` lo reparte entre los trackers del inversor (`ceil(N_total/n_trackers)`) — el mecanismo REAL de esa referencia (parte de lo que el usuario quiere instalar). Si se deja en 0 (default), sigue autocalculando desde la capacidad máxima del inversor en el catálogo — mejor para explorar cuánto cabe sin haber decidido un total todavía. Reemplaza a `resolver_n_strings_tracker_autocalculado()` con la misma protección: un ajuste manual del usuario se respeta mientras no cambie la fuente activa (inversor, o inversor+total). 4 tests nuevos (8 en total para esta función). Ver sección 6.
 
+
+────────────────────────────────────────────────────────────
+
+## 36. Anexo — Actualizaciones del 29 de agosto de 2026 (relación DC/AC vs. referencia estándar en Teusaquillo; recorte de producción al Pnom del inversor)
+
 Versión anterior (29 de agosto de 2026): 📐 Dimensionamiento/📊 Producción — nueva alarma `evaluar_relacion_dc_ac()` homóloga al aviso real de una referencia estándar internacional ("La potencia del inversor está muy sobredimensionada", Proporción Pnom) para el proyecto real Teusaquillo (ratio 0,538 verificado idéntico contra una captura real de esa referencia, que además reveló que bloquea DURO la simulación en ese caso — no es solo advertencia; la app avisa pero no bloquea, a propósito). Al intentar reproducir el caso real se encontraron y corrigieron 3 bugs reales de catálogo: el Growatt MID15KTL3-X ni siquiera estaba en el catálogo Excel real (solo en un catálogo Python viejo sin uso); faltaba la columna "Potencia AC nominal (kW)" en TODO el catálogo (~106 inversores calculaban su potencia CA vía un respaldo `P_dc_max×0,96` en vez del dato real del fabricante — para este inversor daba 21.600W en vez de 15.000W reales); y la corriente máxima por tracker se había derivado mal (de lo que produce el arreglo, no de lo que soporta el inversor). Además, `N_strings/tracker` (Dimensionamiento) autocalculaba desde `inversor["n_strings_tracker"]` del catálogo en vez de quedar fijo en 1 por defecto — ese default duro había hecho que el mismo proyecto Teusaquillo se calculara como "128 módulos → 8 inversores necesarios" en vez de 1 (función desde entonces reemplazada, ver arriba). ⚠️ **Pendiente sin resolver, léelo antes de tocar el catálogo de inversores**: existe una familia genérica "MID 15/17/20/22/25KTL3-X" (sin marca) casi con certeza duplicada del "Growatt MID15KTL3-X" real, con specs distintas (N_strings/tracker=1 vs 8 real) — el "mapeo de inversores compatibles" tiende a sugerir la genérica primero; ver detalle y advertencia completa en la sección 6. Ficha completa en `DIAGNOSTICO_VALIDACION_TEUSAQUILLO_REFERENCIA_ESTANDAR.md`. Ver secciones 6 y 9.
 
 Versión anterior (29 de agosto de 2026): 📊 Producción — corregido bug real donde la app NUNCA recortaba (clipping) la producción al Pnom del inversor: `P_ac = P_dc × η` sin ningún tope, así que cualquier proyecto con relación DC/AC > 1 (el diseño estándar de la industria) sobreestimaba producción sin límite (cuantificado: +10,8% en un caso típico DC/AC=1.3). Nunca apareció en las validaciones contra una referencia estándar internacional ya hechas (Urabá y Teusaquillo tienen DC/AC < 1). Corregido en ambos motores (modelo simplificado y curva IV real), con nueva fila "Recorte inversor" en la cascada de pérdidas, igual que hace esa referencia. Limitación real declarada: multi-superficie con inversor compartido entre superficies no modela el recorte agregado del bus todavía. Ver sección 9.
+
+
+────────────────────────────────────────────────────────────
+
+## 37. Anexo — Actualizaciones del 28 de agosto de 2026 (Ley 1715; catálogo de paneles Solar First y Suntech; catálogo de inversores Woodward)
 
 Versión anterior (28 de agosto de 2026): 💰 Financiero — nueva advertencia cuando un proyecto supera el umbral de 1 MW de "autoconsumo a pequeña escala" (Ley 1715): el dato ya existía en `datos/ciudades_colombia.py` pero ningún cálculo lo usaba, así que un mega-proyecto podía mostrar beneficios fiscales sin avisar que el régimen real a esa escala puede ser distinto. No bloquea ni recalcula, solo advierte (`FinancialResult.advertencia_ley_1715` + banner en Página 7). Verificado con un caso sintético de ~1,2 MWp y con Urabá (220 kWp, sin advertencia). Suite completa: 718/718. Ver sección 10.
 
@@ -2903,6 +3011,11 @@ Versión anterior (28 de agosto de 2026, más temprano): 📋 Catálogo de Panel
 Versión anterior (28 de agosto de 2026, más temprano): 🔌 Catálogo de Inversores PDF — 3 alias reales agregados para fichas en formato INNOVAQ en español (Vdc_max: «Voltaje FV máximo absoluto»; Vmppt_min/max en filas separadas; P_dc_max_W en kW) tras reportar el usuario una ficha Woodward IDS SOLO 500 sin extraer. **1 hallazgo NO corregido a propósito**: I_max/Isc_max_tracker no es un problema de etiquetas para inversores centrales sin trackers discretos — poblarlo habría vuelto falsamente permisivo el gate de compatibilidad eléctrica para cualquier config de strings. Al intentar guardar el inversor se encontró y corrigió además un bug real de infraestructura: `datos/catalogo_inversores_excel.py` tenía la ruta del Excel hardcodeada solo al servidor (sin el fallback local que sí tenía el de paneles) — en cualquier entorno de desarrollo el catálogo real de 105 inversores nunca cargaba, cayendo en silencio al catálogo Python de 7. Inversor Woodward IDS SOLO 500 ingresado al catálogo real (marcado `Datos completos = No`, primer caso del catálogo, por los campos que genuinamente no aplican a este inversor central). Ver sección 13b.
 
 Versión anterior (28 de agosto de 2026, más temprano): 📋 Catálogo de Paneles — corregido falso "multi-modelo" (una ficha de un solo panel real, Suntech STP-410-A72-Pnh-Bifacial, se detectaba como 2 modelos) causado por una nota de auto-verificación cruzada en la misma línea del valor de Pmax (`"410.18 W ✓ coincide con 410.0 Wp"`); el mismo bug también corrompía Isc (0.05 A en vez de 10.49 A) por la misma causa en la línea del coeficiente de temperatura µIsc — confirmado con el PDF real que un solo fix resuelve ambos. Reportado por el usuario, root-caused reproduciendo el texto y luego el PDF real antes de tocar/confirmar el fix. Panel Suntech STP-410-A72-Pnh-Bifacial ingresado al catálogo real. Ver sección 13d.
+
+
+────────────────────────────────────────────────────────────
+
+## 38. Anexo — Actualizaciones del 26-27 de agosto de 2026 (Ficha RETIE, Diagrama Unifilar, multi-superficie, catálogo real de paneles, validación cruzada Urabá)
 
 Versión anterior (27 de agosto de 2026): `optimization.variable_panel()` conectado al catálogo Excel real de 65 paneles (antes solo 7) para que el optimizador de Fase 4 y cualquier agente puedan barrer panel real × geometría × inversor al buscar mejor TIR — 4 bugs reales encontrados y corregidos en la misma auditoría (3 apariciones del mismo patrón de `KeyError` por resolver contra el catálogo viejo, 1 `TypeError` real en el modelo simplificado de producción). Ver sección 24.3.
 
