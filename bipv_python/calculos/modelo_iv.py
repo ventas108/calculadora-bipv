@@ -463,6 +463,29 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
         alpha_sc_A = alpha_pct / 100.0 * Isc
 
     # ── Estimación SDM con pvlib fit_desoto ────────────────────────────────────
+    # Cascada de 3 métodos, del más riguroso al más tosco (30-ago-2026,
+    # investigación pedida por el usuario: "investiga por qué falla
+    # fit_desoto para paneles reales"):
+    #
+    # 1. fit_desoto() -- el método iterativo (Newton/MINPACK 'hybr', sin
+    #    escalar) que ya se usaba. Auditado: falla de forma REPRODUCIBLE
+    #    (no es ruido aleatorio -- mismos parámetros de entrada, mismo
+    #    resultado en corridas repetidas) para el panel real de Urabá y,
+    #    según la auditoría del catálogo completo, para la enorme mayoría
+    #    de los 76 paneles reales. Causa: los 5 parámetros del SDM abarcan
+    #    magnitudes muy distintas (I_o ~1e-14, I_L ~10-20, Rsh ~100-1000),
+    #    y el jacobiano por diferencias finitas de un solver sin escalar
+    #    es numéricamente frágil para esa combinación -- una debilidad ya
+    #    documentada del método clásico con módulos modernos de alta
+    #    corriente/muchas celdas, no un bug de esta app.
+    # 2. fit_desoto_batzelis() -- método CERRADO (Lambert W, sin iteración,
+    #    no puede fallar por no-convergencia) del mismo pvlib. Probado
+    #    contra los 76 paneles reales del catálogo: reproduce Voc/Vmp/Pmax
+    #    de la ficha STC dentro del margen de validación del 5% en 71 de
+    #    74 casos evaluables (vs. 0 de 76 con fit_desoto solo) -- respaldo
+    #    mucho mejor que el heurístico anterior, que llegó a dar Voc con
+    #    96% de error para el panel real de Urabá.
+    # 3. Heurístico (el que ya existía) -- último recurso si ambos fallan.
     try:
         fit = pvlib.ivtools.sdm.fit_desoto(
             v_mp            = Vmp,
@@ -483,12 +506,47 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
         R_sh = float(fit["R_sh_ref"])
         _metodo = "fit_desoto"
     except Exception:
-        # Fallback heurístico si la optimización falla
-        I_L  = Isc * 1.001
-        I_o  = Isc * np.exp(-Voc / a_ref) * 1e-3
-        R_s  = (Voc - Vmp) / Imp * 0.20
-        R_sh = Vmp / max(Isc - Imp, 1e-6) * 5.0
-        _metodo = "heurístico"
+        try:
+            # Método cerrado -- sus 5 parámetros son mutuamente consistentes
+            # entre sí (resueltos juntos por las mismas ecuaciones), así que
+            # se usa también su propio a_ref en vez del heurístico n×Ns×Vt de
+            # arriba (que no fue derivado junto con I_L/I_o/Rs/Rsh de Batzelis
+            # y rompería esa consistencia interna).
+            fit_b = pvlib.ivtools.sdm.fit_desoto_batzelis(
+                v_mp=Vmp, i_mp=Imp, v_oc=Voc, i_sc=Isc,
+                alpha_sc=alpha_sc_A, beta_voc=beta_voc_V,
+            )
+            I_L   = float(fit_b["I_L_ref"])
+            I_o   = float(fit_b["I_o_ref"])
+            R_s   = float(fit_b["R_s"])
+            R_sh  = float(fit_b["R_sh_ref"])
+            a_ref = float(fit_b["a_ref"])
+            _metodo = "fit_desoto_batzelis"
+        except Exception:
+            # Fallback heurístico si ambos ajustes fallan
+            I_L  = Isc * 1.001
+            I_o  = Isc * np.exp(-Voc / a_ref) * 1e-3
+            R_s  = (Voc - Vmp) / Imp * 0.20
+            R_sh = Vmp / max(Isc - Imp, 1e-6) * 5.0
+            _metodo = "heurístico"
+
+    # Bug real, más grave que los métodos de ajuste en sí (30-ago-2026):
+    # `a_ref` arriba está en VOLTIOS (convención nativa de pvlib -- así lo
+    # devuelven fit_desoto()/fit_desoto_batzelis(), y así lo necesita la
+    # fórmula heurística de I_o unas líneas arriba, exp(-Voc/a_ref)). Pero
+    # `trasladar_parametros_gt()` (más abajo en este mismo archivo) y
+    # `calculos/produccion_iv.py::_pmp_iv_vectorizado()` esperan que
+    # panel["a_ref"] venga en la convención UNITLESS (n × Ns) usada por el
+    # único panel precalibrado a mano de esta app (ASP-ST1-T40 en
+    # datos/tecnologias_bipv.py, a_ref=154.0) y multiplican por Vt_ref para
+    # convertir a voltios ellos mismos -- devolver aquí el valor ya en
+    # voltios lo convertía DOS VECES, encogiendo nNsVth ~39× (1/Vt_ref) y
+    # colapsando Voc a ~1.3-1.6 V en vez de los ~40-50 V reales. Esto
+    # afectaba a CUALQUIER panel estimado on-demand (fit_desoto, Batzelis o
+    # heurístico) desde que esta función existe -- enmascarado hasta hoy
+    # porque ningún panel real llegaba tan lejos (ver bug de Imp_stc y la
+    # no-convergencia de fit_desoto, ambos corregidos/documentados arriba).
+    a_ref_unitless = a_ref / Vt_ref
 
     return {
         "nombre":            panel.get("nombre", "Panel"),
@@ -497,7 +555,7 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
         "I_o_ref":           I_o,
         "R_s":               R_s,
         "R_sh_ref":          R_sh,
-        "a_ref":             a_ref,
+        "a_ref":             a_ref_unitless,
         "Tk_alfa":           float(Tk_alfa) if Tk_alfa else alpha_pct if "alpha_pct" in dir() else 0.05,
         "Tk_gamma":          float(Tk_gamma) if Tk_gamma else -0.40,
         "Voc_stc":           Voc,

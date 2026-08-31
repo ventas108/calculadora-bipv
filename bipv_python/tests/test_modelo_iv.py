@@ -1,19 +1,32 @@
 """
 Tests de calculos.modelo_iv -- sin cobertura directa hasta el 30-ago-2026.
 
-Auditoría pedida por el usuario ("confírmalo en Motor IV también"): verificar
-que el modelo lineal usado por curva_electrica_temperatura()/
-evaluar_compatibilidad_string() (Voc_stc/Vmp_stc escalados por Tk_beta) es
-coherente con el modelo físico completo del propio Motor IV (SDM De Soto
-2006). Durante la auditoría se encontró y corrigió un bug real (ver los dos
-primeros tests) que impedía completar la comprobación para paneles reales
-del catálogo Excel.
+Auditoría en 2 rondas pedida por el usuario:
+1. "confírmalo en Motor IV también" -- verificar que el modelo lineal usado
+   por curva_electrica_temperatura()/evaluar_compatibilidad_string()
+   (Voc_stc/Vmp_stc escalados por Tk_beta) es coherente con el modelo físico
+   completo del propio Motor IV (SDM De Soto 2006). Encontró un bug real
+   (Imp_stc, ver los 2 primeros tests) que bloqueaba la comprobación.
+2. "investiga por qué falla fit_desoto para paneles reales" -- encontró la
+   causa real de la no-convergencia (sistema de 5 ecuaciones mal escalado,
+   ver comentarios en calculos/modelo_iv.py::estimar_sdm_desde_ficha), un
+   respaldo cerrado (fit_desoto_batzelis) que sí funciona para la enorme
+   mayoría del catálogo real, y un SEGUNDO bug real más grave detrás de
+   ambos: un desajuste de unidades en `a_ref` que colapsaba Voc ~39× para
+   CUALQUIER panel estimado on-demand (no solo los que fallaban por
+   Imp_stc) -- ver los tests de "unidades_a_ref" más abajo.
 """
 import copy
 
 import pytest
 
-from calculos.modelo_iv import resolver_curva_iv, validar_sdm_vs_ficha
+from calculos.modelo_iv import (
+    estimar_sdm_desde_ficha,
+    preparar_panel_iv,
+    resolver_curva_iv,
+    tiene_sdm_completo,
+    validar_sdm_vs_ficha,
+)
 from calculos.dimensionamiento import calcular_voc_string, calcular_vmp_string
 from datos.catalogo_paneles_excel import cargar_catalogo_paneles
 from datos.tecnologias_bipv import ASP_ST1_T40
@@ -59,22 +72,80 @@ def test_validar_sdm_vs_ficha_no_lanza_keyerror_sin_alias_imp_stc():
 
 
 # ---------------------------------------------------------------------------
+# Segundo bug real, más grave, encontrado investigando por qué fit_desoto()
+# fallaba (30-ago-2026): `estimar_sdm_desde_ficha()` devolvía `a_ref` en
+# VOLTIOS (la convención nativa de pvlib -- así lo dan fit_desoto()/
+# fit_desoto_batzelis(), y así lo necesita la fórmula heurística interna
+# exp(-Voc/a_ref)), pero `trasladar_parametros_gt()` y
+# `calculos/produccion_iv.py::_pmp_iv_vectorizado()` esperan la convención
+# UNITLESS (n × Ns) que usa el único panel precalibrado a mano de esta app
+# (ASP-ST1-T40, a_ref=154.0) y multiplican por Vt_ref ellos mismos para
+# convertir a voltios -- devolver ya-en-voltios lo convertía DOS veces,
+# encogiendo nNsVth ~39× y colapsando Voc a ~1.3-1.6 V. Afectaba a
+# CUALQUIER panel estimado on-demand desde que la función existe, sin que
+# ningún test lo detectara porque los tests existentes solo comparaban la
+# fórmula interna de a_ref, nunca la física reproducida.
+# ---------------------------------------------------------------------------
+def test_estimar_sdm_desde_ficha_devuelve_a_ref_en_convencion_unitless():
+    # Regresión directa del bug de unidades: a_ref debe venir en la misma
+    # convención (n × Ns, NO en voltios) que usa ASP-ST1-T40 -- del orden de
+    # decenas/cientos para un panel normal de 60-72 celdas, nunca ~1-4 (eso
+    # sería el valor en voltios, el síntoma exacto del bug).
+    panel = {
+        "Voc_stc": 37.5, "Vmp_stc": 30.5, "Isc_stc": 8.5, "Imp_stc": 8.0,
+        "N_s": 60, "tecnologia": "Mono-Si", "Tk_beta": -0.35, "Tk_alfa": 0.05,
+    }
+    res = estimar_sdm_desde_ficha(panel)
+    assert res is not None
+    assert 30 < res["a_ref"] < 200, (
+        f"a_ref={res['a_ref']} fuera del rango unitless esperado (n×Ns) -- "
+        f"¿volvió el bug de unidades (a_ref en voltios, ~1-4)?"
+    )
+
+
+def test_panel_real_uraba_activa_motor_iv_y_reproduce_ficha_stc():
+    # El caso concreto que expuso ambos bugs (Imp_stc y unidades de a_ref):
+    # antes de corregirlos, preparar_panel_iv() devolvía None para este
+    # panel real (JA Solar JAM66D46-720/LB, sin SDM precalibrado).
+    catalogo = cargar_catalogo_paneles()
+    panel = catalogo["JA Solar JAM66D46-720/LB"]
+    assert not tiene_sdm_completo(panel)  # este panel depende del ajuste on-demand
+
+    resultado = preparar_panel_iv(panel)
+    assert resultado is not None, (
+        "preparar_panel_iv() no debe rechazar este panel real -- si esto "
+        "falla, volvió el bug de Imp_stc o el de unidades de a_ref."
+    )
+    prueba = {**panel, **resultado}
+    val = validar_sdm_vs_ficha(prueba, tolerancia_pct=5.0)
+    assert val["validacion_ok"] is True, val
+
+
+def test_mayoria_del_catalogo_real_activa_motor_iv():
+    # Auditoría completa (30-ago-2026): antes de corregir Imp_stc + unidades
+    # de a_ref, 0 de 76 paneles reales del catálogo activaban el ajuste
+    # on-demand. Después: 62/76 (55 vía fit_desoto_batzelis + 7 con SDM ya
+    # precalibrado). Umbral conservador (50) para no romper el test con
+    # cambios normales al catálogo real, mientras sigue detectando una
+    # regresión grande si alguno de los dos bugs corregidos hoy reaparece.
+    catalogo = cargar_catalogo_paneles()
+    activa_ok = sum(
+        1 for p in catalogo.values()
+        if tiene_sdm_completo(p) or preparar_panel_iv(p) is not None
+    )
+    assert activa_ok >= 50, (
+        f"solo {activa_ok}/{len(catalogo)} paneles reales activan Motor IV -- "
+        f"muy por debajo de los 62/76 medidos tras corregir Imp_stc y las "
+        f"unidades de a_ref; investigar antes de continuar."
+    )
+
+
+# ---------------------------------------------------------------------------
 # Coherencia modelo lineal (curva_electrica_temperatura) vs. SDM completo
 # (Motor IV) -- pedido explícito del usuario, 30-ago-2026. Usa ASP-ST1-T40,
 # el único panel de esta app con SDM auditado contra VBA (ver docstring de
 # validar_sdm_vs_ficha: Voc/Isc/Pmax/FF ya verificados ahí) -- sin invocar
 # pvlib.fit_desoto() (ya calibrado), así que es 100% determinista.
-#
-# NOTA: los paneles reales del catálogo Excel (JA Solar Urabá, etc.) NO
-# sirven para esta comprobación todavía: pvlib.fit_desoto() (0.15.2) da
-# resultados NO DETERMINISTAS para sus datos entre una corrida y otra en
-# este entorno -- a veces converge, a veces falla con RuntimeError de
-# Jacobiano, a veces con un TypeError interno de pvlib ("tuple indices must
-# be integers, not str") para EXACTAMENTE los mismos parámetros de entrada.
-# Es un hallazgo real y separado (documentado en el diagnóstico), fuera del
-# código de esta app -- el auto-chequeo de preparar_panel_iv() (rechazar
-# cualquier SDM que no reproduzca la ficha STC dentro de 5%) ya protege al
-# usuario de que se muestre una curva incorrecta cuando esto pasa.
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize(
     "T_cel, tol_voc_pct, tol_vmp_pct",

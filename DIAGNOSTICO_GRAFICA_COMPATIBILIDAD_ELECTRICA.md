@@ -235,6 +235,80 @@ completo, uno aislando el `KeyError` sin invocar `fit_desoto`), 3 parametrizados
 coherencia lineal-vs-SDM de ASP-ST1-T40 con los márgenes de arriba. Suite completa: **802/802**
 (verificada 3 veces seguidas para confirmar que los tests nuevos son deterministas).
 
+## Cuarta actualización (30 de agosto de 2026, mismo día): investigación de fit_desoto — 2 bugs reales más, corregidos
+
+El usuario pidió "investiga por qué falla fit_desoto para paneles reales", siguiendo el hallazgo
+separado de la actualización anterior. Investigación completa, con dos resultados reales:
+
+### 1. Causa raíz de la no-convergencia de `fit_desoto()` (entendida, NO corregible desde esta app)
+
+`pvlib.ivtools.sdm.fit_desoto()` resuelve un sistema de 5 ecuaciones no lineales (I_L, I_o, R_s,
+R_sh, a_ref) con `scipy.optimize.root(method='hybr')` — un método tipo Newton (MINPACK hybrd) sin
+escalar, con jacobiano por diferencias finitas. Los 5 parámetros del SDM abarcan magnitudes muy
+distintas para un panel real moderno de alta potencia (para el panel de Urabá: I_o≈2×10⁻¹⁴,
+I_L≈18.6, R_s≈0.09, R_sh≈185, a_ref≈1.8 — **16 órdenes de magnitud entre el más pequeño y el más
+grande**). Confirmado experimentalmente: pasando un `init_guess` explícito y fijo, el solver falla
+de forma **reproducible y determinista** (mismo `RuntimeError` de "Jacobiano sin progreso" en 4/4
+corridas) — no es ruido aleatorio, es un sistema genuinamente mal condicionado para este método en
+esta combinación de magnitudes. Esta es una debilidad ya conocida en la comunidad de `pvlib` del
+método clásico De Soto con módulos modernos de alta corriente/muchas celdas — no un bug de esta
+app, y no corregible sin reimplementar el solver (ej. ajustar en espacio logarítmico para I_o, o
+usar un optimizador con escalado explícito) — desproporcionado frente a la alternativa encontrada
+abajo.
+
+### 2. Alternativa robusta encontrada y adoptada: `fit_desoto_batzelis()`
+
+El mismo `pvlib` incluye un método **cerrado** (Batzelis 2017, vía Lambert W, sin iteración —
+no puede fallar por no-convergencia) en el mismo módulo. Probado contra los 76 paneles reales del
+catálogo: reproduce Voc/Vmp/Isc/Imp/Pmax de la ficha STC dentro del margen de validación existente
+del 5% en la gran mayoría de los casos. **Implementado como segundo escalón** en
+`calculos/modelo_iv.py::estimar_sdm_desde_ficha()`: se intenta `fit_desoto()` primero (si converge,
+sin cambios); si falla, se intenta `fit_desoto_batzelis()`; si también falla, cae al heurístico
+tosco que ya existía (último recurso).
+
+### 3. Segundo bug real, más grave, encontrado investigando el primero: unidades de `a_ref`
+
+Con el respaldo Batzelis funcionando de forma aislada (confirmado con `pvlib.pvsystem.singlediode`
+directamente), el resultado END-TO-END dentro de la app seguía siendo un desastre: Voc calculado
+≈1.26 V en vez de 49 V — el MISMO patrón de colapso ~39× que ya se había visto con el heurístico
+original y que antes se había atribuido, incorrectamente, solo a que "el heurístico es tosco".
+Causa real: **`estimar_sdm_desde_ficha()` devuelve `a_ref` en VOLTIOS** (la convención nativa de
+`pvlib` — así lo entregan `fit_desoto()`/`fit_desoto_batzelis()`, y así lo necesita la fórmula
+heurística interna `exp(-Voc/a_ref)`), pero **`calculos/modelo_iv.py::trasladar_parametros_gt()` y
+`calculos/produccion_iv.py::_pmp_iv_vectorizado()` esperan la convención UNITLESS** (n × Ns) que usa
+el único panel precalibrado a mano de esta app (`ASP-ST1-T40` en `datos/tecnologias_bipv.py`,
+`a_ref=154.0`) — ambas funciones multiplican por `Vt_ref` (0.0257 V) ellas mismas para convertir a
+voltios. Devolver un valor ya-en-voltios lo convertía **dos veces**, encogiendo `nNsVth` ~39×
+(≈1/`Vt_ref`) y colapsando Voc.
+
+**Impacto real, más allá de hoy**: este bug afectaba a **cualquier panel estimado on-demand desde
+que `estimar_sdm_desde_ficha()` existe** — no solo a los que fallaban por `fit_desoto`/`Imp_stc`.
+Ningún test existente lo detectó porque los tests de `test_ns_halfcut_nsa.py` solo comparaban la
+**fórmula interna** de `a_ref` contra un valor esperado (que coincidía con el bug, no con lo
+correcto), nunca la física reproducida corriente abajo. También afectaba silenciosamente el modo
+real de curva IV de 📊 Producción (`calculos/produccion_iv.py::_pmp_iv_vectorizado()`, cero tests
+directos) — verificado manualmente tras el fix: para el panel real de Urabá a G=1000 W/m²,
+T=45°C, Pmp calculado = 679.2 W, coincide con el derate térmico esperado (720 W × (1 − 0.29%×20°C)
+≈ 678.2 W) — antes del fix habría dado un valor colapsado sin sentido físico.
+
+**Corregido**: `estimar_sdm_desde_ficha()` ahora convierte `a_ref` a la convención unitless
+(÷ `Vt_ref`) antes de devolverlo, sin tocar `trasladar_parametros_gt()`/`_pmp_iv_vectorizado()`
+(ya correctas para esa convención) ni el panel precalibrado `ASP-ST1-T40` (ya en esa convención).
+
+### Resultado final medido
+
+| | Antes de hoy | Después de los 4 fixes de esta sesión |
+|---|---|---|
+| Paneles reales del catálogo (76) que activan Motor IV | **0** | **62** (55 vía Batzelis + 7 ya precalibrados) |
+| Voc reproducido para el panel real de Urabá | colapsado (~1.3–1.6 V) | 48.96 V (ficha: 49.0 V, error 0.09%) |
+
+**Cobertura**: 3 tests nuevos en `test_modelo_iv.py` (unidades de `a_ref` en rango unitless
+esperado; panel real de Urabá activa Motor IV end-to-end; ≥50/76 del catálogo real activa Motor
+IV — umbral conservador) + 2 tests existentes en `test_ns_halfcut_nsa.py` reescritos (antes
+comparaban la fórmula interna de `a_ref`, ahora comparan que `validar_sdm_vs_ficha()` reproduce la
+ficha STC — más robusto y es justo el tipo de comprobación que habría atrapado este bug antes).
+Suite completa: **805/805**.
+
 ## Nota aparte (no corregida, fuera de alcance)
 
 Se detectó que el checkbox "Incluir sección Dimensionamiento" (`key="rep_inc_dim"`) del Reporte PDF

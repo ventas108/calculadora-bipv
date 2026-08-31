@@ -2,7 +2,7 @@
 """#67: el camino NsA de estimar_sdm_desde_ficha también detecta half-cut."""
 import pytest
 
-from calculos.modelo_iv import estimar_sdm_desde_ficha
+from calculos.modelo_iv import estimar_sdm_desde_ficha, validar_sdm_vs_ficha
 
 # Panel típico 144 half-cells (equivalente eléctrico: 72 celdas en serie)
 _FICHA_144 = {
@@ -19,9 +19,17 @@ def test_nsa_duplicado_se_corrige():
     assert res is not None
     assert res["_ns_corregido"] is True
     assert res["_N_s_usado"] == 72
-    # a_ref recomputado con el Ns corregido: 1.05 × 72 × 0.025693 ≈ 1.94 V
-    assert res["a_ref"] == pytest.approx(1.05 * 72 * 0.025693, rel=0.01)
     assert res["_ns_halfcut_info"]["tipo"] == "ns_duplicado"
+    # El SDM resultante debe reproducir la ficha STC dentro del margen de
+    # validación de la app -- no se fija un valor exacto de a_ref porque
+    # el método de ajuste que gana (fit_desoto/Batzelis/heurístico) puede
+    # cambiar; lo que importa es que la física salga correcta (30-ago-2026:
+    # antes un bug real de unidades en a_ref colapsaba Voc ~39× por debajo
+    # del real para CUALQUIER panel estimado on-demand, sin que este test
+    # lo detectara porque solo comparaba la fórmula interna de a_ref).
+    prueba = {**panel, **res}
+    val = validar_sdm_vs_ficha(prueba, tolerancia_pct=5.0)
+    assert val["validacion_ok"] is True, val
 
 
 def test_nsa_sin_ns_tambien_detecta():
@@ -38,7 +46,9 @@ def test_nsa_correcto_no_se_toca():
     assert res is not None
     assert res["_ns_corregido"] is False
     assert res["_N_s_usado"] == 72
-    assert res["a_ref"] == pytest.approx(1.05 * 72 * 0.025693, rel=0.01)
+    prueba = {**panel, **res}
+    val = validar_sdm_vs_ficha(prueba, tolerancia_pct=5.0)
+    assert val["validacion_ok"] is True, val
 
 
 def test_voc_modelo_fisico_tras_correccion():
