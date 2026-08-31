@@ -125,6 +125,16 @@ Generado ejecutando el motor real: `calculos.solar.obtener_tmy_pvgis()` (TMY rea
 2. **POA anual** (GlobInc de PVsyst vs los 807,8/737,2 kWh/m²/año de arriba) — el chequeo más simple y menos dependiente del modelo de módulo.
 3. **Cascada de pérdidas de PVsyst** (IAM, sombreado, térmico) — comparar cada etapa contra el desglose de Motor Óptico (factor global 0,9073 = IAM × soiling × térmico combinados).
 
+## Actualización 31-ago-2026 — verificación cruzada con literatura + modelo independiente
+
+Mientras se espera el resultado de PVsyst, se corrió una verificación con un modelo CdTe
+completamente independiente (power-rating model de Huld/JRC, calibrado contra literatura
+académica real de CdTe BIPV bajo clima tropical) sobre los mismos datos reales de Teusaquillo.
+Resultado: PR=89,4% (vs. 100,6% del motor principal) — 11,2 puntos más bajo, con evidencia
+convergente hacia que el >100% es un artefacto de la calibración del panel, no un comportamiento
+físico genuino. Detalle completo en `DIAGNOSTICO_VERIFICACION_JRC_CDTE_TEUSAQUILLO.md`. El
+resultado real de PVsyst sigue siendo el punto de comparación más directo y decisivo, aún pendiente.
+
 ## Pendiente
 
 - [ ] Correr el proyecto en PVsyst con los datos de arriba.

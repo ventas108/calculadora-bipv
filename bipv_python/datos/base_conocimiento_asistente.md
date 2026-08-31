@@ -2893,6 +2893,16 @@ Al entregar el mapa "Coherencia Aguas Abajo" de los 12 módulos y sus blindajes 
 
 5 tests nuevos: vigente cuando coincide, aviso cuando cambia panel, aviso cuando cambia inversor, sin falso positivo cuando no hay referencia histórica, sin aviso cuando Dimensionamiento nunca corrió. Suite completa: **814/814**. Ver `DIAGNOSTICO_ALERTA_VIGENCIA_DISENO.md`.
 
+## 25j. Anexo — Actualizaciones del 31 de agosto de 2026 (verificación cruzada CdTe: literatura académica + modelo JRC/Huld independiente para el PR>100% de Teusaquillo)
+
+El usuario pidió analizar "como un científico" un paper académico real sobre CdTe BIPV bajo clima tropical (Kumar/Sudhakar/Samykano, 3 papers relacionados) para sacarle provecho a la duda abierta del PR>100% en Teusaquillo (fachada CdTe vertical, `FICHA_PVSYST_TEUSAQUILLO.md`). Se descargó y leyó el texto completo (no solo el resumen) de uno de los papers — corrección importante: usa **PVGIS**, no PVsyst como el usuario asumía inicialmente. La literatura real (3 estudios, mismo grupo de autores, clima tropical de Malasia) nunca reporta PR por encima de 78% para CdTe BIPV, ni en techo ni en fachada (rango real: 66,4%-77,4%).
+
+**Verificación implementada**: `calculos/modelo_jrc_cdte.py` reimplementa el power-rating model de Huld et al. (2011) con los coeficientes específicos de CdTe citados en el paper (t1 a t6, más n=23,37/n*=5,44 para el modelo de temperatura Faiman) — un modelo completamente independiente del SDM De Soto que usa el motor principal de la app. `scripts/verificar_jrc_teusaquillo.py` lo corre sobre el TMY REAL de Bogotá (mismo pipeline `calculos.solar` que usa la app en producción, POA coincide exactamente: 807,8 kWh/m²/año).
+
+**Resultado real**: el modelo JRC/Huld da PR=89,4% (vs. 100,6% del motor principal) — 11,2 puntos más bajo, para los MISMOS datos horarios reales. Sigue por encima de la literatura tropical (66-77%), pero eso tiene explicación física razonable (Bogotá es mucho más fría que Malasia, y CdTe rinde mejor en frío). La brecha de 11 puntos frente a un modelo independiente, sí calibrado para CdTe, es evidencia (no prueba definitiva) de que el >100% es un artefacto de la curva FF-vs-irradiancia calibrada del ASP-ST1-T40 en el SDM, no un comportamiento físico genuino. El resultado real de PVsyst sigue pendiente y sería el punto de comparación más decisivo.
+
+6 tests nuevos anclados a condiciones STC exactas (P=P_STC cuando I'=1, T'=0) y casos sintéticos. Suite completa: **827/827**. Herramienta de diagnóstico puntual en `scripts/`, no integrada a la UI de la app. Ver `DIAGNOSTICO_VERIFICACION_JRC_CDTE_TEUSAQUILLO.md`.
+
 ## 25i. Anexo — Actualizaciones del 31 de agosto de 2026 (auditoría de la alerta de vigencia: 2 páginas sin cubrir + 1 riesgo de falso positivo)
 
 El usuario preguntó explícitamente por ⚡ Diagrama Unifilar: "varias métricas antes del módulo dimensionamiento influyen en esta función y no las hemos ni revisado, ni auditado ni prevenido antes de cualquier incoherencia" — pidió una auditoría real, no una respuesta del manual.
