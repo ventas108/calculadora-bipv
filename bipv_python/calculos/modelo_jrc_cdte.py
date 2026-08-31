@@ -140,3 +140,66 @@ def calcular_pr_jrc_cdte(
         "PR_pct": round(pr_pct, 2) if pr_pct is not None else None,
         "P_dc_jrc_w": p_dc,
     }
+
+
+def extraer_parametros_proyecto(estado: dict) -> dict:
+    """
+    Extrae de un proyecto guardado (el dict "estado" de un JSON de
+    `datos/proyectos/*.json`, ver `calculos/proyectos_manager.py`) los
+    parámetros mínimos para correr la verificación JRC/Huld: sitio,
+    geometría del array y potencia STC total.
+
+    Generalización (31-ago-2026, pedida explícitamente por el usuario tras
+    correr la verificación a mano para Teusaquillo): antes esto estaba fijo
+    como constantes al inicio de un script; ahora cualquier proyecto CdTe
+    guardado puede verificarse sin editar código.
+
+    Lanza ValueError con un mensaje claro (nunca un valor inventado) si:
+    - el panel del proyecto no es CdTe -- los coeficientes de este modelo
+      son específicos de esa tecnología, no aplican a c-Si/CIS/otros;
+    - la ciudad no está en `datos/ciudades_colombia.py`;
+    - falta la potencia del panel o el número de módulos (Dimensionamiento
+      nunca se corrió en ese proyecto).
+    """
+    panel = estado.get("panel_dict") or {}
+    tecnologia = panel.get("tecnologia")
+    if tecnologia != "CdTe":
+        raise ValueError(
+            f"Este proyecto usa panel de tecnología '{tecnologia or 'desconocida'}' "
+            "-- el modelo JRC/Huld implementado aquí solo tiene coeficientes "
+            "calibrados para CdTe (ver docstring del módulo). No aplica a este proyecto."
+        )
+
+    from datos.ciudades_colombia import CIUDADES
+
+    ciudad_nombre = estado.get("ciudad") or estado.get("tmy_ciudad")
+    ciudad = CIUDADES.get(ciudad_nombre)
+    if not ciudad:
+        raise ValueError(
+            f"Ciudad '{ciudad_nombre}' no reconocida en datos/ciudades_colombia.py "
+            "-- no se puede derivar lat/lon/altitud para descargar el TMY."
+        )
+
+    p_stc_modulo_w = float(panel.get("Pmax_stc") or 0)
+    n_paneles = int(
+        estado.get("N_paneles_granja") or estado.get("N_paneles_dim")
+        or estado.get("N_paneles") or 0
+    )
+    if p_stc_modulo_w <= 0 or n_paneles <= 0:
+        raise ValueError(
+            "Faltan datos del array (potencia del panel o número de módulos) -- "
+            "corre 📐 Dimensionamiento en ese proyecto antes de esta verificación."
+        )
+
+    return {
+        "nombre_proyecto": estado.get("nombre_proyecto", "Proyecto sin nombre"),
+        "panel_nombre": estado.get("panel_nombre_dim", "?"),
+        "tecnologia": tecnologia,
+        "ciudad": ciudad_nombre,
+        "lat": float(ciudad["lat"]), "lon": float(ciudad["lon"]), "alt_m": float(ciudad["alt_m"]),
+        "tilt": float(estado.get("tilt_fachada", estado.get("tilt_default", 90.0))),
+        "azimuth": float(estado.get("azimuth_fachada", 180.0)),
+        "albedo": float(estado.get("albedo_suelo", 0.20)),
+        "p_stc_total_w": p_stc_modulo_w * n_paneles,
+        "n_paneles": n_paneles,
+    }

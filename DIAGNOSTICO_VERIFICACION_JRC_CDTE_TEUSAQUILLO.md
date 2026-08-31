@@ -43,7 +43,8 @@ coeficientes CdTe exactos del paper, usando `pvlib.temperature.faiman()` (ya en 
 incluyendo el ancla física más simple: a condiciones STC exactas (I'=1, T'=0), el modelo debe
 reproducir exactamente P_STC (el corchete se reduce a 1).
 
-`scripts/verificar_jrc_teusaquillo.py`: descarga el TMY REAL de PVGIS para Bogotá (mismas
+`scripts/verificar_jrc_cdte.py <slug>` (generalizado el mismo día, ver sección "Actualización" al
+final de este archivo): descarga el TMY REAL de PVGIS para Bogotá (mismas
 coordenadas que usa la app: 4,711°N, -74,072°O, 2.600 m), calcula la POA con
 `calculos.solar.calcular_poa()` (el mismo pipeline Hay-Davies que usa la app en producción, no
 uno paralelo) para una fachada vertical (tilt=90°, azimut=180°), y corre el modelo JRC/Huld sobre
@@ -106,3 +107,29 @@ los genéricos de pvlib, caso sintético día completo, caso sin irradiancia). S
 **827/827**. El script de verificación reutiliza `calculos.solar.obtener_tmy_pvgis()` y
 `calculos.solar.calcular_poa()` reales (no una reimplementación paralela) — la coincidencia exacta
 de la POA anual (807,8 kWh/m²/año) confirma que la comparación es de manzanas contra manzanas.
+
+## Actualización 31-ago-2026 — generalizado para cualquier proyecto guardado
+
+Pedido explícito del usuario tras confirmar que el script solo servía para Teusaquillo (los datos
+del sitio/panel estaban fijos como constantes al inicio del archivo): "generalízalo para leer
+cualquier proyecto guardado". Renombrado `scripts/verificar_jrc_teusaquillo.py` →
+`scripts/verificar_jrc_cdte.py <slug>`, que ahora:
+
+- Lee el JSON del proyecto directamente de `datos/proyectos/*.json` (bypasea
+  `calculos.proyectos_manager`, que exige una sesión de Streamlit activa para el aislamiento por
+  usuario — este es un script de terminal, no una vista multi-usuario de la app).
+- Nueva función pura `calculos/modelo_jrc_cdte.py::extraer_parametros_proyecto(estado)`: deriva
+  sitio (vía `datos/ciudades_colombia.py`), geometría (tilt/azimuth/albedo) y potencia STC total
+  del proyecto guardado. Rechaza con un mensaje claro (nunca un valor inventado) si el panel no es
+  CdTe, si la ciudad no está en el catálogo, o si Dimensionamiento nunca se corrió en ese proyecto.
+- `--listar` enumera los proyectos disponibles en disco.
+
+**Verificado que la generalización no cambió el resultado conocido**: se armó un JSON de proyecto
+sintético con los valores reales exactos de Teusaquillo (128 módulos ASP-ST1-T40, Bogotá, fachada
+90°/180°) y se corrió el script generalizado contra él — reproduce EXACTAMENTE el mismo resultado
+que la versión original fija: POA 807,8 kWh/m²/año, E_dc 5.825 kWh/año, PR 89,41%.
+
+7 tests nuevos en `tests/test_extraer_parametros_proyecto_jrc.py` (extracción real anclada a
+Teusaquillo, prioridad `N_paneles_granja` > `N_paneles_dim`, rechazo de panel no-CdTe, rechazo sin
+panel/ciudad/Dimensionamiento, defaults razonables si faltan tilt/azimuth/albedo). Suite completa:
+**834/834**.
