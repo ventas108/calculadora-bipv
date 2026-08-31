@@ -11,6 +11,7 @@ from calculos.dimensionamiento import (
     resolver_n_strings_tracker,
     curva_electrica_temperatura,
     interpretar_curva_electrica,
+    diseno_electrico_confirmado,
 )
 from datos.tecnologias_bipv import ASP_ST1_T40
 
@@ -690,3 +691,39 @@ def test_escalar_p_ac_nom_sin_potencia_ac_retorna_none():
     )
 
     assert r["p_ac_nom_w_total"] is None
+
+# ---------------------------------------------------------------------------
+# diseno_electrico_confirmado() -- fuente única del diseño CONFIRMADO
+# (31-ago-2026, "blindaje" pedido por el usuario tras encontrar que
+# Producción leía el widget en vivo de N_strings/tracker en vez del valor
+# confirmado -- el mismo caso real de Teusaquillo, con el widget "en vivo"
+# desviado del confirmado, sirve de ancla aquí).
+# ---------------------------------------------------------------------------
+
+
+def test_diseno_confirmado_usa_n_str_tr_usado_no_el_widget_en_vivo():
+    # Caso real Teusaquillo: Dimensionamiento confirmó N_str_tr_usado=8,
+    # pero el widget en vivo N_str_tr había vuelto a caer en 1 -- el
+    # diseño confirmado debe ignorar el widget y devolver 8.
+    estado = {"N_serie": 8, "N_str_tr": 1, "N_str_tr_usado": 8}
+    resultado = diseno_electrico_confirmado(estado)
+    assert resultado["N_strings_tracker"] == 8
+    assert resultado["N_serie"] == 8
+
+
+def test_diseno_confirmado_default_1_sin_diseno_confirmado_todavia():
+    # Dimensionamiento nunca se corrió en esta sesión -- ni N_serie ni
+    # N_str_tr_usado existen. No debe inventar un valor del widget en vivo.
+    estado = {}
+    resultado = diseno_electrico_confirmado(estado)
+    assert resultado["N_strings_tracker"] == 1
+    assert resultado["N_serie"] is None
+
+
+def test_diseno_confirmado_ignora_n_str_tr_aunque_no_haya_usado():
+    # Si por algún motivo solo existe el widget en vivo (sin _usado todavía
+    # confirmado), el diseño confirmado debe caer al default (1), NUNCA
+    # tomar el valor del widget -- es justo el bug que se corrigió.
+    estado = {"N_serie": 8, "N_str_tr": 8}
+    resultado = diseno_electrico_confirmado(estado)
+    assert resultado["N_strings_tracker"] == 1

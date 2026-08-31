@@ -2864,6 +2864,16 @@ El usuario reenvió el aviso por correo de GitHub Actions ("Tests / test — Fai
 
 ⚠️ **Lección para el futuro**: ningún test local corre contra las versiones EXACTAS de `requirements.txt` a menos que se verifique explícitamente — el entorno de desarrollo de esta sesión tiene versiones más nuevas de `pvlib`, `numpy` y `scipy` que las fijadas en el proyecto. Antes de depender de una función nueva de una librería externa, vale la pena confirmar que existe en la versión realmente fijada (instalar esa versión exacta en una carpeta aislada y verificar con `hasattr()`).
 
+## 25e. Anexo — Actualizaciones del 31 de agosto de 2026 (blindaje: fuente única del diseño confirmado entre módulos)
+
+Tras corregir el bug de N_strings/tracker desalineado en Producción, el usuario pidió explícitamente "blindar las alineaciones entre los módulos... siempre imponer coherencia". Se auditaron todas las claves de sesión "_usado" (la convención ya establecida para "valor CONFIRMADO", distinto del widget en vivo) y sus consumidores: los otros 4 lugares que necesitan N_strings/tracker (Reporte PDF, Análisis IA, Comparador Paneles, Comparador Orientación) ya usaban la clave correcta; Producción era el único desalineado, ya corregido.
+
+Un caso revisado a fondo y descartado como bug: `calculos/escenarios_fase4.py::capturar_base_comparacion()` lee a propósito el widget en vivo primero -- existe específicamente para CONGELAR una nueva base de comparación de escenarios con lo que el usuario tiene configurado en ese momento (🔒 Fase 2 de 🔀 Mismatch), no para consumir un diseño ya confirmado. Se dejó sin tocar, documentado.
+
+**El blindaje real**: nueva función pura `calculos/dimensionamiento.py::diseno_electrico_confirmado(session_state)` -- única fuente de verdad para N_serie y N_strings_tracker CONFIRMADOS. Las 5 páginas que antes repetían `session_state.get("N_str_tr_usado", 1)` a mano (cinco oportunidades independientes de volver a equivocar la clave) ahora llaman todas a esta misma función. Un typo de clave en una página ya no puede pasar desapercibido en silencio -- o funcionan las 5, o falla de forma visible en los tests de la única función que todas comparten.
+
+3 tests nuevos anclados al caso real de Teusaquillo (el decoy N_str_tr=1 vs el confirmado N_str_tr_usado=8; sesión nueva sin diseño confirmado; solo widget en vivo sin confirmación). Suite completa: **809/809**. Ver `DIAGNOSTICO_BLINDAJE_DISENO_CONFIRMADO.md`.
+
 ## 25d. Anexo — Actualizaciones del 31 de agosto de 2026 (Producción leía N_strings/tracker desalineado de Dimensionamiento)
 
 El usuario pidió revisar unas capturas reales de la simulación de Teusaquillo para confirmar visualmente el trabajo del día. Sin buscarlo, se encontró una inconsistencia real entre 📐 Dimensionamiento y 📊 Producción para la MISMA sesión: Dimensionamiento confirmó un diseño con 8 strings/tracker (128 paneles/inversor, 2 inversores reales), pero Producción mostraba 1 string/tracker (16 paneles/inversor, 16 inversores) — el usuario confirmó que navegó en la misma pestaña con el menú lateral, sin recargar, descartando que fuera un artefacto de sesiones separadas.

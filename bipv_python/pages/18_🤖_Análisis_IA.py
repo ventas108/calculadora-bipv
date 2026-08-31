@@ -125,6 +125,8 @@ if not os.environ.get("ANTHROPIC_API_KEY", "").strip():
 
 # ── Ensamblar el candidato "Actual" desde resultados YA calculados ──────────
 def _candidato_actual() -> CandidatoRegistrado:
+    from calculos.dimensionamiento import diseno_electrico_confirmado
+    _diseno_ia = diseno_electrico_confirmado(st.session_state)
     ciudad_nombre = st.session_state.get("ciudad")
     c = CIUDADES.get(ciudad_nombre, {})
     lat = float(st.session_state.get("lat_proyecto", c.get("lat", 4.711)))
@@ -138,8 +140,8 @@ def _candidato_actual() -> CandidatoRegistrado:
         area_m2=float(st.session_state.get("area_util_m2", 0.0)),
         albedo=float(st.session_state.get("albedo_suelo", 0.20)),
         panel=st.session_state.get("panel_dict") or {},
-        N_serie=int(st.session_state.get("N_serie", 1)),
-        N_strings_tracker=int(st.session_state.get("N_str_tr_usado", 1)),
+        N_serie=int(_diseno_ia["N_serie"] or 1),
+        N_strings_tracker=_diseno_ia["N_strings_tracker"],
         eta_inversor=float(st.session_state.get("eta_inversor", 0.97)),
         k_bipv=float(st.session_state.get("motor_optico_k_bipv", 1.0)),
         inversor=st.session_state.get("inversor_dict_dim"),

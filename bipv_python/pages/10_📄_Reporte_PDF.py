@@ -721,7 +721,9 @@ def generar_html_reporte() -> str:
     # evaluar_compatibilidad_string(), el gate real ya usado en
     # Dimensionamiento y Producción, así que el veredicto del gráfico nunca
     # puede contradecir al resto de la app.
-    _N_serie_pdf = st.session_state.get("N_serie")
+    from calculos.dimensionamiento import diseno_electrico_confirmado
+    _diseno_pdf = diseno_electrico_confirmado(st.session_state)
+    _N_serie_pdf = _diseno_pdf["N_serie"]
     _panel_dim_pdf = st.session_state.get("panel_dict")
     _inv_dim_pdf = st.session_state.get("inversor_dict_dim")
     if _N_serie_pdf and _panel_dim_pdf and _inv_dim_pdf:
@@ -730,7 +732,7 @@ def generar_html_reporte() -> str:
             _T_frio_pdf = st.session_state.get("T_min_diseno", -5.0)
             _T_real_pdf = st.session_state.get("T_cel_realista", 36.35)
             _T_extr_pdf = st.session_state.get("T_cel_extremo", 41.94)
-            _n_str_tr_pdf = int(st.session_state.get("N_str_tr_usado", 1) or 1)
+            _n_str_tr_pdf = _diseno_pdf["N_strings_tracker"]
             _curva_pdf = curva_electrica_temperatura(
                 _panel_dim_pdf, _inv_dim_pdf, int(_N_serie_pdf),
                 _T_frio_pdf, _T_real_pdf, _T_extr_pdf,

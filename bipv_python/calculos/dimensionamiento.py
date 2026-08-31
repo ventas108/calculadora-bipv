@@ -573,6 +573,49 @@ def resolver_n_strings_tracker(
     }
 
 
+def diseno_electrico_confirmado(session_state) -> dict:
+    """
+    Fuente ÚNICA del diseño eléctrico CONFIRMADO por el usuario en
+    📐 Dimensionamiento -- NUNCA el valor en vivo de un widget, que
+    `resolver_n_strings_tracker()` puede recalcular en cualquier render
+    posterior de esa página (ej. si la "firma" mecanismo/inversor/total ya
+    no coincide con la última vez), sin que el usuario haya vuelto a
+    confirmar nada.
+
+    Blindaje (31-ago-2026): al menos 5 páginas distintas necesitan este
+    mismo dato (📊 Producción, 📄 Reporte PDF, 🤖 Análisis IA, 🧩 Comparador
+    Paneles, 🧭 Comparador Orientación). Repetir
+    `session_state.get("N_str_tr_usado", 1)` a mano en cada una es frágil
+    -- un bug real encontrado ese mismo día mostró que una sola página
+    (Producción) terminó leyendo la clave equivocada (el widget en vivo,
+    "N_str_tr") sin que nada lo detectara, mostrando strings/tracker,
+    paneles/inversor y relación DC/AC distintos a los que Dimensionamiento
+    ya había confirmado -- para la MISMA sesión, con el usuario navegando
+    normalmente por el menú lateral. Centralizar la resolución aquí deja
+    un solo lugar para acertar; los consumidores solo llaman a esta
+    función en vez de repetir la clave a mano.
+
+    ⚠️ NO usar `session_state["N_str_tr"]` directamente en ningún consumidor
+    aguas abajo de Dimensionamiento -- esa es la clave del widget, cambia
+    sola. La única excepción legítima es `calculos/escenarios_fase4.py::
+    capturar_base_comparacion()`, que a propósito congela el valor EN VIVO
+    en el momento de fijar una nueva base de comparación de escenarios
+    (ahí "capturar lo que hay ahora mismo" es justamente el propósito, no
+    un error) -- lo demás debe pasar por aquí.
+
+    Retorna dict:
+      N_serie            : módulos en serie confirmados (int) o None si
+                            Dimensionamiento no se ha ejecutado todavía.
+      N_strings_tracker  : strings/tracker CONFIRMADOS (int, default 1 si
+                            el usuario nunca confirmó un diseño).
+    """
+    n_serie = session_state.get("N_serie")
+    return {
+        "N_serie": int(n_serie) if n_serie else None,
+        "N_strings_tracker": int(session_state.get("N_str_tr_usado", 1) or 1),
+    }
+
+
 def escalar_p_ac_nom_por_inversores(
     N_paneles: int,
     N_serie: int | None,

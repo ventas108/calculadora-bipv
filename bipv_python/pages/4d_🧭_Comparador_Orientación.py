@@ -114,6 +114,8 @@ def _coords_proyecto() -> tuple[float, float, float]:
 
 
 def _config_base() -> BIPVConfiguration:
+    from calculos.dimensionamiento import diseno_electrico_confirmado
+    _diseno_co = diseno_electrico_confirmado(st.session_state)
     lat, lon, alt_m = _coords_proyecto()
     return BIPVConfiguration(
         lat=lat, lon=lon, alt_m=alt_m,
@@ -122,8 +124,8 @@ def _config_base() -> BIPVConfiguration:
         area_m2=float(st.session_state.get("area_util_m2", 0.0)),
         albedo=float(st.session_state.get("albedo_suelo", 0.20)),
         panel=st.session_state.get("panel_dict") or {},
-        N_serie=int(st.session_state.get("N_serie", 1)),
-        N_strings_tracker=int(st.session_state.get("N_str_tr_usado", 1)),
+        N_serie=int(_diseno_co["N_serie"] or 1),
+        N_strings_tracker=_diseno_co["N_strings_tracker"],
         N_inversores=_n_inv_total,
         eta_inversor=float(st.session_state.get("eta_inversor", 0.97)),
         k_bipv=float(st.session_state.get("motor_optico_k_bipv", 1.0)),
