@@ -122,22 +122,50 @@ def test_panel_real_uraba_activa_motor_iv_y_reproduce_ficha_stc():
 
 
 def test_mayoria_del_catalogo_real_activa_motor_iv():
-    # Auditoría completa (30-ago-2026): antes de corregir Imp_stc + unidades
-    # de a_ref, 0 de 76 paneles reales del catálogo activaban el ajuste
-    # on-demand. Después: 62/76 (55 vía fit_desoto_batzelis + 7 con SDM ya
-    # precalibrado). Umbral conservador (50) para no romper el test con
-    # cambios normales al catálogo real, mientras sigue detectando una
-    # regresión grande si alguno de los dos bugs corregidos hoy reaparece.
+    # Auditoría completa (30/31-ago-2026): antes de corregir Imp_stc +
+    # unidades de a_ref, 0 de 76 paneles reales del catálogo activaban el
+    # ajuste on-demand. Tras esos 2 fixes: 62/76. Tras agregar N_s estimado
+    # (por analogía real con ASP-ST1-T40) a los 10 paneles Solar First que
+    # solo les faltaba ese dato: 72/76. Umbral conservador (65) para no
+    # romper el test con cambios normales al catálogo real, mientras sigue
+    # detectando una regresión grande si algo de esto se rompe.
     catalogo = cargar_catalogo_paneles()
     activa_ok = sum(
         1 for p in catalogo.values()
         if tiene_sdm_completo(p) or preparar_panel_iv(p) is not None
     )
-    assert activa_ok >= 50, (
+    assert activa_ok >= 65, (
         f"solo {activa_ok}/{len(catalogo)} paneles reales activan Motor IV -- "
-        f"muy por debajo de los 62/76 medidos tras corregir Imp_stc y las "
-        f"unidades de a_ref; investigar antes de continuar."
+        f"muy por debajo de los 72/76 medidos tras los fixes de Imp_stc, "
+        f"unidades de a_ref, y N_s estimado para Solar First; investigar "
+        f"antes de continuar."
     )
+
+
+def test_solar_first_activa_motor_iv_con_ns_estimado():
+    # Los 10 paneles reales de la familia Solar First (ST1/ST2) no publican
+    # N_s en su ficha -- estimado el 31-ago-2026 (pedido explícito del
+    # usuario) por analogía con ASP-ST1-T40 (mismas dimensiones físicas
+    # 1200x600mm, mismo Voc ~116V para ST1; ST2 con la mitad de celdas,
+    # consistente con su Voc ~59V siendo casi exactamente la mitad).
+    # Marcado como "Estimado -- no confirmado por fabricante" en el Excel
+    # real, sin tocar la política de no inventar coeficientes de
+    # temperatura para esta misma familia.
+    catalogo = cargar_catalogo_paneles()
+    modelos_st1 = [f"Solar First ST1-{n}" for n in (72, 64, 56, 48, 40, 32, 24, 16)]
+    modelos_st2 = ["Solar First ST2-80", "Solar First ST2-85"]
+    for nombre in modelos_st1 + modelos_st2:
+        panel = catalogo[nombre]
+        assert panel.get("N_s"), f"{nombre} debería tener N_s estimado"
+        assert panel.get("confianza", "").lower().startswith("estimado"), (
+            f"{nombre}: la confianza debe declarar que el N_s es estimado, "
+            f"no del fabricante"
+        )
+        resultado = preparar_panel_iv(panel)
+        assert resultado is not None, f"{nombre} debería activar Motor IV"
+        prueba = {**panel, **resultado}
+        val = validar_sdm_vs_ficha(prueba, tolerancia_pct=5.0)
+        assert val["validacion_ok"] is True, (nombre, val)
 
 
 # ---------------------------------------------------------------------------

@@ -309,6 +309,52 @@ comparaban la fórmula interna de `a_ref`, ahora comparan que `validar_sdm_vs_fi
 ficha STC — más robusto y es justo el tipo de comprobación que habría atrapado este bug antes).
 Suite completa: **805/805**.
 
+## Quinta actualización (31 de agosto de 2026): N_s estimado para la familia Solar First
+
+Siguiendo la auditoría de "qué más del catálogo quedó afectado", el usuario pidió agregar N_s a los
+paneles reales que lo necesitaran para activar Motor IV. Antes de escribir nada se encontró un
+conflicto real: los 10 paneles Solar First (ST1-16/24/32/40/48/56/64/72, ST2-80/85) ya tenían una
+decisión explícita documentada en su propio campo `Notas` de una sesión anterior — *"Ns (celdas en
+serie) no especificado en la ficha -- no se infiere"* — la misma política de rigor aplicada ahí para
+no cargar coeficientes de temperatura no oficiales de esa misma ficha. Se confirmó de nuevo con el
+PDF real (`Ficha_Tecnica_SolarFirst_ST1_ST2_Serie.pdf`) que el fabricante genuinamente no publica
+ese dato en ningún lado.
+
+Presentado el conflicto al usuario, decidió explícitamente: **sí estimar un N_s razonable y
+guardarlo, claramente marcado como estimado**.
+
+**Método de estimación (real, no arbitrario)**: el propio panel de referencia ya validado de esta
+app (SolTech ASP-ST1-T40, usado en Teusaquillo) **tampoco** tiene un campo `N_s` — su SDM se
+calibró directamente sin necesitarlo (`a_ref=154.0`, sin depender de un conteo de celdas). Se derivó
+N_s para la familia ST1 de ese mismo `a_ref` validado (`154 / n_típico_CdTe(1.09) ≈ 141`), justificado
+porque ST1 comparte con ASP-ST1-T40 las mismas dimensiones físicas (1200×600mm) y el mismo Voc
+(~116V) — fuerte evidencia de la misma tecnología de escriba láser CdTe. Para ST2 (mismas
+dimensiones, pero Voc ~59V, casi exactamente la mitad del de ST1) se usó la mitad: N_s≈72.
+
+**Importante**: esta estimación de N_s en realidad no determina si Motor IV activa o no — el método
+que efectivamente termina calibrando estos paneles es `fit_desoto_batzelis()` (agregado en la
+actualización anterior), que **no necesita N_s en absoluto**. N_s solo se necesitaba para pasar la
+puerta de entrada de `preparar_panel_iv()` (`tiene_ficha and tiene_ns`) y, como último recurso, para
+el heurístico tosco si ambos ajustes fallaran — ninguno de los dos casos ocurrió aquí.
+
+**Guardado en el Excel real** (`datos/paneles_catalogo.xlsx`, vía `guardar_panel_excel(...,
+merge_conservador=True)` para no tocar ningún otro campo): columnas `Ns (Celdas Serie)` y
+`NsA = n × Ns` con los valores estimados; `Confianza` cambiada a `"Estimado -- no confirmado por
+fabricante"` (antes vacía); `Fuente NsA` a `"Estimado por analogía con ASP-ST1-T40 (ver Notas)"`;
+y la frase de `Notas` que decía "no se infiere" reemplazada por la explicación completa del método,
+dejando explícito que es un dato estimado y qué hacer si se consigue el dato real del fabricante.
+
+**Resultado medido**: de 76 paneles reales, **72/76 ahora activan Motor IV** (65 vía
+`fit_desoto_batzelis` + 7 precalibrados), subiendo desde 62/76. Los 4 que siguen sin activarlo no
+tienen relación con N_s: 2 con ficha electrica genuinamente incompleta (`ASP-LAM3-T0
+(1200x1200mm)`, `PERC half Cut Bifacial ESM` — falta Voc/Vmp/Isc/Imp por completo) y 2 con el caso
+límite de Rsh negativo de Batzelis ya documentado (`EINNOVA ESM-620M`, `EINNOVA Agri ESM-305HE`).
+
+**Cobertura**: 1 test nuevo (`test_solar_first_activa_motor_iv_con_ns_estimado`) verifica los 10
+paneles reales activan Motor IV y reproducen su ficha STC dentro del 5%, y que `confianza` declara
+explícitamente que el dato es estimado. Umbral del test de catálogo completo subido de ≥50 a ≥65.
+Suite completa: **806/806**.
+
 ## Nota aparte (no corregida, fuera de alcance)
 
 Se detectó que el checkbox "Incluir sección Dimensionamiento" (`key="rep_inc_dim"`) del Reporte PDF
