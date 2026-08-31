@@ -15,6 +15,7 @@ from calculos.diagrama_unifilar import (
     generar_diagrama_unifilar,
     exportar_unifilar_bytes,
 )
+from calculos.dimensionamiento import diseno_electrico_confirmado
 from calculos import ledger_auditoria as _ledger
 
 
@@ -51,6 +52,41 @@ if not st.session_state.get("panel_dict") and not st.session_state.get("inversor
         "ℹ️ No se detecta panel ni inversor configurados todavía en 📐 Dimensionamiento. "
         "Puedes seguir de todos modos e ingresar los datos manualmente abajo, o "
         "configurar primero Dimensionamiento para que se auto-llenen."
+    )
+
+# ── Vigencia del diseño confirmado (31-ago-2026) ───────────────────────────────
+# Esta página auto-llena "Módulos en serie" (N_serie) y "Número total de
+# módulos" (N_paneles_granja) desde el último diseño CONFIRMADO en
+# Dimensionamiento -- pero como aquí todo es un campo editable (a propósito,
+# es un generador universal, no exclusivo del proyecto abierto), un valor
+# desactualizado puede pasar desapercibido, generarse en el diagrama y
+# sellarse en el Ledger sin que nadie lo note. Pregunta explícita del
+# usuario: "varias métricas antes del módulo dimensionamiento influyen en
+# esta función y no las hemos ni revisado, ni auditado". Mismo rigor que las
+# otras 6 páginas que ya muestran la alerta de vigencia
+# (`DIAGNOSTICO_ALERTA_VIGENCIA_DISENO.md`) -- esta era la única que había
+# quedado sin auditar.
+_diseno_unif = diseno_electrico_confirmado(st.session_state)
+if _diseno_unif["aviso"]:
+    st.warning(_diseno_unif["aviso"])
+
+# Segunda alerta, específica de esta página: "Número total de módulos" se
+# auto-llena desde N_paneles_granja, que Dimensionamiento ya protege con su
+# propia firma de invalidación (N_paneles_granja_inversor_ref, del bug real
+# del 29-ago-2026 donde ese total quedaba pegado al inversor anterior) --
+# pero esa protección solo se aplicaba DENTRO de Dimensionamiento; esta
+# página nunca la revisaba. Mismo principio anti-falso-positivo: solo avisa
+# si hay una referencia guardada que YA NO coincide con el inversor actual.
+_npg_ref = st.session_state.get("N_paneles_granja_inversor_ref")
+_inv_actual_dim = st.session_state.get("inversor_nombre_dim")
+_npg_valor = st.session_state.get("N_paneles_granja")
+if _npg_ref and _inv_actual_dim and _npg_ref != _inv_actual_dim and _npg_valor:
+    st.warning(
+        f"⚠️ El total de módulos auto-llenado ({_npg_valor}) viene del cálculo de "
+        f"Proyecto completo con **{_npg_ref}**, pero el inversor seleccionado ahora en "
+        f"📐 Dimensionamiento es **{_inv_actual_dim}** — vuelve a correr "
+        "\"▶️ Optimizar N paneles/string\" o \"Prorrateo preliminar\" con el inversor "
+        "actual, o revisa a mano el número de módulos abajo antes de generar el diagrama."
     )
 
 col1, col2 = st.columns(2)

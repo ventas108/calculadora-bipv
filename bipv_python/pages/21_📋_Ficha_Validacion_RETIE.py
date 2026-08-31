@@ -19,6 +19,7 @@ from calculos.ficha_validacion_retie import (
     exportar_ficha_svg_bytes,
     exportar_ficha_png_bytes,
 )
+from calculos.dimensionamiento import diseno_electrico_confirmado
 from calculos import ledger_auditoria as _ledger
 
 
@@ -51,6 +52,28 @@ if not st.session_state.get("panel_dict") and not st.session_state.get("inversor
     st.info(
         "ℹ️ No se detecta panel ni inversor configurados todavía en 📐 Dimensionamiento. "
         "Puedes seguir de todos modos e ingresar los datos manualmente abajo."
+    )
+
+# ── Vigencia del diseño confirmado (31-ago-2026) ───────────────────────────────
+# Mismo gap real que ⚡ Diagrama Unifilar (página gemela: mismo patrón de
+# "generador universal" auto-llenado y editable) -- "Módulos en serie" y
+# "Número total de módulos" se auto-llenan desde el último diseño CONFIRMADO
+# en Dimensionamiento, sin ninguna alerta si panel/inversor cambiaron desde
+# entonces. Ver `DIAGNOSTICO_ALERTA_VIGENCIA_DISENO.md`.
+_diseno_retie = diseno_electrico_confirmado(st.session_state)
+if _diseno_retie["aviso"]:
+    st.warning(_diseno_retie["aviso"])
+
+_npg_ref_retie = st.session_state.get("N_paneles_granja_inversor_ref")
+_inv_actual_retie = st.session_state.get("inversor_nombre_dim")
+_npg_valor_retie = st.session_state.get("N_paneles_granja")
+if _npg_ref_retie and _inv_actual_retie and _npg_ref_retie != _inv_actual_retie and _npg_valor_retie:
+    st.warning(
+        f"⚠️ El total de módulos auto-llenado ({_npg_valor_retie}) viene del cálculo de "
+        f"Proyecto completo con **{_npg_ref_retie}**, pero el inversor seleccionado ahora en "
+        f"📐 Dimensionamiento es **{_inv_actual_retie}** — vuelve a correr "
+        "\"▶️ Optimizar N paneles/string\" o \"Prorrateo preliminar\" con el inversor "
+        "actual, o revisa a mano el número de módulos abajo antes de generar la ficha."
     )
 
 col1, col2 = st.columns(2)

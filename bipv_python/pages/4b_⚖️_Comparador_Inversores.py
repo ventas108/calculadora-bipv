@@ -297,6 +297,15 @@ if _sel:
             st.session_state["inversor_dict_dim"] = _cat.get(_modelo_full, {})
             st.session_state["N_inv_total"] = configs[_idx]["n_unidades"]
             st.session_state["N_serie"] = int(N_serie)
+            # Este botón es un 3er punto de confirmación del diseño eléctrico,
+            # además de los 2 de Dimensionamiento -- sin esto, diseno_electrico_
+            # confirmado() dispararía un FALSO POSITIVO de la alerta de vigencia
+            # en las 7 páginas que la muestran (la referencia guardada seguiría
+            # apuntando al inversor confirmado ANTES de adoptar aquí, aunque
+            # N_serie/inversor_nombre_dim ya estén correctamente al día).
+            # Encontrado auditando el módulo a pedido del usuario (31-ago-2026).
+            st.session_state["N_serie_panel_ref"] = st.session_state.get("panel_nombre_dim")
+            st.session_state["N_serie_inversor_ref"] = _modelo_full
             # Adopción atómica: la producción/bypass/financiero/CO₂ guardados
             # corresponden al inversor ANTERIOR → se invalidan (misma filosofía
             # de calculos/invalidacion.py; POA no depende del inversor).

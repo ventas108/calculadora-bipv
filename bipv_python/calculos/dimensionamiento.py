@@ -582,9 +582,18 @@ def diseno_electrico_confirmado(session_state) -> dict:
     no coincide con la última vez), sin que el usuario haya vuelto a
     confirmar nada.
 
-    Blindaje (31-ago-2026): al menos 5 páginas distintas necesitan este
+    Blindaje (31-ago-2026): al menos 7 páginas distintas necesitan este
     mismo dato (📊 Producción, 📄 Reporte PDF, 🤖 Análisis IA, 🧩 Comparador
-    Paneles, 🧭 Comparador Orientación). Repetir
+    Paneles, 🧭 Comparador Orientación, ⚡ Diagrama Unifilar, 📋 Ficha de
+    Validación RETIE -- las últimas 2 se sumaron en una auditoría posterior
+    el mismo día, pedida explícitamente por el usuario tras notar que nunca
+    se habían revisado: ver `DIAGNOSTICO_VIGENCIA_UNIFILAR_RETIE_COMPARADOR.md`).
+    Esa misma auditoría encontró un 3er punto de CONFIRMACIÓN además de los
+    2 de esta página: el botón "Adoptar esta configuración" de ⚖️ Comparador
+    de Inversores también fija N_serie/inversor_nombre_dim, y por eso
+    también debe escribir N_serie_panel_ref/N_serie_inversor_ref -- si no,
+    la alerta de vigencia de abajo dispara un FALSO POSITIVO contra
+    cualquier página que la muestre. Repetir
     `session_state.get("N_str_tr_usado", 1)` a mano en cada una es frágil
     -- un bug real encontrado ese mismo día mostró que una sola página
     (Producción) terminó leyendo la clave equivocada (el widget en vivo,
