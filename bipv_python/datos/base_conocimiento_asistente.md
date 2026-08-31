@@ -2884,6 +2884,73 @@ Al entregar el mapa "Coherencia Aguas Abajo" de los 12 módulos y sus blindajes 
 
 5 tests nuevos: vigente cuando coincide, aviso cuando cambia panel, aviso cuando cambia inversor, sin falso positivo cuando no hay referencia histórica, sin aviso cuando Dimensionamiento nunca corrió. Suite completa: **814/814**. Ver `DIAGNOSTICO_ALERTA_VIGENCIA_DISENO.md`.
 
+## 25g. Anexo — Manual consolidado: el procedimiento correcto por módulos, en el orden del recorrido, con las alertas de coherencia (31-ago-2026)
+
+El usuario pidió, tras el blindaje y la alerta de vigencia de los días anteriores: "entrégame el procedimiento por módulos aguas abajo correcto, iniciando desde el módulo proyecto con las alertas respectivas... enunciar las alertas en el caso si el usuario se devuelve a algún módulo anterior si altera la simulación" y luego, explícitamente: "actualiza al asistente con la aplicación del manual en el orden que me entregas y documéntalo respecto de las alertas para que informe al usuario de múltiples formas comprensibles". Esta guía consolidada complementa las secciones de cada página (arriba, con el detalle operativo completo) con la vista de conjunto del RECORRIDO: qué confirma cada módulo y, si vuelves a uno anterior y cambias algo, qué se revalida solo y qué exige tu acción.
+
+### 0. El principio y los 2 mecanismos de alerta que usa la app
+
+Regla: todo dato que un módulo posterior reutiliza debe leerse en vivo, o invalidarse explícitamente cuando su origen cambia — nunca quedar cacheado en silencio. Un valor "fantasma" aparece cuando guardas un resultado derivado de una elección (un panel, un inversor, un tipo de instalación) y luego esa elección cambia sin que nadie le avise al valor guardado.
+
+Dos mecanismos, explicados de 2 formas para que reconozcas cuál aplica en cada caso:
+- **Compuerta de prerrequisito** (técnico: bandera `*_ok`, ej. `recurso_solar_ok`, `produccion_ok`). En criollo: la página completa se niega a mostrar resultados y te manda de vuelta con un aviso si el paso anterior nunca corrió — todo o nada, no puedes "adivinar a medias".
+- **Firma de invalidación** (técnico: clave `*_ref` que guarda de qué elección salió el último cálculo). En criollo: la app recuerda con qué panel/inversor/ciudad calculó algo, y si detecta que ya elegiste otro, lo recalcula sola sin que tengas que hacer nada — silenciosa y automática, no te interrumpe.
+- Un tercer caso, más reciente, es la **alerta de vigencia**: ni bloquea (como la compuerta) ni recalcula solo (como la firma) — te avisa con texto explícito de qué cambió y qué botón presionar, porque el valor afectado (el diseño eléctrico N/string) exige tu confirmación explícita, no puede recalcularse automáticamente sin que tú decidas el nuevo diseño.
+
+### 1. 🏠 Proyecto — el origen de todo
+
+Confirma: tipo de instalación, ciudad, área/factor de ocupación. Si cambias el **tipo de instalación**, Proyecto se autoprotege en el origen: resetea densidad, PR, tilt y factor de ocupación al nuevo default ANTES de que cualquier otro módulo alcance a leer el valor viejo — no hay nada que tú tengas que revisar aquí. Ejemplo real: cambiar de "Granja fotovoltaica" (factor típico 40-90%) a "Fachada BIPV" ya no arrastra el mensaje de "libre para el cultivo" que no tiene sentido en una fachada (ver `DIAGNOSTICO` del 29-ago sobre este bug, ya corregido).
+
+### 2. ☀️ Recurso Solar — clima y temperaturas de diseño
+
+Confirma: TMY cargado, POA calculada, las 3 temperaturas de diseño (frío/real/extremo). Protegido por compuerta: `recurso_solar_ok` bloquea Motor Óptico, Mismatch y Producción con un aviso si nunca ejecutaste este paso. Si vuelves aquí y cambias de ciudad, Dimensionamiento lo detecta solo (`_dim_tmy_ciudad_ref`) y refresca las temperaturas de diseño sin que tengas que hacer nada más.
+
+### 3. 🔬 Motor IV (opcional) — validación de la curva I-V
+
+Confirma: si el modelo de diodo único (SDM) del panel converge y se parece a la ficha real. Protegido por firma: en cuanto cambias de panel en Dimensionamiento, la validación vieja se invalida sola (compara `panel_nombre_dim` contra `motor_iv_validacion_panel`) — nunca queda una validación de un panel distinto colgada como si aplicara al nuevo.
+
+### 4. 📐 Dimensionamiento — el diseño eléctrico (la alerta más importante de todo el recorrido)
+
+Aquí hay 2 tipos de dato con comportamiento MUY distinto, y es la causa de la mayoría de confusiones reales encontradas esta semana:
+- **En vivo** (cambia apenas tocas el selector): panel elegido, inversor elegido.
+- **Confirmado** (solo cambia cuando presionas un botón): N° de módulos en serie (N_serie), N° de strings/tracker — el resultado de "▶️ Optimizar N paneles/string" o "Prorrateo preliminar".
+
+**La alerta de vigencia (nueva, 31-ago-2026)**: si cambias de panel o inversor y sigues navegando SIN volver a presionar el botón de confirmación, la app ahora te avisa explícitamente — en la propia página con un banner, y en Producción, Reporte PDF, Análisis IA, Comparador de Paneles y Comparador de Orientación con una advertencia. En criollo: es como si guardaras la talla de un traje y luego cambiaras de sastre — la app te recuerda que la talla guardada era para el sastre anterior, antes de que uses ese traje en otro lado. Ejemplo real: confirmas 8 strings/tracker con el panel A, cambias al panel B sin re-confirmar, y ahora ves "⚠️ El panel o inversor cambió desde que confirmaste este diseño... vuelve a 📐 Dimensionamiento y presiona 'Optimizar N paneles/string'". Acción a tomar: exactamente eso — vuelve a presionar el botón. La alerta desaparece sola en cuanto el diseño confirmado vuelve a coincidir con tu selección actual (ver `DIAGNOSTICO_ALERTA_VIGENCIA_DISENO.md`). Antes de esta fecha, este era el único punto del recorrido sin ninguna protección automática; ahora está cubierto igual que el resto.
+
+También protegido por firma: el mínimo de exploración (`N_min_scan_inversor_ref`) y la sugerencia de N total de cadenas (`N_paneles_granja_inversor_ref`) se resetean solos al cambiar de inversor.
+
+### 5b. 🔆 Motor Óptico (opcional, recomendado)
+
+Confirma: la irradiancia efectiva corregida por sombreado/reflexión (POA efectiva), el factor k_BIPV. Doble firma: si cambia el tipo de instalación, el montaje/k_BIPV se re-preselecciona solo; si cambia el panel, se detecta solo.
+
+### 5. 🔀 Mismatch / Bypass (opcional)
+
+Confirma: pérdidas por sombreado parcial entre módulos de un mismo string. Protegido por compuerta sobre `recurso_solar_ok`, y por diseño solo ofrece paneles ya precalibrados de fábrica en su simulación — nunca hereda un SDM estimado que pudiera quedar desactualizado.
+
+### 6. 📊 Producción — el corazón de los resultados
+
+Confirma: energía anual generada (E_ac_anual_kWh). **Corregido el 31-ago-2026**: ahora lee el diseño eléctrico a través de la misma función centralizada que usan las otras páginas (antes leía el widget en vivo de Dimensionamiento en vez del valor confirmado — el bug real que disparó todo este blindaje, con capturas reales del proyecto Teusaquillo mostrando 1 string/tracker en Producción contra 8 confirmados en Dimensionamiento, ver `DIAGNOSTICO_NSTRTR_PRODUCCION_DESALINEADO.md`). También recibe la alerta de vigencia del punto 4 si aplica.
+
+### 9. 🗺️ Vista 3D / Multi-superficie (opcional, solo si hay más de 1 superficie)
+
+El combinador MPPT solo ofrece paneles ya precalibrados — mismo diseño defensivo que Mismatch, por la misma razón.
+
+### 7. 💰 Financiero
+
+Confirma: VPN, TIR, LCOE. Doble firma: el OPEX por defecto se reinvalida solo si cambió el tipo de instalación; si el factor P90 cambió desde el último cálculo guardado, aparece un aviso explícito para que decidas si quieres recalcular.
+
+### 8. 💼 Presupuesto (opcional, recomendado)
+
+Compuerta simple sobre `produccion_ok` — no se puede armar un presupuesto sin producción confirmada primero.
+
+### 11. 🔋 Baterías y Balance (opcional)
+
+Sincroniza el consumo real declarado en Proyecto por defecto en vez de estimarlo — sin caché propia que pueda quedar vieja.
+
+### 10. 📄 Reporte PDF — el final del recorrido
+
+Diseñado para nunca bloquear: cada sección del reporte se muestra solo si su página de origen se ejecutó, y no copia valores propios — vuelve a leer la fuente de cada dato (incluida la alerta de vigencia del punto 4, plegada dentro de la nota de la sección de compatibilidad eléctrica) al momento de generar el reporte, así que nunca puede mostrar un dato más viejo que el resto de la app.
+
 ## 25d. Anexo — Actualizaciones del 31 de agosto de 2026 (Producción leía N_strings/tracker desalineado de Dimensionamiento)
 
 El usuario pidió revisar unas capturas reales de la simulación de Teusaquillo para confirmar visualmente el trabajo del día. Sin buscarlo, se encontró una inconsistencia real entre 📐 Dimensionamiento y 📊 Producción para la MISMA sesión: Dimensionamiento confirmó un diseño con 8 strings/tracker (128 paneles/inversor, 2 inversores reales), pero Producción mostraba 1 string/tracker (16 paneles/inversor, 16 inversores) — el usuario confirmó que navegó en la misma pestaña con el menú lateral, sin recargar, descartando que fuera un artefacto de sesiones separadas.
