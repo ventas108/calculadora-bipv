@@ -7,6 +7,7 @@ Validación numérica disponible en tests/test_validacion_vba.py:
 """
 import numpy as np
 import pvlib
+from scipy.special import lambertw
 from datos.tecnologias_bipv import CONSTANTES_TECNOLOGIA
 
 
@@ -15,6 +16,50 @@ K_BOLTZMANN = 1.380649e-23   # J/K
 Q_ELECTRON  = 1.602176634e-19  # C
 T_REF_K     = 298.15           # 25°C en Kelvin
 G_REF       = 1000.0           # W/m² referencia STC
+
+
+def _fit_desoto_batzelis_local(v_mp, i_mp, v_oc, i_sc, alpha_sc, beta_voc):
+    """
+    Reimplementación local, cerrada (Lambert W, sin iteración), del método
+    Batzelis para estimar los 5 parámetros del SDM De Soto desde datos de
+    ficha técnica -- mismas ecuaciones y mismo resultado (verificado
+    bit-a-bit, dif=0.0 en 3 paneles reales) que
+    `pvlib.ivtools.sdm.fit_desoto_batzelis()`.
+
+    Reimplementada aquí (31-ago-2026) en vez de llamar directo a pvlib
+    porque esa función SOLO existe en versiones de pvlib más nuevas que la
+    fijada en requirements.txt (pvlib==0.11.1) -- usarla directamente pasaba
+    los tests locales (con un pvlib más nuevo ya instalado en el entorno de
+    desarrollo) pero fallaba en CI y en cualquier entorno que respetara el
+    pin real (`AttributeError`, capturado en silencio por el except
+    genérico de `estimar_sdm_desde_ficha()`, cayendo siempre al heurístico
+    tosco sin que ningún test lo notara). Usa `scipy.special.lambertw`
+    (ya fijado en requirements.txt) en vez del helper privado
+    `pvlib.ivtools.utils._lambertw_pvlib` -- verificado que da el mismo
+    valor (dif=0.0) para los rangos reales de esta app.
+
+    Referencia: E. I. Batzelis, "Simple PV Performance Equations
+    Theoretically Well Founded on the Single-Diode Model", IEEE J.
+    Photovoltaics, vol. 7, no. 5, 2017.
+    """
+    alpha_sc_n = alpha_sc / i_sc
+    beta_voc_n = beta_voc / v_oc
+    t0 = 298.15  # K
+    del0 = (1 - beta_voc_n * t0) / (50.1 - alpha_sc_n * t0)
+    w0 = float(lambertw(np.exp(1.0 / del0 + 1.0)).real)
+    a0 = del0 * v_oc
+    Rs0 = (a0 * (w0 - 1) - v_mp) / i_mp
+    Rsh0 = a0 * (w0 - 1) / (i_sc * (1 - 1 / w0) - i_mp)
+    Iph0 = (1 + Rs0 / Rsh0) * i_sc
+    Isat0 = Iph0 * np.exp(-1 / del0)
+    return {
+        "alpha_sc": alpha_sc_n * i_sc,
+        "a_ref": a0,
+        "I_L_ref": Iph0,
+        "I_o_ref": Isat0,
+        "R_sh_ref": Rsh0,
+        "R_s": Rs0,
+    }
 
 
 def obtener_constantes_tecnologia(tecnologia: str) -> dict:
@@ -512,7 +557,7 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
             # se usa también su propio a_ref en vez del heurístico n×Ns×Vt de
             # arriba (que no fue derivado junto con I_L/I_o/Rs/Rsh de Batzelis
             # y rompería esa consistencia interna).
-            fit_b = pvlib.ivtools.sdm.fit_desoto_batzelis(
+            fit_b = _fit_desoto_batzelis_local(
                 v_mp=Vmp, i_mp=Imp, v_oc=Voc, i_sc=Isc,
                 alpha_sc=alpha_sc_A, beta_voc=beta_voc_V,
             )
