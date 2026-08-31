@@ -107,6 +107,8 @@ if _n_inv_total > 1:
 def _config_base() -> BIPVConfiguration:
     from calculos.dimensionamiento import diseno_electrico_confirmado
     _diseno_cp = diseno_electrico_confirmado(st.session_state)
+    if _diseno_cp["aviso"]:
+        st.warning(_diseno_cp["aviso"])
     ciudad_nombre = st.session_state.get("ciudad")
     c = CIUDADES.get(ciudad_nombre, {})
     lat = float(st.session_state.get("lat_proyecto", c.get("lat", 4.711)))

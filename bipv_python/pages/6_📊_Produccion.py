@@ -249,6 +249,8 @@ with col_c3:
 _diseno_cfg = diseno_electrico_confirmado(st.session_state)
 _n_serie_cfg = _diseno_cfg["N_serie"]
 _n_strings_tracker_cfg = _diseno_cfg["N_strings_tracker"]
+if _diseno_cfg["aviso"]:
+    st.warning(_diseno_cfg["aviso"])
 _compat_inversor_ok = True
 _compat_inversor_mensajes = []
 _compat_inversor_evaluable = bool(_n_serie_cfg and inversor)

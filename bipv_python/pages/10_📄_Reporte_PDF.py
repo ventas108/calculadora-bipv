@@ -769,7 +769,8 @@ def generar_html_reporte() -> str:
             nota="Voc y Vmp son funciones lineales de la temperatura de celda: verificar los "
                  "3 puntos de diseño (frío, real, extremo) cubre con certeza matemática toda la "
                  "curva continua entre ellos — el gráfico es para verificación visual, no agrega "
-                 "precisión sobre el cálculo ya validado.")
+                 "precisión sobre el cálculo ya validado."
+                 + (f" ⚠️ {_diseno_pdf['aviso']}" if _diseno_pdf["aviso"] else ""))
             html += cierre()
 
     # ── 3. Motor Óptico ───────────────────────────────────────────────────────

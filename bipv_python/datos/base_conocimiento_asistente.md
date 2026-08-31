@@ -2874,6 +2874,16 @@ Un caso revisado a fondo y descartado como bug: `calculos/escenarios_fase4.py::c
 
 3 tests nuevos anclados al caso real de Teusaquillo (el decoy N_str_tr=1 vs el confirmado N_str_tr_usado=8; sesión nueva sin diseño confirmado; solo widget en vivo sin confirmación). Suite completa: **809/809**. Ver `DIAGNOSTICO_BLINDAJE_DISENO_CONFIRMADO.md`.
 
+## 25f. Anexo — Actualizaciones del 31 de agosto de 2026 (alerta de vigencia: panel/inversor cambiado sin re-confirmar el diseño)
+
+Al entregar el mapa "Coherencia Aguas Abajo" de los 12 módulos y sus blindajes (pedido inmediatamente después del blindaje de `diseno_electrico_confirmado()`), quedó identificado un hueco real sin cubrir: en 📐 Dimensionamiento, `panel_dict`/`inversor_dict_dim` se reescriben SOLOS en cada render apenas el usuario cambia la selección, pero `N_serie`/`N_str_tr_usado` (el diseño CONFIRMADO) solo se actualizan al oprimir "▶️ Optimizar N paneles/string" o "Prorrateo preliminar". Si el usuario cambiaba de panel/inversor sin volver a confirmar, las 5 páginas consumidoras seguían evaluando la compatibilidad eléctrica del panel/inversor NUEVO contra el N/string calculado para el diseño VIEJO, sin ningún aviso — misma familia del bug de `N_strings/tracker` en Producción, pero del lado panel/inversor. El usuario pidió explícitamente: "construye esa alerta con el mismo rigor".
+
+**Diseño con la misma garantía anti-falso-positivo** que el resto del blindaje: `diseno_electrico_confirmado()` ahora también compara `N_serie_panel_ref`/`N_serie_inversor_ref` (guardados en el mismo punto donde se confirma `N_serie`) contra la selección actual en vivo. Solo avisa (`vigente=False`, `aviso` con texto listo para mostrar) si hay una referencia guardada que YA NO coincide — nunca por la sola ausencia de la referencia (ej. un proyecto guardado antes de que este campo existiera), donde `vigente` queda en `True` por diseño.
+
+**Mostrado en los 6 puntos**: banner persistente en la propia 📐 Dimensionamiento (colocado después del bloque que reescribe panel/inversor en cada render, para comparar contra la selección ya fresca), `st.warning()` en 📊 Producción, 🤖 Análisis IA, 🧩 Comparador Paneles y 🧭 Comparador Orientación, y el texto plegado dentro del `nota=` ya existente de 📄 Reporte PDF (no bloquea el reporte, coherente con el resto de esa página).
+
+5 tests nuevos: vigente cuando coincide, aviso cuando cambia panel, aviso cuando cambia inversor, sin falso positivo cuando no hay referencia histórica, sin aviso cuando Dimensionamiento nunca corrió. Suite completa: **814/814**. Ver `DIAGNOSTICO_ALERTA_VIGENCIA_DISENO.md`.
+
 ## 25d. Anexo — Actualizaciones del 31 de agosto de 2026 (Producción leía N_strings/tracker desalineado de Dimensionamiento)
 
 El usuario pidió revisar unas capturas reales de la simulación de Teusaquillo para confirmar visualmente el trabajo del día. Sin buscarlo, se encontró una inconsistencia real entre 📐 Dimensionamiento y 📊 Producción para la MISMA sesión: Dimensionamiento confirmó un diseño con 8 strings/tracker (128 paneles/inversor, 2 inversores reales), pero Producción mostraba 1 string/tracker (16 paneles/inversor, 16 inversores) — el usuario confirmó que navegó en la misma pestaña con el menú lateral, sin recargar, descartando que fuera un artefacto de sesiones separadas.

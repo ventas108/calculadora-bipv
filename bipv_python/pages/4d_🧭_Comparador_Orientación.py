@@ -116,6 +116,8 @@ def _coords_proyecto() -> tuple[float, float, float]:
 def _config_base() -> BIPVConfiguration:
     from calculos.dimensionamiento import diseno_electrico_confirmado
     _diseno_co = diseno_electrico_confirmado(st.session_state)
+    if _diseno_co["aviso"]:
+        st.warning(_diseno_co["aviso"])
     lat, lon, alt_m = _coords_proyecto()
     return BIPVConfiguration(
         lat=lat, lon=lon, alt_m=alt_m,

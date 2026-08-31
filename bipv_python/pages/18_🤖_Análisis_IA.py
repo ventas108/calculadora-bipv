@@ -170,6 +170,11 @@ def _candidato_actual() -> CandidatoRegistrado:
     return CandidatoRegistrado(resultado=resultado, fin=fin, capex_usd=capex_usd)
 
 
+from calculos.dimensionamiento import diseno_electrico_confirmado as _diseno_confirmado_check
+_aviso_diseno_ia = _diseno_confirmado_check(st.session_state)["aviso"]
+if _aviso_diseno_ia:
+    st.warning(_aviso_diseno_ia)
+
 registro = {"Actual": _candidato_actual()}
 
 # El SYSTEM_PROMPT de ambos agentes ya no asume "fachada" por defecto, pero

@@ -603,16 +603,69 @@ def diseno_electrico_confirmado(session_state) -> dict:
     (ahí "capturar lo que hay ahora mismo" es justamente el propósito, no
     un error) -- lo demás debe pasar por aquí.
 
+    Alerta de vigencia (31-ago-2026, pedida explícitamente por el usuario:
+    "construye esa alerta con el mismo rigor"): `panel_dict`/`inversor_dict_dim`
+    se actualizan SOLOS apenas el usuario cambia la selección en
+    Dimensionamiento, pero `N_serie`/`N_str_tr_usado` solo se actualizan
+    cuando confirma un diseño ("▶️ Optimizar N paneles/string" o "Prorrateo
+    preliminar"). Si cambia de panel o inversor y no vuelve a confirmar,
+    todo lo que consume este diseño evaluaría el panel/inversor NUEVO
+    contra el N/string del diseño VIEJO, sin ningún aviso. Esta función
+    ahora compara el panel/inversor que produjo el último diseño confirmado
+    (`N_serie_panel_ref`/`N_serie_inversor_ref`, escritos en el mismo punto
+    donde se confirma `N_serie`) contra la selección actual
+    (`panel_nombre_dim`/`inversor_nombre_dim`, en vivo) y arma un aviso
+    listo para mostrar -- diseñado a propósito para NO dar falsos positivos:
+    solo avisa si hay evidencia POSITIVA de un cambio real (una referencia
+    guardada que ya no coincide con la selección actual), nunca por la sola
+    ausencia de la referencia (ej. un proyecto guardado antes de que esta
+    función existiera) -- ahí `vigente` queda en `True` por diseño, no se
+    inventa una alarma sin poder confirmarla.
+
     Retorna dict:
       N_serie            : módulos en serie confirmados (int) o None si
                             Dimensionamiento no se ha ejecutado todavía.
       N_strings_tracker  : strings/tracker CONFIRMADOS (int, default 1 si
                             el usuario nunca confirmó un diseño).
+      vigente            : False solo si HAY una referencia guardada de
+                            panel/inversor y ya no coincide con la
+                            selección actual. True en cualquier otro caso
+                            (incluida la falta de referencia histórica).
+      aviso              : texto listo para `st.warning()`/nota del reporte
+                            si `vigente` es False; None si no aplica.
     """
     n_serie = session_state.get("N_serie")
+    n_serie_int = int(n_serie) if n_serie else None
+    n_str_tr = int(session_state.get("N_str_tr_usado", 1) or 1)
+
+    panel_ref = session_state.get("N_serie_panel_ref")
+    inversor_ref = session_state.get("N_serie_inversor_ref")
+    panel_actual = session_state.get("panel_nombre_dim")
+    inversor_actual = session_state.get("inversor_nombre_dim")
+
+    vigente = True
+    aviso = None
+    if n_serie_int is not None:
+        panel_cambio = bool(panel_ref) and panel_ref != panel_actual
+        inversor_cambio = bool(inversor_ref) and inversor_ref != inversor_actual
+        if panel_cambio or inversor_cambio:
+            vigente = False
+            aviso = (
+                f"⚠️ El panel o inversor cambió desde que confirmaste este diseño "
+                f"(N={n_serie_int} en serie, {n_str_tr} string(s)/tracker, con "
+                f"**{panel_ref}** / **{inversor_ref}**) — vuelve a 📐 Dimensionamiento "
+                f"y presiona \"▶️ Optimizar N paneles/string\" (o recarga el "
+                f"Prorrateo preliminar) para actualizarlo antes de confiar en estos "
+                f"resultados."
+            )
+
     return {
-        "N_serie": int(n_serie) if n_serie else None,
-        "N_strings_tracker": int(session_state.get("N_str_tr_usado", 1) or 1),
+        "N_serie": n_serie_int,
+        "N_strings_tracker": n_str_tr,
+        "vigente": vigente,
+        "aviso": aviso,
+        "panel_confirmado": panel_ref,
+        "inversor_confirmado": inversor_ref,
     }
 
 

@@ -11,6 +11,7 @@ from calculos.dimensionamiento import (
     resolver_n_strings_tracker,
     curva_electrica_temperatura,
     interpretar_curva_electrica,
+    diseno_electrico_confirmado,
 )
 from calculos.graficos_compatibilidad import figura_compatibilidad_electrica
 from calculos.modelo_iv import (
@@ -568,6 +569,23 @@ else:
     _inv_falt = [k for k in ["Vdc_max","Vmppt_min","Vmppt_max","n_trackers","n_strings_tracker","I_max_tracker","P_dc_max_W"] if not inversor.get(k)]
     st.warning(f"🟡 Inversor incompleto — faltan: {', '.join(_inv_falt)}" if _inv_falt else "🟡 Inversor marcado como incompleto en catálogo")
 
+# ── Vigencia del diseño confirmado (31-ago-2026) ──────────────────────────────
+# El resultado de "▶️ Optimizar N paneles/string" solo se redibuja en el mismo
+# render donde se oprime el botón -- si después cambias panel/inversor sin
+# volver a oprimirlo, esa tabla simplemente desaparece de la vista sin avisar
+# que N_serie/N_str_tr_usado (lo que Producción y el resto ya están usando)
+# quedó apuntando al diseño viejo. Este aviso persiste independientemente de
+# si el botón se oprimió en este render o no.
+_diseno_vigencia = diseno_electrico_confirmado(st.session_state)
+if _diseno_vigencia["aviso"]:
+    st.warning(_diseno_vigencia["aviso"])
+elif _diseno_vigencia["N_serie"]:
+    st.caption(
+        f"✅ Diseño confirmado vigente: N={_diseno_vigencia['N_serie']} en serie, "
+        f"{_diseno_vigencia['N_strings_tracker']} string(s)/tracker, con "
+        f"{panel_nombre} / {inversor_nombre}."
+    )
+
 st.markdown("---")
 st.subheader("🧭 Mapeo de inversores opcionales para este panel")
 st.caption(
@@ -738,6 +756,12 @@ with st.container(border=True):
                 )
                 # Resultado (sobrevive F5, a diferencia de la key del widget)
                 st.session_state["N_str_tr_usado"] = int(N_str_tr)
+                # Referencia de vigencia (31-ago-2026, ver
+                # diseno_electrico_confirmado()): con qué panel/inversor se
+                # confirmó este N -- si cualquiera de los dos cambia después
+                # sin volver a confirmar, esa función avisa sola.
+                st.session_state["N_serie_panel_ref"] = panel_nombre
+                st.session_state["N_serie_inversor_ref"] = _modelo_compatible
                 # Clave PROPIA del prorrateo (distinta de N_str_tr_usado, que
                 # también escribe el botón "Optimizar N paneles/string" más
                 # abajo para su propio propósito) -- evita que ese otro botón
@@ -998,6 +1022,10 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
         )
         st.session_state["N_serie"] = mejor.N_serie
         st.session_state["N_str_tr_usado"] = int(N_str_tr)
+        # Referencia de vigencia (31-ago-2026, ver diseno_electrico_confirmado()):
+        # con qué panel/inversor se confirmó este N.
+        st.session_state["N_serie_panel_ref"] = panel_nombre
+        st.session_state["N_serie_inversor_ref"] = inversor_nombre
 
         # ── Gráfico Voc/Vmp vs. temperatura + interpretación del N elegido ────
         # Visibilizado también aquí (pedido explícito del usuario, 30-ago-2026,

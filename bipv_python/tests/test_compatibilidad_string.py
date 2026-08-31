@@ -727,3 +727,77 @@ def test_diseno_confirmado_ignora_n_str_tr_aunque_no_haya_usado():
     estado = {"N_serie": 8, "N_str_tr": 8}
     resultado = diseno_electrico_confirmado(estado)
     assert resultado["N_strings_tracker"] == 1
+
+
+# ---------------------------------------------------------------------------
+# diseno_electrico_confirmado() -- alerta de vigencia (31-ago-2026, "construye
+# esa alerta con el mismo rigor"): panel_dict/inversor_dict_dim se actualizan
+# solos al cambiar la selección en Dimensionamiento, pero N_serie/N_str_tr_usado
+# solo se actualizan al re-confirmar. Diseñado para NUNCA dar falso positivo:
+# solo avisa si hay evidencia POSITIVA (una referencia guardada que ya no
+# coincide con la selección actual), nunca por la sola ausencia de referencia.
+# ---------------------------------------------------------------------------
+
+
+def test_diseno_confirmado_vigente_cuando_panel_e_inversor_no_cambiaron():
+    estado = {
+        "N_serie": 8, "N_str_tr_usado": 8,
+        "N_serie_panel_ref": "ASP-ST1-T40", "N_serie_inversor_ref": "Growatt MID15KTL3-X",
+        "panel_nombre_dim": "ASP-ST1-T40", "inversor_nombre_dim": "Growatt MID15KTL3-X",
+    }
+    resultado = diseno_electrico_confirmado(estado)
+    assert resultado["vigente"] is True
+    assert resultado["aviso"] is None
+    assert resultado["panel_confirmado"] == "ASP-ST1-T40"
+    assert resultado["inversor_confirmado"] == "Growatt MID15KTL3-X"
+
+
+def test_diseno_confirmado_avisa_si_panel_cambio_sin_reconfirmar():
+    # El usuario confirmó con ASP-ST1-T40 y luego, sin volver a oprimir
+    # "Optimizar N paneles/string", cambió el panel en vivo a otro distinto.
+    estado = {
+        "N_serie": 8, "N_str_tr_usado": 8,
+        "N_serie_panel_ref": "ASP-ST1-T40", "N_serie_inversor_ref": "Growatt MID15KTL3-X",
+        "panel_nombre_dim": "EINNOVA ESM-620M", "inversor_nombre_dim": "Growatt MID15KTL3-X",
+    }
+    resultado = diseno_electrico_confirmado(estado)
+    assert resultado["vigente"] is False
+    assert resultado["aviso"] is not None
+    assert "ASP-ST1-T40" in resultado["aviso"]
+    assert "Dimensionamiento" in resultado["aviso"]
+
+
+def test_diseno_confirmado_avisa_si_inversor_cambio_sin_reconfirmar():
+    estado = {
+        "N_serie": 8, "N_str_tr_usado": 8,
+        "N_serie_panel_ref": "ASP-ST1-T40", "N_serie_inversor_ref": "Growatt MID15KTL3-X",
+        "panel_nombre_dim": "ASP-ST1-T40", "inversor_nombre_dim": "SOLIS-60K",
+    }
+    resultado = diseno_electrico_confirmado(estado)
+    assert resultado["vigente"] is False
+    assert resultado["aviso"] is not None
+    assert "Growatt MID15KTL3-X" in resultado["aviso"]
+
+
+def test_diseno_confirmado_sin_referencia_historica_no_inventa_alarma():
+    # Proyecto guardado ANTES de que existieran N_serie_panel_ref/
+    # N_serie_inversor_ref (o cualquier caso donde nunca se escribieron):
+    # no hay forma de saber si el panel/inversor cambió, así que NO debe
+    # avisar -- vigente=True por diseño, nunca una alarma sin evidencia.
+    estado = {
+        "N_serie": 8, "N_str_tr_usado": 8,
+        "panel_nombre_dim": "ASP-ST1-T40", "inversor_nombre_dim": "Growatt MID15KTL3-X",
+    }
+    resultado = diseno_electrico_confirmado(estado)
+    assert resultado["vigente"] is True
+    assert resultado["aviso"] is None
+
+
+def test_diseno_confirmado_sin_diseno_confirmado_todavia_no_avisa():
+    # Dimensionamiento nunca se corrió (N_serie ausente) -- no hay diseño
+    # que pueda quedar desactualizado, así que tampoco hay aviso.
+    estado = {"panel_nombre_dim": "ASP-ST1-T40", "inversor_nombre_dim": "Growatt MID15KTL3-X"}
+    resultado = diseno_electrico_confirmado(estado)
+    assert resultado["N_serie"] is None
+    assert resultado["vigente"] is True
+    assert resultado["aviso"] is None
