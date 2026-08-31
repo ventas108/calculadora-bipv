@@ -360,6 +360,26 @@ El Motor IV (modelo De Soto/pvlib de 5 parámetros) es el motor de cálculo detr
 
 ────────────────────────────────────────────────────────────
 
+### 3 bugs reales corregidos: el catálogo real pasó de 0 a 72 de 76 paneles activando Motor IV  ACTUALIZADO (30/31-ago-2026)
+
+Hasta esta actualización, el ajuste automático del Motor IV (el que se dispara solo cuando un panel del catálogo real tiene ficha completa pero no un SDM ya calibrado a mano) **no funcionaba para NINGÚN panel real del catálogo Excel** — sin ningún error visible, simplemente la sección "📈 Curva I-V real" no aparecía. Se encontraron y corrigieron 3 causas reales, en cascada:
+
+1. **Un dato que faltaba silenciosamente**: el catálogo Excel de paneles guardaba 3 de los 4 valores eléctricos STC del panel bajo un nombre especial, pero olvidaba el cuarto (`Imp`) — así que el motor de ajuste fallaba internamente para cualquier panel sin SDM precalibrado, sin mostrar ningún aviso. Corregido, y además blindado para que un problema similar con otra fuente de paneles no vuelva a pasar desapercibido.
+2. **Un desajuste de unidades**: el cálculo que traduce el ajuste eléctrico a la curva real usaba una unidad distinta a la que esperaba el resto del motor — el resultado era que, incluso cuando el ajuste "funcionaba", el voltaje calculado salía colapsado a una fracción del real (por ejemplo, ~1,3 V en vez de ~49 V). Corregido en el único punto de origen del dato, sin tocar el resto del motor.
+3. **Un método de ajuste más robusto**: el método principal de ajuste (iterativo) tiene una debilidad numérica conocida con paneles reales modernos de alta potencia — a veces simplemente no converge. Se agregó un segundo método de respaldo (un cálculo cerrado, que no puede fallar por falta de convergencia) que ahora resuelve la gran mayoría de los casos donde el método principal no llega.
+
+**Resultado medido**: de los 76 paneles reales del catálogo, ahora **72 activan el Motor IV automáticamente** (antes: 0). Los 4 que aún no lo logran son: 2 con ficha técnica genuinamente incompleta (falta el dato eléctrico STC), y 2 casos límite donde el método de respaldo da un resultado matemáticamente válido pero físicamente imposible para esa ficha en particular — en ambos casos la app **rechaza correctamente** activar Motor IV en vez de mostrar un número inventado (el autochequeo que compara el resultado contra la ficha técnica, con 5% de tolerancia, ya protegía contra esto desde antes — nunca se mostró un dato incorrecto al usuario, solo la función quedaba inactiva).
+
+⚠️ **Para no cometer errores**: si cargas un panel nuevo del catálogo real y el Motor IV no se activa, ya no asumas que es porque "le falta algo obvio" — revisa el aviso de "🔴 Motor IV: SDM no válido" o la ausencia silenciosa de la curva; en la gran mayoría de los casos reales de hoy en adelante, si tiene Voc/Isc/Vmp/Imp completos, sí debería activarse.
+
+### N_s estimado para la familia Solar First (CdTe, 10 variantes) — dato marcado explícitamente como no oficial (31-ago-2026)
+
+Los paneles CdTe de película delgada (vidrio fotovoltaico, sin celdas discretas como el silicio cristalino) muchas veces no publican un "número de celdas en serie" en su ficha — es el caso real de los 10 paneles Solar First (series ST1 y ST2) de este catálogo. Sin ese dato, el ajuste automático no podía ni empezar. Se estimó un valor razonable por analogía real con el panel de referencia ya validado de esta app (SolTech ASP-ST1-T40, el mismo que usa el proyecto Teusaquillo — mismas dimensiones físicas y voltaje similar), y se guardó en el catálogo **marcado explícitamente como estimado, no como dato del fabricante** (columna "Confianza": *"Estimado -- no confirmado por fabricante"*).
+
+⚠️ **Para no cometer errores**: si ves este aviso de confianza en un panel, el N° de celdas en serie es una estimación razonada, no un dato verificado por el fabricante — si en algún momento consigues la ficha real con ese dato, reemplázalo en el catálogo. No afecta la precisión del ajuste eléctrico en sí (el método que realmente calibra estos paneles no depende de este número), solo permite que el ajuste se intente.
+
+────────────────────────────────────────────────────────────
+
 ## 6. Página 4 — Dimensionamiento  ACTUALIZADO
 
 Propósito: Calcular cuántos paneles caben en la fachada y seleccionar el inversor óptimo.
@@ -428,6 +448,17 @@ Ficha de auditoría completa, con capturas reales de esa referencia estándar in
 🔴 **Crash real corregido: "N mínimo a explorar" quedaba pegado al inversor anterior y tumbaba la página (29-ago-2026)**: preparando la corrida real de Urabá, el usuario cambió del Growatt MAX 100KTL3 LV (`Vmppt_activo_min`=850V, que con el panel real JA Solar JAM66D46-720/LB da un N mínimo eléctrico de 21) al SOLIS-60K, y "▶️ Optimizar N paneles/string" reventó con `KeyError: "None of ['1-Voc≤Vdc', ...] are in the [columns]"`. Causa: el `N_min_scan` (arriba, junto a "N máximo a explorar") se calcula con `max(N_min_eléctrico_del_inversor_actual, N_min_guardado)` — ese `max()` **nunca baja**, así que el 21 del Growatt sobrevivía al cambiar de inversor; con `N_max_scan` todavía en su default (20), `N_min(21) > N_max(20)` hacía que `optimizar_n_serie()` recorriera un rango vacío y devolviera `[]` — `pd.DataFrame([])` sale sin columnas, y el `.style.map(subset=[...])` de la tabla revienta con ese `KeyError` crudo en vez de un mensaje entendible.
 
 **Corregido en 3 capas**: (1) `N_min_scan` ahora se resetea al mínimo eléctrico fresco del inversor cada vez que CAMBIA el inversor seleccionado (un ajuste manual posterior para ese MISMO inversor se sigue respetando); (2) aviso temprano (`st.warning`) si `N_min_scan > N_max_scan`, antes de que el usuario llegue a oprimir el botón; (3) guard defensivo en el propio botón — si `optimizar_n_serie()` devuelve una lista vacía por cualquier motivo, se muestra un `st.error` claro y se detiene ahí, en vez de dejar que pandas/Streamlit avancen hacia el crash. Reproducido y verificado exactamente con los datos reales (panel JA Solar, Growatt MAX 100KTL3 LV → SOLIS-60K). Test de regresión nuevo anclado al caso real. Suite completa: **739/739**.
+
+### ⚡ Gráfica de compatibilidad eléctrica string–inversor, integrada al resultado del optimizador  NUEVO (30-ago-2026)
+
+Al presionar "▶️ Optimizar N paneles/string" y obtener el "✅ N óptimo", un panel desplegable nuevo (colapsado por defecto — el N óptimo mostrado ya pasó las 5 verificaciones eléctricas de la tabla) muestra:
+
+- Un gráfico interactivo con las curvas **Voc(T)** y **Vmp(T)** del string frente a la ventana MPPT del inversor y su límite de tensión máxima (Vdc máx), a lo largo de todo el rango de temperatura entre las 3 condiciones de diseño del sitio (frío / real / extremo).
+- Una interpretación en texto, punto por punto, de cuál límite del inversor manda en cada condición y con qué margen real — no solo si "pasa o no pasa".
+
+Es exactamente el mismo tipo de gráfico que muestra una referencia estándar internacional al verificar la compatibilidad eléctrica de un inversor. **No es una verificación matemática nueva**: Voc y Vmp son funciones lineales de la temperatura de celda, así que los 3 puntos de diseño que ya evalúa el semáforo de la tabla (OK/ALERTA/FALLA) cubren con certeza matemática toda la curva continua entre ellos — el gráfico solo lo hace visible de un vistazo, útil para explicar el diseño a un cliente o revisor sin tener que leer la tabla completa.
+
+⚠️ Para no cometer errores: como este panel solo se muestra para el N óptimo ya elegido por el algoritmo (que descarta cualquier N con riesgos), normalmente vas a ver los 3 puntos en verde — si alguna vez ves un punto en rojo aquí, algo cambió después del cálculo (otro inversor, otra temperatura) y conviene volver a correr el optimizador.
 
 ────────────────────────────────────────────────────────────
 
@@ -984,6 +1015,17 @@ Vida útil (PR > 70%)  │  Años estimados hasta degradación severa
 El resultado se guarda como tasa_degradacion_calculada y queda disponible en Página 7 como alternativa al slider paramétrico.
 
 Ejemplo: Si PR_corr_T fue 82% en 2022, 81.3% en 2023 y 80.6% en 2024, la regresión da −0.7 pp/año → tasa = 0.70%/año (ligeramente superior al 0.5% de catálogo CdTe).
+
+### ⚡ Gráfica de compatibilidad eléctrica string–inversor, junto al banner de compatibilidad  NUEVO (30-ago-2026)
+
+Justo debajo del banner 🟢/🔴 "Compatibilidad eléctrica preliminar" que ya existía en esta página, un panel desplegable (se abre solo si la configuración actual es **incompatible** — colapsado si está todo bien) muestra:
+
+- El gráfico Voc(T)/Vmp(T) del string contra la ventana MPPT y el límite Vdc máximo del inversor, en las 3 temperaturas de diseño del sitio.
+- Una interpretación punto por punto (Voc en frío / Vmp real / Vmp en el momento más caluroso), marcada 🟢 sano / 🟠 margen ajustado / 🔴 crítico, con el margen real en voltios o porcentaje frente al límite que aplica en cada caso.
+
+Este gráfico usa exactamente el mismo veredicto que ya calcula el banner de arriba (no es una verificación nueva, solo lo visualiza) — así que nunca vas a ver el banner en verde y el gráfico marcando algo crítico, o viceversa. Sirve para entender DE INMEDIATO por qué una configuración fue rechazada: por ejemplo, si el string queda incompatible por el calor extremo del sitio (el caso más común en climas cálidos como Urabá), el punto rojo en el gráfico muestra exactamente cuántos voltios falta para llegar al piso mínimo del inversor.
+
+⚠️ Para no cometer errores: si ves 🔴 crítico en "Vmp extremo (calor)", el problema casi siempre se resuelve subiendo el número de módulos en serie (N/string) en 📐 Dimensionamiento — no cambiando el inversor.
 
 ────────────────────────────────────────────────────────────
 
@@ -1780,6 +1822,8 @@ Sección  │  Contenido  │  Disponible si  │  Checkbox
 
 2. Recurso Solar  │  POA anual, GHI, temperatura  │  Página 2 ejecutada  │  —
 
+2b. Compatibilidad Eléctrica  │  Gráfica Voc/Vmp vs. temperatura, veredicto  │  N/string + panel + inversor cargados  │  —
+
 3. Motor Óptico  │  Cascada IAM + Soiling + Térmico  │  Página 5b ejecutada  │  ✅ Motor Óptico
 
 4. Producción  │  E_ac, PR, Factor de Planta  │  Página 6 ejecutada  │  ✅ Producción
@@ -1797,6 +1841,16 @@ Sección  │  Contenido  │  Disponible si  │  Checkbox
 6. Balance  │  Autogeneración, batería  │  Página 11 ejecutada  │  ✅ Balance
 
 7. CO₂  │  Emisiones evitadas, equivalencias  │  Página 12 ejecutada  │  ✅ CO₂
+
+### Sección 2b — Compatibilidad Eléctrica String–Inversor (nueva, 30-ago-2026)
+
+Se genera automáticamente cuando el proyecto ya tiene un N° de módulos en serie, panel e inversor definidos en 📐 Dimensionamiento (no requiere checkbox aparte). Incluye:
+
+- El gráfico Voc(T)/Vmp(T) del string contra la ventana MPPT y el límite Vdc máximo del inversor — el mismo que se ve en 📊 Producción y 📐 Dimensionamiento.
+- Una tabla resumen: estado (compatible/incompatible), N° de módulos en serie, y el voltaje del string en cada una de las 3 condiciones de diseño (frío / real / extremo).
+- Una nota explícita, visible para quien reciba el reporte, aclarando que el gráfico visualiza — pero no reemplaza — la verificación matemática ya incluida en el diseño.
+
+Útil para incluir en un reporte técnico entregable a un cliente o para una revisión de diseño, sin que quien lo reciba tenga que abrir la app.
 
 ### Sección 4c — Bypass Diodes (superficie única)
 
