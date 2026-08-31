@@ -14,6 +14,7 @@ El asistente NUNCA modifica valores ni ejecuta cálculos.
 """
 from __future__ import annotations
 
+import math
 import os
 import re
 import unicodedata
@@ -149,16 +150,51 @@ _STOPWORDS = {
 }
 
 
+def _singularizar(palabra: str) -> str:
+    """Heurística simple de plural español -> singular, SOLO para hacer
+    calzar tokens al buscar (nunca se usa para mostrar texto). Sin esto,
+    "alertas" (pregunta del usuario) no calzaba con "alerta" (título de la
+    sección real), y una sección específica perdía el bono de título frente
+    a secciones genéricas -- bug real encontrado probando la pregunta "qué
+    alertas nuevas se instalaron..." en el chat en vivo (31-ago-2026, ver
+    `DIAGNOSTICO_RETRIEVAL_IDF_PLURALES.md`)."""
+    if len(palabra) > 5 and palabra.endswith("es"):
+        return palabra[:-2]
+    if len(palabra) > 4 and palabra.endswith("s"):
+        return palabra[:-1]
+    return palabra
+
+
 def _normalizar(texto: str) -> list[str]:
     t = unicodedata.normalize("NFKD", texto.lower())
     t = "".join(c for c in t if not unicodedata.combining(c))
     palabras = re.findall(r"[a-z0-9_]+", t)
-    return [p for p in palabras if p not in _STOPWORDS and len(p) > 1]
+    return [_singularizar(p) for p in palabras if p not in _STOPWORDS and len(p) > 1]
+
+
+def _calcular_idf(secciones: list[dict]) -> dict[str, float]:
+    """IDF (frecuencia inversa de documento) por palabra, sobre las secciones
+    reales del manual. Sin esto, `buscar()` contaba cada palabra igual --
+    "nuevo"/"nueva" marca decenas de funciones no relacionadas en todo el
+    manual (cada vez que se documenta una función agregada), así que una
+    pregunta genérica tipo "qué alertas NUEVAS se instalaron" le daba el
+    mismo peso a "nuevas" que a una palabra realmente específica como
+    "vigencia" -- las secciones viejas con "nuevo" en el título ganaban por
+    volumen aunque no tuvieran nada que ver con la pregunta real. Con IDF,
+    una palabra que aparece en pocas secciones (específica) pesa más que una
+    que aparece en decenas (genérica)."""
+    n = len(secciones)
+    df: dict[str, int] = {}
+    for s in secciones:
+        for t in s["tokens"]:
+            df[t] = df.get(t, 0) + 1
+    return {t: math.log((n + 1) / (c + 1)) + 1 for t, c in df.items()}
 
 
 @dataclass
 class BaseConocimiento:
     secciones: list[dict] = field(default_factory=list)  # {titulo, texto, tokens}
+    idf: dict[str, float] = field(default_factory=dict, repr=False, compare=False)
 
     @classmethod
     def cargar(cls, ruta: str = RUTA_BASE_CONOCIMIENTO) -> "BaseConocimiento":
@@ -178,12 +214,19 @@ class BaseConocimiento:
                 "titulo": titulo, "texto": texto,
                 "tokens": set(_normalizar(texto)),
             })
-        return cls(secciones)
+        return cls(secciones, idf=_calcular_idf(secciones))
 
     def buscar(self, pregunta: str, k: int = 4) -> list[dict]:
         q = set(_normalizar(pregunta))
         if not q:
             return []
+
+        def peso(tok: str) -> float:
+            # Sin idf precalculado (ej. instancia armada a mano en un test
+            # con secciones sintéticas): cae a peso uniforme, mismo
+            # comportamiento que antes de este cambio.
+            return self.idf.get(tok, 1.0)
+
         puntuadas = []
         for s in self.secciones:
             inter = q & s["tokens"]
@@ -191,7 +234,7 @@ class BaseConocimiento:
                 continue
             # peso extra si la palabra aparece en el título
             t_toks = set(_normalizar(s["titulo"]))
-            score = len(inter) + 2 * len(q & t_toks)
+            score = sum(peso(t) for t in inter) + 2 * sum(peso(t) for t in (q & t_toks))
             puntuadas.append((score, s))
         puntuadas.sort(key=lambda x: -x[0])
         return [s for _, s in puntuadas[:k]]
