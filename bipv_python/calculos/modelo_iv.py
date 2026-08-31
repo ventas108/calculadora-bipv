@@ -586,12 +586,20 @@ def validar_sdm_vs_ficha(panel: dict, tolerancia_pct=5.0) -> dict:
     """
     res = resolver_curva_iv(1000.0, 25.0, panel, n_puntos=0)
 
+    # .get() con respaldo a la clave sin "_stc" -- bug real (30-ago-2026):
+    # el subíndice directo panel["Imp_stc"] lanzaba KeyError para cualquier
+    # panel cuya fuente no hubiera fijado ese alias exacto (encontrado con
+    # datos/catalogo_paneles_excel.py, que omitía "Imp_stc" mientras sí
+    # fijaba "Voc_stc"/"Vmp_stc"/"Isc_stc"). preparar_panel_iv() capturaba
+    # ese KeyError y lo convertía en "datos insuficientes" (None) en
+    # silencio -- bloqueaba el Motor IV on-demand para cualquier panel real
+    # afectado, incluso cuando el ajuste SDM habría sido válido.
     campos = {
-        "Voc":  (res["Voc"],  panel["Voc_stc"]),
-        "Isc":  (res["Isc"],  panel["Isc_stc"]),
-        "Vmp":  (res["Vmp"],  panel["Vmp_stc"]),
-        "Imp":  (res["Imp"],  panel["Imp_stc"]),
-        "Pmax": (res["Pmax"], panel["Pmax_stc"]),
+        "Voc":  (res["Voc"],  panel.get("Voc_stc")  or panel.get("Voc")),
+        "Isc":  (res["Isc"],  panel.get("Isc_stc")  or panel.get("Isc")),
+        "Vmp":  (res["Vmp"],  panel.get("Vmp_stc")  or panel.get("Vmp")),
+        "Imp":  (res["Imp"],  panel.get("Imp_stc")  or panel.get("Imp")),
+        "Pmax": (res["Pmax"], panel.get("Pmax_stc") or panel.get("Pmax")),
     }
     resultado = {}
     todo_ok   = True

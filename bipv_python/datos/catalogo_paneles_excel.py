@@ -82,6 +82,16 @@ def cargar_catalogo_paneles() -> dict:
             "Voc_stc":  Voc,                          # = Voc_STC  del Excel
             "Vmp_stc":  Vmp,                          # = Vmp_STC  del Excel
             "Isc_stc":  Isc,                          # = Isc_STC  del Excel
+            "Imp_stc":  Imp,                          # = Imp_STC  del Excel -- bug real
+            # (30-ago-2026): faltaba mientras los otros 3 sí tenían alias
+            # "_stc". calculos.modelo_iv.validar_sdm_vs_ficha() accede a
+            # panel["Imp_stc"] con subíndice directo (sin .get()) -- sin este
+            # alias, CUALQUIER panel del catálogo Excel sin SDM precalibrado
+            # lanzaba KeyError dentro de preparar_panel_iv() (capturado y
+            # silenciado como "datos insuficientes"), así que el ajuste
+            # on-demand fit_desoto() nunca llegaba a activarse para ningún
+            # panel real de este catálogo -- Motor IV quedaba mudo pese al
+            # aviso "🟢 se activará automáticamente" en Dimensionamiento.
             "Tk_beta":  _f(r.get("CoefVoc_C")),       # coef. temp. Voc  (%/°C)
             "Tk_gamma": _f(r.get("CoefT_C")),         # coef. temp. Pmax (%/°C)
             "I_L_ref": None, "I_o_ref": None,

@@ -150,6 +150,91 @@ es un paso a través puramente visual de datos ya cubiertos por los tests de
 compartido con Plotly 5.22.0 instalado en un entorno aislado, para N=18 y N=28 de Urabá — la figura
 se construye sin excepciones para ambos casos.
 
+## Tercera actualización (30 de agosto de 2026, mismo día): auditoría de coherencia con Motor IV
+
+El usuario pidió "confírmalo en Motor IV también". Motor IV no tiene contexto de string/inversor
+(simula UN panel, sin N/string ni inversor en pantalla), así que tras aclarar el alcance con el
+usuario, la tarea quedó en: **confirmar que el modelo lineal** que usa `curva_electrica_temperatura()`
+(Voc_stc/Vmp_stc escalados por `Tk_beta`) **es coherente con el modelo físico completo que usa el
+propio Motor IV** (SDM De Soto 2006, vía `pvlib`).
+
+### Bug real encontrado y corregido (bloqueaba la comprobación)
+
+Intentando correr la comprobación con el panel real de Urabá (JA Solar JAM66D46-720/LB, sin SDM
+precalibrado), `preparar_panel_iv()` devolvía `None` sin ningún error visible. Causa raíz:
+
+- `datos/catalogo_paneles_excel.py` fijaba los alias `Voc_stc`/`Vmp_stc`/`Isc_stc` para cada panel
+  del catálogo Excel real, pero **nunca fijaba `Imp_stc`** — pese a que el valor (`Imp`) sí estaba
+  disponible en la ficha. Una asimetría real de 3-de-4 en un solo archivo.
+- `calculos/modelo_iv.py::validar_sdm_vs_ficha()` accedía a `panel["Imp_stc"]` con **subíndice
+  directo** (sin `.get()`), a diferencia del resto de esa misma función (`preparar_panel_iv()` sí
+  usa `.get()` con respaldo en otros puntos).
+- Resultado: **todo panel del catálogo Excel real sin SDM precalibrado** lanzaba `KeyError` dentro
+  de `preparar_panel_iv()`, capturado por un `except (KeyError, ...)` genérico y convertido en
+  "datos insuficientes" (`None`) — silenciosamente, sin ningún mensaje al usuario, incluso cuando
+  el ajuste SDM habría sido válido.
+
+**Corregido en dos capas** (root cause + hardening del patrón frágil que lo permitió):
+1. `datos/catalogo_paneles_excel.py`: se agregó el alias `Imp_stc` que faltaba (mismo patrón que
+   los otros 3).
+2. `calculos/modelo_iv.py::validar_sdm_vs_ficha()`: los 5 campos (`Voc`/`Isc`/`Vmp`/`Imp`/`Pmax`)
+   ahora usan `.get(...) or .get(...)` con respaldo a la clave sin sufijo `_stc`, en vez de
+   subíndice directo — evita que la misma clase de bug reaparezca si otra fuente de paneles (ficha
+   subida por PDF, catálogo futuro) tampoco fija el alias exacto.
+
+### Segundo hallazgo, real y separado (NO corregido, fuera del código de esta app)
+
+Con el bug de `Imp_stc` corregido, se auditaron los 76 paneles reales del catálogo Excel: **ninguno
+de los 76** logra activar el ajuste SDM on-demand (`pvlib.ivtools.sdm.fit_desoto()`) — o bien
+`fit_desoto()` no converge, o converge a parámetros que no reproducen la ficha STC dentro de 5%
+(y el auto-chequeo de `preparar_panel_iv()`, que ya existía, correctamente rechaza mostrar una
+curva inválida). Auditando más a fondo con el panel real de Urabá y con un panel "de libro" (60
+celdas, valores típicos): **`fit_desoto()` de pvlib 0.15.2 da resultados NO DETERMINISTAS entre una
+corrida y otra en este entorno para los MISMOS parámetros de entrada** — a veces converge
+correctamente, a veces falla con un `RuntimeError` de Jacobiano, a veces con un `TypeError` interno
+de pvlib ("tuple indices must be integers, not str"). Esto apunta a un problema de la propia
+librería `pvlib`/`scipy` en este entorno, no a un bug de esta app — no se investigó más a fondo por
+ser una desviación grande de alcance frente a lo pedido ("confírmalo"), y porque el mecanismo de
+seguridad ya existente (rechazar cualquier SDM que no reproduzca la ficha) ya protege al usuario:
+el síntoma es que Motor IV on-demand no está disponible hoy para paneles reales del catálogo sin
+SDM precalibrado, no que muestre un resultado incorrecto.
+
+**Impacto real**: el mensaje "🟢 Datos IV obligatorios completos — Motor IV se activará
+automáticamente" en 📐 Dimensionamiento (línea ~444) puede aparecer para un panel que luego, en la
+práctica, no logra activar la curva real (sin ningún error explicado al usuario, solo la ausencia
+silenciosa del expander "📈 Curva I-V real"). Vale la pena revisarlo en una sesión futura si el
+usuario lo prioriza.
+
+### Confirmación de coherencia (lo que sí se pudo completar)
+
+Como ningún panel del catálogo Excel llega a tener un SDM válido hoy, la comprobación se hizo con
+**ASP-ST1-T40** — el único panel de esta app con SDM ya calibrado y auditado contra el VBA original
+(ver docstring de `validar_sdm_vs_ficha`). Comparación real, determinista (sin `fit_desoto`), N=8
+en serie, en las 3 temperaturas de diseño (frío/real/extremo):
+
+| Punto | Voc lineal | Voc SDM | dif. | Vmp lineal | Vmp SDM | dif. |
+|---|---|---|---|---|---|---|
+| T frío (-5°C) | 1017.4 V | 1039.7 V | +2.2% | 757.8 V | 806.5 V | **+6.4%** |
+| T real (36.35°C) | 894.2 V | 885.5 V | -1.0% | 666.0 V | 648.3 V | -2.7% |
+| T extremo (41.94°C) | 877.5 V | 864.5 V | -1.5% | 653.6 V | 627.3 V | **-4.0%** |
+
+**Conclusión honesta**: Voc es muy coherente (dentro de ~2.2% en los 3 puntos, como se esperaba —
+Voc es casi lineal en T incluso en el modelo físico completo). Vmp diverge más (hasta 6.4% en frío,
+4.0% en el extremo caliente) porque el modelo lineal reutiliza el coeficiente de Voc (`Tk_beta`)
+también para Vmp — una aproximación aceptada explícitamente por el usuario al descartar la Fase 2
+(modelo Faiman de 2 parámetros completo) en el plan del modelo térmico. El sesgo tiene dirección:
+en el punto más crítico para el gate de compatibilidad (calor extremo, el que decide
+compatible/incompatible en casos reales como Urabá), **el modelo lineal SOBREESTIMA Vmp ~4%
+respecto al SDM real** — un margen que hoy queda cubierto por el umbral de alerta del 7.5% que ya
+usa `evaluar_compatibilidad_string()`, pero es una limitación real y ahora cuantificada, no solo
+teórica.
+
+**Cobertura**: nuevo archivo `tests/test_modelo_iv.py` (`calculos/modelo_iv.py` no tenía tests
+directos hasta hoy) — 5 tests: 2 anclan el fix de `Imp_stc` (uno contra el catálogo Excel real
+completo, uno aislando el `KeyError` sin invocar `fit_desoto`), 3 parametrizados anclan la
+coherencia lineal-vs-SDM de ASP-ST1-T40 con los márgenes de arriba. Suite completa: **802/802**
+(verificada 3 veces seguidas para confirmar que los tests nuevos son deterministas).
+
 ## Nota aparte (no corregida, fuera de alcance)
 
 Se detectó que el checkbox "Incluir sección Dimensionamiento" (`key="rep_inc_dim"`) del Reporte PDF
