@@ -2903,6 +2903,8 @@ El usuario pidió analizar "como un científico" un paper académico real sobre 
 
 6 tests nuevos anclados a condiciones STC exactas (P=P_STC cuando I'=1, T'=0) y casos sintéticos. Suite completa: **827/827**. Herramienta de diagnóstico puntual en `scripts/`, no integrada a la UI de la app. Ver `DIAGNOSTICO_VERIFICACION_JRC_CDTE_TEUSAQUILLO.md`.
 
+**Decisión explícita del usuario sobre integrarlo a la app**: se le explicó qué ganaría si el modelo JRC quedara instalado como función permanente (segunda opinión automática por proyecto sin depender de PVsyst, una alerta tipo la de relación DC/AC si el PR del motor principal se aleja del modelo independiente, respaldo citable frente a un evaluador externo, guardia de calidad para futuros paneles CdTe del catálogo) y qué NO — solo aplica a tecnología CdTe, no a c-Si/CIS, y es una segunda opinión, no un tribunal, puede diferir del motor principal por razones legítimas. El usuario decidió dejarlo **solo como herramienta de diagnóstico manual** (correr `scripts/verificar_jrc_teusaquillo.py` a mano), sin integrarlo a la UI ni agregar la alerta automática, hasta tener el resultado real de PVsyst.
+
 ## 25i. Anexo — Actualizaciones del 31 de agosto de 2026 (auditoría de la alerta de vigencia: 2 páginas sin cubrir + 1 riesgo de falso positivo)
 
 El usuario preguntó explícitamente por ⚡ Diagrama Unifilar: "varias métricas antes del módulo dimensionamiento influyen en esta función y no las hemos ni revisado, ni auditado ni prevenido antes de cualquier incoherencia" — pidió una auditoría real, no una respuesta del manual.
