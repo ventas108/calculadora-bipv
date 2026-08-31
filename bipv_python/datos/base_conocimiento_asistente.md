@@ -968,6 +968,8 @@ Nota: la vista muestra las filas como bandas continuas, no módulos individuales
 
 Propósito: Calcular la producción AC anual del sistema completo.
 
+**⚠️ Alerta de vigencia del diseño confirmado (31-ago-2026)**: el N en serie y los strings/tracker que usa esta página vienen SIEMPRE del último diseño CONFIRMADO en 📐 Dimensionamiento (nunca del widget en vivo — bug real corregido ese mismo día, ver `DIAGNOSTICO_NSTRTR_PRODUCCION_DESALINEADO.md`: esta página llegó a mostrar 1 string/tracker mientras Dimensionamiento tenía 8 confirmados, para la MISMA sesión). Si cambiaste panel/inversor en Dimensionamiento sin volver a presionar "▶️ Optimizar N paneles/string", esta página muestra un `st.warning()` explícito antes de simular, avisando qué quedó desactualizado (ver `DIAGNOSTICO_ALERTA_VIGENCIA_DISENO.md`).
+
 ### Pasos
 
 - Revisa los datos de entrada (tomados automáticamente de páginas anteriores)
@@ -1096,6 +1098,8 @@ El mensaje del estado 🔴 "muy_sobredimensionado" decía siempre la misma frase
 ## 10. Página 7 — Análisis Financiero  ACTUALIZADO
 
 Propósito: Calcular TIR, VPN, Payback y LCOE del proyecto bajo la Ley 1715/2014.
+
+**ℹ️ Esta página NO necesita la alerta de vigencia del diseño eléctrico** (a diferencia de Producción, Reporte PDF, Análisis IA y los Comparadores): solo lee `panel_dict`/`inversor_dict_dim` para sugerir precios por defecto (USD/kW), nunca N_serie ni compatibilidad eléctrica — no hay un valor "confirmado" que pueda quedar desalineado aquí. Sí tiene sus 2 propias firmas de invalidación, autocontenidas: `opex_kw_guardado_tipo_ref` reinvalida el default de OPEX (USD/kWp·año) si cambia el Tipo de instalación en 🏠 Proyecto (bug real corregido 29-ago-2026 — el default de una Granja fotovoltaica, 10 USD/kWp·año, quedaba pegado tras cambiar a Fachada BIPV, que debería usar 20); y `factor_p90_guardado` avisa explícitamente si el factor P90 cambió desde el último cálculo financiero guardado, para que decidas si recalculas.
 
 ### Prioridad de E_ac: multi-superficie > bypass > base
 
