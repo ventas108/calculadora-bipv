@@ -2893,6 +2893,20 @@ Al entregar el mapa "Coherencia Aguas Abajo" de los 12 módulos y sus blindajes 
 
 5 tests nuevos: vigente cuando coincide, aviso cuando cambia panel, aviso cuando cambia inversor, sin falso positivo cuando no hay referencia histórica, sin aviso cuando Dimensionamiento nunca corrió. Suite completa: **814/814**. Ver `DIAGNOSTICO_ALERTA_VIGENCIA_DISENO.md`.
 
+## 25l. Anexo — Actualizaciones del 31 de agosto de 2026 (JRC/Huld visible dentro de 📊 Producción + Crystalline + el asistente lo explica)
+
+Pedido explícito del usuario, en 2 mensajes: primero preguntó si era posible mostrar la verificación cruzada JRC/Huld físicamente dentro del módulo (no solo en un script de terminal) y que el asistente la explicara con los valores reales calculados — confirmado que sí; luego pidió implementarlo Y agregar Crystalline (c-Si), "la tercera tecnología del ciclo" que compara el paper fuente de los coeficientes de CIS.
+
+**Crystalline (c-Si) agregado**: mismo paper y Tabla 4 que ya dio CIS — u0=30,02, u1=6,28, t1=-0,017237 a t6=0,000005, con rango de referencia propio (BIPV 71,11%-73,92%, BAPV 74,18%-76,34%, mismo estudio que CIS y CdTe, comparables entre sí).
+
+**El catálogo real no usa etiquetas limpias**: auditado, ningún panel de silicio cristalino dice literalmente "Crystalline"/"c-Si" — es texto de fabricante ("MonoSi", "N-Type TopCon Bifacial Agri", etc., 13 valores reales distintos encontrados). Nuevo `clasificar_tecnologia_jrc()` por palabras clave (nunca adivina). Aproximación declarada: "CIGS" (variante real del catálogo) se mapea a CIS, documentado como aproximación no exacta.
+
+**Visible en 📊 Producción, no bloqueante**: `resultado_jrc_desde_sesion()` reutiliza el TMY/POA YA calculados por ☀️ Recurso Solar en esa sesión (sin llamada de red nueva). Se muestra en un `st.expander` colapsado justo después de la nota existente de "PR > 100%" (que afirmaba "resultado correcto, no es un error" sin ningún contraste), dejando explícito que ninguno de los 2 modelos es automáticamente "el correcto" — solo informa, nunca bloquea ni reemplaza el motor principal.
+
+**El asistente lo explica con datos reales**: el resultado se guarda en `session_state["verificacion_jrc"]`, y `contexto_sesion()` (Nivel 1, sin IA) ahora incluye el PR de ambos modelos y la diferencia real cuando está disponible — el asistente responde con los números REALES de esa sesión, no una explicación genérica del manual.
+
+25 tests nuevos (coeficientes Crystalline, clasificador contra 13 valores reales del catálogo, `resultado_jrc_desde_sesion()` sin llamadas de red, `contexto_sesion()` con y sin verificación disponible — primera cobertura de tests que existe para esa función). Suite completa: **868/868**. Ver `DIAGNOSTICO_VERIFICACION_JRC_CDTE_TEUSAQUILLO.md`, sección "Actualización 31-ago-2026 — integrado visualmente...".
+
 ## 25k. Anexo — Actualizaciones del 31 de agosto de 2026 (verificación JRC/Huld generalizada también a CIS)
 
 El usuario pidió explícitamente: "puedo tambien tener esta auditoría puntual proyecto por proyecto con paneles CIS... recuerda que los sistemas BIPV necesitan tambien este tipo de tecnologia". Se verificó (mismo rigor que CdTe, nunca coeficientes inventados) descargando y leyendo el texto completo del segundo paper de la familia Kumar/Sudhakar/Samykano (BAPV/BIPV con c-Si/CIS/CdTe, DOI 10.1016/j.csite.2018.100374) — su Tabla 4 trae coeficientes reales de Faiman + power-rating model para las 3 tecnologías, y la fila de CdTe coincide EXACTA con la ya implementada, confirmando que la tabla es confiable.

@@ -57,13 +57,39 @@ def test_acepta_panel_cis_con_los_mismos_criterios_que_cdte():
     assert params["tecnologia"] == "CIS"
 
 
-def test_rechaza_panel_tecnologia_sin_coeficientes_verificados():
-    # c-Si (mayoría del catálogo real) todavía no tiene coeficientes
-    # verificados en este módulo -- solo CdTe y CIS -- debe rechazarse con
-    # mensaje claro, no dar un número inventado.
+def test_acepta_panel_crystalline_agregado_el_mismo_dia():
+    # Pedido explícito del usuario: "integra en el calculo interno
+    # technologies namely crystalline (c-Si) y asi cumplimos con el ciclo".
     estado = _estado_teusaquillo()
     estado["panel_dict"] = {"tecnologia": "c-Si", "Pmax_stc": 450.0}
-    with pytest.raises(ValueError, match="c-Si"):
+    params = extraer_parametros_proyecto(estado)
+    assert params["tecnologia"] == "Crystalline"
+
+
+@pytest.mark.parametrize("texto_real_catalogo,esperado", [
+    ("CdTe pelicula delgada", "CdTe"),
+    ("CIGS", "CIS"),
+    ("MonoSi", "Crystalline"),
+    ("N-Type TopCon Bifacial Agri", "Crystalline"),
+])
+def test_acepta_texto_libre_real_del_catalogo_no_solo_etiquetas_limpias(texto_real_catalogo, esperado):
+    # datos/catalogo_paneles_excel.py trae texto libre de fabricante, no las
+    # etiquetas limpias "CdTe"/"CIS"/"Crystalline" -- verificado con 4 valores
+    # reales distintos encontrados en el catálogo al auditar esta generalización.
+    estado = _estado_teusaquillo()
+    estado["panel_dict"] = {"tecnologia": texto_real_catalogo, "Pmax_stc": 300.0}
+    params = extraer_parametros_proyecto(estado)
+    assert params["tecnologia"] == esperado
+    assert params["tecnologia_cruda"] == texto_real_catalogo
+
+
+def test_rechaza_panel_tecnologia_sin_coeficientes_verificados():
+    # Ninguna palabra clave reconocida (ni CdTe, ni CIGS/CIS, ni las
+    # variantes de silicio cristalino) -- debe rechazarse con mensaje claro,
+    # nunca dar un número inventado.
+    estado = _estado_teusaquillo()
+    estado["panel_dict"] = {"tecnologia": "Perovskita experimental", "Pmax_stc": 450.0}
+    with pytest.raises(ValueError, match="Perovskita"):
         extraer_parametros_proyecto(estado)
 
 

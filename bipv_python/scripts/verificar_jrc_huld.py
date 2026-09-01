@@ -38,10 +38,15 @@ DIR_PROYECTOS = os.path.join(
 
 # Rangos de PR reportados en la literatura real (Kumar et al., mismo grupo de
 # autores, clima tropical de Malasia), verificados contra el texto completo
-# de ambos papers -- ver docstring de calculos/modelo_jrc_huld.py.
+# de los 2 papers -- ver docstring de calculos/modelo_jrc_huld.py. CdTe usa
+# los 2 estudios más específicos (techo inclinado + fachadas); CIS y
+# Crystalline solo tienen el estudio BAPV/BIPV de 32,7 kWp (mismo paper de
+# los coeficientes) -- se cita con esa framing, sin forzar una equivalencia
+# que la literatura no ofrece.
 REFERENCIA_LITERATURA_PR = {
     "CdTe": {"techo": (74.92, 77.36), "fachada": (66.42, 76.26)},
     "CIS": {"BIPV": (72.21, 73.92), "BAPV": (73.68, 75.46)},
+    "Crystalline": {"BIPV": (71.11, 73.92), "BAPV": (74.18, 76.34)},
 }
 
 

@@ -253,6 +253,21 @@ def contexto_sesion(estado: Mapping[str, Any]) -> str:
         lineas.append(f"👉 Siguiente paso sugerido: {sig['pagina']}")
     for a in avisos_coherencia(estado):
         lineas.append(f"⚠️ {a}")
+    # Segunda opinión JRC/Huld (31-ago-2026, pedido explícito del usuario:
+    # "el asistente si se le pregunta ayude a explicar de forma asertiva
+    # dicha comparacion de acuerdo a los valores calculados") -- escrita en
+    # session_state por 📊 Producción cuando aplica (panel CdTe/CIS/Crystalline
+    # Y ☀️ Recurso Solar ya corrido); None en cualquier otro caso, así que el
+    # asistente nunca inventa una comparación que no se calculó de verdad.
+    _jrc = estado.get("verificacion_jrc")
+    if _jrc:
+        lineas.append(
+            f"🔬 Verificación cruzada JRC/Huld ({_jrc['tecnologia']}, panel {_jrc['panel_nombre']}): "
+            f"PR={_jrc['PR_pct']:.1f}% — motor principal de la app: "
+            f"{estado.get('PR_sistema', 0) * 100:.1f}%. "
+            "Es una segunda opinión independiente (modelo empírico calibrado, distinto del SDM "
+            "de la app), no un veredicto — explica la diferencia sin declarar cuál es \"el correcto\"."
+        )
     return "\n".join(lineas)
 
 

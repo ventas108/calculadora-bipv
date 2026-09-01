@@ -11,6 +11,8 @@ from calculos.modelo_jrc_huld import (
     potencia_jrc,
     calcular_pr_jrc,
     temperatura_modulo_faiman_jrc,
+    clasificar_tecnologia_jrc,
+    resultado_jrc_desde_sesion,
     COEFICIENTES_JRC,
     TECNOLOGIAS_SOPORTADAS,
 )
@@ -114,3 +116,105 @@ def test_calcular_pr_jrc_sin_irradiancia_no_revienta():
     )
     assert r["E_anual_kWh"] == 0.0
     assert r["PR_pct"] is None  # sin irradiancia, PR no es evaluable -- no se inventa un 0%
+
+
+# ---------------------------------------------------------------------------
+# Crystalline (c-Si) -- agregada 31-ago-2026, pedido explícito del usuario:
+# "integra en el calculo interno technologies namely crystalline (c-Si) y
+# asi cumplimos con el ciclo" (las 3 tecnologías que el paper compara).
+# ---------------------------------------------------------------------------
+
+
+def test_coeficientes_crystalline_verificados_contra_tabla_4_kumar_2019():
+    coef = COEFICIENTES_JRC["Crystalline"]
+    assert coef["temperatura"] == {"u0": 30.02, "u1": 6.28}
+    assert coef["potencia"]["t1"] == pytest.approx(-0.017237)
+    assert coef["potencia"]["t6"] == pytest.approx(0.000005)
+
+
+def test_crystalline_da_potencia_distinta_de_cdte_y_cis():
+    p_cryst = potencia_jrc(poa_wm2=600.0, t_modulo_c=40.0, p_stc_w=300.0, tecnologia="Crystalline")
+    p_cdte = potencia_jrc(poa_wm2=600.0, t_modulo_c=40.0, p_stc_w=300.0, tecnologia="CdTe")
+    assert p_cryst != pytest.approx(p_cdte, abs=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# clasificar_tecnologia_jrc() -- el catálogo REAL (datos/catalogo_paneles_
+# excel.py) no usa las etiquetas limpias "CdTe"/"CIS"/"Crystalline", trae
+# texto libre de fabricante. Casos anclados a los 13 valores reales distintos
+# encontrados en el catálogo al auditar esta generalización.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("texto,esperado", [
+    ("CdTe", "CdTe"),
+    ("CdTe pelicula delgada", "CdTe"),
+    ("CIGS", "CIS"),
+    ("MonoSi", "Crystalline"),
+    ("Mono PERC Bifacial BIPV", "Crystalline"),
+    ("Mono-Si Bifacial", "Crystalline"),
+    ("N-Type TopCon Mono Colored Glass", "Crystalline"),
+    ("N-Type TopCon Bifacial Agri", "Crystalline"),
+    ("N-Type TOPCon Double Glass BIPV Tile", "Crystalline"),
+    ("N-Type TOPCon Bifacial", "Crystalline"),
+    ("N-Type TopCon Bifacial Mono", "Crystalline"),
+    ("N-Type TopCon Mono", "Crystalline"),
+    ("N-Type Bifacial", "Crystalline"),
+])
+def test_clasificar_tecnologia_jrc_catalogo_real(texto, esperado):
+    assert clasificar_tecnologia_jrc(texto) == esperado
+
+
+def test_clasificar_tecnologia_jrc_no_inventa_para_texto_desconocido():
+    assert clasificar_tecnologia_jrc("Perovskita experimental") is None
+    assert clasificar_tecnologia_jrc(None) is None
+    assert clasificar_tecnologia_jrc("") is None
+
+
+# ---------------------------------------------------------------------------
+# resultado_jrc_desde_sesion() -- versión "en vivo" para mostrar dentro de la
+# página (31-ago-2026, pedido explícito: "que el valor se ubique físico
+# dentro del modulo respectivo... y el asistente si se le pregunta ayude a
+# explicar"). Reutiliza poa_df/tmy_df ya en session_state, sin red.
+# ---------------------------------------------------------------------------
+
+
+def _session_state_teusaquillo_con_poa() -> dict:
+    import pandas as pd
+
+    horas = pd.date_range("2001-01-01", periods=48, freq="h")
+    poa_vals = np.tile(np.clip(800 * np.sin(np.pi * (np.arange(24) - 6) / 12), 0, None), 2)
+    return {
+        "ciudad": "Bogotá",
+        "panel_dict": {"tecnologia": "CdTe", "Pmax_stc": 63.0},
+        "panel_nombre_dim": "ASP-ST1-T40",
+        "N_paneles_dim": 128,
+        "tilt_fachada": 90.0,
+        "azimuth_fachada": 180.0,
+        "albedo_suelo": 0.20,
+        "poa_df": pd.DataFrame({"poa_global": poa_vals}, index=horas),
+        "tmy_df": pd.DataFrame({"T2m": np.full(48, 15.0), "WS10m": np.full(48, 2.0)}, index=horas),
+    }
+
+
+def test_resultado_jrc_desde_sesion_caso_real_no_llama_a_red():
+    r = resultado_jrc_desde_sesion(_session_state_teusaquillo_con_poa())
+    assert r is not None
+    assert r["tecnologia"] == "CdTe"
+    assert 0 < r["PR_pct"] < 150
+    assert r["referencia_literatura"] is not None
+
+
+def test_resultado_jrc_desde_sesion_sin_poa_devuelve_none():
+    # ☀️ Recurso Solar todavía no se corrió en esta sesión -- no debe
+    # reventar, ni inventar un resultado.
+    estado = _session_state_teusaquillo_con_poa()
+    del estado["poa_df"]
+    del estado["tmy_df"]
+    assert resultado_jrc_desde_sesion(estado) is None
+
+
+def test_resultado_jrc_desde_sesion_tecnologia_no_reconocida_devuelve_none():
+    estado = _session_state_teusaquillo_con_poa()
+    estado["panel_dict"] = {"tecnologia": "Perovskita experimental", "Pmax_stc": 63.0}
+    assert resultado_jrc_desde_sesion(estado) is None

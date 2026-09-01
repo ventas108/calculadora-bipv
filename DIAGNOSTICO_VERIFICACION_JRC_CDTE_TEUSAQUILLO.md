@@ -175,3 +175,71 @@ tropical por la misma razón climática ya discutida para CdTe: Bogotá es mucho
 tablas citadas, CIS y CdTe dan potencias distintas para el mismo input, tecnología no soportada
 lanza error claro) + 2 tests actualizados en `tests/test_extraer_parametros_proyecto_jrc.py`
 (acepta CIS, rechaza tecnología sin coeficientes). Suite completa: **840/840**.
+
+## Actualización 31-ago-2026 — integrado visualmente en 📊 Producción + Crystalline (c-Si) + asistente
+
+Pedido explícito del usuario, en 2 mensajes seguidos: primero preguntó *"si internamente se corre
+esta auditoria pero el valor se ubica fisico dentro del modulo respectivo solo para comparacion
+visual y verificacion de coherencia... y que el asistente si se le pregunta ayude a explicar de
+forma asertiva dicha comparacion... ahi si estariamos hablando de una auditoria"* — confirmado que
+sí era posible — y luego: *"implementalo, pero tambien integra en el calculo interno technologies
+namely crystalline (c-Si) y asi cumplimos con el ciclo"* (las 3 tecnologías que compara el paper
+fuente de los coeficientes de CIS).
+
+### 1. Tercera tecnología: Crystalline (c-Si)
+
+Mismo paper y misma Tabla 4 que dio los coeficientes de CIS — verificados sin research adicional
+(ya estaban en el texto extraído): `u0=30,02`, `u1=6,28`, `t1=-0,017237` a `t6=0,000005`. Rango de
+referencia propio (mismo paper, mismo sistema 32,7 kWp, así que es directamente comparable con CIS
+y CdTe del mismo estudio, sin mezclar configuraciones de estudios distintos): BIPV 71,11%-73,92%,
+BAPV 74,18%-76,34%.
+
+### 2. El catálogo real no usa etiquetas limpias — nuevo clasificador
+
+Auditando el catálogo real (`datos/catalogo_paneles_excel.py`) se encontró que NINGÚN panel de
+silicio cristalino usa literalmente "Crystalline" ni "c-Si" — el texto real es de fabricante:
+"MonoSi", "Mono PERC Bifacial BIPV", "N-Type TopCon Bifacial Agri", etc. (13 valores distintos
+reales encontrados). Comparar por igualdad exacta (como hacía la función hasta este punto) habría
+rechazado casi todo el catálogo real, no solo los paneles genuinamente sin coeficientes.
+
+Nuevo `clasificar_tecnologia_jrc()`: reglas por palabra clave (nunca adivina — si nada calza,
+sigue rechazando con mensaje claro). CdTe se revisa primero. **Aproximación declarada, no
+ocultada**: "CIGS" (la variante real presente en el catálogo, no hay panel etiquetado "CIS" a
+secas) se mapea a los coeficientes de CIS — son familias de calcogenuro de cobre relacionadas pero
+no idénticas; es la mejor aproximación disponible con literatura verificada, documentada como tal
+en el docstring de la función.
+
+### 3. Visible dentro de 📊 Producción, no bloqueante
+
+`calculos/modelo_jrc_huld.py::resultado_jrc_desde_sesion(session_state)`: versión "en vivo" que
+reutiliza `session_state["poa_df"]`/`["tmy_df"]` (ya calculados por ☀️ Recurso Solar para esa
+sesión) — **sin ninguna llamada de red nueva**, a diferencia del script de terminal. Devuelve
+`None` (nunca revienta) si la tecnología no aplica o Recurso Solar no ha corrido.
+
+En `pages/6_📊_Produccion.py`, justo después de la nota existente de "PR > 100%" (que afirmaba
+"resultado correcto... no es un error de cálculo" sin ningún contraste — exactamente la afirmación
+que esta sesión llevaba horas cuestionando con evidencia real): un `st.expander` colapsado con la
+comparación (motor principal vs. JRC/Huld, diferencia en puntos porcentuales, rango de literatura),
+dejando explícito que **ninguno de los 2 modelos es automáticamente "el correcto"** — nunca
+reemplaza al motor principal, solo lo contrasta.
+
+### 4. El asistente 🧭 explicándolo con los números reales de la sesión
+
+El resultado se guarda en `session_state["verificacion_jrc"]` (incluido `None` cuando no aplica,
+para que quede explícito que se evaluó y no hubo dato, no que se olvidó revisar). `contexto_sesion()`
+(Nivel 1, sin IA — la misma función que ya le dice al asistente qué páginas están listas/pendientes)
+ahora incluye una línea con el PR de ambos modelos y la diferencia real, cuando está disponible —
+así, si el usuario pregunta "¿por qué difiere el PR?", el asistente responde con los números
+REALES de esa sesión, no una explicación genérica del manual.
+
+### Verificación
+
+25 tests nuevos: 15 en `tests/test_modelo_jrc_huld.py` (coeficientes Crystalline, clasificador
+contra los 13 valores reales del catálogo + casos de rechazo, `resultado_jrc_desde_sesion()` con
+un caso sintético completo verificando que NO llama a red), 3 en
+`tests/test_extraer_parametros_proyecto_jrc.py` (acepta Crystalline, acepta 4 textos reales del
+catálogo, rechazo con mensaje claro), 3 en `tests/test_contexto_sesion_jrc.py` (primera cobertura
+de tests que existe para `contexto_sesion()` en este repo). Sintaxis de `pages/6_📊_Produccion.py`
+y `calculos/asistente.py` verificada con `ast.parse()` (fix de página, no unit-testeable
+directamente sin un harness de Streamlit — mismo criterio que el resto de fixes de página de esta
+sesión). Suite completa: **868/868**.
