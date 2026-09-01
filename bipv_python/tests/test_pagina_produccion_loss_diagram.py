@@ -31,3 +31,8 @@ def test_pagina_produccion_declara_las_categorias_pvsyst_no_modeladas():
     src = _leer(_PAG_PRODUCCION)
     assert "Module quality loss" in src
     assert "Ohmic wiring loss" in src
+
+
+def test_pagina_produccion_explica_el_desglose_irradiancia_vs_temperatura():
+    src = _leer(_PAG_PRODUCCION)
+    assert "②a/②b" in src

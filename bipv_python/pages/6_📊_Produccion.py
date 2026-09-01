@@ -979,6 +979,11 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 }),
                 use_container_width=True,
             )
+            st.caption(
+                "ℹ️ Filas ②a/②b (nivel de irradiancia vs. temperatura, aislados entre sí) "
+                "corriendo el mismo SDM ya validado una segunda vez a T=25°C fijo — "
+                "no es una estimación aparte, los dos deltas suman exacto el de la fila ②."
+            )
             if _motor_ok:
                 st.caption(
                     "ℹ️ Filas ①a/①b (IAM, soiling) disponibles porque 🔆 Motor Óptico "

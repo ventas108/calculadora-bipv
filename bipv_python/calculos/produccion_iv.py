@@ -288,6 +288,9 @@ def simular_produccion_iv(
         "perdida_clipping_kWh":    round(perdida_clipping_kWh, 0),
         "horas_con_clipping":      horas_con_clipping,
         "E_ac_sin_recorte_kWh":    round(E_ac_sin_recorte_anual, 0),
+        # Mismo campo que calculos.produccion.simular_produccion_anual() --
+        # ver ahí el comentario completo. E_dc con G_eff real, T_cel=25°C fija.
+        "E_dc_a_T25_kWh":          round(float(pmp_stc_g.sum()) * N_paneles / 1000.0, 0),
         "H_i_kWh_m2":              round(H_i, 1),
         "H_ef_kWh_m2":             round(H_ef, 1),
         "df_horario":              df_h,

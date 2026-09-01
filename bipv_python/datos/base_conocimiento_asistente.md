@@ -2881,6 +2881,14 @@ Antes de tocar nada se verificó (y se descartó) un riesgo real: que Motor Ópt
 
 6 tests de aritmética exacta en `tests/test_perdidas_desglosadas_pvsyst.py` (compatibilidad hacia atrás, filas nuevas correctas, el bug de doble conteo específicamente evitado) + 2 tests de página. Suite completa: **911/911**. Ver `DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md`.
 
+## 25q. Anexo — Actualizaciones del 1 de septiembre de 2026 (irradiancia vs. temperatura, separadas de verdad en la tabla estilo PVsyst)
+
+Continuación de la sección 25p (tabla de balance estilo PVsyst): el usuario preguntó qué herramientas hacían falta para separar "irradiance level loss" de "temperature loss" como hace PVsyst (2 líneas, no combinadas). La respuesta real, verificando el código: nada externo — el SDM ya se llamaba una segunda vez internamente (misma G_eff real, T_cel fija en 25°C) para calcular `perdida_temp_kWh`, pero ese resultado intermedio nunca se sumaba como su propio total.
+
+Se agregó la clave `E_dc_a_T25_kWh` al dict de retorno de `calculos/produccion.py::simular_produccion_anual()` Y de `calculos/produccion_iv.py::simular_produccion_iv()` (mismo SDM ya validado, sin fórmula física nueva — solo una segunda corrida con T fija). `perdidas_desglosadas()` la usa para descomponer "② Efecto SDM" en "②a Pérdida por nivel de irradiancia" (T=25°C fijo, aísla la no linealidad a baja luz) y "②b Efecto temperatura" (T real vs. 25°C, con signo). Los dos deltas suman EXACTO el de la fila ②, verificado con aritmética exacta en tests — no es una estimación aparte. Sin la clave (versión anterior, u otro caller), la fila queda combinada como antes.
+
+5 tests nuevos en `tests/test_perdidas_desglosadas_pvsyst.py`, incluido el que garantiza la reconciliación exacta (②a+②b == delta de ②). Suite completa: **917/917**. Ver `DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md`.
+
 ## 25. Anexo — Actualizaciones del 31 de agosto de 2026 (auditoría de retrieval del asistente 🧭)
 
 Manual actualizado el 31 de agosto de 2026

@@ -99,6 +99,71 @@ def test_porcentaje_de_e_ref_sigue_normalizado_contra_la_bruta():
     assert fila_iam["% de E_ref"] == 5.0   # 500 / 10000 × 100
 
 
+def _res_sintetico_con_split_temp():
+    res = _res_sintetico()
+    # Con motor_optico_summary sintético, ref_sdm (POA post-IAM+soiling) =
+    # P_stc(10) × 900 = 9000. E_dc_a_T25_kWh entre ese punto y E_dc_anual
+    # (8800) simula un caso real: pequeña pérdida de linealidad a baja luz
+    # Y pérdida neta de temperatura (clima cálido) -- ambas negativas aquí,
+    # pero la aritmética es la misma con signos mixtos (clima frío = ganancia).
+    res["E_dc_a_T25_kWh"] = 8950.0
+    return res
+
+
+def test_sin_e_dc_a_t25_no_inserta_filas_de_split_irradiancia_temperatura():
+    df = perdidas_desglosadas(
+        _res_sintetico(), 1000.0, _motor_optico_summary_sintetico(),
+    )
+    etapas = df["Etapa"].tolist()
+    assert not any(e.startswith("②a") or e.startswith("②b") for e in etapas)
+
+
+def test_con_e_dc_a_t25_inserta_filas_2a_2b_con_valores_correctos():
+    df = perdidas_desglosadas(
+        _res_sintetico_con_split_temp(), 1000.0, _motor_optico_summary_sintetico(),
+    )
+    fila_irr = df[df["Etapa"].str.startswith("②a")].iloc[0]
+    assert fila_irr["kWh"] == 8950.0
+    assert fila_irr["Δ kWh"] == 8950.0 - 9000.0   # ref_sdm = P_stc(10) × 900
+
+    fila_temp = df[df["Etapa"].str.startswith("②b")].iloc[0]
+    assert fila_temp["kWh"] == 8800.0
+    assert fila_temp["Δ kWh"] == 8800.0 - 8950.0
+
+
+def test_2a_mas_2b_reconcilian_exacto_con_el_delta_de_la_fila_2():
+    # La descomposición no puede perder ni inventar energía: la suma de los
+    # dos deltas nuevos debe dar EXACTO el delta ya existente de la fila ②.
+    df = perdidas_desglosadas(
+        _res_sintetico_con_split_temp(), 1000.0, _motor_optico_summary_sintetico(),
+    )
+    delta_2  = df[df["Etapa"].str.startswith("②") & ~df["Etapa"].str.startswith("②a")
+                  & ~df["Etapa"].str.startswith("②b")]["Δ kWh"].iloc[0]
+    delta_2a = df[df["Etapa"].str.startswith("②a")]["Δ kWh"].iloc[0]
+    delta_2b = df[df["Etapa"].str.startswith("②b")]["Δ kWh"].iloc[0]
+    assert delta_2a + delta_2b == delta_2
+
+
+def test_split_funciona_tambien_sin_motor_optico_summary():
+    # El split irradiancia/temperatura es independiente del split IAM/soiling
+    # -- debe funcionar aunque Motor Óptico no haya corrido (ref_sdm = bruta).
+    res = _res_sintetico()
+    res["E_dc_a_T25_kWh"] = 9700.0   # entre ref_dc(10000) y E_dc_anual(8800)
+    df = perdidas_desglosadas(res, poa_bruta_kWh_m2=1000.0)
+    fila_irr = df[df["Etapa"].str.startswith("②a")].iloc[0]
+    assert fila_irr["Δ kWh"] == 9700.0 - 10000.0
+
+
+def test_produccion_iv_tambien_expone_e_dc_a_t25_kwh():
+    # calculos.produccion_iv debe exponer el mismo campo que
+    # calculos.produccion, para que la tabla se pueda desglosar sin importar
+    # si Producción corrió en modo SDM simple o Motor IV.
+    import inspect
+    import calculos.produccion_iv as produccion_iv
+    src = inspect.getsource(produccion_iv.simular_produccion_iv)
+    assert '"E_dc_a_T25_kWh"' in src
+
+
 def test_tabla_final_sigue_llegando_al_mismo_e_ac_con_o_sin_desglose():
     # El desglose es solo de presentación -- el resultado final (E_ac) no
     # puede cambiar según se pase o no el resumen del Motor Óptico.

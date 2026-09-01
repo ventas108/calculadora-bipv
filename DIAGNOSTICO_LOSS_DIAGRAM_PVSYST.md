@@ -73,12 +73,42 @@ dice explícitamente en un `st.caption()`, no las omite en silencio:
 - **"Ohmic wiring loss"** — pérdida resistiva de cableado DC/AC; no hay un modelo de longitud de
   cable / calibre / caída de tensión en esta app todavía.
 
-**Deliberadamente NO se intentó separar** "irradiance level loss" de "temperature loss" (PVsyst
-sí las separa como 2 líneas). El modelo SDM de esta app no las separa naturalmente — hacerlo
-correctamente requeriría una segunda corrida SDM completa a T=25°C fijo (para aislar el efecto de
-irradiancia) y no es un simple refactor de bookkeeping como el resto de este cambio, sino una
-decisión de metodología física. Se documenta como fila combinada, explícitamente etiquetada como
-tal, en vez de inventar una separación sin validar.
+## Actualización (1-sep-2026): irradiancia vs. temperatura, separadas de verdad
+
+El usuario preguntó explícitamente qué herramientas hacían falta para separar "irradiance level
+loss" de "temperature loss" como hace PVsyst. La respuesta, verificada leyendo el código real: **no
+hacía falta nada externo** — el motor SDM (`_calcular_pmax_vectorizado()` / `_pmp_iv_vectorizado()`
+en el camino Motor IV) YA se llamaba una segunda vez internamente, con la misma `G_eff` real pero
+`T_cel` fija en 25°C, para calcular `perdida_temp_kWh` (la pérdida por horas calientes). Ese
+resultado intermedio (`pmax_stc_g` / `pmp_stc_g`) nunca se sumaba ni se exponía como su propio
+total — solo hacía falta sumarlo.
+
+**Qué se agregó**: una nueva clave `E_dc_a_T25_kWh` en el dict que devuelven tanto
+`calculos/produccion.py::simular_produccion_anual()` como `calculos/produccion_iv.py::
+simular_produccion_iv()` — la energía anual con la irradiancia real de cada hora pero temperatura
+de celda fija en 25°C. Mismo SDM ya validado, sin ninguna fórmula física nueva — solo una segunda
+corrida con un insumo distinto.
+
+`perdidas_desglosadas()` ahora usa esa clave (si está presente) para descomponer la fila "②
+Efecto SDM" en:
+- **②a Pérdida por nivel de irradiancia** (T=25°C fijo) — no linealidad del panel a baja luz,
+  aislada de temperatura.
+- **②b Efecto temperatura** (T real vs. 25°C) — el efecto neto de temperatura, con signo (ganancia
+  en clima frío, pérdida en clima cálido).
+
+Los dos deltas suman **exacto** el delta ya existente de la fila ②, verificado con aritmética
+exacta en tests — es una descomposición, no una estimación aparte que podría no cuadrar. Se
+conservó además la fila informativa vieja "↳ Solo horas calientes" (que ignora las horas con
+ganancia por frío) porque responde una pregunta distinta y ya alimentaba otra parte de la UI.
+
+Si `res` no trae `E_dc_a_T25_kWh` (resultado de una versión anterior en caché, o un caller propio
+que no pasa por estas 2 funciones), la fila ② queda combinada exactamente como antes — mismo
+principio de nunca inventar un desglose que no se calculó de verdad.
+
+5 tests nuevos en `tests/test_perdidas_desglosadas_pvsyst.py`: sin la clave no aparecen las filas,
+con la clave aparecen con los valores correctos, **los dos deltas reconcilian exacto contra el
+delta de ②** (el test que garantiza que no se pierde ni se inventa energía), el split funciona
+también sin Motor Óptico, y `produccion_iv.py` expone el mismo campo. Suite completa: **917/917**.
 
 ## Verificación
 

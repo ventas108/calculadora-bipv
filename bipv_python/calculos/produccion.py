@@ -291,6 +291,13 @@ def simular_produccion_anual(
         "perdida_clipping_kWh":   round(perdida_clipping_kWh, 0),
         "horas_con_clipping":     horas_con_clipping,
         "E_ac_sin_recorte_kWh":   round(E_ac_sin_recorte_anual, 0),
+        # E_dc con la MISMA G_eff real pero T_cel fija en 25°C (STC) para las
+        # 8760 h -- ya se calculaba internamente como paso intermedio
+        # (pmax_stc_g) para "perdida_temp_kWh", pero nunca se exponía sumado.
+        # Permite separar "efecto SDM" en irradiancia vs. temperatura, estilo
+        # PVsyst, sin ninguna fórmula física nueva -- 1-sep-2026, ver
+        # DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md.
+        "E_dc_a_T25_kWh":         round(float(pmax_stc_g.sum()) * N_paneles / 1000.0, 0),
         "H_i_kWh_m2":             round(H_i, 1),
         "H_ef_kWh_m2":            round(H_ef, 1),
         "df_horario":             df_h,
@@ -324,6 +331,16 @@ def perdidas_desglosadas(
     (no la bruta), para no contar la misma pérdida dos veces. Si no se pasa
     (o el Motor Óptico no corrió), la tabla queda exactamente como antes --
     nunca inventa un desglose que no se calculó de verdad para esta sesión.
+
+    Si `res` trae la clave "E_dc_a_T25_kWh" (calculos.produccion.
+    simular_produccion_anual() y calculos.produccion_iv.simular_produccion_iv()
+    ya la exponen ambas desde el 1-sep-2026), "② Efecto SDM" además se
+    descompone en "②a Pérdida por nivel de irradiancia" y "②b Efecto
+    temperatura" -- misma SDM ya validada, corrida una segunda vez con
+    T_cel fija en 25°C y la misma G_eff real; los dos deltas suman EXACTO
+    al de la fila ②, verificado en tests. Si `res` no trae esa clave
+    (resultado de una versión anterior, o un caller propio), la fila ②
+    queda combinada como antes -- mismo principio de nunca inventar.
 
     Categorías del Loss Diagram de PVsyst que esta tabla NO modela hoy
     (a propósito, sin inventar un número): "Module quality loss" y "Ohmic
@@ -379,6 +396,15 @@ def perdidas_desglosadas(
     def _signo(v):
         return f"+{v:,.0f}" if v >= 0 else f"{v:,.0f}"
 
+    # ── ②a/②b — irradiancia vs. temperatura, separadas de verdad (1-sep-2026) ──
+    # E_dc_a_T25_kWh = misma G_eff real, T_cel fija en 25°C (STC) para las
+    # 8760 h -- calculado con el MISMO SDM ya validado, solo una segunda
+    # corrida con un insumo distinto (no es una fórmula física nueva). Los 2
+    # deltas de abajo suman EXACTO al delta_sdm de la fila ② (verificado en
+    # tests) -- es una descomposición, no una estimación aparte.
+    E_dc_a_T25 = res.get("E_dc_a_T25_kWh")
+    _tiene_split_temp = E_dc_a_T25 is not None
+
     filas += [
         {
             "Etapa":     "② Efecto SDM  (T° + baja irradiancia)",
@@ -387,13 +413,43 @@ def perdidas_desglosadas(
             "Nota":      ("🟢 Ganancia por T_cel < 25°C (clima frío / alta altitud)"
                           if delta_sdm >= 0
                           else "🔴 Pérdida óptica + temperatura") +
-                         (" · combina \"irradiance level\" + \"temperature\" de PVsyst (no separables sin una segunda corrida SDM)"
+                         (" · ver desglose ②a/②b abajo"
+                          if _tiene_split_temp else
+                          " · combina \"irradiance level\" + \"temperature\" de PVsyst (no separables sin una segunda corrida SDM)"
                           if _tiene_cascada_optica else ""),
         },
+    ]
+
+    if _tiene_split_temp:
+        delta_irr  = E_dc_a_T25 - ref_sdm
+        delta_temp_neto = res["E_dc_anual_kWh"] - E_dc_a_T25
+        filas += [
+            {
+                "Etapa":     "②a Pérdida por nivel de irradiancia  (T=25°C fijo)",
+                "kWh":       round(E_dc_a_T25, 0),
+                "Δ kWh":     round(delta_irr, 0),
+                "Nota":      "No linealidad del panel a baja luz, aislada de temperatura · equivalente a \"PV loss due to irradiance level\" de PVsyst",
+            },
+            {
+                "Etapa":     "②b Efecto temperatura  (T real vs. 25°C)",
+                "kWh":       round(res["E_dc_anual_kWh"], 0),
+                "Δ kWh":     round(delta_temp_neto, 0),
+                "Nota":      ("🟢 Ganancia neta por T_cel < 25°C (clima frío / alta altitud)"
+                              if delta_temp_neto >= 0
+                              else "🔴 Pérdida neta por temperatura") +
+                             " · equivalente a \"PV loss due to temperature\" de PVsyst",
+            },
+        ]
+
+    filas += [
         {
-            # Fila informativa: desglosa la componente térmica pura del efecto SDM de fila ②
-            # NO es un paso acumulado — la kWh muestra E_dc (mismo que fila ②)
-            "Etapa":     "   ↳ Componente T° horas calientes  (T_cel > 25°C)",
+            # Fila informativa: SOLO las horas donde T_cel > 25°C (ignora las
+            # horas con ganancia por frío) -- distinta de "②b" de arriba, que
+            # es el efecto NETO (pérdida y ganancia ya compensadas). Se
+            # conserva porque responde una pregunta distinta ("¿cuánto cuestan
+            # solo las horas calientes?"), no es un paso acumulado de la
+            # cascada -- la kWh muestra E_dc (mismo que fila ②).
+            "Etapa":     "   ↳ Solo horas calientes  (T_cel > 25°C, sin compensar por frío)",
             "kWh":       round(res["E_dc_anual_kWh"], 0),
             "Δ kWh":     round(delta_t, 0),
             "Nota":      f"Sub-componente de ②  ·  Tk_gamma={res.get('Tk_gamma_pct','—')}%/°C",
