@@ -164,6 +164,27 @@ def test_produccion_iv_tambien_expone_e_dc_a_t25_kwh():
     assert '"E_dc_a_T25_kWh"' in src
 
 
+def test_fila_modulo_2c_siempre_presente_y_nunca_afecta_el_calculo():
+    # Fila informativa ("Módulo", +0,75% visto en 2 papers reales de PVsyst,
+    # probable default del software) -- nunca debe alterar la aritmética real
+    # de esta app: Δ kWh siempre 0, kWh igual a la etapa anterior (E_dc_anual).
+    df = perdidas_desglosadas(_res_sintetico(), 1000.0)
+    fila_mod = df[df["Etapa"].str.startswith("②c")].iloc[0]
+    assert fila_mod["Δ kWh"] == 0
+    assert fila_mod["kWh"] == 8800.0   # = E_dc_anual_kWh, sin cambio
+
+
+def test_fila_modulo_2c_presente_con_y_sin_cascada_optica():
+    # Es independiente de Motor Óptico y del split irradiancia/temperatura --
+    # siempre aparece, porque no depende de ningún cálculo propio de la app.
+    df_min = perdidas_desglosadas(_res_sintetico(), 1000.0)
+    df_full = perdidas_desglosadas(
+        _res_sintetico_con_split_temp(), 1000.0, _motor_optico_summary_sintetico(),
+    )
+    assert any(df_min["Etapa"].str.startswith("②c"))
+    assert any(df_full["Etapa"].str.startswith("②c"))
+
+
 def test_tabla_final_sigue_llegando_al_mismo_e_ac_con_o_sin_desglose():
     # El desglose es solo de presentación -- el resultado final (E_ac) no
     # puede cambiar según se pase o no el resumen del Motor Óptico.

@@ -24,13 +24,19 @@ def test_pagina_produccion_pasa_el_resumen_del_motor_optico_a_la_tabla():
     assert "perdidas_desglosadas(res, poa_bruta_anual, _mo_summary)" in src
 
 
-def test_pagina_produccion_declara_las_categorias_pvsyst_no_modeladas():
-    # Nunca debe dar a entender que la tabla cubre el Loss Diagram completo
-    # de PVsyst -- debe declarar explícitamente lo que falta (calidad de
-    # módulo, óhmico), mismo principio de honestidad del resto de la app.
+def test_pagina_produccion_declara_la_categoria_pvsyst_no_modelada():
+    # "Ohmic wiring loss" sigue sin modelarse en absoluto -- debe declararlo
+    # explícitamente, mismo principio de honestidad del resto de la app.
     src = _leer(_PAG_PRODUCCION)
-    assert "Module quality loss" in src
     assert "Ohmic wiring loss" in src
+
+
+def test_pagina_produccion_aclara_que_la_fila_de_modulo_es_informativa():
+    # Fila ②c "Módulo" (+0,75%, visto idéntico en 2 papers PVsyst reales)
+    # nunca debe dar a entender que esta app lo aplica al cálculo.
+    src = _leer(_PAG_PRODUCCION)
+    assert "②c" in src
+    assert "esta app no lo aplica" in src
 
 
 def test_pagina_produccion_explica_el_desglose_irradiancia_vs_temperatura():

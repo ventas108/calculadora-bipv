@@ -110,6 +110,32 @@ con la clave aparecen con los valores correctos, **los dos deltas reconcilian ex
 delta de ②** (el test que garantiza que no se pierde ni se inventa energía), el split funciona
 también sin Motor Óptico, y `produccion_iv.py` expone el mismo campo. Suite completa: **917/917**.
 
+## Actualización (1-sep-2026): fila informativa "Módulo" (②c), sin aplicarla al cálculo
+
+El usuario encontró un tercer paper real (Mohammadi & Gezegin 2022, *IJPTE* — planta on-grid de
+5 MW en Ghor, Afganistán, comparando PVsyst vs. PVGIS vs. HOMER) y pidió analizarlo. Hallazgo
+concreto: su Loss Diagram muestra **"Module quality loss" = +0,75%**, el mismo valor EXACTO que ya
+había aparecido en el paper de Kadir — dos estudios independientes, plantas y autores distintos,
+mismo número. Fuerte indicio de que **+0,75% es el valor por defecto de PVsyst** para esa
+categoría cuando el usuario no carga datos reales de binning/clasificación de fábrica del
+fabricante, no una medición específica de cada proyecto.
+
+**Se agregó una fila puramente informativa** ("②c Módulo") a `perdidas_desglosadas()`, mostrando
+ese +0,75% como referencia — pero con `Δ kWh` **fijo en 0** y `kWh` igual a la etapa anterior a
+propósito: esta app no tiene datos de binning del panel real, así que no hay ningún número propio
+que aportar aquí (mismo principio de nunca inventar). Sirve para que, cuando el usuario tenga su
+reporte real de PVsyst, pueda confirmar si el suyo también trae +0,75% en esa línea (confirmando
+que es el default) o algo distinto (indicando que sí cargó datos reales de binning).
+
+También sirvió este paper como tercer PR real independiente en el rango típico (84,9%, junto a
+80,2% de Kadir y 77,8% de Ruespina et al.) — refuerza que el >100% de Teusaquillo sigue siendo la
+anomalía a explicar. Y su corrida cruzada PVsyst/PVGIS/HOMER del MISMO sistema mostró 2%-10,6% de
+diferencia entre herramientas igualmente válidas — referencia útil de cuánta discrepancia es
+"normal" al comparar esta app contra un PVsyst real.
+
+2 tests nuevos: la fila ②c nunca afecta la aritmética real (Δ kWh=0 siempre), y aparece
+consistentemente con o sin el resto de la cascada óptica. Suite completa: **920/920**.
+
 ## Verificación
 
 6 tests nuevos en `tests/test_perdidas_desglosadas_pvsyst.py` con aritmética exacta y sintética

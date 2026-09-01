@@ -984,14 +984,21 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 "corriendo el mismo SDM ya validado una segunda vez a T=25°C fijo — "
                 "no es una estimación aparte, los dos deltas suman exacto el de la fila ②."
             )
+            st.caption(
+                "ℹ️ Fila ②c \"Módulo\" es **solo informativa** — muestra +0,75% porque eso "
+                "fue lo que PVsyst reportó, idéntico, en 2 papers reales independientes "
+                "(probable valor por defecto del software sin datos de binning propios), "
+                "pero **esta app no lo aplica** al cálculo (Δ kWh = 0 a propósito). Compárala "
+                "contra tu propio reporte de PVsyst — si el tuyo también trae +0,75% ahí, "
+                "confirma que es el default, no algo medido de tu proyecto."
+            )
             if _motor_ok:
                 st.caption(
                     "ℹ️ Filas ①a/①b (IAM, soiling) disponibles porque 🔆 Motor Óptico "
-                    "corrió en esta sesión. Categorías del Loss Diagram de PVsyst que "
-                    "esta app **no modela** hoy (a propósito, sin inventar un número): "
-                    "*\"Module quality loss\"* y *\"Ohmic wiring loss\"* — si comparas "
-                    "contra un reporte real de PVsyst, esas 2 líneas no tendrán "
-                    "equivalente de este lado."
+                    "corrió en esta sesión. Categoría del Loss Diagram de PVsyst que "
+                    "esta app **no modela en absoluto** hoy (a propósito, sin inventar un "
+                    "número): *\"Ohmic wiring loss\"* — si comparas contra un reporte real "
+                    "de PVsyst, esa línea no tendrá equivalente de este lado."
                 )
             else:
                 st.caption(

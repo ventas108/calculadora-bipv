@@ -455,6 +455,26 @@ def perdidas_desglosadas(
             "Nota":      f"Sub-componente de ②  ·  Tk_gamma={res.get('Tk_gamma_pct','—')}%/°C",
         },
         {
+            # Informativa, NUNCA aplicada al cálculo -- esta app no tiene datos
+            # de binning/clasificación de fábrica del panel, así que no hay
+            # ningún número propio que agregar aquí (mismo principio de nunca
+            # inventar). +0,75% es el valor que PVsyst mostró, IDÉNTICO, en 2
+            # papers reales e independientes (Kadir et al. 2023; Mohammadi &
+            # Gezegin 2022) -- fuerte indicio de que es el DEFAULT del software
+            # cuando el usuario no carga datos reales de binning, no una
+            # medición específica de cada proyecto. Se muestra como referencia
+            # para cuando compares contra tu propio reporte de PVsyst -- si el
+            # tuyo también trae +0,75% aquí, confirma que es el default y no
+            # algo que tu instalador midió. Δ kWh y kWh quedan iguales a la
+            # fila anterior a propósito: cero efecto en el cálculo real.
+            "Etapa":     "②c Módulo  (informativo — no aplicado por esta app)",
+            "kWh":       round(res["E_dc_anual_kWh"], 0),
+            "Δ kWh":     0,
+            "Nota":      ("PVsyst mostró +0,75% (ganancia) en 2 papers reales independientes -- "
+                          "probable valor por defecto del software sin datos de binning propios. "
+                          "Esta app no lo modela ni lo aplica; compáralo contra tu propio reporte."),
+        },
+        {
             "Etapa":     "③ E_dc  (salida del array)",
             "kWh":       round(res["E_dc_anual_kWh"], 0),
             "Δ kWh":     0,

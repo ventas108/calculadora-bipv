@@ -2889,6 +2889,16 @@ Se agregó la clave `E_dc_a_T25_kWh` al dict de retorno de `calculos/produccion.
 
 5 tests nuevos en `tests/test_perdidas_desglosadas_pvsyst.py`, incluido el que garantiza la reconciliación exacta (②a+②b == delta de ②). Suite completa: **917/917**. Ver `DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md`.
 
+## 25r. Anexo — Actualizaciones del 1 de septiembre de 2026 (fila informativa "Módulo" ②c en la tabla estilo PVsyst, sin aplicarla al cálculo)
+
+Continuación de las secciones 25p/25q: el usuario encontró un tercer paper real sobre PVsyst (Mohammadi & Gezegin 2022, *IJPTE* — 5 MW on-grid en Afganistán, comparando PVsyst vs. PVGIS vs. HOMER) y pidió analizarlo. Hallazgo concreto: su Loss Diagram muestra "Module quality loss" = +0,75% — el mismo valor EXACTO que ya había aparecido en el paper de Kadir (dos estudios independientes, mismo número), fuerte indicio de que es el valor por defecto de PVsyst cuando no se cargan datos reales de binning del fabricante, no una medición específica de cada proyecto.
+
+Se agregó una fila puramente informativa ("②c Módulo") a `perdidas_desglosadas()` mostrando ese +0,75% como referencia — con `Δ kWh` fijo en 0 y `kWh` igual a la etapa anterior a propósito: esta app no tiene datos de binning reales, así que no aporta ningún número propio ahí (mismo principio de nunca inventar). Sirve para que el usuario compare: si su PVsyst real también trae +0,75%, confirma que es el default; si trae otro valor, indica que sí cargó datos reales de binning.
+
+El paper también aportó el tercer PR real independiente en rango típico (84,9%, junto a 80,2% de Kadir y 77,8% de Ruespina et al.) — sigue reforzando que el >100% de Teusaquillo es la anomalía. Y su corrida cruzada PVsyst/PVGIS/HOMER del mismo sistema mostró 2%-10,6% de diferencia entre herramientas válidas — referencia útil de discrepancia "normal" esperable.
+
+2 tests nuevos en `tests/test_perdidas_desglosadas_pvsyst.py`. Suite completa: **920/920**. Ver `DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md`.
+
 ## 25. Anexo — Actualizaciones del 31 de agosto de 2026 (auditoría de retrieval del asistente 🧭)
 
 Manual actualizado el 31 de agosto de 2026
