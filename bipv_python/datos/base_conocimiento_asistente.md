@@ -2851,6 +2851,18 @@ Tests: se actualizaron 2 aserciones que asumían el catálogo viejo de 7 paneles
 
 ────────────────────────────────────────────────────────────
 
+## 25n. Anexo — Actualizaciones del 1 de septiembre de 2026 (Diagrama Unifilar: la compatibilidad batería↔inversor quedaba obsoleta si se cambiaba de inversor después)
+
+El usuario pidió aclarar cómo se emparientan el catálogo de inversores híbridos y el de baterías, en particular entre 📐 Dimensionamiento y ⚡ Diagrama Unifilar. La auditoría encontró un hueco real: 📐 Dimensionamiento no menciona baterías en absoluto (0 referencias) — la verificación batería↔inversor solo ocurre en 🔋 Baterías y Balance, y solo en el momento en que se pulsa "▶️ Dimensionar batería", contra el inversor que estuviera seleccionado en ese instante.
+
+**El bug**: `session_state["bateria_ok"]` es esa foto fija — nunca se invalida si después el usuario vuelve a 📐 Dimensionamiento y cambia de inversor (p. ej. a uno de string, sin puerto DC para batería). ⚡ Diagrama Unifilar confiaba ciegamente en ese flag para pre-marcar "Incluir batería" y, peor, para afirmar en el diagrama la leyenda fija "conectada al mismo inversor híbrido... verificado por rango de voltaje" — sin volver a comprobar nada contra el inversor realmente vigente. El diagrama podía dibujar (y declarar verificada) una batería colgada de un inversor que ya no era el validado, o que ni siquiera era híbrido.
+
+**Corregido re-verificando en vivo**: `pages/20_⚡_Diagrama_Unifilar.py` ahora vuelve a llamar `calculos.compatibilidad_bateria.check_compatibilidad()` — la misma función pura que usa 🔋 Baterías y Balance — justo antes de dibujar, contra `inversor_dict`/`inversor_nombre` (los valores ya recalculados en esa misma página, no el flag viejo). El resultado ("ok"/"warning"/"error") decide qué se muestra: éxito solo si la compatibilidad es real ahora mismo, advertencia o error explícito con instrucción de corregir antes de usar el diagrama para RETIE si no lo es — nunca una afirmación de "verificado" sin haberlo comprobado. No bloquea la generación (mismo principio de toda la app: alertar, no impedir).
+
+2 tests nuevos en `tests/test_pagina_diagrama_unifilar.py` (auditoría de código fuente, mismo patrón AST/substring que el resto de esa suite): confirma que se re-verifica en vivo y que ya no queda la leyenda incondicional vieja. Suite completa: **894/894**.
+
+Hueco relacionado, no corregido en este cambio (menor prioridad, no afecta producción): `datos/catalogo_baterias_excel.py` tiene el path del Excel hardcodeado solo a la ruta del servidor (`/var/www/...`), sin el mismo fallback relativo que ya tiene `catalogo_inversores_excel.py` desde el 28-ago — en cualquier entorno de desarrollo local el catálogo de baterías carga vacío en silencio (verificado: 0 baterías cargadas localmente).
+
 ## 25. Anexo — Actualizaciones del 31 de agosto de 2026 (auditoría de retrieval del asistente 🧭)
 
 Manual actualizado el 31 de agosto de 2026

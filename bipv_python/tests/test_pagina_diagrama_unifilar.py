@@ -51,6 +51,29 @@ def test_pagina_unifilar_auto_llena_bateria_y_multisuperficie():
     assert "multisup_desglose" in src
 
 
+def test_pagina_unifilar_reverifica_compatibilidad_bateria_en_vivo():
+    # Hueco #2 (31-ago-2026): `bateria_ok` es una foto fija del inversor que
+    # estaba seleccionado cuando se dio clic en "Dimensionar batería" en
+    # 🔋 Baterías y Balance -- si el usuario cambia de inversor después en
+    # 📐 Dimensionamiento, ese flag queda obsoleto y el diagrama afirmaba
+    # "verificado" sin volver a comprobar nada. Corrección: re-correr
+    # check_compatibilidad() aquí mismo, contra el inversor actual.
+    src = _leer(_PAG_UNIFILAR)
+    assert "from calculos.compatibilidad_bateria import check_compatibilidad" in src
+    assert "check_compatibilidad(\n        bateria_dict, inversor_dict, inversor_nombre\n    )" in src
+    # La leyenda vieja afirmaba la verificación de forma incondicional citando
+    # a la página 11 -- ya no debe estar: el resultado ahora depende de la
+    # re-verificación en vivo hecha aquí mismo, no de lo que se hizo en 🔋.
+    assert "ver ⚙️ Compatibilidad en" not in src
+
+
+def test_pagina_unifilar_advierte_si_bateria_actual_no_es_compatible():
+    src = _leer(_PAG_UNIFILAR)
+    assert '_compat_estado_vivo == "error"' in src
+    assert "no está " in src
+    assert "verificada** con los datos actuales" in src
+
+
 def test_pagina_unifilar_expone_detalle_retie():
     # Contenido extraído (27-ago-2026) del script RETIE que aportó el
     # usuario -- protecciones detalladas, equipotencialidad, notas y

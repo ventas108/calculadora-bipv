@@ -16,6 +16,7 @@ from calculos.diagrama_unifilar import (
     exportar_unifilar_bytes,
 )
 from calculos.dimensionamiento import diseno_electrico_confirmado
+from calculos.compatibilidad_bateria import check_compatibilidad
 from calculos import ledger_auditoria as _ledger
 
 
@@ -208,10 +209,36 @@ if incluir_bateria:
     )
     st.caption(
         "ℹ️ En esta app la batería se conecta al **mismo inversor híbrido** que el "
-        "generador FV (verificado por rango de voltaje, ver ⚙️ Compatibilidad en "
-        "🔋 Baterías y Balance) — por eso el diagrama la dibuja como una segunda "
-        "entrada DC del mismo inversor, no como un equipo aparte."
+        "generador FV — por eso el diagrama la dibuja como una segunda entrada DC "
+        "del mismo inversor, no como un equipo aparte."
     )
+    # ── Re-verificación en vivo, no el flag "bateria_ok" (31-ago-2026) ──────
+    # `bateria_ok` es una foto fija de cuando se dio clic en "▶️ Dimensionar
+    # batería" en 🔋 Baterías y Balance, validada CONTRA EL INVERSOR QUE
+    # ESTABA seleccionado en ese momento -- si después el usuario vuelve a
+    # 📐 Dimensionamiento y cambia de inversor (p.ej. a uno de string, no
+    # híbrido), ese flag no se invalida solo. Antes, esta página confiaba
+    # ciegamente en `bateria_ok` para afirmar "verificado por rango de
+    # voltaje" en el diagrama -- el diagrama podía dibujar (y declarar
+    # verificada) una batería colgada de un inversor que ya no era el
+    # validado. Corregido re-corriendo check_compatibilidad() aquí mismo,
+    # contra el inversor ACTUAL (inversor_dict/inversor_nombre, ya
+    # recalculados arriba en esta misma página), justo antes de dibujar.
+    _compat_estado_vivo, _compat_msg_vivo = check_compatibilidad(
+        bateria_dict, inversor_dict, inversor_nombre
+    )
+    if _compat_estado_vivo == "error":
+        st.error(_compat_msg_vivo)
+        st.warning(
+            "⚠️ El diagrama se generará igual si continúas, con la batería dibujada "
+            "como conectada a este inversor — pero esa conexión **no está "
+            "verificada** con los datos actuales. Corrige el inversor o la batería "
+            "antes de usar este diagrama para un trámite RETIE."
+        )
+    elif _compat_estado_vivo == "warning":
+        st.warning(_compat_msg_vivo)
+    else:
+        st.success(_compat_msg_vivo)
 
 st.subheader("🗺️ Multi-superficie (opcional)")
 _multisup_detectado = bool(st.session_state.get("multisup_activo"))
