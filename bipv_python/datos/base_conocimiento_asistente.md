@@ -2861,7 +2861,7 @@ El usuario pidió aclarar cómo se emparientan el catálogo de inversores híbri
 
 2 tests nuevos en `tests/test_pagina_diagrama_unifilar.py` (auditoría de código fuente, mismo patrón AST/substring que el resto de esa suite): confirma que se re-verifica en vivo y que ya no queda la leyenda incondicional vieja. Suite completa: **894/894**.
 
-Hueco relacionado, no corregido en este cambio (menor prioridad, no afecta producción): `datos/catalogo_baterias_excel.py` tiene el path del Excel hardcodeado solo a la ruta del servidor (`/var/www/...`), sin el mismo fallback relativo que ya tiene `catalogo_inversores_excel.py` desde el 28-ago — en cualquier entorno de desarrollo local el catálogo de baterías carga vacío en silencio (verificado: 0 baterías cargadas localmente).
+**Actualización del mismo día — hueco #3 también corregido**: `datos/catalogo_baterias_excel.py` tenía el path del Excel hardcodeado solo a la ruta del servidor (`/var/www/...`), sin el mismo fallback relativo que ya tiene `catalogo_inversores_excel.py` desde el 28-ago — en cualquier entorno local el catálogo de baterías cargaba vacío en silencio (verificado antes del fix: 0 baterías). Corregido con el mismo patrón: ruta relativa al módulo primero, fallback al path del servidor si no existe — cero cambio de comportamiento en producción (mismo archivo en ambos casos ahí), pero ahora carga las **26 baterías reales** en cualquier entorno local o de CI. 3 tests nuevos en `tests/test_catalogo_baterias_excel_ruta.py`. Suite completa: **897/897**. Ver `DIAGNOSTICO_STALENESS_BATERIA_DIAGRAMA_UNIFILAR.md`.
 
 ## 25. Anexo — Actualizaciones del 31 de agosto de 2026 (auditoría de retrieval del asistente 🧭)
 

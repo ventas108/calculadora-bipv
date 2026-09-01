@@ -21,11 +21,30 @@ encontró 3 huecos reales; el usuario pidió corregir el más serio (staleness d
    "Incluir batería" y para escribir en el diagrama una leyenda fija afirmando
    *"conectada al mismo inversor híbrido... verificado por rango de voltaje"* — sin volver a
    comprobar nada contra el inversor realmente vigente.
-3. **Menor, no corregido en este cambio (no afecta producción)**: `datos/catalogo_baterias_excel.py`
-   tiene el path del Excel hardcodeado solo a `/var/www/...`, sin el mismo fallback relativo que
+3. **Menor, corregido en la actualización de abajo (no afectaba producción)**: `datos/catalogo_baterias_excel.py`
+   tenía el path del Excel hardcodeado solo a `/var/www/...`, sin el mismo fallback relativo que
    `catalogo_inversores_excel.py` ya tiene desde el 28-ago. En cualquier entorno local, el catálogo
-   de baterías carga vacío en silencio (verificado en vivo: `cargar_catalogo_baterias()` → `{}`,
+   de baterías cargaba vacío en silencio (verificado en vivo: `cargar_catalogo_baterias()` → `{}`,
    0 baterías, aquí mismo).
+
+## Actualización (1-sep-2026): hueco #3 corregido — path del Excel de baterías
+
+Mismo fix que ya tenía `catalogo_inversores_excel.py` desde el 28-ago, nunca replicado en el
+loader de baterías pese a leer del mismo archivo Excel: `_EXCEL` ahora se resuelve primero como
+ruta relativa al propio módulo (`os.path.join(os.path.dirname(os.path.abspath(__file__)), ...)`),
+cayendo al path histórico del servidor (`/var/www/bipv/calculadora-bipv/...`) solo si esa ruta
+relativa no existe. En el servidor, ambas rutas resuelven al mismo archivo — **cero cambio de
+comportamiento en producción**. En cualquier entorno local (incluido CI, donde
+`inversores_catalogo.xlsx` sí está versionado en git), el catálogo ahora carga los datos reales
+en vez de `{}`.
+
+**Verificado en vivo**: antes del fix, `cargar_catalogo_baterias()` devolvía `{}` en este entorno;
+después del fix, devuelve **26 baterías reales** (ej. `BR172R`, `BR186R`, `BC45T`).
+
+3 tests nuevos en `tests/test_catalogo_baterias_excel_ruta.py`: la ruta resuelve a un archivo real
+en este entorno, el catálogo carga datos reales anclados a un modelo conocido (`BR172R`), y el
+fallback al path del servidor sigue presente en el código (por si el layout del servidor cambia
+algún día). Suite completa: **897/897**.
 
 ## Corrección aplicada
 

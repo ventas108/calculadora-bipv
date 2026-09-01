@@ -8,11 +8,21 @@ Robusto frente a:
   - Título/leyenda en filas 1-3 → se detecta automáticamente la fila de headers
   - Variantes de nombres de columna (~30 alias mapeados)
 """
+import os as _os
 import pathlib
 import pandas as pd
 import streamlit as st
 
-_EXCEL  = "/var/www/bipv/calculadora-bipv/bipv_python/datos/inversores_catalogo.xlsx"
+# Ruta relativa al propio módulo primero, con fallback a la ruta histórica del
+# servidor -- mismo patrón que ya tiene catalogo_inversores_excel.py desde el
+# 28-ago-2026 (bug real encontrado ahí: hardcodear solo la ruta del servidor
+# hace que el catálogo cargue vacío en silencio, sin ningún error, en
+# cualquier entorno de desarrollo local). Hueco #3 de la auditoría de
+# emparentamiento batería↔inversor (1-sep-2026): este loader nunca había
+# recibido el mismo fix, aunque comparte el mismo archivo Excel.
+_EXCEL = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "inversores_catalogo.xlsx")
+if not _os.path.exists(_EXCEL):
+    _EXCEL = "/var/www/bipv/calculadora-bipv/bipv_python/datos/inversores_catalogo.xlsx"
 _SHEETS = ["Catalogo_Baterias", "Baterias", "Storage"]
 
 # ── Modificación del Excel — usada para invalidar caché automáticamente ──
