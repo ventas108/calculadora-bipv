@@ -2861,7 +2861,15 @@ El usuario pidió aclarar cómo se emparientan el catálogo de inversores híbri
 
 2 tests nuevos en `tests/test_pagina_diagrama_unifilar.py` (auditoría de código fuente, mismo patrón AST/substring que el resto de esa suite): confirma que se re-verifica en vivo y que ya no queda la leyenda incondicional vieja. Suite completa: **894/894**.
 
-**Actualización del mismo día — hueco #3 también corregido**: `datos/catalogo_baterias_excel.py` tenía el path del Excel hardcodeado solo a la ruta del servidor (`/var/www/...`), sin el mismo fallback relativo que ya tiene `catalogo_inversores_excel.py` desde el 28-ago — en cualquier entorno local el catálogo de baterías cargaba vacío en silencio (verificado antes del fix: 0 baterías). Corregido con el mismo patrón: ruta relativa al módulo primero, fallback al path del servidor si no existe — cero cambio de comportamiento en producción (mismo archivo en ambos casos ahí), pero ahora carga las **26 baterías reales** en cualquier entorno local o de CI. 3 tests nuevos en `tests/test_catalogo_baterias_excel_ruta.py`. Suite completa: **897/897**. Ver `DIAGNOSTICO_STALENESS_BATERIA_DIAGRAMA_UNIFILAR.md`.
+**Actualización del mismo día — hueco #3 también corregido**: `datos/catalogo_baterias_excel.py` tenía el path del Excel hardcodeado solo a la ruta del servidor (`/var/www/...`), sin el mismo fallback relativo que ya tiene `catalogo_inversores_excel.py` desde el 28-ago — en cualquier entorno local el catálogo de baterías cargaba vacío en silencio (verificado antes del fix: 0 baterías). Corregido con el mismo patrón: ruta relativa al módulo primero, fallback al path del servidor si no existe — cero cambio de comportamiento en producción (mismo archivo en ambos casos ahí), pero ahora carga las **26 baterías reales** en cualquier entorno local o de CI. 3 tests nuevos en `tests/test_catalogo_baterias_excel_ruta.py`. Suite completa: **897/897**.
+
+## 25o. Anexo — Actualizaciones del 1 de septiembre de 2026 (Dimensionamiento ya alerta si el inversor elegido deja de servir para la batería configurada)
+
+Tercer y último hueco de la misma auditoría de emparentamiento inversor híbrido ↔ batería (ver [[25n]] arriba): 📐 Dimensionamiento no tenía ninguna referencia a "batería"/"híbrido" — se podía cambiar libremente de inversor sin ninguna alerta, aunque el proyecto ya tuviera una batería configurada en 🔋 Baterías y Balance.
+
+Corregido "hacia arriba": justo después de fijar `inversor_dict_dim`/`inversor_nombre_dim`, si `session_state["bateria_dict"]` ya existe, se re-corre `check_compatibilidad()` (misma función pura que ya usan la página 11 y ⚡ Diagrama Unifilar) contra el inversor recién seleccionado — `st.error`/`st.warning`/`st.caption` según severidad, mismo estilo que la auditoría de compatibilidad regional justo debajo en la misma página. Si el proyecto no usa batería, no aparece nada — nunca inventa la alerta.
+
+5 tests nuevos en `tests/test_pagina_dimensionamiento_compat_bateria.py` (patrón AST/substring). Suite completa: **902/902**. Con esto quedan cubiertos los 3 huecos de esta auditoría. Ver `DIAGNOSTICO_STALENESS_BATERIA_DIAGRAMA_UNIFILAR.md`.
 
 ## 25. Anexo — Actualizaciones del 31 de agosto de 2026 (auditoría de retrieval del asistente 🧭)
 

@@ -29,6 +29,7 @@ from datos.catalogo_inversores_excel import (
 )
 from datos.catalogo_inversores import INVERSORES, seleccionar_inversor
 from calculos.panel_iv_check import analizar_panel_motiv as _check_iv_dim
+from calculos.compatibilidad_bateria import check_compatibilidad as _check_compat_bateria_dim
 
 st.set_page_config(page_title="Dimensionamiento — BIPV", page_icon="📐", layout="wide")
 
@@ -563,6 +564,34 @@ if inversor.get("costo_usd"):
 # Propagar inversor a session_state para compatibilidad baterías (#25)
 st.session_state["inversor_nombre_dim"] = inversor_nombre
 st.session_state["inversor_dict_dim"]   = inversor
+
+# ── 🔋 Compatibilidad con la batería ya configurada (hueco #1, 1-sep-2026) ────
+# Antes, este selector no sabía nada de baterías -- se podía cambiar
+# libremente a cualquier inversor (incluido uno de string, sin puerto DC)
+# sin ninguna alerta, aunque el proyecto ya tuviera una batería configurada
+# en 🔋 Baterías y Balance. La verificación real solo ocurría ahí, nunca
+# "hacia arriba" en este selector. Misma función pura que ya usan la
+# página 11 y ⚡ Diagrama Unifilar (mismo fix aplicado ahí el mismo día
+# para el hueco #2 de staleness) -- re-verificada aquí, en vivo, contra el
+# inversor recién seleccionado. Solo se muestra si YA hay una batería
+# configurada (session_state["bateria_dict"]); un proyecto sin batería no
+# ve nada -- nunca inventa la alerta.
+_bateria_dict_dim = st.session_state.get("bateria_dict")
+if _bateria_dict_dim:
+    _bat_estado_dim, _bat_msg_dim = _check_compat_bateria_dim(
+        _bateria_dict_dim, inversor, inversor_nombre
+    )
+    _bat_contexto_dim = (
+        "🔋 Ya tienes una batería configurada en 🔋 Baterías y Balance — "
+        "verificación contra el inversor seleccionado aquí:  \n"
+    )
+    if _bat_estado_dim == "error":
+        st.error(_bat_contexto_dim + _bat_msg_dim)
+    elif _bat_estado_dim == "warning":
+        st.warning(_bat_contexto_dim + _bat_msg_dim)
+    else:
+        st.caption(_bat_contexto_dim + _bat_msg_dim)
+
 if inversor.get("datos_completos"):
     st.success("🟢 Inversor: ficha completa")
 else:

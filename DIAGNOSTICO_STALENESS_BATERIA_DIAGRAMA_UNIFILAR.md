@@ -8,9 +8,10 @@ encontró 3 huecos reales; el usuario pidió corregir el más serio (staleness d
 
 ## Qué se encontró (verificado leyendo el código real, no supuesto)
 
-1. **📐 Dimensionamiento no sabe nada de baterías**: `pages/4_📐_Dimensionamiento.py` no tiene
-   ninguna referencia a "batería"/"híbrido" (0 resultados). Se puede elegir libremente cualquier
-   inversor ahí sin ninguna alerta, aunque el proyecto ya tenga batería configurada.
+1. **📐 Dimensionamiento no sabe nada de baterías (corregido en la actualización de abajo)**:
+   `pages/4_📐_Dimensionamiento.py` no tenía ninguna referencia a "batería"/"híbrido"
+   (0 resultados). Se podía elegir libremente cualquier inversor ahí sin ninguna alerta, aunque el
+   proyecto ya tuviera batería configurada.
 2. **El bug corregido en este cambio**: `session_state["bateria_ok"]` es una foto fija del momento
    en que se hizo clic en "▶️ Dimensionar batería" en 🔋 Baterías y Balance
    (`pages/11_🔋_Baterias_y_Balance.py:687-690`), validada contra el inversor que estaba
@@ -45,6 +46,28 @@ después del fix, devuelve **26 baterías reales** (ej. `BR172R`, `BR186R`, `BC4
 en este entorno, el catálogo carga datos reales anclados a un modelo conocido (`BR172R`), y el
 fallback al path del servidor sigue presente en el código (por si el layout del servidor cambia
 algún día). Suite completa: **897/897**.
+
+## Actualización (1-sep-2026): hueco #1 corregido — Dimensionamiento ya conoce la batería configurada
+
+Mismo patrón que el fix del hueco #2 (re-correr `check_compatibilidad()` en vivo, misma función
+pura de `calculos/compatibilidad_bateria.py`), aplicado ahora "hacia arriba": justo después de que
+`pages/4_📐_Dimensionamiento.py` fija `inversor_dict_dim`/`inversor_nombre_dim` para la sesión
+(línea donde ya decía en un comentario viejo "Propagar inversor a session_state para
+compatibilidad baterías (#25)" — la propagación existía, pero nunca se usaba para verificar nada),
+se comprueba si el proyecto YA tiene una batería configurada (`session_state["bateria_dict"]`,
+escrito por 🔋 Baterías y Balance). Si la hay, se re-verifica en vivo contra el inversor recién
+seleccionado y se muestra `st.error`/`st.warning`/`st.caption` según severidad — igual que la
+auditoría de compatibilidad regional que ya vive justo debajo en la misma página. Si el proyecto
+no usa batería, no aparece nada — nunca inventa la alerta.
+
+5 tests nuevos en `tests/test_pagina_dimensionamiento_compat_bateria.py` (mismo patrón
+AST/substring). Suite completa: **902/902**.
+
+Con esto quedan cubiertos los 3 huecos encontrados en la auditoría del emparentamiento inversor
+híbrido ↔ batería pedida por el usuario: (1) Dimensionamiento alerta si el inversor elegido deja
+de ser compatible con una batería ya configurada, (2) el diagrama unifilar re-verifica en vivo en
+vez de confiar en un flag desactualizado, (3) el catálogo de baterías carga en cualquier entorno,
+no solo en el servidor.
 
 ## Corrección aplicada
 
