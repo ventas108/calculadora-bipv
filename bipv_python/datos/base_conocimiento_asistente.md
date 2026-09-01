@@ -2871,6 +2871,16 @@ Corregido "hacia arriba": justo después de fijar `inversor_dict_dim`/`inversor_
 
 5 tests nuevos en `tests/test_pagina_dimensionamiento_compat_bateria.py` (patrón AST/substring). Suite completa: **902/902**. Con esto quedan cubiertos los 3 huecos de esta auditoría. Ver `DIAGNOSTICO_STALENESS_BATERIA_DIAGRAMA_UNIFILAR.md`.
 
+## 25p. Anexo — Actualizaciones del 1 de septiembre de 2026 (tabla de balance energético con nombres estilo Loss Diagram de PVsyst)
+
+El usuario encontró el paper Kadir et al. 2023 (*J. Phys.: Conf. Ser.* 2550 012005, PVsyst 7.2, 16,20 kWp c-Si en Malasia) mientras armaba una ficha manual para comparar el proyecto real Teusaquillo contra PVsyst — pidió analizarlo y usarlo para construir "nuestro seguimiento de cálculo para comparar con PVsyst". Lo valioso del paper no son sus números (clima/panel distintos) sino la estructura oficial del Loss Diagram de PVsyst: la cascada nombrada GHI→POA→IAM→Soiling→efectiva→STC→irradiancia/temperatura→calidad módulo→mismatch→óhmico→inversor→red.
+
+Antes de tocar nada se verificó (y se descartó) un riesgo real: que Motor Óptico y el SDM contaran la temperatura dos veces. Confirmado que NO — `pages/6_📊_Producción.py` ya usa `poa_sin_termico_df` para alimentar el SDM (con un comentario explícito de una corrección anterior), reservando `poa_efectiva_df` (con el factor térmico) solo para visualización.
+
+**Extendido `calculos/produccion.py::perdidas_desglosadas()`** con un parámetro opcional `motor_optico_summary` (el dict real de `cascada_optica()`): si está disponible, inserta filas "①a Pérdida IAM" y "①b Pérdida soiling" con los nombres y valores reales de PVsyst, y — el detalle que evita un doble conteo — la fila "② Efecto SDM" pasa a compararse contra la POA YA corregida por IAM+soiling, no contra la bruta. Sin el resumen (Motor Óptico no corrió), la tabla sale idéntica a antes. Las 2 categorías de PVsyst que esta app no modela (calidad de módulo, pérdida óhmica de cableado) se declaran explícitamente en un `st.caption()`, nunca se omiten en silencio ni se inventa un número. La separación irradiancia-vs-temperatura de PVsyst (2 líneas) se deja deliberadamente combinada — separarla bien requeriría una segunda corrida SDM completa a T=25°C fijo, una decisión de metodología física, no un refactor.
+
+6 tests de aritmética exacta en `tests/test_perdidas_desglosadas_pvsyst.py` (compatibilidad hacia atrás, filas nuevas correctas, el bug de doble conteo específicamente evitado) + 2 tests de página. Suite completa: **911/911**. Ver `DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md`.
+
 ## 25. Anexo — Actualizaciones del 31 de agosto de 2026 (auditoría de retrieval del asistente 🧭)
 
 Manual actualizado el 31 de agosto de 2026

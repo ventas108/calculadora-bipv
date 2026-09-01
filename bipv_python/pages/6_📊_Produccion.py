@@ -965,9 +965,11 @@ if btn_sim or st.session_state.get("produccion_ok"):
             "No se debe sumar aparte."
         )
 
-    # Tabla desglose
-    with st.expander("📋 Ver tabla detallada de balance IEC 61724"):
-        df_loss = perdidas_desglosadas(res, poa_bruta_anual)
+    # Tabla desglose — nombres alineados con el Loss Diagram de PVsyst
+    # (1-sep-2026, ver DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md) para auditar una
+    # corrida manual de PVsyst fila por fila, no solo comparando el PR final.
+    with st.expander("📋 Ver tabla detallada de balance IEC 61724 (estilo PVsyst)"):
+        df_loss = perdidas_desglosadas(res, poa_bruta_anual, _mo_summary)
         if not df_loss.empty:
             st.dataframe(
                 df_loss.style.format({
@@ -977,6 +979,21 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 }),
                 use_container_width=True,
             )
+            if _motor_ok:
+                st.caption(
+                    "ℹ️ Filas ①a/①b (IAM, soiling) disponibles porque 🔆 Motor Óptico "
+                    "corrió en esta sesión. Categorías del Loss Diagram de PVsyst que "
+                    "esta app **no modela** hoy (a propósito, sin inventar un número): "
+                    "*\"Module quality loss\"* y *\"Ohmic wiring loss\"* — si comparas "
+                    "contra un reporte real de PVsyst, esas 2 líneas no tendrán "
+                    "equivalente de este lado."
+                )
+            else:
+                st.caption(
+                    "ℹ️ Corre 🔆 Motor Óptico antes de esta página para que la tabla "
+                    "también desglose IAM y soiling por separado (estilo PVsyst) en "
+                    "vez de un solo \"efecto SDM\" combinado."
+                )
 
     # ── Tabla mensual completa ────────────────────────────────────────────────
     with st.expander("📋 Ver tabla de producción mensual completa"):

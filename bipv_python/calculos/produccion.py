@@ -301,40 +301,94 @@ def simular_produccion_anual(
     }
 
 
-def perdidas_desglosadas(res: dict, poa_bruta_kWh_m2: float) -> pd.DataFrame:
+def perdidas_desglosadas(
+    res: dict,
+    poa_bruta_kWh_m2: float,
+    motor_optico_summary: dict | None = None,
+) -> pd.DataFrame:
     """
-    Tabla de balance energético IEC 61724.
+    Tabla de balance energético IEC 61724 — nombres alineados con el "Loss
+    Diagram" oficial de PVsyst (POA → IAM → Soiling → efectiva → STC →
+    SDM → inversor → red), para que una corrida manual de PVsyst se pueda
+    auditar contra esta tabla fila por fila, no solo comparando el PR final.
+    Ver DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md (1-sep-2026).
 
     Para climas fríos de alta altitud (Bogotá, Medellín) el SDM puede producir
     MÁS que la referencia STC porque los módulos operan por debajo de 25°C.
     En ese caso el 'delta SDM' es positivo (ganancia, no pérdida).
+
+    motor_optico_summary: el dict que devuelve calculos.motor_optico.cascada_optica()
+    (o su copia en session_state["motor_optico_summary"]). Si trae las claves
+    IAM/soiling reales, se insertan como filas propias (①a/①b) ANTES de "②
+    Efecto SDM" -- cuya referencia entonces pasa a ser la POA post-IAM+soiling
+    (no la bruta), para no contar la misma pérdida dos veces. Si no se pasa
+    (o el Motor Óptico no corrió), la tabla queda exactamente como antes --
+    nunca inventa un desglose que no se calculó de verdad para esta sesión.
+
+    Categorías del Loss Diagram de PVsyst que esta tabla NO modela hoy
+    (a propósito, sin inventar un número): "Module quality loss" y "Ohmic
+    wiring loss" -- ver el diagnóstico arriba para el detalle.
     """
     P_stc  = res["P_stc_kW"]
-    ref_dc = P_stc * poa_bruta_kWh_m2   # kWh teóricos a STC (Pmax_nom × POA)
+    ref_dc = P_stc * poa_bruta_kWh_m2   # kWh teóricos a STC (Pmax_nom × POA bruta)
     if ref_dc == 0:
         return pd.DataFrame()
-
-    delta_sdm = res["E_dc_anual_kWh"] - ref_dc          # positivo = ganancia temperatura
-    delta_t   = -res["perdida_temp_kWh"]                 # horas T > 25 °C (siempre ≤ 0)
-    delta_inv = -res["perdida_inv_kWh"]                  # pérdida inversor (siempre ≤ 0)
-
-    def _signo(v):
-        return f"+{v:,.0f}" if v >= 0 else f"{v:,.0f}"
 
     filas = [
         {
             "Etapa":     "① E ref  (P_STC × POA bruta)",
             "kWh":       round(ref_dc, 0),
             "Δ kWh":     0,
-            "Nota":      "Baseline a condiciones STC",
+            "Nota":      "Baseline a condiciones STC · equivalente a \"Global incident in coll. plane\" de PVsyst",
         },
+    ]
+
+    # ── ①a/①b — IAM y Soiling (solo si el Motor Óptico corrió de verdad) ──────
+    _mo = motor_optico_summary or {}
+    _tiene_cascada_optica = all(
+        k in _mo for k in ("poa_optica_anual_kWh_m2", "poa_post_soil_anual_kWh_m2",
+                            "perdida_iam_kWh_m2", "perdida_soil_kWh_m2")
+    )
+    if _tiene_cascada_optica:
+        ref_post_iam  = P_stc * _mo["poa_optica_anual_kWh_m2"]
+        ref_post_soil = P_stc * _mo["poa_post_soil_anual_kWh_m2"]
+        filas.append({
+            "Etapa":     "①a Pérdida IAM  (ángulo de incidencia)",
+            "kWh":       round(ref_post_iam, 0),
+            "Δ kWh":     round(-P_stc * _mo["perdida_iam_kWh_m2"], 0),
+            "Nota":      f"ASHRAE b₀ · equivalente a \"IAM factor on global\" de PVsyst · factor medio {_mo.get('f_iam_prom', '—')}",
+        })
+        filas.append({
+            "Etapa":     "①b Pérdida soiling  (suciedad)",
+            "kWh":       round(ref_post_soil, 0),
+            "Δ kWh":     round(-P_stc * _mo["perdida_soil_kWh_m2"], 0),
+            "Nota":      f"Calendario Colombia · equivalente a \"Soiling loss factor\" de PVsyst · factor medio {_mo.get('f_soil_prom', '—')}",
+        })
+        # A partir de aquí, la referencia de "② Efecto SDM" es la POA YA
+        # corregida por IAM+soiling -- si se siguiera comparando contra la
+        # bruta, esas dos pérdidas se contarían dos veces (una aquí arriba,
+        # otra de nuevo escondidas dentro del delta de SDM).
+        ref_sdm = ref_post_soil
+    else:
+        ref_sdm = ref_dc
+
+    delta_sdm = res["E_dc_anual_kWh"] - ref_sdm         # positivo = ganancia temperatura
+    delta_t   = -res["perdida_temp_kWh"]                 # horas T > 25 °C (siempre ≤ 0)
+    delta_inv = -res["perdida_inv_kWh"]                  # pérdida inversor (siempre ≤ 0)
+
+    def _signo(v):
+        return f"+{v:,.0f}" if v >= 0 else f"{v:,.0f}"
+
+    filas += [
         {
             "Etapa":     "② Efecto SDM  (T° + baja irradiancia)",
             "kWh":       round(res["E_dc_anual_kWh"], 0),
             "Δ kWh":     round(delta_sdm, 0),
             "Nota":      ("🟢 Ganancia por T_cel < 25°C (clima frío / alta altitud)"
                           if delta_sdm >= 0
-                          else "🔴 Pérdida óptica + temperatura"),
+                          else "🔴 Pérdida óptica + temperatura") +
+                         (" · combina \"irradiance level\" + \"temperature\" de PVsyst (no separables sin una segunda corrida SDM)"
+                          if _tiene_cascada_optica else ""),
         },
         {
             # Fila informativa: desglosa la componente térmica pura del efecto SDM de fila ②
