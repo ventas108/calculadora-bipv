@@ -37,3 +37,27 @@ def test_contexto_sesion_con_verificacion_jrc_none_no_revienta():
     # 📊 Producción corre pero la tecnología no aplica -- no debe romper.
     contexto = contexto_sesion({"verificacion_jrc": None})
     assert "JRC" not in contexto
+
+
+def test_contexto_sesion_sin_compatibilidad_regional_no_la_menciona():
+    contexto = contexto_sesion({})
+    assert "Compatibilidad regional" not in contexto
+
+
+def test_contexto_sesion_incluye_compatibilidad_regional_cuando_esta_disponible():
+    estado = {
+        "compatibilidad_regional_bipv": {
+            "familia": "einnova_bifacial", "region": "andina", "region_etiqueta": "Andina",
+            "confianza": "alta", "score": 1, "nivel": "no_recomendado", "icono": "🔴",
+            "notas": "Cubiertas planas, agrovoltaico", "marca": "einnova",
+        },
+    }
+    contexto = contexto_sesion(estado)
+    assert "Compatibilidad regional" in contexto
+    assert "Andina" in contexto
+    assert "no recomendado" in contexto
+
+
+def test_contexto_sesion_con_compatibilidad_regional_none_no_revienta():
+    contexto = contexto_sesion({"compatibilidad_regional_bipv": None})
+    assert "Compatibilidad regional" not in contexto

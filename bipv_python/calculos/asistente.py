@@ -268,6 +268,20 @@ def contexto_sesion(estado: Mapping[str, Any]) -> str:
             "Es una segunda opinión independiente (modelo empírico calibrado, distinto del SDM "
             "de la app), no un veredicto — explica la diferencia sin declarar cuál es \"el correcto\"."
         )
+    # Auditoría de compatibilidad regional (31-ago-2026, mismo pedido: "que
+    # la app reconozca... si ese panel/tecnología simplemente no encaja con
+    # esa región"). Escrita en session_state por 📐 Dimensionamiento; None si
+    # no se pudo clasificar con evidencia positiva la familia del panel.
+    _compat_regional = estado.get("compatibilidad_regional_bipv")
+    if _compat_regional:
+        lineas.append(
+            f"{_compat_regional['icono']} Compatibilidad regional del panel — "
+            f"{_compat_regional['region_etiqueta']}: calificado como "
+            f"'{_compat_regional['nivel'].replace('_', ' ')}' ({_compat_regional['score']}/3). "
+            f"Motivo real: {_compat_regional['notas']}. "
+            "Es juicio experto real de un catálogo curado (estructura, estética, salinidad, "
+            "logística — no solo energía), no calculado por esta app — es una auditoría, no un veredicto."
+        )
     return "\n".join(lineas)
 
 

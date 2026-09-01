@@ -569,6 +569,36 @@ else:
     _inv_falt = [k for k in ["Vdc_max","Vmppt_min","Vmppt_max","n_trackers","n_strings_tracker","I_max_tracker","P_dc_max_W"] if not inversor.get(k)]
     st.warning(f"🟡 Inversor incompleto — faltan: {', '.join(_inv_falt)}" if _inv_falt else "🟡 Inversor marcado como incompleto en catálogo")
 
+# ── 🌎 Auditoría de compatibilidad regional (31-ago-2026) ─────────────────────
+# Pedido explícito del usuario: "que la app reconozca -- con los mismos
+# criterios reales que ya documentaste (GHI, temperatura, humedad, fenómenos
+# críticos) -- si ese panel/tecnología simplemente no encaja con esa región".
+# Matriz portada 1:1 desde la app hermana bipv.innovacionquimica.com.co (no
+# reinventada) -- juicio experto real por familia de producto (estructural,
+# estética, salinidad, logística), no solo energía. Alarma informativa, NO
+# bloqueante -- nunca impide continuar. No aparece si no se puede clasificar
+# con evidencia positiva la familia del panel (ver calculos/compatibilidad_
+# regional.py -- nunca falsa precisión).
+_ciudad_dim = st.session_state.get("ciudad") or st.session_state.get("tmy_ciudad")
+if _ciudad_dim:
+    from calculos.compatibilidad_regional import evaluar_compatibilidad_regional_desde_ciudad
+    _compat_regional = evaluar_compatibilidad_regional_desde_ciudad(
+        panel.get("tecnologia"), _ciudad_dim,
+    )
+    if _compat_regional:
+        _msg_regional = (
+            f"{_compat_regional['icono']} **Compatibilidad regional — {_compat_regional['region_etiqueta']}**: "
+            f"{panel_nombre} está calificado como **{_compat_regional['nivel'].replace('_', ' ')}** "
+            f"para esta región (auditoría de juicio experto, no un veredicto). {_compat_regional['notas']}"
+        )
+        if _compat_regional["score"] == 1:
+            st.error(_msg_regional)
+        elif _compat_regional["score"] == 2:
+            st.warning(_msg_regional)
+        else:
+            st.caption(_msg_regional)
+    st.session_state["compatibilidad_regional_bipv"] = _compat_regional
+
 # ── Vigencia del diseño confirmado (31-ago-2026) ──────────────────────────────
 # El resultado de "▶️ Optimizar N paneles/string" solo se redibuja en el mismo
 # render donde se oprime el botón -- si después cambias panel/inversor sin

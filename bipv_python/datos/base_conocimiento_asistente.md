@@ -2893,6 +2893,20 @@ Al entregar el mapa "Coherencia Aguas Abajo" de los 12 módulos y sus blindajes 
 
 5 tests nuevos: vigente cuando coincide, aviso cuando cambia panel, aviso cuando cambia inversor, sin falso positivo cuando no hay referencia histórica, sin aviso cuando Dimensionamiento nunca corrió. Suite completa: **814/814**. Ver `DIAGNOSTICO_ALERTA_VIGENCIA_DISENO.md`.
 
+## 25m. Anexo — Actualizaciones del 31 de agosto de 2026 (auditoría de compatibilidad regional BIPV: panel/tecnología vs. región, portada desde la app hermana)
+
+El usuario preguntó si la verificación JRC/Huld podía ayudar a elegir el panel ideal por región ("estoy seguro que el panel que evalúe para Bogotá no servirá para el Chocó"), compartió 2 carpetas propias con matrices reales de compatibilidad producto×región, y reveló que esa función YA EXISTE en producción en la otra app del mismo repositorio (`client/`, TypeScript/React, en bipv.innovacionquimica.com.co) — pidió extraerla de ahí y optimizarla con el trabajo JRC/Huld, no reinventarla.
+
+**Qué se extrajo (programáticamente con Node.js, no a mano)**: `colombianRegions.ts` (detección de región por polígonos geográficos reales, base IGAC, algoritmo ray-casting) y `panelTechnologies.ts` (63 productos reales de 3 marcas — HIITIO, EINNOVA, y **SOLTECH, la misma marca del panel ASP-ST1-T40 ya usado en Teusaquillo** — reducidos sin pérdida a 21 familias únicas, cada una con score 1-2-3 por región + nota técnica real: estructura, estética, salinidad, logística, transmitancia).
+
+**Portado a Python**: `datos/compatibilidad_regional_bipv.py` (los 21 datos reales), `calculos/regiones_colombia.py` (detección de región, verificada bit-a-bit contra el TypeScript original ejecutado con Node — incluido un caso límite conocido, Villavicencio cae en "andina" no "orinoquía", confirmado que el original también lo hace así), y `calculos/compatibilidad_regional.py` (nuevo: combina ambos, con `clasificar_familia_regional()` que solo asigna una familia Crystalline específica si hay palabra clave positiva — bifacial/flex/teja/etc. tienen puntajes MUY distintos entre sí, nunca se inventa un representante).
+
+Verificado contra los 2 ejemplos reales que el propio usuario ya había documentado: Bifacial en Andina = 1/rojo ✅, Flexible en Pacífica = 3/verde ✅.
+
+**Integrado, combinado con JRC/Huld**: alarma temprana en 📐 Dimensionamiento (apenas se conoce panel+ciudad); en 📊 Producción el mismo expander de "Segunda opinión JRC/Huld" ahora también muestra la auditoría regional (dos preguntas complementarias: ¿el PR tiene sentido? / ¿el panel encaja físicamente con la región?); el asistente lo explica vía `contexto_sesion()` cuando está disponible.
+
+21 tests nuevos + 3 en contexto_sesion. Suite completa: **892/892**. Ver `DIAGNOSTICO_COMPATIBILIDAD_REGIONAL_BIPV.md`.
+
 ## 25l. Anexo — Actualizaciones del 31 de agosto de 2026 (JRC/Huld visible dentro de 📊 Producción + Crystalline + el asistente lo explica)
 
 Pedido explícito del usuario, en 2 mensajes: primero preguntó si era posible mostrar la verificación cruzada JRC/Huld físicamente dentro del módulo (no solo en un script de terminal) y que el asistente la explicara con los valores reales calculados — confirmado que sí; luego pidió implementarlo Y agregar Crystalline (c-Si), "la tercera tecnología del ciclo" que compara el paper fuente de los coeficientes de CIS.

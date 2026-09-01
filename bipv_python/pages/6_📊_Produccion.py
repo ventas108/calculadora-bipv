@@ -802,37 +802,65 @@ if btn_sim or st.session_state.get("produccion_ok"):
     # comparación sin datos reales que la respalden.
     _jrc = resultado_jrc_desde_sesion(st.session_state)
     st.session_state["verificacion_jrc"] = _jrc  # para que 🧭 el asistente lo pueda explicar
-    if _jrc:
-        _diff_pp = res["PR"] * 100 - _jrc["PR_pct"]
-        with st.expander(
-            f"🔬 Segunda opinión — modelo JRC/Huld independiente ({_jrc['tecnologia']}): "
-            f"PR={_jrc['PR_pct']:.1f}% (motor principal: {res['PR']*100:.1f}%)"
-        ):
-            st.caption(
-                f"Panel: {_jrc['panel_nombre']} · Tecnología detectada: **{_jrc['tecnologia']}** "
-                + (f"(catálogo: \"{_jrc['tecnologia_cruda']}\")" if _jrc["tecnologia_cruda"] != _jrc["tecnologia"] else "")
-            )
-            st.markdown(
-                f"- **Motor principal de la app** (SDM De Soto): PR = **{res['PR']*100:.1f}%**\n"
-                f"- **Modelo JRC/Huld** (power-rating, calibrado contra mediciones ESTI, "
-                f"independiente del anterior): PR = **{_jrc['PR_pct']:.1f}%**\n"
-                f"- Diferencia: **{_diff_pp:+.1f} puntos porcentuales**"
-            )
-            if _jrc["referencia_literatura"]:
-                _partes_ref = " · ".join(
-                    f"{k}: {lo:.1f}%–{hi:.1f}%" for k, (lo, hi) in _jrc["referencia_literatura"].items()
+    # Auditoría de compatibilidad regional (31-ago-2026) -- ya calculada en
+    # 📐 Dimensionamiento (mismo panel/ciudad, sin recalcular ni pedir datos
+    # de nuevo); se combina aquí con el modelo JRC/Huld: uno mide "¿encaja
+    # este panel con las condiciones físicas de la región?" con criterios
+    # reales más allá de energía (estructura, estética, salinidad,
+    # logística), el otro mide "¿el PR de este proyecto concreto tiene
+    # sentido frente a un modelo independiente?" -- señales complementarias,
+    # no la misma pregunta.
+    _compat_regional = st.session_state.get("compatibilidad_regional_bipv")
+    if _jrc or _compat_regional:
+        _titulo_partes = []
+        if _jrc:
+            _titulo_partes.append(f"JRC/Huld: PR={_jrc['PR_pct']:.1f}% (app: {res['PR']*100:.1f}%)")
+        if _compat_regional:
+            _titulo_partes.append(f"región: {_compat_regional['icono']} {_compat_regional['nivel'].replace('_', ' ')}")
+        with st.expander(f"🔬 Segunda opinión y auditoría regional — {' · '.join(_titulo_partes)}"):
+            if _jrc:
+                _diff_pp = res["PR"] * 100 - _jrc["PR_pct"]
+                st.markdown(f"**Verificación cruzada de energía — modelo JRC/Huld ({_jrc['tecnologia']})**")
+                st.caption(
+                    f"Panel: {_jrc['panel_nombre']} · Tecnología detectada: **{_jrc['tecnologia']}** "
+                    + (f"(catálogo: \"{_jrc['tecnologia_cruda']}\")" if _jrc["tecnologia_cruda"] != _jrc["tecnologia"] else "")
+                )
+                st.markdown(
+                    f"- **Motor principal de la app** (SDM De Soto): PR = **{res['PR']*100:.1f}%**\n"
+                    f"- **Modelo JRC/Huld** (power-rating, calibrado contra mediciones ESTI, "
+                    f"independiente del anterior): PR = **{_jrc['PR_pct']:.1f}%**\n"
+                    f"- Diferencia: **{_diff_pp:+.1f} puntos porcentuales**"
+                )
+                if _jrc["referencia_literatura"]:
+                    _partes_ref = " · ".join(
+                        f"{k}: {lo:.1f}%–{hi:.1f}%" for k, (lo, hi) in _jrc["referencia_literatura"].items()
+                    )
+                    st.caption(
+                        f"📚 Referencia — literatura real de {_jrc['tecnologia']} BIPV bajo clima tropical "
+                        f"(Kumar, Sudhakar, Samykano 2019): {_partes_ref}."
+                    )
+                st.caption(
+                    "⚠️ Ninguno de los 2 modelos es automáticamente \"el correcto\" — son 2 aproximaciones "
+                    "distintas (circuito físico equivalente vs. ajuste empírico calibrado). Una diferencia "
+                    "grande vale la pena revisarla antes de usar el resultado en un análisis financiero, "
+                    "pero no invalida por sí sola ninguno de los 2. Detalle completo: "
+                    "`DIAGNOSTICO_VERIFICACION_JRC_CDTE_TEUSAQUILLO.md`."
+                )
+            if _jrc and _compat_regional:
+                st.markdown("---")
+            if _compat_regional:
+                st.markdown(f"**Auditoría de compatibilidad regional — {_compat_regional['region_etiqueta']}**")
+                st.markdown(
+                    f"{_compat_regional['icono']} Calificación: **{_compat_regional['nivel'].replace('_', ' ')}** "
+                    f"({_compat_regional['score']}/3) — {_compat_regional['notas']}"
                 )
                 st.caption(
-                    f"📚 Referencia — literatura real de {_jrc['tecnologia']} BIPV bajo clima tropical "
-                    f"(Kumar, Sudhakar, Samykano 2019): {_partes_ref}."
+                    "Juicio experto real (no calculado por esta app) portado desde el catálogo curado "
+                    "de referencia — criterios más allá de la energía: estructura, estética, salinidad, "
+                    "logística, transmitancia. Es una auditoría, no un veredicto: revisa la nota técnica "
+                    "antes de descartar o confirmar el panel. Detalle completo: "
+                    "`DIAGNOSTICO_COMPATIBILIDAD_REGIONAL_BIPV.md`."
                 )
-            st.caption(
-                "⚠️ Ninguno de los 2 modelos es automáticamente \"el correcto\" — son 2 aproximaciones "
-                "distintas (circuito físico equivalente vs. ajuste empírico calibrado). Una diferencia "
-                "grande vale la pena revisarla antes de usar el resultado en un análisis financiero, "
-                "pero no invalida por sí sola ninguno de los 2. Detalle completo: "
-                "`DIAGNOSTICO_VERIFICACION_JRC_CDTE_TEUSAQUILLO.md`."
-            )
 
     # ── Desglose de pérdidas / ganancias ─────────────────────────────────────
     st.subheader("📉 Balance energético del sistema")
