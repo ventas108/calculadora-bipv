@@ -102,15 +102,51 @@ mensual de nuestro motor sigue relativamente plano (89,9%-91,0%, brecha de 9,0 a
 PVsyst real) — prácticamente igual que sin el término (91,04% anual, brecha 9,7-24,6 puntos). El
 patrón estacional real de PVsyst (mínimo marcado en marzo/septiembre) sigue sin explicarse.
 
-## Hipótesis abiertas para el patrón mensual (no investigadas aún)
+## Hipótesis abiertas para el patrón mensual
 
-1. `V_bi=0,9V` es un valor típico genérico (Merten 1998, a-Si), no calibrado para CdTe — podría no
-   ser el correcto para esta tecnología.
-2. PVsyst documenta una **tercera corrección** para capa fina, aparte de Rsh exponencial y
-   recombinación: "Spectral Corrections... particularly for amorphous modules, improving error
-   distributions by factors of 10-20%" — no investigada en esta sesión.
+1. ~~`V_bi=0,9V` es un valor típico genérico (Merten 1998, a-Si), no calibrado para CdTe.~~
+   **Investigada y descartada (2-sep-2026)**: tanto la literatura real de CdTe como la propia
+   documentación de pvlib/PVsyst confirman que **0,9V es el valor por defecto que PVsyst usa para
+   CUALQUIER unión simple** (a-Si o CdTe por igual) — solo tándem/triple-unión usan defaults
+   distintos (1,8V/2,7V). Ya se usó ese mismo valor. Descartada como causa: no estábamos
+   desviados del propio default real de PVsyst.
+   Nota aparte (no descarta el mecanismo, pero sí matiza su base física): CdTe comercial suele ser
+   una unión p-n, no p-i-n como el a-Si real que motivó el modelo de Merten — el ajuste de d²/µτ
+   para CdTe es, según la propia documentación de PVsyst, una adaptación semi-empírica del modelo,
+   no una derivación de primeros principios para esta tecnología.
+2. ~~PVsyst documenta una tercera corrección para capa fina: corrección espectral.~~
+   **Investigada y descartada (2-sep-2026)**: PVsyst tiene DOS modelos espectrales distintos —
+   CREST/Loughborough (para a-Si, rango real ~30%, UF 0,5-0,65, no calibrado para CdTe) y
+   FirstSolar (Lee & Panchula 2016, IEEE PVSC, específico para CdTe, fórmula
+   `M = c₁+c₂·AMₐ+c₃·Pw+c₄·√AMₐ+c₅·√Pw+c₆·AMₐ/√Pw`, con AMₐ=masa de aire absoluta, Pw=agua
+   precipitable). Ambos disponibles en pvlib (`pvlib.spectrum.spectral_factor_firstsolar`,
+   verificado en la versión pineada 0.11.1) sin necesidad de reimplementar física. Calculado el
+   rango real para Teusaquillo (altitud 2620m, AMₐ 0,7-1,8, Pw 1-4cm plausibles): **M entre 0,987
+   y 1,041 — solo ±2-4%**, un orden de magnitud menor que el ~20-30 puntos de brecha mensual que
+   buscamos explicar. Además, ninguna corrida de PVsyst que revisamos mostró una línea de pérdida
+   espectral en su diagrama, sugiriendo que ni siquiera estaba activada. **Descartada como
+   explicación principal** — quedaría como mejora de precisión menor si se implementa a futuro,
+   no como el mecanismo que cierra la brecha.
 3. Posible diferencia en cómo PVsyst pondera/distribuye la irradiancia sub-horaria real vs. el TMY
-   horario promedio que usamos.
+   horario promedio que usamos. **Parcialmente investigada (2-sep-2026)**: se verificó que
+   `calculos.solar.calcular_poa()` (misma fuente PVGIS TMY que reporta PVsyst, mismo sitio) pasa
+   limpio el chequeo de cierre físico `verificar_consistencia_radiativa()` que existe
+   específicamente para atrapar la clase de bug documentada en
+   `DIAGNOSTICO_TZ_TMY_SCRIPTS_URABA.md` (desfase de huso horario en TMY) — 0 de 4109 horas
+   inconsistentes, diferencia media 0,3 W/m². **Nuestro propio pipeline de irradiancia/posición
+   solar está limpio.** Sigue sin poder descartarse un desfase o resampleo distinto del lado de
+   PVsyst (su archivo `.MET` interno vs. nuestra llamada en vivo a la misma API) — no verificable
+   sin una exportación horaria real de PVsyst, que ya se intentó obtener sin éxito (solo se pudo
+   extraer resumen mensual).
+
+## Estado actual de la investigación (2-sep-2026)
+
+De las 3 hipótesis abiertas para el patrón mensual, **2 quedaron descartadas** (corrección
+espectral: magnitud real demasiado pequeña, ±2-4%; V_bi: ya se usaba el valor por defecto real de
+PVsyst) y la tercera (granularidad sub-horaria / desfase TMY del lado de PVsyst) **no se puede
+avanzar más sin datos que no logramos obtener** (exportación horaria real de PVsyst). El patrón
+estacional real de PVsyst (PR aislado 67%-81% variando por mes) sigue sin una causa identificada
+más allá de las ya investigadas y descartadas.
 
 ## Verificación
 

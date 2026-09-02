@@ -2928,9 +2928,18 @@ por no tener esos puntos crudos disponibles en la sesión.
 para ese módulo, sin mezclar con nuestros valores de laboratorio): Pmax_STC=60,87W vs 60,59W
 implícito de PVsyst (0,5%) — el mecanismo replica bien el ajuste real de PVsyst. Pero NO cierra la
 brecha mensual buscada (89,9-91,0% de nuestro motor vs 67-81% real, brecha similar a sin el
-término) — el patrón estacional real sigue sin explicarse. Hipótesis abiertas: V_bi=0,9V es
-genérico (a-Si), no calibrado para CdTe; PVsyst documenta una tercera corrección ("Spectral
-Corrections") no investigada; posible diferencia TMY horario vs sub-horario real.
+término) — el patrón estacional real sigue sin explicarse.
+
+**Actualización (mismo día)**: de las 3 hipótesis abiertas, 2 quedaron descartadas tras
+investigarlas. (1) Corrección espectral de PVsyst (dos modelos reales: CREST/a-Si y FirstSolar/
+CdTe, éste vía `pvlib.spectrum.spectral_factor_firstsolar`, presente en la versión pineada) —
+magnitud real calculada para Teusaquillo (AMₐ 0,7-1,8, Pw 1-4cm): solo ±2-4%, orden de magnitud
+menor a la brecha buscada; descartada. (2) V_bi=0,9V — confirmado que ES el valor por defecto real
+que PVsyst usa para cualquier unión simple (a-Si o CdTe, no solo a-Si); ya se usaba correctamente;
+descartada. (3) Granularidad sub-horaria/desfase TMY: verificado que nuestro propio pipeline
+(`calcular_poa()`) pasa limpio el chequeo de cierre físico anti-desfase horario (0/4109 horas
+inconsistentes) — el problema no está de nuestro lado; no se pudo verificar del lado de PVsyst por
+falta de exportación horaria real. Sin causa identificada adicional tras esta ronda.
 
 Bug real encontrado en el camino: `calcular_pmax_vectorizado()` usaba `np.asarray()` en vez de
 `np.array()`, devolviendo a veces un array de solo lectura que rompía las mutaciones in-place de
