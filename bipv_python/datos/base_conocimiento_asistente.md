@@ -2557,6 +2557,26 @@ R: Sí, conviene corregirlo: cuando un modelo se repite, solo la última fila de
 
 ────────────────────────────────────────────────────────────
 
+### Manual de los 3 motores de producción FV (SDM, JRC/Huld, fallback lineal)  NUEVO (2-sep-2026)
+
+P: ¿Cuántos motores de cálculo usa la app para producción de energía y cuándo corre cada uno?
+
+R: Tres. (1) **Fallback lineal**: cualquier tecnología sin ficha SDM calibrada — solo escala Pmax_stc por irradiancia/temperatura, sin curva I-V. (2) **SDM (modelo de un diodo, PVsyst v6)**: TODAS las tecnologías, y es el ÚNICO motor de 🔬 Motor IV, 🔀 Mismatch/Bypass y 🗺️ Vista 3D/MPPT combinado (estas 3 páginas siempre necesitan la curva I-V completa, algo que JRC/Huld no calcula). (3) **JRC/Huld (empírico, Huld et al. 2011)**: motor PRINCIPAL de energía en 📊 Producción Anual, pero solo para paneles **CdTe** (película delgada) — activado desde el 2-sep-2026. Paneles cristalinos y CIS/CIGS en 📊 Producción siguen usando el SDM como siempre.
+
+P: ¿Por qué se cambió a JRC/Huld como motor principal solo para CdTe, y no para todas las tecnologías?
+
+R: Se encontró un defecto estructural real del SDM específico de CdTe: a irradiancia media (~200 W/m²) el SDM predice una "joroba" de eficiencia relativa por encima del 100% que no aparece en corridas reales de PVsyst 8.1.5 ni en el modelo JRC/Huld. Validado contra un caso real (proyecto Teusaquillo, panel ASP-ST1-T40): el PR mensual de JRC/Huld correlaciona con el PR mensual real de PVsyst (r=0.545), mientras el SDM correlaciona negativamente (r=-0.142). Ver `DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md`. Para silicio cristalino y CIS/CIGS no se encontró ese defecto, así que ahí el SDM sigue siendo el motor principal.
+
+P: Corrí un panel CdTe en 🔬 Motor IV y en 📊 Producción y los números de energía no coinciden exactamente. ¿Es un bug?
+
+R: No, es el comportamiento esperado desde el 2-sep-2026. Motor IV, Mismatch/Bypass y Vista 3D usan el SDM (necesitan la curva I-V completa); Producción Anual usa JRC/Huld para CdTe (más preciso para energía, pero no calcula curva I-V). Ambos comparten el mismo modelo térmico (NOCT + k_BIPV), pero difieren en el modelo de potencia. La página 📊 Producción tiene un expander "🔬 Segunda opinión" que, para CdTe, muestra explícitamente esta comparación (motor principal JRC/Huld+cascada vs. JRC/Huld con Faiman propio sin cascada) para que el contraste sea visible, no oculto.
+
+P: ¿Dónde encuentro el manual completo y la ficha técnica del motor de producción, con más detalle que este resumen?
+
+R: Se entregaron dos documentos de referencia el 2-sep-2026: una ficha técnica ("Motor de Producción BIPV") y un manual operativo con procedimiento paso a paso, tabla de qué motor corre en cada página, y errores comunes ("Motores de Producción FV"). Pídele al equipo el enlace o la copia en Word si los necesitas — el contenido esencial de ambos (arquitectura de 3 motores, cuándo usa cada uno) ya está resumido en esta sección para que puedas consultarlo aquí mismo con el asistente.
+
+────────────────────────────────────────────────────────────
+
 ## 18. Anexo — Actualizaciones del 6 y 7 de agosto de 2026
 
 Esta entrega convierte la calculadora en una aplicación multiusuario: cada persona entra con su cuenta, guarda varios proyectos privados y no pierde el trabajo al cerrar la pestaña. Además se suma el Asistente 🧭 que guía el flujo paso a paso, un tab de análisis solar en la Vista 3D para elegir la mejor orientación, y mejoras de robustez en catálogos, presupuesto, financiero y reporte PDF.
