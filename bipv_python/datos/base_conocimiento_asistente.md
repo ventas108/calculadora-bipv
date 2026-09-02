@@ -2911,11 +2911,21 @@ ventana MPPT (ficha 2020: 50-400V más amplia; pantalla PVsyst: 60-350V) — se 
 ser la efectivamente validada, con la discrepancia documentada en el campo "Notas" del catálogo,
 no oculta. Potencia FV máx. recomendada (900W) real, de la ficha oficial ("Max. DC input power").
 Sin dato real de corriente máxima de entrada en ninguna de las 2 fuentes (PVsyst mostró "N/A") —
-se dejó en blanco, no se estimó.
+se dejó en blanco inicialmente.
 
-2 tests nuevos (`tests/test_inversor_invt_mg750tl.py`), script de agregado
-(`datos/agregar_inversor_invt_mg750tl.py`, mismo patrón que
-`agregar_inversores_apsystems.py`). Suite completa: **941/941**.
+**Corrección el mismo día**: al pedir "verifica que el nuevo inversor calcule bien en
+Dimensionamiento", se encontró que dejar la corriente máxima en blanco rompía por completo
+`evaluar_compatibilidad_string()` — devolvía `evaluable=False` ("ficha incompleta") para CUALQUIER
+configuración con este inversor, incluida la config real ya validada (3 en serie × 4 strings), no
+por incompatibilidad real. Corregido con un valor DERIVADO (no inventado): 900W (potencia DC
+máxima real) / 60V (Vmppt mínimo real) = 15A — el peor caso físico real de corriente a máxima
+potencia en el extremo inferior de la ventana MPPT, documentado como derivado en el campo Notas.
+Verificado con la config real: `compatible=True`, ratio DC:AC=1,01 🟢, `alerta_margen=True` (Voc en
+frío 381,5V cerca del límite de 400V — coincide con lo ya visto en las capturas reales de PVsyst).
+
+3 tests (`tests/test_inversor_invt_mg750tl.py`), script de agregado/actualización
+(`datos/agregar_inversor_invt_mg750tl.py`, mismo patrón que `agregar_inversores_apsystems.py`,
+ahora también actualiza si el modelo ya existe). Suite completa: **942/942**.
 
 ## 25w. Anexo — Actualizaciones del 2 de septiembre de 2026 (JRC/Huld reemplaza al SDM como motor de energía para CdTe)
 

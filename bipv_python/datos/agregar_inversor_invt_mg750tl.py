@@ -48,9 +48,19 @@ INVERSOR = {
     "Tension Minima MPPT Activo (V)":            60,
     "N Trackers":                                1,
     "N Strings/Tracker":                         1,
-    "Corriente Maxima Tracker (A)":              "",    # no publicada explícitamente en ninguna
-                                                          # fuente -- PVsyst mostró "N/A"
-    "Corriente Cortocircuito Max Tracker (A)":   "",
+    # Corriente máxima de entrada: NINGUNA de las 2 fuentes la publica
+    # directamente (PVsyst mostró "N/A" en pantalla). Sin este dato,
+    # evaluar_compatibilidad_string() (calculos/dimensionamiento.py) devuelve
+    # evaluable=False para CUALQUIER configuración con este inversor --
+    # encontrado el 2-sep-2026 corriendo la config real ya validada (3 en
+    # serie x 4 strings) y viendo que fallaba por "ficha incompleta", no por
+    # incompatibilidad real. Se deriva (no se inventa) del límite físico real
+    # ya publicado: Max. DC input power (900W, ficha oficial) / Vmppt_min
+    # (60V, ver arriba) = 15A -- el peor caso real de corriente a la potencia
+    # máxima del inversor operando en el extremo inferior de su ventana MPPT,
+    # no un número sacado de la nada. Documentado como derivado, no medido.
+    "Corriente Maxima Tracker (A)":              15.0,
+    "Corriente Cortocircuito Max Tracker (A)":   15.0,
     "Potencia FV Max Recomendada (W)":           900,   # real, ficha oficial ("Max. DC input power")
     "Potencia AC nominal (kW)":                  0.75,  # real, ambas fuentes coinciden
     "Marca":                                      "INVT Solar Technology",
@@ -60,7 +70,10 @@ INVERSOR = {
         "resuelta. Corriente AC nominal ficha PVsyst: 3,26A (=750W/230V); corriente AC máxima "
         "ficha oficial: 3,6A (=~828W/230V, coherente con 'Potencia CA máxima 0,80kW' vista en "
         "PVsyst). Ventana MPPT de la ficha oficial 2020 es más amplia (50-400V) que la usada en "
-        "la corrida real de PVsyst (60-350V) -- se usó esta última por ser la validada."
+        "la corrida real de PVsyst (60-350V) -- se usó esta última por ser la validada. "
+        "Corriente máxima de entrada (15A): DERIVADA de 900W/60V (potencia DC máxima real / "
+        "Vmppt mínimo real), no publicada directamente por ninguna fuente -- sin este valor, "
+        "evaluar_compatibilidad_string() no podía evaluar ninguna configuración con este inversor."
     ),
 }
 
@@ -82,27 +95,25 @@ def main():
 
     col_modelo = headers.index("Modelo") + 1
 
-    existentes = set()
+    modelo = INVERSOR["Modelo"]
+    fila_existente = None
     for row in ws.iter_rows(min_row=header_row + 1, values_only=False):
         val = str(row[col_modelo - 1].value).strip() if row[col_modelo - 1].value else ""
-        if val:
-            existentes.add(val.upper())
+        if val.upper() == modelo.upper():
+            fila_existente = row[0].row
+            break
 
-    modelo = INVERSOR["Modelo"]
-    if modelo.upper() in existentes:
-        print(f"'{modelo}' ya existe en el catálogo -- no se hicieron cambios.")
-        return
-
-    next_row = ws.max_row + 1
+    target_row = fila_existente if fila_existente else ws.max_row + 1
     for col_name, value in INVERSOR.items():
         if col_name not in headers:
             print(f"  AVISO: columna '{col_name}' no encontrada en el catálogo real (se omite)")
             continue
         col_idx = headers.index(col_name) + 1
-        ws.cell(row=next_row, column=col_idx, value=value if value != "" else None)
+        ws.cell(row=target_row, column=col_idx, value=value if value != "" else None)
 
     wb.save(EXCEL)
-    print(f"Agregado: {modelo} en la fila {next_row}. Archivo guardado: {EXCEL}")
+    accion = "Actualizado" if fila_existente else "Agregado"
+    print(f"{accion}: {modelo} en la fila {target_row}. Archivo guardado: {EXCEL}")
 
 
 if __name__ == "__main__":
