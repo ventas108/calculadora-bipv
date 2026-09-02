@@ -2,10 +2,27 @@
 Módulo de producción anual BIPV — IEC 61724.
 
 Simula la energía hora a hora aplicando:
-  1. SDM De Soto 2006 vectorizado  (pvlib + Rsh CdTe Mermoud 2005)
+  1. Motor eléctrico por módulo -- SDM PVsyst v6 vectorizado (pvlib) para la
+     mayoría de tecnologías; power-rating model JRC/Huld (Huld et al. 2011)
+     para CdTe -- ver nota "Motor CdTe" abajo.
   2. Factor de pérdidas ópticas/eléctricas de la cascada Mismatch
   3. Temperatura de celda NOCT hora a hora
   4. Curva de eficiencia del inversor
+
+Motor CdTe (2-sep-2026, ver DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md): para
+paneles CdTe, este módulo usa el power-rating model JRC/Huld como motor
+PRIMARIO de energía, no el SDM. Decisión basada en evidencia real: comparado
+contra una corrida real de PVsyst 8.1.5 (panel ASP-ST1-T40, fachada vertical,
+Teusaquillo), el patrón mensual de PR de JRC/Huld correlaciona con el real
+(r=0.545, RMSE=13.2pts) mientras el SDM no correlaciona en absoluto
+(r=-0.142, RMSE=16.2pts) -- el SDM con Rsh exponencial produce una "joroba"
+de eficiencia por encima del 100% entre G=100-300 W/m² que ni PVsyst real ni
+el modelo empírico JRC/Huld (ajustado contra mediciones reales de módulos
+CdTe en el ESTI europeo) reproducen. Esto SOLO cambia el cálculo de energía
+de este módulo -- Motor IV (produccion_iv.py), mismatch/bypass
+(mismatch_bypass.py) y MPPT compartido (mppt_combinado.py) siguen en el SDM
+exclusivamente, porque necesitan la curva I-V completa (Vmp/Voc/Isc) que
+JRC/Huld no calcula (JRC/Huld solo predice Pmax).
 
 Métricas de salida (IEC 61724):
   Y_f  — Final yield    (kWh/kWp)
@@ -19,6 +36,7 @@ import numpy as np
 import pandas as pd
 
 from calculos.modelo_iv import calcular_pmax_vectorizado
+from calculos.modelo_jrc_huld import clasificar_tecnologia_jrc, potencia_jrc
 from calculos.temperatura import temperatura_celda_noct
 from calculos.agregador_anual import (
     agregar_anual_8760_poa,
@@ -50,15 +68,32 @@ def _calcular_pmax_vectorizado(
     panel: dict,
 ) -> np.ndarray:
     """
-    Calcula Pmax (W) por módulo hora a hora usando SDM De Soto 2006 vectorizado.
-    Utiliza el modelo Rsh exponencial CdTe (Mermoud 2005) en lugar del lineal de pvlib.
+    Calcula Pmax (W) por módulo hora a hora.
+
+    Para CdTe usa el power-rating model JRC/Huld como motor PRIMARIO (ver
+    nota "Motor CdTe" en el docstring del módulo y
+    DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md) -- reemplaza al SDM SOLO aquí
+    (cálculo de energía), nunca en Motor IV/mismatch/MPPT compartido, que
+    necesitan la curva I-V completa. Para el resto de tecnologías usa el SDM
+    PVsyst v6 vectorizado (pvlib), con el modelo Rsh exponencial CdTe/CIGS
+    (Mermoud 2005) donde aplica.
 
     G     : irradiancia efectiva en el plano (W/m²) — array 1D
     T_cel : temperatura de celda (°C) — array 1D
-    panel : dict con parámetros SDM del catálogo
+    panel : dict con parámetros del catálogo
 
     Retorna: array 1D de Pmax (W) por módulo
     """
+    # ── CdTe: JRC/Huld primario (no requiere parámetros SDM, solo Pmax_stc) ──
+    if clasificar_tecnologia_jrc(panel.get("tecnologia")) == "CdTe":
+        pmax_stc = float(panel.get("Pmax_stc") or 0.0)
+        if pmax_stc > 0:
+            pmax = potencia_jrc(G, T_cel, pmax_stc, tecnologia="CdTe")
+            pmax[G < 5.0] = 0.0
+            return pmax
+        # Pmax_stc ausente/0: cae al fallback lineal genérico de abajo (mismo
+        # comportamiento que un panel sin SDM completo).
+
     # ── Fallback para paneles sin parámetros SDM completos ───────────────────
     # (paneles del catálogo Excel que no tienen a_ref, I_L_ref, etc.)
     if not panel_tiene_sdm_completo(panel):

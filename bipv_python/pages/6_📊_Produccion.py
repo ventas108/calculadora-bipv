@@ -780,15 +780,29 @@ if btn_sim or st.session_state.get("produccion_ok"):
     st.plotly_chart(fig_hm, use_container_width=True)
 
     # ── Nota PR > 100% ────────────────────────────────────────────────────────
+    # Redactada con más cautela desde el 2-sep-2026 (ver
+    # DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md): esta nota afirmaba antes, sin
+    # ningún contraste, que un PR>100% de CdTe era "resultado correcto...no es
+    # un error de cálculo". Una investigación real (comparación contra una
+    # corrida de PVsyst 8.1.5 + el modelo empírico JRC/Huld + literatura de
+    # BIPV real) encontró que el motor SDM anterior sí producía un
+    # sobre-rendimiento ARTIFICIAL para CdTe (una "joroba" de eficiencia entre
+    # G=100-300 W/m² que ni PVsyst real ni mediciones reales reproducen) --
+    # exactamente lo que esta nota negaba. Con JRC/Huld como motor primario de
+    # CdTe (desde esa misma fecha), ese artefacto específico ya no debería
+    # producir el PR>100%, pero la nota ya no afirma con certeza que cualquier
+    # PR>100% restante sea automáticamente real.
     if res["PR"] > 1.0:
         st.info(
-            f"ℹ️ **PR = {res['PR']*100:.1f}% > 100%** — resultado correcto para "
+            f"ℹ️ **PR = {res['PR']*100:.1f}% > 100%** para "
             f"**{ciudad}** (altitud {st.session_state.get('alt_m', '≈2600')} m, "
             f"T_amb media {st.session_state.get('t_media_anual', 13.9):.1f}°C). "
-            "En climas fríos de alta altitud, los módulos CdTe operan por debajo de 25°C "
-            "durante muchas horas, ganando eficiencia respecto a STC. "
-            "El PR > 100% indica **sobre-rendimiento real** (no es un error de cálculo). "
-            "IEC 61724 permite PR > 100% cuando las condiciones reales superan las STC."
+            "En climas fríos de alta altitud, es real que los módulos CdTe operan por debajo "
+            "de 25°C durante muchas horas, ganando algo de eficiencia respecto a STC — pero "
+            "un sobre-rendimiento tan grande merece revisarse, no asumirse como correcto sin más. "
+            "IEC 61724 permite PR > 100% en teoría, pero conviene contrastarlo (ver la sección "
+            "de verificación cruzada más abajo si el panel es CdTe/CIS/cristalino) antes de "
+            "usarlo en un análisis financiero."
         )
 
     # ── 🔬 Segunda opinión: verificación cruzada JRC/Huld (31-ago-2026) ──────
@@ -820,17 +834,34 @@ if btn_sim or st.session_state.get("produccion_ok"):
         with st.expander(f"🔬 Segunda opinión y auditoría regional — {' · '.join(_titulo_partes)}"):
             if _jrc:
                 _diff_pp = res["PR"] * 100 - _jrc["PR_pct"]
+                _es_cdte = _jrc["tecnologia"] == "CdTe"
                 st.markdown(f"**Verificación cruzada de energía — modelo JRC/Huld ({_jrc['tecnologia']})**")
                 st.caption(
                     f"Panel: {_jrc['panel_nombre']} · Tecnología detectada: **{_jrc['tecnologia']}** "
                     + (f"(catálogo: \"{_jrc['tecnologia_cruda']}\")" if _jrc["tecnologia_cruda"] != _jrc["tecnologia"] else "")
                 )
-                st.markdown(
-                    f"- **Motor principal de la app** (SDM De Soto): PR = **{res['PR']*100:.1f}%**\n"
-                    f"- **Modelo JRC/Huld** (power-rating, calibrado contra mediciones ESTI, "
-                    f"independiente del anterior): PR = **{_jrc['PR_pct']:.1f}%**\n"
-                    f"- Diferencia: **{_diff_pp:+.1f} puntos porcentuales**"
-                )
+                if _es_cdte:
+                    # Desde el 2-sep-2026 (DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md),
+                    # JRC/Huld es el motor PRIMARIO de energía para CdTe -- ya no
+                    # es "SDM vs. independiente", son 2 corridas del MISMO modelo
+                    # JRC/Huld con distinto pipeline alrededor (temperatura NOCT+
+                    # k_BIPV de la app vs. Faiman propio del paper; cascada
+                    # Mismatch/IAM completa vs. solo POA+temperatura).
+                    st.markdown(
+                        f"- **Motor principal de la app** (JRC/Huld + temperatura NOCT/k_BIPV + "
+                        f"cascada Mismatch/IAM completa): PR = **{res['PR']*100:.1f}%**\n"
+                        f"- **JRC/Huld con su propio modelo térmico Faiman** (sin la cascada "
+                        f"Mismatch/IAM de la app, solo POA+temperatura): PR = **{_jrc['PR_pct']:.1f}%**\n"
+                        f"- Diferencia: **{_diff_pp:+.1f} puntos porcentuales** (esperable -- distinto "
+                        f"pipeline alrededor del mismo modelo de módulo, no dos físicas distintas)"
+                    )
+                else:
+                    st.markdown(
+                        f"- **Motor principal de la app** (SDM PVsyst v6): PR = **{res['PR']*100:.1f}%**\n"
+                        f"- **Modelo JRC/Huld** (power-rating, calibrado contra mediciones ESTI, "
+                        f"independiente del anterior): PR = **{_jrc['PR_pct']:.1f}%**\n"
+                        f"- Diferencia: **{_diff_pp:+.1f} puntos porcentuales**"
+                    )
                 if _jrc["referencia_literatura"]:
                     _partes_ref = " · ".join(
                         f"{k}: {lo:.1f}%–{hi:.1f}%" for k, (lo, hi) in _jrc["referencia_literatura"].items()
@@ -839,13 +870,23 @@ if btn_sim or st.session_state.get("produccion_ok"):
                         f"📚 Referencia — literatura real de {_jrc['tecnologia']} BIPV bajo clima tropical "
                         f"(Kumar, Sudhakar, Samykano 2019): {_partes_ref}."
                     )
-                st.caption(
-                    "⚠️ Ninguno de los 2 modelos es automáticamente \"el correcto\" — son 2 aproximaciones "
-                    "distintas (circuito físico equivalente vs. ajuste empírico calibrado). Una diferencia "
-                    "grande vale la pena revisarla antes de usar el resultado en un análisis financiero, "
-                    "pero no invalida por sí sola ninguno de los 2. Detalle completo: "
-                    "`DIAGNOSTICO_VERIFICACION_JRC_CDTE_TEUSAQUILLO.md`."
-                )
+                if _es_cdte:
+                    st.caption(
+                        "ℹ️ Para CdTe, el motor principal de esta app usa JRC/Huld (no el SDM) desde el "
+                        "2-sep-2026 -- comparado contra una corrida real de PVsyst 8.1.5, correlaciona "
+                        "mejor con el patrón mensual real que el SDM (r=0.545 vs. r=-0.142). El SDM sigue "
+                        "siendo el único motor en Motor IV, Mismatch/Bypass y MPPT compartido, que necesitan "
+                        "la curva I-V completa. Detalle completo: "
+                        "`DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md`."
+                    )
+                else:
+                    st.caption(
+                        "⚠️ Ninguno de los 2 modelos es automáticamente \"el correcto\" — son 2 aproximaciones "
+                        "distintas (circuito físico equivalente vs. ajuste empírico calibrado). Una diferencia "
+                        "grande vale la pena revisarla antes de usar el resultado en un análisis financiero, "
+                        "pero no invalida por sí sola ninguno de los 2. Detalle completo: "
+                        "`DIAGNOSTICO_VERIFICACION_JRC_CDTE_TEUSAQUILLO.md`."
+                    )
             if _jrc and _compat_regional:
                 st.markdown("---")
             if _compat_regional:

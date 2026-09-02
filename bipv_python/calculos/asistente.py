@@ -261,13 +261,28 @@ def contexto_sesion(estado: Mapping[str, Any]) -> str:
     # asistente nunca inventa una comparación que no se calculó de verdad.
     _jrc = estado.get("verificacion_jrc")
     if _jrc:
-        lineas.append(
-            f"🔬 Verificación cruzada JRC/Huld ({_jrc['tecnologia']}, panel {_jrc['panel_nombre']}): "
-            f"PR={_jrc['PR_pct']:.1f}% — motor principal de la app: "
-            f"{estado.get('PR_sistema', 0) * 100:.1f}%. "
-            "Es una segunda opinión independiente (modelo empírico calibrado, distinto del SDM "
-            "de la app), no un veredicto — explica la diferencia sin declarar cuál es \"el correcto\"."
-        )
+        # Desde el 2-sep-2026 (DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md), CdTe usa
+        # JRC/Huld como motor PRINCIPAL de energía (no el SDM) -- el texto debe
+        # reflejar eso, no seguir describiendo "SDM vs. independiente" para una
+        # tecnología donde ambos números ya vienen del mismo modelo de módulo.
+        if _jrc["tecnologia"] == "CdTe":
+            lineas.append(
+                f"🔬 Verificación cruzada JRC/Huld (CdTe, panel {_jrc['panel_nombre']}): "
+                f"PR={_jrc['PR_pct']:.1f}% (solo POA+temperatura Faiman propia) — motor principal "
+                f"de la app (JRC/Huld + cascada completa Mismatch/IAM): {estado.get('PR_sistema', 0) * 100:.1f}%. "
+                "Desde el 2-sep-2026, CdTe usa JRC/Huld como motor PRINCIPAL de energía (no el SDM) "
+                "por evidencia real (correlación con una corrida de PVsyst 8.1.5: r=0.545 JRC vs. "
+                "r=-0.142 SDM) -- la diferencia aquí es de pipeline (temperatura/cascada), no de "
+                "física distinta como antes."
+            )
+        else:
+            lineas.append(
+                f"🔬 Verificación cruzada JRC/Huld ({_jrc['tecnologia']}, panel {_jrc['panel_nombre']}): "
+                f"PR={_jrc['PR_pct']:.1f}% — motor principal de la app: "
+                f"{estado.get('PR_sistema', 0) * 100:.1f}%. "
+                "Es una segunda opinión independiente (modelo empírico calibrado, distinto del SDM "
+                "de la app), no un veredicto — explica la diferencia sin declarar cuál es \"el correcto\"."
+            )
     # Auditoría de compatibilidad regional (31-ago-2026, mismo pedido: "que
     # la app reconozca... si ese panel/tecnología simplemente no encaja con
     # esa región"). Escrita en session_state por 📐 Dimensionamiento; None si

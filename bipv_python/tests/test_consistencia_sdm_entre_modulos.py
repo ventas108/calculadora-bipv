@@ -33,6 +33,7 @@ from calculos.produccion import _calcular_pmax_vectorizado
 from calculos.produccion_iv import _pmp_iv_vectorizado
 from calculos.mismatch_bypass import _sdm_vectorizado
 from calculos.mppt_combinado import _params_grupo
+from calculos.modelo_jrc_huld import potencia_jrc
 from datos.tecnologias_bipv import ASP_ST1_T40
 
 # G >= 5 W/m² para evitar la zona de apagado nocturno (cada módulo la trata
@@ -61,16 +62,28 @@ _PANELES_PRUEBA = {"CdTe (ASP_ST1_T40)": ASP_ST1_T40, "Poli-Si (XTP_50_17B)": XT
 
 @pytest.mark.parametrize("nombre_panel,panel", _PANELES_PRUEBA.items())
 def test_pmax_identico_entre_modelo_iv_produccion_produccion_iv_y_bypass(nombre_panel, panel):
+    # CdTe (2-sep-2026, ver DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md): produccion.py
+    # deliberadamente YA NO usa el SDM para CdTe -- usa JRC/Huld como motor
+    # primario de energía (evidencia real: correlación con PVsyst 8.1.5). Este
+    # test verifica esa divergencia INTENCIONAL para produccion.py, y sigue
+    # exigiendo igualdad exacta para produccion_iv.py/mismatch_bypass.py, que
+    # necesitan la curva I-V completa y siguen exclusivamente en el SDM.
+    T_arr = np.full_like(G_PRUEBA, T_PRUEBA)
     pmax_modelo_iv = np.array([
         resolver_curva_iv(float(g), T_PRUEBA, panel, n_puntos=0)["Pmax"]
         for g in G_PRUEBA
     ])
-    pmax_produccion    = _calcular_pmax_vectorizado(G_PRUEBA, np.full_like(G_PRUEBA, T_PRUEBA), panel)
-    pmax_produccion_iv = _pmp_iv_vectorizado(G_PRUEBA, np.full_like(G_PRUEBA, T_PRUEBA), panel)
-    pmax_bypass, _, _, _ = _sdm_vectorizado(G_PRUEBA, np.full_like(G_PRUEBA, T_PRUEBA), panel)
+    pmax_produccion    = _calcular_pmax_vectorizado(G_PRUEBA, T_arr, panel)
+    pmax_produccion_iv = _pmp_iv_vectorizado(G_PRUEBA, T_arr, panel)
+    pmax_bypass, _, _, _ = _sdm_vectorizado(G_PRUEBA, T_arr, panel)
 
-    np.testing.assert_allclose(pmax_produccion, pmax_modelo_iv, rtol=1e-6,
-                               err_msg=f"produccion.py diverge de modelo_iv.py ({nombre_panel})")
+    if nombre_panel == "CdTe (ASP_ST1_T40)":
+        pmax_jrc = potencia_jrc(G_PRUEBA, T_arr, float(panel["Pmax_stc"]), tecnologia="CdTe")
+        np.testing.assert_allclose(pmax_produccion, pmax_jrc, rtol=1e-9,
+                                   err_msg="produccion.py CdTe diverge de JRC/Huld (motor primario esperado)")
+    else:
+        np.testing.assert_allclose(pmax_produccion, pmax_modelo_iv, rtol=1e-6,
+                                   err_msg=f"produccion.py diverge de modelo_iv.py ({nombre_panel})")
     np.testing.assert_allclose(pmax_produccion_iv, pmax_modelo_iv, rtol=1e-6,
                                err_msg=f"produccion_iv.py diverge de modelo_iv.py ({nombre_panel})")
     np.testing.assert_allclose(pmax_bypass, pmax_modelo_iv, rtol=1e-6,

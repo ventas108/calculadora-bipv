@@ -2899,6 +2899,36 @@ El paper también aportó el tercer PR real independiente en rango típico (84,9
 
 2 tests nuevos en `tests/test_perdidas_desglosadas_pvsyst.py`. Suite completa: **920/920**. Ver `DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md`.
 
+## 25w. Anexo — Actualizaciones del 2 de septiembre de 2026 (JRC/Huld reemplaza al SDM como motor de energía para CdTe)
+
+Cierre de la investigación del vacío mensual de PR de CdTe (secciones 25u/25v): tras descartar
+corrección espectral, V_bi genérico y sesgo de Pnom, y agotar el ajuste de parámetros del SDM
+(Rs, Rsh, Gamma, recombinación), se encontró la causa raíz: el modelo de un diodo con Rsh
+exponencial produce una "joroba" de eficiencia >100% entre G=100-300 W/m² que ni una corrida real
+de PVsyst 8.1.5 ni el modelo empírico JRC/Huld (Huld et al. 2011, ya en el repo como segunda
+opinión desde el 31-ago) reproducen. Comparado mes a mes contra PVsyst real: SDM r=-0,142 (sin
+relación), JRC/Huld r=0,545 (correlación real), RMSE 16,2 vs. 13,2 puntos.
+
+**Cambio**: `calculos/produccion.py::_calcular_pmax_vectorizado()` usa JRC/Huld como motor
+PRIMARIO de energía para paneles CdTe (63,0W exacto en STC, vs. 60,48W del SDM — refleja mejor el
+patrón de baja irradiancia a cambio de no capturar la inconsistencia real de ficha
+Vmpp×Impp≠Pmax). **Alcance acotado a energía**: Motor IV (`produccion_iv.py`), mismatch/bypass y
+MPPT compartido siguen exclusivamente en el SDM — JRC/Huld solo predice Pmax, no da curva I-V
+(Voc/Isc/Vmp/Imp) que esos 3 módulos necesitan. Afecta 7/7 paneles ASP-ST1 y 53/76 del catálogo
+Excel (clasificados CdTe); solo ASP-ST1-T40 tiene validación numérica directa contra PVsyst, el
+resto se beneficia por el mismo argumento estructural (defecto de la ecuación, no de calibración
+por panel).
+
+Textos de UI corregidos: la sección "🔬 Segunda opinión" de 📊 Producción y el contexto del
+asistente ya no describen "SDM vs. modelo independiente" para CdTe (ambos números ahora comparten
+el mismo modelo de módulo, difieren solo en el pipeline de temperatura/cascada alrededor); la nota
+de "PR>100% es resultado correcto, no un error" se suavizó, ya no lo afirma con certeza sin
+contraste.
+
+6 tests nuevos (`tests/test_jrc_huld_primario_cdte.py`) + 1 test existente actualizado
+(`test_consistencia_sdm_entre_modulos.py`, CdTe ahora diverge intencionalmente en produccion.py).
+Suite completa: **939/939**. Ver `DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md`.
+
 ## 25v. Anexo — Actualizaciones del 2 de septiembre de 2026 (recombinación en capa intrínseca CdTe: implementada, no activada)
 
 Validando el motor CdTe contra una corrida real de PVsyst 8.1.5 (ASP-ST1-T40, Teusaquillo),
