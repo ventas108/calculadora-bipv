@@ -91,6 +91,22 @@ ASP_ST1_T40 = {
                              #       real, 4.0% -- dentro de la tolerancia de 5% ya usada
                              #       en validar_sdm_vs_ficha()).
 
+    # ── Recombinación en capa intrínseca (Merten et al. 1998) -- NO activada ──
+    # El motor ya soporta el término de recombinación PVsyst/Merten 1998
+    # (calculos.modelo_iv._parametros_recombinacion + calcular_pmax_vectorizado,
+    # vía pvlib.singlediode.bishop88 -- ver DIAGNOSTICO_RECOMBINACION_CDTE.md),
+    # pero NO se activa aquí (`d2mutau` queda sin definir = 0.0, sin efecto).
+    # Investigado el 2-sep-2026: agregar d2mutau=0.885V/V_bi=0.9V (valores
+    # reales leídos de PVsyst 8.1.5 para este panel) SOBRE nuestro R_s/R_sh_ref
+    # ya calibrados con datos de laboratorio (FF_vs_Irradiancia del XLSM)
+    # rompe esa calibración real: FF@G=200W/m² cae a 47.06% contra el 76.28%
+    # real medido -- el R_s=25.51Ω ya "absorbe" implícitamente el efecto de
+    # recombinación (fue ajustado SIN ese término), así que sumarlo aparte lo
+    # cuenta dos veces. Activarlo correctamente requeriría re-calibrar
+    # I_L_ref/I_o_ref/R_s/R_sh_ref TODOS JUNTOS contra los 10 puntos reales
+    # del XLSM con el término de recombinación ya incluido -- no se hizo por
+    # no tener esos puntos crudos disponibles en la sesión que lo investigó.
+
     # ── Temperatura nominal ────────────────────────────────────────────────
     "NOCT":     45.0,    # °C
 

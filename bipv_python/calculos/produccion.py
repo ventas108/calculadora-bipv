@@ -17,9 +17,8 @@ Métricas de salida (IEC 61724):
 
 import numpy as np
 import pandas as pd
-import pvlib
 
-from calculos.modelo_iv import trasladar_parametros_gt
+from calculos.modelo_iv import calcular_pmax_vectorizado
 from calculos.temperatura import temperatura_celda_noct
 from calculos.agregador_anual import (
     agregar_anual_8760_poa,
@@ -77,25 +76,16 @@ def _calcular_pmax_vectorizado(
         pmax = np.maximum(pmax, 0.0)
         return pmax
 
-    # Motor SDM centralizado en calculos.modelo_iv.trasladar_parametros_gt()
+    # Motor SDM centralizado en calculos.modelo_iv.calcular_pmax_vectorizado()
     # (modelo PVsyst v6, Sauer/Roessler/Hansen 2015 -- migrado desde De Soto
-    # 2006 el 2-sep-2026, ver DIAGNOSTICO_MOTOR_PVSYST.md). Antes cada una
-    # de las 5 implementaciones del SDM reimplementaba esta llamada por su
-    # cuenta (ver test_consistencia_sdm_entre_modulos.py, que existe
-    # precisamente para atrapar el riesgo de que una copia se actualice y
-    # las otras no) -- se centraliza aquí para eliminar esa clase de bug.
-    I_L, I_o, R_s, R_sh, nNsVth = trasladar_parametros_gt(G, T_cel, panel)
-
-    resultado = pvlib.pvsystem.singlediode(
-        photocurrent       = I_L,
-        saturation_current = I_o,
-        resistance_series  = R_s,
-        resistance_shunt   = R_sh,
-        nNsVth             = nNsVth,
-        method             = 'lambertw',
-    )
-
-    pmax = np.array(resultado["p_mp"], dtype=float)
+    # 2006 el 2-sep-2026, ver DIAGNOSTICO_MOTOR_PVSYST.md; incluye el término
+    # de recombinación PVsyst/Merten 1998 para CdTe con d2mutau calibrado,
+    # ver DIAGNOSTICO_RECOMBINACION_CDTE.md). Antes cada una de las 5
+    # implementaciones del SDM reimplementaba esta llamada por su cuenta (ver
+    # test_consistencia_sdm_entre_modulos.py, que existe precisamente para
+    # atrapar el riesgo de que una copia se actualice y las otras no) -- se
+    # centraliza aquí para eliminar esa clase de bug.
+    pmax = calcular_pmax_vectorizado(G, T_cel, panel)
     pmax[G < 5.0] = 0.0     # sin producción nocturna / irradiancia mínima
     pmax[pmax < 0] = 0.0    # seguridad numérica
     return pmax

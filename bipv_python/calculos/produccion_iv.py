@@ -15,12 +15,11 @@ tiene ficha completa para el Motor IV (calculos.modelo_iv.tiene_sdm_completo).
 
 import numpy as np
 import pandas as pd
-import pvlib
 
 from calculos.modelo_iv import (
     tiene_sdm_completo,
     preparar_panel_iv,
-    trasladar_parametros_gt,
+    calcular_pmax_vectorizado,
 )
 from calculos.temperatura import temperatura_celda_noct
 from calculos.agregador_anual import (
@@ -82,21 +81,12 @@ def _pmp_iv_vectorizado(
     G     = np.asarray(G, dtype=float)
     T_cel = np.asarray(T_cel, dtype=float)
 
-    # Motor SDM centralizado en calculos.modelo_iv.trasladar_parametros_gt()
+    # Motor SDM centralizado en calculos.modelo_iv.calcular_pmax_vectorizado()
     # (modelo PVsyst v6, migrado desde De Soto 2006 el 2-sep-2026, ver
-    # DIAGNOSTICO_MOTOR_PVSYST.md) -- misma llamada que produccion.py.
-    I_L, I_o, R_s, R_sh, nNsVth = trasladar_parametros_gt(G, T_cel, panel)
-
-    resultado = pvlib.pvsystem.singlediode(
-        photocurrent       = I_L,
-        saturation_current = I_o,
-        resistance_series  = R_s,
-        resistance_shunt   = R_sh,
-        nNsVth             = nNsVth,
-        method             = 'lambertw',
-    )
-
-    pmp = np.asarray(resultado["p_mp"], dtype=float)
+    # DIAGNOSTICO_MOTOR_PVSYST.md; incluye recombinación PVsyst/Merten 1998
+    # para CdTe con d2mutau calibrado, ver DIAGNOSTICO_RECOMBINACION_CDTE.md)
+    # -- misma llamada que produccion.py.
+    pmp = calcular_pmax_vectorizado(G, T_cel, panel)
     pmp = np.where(G < 5.0, 0.0, pmp)   # sin producción nocturna / irradiancia mínima
     pmp = np.maximum(pmp, 0.0)          # seguridad numérica
     return pmp

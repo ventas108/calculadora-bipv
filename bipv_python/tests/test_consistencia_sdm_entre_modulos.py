@@ -85,7 +85,7 @@ def test_parametros_sdm_identicos_entre_modelo_iv_y_mppt_combinado(nombre_panel,
     for g in G_PRUEBA:
         I_L_ref, I_o_ref, R_s_ref, R_sh_ref, nNsVth_ref = trasladar_parametros_gt(
             float(g), T_PRUEBA, panel)
-        I_L_g, I_o_g, R_s_g, R_sh_g, nNsVth_g = _params_grupo(
+        I_L_g, I_o_g, R_s_g, R_sh_g, nNsVth_g, _d2mutau_g, _NsVbi_g = _params_grupo(
             np.array([g]), np.array([T_PRUEBA]), panel, n_serie=1, n_paralelo=1)
 
         assert I_L_g[0]    == pytest.approx(I_L_ref, rel=1e-6), nombre_panel
@@ -100,9 +100,19 @@ def test_las_5_implementaciones_centralizan_en_trasladar_parametros_gt():
     # corrige en un lugar pero no en sus copias"): desde la migración al
     # motor PVsyst v6 (2-sep-2026, ver DIAGNOSTICO_MOTOR_PVSYST.md), las 4
     # implementaciones fuera de modelo_iv.py NO reimplementan la llamada a
-    # calcparams_pvsyst -- todas llaman directo a
-    # calculos.modelo_iv.trasladar_parametros_gt(). Este test falla de
-    # inmediato si alguna vuelve a traer su propia copia de la fórmula.
+    # calcparams_pvsyst. Este test falla de inmediato si alguna vuelve a
+    # traer su propia copia de la fórmula.
+    #
+    # Centralización adicional (2-sep-2026, ver
+    # DIAGNOSTICO_RECOMBINACION_CDTE.md): produccion.py y produccion_iv.py
+    # solo necesitan Pmax, así que llaman a
+    # calculos.modelo_iv.calcular_pmax_vectorizado() (que internamente llama
+    # trasladar_parametros_gt() Y decide si usar bishop88_mpp para el
+    # término de recombinación PVsyst/Merten 1998). mismatch_bypass.py y
+    # mppt_combinado.py necesitan el tuple completo (I_L, I_o, Rs, Rsh,
+    # nNsVth) para su propia lógica (bypass diodes / malla MPPT
+    # compartido), así que siguen llamando trasladar_parametros_gt()
+    # directo.
     import inspect
 
     import calculos.produccion as produccion
@@ -110,8 +120,12 @@ def test_las_5_implementaciones_centralizan_en_trasladar_parametros_gt():
     import calculos.mismatch_bypass as mismatch_bypass
     import calculos.mppt_combinado as mppt_combinado
 
+    assert produccion.calcular_pmax_vectorizado is not None
+    assert produccion_iv.calcular_pmax_vectorizado is not None
+    assert mismatch_bypass.trasladar_parametros_gt is not None
+    assert mppt_combinado.trasladar_parametros_gt is not None
+
     for modulo in (produccion, produccion_iv, mismatch_bypass, mppt_combinado):
-        assert modulo.trasladar_parametros_gt is not None
         fuente = inspect.getsource(modulo)
         assert "calcparams_pvsyst" not in fuente, (
             f"{modulo.__name__} parece llamar a calcparams_pvsyst() por su "

@@ -72,7 +72,7 @@ check("3b. …y acotada (<5%)", r3["perdida_pct"] < 5.0,
       f"(pérdida={r3['perdida_pct']}%)")
 
 # 4. Consistencia con singlediode (módulo suelto Ns=1, Np=1)
-I_L, I_o, R_s, R_sh, nNsVth = _params_grupo(G_alta[:1], T25[:1], panel, 1, 1)
+I_L, I_o, R_s, R_sh, nNsVth, _d2mutau, _NsVbi = _params_grupo(G_alta[:1], T25[:1], panel, 1, 1)
 res_sd = pvlib.pvsystem.singlediode(
     photocurrent=I_L, saturation_current=I_o, resistance_series=R_s,
     resistance_shunt=R_sh, nNsVth=nNsVth, method='lambertw')

@@ -2899,6 +2899,46 @@ El paper también aportó el tercer PR real independiente en rango típico (84,9
 
 2 tests nuevos en `tests/test_perdidas_desglosadas_pvsyst.py`. Suite completa: **920/920**. Ver `DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md`.
 
+## 25v. Anexo — Actualizaciones del 2 de septiembre de 2026 (recombinación en capa intrínseca CdTe: implementada, no activada)
+
+Validando el motor CdTe contra una corrida real de PVsyst 8.1.5 (ASP-ST1-T40, Teusaquillo),
+quedó un patrón mensual sin explicar: nuestro PR aislado (irradiancia+temperatura) es casi plano
+todo el año (88-104%), mientras PVsyst real varía fuerte por mes (67%-81%, mínimo en marzo/
+septiembre). PVsyst mostró un parámetro real y activo que no modelamos: `d²/µτ=1,13 1/V` (pestaña
+"Pérdida de recombinación"), del modelo de Merten et al. 1998 (IEEE Trans. Electron Devices 45,
+423-429) para uniones p-i-n de capa fina, que PVsyst adopta para CdTe/a-Si. Agrega una corriente
+de recombinación aditiva: `I_rec = I_L·(d²/µτ)/[N_s·V_bi−(V+I·Rs)]`.
+
+**Implementado**: `pvlib.singlediode.bishop88_mpp/_i_from_v/_v_from_i` (verificado que soportan
+`d2mutau`/`NsVbi` en la versión exacta pineada, pvlib==0.11.1) — nueva función centralizada
+`calcular_pmax_vectorizado()` en `modelo_iv.py`, usada ahora por `produccion.py`/`produccion_iv.py`
+(centralización adicional); `mismatch_bypass.py`/`mppt_combinado.py` con su propia rama bishop88.
+Por defecto (`d2mutau` ausente) el mecanismo queda inactivo y reproduce EXACTO el modelo estándar
+(verificado bit-a-bit, rtol=1e-9, 5 paneles reales).
+
+**NO se activó para ningún panel real**: agregar `d2mutau=0,885V` (=1/1,13, unidad reconciliada
+con el usuario — pantalla real en 1/V, pvlib/PVsyst documentan V) sobre el R_s=25,51Ω YA calibrado
+de ASP-ST1-T40 (sin ese término) rompió la validación real de laboratorio: FF@G=200W/m² cayó a
+47,06% contra el 76,28% real medido — el R_s real ya absorbe implícitamente el efecto, sumarlo
+aparte lo cuenta dos veces. Activarlo bien requiere re-calibrar I_L_ref/I_o_ref/R_s/R_sh_ref TODOS
+JUNTOS contra los 10 puntos reales del XLSM con el término incluido desde el inicio — no se hizo
+por no tener esos puntos crudos disponibles en la sesión.
+
+**Validación del mecanismo aislado** (con el set completo de parámetros reales que PVsyst ajustó
+para ese módulo, sin mezclar con nuestros valores de laboratorio): Pmax_STC=60,87W vs 60,59W
+implícito de PVsyst (0,5%) — el mecanismo replica bien el ajuste real de PVsyst. Pero NO cierra la
+brecha mensual buscada (89,9-91,0% de nuestro motor vs 67-81% real, brecha similar a sin el
+término) — el patrón estacional real sigue sin explicarse. Hipótesis abiertas: V_bi=0,9V es
+genérico (a-Si), no calibrado para CdTe; PVsyst documenta una tercera corrección ("Spectral
+Corrections") no investigada; posible diferencia TMY horario vs sub-horario real.
+
+Bug real encontrado en el camino: `calcular_pmax_vectorizado()` usaba `np.asarray()` en vez de
+`np.array()`, devolviendo a veces un array de solo lectura que rompía las mutaciones in-place de
+los 3 llamadores (`pmax[G<5.0]=0.0`) — 49 tests fallaron en cascada hasta corregirlo.
+
+6 tests nuevos (`tests/test_recombinacion_cdte.py`). Suite completa: **933/933**. Ver
+`DIAGNOSTICO_RECOMBINACION_CDTE.md`.
+
 ## 25t. Anexo — Actualizaciones del 2 de septiembre de 2026 (migración del motor SDM: De Soto 2006 → PVsyst v6)
 
 Tras el fix del Rsh (sección 25s), quedaba un residual de ~4-5 puntos porcentuales entre esta app y PVsyst real incluso usando los parámetros de diodo EXACTOS de PVsyst — replicado además de forma independiente contra un paper real (Mohammadi & Gezegin 2022, panel Suntech STP320S). Causa real: esta app usaba el modelo académico De Soto 2006, mientras PVsyst usa su propio modelo (PVsyst v6, Sauer/Roessler/Hansen 2015, IEEE J. Photovoltaics — `pvlib.pvsystem.calcparams_pvsyst`), con fórmulas distintas de I_L(T), I_o(T), Rsh(G) y un factor de idealidad Gamma que PVsyst permite variar con la temperatura (`mu_gamma`).

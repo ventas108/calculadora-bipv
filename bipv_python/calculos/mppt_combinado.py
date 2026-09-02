@@ -31,8 +31,13 @@ sobre la MISMA malla de voltaje (misma resolución y misma ventana MPPT si se da
 import numpy as np
 import pandas as pd
 import pvlib
+from pvlib.singlediode import bishop88_i_from_v, bishop88_v_from_i
 
-from calculos.modelo_iv import tiene_sdm_completo, trasladar_parametros_gt
+from calculos.modelo_iv import (
+    tiene_sdm_completo,
+    trasladar_parametros_gt,
+    _parametros_recombinacion,
+)
 
 G_MIN_WM2 = 5.0          # por debajo no hay producción (igual que produccion_iv)
 N_PUNTOS_DEFAULT = 120   # puntos de la malla de voltaje por hora
@@ -41,7 +46,11 @@ N_PUNTOS_DEFAULT = 120   # puntos de la malla de voltaje por hora
 def _params_grupo(G, T_cel, panel: dict, n_serie: int, n_paralelo: int):
     """
     Parámetros SDM equivalentes del GRUPO (N_serie en serie × N_paralelo en paralelo)
-    hora a hora. Retorna (I_L, I_o, R_s, R_sh, nNsVth) como arrays (H,).
+    hora a hora. Retorna (I_L, I_o, R_s, R_sh, nNsVth, d2mutau, NsVbi) -- los
+    primeros 5 como arrays (H,); d2mutau/NsVbi son escalares (0.0/inf si el
+    panel no trae recombinación calibrada -- ver
+    DIAGNOSTICO_RECOMBINACION_CDTE.md). `d2mutau` (propiedad de material, por
+    celda) no escala con ns/npar; `NsVbi` sí escala ×ns, igual que nNsVth.
     """
     G     = np.asarray(G, dtype=float)
     T_cel = np.asarray(T_cel, dtype=float)
@@ -52,6 +61,7 @@ def _params_grupo(G, T_cel, panel: dict, n_serie: int, n_paralelo: int):
     # (modelo PVsyst v6, migrado desde De Soto 2006 el 2-sep-2026, ver
     # DIAGNOSTICO_MOTOR_PVSYST.md).
     I_L, I_o, R_s_mod, R_sh_mod, nNsVth = trasladar_parametros_gt(G, T_cel, panel)
+    d2mutau, NsVbi = _parametros_recombinacion(panel)
 
     ns, npar = float(n_serie), float(n_paralelo)
     I_L_g    = np.asarray(I_L, dtype=float) * npar
@@ -59,23 +69,30 @@ def _params_grupo(G, T_cel, panel: dict, n_serie: int, n_paralelo: int):
     R_s_g    = np.asarray(R_s_mod, dtype=float) * ns / npar
     R_sh_g   = np.asarray(R_sh_mod, dtype=float) * ns / npar
     nNsVth_g = np.asarray(nNsVth, dtype=float) * ns
-    return I_L_g, I_o_g, R_s_g, R_sh_g, nNsVth_g
+    NsVbi_g  = NsVbi * ns if np.isfinite(NsVbi) else np.inf
+    return I_L_g, I_o_g, R_s_g, R_sh_g, nNsVth_g, d2mutau, NsVbi_g
 
 
-def _voc_grupo(I_L, I_o, R_sh, nNsVth):
+def _voc_grupo(I_L, I_o, R_sh, nNsVth, d2mutau=0.0, NsVbi=np.inf):
     """Voc (V) del grupo hora a hora (0 donde no hay fotocorriente)."""
     con_luz = I_L > 1e-9
     voc = np.zeros_like(I_L)
     if np.any(con_luz):
-        voc_l = pvlib.pvsystem.v_from_i(
-            current            = 0.0,
-            photocurrent       = I_L[con_luz],
-            saturation_current = I_o[con_luz],
-            resistance_series  = 0.0,          # sin corriente, Rs no afecta Voc
-            resistance_shunt   = R_sh[con_luz],
-            nNsVth             = nNsVth[con_luz],
-            method             = 'lambertw',
-        )
+        if d2mutau > 0:
+            voc_l = bishop88_v_from_i(
+                0.0, I_L[con_luz], I_o[con_luz], 0.0, R_sh[con_luz],
+                nNsVth[con_luz], d2mutau=d2mutau, NsVbi=NsVbi,
+            )
+        else:
+            voc_l = pvlib.pvsystem.v_from_i(
+                current            = 0.0,
+                photocurrent       = I_L[con_luz],
+                saturation_current = I_o[con_luz],
+                resistance_series  = 0.0,          # sin corriente, Rs no afecta Voc
+                resistance_shunt   = R_sh[con_luz],
+                nNsVth             = nNsVth[con_luz],
+                method             = 'lambertw',
+            )
         voc[con_luz] = np.maximum(np.asarray(voc_l, dtype=float), 0.0)
     return voc
 
@@ -131,7 +148,7 @@ def simular_mppt_compartido(
         p = _params_grupo(g["G"], g["T_cel"], g["panel"],
                           int(g["n_serie"]), int(g["n_paralelo"]))
         params.append(p)
-        vocs.append(_voc_grupo(p[0], p[1], p[3], p[4]))
+        vocs.append(_voc_grupo(p[0], p[1], p[3], p[4], p[5], p[6]))
 
     voc_max = np.max(np.stack(vocs, axis=0), axis=0)          # (H,)
     hay_luz = voc_max > 1e-6
@@ -150,19 +167,28 @@ def simular_mppt_compartido(
     p_indep  = np.zeros(H)
     e_indep_por_grupo = []
     I_por_grupo = []
-    for (I_L, I_o, R_s, R_sh, nNsVth), voc_g, g in zip(params, vocs, grupos):
+    for (I_L, I_o, R_s, R_sh, nNsVth, d2mutau, NsVbi), voc_g, g in zip(params, vocs, grupos):
         I_g = np.zeros_like(V)
         if np.any(hay_luz):
             idx = np.where(hay_luz)[0]
-            I_calc = pvlib.pvsystem.i_from_v(
-                voltage            = V[idx, :],
-                photocurrent       = I_L[idx, None],
-                saturation_current = I_o[idx, None],
-                resistance_series  = R_s[idx, None],
-                resistance_shunt   = R_sh[idx, None],
-                nNsVth             = nNsVth[idx, None],
-                method             = 'lambertw',
-            )
+            if d2mutau > 0:
+                # Recombinación en capa intrínseca (Merten 1998 / PVsyst) --
+                # ver DIAGNOSTICO_RECOMBINACION_CDTE.md.
+                I_calc = bishop88_i_from_v(
+                    V[idx, :], I_L[idx, None], I_o[idx, None],
+                    R_s[idx, None], R_sh[idx, None], nNsVth[idx, None],
+                    d2mutau=d2mutau, NsVbi=NsVbi,
+                )
+            else:
+                I_calc = pvlib.pvsystem.i_from_v(
+                    voltage            = V[idx, :],
+                    photocurrent       = I_L[idx, None],
+                    saturation_current = I_o[idx, None],
+                    resistance_series  = R_s[idx, None],
+                    resistance_shunt   = R_sh[idx, None],
+                    nNsVth             = nNsVth[idx, None],
+                    method             = 'lambertw',
+                )
             # Diodo de bloqueo ideal: el string no absorbe corriente inversa
             I_g[idx, :] = np.clip(np.asarray(I_calc, dtype=float), 0.0, None)
         I_por_grupo.append(I_g)

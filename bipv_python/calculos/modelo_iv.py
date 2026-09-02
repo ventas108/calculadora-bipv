@@ -8,6 +8,7 @@ Validación numérica disponible en tests/test_validacion_vba.py:
 """
 import numpy as np
 import pvlib
+from pvlib.singlediode import bishop88_mpp, bishop88_i_from_v, bishop88_v_from_i
 from scipy.special import lambertw
 from scipy.optimize import brentq
 from datos.tecnologias_bipv import CONSTANTES_TECNOLOGIA
@@ -302,6 +303,66 @@ def trasladar_parametros_gt(G, T_cel_C, panel: dict):
     return I_L, I_o, R_s, R_sh, nNsVth
 
 
+def _parametros_recombinacion(panel: dict) -> tuple[float, float]:
+    """
+    d2mutau (V) y NsVbi (V) del término de recombinación en la capa intrínseca
+    (Merten et al. 1998, IEEE Trans. Electron Devices 45, 423-429 -- adoptado
+    por PVsyst para capa fina CdTe/a-Si). Ver DIAGNOSTICO_RECOMBINACION_CDTE.md.
+
+    Por defecto (panel sin `d2mutau` calibrado) devuelve (0.0, inf), que anula
+    el término de recombinación y reproduce EXACTO el modelo de un diodo
+    estándar -- ningún panel existente cambia de comportamiento salvo que se
+    le agregue `d2mutau` explícitamente (hoy: solo ASP-ST1-T40).
+
+    `V_bi` (voltaje interno de la unión) no se fabrica por panel: se usa el
+    valor típico ~0.9V que documenta PVsyst/Merten 1998 para uniones p-i-n
+    amorfas, salvo que el panel traiga su propio `V_bi` calibrado.
+    """
+    d2mutau = float(panel.get("d2mutau") or 0.0)
+    if d2mutau <= 0:
+        return 0.0, np.inf
+    N_s = int(panel.get("N_s") or panel.get("_N_s_usado") or 0)
+    if N_s <= 0:
+        return 0.0, np.inf
+    V_bi = float(panel.get("V_bi") or 0.9)
+    return d2mutau, V_bi * N_s
+
+
+def calcular_pmax_vectorizado(G, T_cel_C, panel: dict) -> np.ndarray:
+    """
+    Pmax (W) vectorizado -- centraliza trasladar_parametros_gt() + la
+    resolución del punto de máxima potencia. Usa `pvlib.singlediode.
+    bishop88_mpp` (que soporta el término de recombinación PVsyst/Merten
+    1998) cuando el panel trae `d2mutau` calibrado; si no, usa el mismo
+    `pvlib.pvsystem.singlediode` de siempre (comportamiento idéntico al
+    anterior a este cambio). Ver DIAGNOSTICO_RECOMBINACION_CDTE.md.
+    """
+    I_L, I_o, R_s, R_sh, nNsVth = trasladar_parametros_gt(G, T_cel_C, panel)
+    d2mutau, NsVbi = _parametros_recombinacion(panel)
+
+    if d2mutau > 0:
+        _, _, p_mp = bishop88_mpp(
+            photocurrent=I_L, saturation_current=I_o,
+            resistance_series=R_s, resistance_shunt=R_sh, nNsVth=nNsVth,
+            d2mutau=d2mutau, NsVbi=NsVbi,
+        )
+        return np.array(p_mp, dtype=float)  # copia -- ver nota de solo-lectura abajo
+
+    resultado = pvlib.pvsystem.singlediode(
+        photocurrent       = I_L,
+        saturation_current = I_o,
+        resistance_series  = R_s,
+        resistance_shunt   = R_sh,
+        nNsVth              = nNsVth,
+        method             = 'lambertw',
+    )
+    # np.array() (copia), no np.asarray(): el array que devuelve pvlib puede
+    # venir de solo lectura, y los 3 llamadores mutan el resultado in-place
+    # (pmax[G < 5.0] = 0.0) -- con np.asarray() eso lanzaba
+    # "ValueError: assignment destination is read-only".
+    return np.array(resultado["p_mp"], dtype=float)
+
+
 def resolver_curva_iv(G, T_cel_C, panel: dict, n_puntos=100):
     """
     Equivalente Python de CurvaIV_CdTe (VBA, SimuladorIV_CdTe_v2).
@@ -312,33 +373,54 @@ def resolver_curva_iv(G, T_cel_C, panel: dict, n_puntos=100):
                 "V": None, "I": None}
 
     I_L, I_o, R_s, R_sh, nNsVth = trasladar_parametros_gt(G, T_cel_C, panel)
+    d2mutau, NsVbi = _parametros_recombinacion(panel)
 
-    resultado = pvlib.pvsystem.singlediode(
-        photocurrent       = I_L,
-        saturation_current = I_o,
-        resistance_series  = R_s,
-        resistance_shunt   = R_sh,
-        nNsVth             = nNsVth,
-        method             = 'lambertw',
-    )
+    if d2mutau > 0:
+        # Modelo con recombinación en capa intrínseca (Merten 1998 / PVsyst,
+        # via pvlib.singlediode.bishop88) -- ver DIAGNOSTICO_RECOMBINACION_CDTE.md.
+        i_mp, v_mp, p_mp = bishop88_mpp(
+            I_L, I_o, R_s, R_sh, nNsVth, d2mutau=d2mutau, NsVbi=NsVbi,
+        )
+        Voc  = float(bishop88_v_from_i(0.0, I_L, I_o, R_s, R_sh, nNsVth,
+                                        d2mutau=d2mutau, NsVbi=NsVbi))
+        Isc  = float(bishop88_i_from_v(0.0, I_L, I_o, R_s, R_sh, nNsVth,
+                                        d2mutau=d2mutau, NsVbi=NsVbi))
+        Vmp, Imp, Pmax = float(v_mp), float(i_mp), float(p_mp)
+    else:
+        resultado = pvlib.pvsystem.singlediode(
+            photocurrent       = I_L,
+            saturation_current = I_o,
+            resistance_series  = R_s,
+            resistance_shunt   = R_sh,
+            nNsVth             = nNsVth,
+            method             = 'lambertw',
+        )
+        Voc  = float(resultado['v_oc'])
+        Isc  = float(resultado['i_sc'])
+        Vmp  = float(resultado['v_mp'])
+        Imp  = float(resultado['i_mp'])
+        Pmax = float(resultado['p_mp'])
 
-    Voc  = float(resultado['v_oc'])
-    Isc  = float(resultado['i_sc'])
-    Pmax = float(resultado['p_mp'])
-    FF   = Pmax / (Voc * Isc) if (Voc * Isc) > 0 else 0.0
+    FF = Pmax / (Voc * Isc) if (Voc * Isc) > 0 else 0.0
 
     # Generar curva I-V manualmente (pvlib >=0.9 elimino ivcurve_pnts)
     if n_puntos > 0 and Voc > 0:
         V_arr = np.linspace(0, Voc, n_puntos)
-        I_arr = pvlib.pvsystem.i_from_v(
-            resistance_shunt   = R_sh,
-            resistance_series  = R_s,
-            nNsVth             = nNsVth,
-            voltage            = V_arr,
-            saturation_current = I_o,
-            photocurrent       = I_L,
-            method             = 'lambertw',
-        )
+        if d2mutau > 0:
+            I_arr = bishop88_i_from_v(
+                V_arr, I_L, I_o, R_s, R_sh, nNsVth,
+                d2mutau=d2mutau, NsVbi=NsVbi,
+            )
+        else:
+            I_arr = pvlib.pvsystem.i_from_v(
+                resistance_shunt   = R_sh,
+                resistance_series  = R_s,
+                nNsVth             = nNsVth,
+                voltage            = V_arr,
+                saturation_current = I_o,
+                photocurrent       = I_L,
+                method             = 'lambertw',
+            )
     else:
         V_arr = None
         I_arr = None
@@ -346,8 +428,8 @@ def resolver_curva_iv(G, T_cel_C, panel: dict, n_puntos=100):
     return {
         "Voc":  Voc,
         "Isc":  Isc,
-        "Vmp":  float(resultado['v_mp']),
-        "Imp":  float(resultado['i_mp']),
+        "Vmp":  Vmp,
+        "Imp":  Imp,
         "Pmax": Pmax,
         "FF":   FF,
         "V":    V_arr,

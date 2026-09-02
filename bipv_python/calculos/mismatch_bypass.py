@@ -26,7 +26,8 @@ from calculos.agregacion_fs import (
     normalizar_nombre_columna,
     promedio_fs_por_claves,
 )
-from calculos.modelo_iv import trasladar_parametros_gt
+from pvlib.singlediode import bishop88_mpp, bishop88_i_from_v
+from calculos.modelo_iv import trasladar_parametros_gt, _parametros_recombinacion
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -45,20 +46,34 @@ def _sdm_vectorizado(
     DIAGNOSTICO_MOTOR_PVSYST.md). Idéntico al modelo de produccion.py.
     """
     I_L, I_o, R_s, R_sh, nNsVth = trasladar_parametros_gt(G, T_cel, panel)
+    d2mutau, NsVbi = _parametros_recombinacion(panel)
 
-    res = pvlib.pvsystem.singlediode(
-        photocurrent       = I_L,
-        saturation_current = I_o,
-        resistance_series  = R_s,
-        resistance_shunt   = R_sh,
-        nNsVth             = nNsVth,
-        method             = "lambertw",
-    )
-
-    Pmp = np.array(res["p_mp"], dtype=float)
-    Isc = np.array(res["i_sc"], dtype=float)
-    Imp = np.array(res["i_mp"], dtype=float)
-    Vmp = np.array(res["v_mp"], dtype=float)
+    if d2mutau > 0:
+        # Recombinación en capa intrínseca (Merten 1998 / PVsyst, vía
+        # pvlib.singlediode.bishop88) -- ver DIAGNOSTICO_RECOMBINACION_CDTE.md.
+        Imp_, Vmp_, Pmp_ = bishop88_mpp(
+            I_L, I_o, R_s, R_sh, nNsVth, d2mutau=d2mutau, NsVbi=NsVbi,
+        )
+        Isc_ = bishop88_i_from_v(
+            0.0, I_L, I_o, R_s, R_sh, nNsVth, d2mutau=d2mutau, NsVbi=NsVbi,
+        )
+        Pmp = np.asarray(Pmp_, dtype=float)
+        Isc = np.asarray(Isc_, dtype=float)
+        Imp = np.asarray(Imp_, dtype=float)
+        Vmp = np.asarray(Vmp_, dtype=float)
+    else:
+        res = pvlib.pvsystem.singlediode(
+            photocurrent       = I_L,
+            saturation_current = I_o,
+            resistance_series  = R_s,
+            resistance_shunt   = R_sh,
+            nNsVth             = nNsVth,
+            method             = "lambertw",
+        )
+        Pmp = np.array(res["p_mp"], dtype=float)
+        Isc = np.array(res["i_sc"], dtype=float)
+        Imp = np.array(res["i_mp"], dtype=float)
+        Vmp = np.array(res["v_mp"], dtype=float)
 
     # Apagar módulos con irradiancia mínima
     low = G < 5.0
