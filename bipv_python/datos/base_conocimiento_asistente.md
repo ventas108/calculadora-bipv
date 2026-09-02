@@ -2911,6 +2911,32 @@ Se encontró documentación oficial de PVsyst con sus reglas reales por defecto 
 
 Las 4 implementaciones fuera de `modelo_iv.py` ahora centralizan en `trasladar_parametros_gt()` en vez de reimplementar la llamada por su cuenta. Catálogo real: 74/76 paneles activan el Motor IV (antes 72/76), con tolerancia de validación STC ampliada de 5% a 6% (Pmax ahora exacto por construcción, a cambio de que Vmp/Imp individuales varíen un poco más). Suite completa: **927/927**. Ver `DIAGNOSTICO_MOTOR_PVSYST.md`.
 
+## 25u. Anexo — Actualizaciones del 2 de septiembre de 2026 (investigación bibliográfica: razón Rsh_0/Rsh_ref de CdTe en la literatura)
+
+Tras la migración a PVsyst v6 (sección 25t), quedó documentado que la razón `R_sh_0/R_sh_ref`
+para CdTe/CIGS (≈13,76) no tiene fórmula oficial de PVsyst como sí la tiene cristalino
+(`4×Rsh_ref`) — se reutiliza la razón real calibrada del único panel CdTe con datos de laboratorio
+propios (ASP-ST1-T40). El usuario pidió buscar en la literatura académica algo que valide o
+mejore ese fallback. **Investigación bibliográfica pura — no se modificó ningún valor.**
+
+Se leyeron dos papers reales con datos utilizables: **Bätzner et al. 2001** (17th EC PVSEC Munich,
+celdas CdTe/CdS de laboratorio, proceso HVE) da, extraído de su Figura 5 (Rp vs. G, leída con
+`pymupdf` a 4× zoom), una razón implícita Rsh_0/Rsh_ref ≈ 280-300 — no adoptado por tratarse de
+celdas de laboratorio de área pequeña de 2001, no representativas de módulos comerciales. **Xu et
+al. 2020** (Materials/MDPI 13, 2194, acceso abierto CC BY, moderno, cita directamente a Bätzner
+2001) da, de su Figura 8 (celda #2, CdTe real), una razón Rsh(150 W/m²)/Rsh(STC) ≈ 4,2 — pero es
+solo una cota inferior real, porque la curva no se aplana en el rango medido (se detiene en
+G=150 W/m²), así que el verdadero Rsh_0 sería mayor. **Rangel-Kuoppa et al. 2018** (Semiconductor
+Science and Technology) — el paper que el usuario pidió explícitamente buscar — se confirmó
+genuinamente sin copia de acceso abierto en ningún repositorio (Unpaywall, Semantic Scholar,
+IOPscience, ResearchGate agotados), sin recurrir a ningún método ilegítimo.
+
+**Conclusión**: ambas fuentes reales (≈4,2 de cota inferior vs. ≈280-300) bracket amplio y
+dependiente del dispositivo/antigüedad — ninguna es una fuente autorizada equivalente a la fórmula
+oficial de PVsyst para cristalino. El fallback actual (13,76) queda dentro de ese rango real, ni
+absurdamente bajo ni absurdamente alto. Sin cambios de código; documento de referencia únicamente.
+Ver `DIAGNOSTICO_CDTE_RSH_LITERATURA.md`.
+
 ## 25s. Anexo — Actualizaciones del 1 de septiembre de 2026 (bug real: el modelo Rsh de capa fina CdTe se aplicaba a silicio cristalino)
 
 El usuario corrió PVsyst 8.1.5 en paralelo con un panel de silicio cristalino real (XTP 50-17B, base de datos original de PVsyst), mismo inversor, mismo sitio (Teusaquillo). PVsyst dio PR=77,03% (típico); esta app, mismo panel/sitio, dio PR=104,4%. La investigación descartó primero el modelo de temperatura (NOCT vs Faiman, solo explicaba ~2 de 13 puntos) y luego una falsa alarma propia sobre el factor Gamma (error de unidades en la propia verificación, corregido — Gamma real resultó 0,94, cercano al 1,070 de PVsyst, no 36 como se reportó por error).
