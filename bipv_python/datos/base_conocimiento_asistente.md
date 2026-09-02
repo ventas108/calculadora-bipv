@@ -2899,6 +2899,24 @@ El paper también aportó el tercer PR real independiente en rango típico (84,9
 
 2 tests nuevos en `tests/test_perdidas_desglosadas_pvsyst.py`. Suite completa: **920/920**. Ver `DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md`.
 
+## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
+
+El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de
+PVsyst 8.1.5 (el mismo caso de las secciones 25v/25w). Agregado con datos de 2 fuentes reales
+cruzadas: la ficha oficial del fabricante (INVT-MG-0.75-6kW datasheet, rev. 2020.07 V1.0) y la
+propia pantalla de PVsyst capturada en la corrida real ("Definición del inversor de red",
+fabricante "INVT Solar technology", fuente "Manufacturer 2017"). Ambas coinciden exacto en
+tensión DC máxima (400V), potencia CA nominal (750W) y eficiencia máxima (96,80%). Difieren en la
+ventana MPPT (ficha 2020: 50-400V más amplia; pantalla PVsyst: 60-350V) — se usó la de PVsyst por
+ser la efectivamente validada, con la discrepancia documentada en el campo "Notas" del catálogo,
+no oculta. Potencia FV máx. recomendada (900W) real, de la ficha oficial ("Max. DC input power").
+Sin dato real de corriente máxima de entrada en ninguna de las 2 fuentes (PVsyst mostró "N/A") —
+se dejó en blanco, no se estimó.
+
+2 tests nuevos (`tests/test_inversor_invt_mg750tl.py`), script de agregado
+(`datos/agregar_inversor_invt_mg750tl.py`, mismo patrón que
+`agregar_inversores_apsystems.py`). Suite completa: **941/941**.
+
 ## 25w. Anexo — Actualizaciones del 2 de septiembre de 2026 (JRC/Huld reemplaza al SDM como motor de energía para CdTe)
 
 Cierre de la investigación del vacío mensual de PR de CdTe (secciones 25u/25v): tras descartar
