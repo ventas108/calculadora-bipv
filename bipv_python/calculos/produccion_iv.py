@@ -18,14 +18,9 @@ import pandas as pd
 import pvlib
 
 from calculos.modelo_iv import (
-    calcular_rsh_cdte,
-    obtener_constantes_tecnologia,
     tiene_sdm_completo,
     preparar_panel_iv,
-    K_BOLTZMANN,
-    Q_ELECTRON,
-    T_REF_K,
-    G_REF,
+    trasladar_parametros_gt,
 )
 from calculos.temperatura import temperatura_celda_noct
 from calculos.agregador_anual import (
@@ -87,41 +82,10 @@ def _pmp_iv_vectorizado(
     G     = np.asarray(G, dtype=float)
     T_cel = np.asarray(T_cel, dtype=float)
 
-    constantes = obtener_constantes_tecnologia(panel["tecnologia"])
-
-    # nNsVth_ref en Voltios (convención pvlib)
-    Vt_ref     = K_BOLTZMANN * T_REF_K / Q_ELECTRON      # 0.025693 V @ 25°C
-    nNsVth_ref = panel["a_ref"] * Vt_ref
-
-    # alpha_sc: pvlib espera A/°C → Tk_alfa[%/°C] / 100 × Isc_stc[A]
-    _Isc_stc = float(panel.get("Isc_stc") or panel.get("Isc") or 1.0)
-    alpha_sc = panel["Tk_alfa"] / 100.0 * _Isc_stc
-
-    I_L, I_o, R_s, R_sh_estandar, nNsVth = pvlib.pvsystem.calcparams_desoto(
-        effective_irradiance = G,
-        temp_cell            = T_cel,
-        alpha_sc             = alpha_sc,
-        a_ref                = nNsVth_ref,
-        I_L_ref              = panel["I_L_ref"],
-        I_o_ref              = panel["I_o_ref"],
-        R_sh_ref             = panel["R_sh_ref"],
-        R_s                  = panel["R_s"],
-        EgRef                = constantes["Eg_ref"],
-        dEgdT                = constantes["dEgdT"],
-        irrad_ref            = G_REF,
-        temp_ref             = 25.0,
-    )
-
-    # R_sh: modelo exponencial saturado (Mermoud 2005) SOLO para capa fina
-    # (CdTe/CIGS) -- misma corrección que calculos/produccion.py, mismo día.
-    # Ver el comentario completo ahí y DIAGNOSTICO_RSH_TECNOLOGIA.md.
-    _TECNOLOGIAS_RSH_EXPONENCIAL = ("CdTe", "CIGS")
-    if panel["tecnologia"] in _TECNOLOGIAS_RSH_EXPONENCIAL:
-        R_sh = calcular_rsh_cdte(
-            G, panel["R_sh_ref"], c_Rsh=constantes["c_Rsh"], R_sh_0=panel.get("R_sh_0"),
-        )
-    else:
-        R_sh = R_sh_estandar
+    # Motor SDM centralizado en calculos.modelo_iv.trasladar_parametros_gt()
+    # (modelo PVsyst v6, migrado desde De Soto 2006 el 2-sep-2026, ver
+    # DIAGNOSTICO_MOTOR_PVSYST.md) -- misma llamada que produccion.py.
+    I_L, I_o, R_s, R_sh, nNsVth = trasladar_parametros_gt(G, T_cel, panel)
 
     resultado = pvlib.pvsystem.singlediode(
         photocurrent       = I_L,

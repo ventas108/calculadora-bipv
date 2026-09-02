@@ -61,7 +61,12 @@ ASP_ST1_T40 = {
     "Tk_alfa":  +0.060,  # %/°C — Isc
     "Tk_gamma": -0.214,  # %/°C — Pmax
 
-    # ── Modelo De Soto 2006 — parámetros SDM calibrados (STC) ─────────────
+    # ── Modelo PVsyst v6 (Sauer/Roessler/Hansen 2015, calcparams_pvsyst) —
+    # parámetros SDM calibrados (STC). Migrado desde De Soto 2006 el
+    # 2-sep-2026 (ver DIAGNOSTICO_MOTOR_PVSYST.md) -- los valores de I_L_ref/
+    # I_o_ref/R_s/R_sh_ref/R_sh_0 vienen sin cambios de la calibración
+    # original contra la hoja FF_vs_Irradiancia del XLSM auditado; solo se
+    # agregan N_s, gamma_ref y mu_gamma, requeridos por el nuevo motor.
     # Fuente: hoja FF_vs_Irradiancia del XLSM auditado
     "I_L_ref":   0.8152,     # A   — fotocorriente de referencia
     "I_o_ref":   1.35e-13,   # A   — corriente de saturación
@@ -74,7 +79,17 @@ ASP_ST1_T40 = {
                              #       este parámetro, la fórmula sin saturar llegaba a 12.6%
                              #       de error y con la forma de curva invertida). Ver
                              #       calculos.modelo_iv.calcular_rsh_cdte() para el detalle.
-    "a_ref":     154.0,      # n×Ns adimensional (Ns=141, n=1.094)
+    "a_ref":     154.0,      # n×Ns adimensional (Ns=141, n=1.094) -- se conserva
+                             #       por compatibilidad con código/UI que aún lo lee.
+    "N_s":       141,        # celdas en serie (antes solo vivía en el comentario de a_ref)
+    "gamma_ref": 154.0/141,  # = a_ref/N_s = 1.09220 -- factor de idealidad a Tref
+    "mu_gamma":  0.001477,   # 1/K -- resuelto (2-sep-2026) para que dPmax/dT en
+                             #       Tref reproduzca Tk_gamma=-0.214%/°C bajo
+                             #       calcparams_pvsyst (antes, con De Soto, Tk_gamma
+                             #       no era una entrada directa del modelo). Verificado:
+                             #       reproduce Voc=116.0V exacto y Pmax=60.48W (vs 63.0W
+                             #       real, 4.0% -- dentro de la tolerancia de 5% ya usada
+                             #       en validar_sdm_vs_ficha()).
 
     # ── Temperatura nominal ────────────────────────────────────────────────
     "NOCT":     45.0,    # °C

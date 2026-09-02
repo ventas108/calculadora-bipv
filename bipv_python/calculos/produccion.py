@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 import pvlib
 
-from calculos.modelo_iv import calcular_rsh_cdte, obtener_constantes_tecnologia
+from calculos.modelo_iv import trasladar_parametros_gt
 from calculos.temperatura import temperatura_celda_noct
 from calculos.agregador_anual import (
     agregar_anual_8760_poa,
@@ -77,46 +77,14 @@ def _calcular_pmax_vectorizado(
         pmax = np.maximum(pmax, 0.0)
         return pmax
 
-    constantes = obtener_constantes_tecnologia(panel["tecnologia"])
-
-    # nNsVth_ref en Voltios (pvlib convention)
-    Vt_ref     = K_BOLTZMANN * T_REF_K / Q_ELECTRON   # 0.025693 V
-    nNsVth_ref = panel["a_ref"] * Vt_ref               # 154 × Vt_ref
-
-    I_L, I_o, R_s, R_sh_estandar, nNsVth = pvlib.pvsystem.calcparams_desoto(
-        effective_irradiance = G,
-        temp_cell            = T_cel,
-        alpha_sc             = panel["Tk_alfa"] / 100.0 * float(panel.get("Isc_stc") or panel.get("Isc") or 1.0),
-        a_ref                = nNsVth_ref,
-        I_L_ref              = panel["I_L_ref"],
-        I_o_ref              = panel["I_o_ref"],
-        R_sh_ref             = panel["R_sh_ref"],
-        R_s                  = panel["R_s"],
-        EgRef                = constantes["Eg_ref"],
-        dEgdT                = constantes["dEgdT"],
-        irrad_ref            = G_REF,
-        temp_ref             = 25.0,
-    )
-
-    # R_sh: modelo exponencial saturado (Mermoud 2005) SOLO para capa fina
-    # (CdTe/CIGS) — validado contra Batzner et al. 2001 para CdTe. Bug real
-    # encontrado el 1-sep-2026 comparando contra PVsyst con un panel real
-    # (XTP 50-17B, Poli-Si, mismo Rs/Rsh/Gamma que calculó PVsyst): aplicar
-    # el modelo de capa fina a silicio cristalino producía una ganancia
-    # irreal a baja/media irradiancia (+3.2% donde PVsyst midió -3.90% con
-    # los mismos parámetros y T=25°C fijo) — ese modelo SUBE el Rsh (mejor
-    # Fill Factor) a baja luz, un comportamiento real de capa fina que el
-    # silicio cristalino no tiene. `datos/tecnologias_bipv.py` ya definía
-    # `c_Rsh` idéntico (5.5) para CdTe/Mono-Si/Poli-Si, pero nunca se
-    # verificaba la tecnología antes de aplicar el modelo exponencial — se
-    # usaba para las 4 tecnologías por igual. Ver DIAGNOSTICO_RSH_TECNOLOGIA.md.
-    _TECNOLOGIAS_RSH_EXPONENCIAL = ("CdTe", "CIGS")
-    if panel["tecnologia"] in _TECNOLOGIAS_RSH_EXPONENCIAL:
-        R_sh = calcular_rsh_cdte(
-            G, panel["R_sh_ref"], c_Rsh=constantes["c_Rsh"], R_sh_0=panel.get("R_sh_0"),
-        )
-    else:
-        R_sh = R_sh_estandar
+    # Motor SDM centralizado en calculos.modelo_iv.trasladar_parametros_gt()
+    # (modelo PVsyst v6, Sauer/Roessler/Hansen 2015 -- migrado desde De Soto
+    # 2006 el 2-sep-2026, ver DIAGNOSTICO_MOTOR_PVSYST.md). Antes cada una
+    # de las 5 implementaciones del SDM reimplementaba esta llamada por su
+    # cuenta (ver test_consistencia_sdm_entre_modulos.py, que existe
+    # precisamente para atrapar el riesgo de que una copia se actualice y
+    # las otras no) -- se centraliza aquí para eliminar esa clase de bug.
+    I_L, I_o, R_s, R_sh, nNsVth = trasladar_parametros_gt(G, T_cel, panel)
 
     resultado = pvlib.pvsystem.singlediode(
         photocurrent       = I_L,

@@ -26,13 +26,7 @@ from calculos.agregacion_fs import (
     normalizar_nombre_columna,
     promedio_fs_por_claves,
 )
-from calculos.modelo_iv import calcular_rsh_cdte, obtener_constantes_tecnologia
-
-# ── Constantes físicas ─────────────────────────────────────────────────────────
-K_BOLTZMANN = 1.380649e-23
-Q_ELECTRON  = 1.602176634e-19
-T_REF_K     = 298.15
-G_REF       = 1000.0
+from calculos.modelo_iv import trasladar_parametros_gt
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -46,38 +40,11 @@ def _sdm_vectorizado(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Pmp, Isc, Imp, Vmp por módulo para arrays G y T_cel.
-    Usa SDM De Soto 2006 + Rsh exponencial CdTe Mermoud 2005.
-    Idéntico al modelo de produccion.py para consistencia.
+    Motor SDM centralizado en calculos.modelo_iv.trasladar_parametros_gt()
+    (modelo PVsyst v6, migrado desde De Soto 2006 el 2-sep-2026, ver
+    DIAGNOSTICO_MOTOR_PVSYST.md). Idéntico al modelo de produccion.py.
     """
-    constantes  = obtener_constantes_tecnologia(panel["tecnologia"])
-    Vt_ref      = K_BOLTZMANN * T_REF_K / Q_ELECTRON
-    nNsVth_ref  = panel["a_ref"] * Vt_ref
-
-    I_L, I_o, R_s, R_sh_estandar, nNsVth = pvlib.pvsystem.calcparams_desoto(
-        effective_irradiance = G,
-        temp_cell            = T_cel,
-        alpha_sc             = panel["Tk_alfa"] / 100.0 * float(panel.get("Isc_stc") or panel.get("Isc") or 1.0),
-        a_ref                = nNsVth_ref,
-        I_L_ref              = panel["I_L_ref"],
-        I_o_ref              = panel["I_o_ref"],
-        R_sh_ref             = panel["R_sh_ref"],
-        R_s                  = panel["R_s"],
-        EgRef                = constantes["Eg_ref"],
-        dEgdT                = constantes["dEgdT"],
-        irrad_ref            = G_REF,
-        temp_ref             = 25.0,
-    )
-
-    # Rsh exponencial saturado (Mermoud 2005), SOLO capa fina (CdTe/CIGS) --
-    # misma corrección que calculos/produccion.py, mismo día. Ver
-    # DIAGNOSTICO_RSH_TECNOLOGIA.md.
-    _TECNOLOGIAS_RSH_EXPONENCIAL = ("CdTe", "CIGS")
-    if panel["tecnologia"] in _TECNOLOGIAS_RSH_EXPONENCIAL:
-        R_sh = calcular_rsh_cdte(
-            G, panel["R_sh_ref"], c_Rsh=constantes["c_Rsh"], R_sh_0=panel.get("R_sh_0"),
-        )
-    else:
-        R_sh = R_sh_estandar
+    I_L, I_o, R_s, R_sh, nNsVth = trasladar_parametros_gt(G, T_cel, panel)
 
     res = pvlib.pvsystem.singlediode(
         photocurrent       = I_L,

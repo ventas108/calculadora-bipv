@@ -164,7 +164,7 @@ def test_solar_first_activa_motor_iv_con_ns_estimado():
         resultado = preparar_panel_iv(panel)
         assert resultado is not None, f"{nombre} debería activar Motor IV"
         prueba = {**panel, **resultado}
-        val = validar_sdm_vs_ficha(prueba, tolerancia_pct=5.0)
+        val = validar_sdm_vs_ficha(prueba)  # tolerancia por defecto (6.0%, ver docstring)
         assert val["validacion_ok"] is True, (nombre, val)
 
 
@@ -178,9 +178,14 @@ def test_solar_first_activa_motor_iv_con_ns_estimado():
 @pytest.mark.parametrize(
     "T_cel, tol_voc_pct, tol_vmp_pct",
     [
-        (-5.0, 3.0, 8.0),      # frío: Voc dif real ~2.2%, Vmp dif real ~6.4%
-        (36.35, 2.0, 4.0),     # real: Voc dif real ~1.0%, Vmp dif real ~2.7%
-        (41.94, 2.0, 5.0),     # extremo: Voc dif real ~1.5%, Vmp dif real ~4.0%
+        # Tolerancias recalibradas 2-sep-2026 tras migrar el motor SDM de
+        # De Soto 2006 a PVsyst v6 (calcparams_pvsyst, ver
+        # DIAGNOSTICO_MOTOR_PVSYST.md) -- el nuevo modelo de Gamma(T) via
+        # mu_gamma cambia ligeramente la respuesta térmica de Voc/Vmp frente
+        # al modelo lineal simplificado.
+        (-5.0, 4.5, 1.5),      # frío: Voc dif real ~3.8%, Vmp dif real ~1.0%
+        (36.35, 2.5, 1.5),     # real: Voc dif real ~1.8%, Vmp dif real ~0.7%
+        (41.94, 3.5, 1.5),     # extremo: Voc dif real ~2.8%, Vmp dif real ~1.1%
     ],
 )
 def test_coherencia_modelo_lineal_vs_sdm_asp_st1_t40(T_cel, tol_voc_pct, tol_vmp_pct):

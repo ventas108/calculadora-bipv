@@ -2899,6 +2899,18 @@ El paper también aportó el tercer PR real independiente en rango típico (84,9
 
 2 tests nuevos en `tests/test_perdidas_desglosadas_pvsyst.py`. Suite completa: **920/920**. Ver `DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md`.
 
+## 25t. Anexo — Actualizaciones del 2 de septiembre de 2026 (migración del motor SDM: De Soto 2006 → PVsyst v6)
+
+Tras el fix del Rsh (sección 25s), quedaba un residual de ~4-5 puntos porcentuales entre esta app y PVsyst real incluso usando los parámetros de diodo EXACTOS de PVsyst — replicado además de forma independiente contra un paper real (Mohammadi & Gezegin 2022, panel Suntech STP320S). Causa real: esta app usaba el modelo académico De Soto 2006, mientras PVsyst usa su propio modelo (PVsyst v6, Sauer/Roessler/Hansen 2015, IEEE J. Photovoltaics — `pvlib.pvsystem.calcparams_pvsyst`), con fórmulas distintas de I_L(T), I_o(T), Rsh(G) y un factor de idealidad Gamma que PVsyst permite variar con la temperatura (`mu_gamma`).
+
+Se encontró documentación oficial de PVsyst con sus reglas reales por defecto ("Standard Model", usado cuando no hay caracterización de laboratorio propia): `Rsh_ref = Vmp/(0,2×(Isc−Imp))` (validado: 192,2Ω vs 190,0Ω real para XTP 50-17B, 1,2% de diferencia), `Rsh_0 ≈ 4×Rsh_ref` para cristalino, `Rsh_exp=5,5` "constante independiente de la tecnología" (excepción real CdTe~3).
+
+**Migrado** el motor completo (`calculos/modelo_iv.py::trasladar_parametros_gt()` + `estimar_sdm_desde_ficha()`) de `calcparams_desoto` a `calcparams_pvsyst`. `R_s` se resuelve para reproducir el Pmax exacto de la ficha en STC (no el criterio oficial "-3%@200W/m²" de PVsyst, que se probó primero y dejaba solo 19/76 paneles del catálogo activando el Motor IV). `I_L_ref`/`I_o_ref` por autoconsistencia en Isc/Voc; `mu_gamma` resuelto para reproducir Tk_gamma de la ficha.
+
+**Validado contra el caso real de PVsyst 8.1.5** (XTP 50-17B, Teusaquillo): con parámetros derivados 100% de la ficha (sin espiar ningún valor de PVsyst), PR=96,0% vs 95,9% real — 0,1 puntos de diferencia. El pipeline real completo (con inversor) da PR=92,2% para este caso, cerrando más brecha hacia el 77,03% real de PVsyst (el resto es IAM/mismatch/óhmico, ya documentado en sección 25p).
+
+Las 4 implementaciones fuera de `modelo_iv.py` ahora centralizan en `trasladar_parametros_gt()` en vez de reimplementar la llamada por su cuenta. Catálogo real: 74/76 paneles activan el Motor IV (antes 72/76), con tolerancia de validación STC ampliada de 5% a 6% (Pmax ahora exacto por construcción, a cambio de que Vmp/Imp individuales varíen un poco más). Suite completa: **927/927**. Ver `DIAGNOSTICO_MOTOR_PVSYST.md`.
+
 ## 25s. Anexo — Actualizaciones del 1 de septiembre de 2026 (bug real: el modelo Rsh de capa fina CdTe se aplicaba a silicio cristalino)
 
 El usuario corrió PVsyst 8.1.5 en paralelo con un panel de silicio cristalino real (XTP 50-17B, base de datos original de PVsyst), mismo inversor, mismo sitio (Teusaquillo). PVsyst dio PR=77,03% (típico); esta app, mismo panel/sitio, dio PR=104,4%. La investigación descartó primero el modelo de temperatura (NOCT vs Faiman, solo explicaba ~2 de 13 puntos) y luego una falsa alarma propia sobre el factor Gamma (error de unidades en la propia verificación, corregido — Gamma real resultó 0,94, cercano al 1,070 de PVsyst, no 36 como se reportó por error).

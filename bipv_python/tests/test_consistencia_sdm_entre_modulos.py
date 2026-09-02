@@ -52,7 +52,8 @@ XTP_50_17B = {
     "Pmax_stc": 50.0, "Tk_beta": -0.34, "Tk_alfa": 0.04, "Tk_gamma": -0.45,
     "I_L_ref": 3.3280621683489193, "I_o_ref": 5.5322736788824886e-11,
     "R_s": 0.5247000612677759, "R_sh_ref": 61.70265179277618,
-    "a_ref": 33.71514270005188, "NOCT": 45.0,
+    "a_ref": 33.71514270005188, "N_s": 36, "gamma_ref": 33.71514270005188/36,
+    "NOCT": 45.0,
 }
 
 _PANELES_PRUEBA = {"CdTe (ASP_ST1_T40)": ASP_ST1_T40, "Poli-Si (XTP_50_17B)": XTP_50_17B}
@@ -94,10 +95,14 @@ def test_parametros_sdm_identicos_entre_modelo_iv_y_mppt_combinado(nombre_panel,
         assert nNsVth_g[0] == pytest.approx(nNsVth_ref, rel=1e-6), nombre_panel
 
 
-def test_rsh_identico_entre_las_5_implementaciones_a_traves_de_calcular_rsh_cdte():
-    # Salvaguarda directa contra el bug original: las 5 implementaciones
-    # ahora llaman a la MISMA función -- este test falla de inmediato si
-    # alguna vuelve a traer su propia copia de la fórmula.
+def test_las_5_implementaciones_centralizan_en_trasladar_parametros_gt():
+    # Salvaguarda directa contra el bug original ("una fórmula física se
+    # corrige en un lugar pero no en sus copias"): desde la migración al
+    # motor PVsyst v6 (2-sep-2026, ver DIAGNOSTICO_MOTOR_PVSYST.md), las 4
+    # implementaciones fuera de modelo_iv.py NO reimplementan la llamada a
+    # calcparams_pvsyst -- todas llaman directo a
+    # calculos.modelo_iv.trasladar_parametros_gt(). Este test falla de
+    # inmediato si alguna vuelve a traer su propia copia de la fórmula.
     import inspect
 
     import calculos.produccion as produccion
@@ -106,11 +111,14 @@ def test_rsh_identico_entre_las_5_implementaciones_a_traves_de_calcular_rsh_cdte
     import calculos.mppt_combinado as mppt_combinado
 
     for modulo in (produccion, produccion_iv, mismatch_bypass, mppt_combinado):
-        assert modulo.calcular_rsh_cdte is not None
+        assert modulo.trasladar_parametros_gt is not None
         fuente = inspect.getsource(modulo)
-        # No debe existir una fórmula de Rsh escrita a mano en el módulo --
-        # solo la llamada a la función compartida.
-        assert "np.exp(-constantes" not in fuente, (
-            f"{modulo.__name__} parece tener su propia fórmula de Rsh en vez de "
-            "llamar a calcular_rsh_cdte() -- eso es exactamente el bug original."
+        assert "calcparams_pvsyst" not in fuente, (
+            f"{modulo.__name__} parece llamar a calcparams_pvsyst() por su "
+            "cuenta en vez de usar trasladar_parametros_gt() -- eso es "
+            "exactamente el bug original (fórmula duplicada en 5 lugares)."
+        )
+        assert "calcparams_desoto" not in fuente, (
+            f"{modulo.__name__} todavía usa el motor De Soto 2006 -- "
+            "debería centralizar en trasladar_parametros_gt() (PVsyst v6)."
         )

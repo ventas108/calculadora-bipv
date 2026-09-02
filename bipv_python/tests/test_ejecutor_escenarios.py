@@ -25,6 +25,12 @@ _PANEL_SDM = {
     "Tk_alfa": 0.05,
     "NOCT": 45.0,
     "a_ref": 1.6,
+    "N_s": 60,
+    "gamma_ref": 1.05,  # Mono-Si típico -- a_ref=1.6 era un valor arbitrario
+                        # del modelo De Soto anterior, no un Gamma físico real
+                        # (ver calcparams_pvsyst: usa gamma SOLO, no gamma×Ns,
+                        # en la fórmula de I_o(T); dividir a_ref/N_s daría un
+                        # Gamma casi cero y overflow numérico).
     "I_L_ref": 9.85,
     "I_o_ref": 3.0e-10,
     "R_s": 0.35,

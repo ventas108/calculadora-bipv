@@ -32,15 +32,7 @@ import numpy as np
 import pandas as pd
 import pvlib
 
-from calculos.modelo_iv import (
-    calcular_rsh_cdte,
-    obtener_constantes_tecnologia,
-    tiene_sdm_completo,
-    K_BOLTZMANN,
-    Q_ELECTRON,
-    T_REF_K,
-    G_REF,
-)
+from calculos.modelo_iv import tiene_sdm_completo, trasladar_parametros_gt
 
 G_MIN_WM2 = 5.0          # por debajo no hay producción (igual que produccion_iv)
 N_PUNTOS_DEFAULT = 120   # puntos de la malla de voltaje por hora
@@ -56,38 +48,10 @@ def _params_grupo(G, T_cel, panel: dict, n_serie: int, n_paralelo: int):
     if n_serie < 1 or n_paralelo < 1:
         raise ValueError("N_serie y N_paralelo deben ser >= 1.")
 
-    constantes = obtener_constantes_tecnologia(panel["tecnologia"])
-    Vt_ref     = K_BOLTZMANN * T_REF_K / Q_ELECTRON
-    nNsVth_ref = panel["a_ref"] * Vt_ref
-
-    _Isc_stc = float(panel.get("Isc_stc") or panel.get("Isc") or 1.0)
-    alpha_sc = panel["Tk_alfa"] / 100.0 * _Isc_stc
-
-    I_L, I_o, R_s_mod, R_sh_estandar, nNsVth = pvlib.pvsystem.calcparams_desoto(
-        effective_irradiance = G,
-        temp_cell            = T_cel,
-        alpha_sc             = alpha_sc,
-        a_ref                = nNsVth_ref,
-        I_L_ref              = panel["I_L_ref"],
-        I_o_ref              = panel["I_o_ref"],
-        R_sh_ref             = panel["R_sh_ref"],
-        R_s                  = panel["R_s"],
-        EgRef                = constantes["Eg_ref"],
-        dEgdT                = constantes["dEgdT"],
-        irrad_ref            = G_REF,
-        temp_ref             = 25.0,
-    )
-
-    # Rsh exponencial saturado (Mermoud 2005) a nivel de módulo, SOLO capa
-    # fina (CdTe/CIGS) -- misma corrección que calculos/produccion.py, mismo
-    # día. Ver DIAGNOSTICO_RSH_TECNOLOGIA.md.
-    _TECNOLOGIAS_RSH_EXPONENCIAL = ("CdTe", "CIGS")
-    if panel["tecnologia"] in _TECNOLOGIAS_RSH_EXPONENCIAL:
-        R_sh_mod = calcular_rsh_cdte(
-            G, panel["R_sh_ref"], c_Rsh=constantes["c_Rsh"], R_sh_0=panel.get("R_sh_0"),
-        )
-    else:
-        R_sh_mod = R_sh_estandar
+    # Motor SDM centralizado en calculos.modelo_iv.trasladar_parametros_gt()
+    # (modelo PVsyst v6, migrado desde De Soto 2006 el 2-sep-2026, ver
+    # DIAGNOSTICO_MOTOR_PVSYST.md).
+    I_L, I_o, R_s_mod, R_sh_mod, nNsVth = trasladar_parametros_gt(G, T_cel, panel)
 
     ns, npar = float(n_serie), float(n_paralelo)
     I_L_g    = np.asarray(I_L, dtype=float) * npar
