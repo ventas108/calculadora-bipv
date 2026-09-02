@@ -136,21 +136,13 @@ def trasladar_parametros_gt(G, T_cel_C, panel: dict):
     Vt_ref      = K_BOLTZMANN * T_REF_K / Q_ELECTRON   # 0.025693 V @ 25°C
     nNsVth_ref  = panel["a_ref"] * Vt_ref               # 154 × 0.025693 = 3.957 V
 
-    # R_sh exponencial saturado (Mermoud 2005 / PVsyst) — reemplaza el lineal de pvlib
-    R_sh_exp = calcular_rsh_cdte(
-        G,
-        panel["R_sh_ref"],
-        c_Rsh  = constantes["c_Rsh"],
-        R_sh_0 = panel.get("R_sh_0"),   # None → sin regresión si el panel no está calibrado
-    )
-
     # pvlib.calcparams_desoto para I_L, I_o, R_s, nNsVth
     # alpha_sc: pvlib espera A/°C (no %/°C).
     # Conversión: Tk_alfa [%/°C] / 100 × Isc_stc [A] = A/°C
     _Isc_stc = float(panel.get("Isc_stc") or panel.get("Isc") or 1.0)
     _alpha_sc = panel["Tk_alfa"] / 100.0 * _Isc_stc
 
-    I_L, I_o, R_s, _R_sh_pvlib, nNsVth = pvlib.pvsystem.calcparams_desoto(
+    I_L, I_o, R_s, R_sh_estandar, nNsVth = pvlib.pvsystem.calcparams_desoto(
         effective_irradiance = G,
         temp_cell            = T_cel_C,
         alpha_sc             = _alpha_sc,
@@ -165,7 +157,28 @@ def trasladar_parametros_gt(G, T_cel_C, panel: dict):
         temp_ref             = 25.0,
     )
 
-    # Devuelve con Rsh exponencial CdTe en lugar del lineal de pvlib
+    # R_sh: modelo exponencial saturado (Mermoud 2005) SOLO para capa fina
+    # (CdTe/CIGS) -- bug real encontrado 1-sep-2026 comparando contra PVsyst
+    # con un panel de silicio cristalino real (XTP 50-17B): aplicar este
+    # modelo (sube Rsh, mejor FF a baja luz -- comportamiento real de capa
+    # fina) a Mono-Si/Poli-Si producía una ganancia irreal a baja/media
+    # irradiancia que PVsyst no reproduce. `datos/tecnologias_bipv.py` ya
+    # tenía `c_Rsh` definido igual (5.5) para CdTe/Mono-Si/Poli-Si, pero
+    # nunca se filtraba la tecnología antes de aplicar el modelo. Misma
+    # corrección en las 5 implementaciones (produccion.py, produccion_iv.py,
+    # mismatch_bypass.py, mppt_combinado.py y aquí). Ver
+    # DIAGNOSTICO_RSH_TECNOLOGIA.md.
+    _TECNOLOGIAS_RSH_EXPONENCIAL = ("CdTe", "CIGS")
+    if panel["tecnologia"] in _TECNOLOGIAS_RSH_EXPONENCIAL:
+        R_sh_exp = calcular_rsh_cdte(
+            G,
+            panel["R_sh_ref"],
+            c_Rsh  = constantes["c_Rsh"],
+            R_sh_0 = panel.get("R_sh_0"),   # None → sin regresión si el panel no está calibrado
+        )
+    else:
+        R_sh_exp = R_sh_estandar
+
     return I_L, I_o, R_s, R_sh_exp, nNsVth
 
 

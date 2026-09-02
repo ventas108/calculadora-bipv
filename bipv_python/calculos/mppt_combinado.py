@@ -60,15 +60,10 @@ def _params_grupo(G, T_cel, panel: dict, n_serie: int, n_paralelo: int):
     Vt_ref     = K_BOLTZMANN * T_REF_K / Q_ELECTRON
     nNsVth_ref = panel["a_ref"] * Vt_ref
 
-    # Rsh exponencial saturado (Mermoud 2005 / PVsyst) a nivel de módulo
-    R_sh_mod = calcular_rsh_cdte(
-        G, panel["R_sh_ref"], c_Rsh=constantes["c_Rsh"], R_sh_0=panel.get("R_sh_0"),
-    )
-
     _Isc_stc = float(panel.get("Isc_stc") or panel.get("Isc") or 1.0)
     alpha_sc = panel["Tk_alfa"] / 100.0 * _Isc_stc
 
-    I_L, I_o, R_s_mod, _rsh_pvlib, nNsVth = pvlib.pvsystem.calcparams_desoto(
+    I_L, I_o, R_s_mod, R_sh_estandar, nNsVth = pvlib.pvsystem.calcparams_desoto(
         effective_irradiance = G,
         temp_cell            = T_cel,
         alpha_sc             = alpha_sc,
@@ -82,6 +77,17 @@ def _params_grupo(G, T_cel, panel: dict, n_serie: int, n_paralelo: int):
         irrad_ref            = G_REF,
         temp_ref             = 25.0,
     )
+
+    # Rsh exponencial saturado (Mermoud 2005) a nivel de módulo, SOLO capa
+    # fina (CdTe/CIGS) -- misma corrección que calculos/produccion.py, mismo
+    # día. Ver DIAGNOSTICO_RSH_TECNOLOGIA.md.
+    _TECNOLOGIAS_RSH_EXPONENCIAL = ("CdTe", "CIGS")
+    if panel["tecnologia"] in _TECNOLOGIAS_RSH_EXPONENCIAL:
+        R_sh_mod = calcular_rsh_cdte(
+            G, panel["R_sh_ref"], c_Rsh=constantes["c_Rsh"], R_sh_0=panel.get("R_sh_0"),
+        )
+    else:
+        R_sh_mod = R_sh_estandar
 
     ns, npar = float(n_serie), float(n_paralelo)
     I_L_g    = np.asarray(I_L, dtype=float) * npar

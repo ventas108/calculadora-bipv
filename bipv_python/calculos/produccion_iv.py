@@ -93,16 +93,11 @@ def _pmp_iv_vectorizado(
     Vt_ref     = K_BOLTZMANN * T_REF_K / Q_ELECTRON      # 0.025693 V @ 25°C
     nNsVth_ref = panel["a_ref"] * Vt_ref
 
-    # R_sh exponencial saturado (Mermoud 2005 / PVsyst) — ver calcular_rsh_cdte()
-    R_sh = calcular_rsh_cdte(
-        G, panel["R_sh_ref"], c_Rsh=constantes["c_Rsh"], R_sh_0=panel.get("R_sh_0"),
-    )
-
     # alpha_sc: pvlib espera A/°C → Tk_alfa[%/°C] / 100 × Isc_stc[A]
     _Isc_stc = float(panel.get("Isc_stc") or panel.get("Isc") or 1.0)
     alpha_sc = panel["Tk_alfa"] / 100.0 * _Isc_stc
 
-    I_L, I_o, R_s, _rsh_pvlib, nNsVth = pvlib.pvsystem.calcparams_desoto(
+    I_L, I_o, R_s, R_sh_estandar, nNsVth = pvlib.pvsystem.calcparams_desoto(
         effective_irradiance = G,
         temp_cell            = T_cel,
         alpha_sc             = alpha_sc,
@@ -117,11 +112,22 @@ def _pmp_iv_vectorizado(
         temp_ref             = 25.0,
     )
 
+    # R_sh: modelo exponencial saturado (Mermoud 2005) SOLO para capa fina
+    # (CdTe/CIGS) -- misma corrección que calculos/produccion.py, mismo día.
+    # Ver el comentario completo ahí y DIAGNOSTICO_RSH_TECNOLOGIA.md.
+    _TECNOLOGIAS_RSH_EXPONENCIAL = ("CdTe", "CIGS")
+    if panel["tecnologia"] in _TECNOLOGIAS_RSH_EXPONENCIAL:
+        R_sh = calcular_rsh_cdte(
+            G, panel["R_sh_ref"], c_Rsh=constantes["c_Rsh"], R_sh_0=panel.get("R_sh_0"),
+        )
+    else:
+        R_sh = R_sh_estandar
+
     resultado = pvlib.pvsystem.singlediode(
         photocurrent       = I_L,
         saturation_current = I_o,
         resistance_series  = R_s,
-        resistance_shunt   = R_sh,   # modelo CdTe Mermoud 2005
+        resistance_shunt   = R_sh,
         nNsVth             = nNsVth,
         method             = 'lambertw',
     )

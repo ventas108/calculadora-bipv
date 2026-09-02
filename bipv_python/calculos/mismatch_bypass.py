@@ -53,11 +53,7 @@ def _sdm_vectorizado(
     Vt_ref      = K_BOLTZMANN * T_REF_K / Q_ELECTRON
     nNsVth_ref  = panel["a_ref"] * Vt_ref
 
-    R_sh = calcular_rsh_cdte(
-        G, panel["R_sh_ref"], c_Rsh=constantes["c_Rsh"], R_sh_0=panel.get("R_sh_0"),
-    )
-
-    I_L, I_o, R_s, _, nNsVth = pvlib.pvsystem.calcparams_desoto(
+    I_L, I_o, R_s, R_sh_estandar, nNsVth = pvlib.pvsystem.calcparams_desoto(
         effective_irradiance = G,
         temp_cell            = T_cel,
         alpha_sc             = panel["Tk_alfa"] / 100.0 * float(panel.get("Isc_stc") or panel.get("Isc") or 1.0),
@@ -71,6 +67,17 @@ def _sdm_vectorizado(
         irrad_ref            = G_REF,
         temp_ref             = 25.0,
     )
+
+    # Rsh exponencial saturado (Mermoud 2005), SOLO capa fina (CdTe/CIGS) --
+    # misma corrección que calculos/produccion.py, mismo día. Ver
+    # DIAGNOSTICO_RSH_TECNOLOGIA.md.
+    _TECNOLOGIAS_RSH_EXPONENCIAL = ("CdTe", "CIGS")
+    if panel["tecnologia"] in _TECNOLOGIAS_RSH_EXPONENCIAL:
+        R_sh = calcular_rsh_cdte(
+            G, panel["R_sh_ref"], c_Rsh=constantes["c_Rsh"], R_sh_0=panel.get("R_sh_0"),
+        )
+    else:
+        R_sh = R_sh_estandar
 
     res = pvlib.pvsystem.singlediode(
         photocurrent       = I_L,

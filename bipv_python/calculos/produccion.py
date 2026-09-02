@@ -83,12 +83,7 @@ def _calcular_pmax_vectorizado(
     Vt_ref     = K_BOLTZMANN * T_REF_K / Q_ELECTRON   # 0.025693 V
     nNsVth_ref = panel["a_ref"] * Vt_ref               # 154 × Vt_ref
 
-    # R_sh exponencial saturado (Mermoud 2005 / PVsyst) — ver calcular_rsh_cdte()
-    R_sh = calcular_rsh_cdte(
-        G, panel["R_sh_ref"], c_Rsh=constantes["c_Rsh"], R_sh_0=panel.get("R_sh_0"),
-    )
-
-    I_L, I_o, R_s, _rsh_pvlib, nNsVth = pvlib.pvsystem.calcparams_desoto(
+    I_L, I_o, R_s, R_sh_estandar, nNsVth = pvlib.pvsystem.calcparams_desoto(
         effective_irradiance = G,
         temp_cell            = T_cel,
         alpha_sc             = panel["Tk_alfa"] / 100.0 * float(panel.get("Isc_stc") or panel.get("Isc") or 1.0),
@@ -103,11 +98,31 @@ def _calcular_pmax_vectorizado(
         temp_ref             = 25.0,
     )
 
+    # R_sh: modelo exponencial saturado (Mermoud 2005) SOLO para capa fina
+    # (CdTe/CIGS) — validado contra Batzner et al. 2001 para CdTe. Bug real
+    # encontrado el 1-sep-2026 comparando contra PVsyst con un panel real
+    # (XTP 50-17B, Poli-Si, mismo Rs/Rsh/Gamma que calculó PVsyst): aplicar
+    # el modelo de capa fina a silicio cristalino producía una ganancia
+    # irreal a baja/media irradiancia (+3.2% donde PVsyst midió -3.90% con
+    # los mismos parámetros y T=25°C fijo) — ese modelo SUBE el Rsh (mejor
+    # Fill Factor) a baja luz, un comportamiento real de capa fina que el
+    # silicio cristalino no tiene. `datos/tecnologias_bipv.py` ya definía
+    # `c_Rsh` idéntico (5.5) para CdTe/Mono-Si/Poli-Si, pero nunca se
+    # verificaba la tecnología antes de aplicar el modelo exponencial — se
+    # usaba para las 4 tecnologías por igual. Ver DIAGNOSTICO_RSH_TECNOLOGIA.md.
+    _TECNOLOGIAS_RSH_EXPONENCIAL = ("CdTe", "CIGS")
+    if panel["tecnologia"] in _TECNOLOGIAS_RSH_EXPONENCIAL:
+        R_sh = calcular_rsh_cdte(
+            G, panel["R_sh_ref"], c_Rsh=constantes["c_Rsh"], R_sh_0=panel.get("R_sh_0"),
+        )
+    else:
+        R_sh = R_sh_estandar
+
     resultado = pvlib.pvsystem.singlediode(
         photocurrent       = I_L,
         saturation_current = I_o,
         resistance_series  = R_s,
-        resistance_shunt   = R_sh,   # modelo CdTe Mermoud 2005
+        resistance_shunt   = R_sh,
         nNsVth             = nNsVth,
         method             = 'lambertw',
     )

@@ -2899,6 +2899,16 @@ El paper también aportó el tercer PR real independiente en rango típico (84,9
 
 2 tests nuevos en `tests/test_perdidas_desglosadas_pvsyst.py`. Suite completa: **920/920**. Ver `DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md`.
 
+## 25s. Anexo — Actualizaciones del 1 de septiembre de 2026 (bug real: el modelo Rsh de capa fina CdTe se aplicaba a silicio cristalino)
+
+El usuario corrió PVsyst 8.1.5 en paralelo con un panel de silicio cristalino real (XTP 50-17B, base de datos original de PVsyst), mismo inversor, mismo sitio (Teusaquillo). PVsyst dio PR=77,03% (típico); esta app, mismo panel/sitio, dio PR=104,4%. La investigación descartó primero el modelo de temperatura (NOCT vs Faiman, solo explicaba ~2 de 13 puntos) y luego una falsa alarma propia sobre el factor Gamma (error de unidades en la propia verificación, corregido — Gamma real resultó 0,94, cercano al 1,070 de PVsyst, no 36 como se reportó por error).
+
+La causa real, confirmada de forma decisiva: insertando los parámetros EXACTOS de PVsyst en el motor de esta app con T=25°C fijo (aislando solo irradiancia), seguía dando +3,2% de ganancia donde PVsyst midió -3,90% de pérdida real. Encontrado en el código: `calcular_rsh_cdte()` (modelo Rsh exponencial saturado, Mermoud 2005, validado para el comportamiento real de capa fina CdTe — Batzner et al. 2001) se aplicaba en las 5 implementaciones del SDM (`modelo_iv.py`, `produccion.py`, `produccion_iv.py`, `mismatch_bypass.py`, `mppt_combinado.py`) SIN verificar la tecnología del panel. `datos/tecnologias_bipv.py` ya tenía `c_Rsh=5.5` idéntico para CdTe/Mono-Si/Poli-Si, pero nada evitaba que el modelo de capa fina se usara también para cristalino, que no tiene ese comportamiento real.
+
+**Corregido**: las 5 implementaciones ahora solo aplican `calcular_rsh_cdte()` si `tecnologia in ("CdTe", "CIGS")` — para Mono-Si/Poli-Si se usa el Rsh estándar que `pvlib.calcparams_desoto()` ya calculaba internamente y se descartaba. Ningún panel CdTe cambia de comportamiento (verificado, incluido ASP-ST1-T40 de Teusaquillo). Con el fix, el caso real de comparación (XTP 50-17B) mejoró de PR=104,4% a **PR=95,9%** (PVsyst real: 77,03%) — cierra ~38% de la brecha de irradiancia; el resto sigue siendo lo ya documentado (IAM, calidad de módulo, mismatch, óhmico no modelados, ver sección 25p).
+
+10 tests nuevos/extendidos (`tests/test_rsh_gating_tecnologia.py` + `tests/test_consistencia_sdm_entre_modulos.py` extendido con caso Poli-Si). Suite completa: **927/927**. Ver `DIAGNOSTICO_RSH_TECNOLOGIA.md`.
+
 ## 25. Anexo — Actualizaciones del 31 de agosto de 2026 (auditoría de retrieval del asistente 🧭)
 
 Manual actualizado el 31 de agosto de 2026
