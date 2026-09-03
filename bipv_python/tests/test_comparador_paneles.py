@@ -76,8 +76,15 @@ def test_paneles_excluidos_por_ficha_incompleta_refleja_el_catalogo_real():
     # microinversor) -- excluidos por incompatibilidad de arquitectura,
     # no por error de traducción del paper. Ver
     # DIAGNOSTICO_CATALOGO_SUNPOWER_NREL.md.
+    #
+    # ACTUALIZADO otra vez (3-sep-2026, mismo día): tras importar 137
+    # paneles reales de Risen Energy (datos/agregar_paneles_risen_nrel.py),
+    # 88 más sin dimensiones -- 1.342 + 88 = 1.430 excluidos reales hoy.
+    # 11 candidatos excluidos por tolerancia SDM: mismo patrón half-cut
+    # ya documentado en Trina/Jinko (RSM120-6/RSM144-6, V/celda≈0.33-
+    # 0.34V, la mitad de lo real). Ver DIAGNOSTICO_CATALOGO_RISEN_NREL.md.
     excluidos = paneles_excluidos_por_ficha_incompleta()
-    assert len(excluidos) == 1342
+    assert len(excluidos) == 1430
     # Los 7 ASP-ST1 (con SDM calibrado, dimensiones reales) nunca deben
     # aparecer excluidos -- si alguno lo hiciera, sería una regresión real
     # de datos, no del import de JA Solar.

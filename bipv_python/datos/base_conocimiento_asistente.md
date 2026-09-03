@@ -3023,6 +3023,18 @@ Suite completa: 942/942 (1182.71s / ~20 min con el catálogo de 2.891 paneles). 
 
 ────────────────────────────────────────────────────────────
 
+## 45. Anexo — Actualizaciones del 3 de septiembre de 2026 (catálogo ampliado con 137 paneles reales de Risen Energy)
+
+El catálogo de paneles pasó de 2.891 a **3.028** — 137 módulos reales de Risen Energy, mismas 2 fuentes. Elegido por evidencia real de mercado en Colombia (no por volumen): sondeo confirmó 492 MW suministrados a la planta Guayepo I y II, y 2 distribuidores locales (Energía Solar Colombia, Ferragro) — a diferencia de otros candidatos del mismo rango de volumen (Boviet Solar, Phono Solar, Hyundai Energy Solutions) sin presencia colombiana verificable.
+
+148 candidatos, 11 excluidos por tolerancia SDM (6%) — mismo patrón half-cut ya documentado en Trina/Jinko: familias `RSM120-6`/`RSM144-6` dan V/celda≈0.33-0.34V (la mitad de lo real), el paper tradujo el conteo físico de medias-celdas en vez de la profundidad eléctrica real. Sin criterios nuevos de exclusión esta vez.
+
+Dato verificado, no bug: 35 de los 137 importados son la línea `RSM60-6-XXXP` policristalina (Risen fabrica ambas tecnologías). 88/137 (64%) sin dimensiones — mejor cobertura que SunPower (95%) y LONGi (86%).
+
+Suite completa: 942/942 (1240.98s / ~20m 40s con el catálogo de 3.028 paneles). Catálogo final: 76 originales + 278 JA Solar + 1.255 Trina + 408 Jinko + 380 Canadian Solar + 244 LONGi + 170 First Solar + 80 SunPower + 137 Risen Energy. Ver `DIAGNOSTICO_CATALOGO_RISEN_NREL.md`.
+
+────────────────────────────────────────────────────────────
+
 ## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
 
 El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de
