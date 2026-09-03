@@ -2993,6 +2993,22 @@ Suite completa: 942/942 (1133.28s / 19 min con el catálogo de 2.641 paneles). V
 
 ────────────────────────────────────────────────────────────
 
+## 43. Anexo — Actualizaciones del 3 de septiembre de 2026 (catálogo ampliado con 170 paneles reales de First Solar, primer fabricante CdTe)
+
+El catálogo de paneles pasó de 2.641 a **2.811** — 170 módulos reales de First Solar, mismas 2 fuentes (NREL/SAM `CEC Modules.csv` + Sandia JPV 2025). Primer fabricante CdTe importado, con un criterio de import **distinto** al de los 5 fabricantes cristalinos previos: **sin exclusión por tolerancia SDM (6%)**. Producción ya usa el motor **JRC/Huld** (no SDM) para energía en paneles CdTe (ver sección sobre `DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md`) — excluir por ajuste SDM habría descartado paneles CdTe reales buenos por una métrica irrelevante para su uso principal. El chequeo SDM se calculó igual, solo como aviso informativo en `Notas` (59/170 no ajustan bien, esperado, es el mismo defecto de la "joroba" ya conocido) — **sin bloquear el import**. Los 170 candidatos reales entraron.
+
+**Reclasificación de Tecnología**: 70 de los 170 módulos venían etiquetados genéricamente "Thin Film" en la fuente — se reclasificaron a "CdTe" explícito (First Solar solo fabrica CdTe; son módulos más antiguos/pequeños, no un producto distinto). Sin esto, `clasificar_tecnologia_jrc()` no los habría reconocido y `produccion.py` los habría dejado caer en SDM por defecto.
+
+**Verificación con 2 fichas oficiales reales** (Series 6 Plus, Series 7 TR1, provistas por el usuario): Voc/Vmp/Isc/Imp coinciden **exactos** contra CEC (`FS-6470A-P`, `FS-7530A-TR1`). NOCT oficial real confirmado = 45°C en ambas fichas; CEC reporta mediana 47.3°C para el lote (~2.3°C por encima, mismo patrón de discrepancia ya visto con JA Solar — documentado, no oculto, sí afecta el modelo térmico NOCT+k_BIPV que Produccion sigue usando).
+
+**Verificación end-to-end real**: se corrió `_calcular_pmax_vectorizado()` sobre un panel First Solar recién importado (`FS-6405A`, 405W) a G=[1000,500,200] W/m² — curva monótona decreciente (100%→99.7%→88.6% eficiencia relativa), **sin joroba**, confirmando que el enrutamiento JRC/Huld funciona para los paneles nuevos, no solo en el papel. También verificado programáticamente: 0/170 paneles First Solar quedan sin clasificar como CdTe.
+
+100/170 sin dimensiones físicas (solo área total) — test de `paneles_excluidos_por_ficha_incompleta()` actualizado a 1.266 excluidos reales (1.166 previos + 100 First Solar).
+
+Suite completa: 942/942 (1205.05s / 20 min con el catálogo de 2.811 paneles). Catálogo final: 76 originales + 278 JA Solar + 1.255 Trina + 408 Jinko + 380 Canadian Solar + 244 LONGi + 170 First Solar. Ver `DIAGNOSTICO_CATALOGO_FIRSTSOLAR_NREL.md`.
+
+────────────────────────────────────────────────────────────
+
 ## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
 
 El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de

@@ -55,12 +55,17 @@ def test_paneles_excluidos_por_ficha_incompleta_refleja_el_catalogo_real():
     #
     # ACTUALIZADO otra vez (3-sep-2026, mismo día): tras importar 244
     # paneles reales de LONGi (datos/agregar_paneles_longi_nrel.py, mismas
-    # 2 fuentes), 209 más sin dimensiones (86% de este lote, el más alto
-    # hasta ahora, verificado real en la fuente) -- 957 + 209 = 1.166
-    # excluidos reales hoy. LONGi es el único de los 5 fabricantes con 0
-    # exclusiones eléctricas (0/244 fuera de tolerancia real).
+    # 2 fuentes), 209 más sin dimensiones -- 957 + 209 = 1.166 excluidos.
+    #
+    # ACTUALIZADO otra vez (3-sep-2026, mismo día): tras importar 170
+    # paneles reales de First Solar (CdTe, datos/agregar_paneles_
+    # firstsolar_nrel.py), 100 más sin dimensiones -- 1.166 + 100 = 1.266
+    # excluidos reales hoy. A diferencia de los fabricantes cristalinos,
+    # First Solar NO se filtró por tolerancia SDM (Producción usa JRC/Huld
+    # para CdTe, no SDM -- ver DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md), así
+    # que todos los 170 candidatos reales entraron al catálogo.
     excluidos = paneles_excluidos_por_ficha_incompleta()
-    assert len(excluidos) == 1166
+    assert len(excluidos) == 1266
     # Los 7 ASP-ST1 (con SDM calibrado, dimensiones reales) nunca deben
     # aparecer excluidos -- si alguno lo hiciera, sería una regresión real
     # de datos, no del import de JA Solar.
