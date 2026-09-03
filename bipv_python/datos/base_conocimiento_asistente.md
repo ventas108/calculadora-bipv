@@ -2919,6 +2919,18 @@ El paper también aportó el tercer PR real independiente en rango típico (84,9
 
 2 tests nuevos en `tests/test_perdidas_desglosadas_pvsyst.py`. Suite completa: **920/920**. Ver `DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md`.
 
+## 25y. Anexo — Actualizaciones del 2 de septiembre de 2026 (Rsh_exp de CdTe según Sandia PVPMC: investigado, no se activa — empeora la joroba)
+
+Revisando la página oficial de PVPMC (Sandia National Laboratories) sobre el modelo de módulo PVsyst, se encontró una tabla de `Rsh_exp` por defecto por tecnología: CdTe=2.0, µc-Si=3.0, todas las demás=5.5. El catálogo real (`CONSTANTES_TECNOLOGIA["CdTe"]["c_Rsh"]`) usa 5.5, el mismo valor genérico — ya se había detectado esta discrepancia antes (sección 25t: "excepción real CdTe~3") y había quedado sin corregir.
+
+**Se probó, con rigor, antes de implementar**: se recalculó la curva de eficiencia relativa del panel real ASP-ST1-T40 (parámetros ya calibrados sin cambios: R_s=25,51Ω, R_sh_ref=1340,6Ω, R_sh_0=18450Ω) variando SOLO `Rsh_exp` entre 5.5 (actual), 3.0 (PVsyst) y 2.0 (Sandia).
+
+**Resultado contraintuitivo**: bajar `Rsh_exp` EMPEORA la joroba de eficiencia >100% que motivó el cambio a JRC/Huld (ver `DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md`), no la mejora — pico de 106,1% (con 5.5) sube a 109,6% (con 3.0) y 111,0% (con 2.0). El FF puntual a G=200W/m² sí mejora ligeramente hacia el real de laboratorio (75,02%→77,09%→77,80%, real Batzner 2001: 76,28%), pero un solo punto y la forma completa de la curva responden en direcciones distintas — no se pueden optimizar ambos con un solo número.
+
+**No se activa** ningún `Rsh_exp` específico de CdTe. Confirma indirectamente que la limitación es la forma funcional del modelo de un diodo con Rsh exponencial en sí (por eso JRC/Huld, un modelo distinto, era la solución correcta para energía CdTe), no un valor de exponente mal elegido dentro de esa misma familia de modelos. `c_Rsh=5.5` sigue sin cambios — solo relevante para Motor IV/Mismatch/MPPT (SDM, todas las tecnologías); Producción CdTe usa JRC/Huld, que no tiene `Rsh_exp`. Ver `DIAGNOSTICO_RSH_EXP_CDTE.md`. Investigación numérica pura, ningún valor de código cambió, sin tests nuevos, suite sin modificar: 942/942.
+
+────────────────────────────────────────────────────────────
+
 ## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
 
 El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de
