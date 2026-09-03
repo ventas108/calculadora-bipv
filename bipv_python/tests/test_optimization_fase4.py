@@ -245,18 +245,27 @@ def test_catalogo_paneles_real_incluye_paneles_exclusivos_del_excel():
 
 
 def test_generar_candidatos_con_panel_e_inversor_varia_ambos():
-    # max_intentos_por_candidato=60 (default 20 -> 300 intentos totales no
-    # alcanza): tras corregir evaluar_compatibilidad_string() (27-ago-2026,
-    # auditoría) para usar Vmppt_activo_min en vez de Vmppt_min como piso
-    # -- el umbral correcto, ya usado por optimizar_n_serie() y
+    # max_intentos_por_candidato=120 (default 20 -> 300 intentos totales no
+    # alcanza; 60 tampoco, ver abajo): tras corregir evaluar_compatibilidad_string()
+    # (27-ago-2026, auditoría) para usar Vmppt_activo_min en vez de Vmppt_min
+    # como piso -- el umbral correcto, ya usado por optimizar_n_serie() y
     # comparador_inversores.py -- el espacio eléctrico válido del catálogo
     # real es más angosto de lo que el presupuesto por defecto asumía. El
     # propio docstring de generar_candidatos() indica subir el presupuesto
     # explícitamente en vez de relajar la aserción.
+    #
+    # Subido de 60 a 120 (3-sep-2026): tras importar 278 paneles reales de JA
+    # Solar (datos/agregar_paneles_ja_solar_nrel.py), variable_panel() sortea
+    # sobre un catálogo mucho más grande y heterogéneo (354 paneles reales,
+    # antes ~72) -- muchos son módulos crystalinos antiguos de baja potencia
+    # que no calzan eléctricamente con el inversor fijo de esta prueba, así
+    # que la tasa de aciertos por intento baja. Verificado empíricamente
+    # (mismo seed=3): 60 intentos da 10/15, 100 da 15/15 -- se deja margen a
+    # 120 en vez del mínimo exacto encontrado.
     cfg = _cfg_electricamente_valida()
     candidatos = generar_candidatos(
         cfg, _variables_panel_inversor_completas(), n_candidatos=15, seed=3,
-        max_intentos_por_candidato=60,
+        max_intentos_por_candidato=120,
     )
     assert len(candidatos) == 15
     inversores = {c.inversor["modelo"] for c in candidatos}

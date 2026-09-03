@@ -28,8 +28,28 @@ def test_paneles_excluidos_por_ficha_incompleta_refleja_el_catalogo_real():
     # Hasta 2026-08-21 T10-T70 estaban excluidos (Pmax_stc=None) -- se
     # completaron con los valores reales de datos/paneles_catalogo.xlsx (ver
     # datos/tecnologias_bipv.py). Hoy los 7 tienen ficha completa.
+    #
+    # ACTUALIZADO (3-sep-2026): tras importar 278 paneles reales de JA Solar
+    # (datos/agregar_paneles_ja_solar_nrel.py, fuente NREL/SAM + Sandia JPV
+    # 2025), 115 de ellos no traen dimensiones físicas en la fuente (solo
+    # área total, DimensionesMM="N/D") -- area_m2=None. El filtro real de
+    # variable_panel()/paneles_excluidos_por_ficha_incompleta() se extendió
+    # el mismo día para exigir también area_m2 (antes solo Pmax_stc, ver
+    # optimization/variables.py) -- este NO es un catálogo con menos fichas
+    # completas, es el mismo filtro real detectando un hueco de datos real
+    # que antes no existía en ningún panel del catálogo Excel.
     excluidos = paneles_excluidos_por_ficha_incompleta()
-    assert excluidos == []
+    assert len(excluidos) == 115
+    # Los 7 ASP-ST1 (con SDM calibrado, dimensiones reales) nunca deben
+    # aparecer excluidos -- si alguno lo hiciera, sería una regresión real
+    # de datos, no del import de JA Solar.
+    assert not any(n.startswith("ASP-ST1") for n in excluidos)
+    # Todos los excluidos deben serlo específicamente por area_m2 -- ninguno
+    # por Pmax_stc (el import de JA Solar siempre trae Pmax_stc real de CEC).
+    from optimization.variables import _catalogo_paneles_real
+    catalogo = _catalogo_paneles_real()
+    assert all(catalogo[n].get("area_m2") is None for n in excluidos)
+    assert all(catalogo[n].get("Pmax_stc") is not None for n in excluidos)
 
 
 def test_comparar_paneles_no_crashea_y_devuelve_todos_los_simulables():

@@ -54,20 +54,31 @@ def test_variables_geometria_usa_bounds_reales_de_tipos_superficie():
 
 def test_variable_panel_opciones_coincide_con_catalogo_real_simulable():
     # No es TODO MODULOS_BIPV -- variable_panel() excluye por defecto los
-    # paneles con Pmax_stc=None (fichas incompletas que hacen reventar
-    # dimensionar_sistema()). Ver docstring de variable_panel() y
+    # paneles con Pmax_stc=None o area_m2=None (fichas incompletas que hacen
+    # reventar dimensionar_sistema()). Ver docstring de variable_panel() y
     # tests/test_optimization_fase4.py::test_variable_panel_excluye_fichas_incompletas_del_catalogo_real
     # para el hallazgo completo.
     #
     # Desde que variable_panel() se conectó al catálogo Excel (27-ago-2026),
-    # el catálogo real ya no es solo MODULOS_BIPV -- es la unión con los 65
+    # el catálogo real ya no es solo MODULOS_BIPV -- es la unión con los
     # paneles del Excel (ver optimization.variables._catalogo_paneles_real()).
     # "esperado" debe construirse contra esa misma unión, no contra
     # MODULOS_BIPV a secas, o este test volvería a fallar por diseño cada
     # vez que el catálogo Excel aporte una clave nueva.
+    #
+    # area_m2 agregado al filtro esperado (3-sep-2026): tras importar 278
+    # paneles reales de JA Solar (datos/agregar_paneles_ja_solar_nrel.py),
+    # 115 no traen dimensiones físicas en la fuente (solo área total) --
+    # variable_panel() ya los excluye (ver el fix real en optimization/
+    # variables.py), pero "esperado" aquí seguía construido solo con
+    # Pmax_stc, así que sobre-incluía esos 115 y el test fallaba comparando
+    # contra el propio filtro real que ya está corregido.
     from optimization.variables import _catalogo_paneles_real
     var = opt_vars.variable_panel()
-    esperado = {k for k, v in _catalogo_paneles_real().items() if v.get("Pmax_stc") is not None}
+    esperado = {
+        k for k, v in _catalogo_paneles_real().items()
+        if v.get("Pmax_stc") is not None and v.get("area_m2") is not None
+    }
     assert set(var.opciones) == esperado
 
 

@@ -2931,6 +2931,20 @@ Revisando la página oficial de PVPMC (Sandia National Laboratories) sobre el mo
 
 ────────────────────────────────────────────────────────────
 
+## 25z. Anexo — Actualizaciones del 3 de septiembre de 2026 (catálogo ampliado con 278 paneles reales de JA Solar, fuente NREL/SAM + paper Sandia 2025)
+
+El catálogo de paneles pasó de 76 a 354 (`datos/paneles_catalogo.xlsx::Catalogo_Paneles_FV`) — 278 módulos reales de JA Solar, cruzando 2 fuentes públicas: `CEC Modules.csv` de NREL/SAM (California Energy Commission, NOCT/dimensiones/coeficientes de temperatura REPORTADOS, no estimados) y el dataset del paper Deville et al. 2025 IEEE J. Photovoltaics (parámetros ya traducidos al modelo PVsyst v6, el mismo que usa el motor SDM de la app). Se descartó antes una fórmula propia para estimar NOCT (`Mod_Estimar_NOCT.bas`, documento fuente autoría IA "Manus AI") por tener datos de validación que no coincidían con datasheets reales verificados.
+
+**Auditoría real** (reutilizando `validar_sdm_vs_ficha()`, tolerancia 6%): 0/278 fuera de tolerancia real de producción, 64/278 con desviación >2% (revisado contra ficha oficial de JA Solar: buena parte es tolerancia de fabricación real declarada por el fabricante, "0~+5W", no error de traducción), 115/278 sin dimensiones físicas en la fuente (solo área total) — todo documentado explícitamente en la columna Notas de cada fila, nada se completa inventado.
+
+**2 bugs reales encontrados y corregidos**: el catálogo nunca había tenido paneles sin `area_m2` hasta este import — `optimization/variables.py::variable_panel()` y `calculos/comparador_paneles.py::paneles_excluidos_por_ficha_incompleta()` solo filtraban/reportaban por `Pmax_stc`, no por `area_m2`. Sin el fix, `dimensionar_sistema()` revienta con `TypeError` (`N_paneles * None`) apenas el barrido de 🧩 Comparador de Paneles o el optimizador de Fase 4 tocaban uno de los 115 paneles sin dimensiones. Corregido: ambos ahora exigen también `area_m2 is not None`.
+
+⚠️ **Para no cometer errores**: si armas un proyecto real con uno de estos 278 paneles JA Solar, revisa la columna Notas de esa fila específica antes de confiar en el NOCT (viene de CEC/NREL, no verificado contra la ficha oficial de ESE modelo puntual) — y si el panel no trae dimensiones, complétalas con la ficha real antes de usarlo en un chequeo de densidad de 🏠 Proyecto.
+
+Suite completa: 942/942 (verificado por archivo; la corrida completa en un solo proceso es notablemente más lenta ahora — cada test que corre `comparar_paneles()` tarda ~20s real con 285 paneles JA Solar en el barrido, no es un bug). Ver `DIAGNOSTICO_CATALOGO_JA_SOLAR_NREL.md`.
+
+────────────────────────────────────────────────────────────
+
 ## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
 
 El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de

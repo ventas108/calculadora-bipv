@@ -136,12 +136,24 @@ def variable_panel(catalogo: dict | None = None) -> OptimizationVariable:
     bug ya evitado para inversor).
 
     Filtro real, no arbitrario: cuando se usa el catálogo por defecto (sin
-    pasar `catalogo`), se excluyen los paneles sin Pmax_stc --
+    pasar `catalogo`), se excluyen los paneles sin Pmax_stc O sin area_m2 --
     calculos.dimensionamiento.dimensionar_sistema() revienta con TypeError
-    (N_paneles * None) si se les intenta dimensionar. Verificado 27-ago-2026:
-    los 65 paneles del catálogo Excel real SÍ traen Pmax_stc (ninguno se
-    excluye por este filtro hoy); no es SDM lo que este filtro exige, ver
-    docstring de _catalogo_paneles_real() para esa distinción.
+    (N_paneles * None) si se les intenta dimensionar con cualquiera de los
+    dos ausente. Verificado 27-ago-2026: los 65 paneles del catálogo Excel
+    real SÍ traen Pmax_stc (ninguno se excluía por ese filtro entonces); no
+    es SDM lo que este filtro exige, ver docstring de _catalogo_paneles_real()
+    para esa distinción.
+
+    area_m2 agregado al filtro el 3-sep-2026: bug real encontrado al importar
+    278 paneles reales de JA Solar (datos/agregar_paneles_ja_solar_nrel.py) --
+    115 de ellos no traen dimensiones físicas en la fuente (solo el área
+    total, sin largo/ancho por separado, ver DimensionesMM="N/D" en el
+    catálogo), así que catalogo_paneles_excel.py::_parse_area() les da
+    area_m2=None. El filtro anterior (solo Pmax_stc) nunca los atrapaba
+    porque SÍ tienen Pmax_stc real -- comparar_paneles() y el optimizador de
+    Fase 4 reventaban con el mismo TypeError de arriba en cuanto el barrido
+    tocaba uno de estos 115. No existía antes porque los 65 paneles Excel
+    previos siempre traían dimensiones completas.
 
     Si se pasa un `catalogo` explícito, NO se filtra -- contrato preexistente
     del que depende calculos.comparador_paneles.paneles_excluidos_por_ficha_incompleta()
@@ -154,11 +166,14 @@ def variable_panel(catalogo: dict | None = None) -> OptimizationVariable:
     """
     if catalogo is None:
         catalogo = _catalogo_paneles_real()
-        catalogo = {k: v for k, v in catalogo.items() if v.get("Pmax_stc") is not None}
+        catalogo = {
+            k: v for k, v in catalogo.items()
+            if v.get("Pmax_stc") is not None and v.get("area_m2") is not None
+        }
     return OptimizationVariable(
         "panel", "categorica", opciones=tuple(catalogo.keys()),
         descripcion="Referencia del catálogo real de paneles (unión de datos.tecnologias_bipv.MODULOS_BIPV "
-                    "y el catálogo Excel real, solo entradas con Pmax_stc).",
+                    "y el catálogo Excel real, solo entradas con Pmax_stc y area_m2).",
     )
 
 

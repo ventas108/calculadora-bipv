@@ -139,25 +139,33 @@ def formatear_comparacion_paneles(df: pd.DataFrame, tipo_instalacion: str) -> st
 
 def paneles_excluidos_por_ficha_incompleta(catalogo: dict | None = None) -> list[str]:
     """Nombres de paneles del catálogo que variable_panel() excluye por no
-    tener Pmax_stc -- para mostrarle al usuario POR QUÉ no aparecen en la
-    comparación, en vez de que simplemente falten sin explicación.
+    tener Pmax_stc o area_m2 -- para mostrarle al usuario POR QUÉ no aparecen
+    en la comparación, en vez de que simplemente falten sin explicación.
 
     No reusa variable_panel(catalogo) aquí a propósito: su filtro por
-    Pmax_stc solo se aplica cuando NO se le pasa un catálogo explícito (ver
-    su código) -- pasarle este mismo `catalogo` lo desactivaría. Se repite
-    el mismo criterio directamente, autocontenido.
+    Pmax_stc/area_m2 solo se aplica cuando NO se le pasa un catálogo
+    explícito (ver su código) -- pasarle este mismo `catalogo` lo
+    desactivaría. Se repite el mismo criterio directamente, autocontenido.
 
     El catálogo por defecto debe ser el MISMO que usa variable_panel()/
     comparar_paneles() cuando no se pasa uno explícito -- antes de conectar
     el catálogo Excel (27-ago-2026) este default era MODULOS_BIPV (7) a
     secas, porque era el único catálogo que existía para variable_panel().
     Dejarlo así tras la conexión sería inconsistente con lo que el usuario
-    ve realmente comparado (65 paneles: los 7 ASP-ST1 con SDM calibrado
-    están dentro de esos 65, no se suman aparte) y, aunque hoy no cambia el
-    resultado (los 65 del Excel sí traen Pmax_stc), subreportaría en
-    silencio el día que el catálogo Excel gane una ficha incompleta.
+    ve realmente comparado.
+
+    area_m2 agregado al filtro el 3-sep-2026: el día que este docstring ya
+    anticipaba ("subreportaría en silencio el día que el catálogo Excel gane
+    una ficha incompleta") llegó al importar 278 paneles reales de JA Solar
+    -- 115 sin dimensiones físicas en la fuente (solo área total, sin largo/
+    ancho), area_m2=None. Sin este segundo criterio, esta función seguía
+    devolviendo "ninguno excluido" mientras 115 paneles reales desaparecían
+    en silencio de 🧩 Comparador de Paneles sin explicación visible.
     """
     if catalogo is None:
         from optimization.variables import _catalogo_paneles_real
         catalogo = _catalogo_paneles_real()
-    return [k for k, v in catalogo.items() if v.get("Pmax_stc") is None]
+    return [
+        k for k, v in catalogo.items()
+        if v.get("Pmax_stc") is None or v.get("area_m2") is None
+    ]
