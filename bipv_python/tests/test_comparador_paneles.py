@@ -64,8 +64,20 @@ def test_paneles_excluidos_por_ficha_incompleta_refleja_el_catalogo_real():
     # First Solar NO se filtró por tolerancia SDM (Producción usa JRC/Huld
     # para CdTe, no SDM -- ver DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md), así
     # que todos los 170 candidatos reales entraron al catálogo.
+    #
+    # ACTUALIZADO otra vez (3-sep-2026, mismo día): tras importar 80
+    # paneles reales de SunPower (datos/agregar_paneles_sunpower_nrel.py),
+    # 76 más sin dimensiones -- 1.266 + 76 = 1.342 excluidos reales hoy.
+    # Este import tuvo un criterio de exclusión NUEVO además del de
+    # tolerancia SDM: 21 candidatos de la familia "-R" (SPR-MAX3-XXX-R)
+    # son AC Modules (microinversor integrado) -- verificados reales
+    # contra ficha pública de Maxeon 3, V/celda=0.36V vs 0.73V real (la
+    # mitad, por el diseño de 2 strings en paralelo alimentando el
+    # microinversor) -- excluidos por incompatibilidad de arquitectura,
+    # no por error de traducción del paper. Ver
+    # DIAGNOSTICO_CATALOGO_SUNPOWER_NREL.md.
     excluidos = paneles_excluidos_por_ficha_incompleta()
-    assert len(excluidos) == 1266
+    assert len(excluidos) == 1342
     # Los 7 ASP-ST1 (con SDM calibrado, dimensiones reales) nunca deben
     # aparecer excluidos -- si alguno lo hiciera, sería una regresión real
     # de datos, no del import de JA Solar.

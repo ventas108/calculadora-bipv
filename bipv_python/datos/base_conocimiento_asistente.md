@@ -3009,6 +3009,20 @@ Suite completa: 942/942 (1205.05s / 20 min con el catálogo de 2.811 paneles). C
 
 ────────────────────────────────────────────────────────────
 
+## 44. Anexo — Actualizaciones del 3 de septiembre de 2026 (catálogo ampliado con 80 paneles reales de SunPower)
+
+El catálogo de paneles pasó de 2.811 a **2.891** — 80 módulos reales de SunPower (familias A-Series y Maxeon 3), mismas 2 fuentes. 107 candidatos con match normalizado, 27 excluidos por **dos criterios distintos**:
+
+**Familia "-R" (21 excluidos)**: variantes Maxeon 3 con sufijo "-R" (ej. `SPR-MAX3-400-R`) fallaban la tolerancia SDM con errores de Voc de hasta 56% — el peor visto en los 7 lotes. Verificado contra ficha pública real de Maxeon 3 (75.6V/6.58A/104 celdas): las variantes SIN "-R" dan V/celda≈0.72-0.73V (coincide exacto); las variantes CON "-R" dan siempre V/celda≈0.36V (exactamente la mitad) e Isc casi el doble, en las 21 sin excepción. No es un bug de traducción del paper (a diferencia del patrón half-cut de Trina/Jinko) — "-R" identifica la línea "Residential AC Module" de SunPower: microinversor integrado por panel, 2 strings en paralelo. Arquitectura eléctrica genuinamente distinta que no encaja en el modelo de la app (paneles DC en serie a un inversor central) — se excluyó por incompatibilidad de producto, no por tolerancia.
+
+**Familia SPR-A-COM (6 excluidos, tolerancia SDM 6%)**: `Pmax` error 7.7-10.0%. Verificado que el problema está en el propio dato fuente CEC: al escalar de 66 a 72 celdas (SPR-A400 → SPR-A400-COM), CEC escaló Voc/Vmp proporcionalmente pero dejó `Pmax` nameplate igual (400W en vez de ~437W esperado, Vmp×Imp=437.3W real) — inconsistencia real de la fuente, mismo criterio de exclusión ya usado en los 5 imports cristalinos.
+
+95% sin dimensiones físicas (76/80) — la peor cobertura de los 7 lotes (peor que LONGi, 86%). Test de `paneles_excluidos_por_ficha_incompleta()` actualizado a 1.342 excluidos reales (1.266 + 76).
+
+Suite completa: 942/942 (1182.71s / ~20 min con el catálogo de 2.891 paneles). Catálogo final: 76 originales + 278 JA Solar + 1.255 Trina + 408 Jinko + 380 Canadian Solar + 244 LONGi + 170 First Solar + 80 SunPower. Ver `DIAGNOSTICO_CATALOGO_SUNPOWER_NREL.md`.
+
+────────────────────────────────────────────────────────────
+
 ## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
 
 El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de
