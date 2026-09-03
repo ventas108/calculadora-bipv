@@ -2959,6 +2959,16 @@ Suite completa: 942/942 (785s / 13 min con el catálogo de 1.609 paneles — `co
 
 ────────────────────────────────────────────────────────────
 
+## 40. Anexo — Actualizaciones del 3 de septiembre de 2026 (catálogo ampliado con 408 paneles reales de Jinko Solar)
+
+El catálogo de paneles pasó de 1.609 a **2.017** — 408 módulos reales de Jinko Solar, mismas 2 fuentes que JA Solar/Trina. 470 candidatos con match normalizado; **62 excluidos (13.2%)** por fallar `validar_sdm_vs_ficha()` (tolerancia 6%) — tasa más alta que Trina (4.3%), pero el mismo mecanismo ya identificado: módulos half-cut con sufijo "H" (ej. `JKM335M-72H`), donde el paper tradujo `cells_in_series=144` (conteo físico de medias-celdas) en vez de la profundidad eléctrica real (72, arquitectura de 2 strings en paralelo) — verificado con un caso real (Voc=46.9V real: 46.9/144=0.33V por celda, físicamente implausible; 46.9/72=0.65V, sí es real). Jinko tiene más línea half-cut en su catálogo que Trina, de ahí la tasa de fallo mayor — no es un problema nuevo. Quedaron **408 importados**.
+
+Sin bugs nuevos de código en este import — los scripts ya quedaron corregidos con JA Solar/Trina (sección 39). Confirmado: 0 paneles Jinko con tecnología vacía.
+
+Suite completa: 942/942 (1024.66s / 17 min con el catálogo de 2.017 paneles). Catálogo final: 76 originales + 278 JA Solar + 1.255 Trina Solar + 408 Jinko Solar. Ver `DIAGNOSTICO_CATALOGO_JINKO_NREL.md`.
+
+────────────────────────────────────────────────────────────
+
 ## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
 
 El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de
