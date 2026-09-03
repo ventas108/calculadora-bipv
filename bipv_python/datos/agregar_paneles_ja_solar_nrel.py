@@ -149,7 +149,14 @@ def main():
 
     wb = openpyxl.load_workbook(EXCEL)
     ws = wb[SHEET]
-    headers = [str(ws.cell(1, c).value).strip() if ws.cell(1, c).value else "" for c in range(1, ws.max_column + 1)]
+    # SIN .strip() a proposito: el encabezado real tiene "Tecnologia " con
+    # espacio al final -- bug real encontrado el 3-sep-2026 (ver
+    # DIAGNOSTICO_CATALOGO_TRINA_NREL.md): con .strip() aqui, col_idx
+    # quedaba con la clave "Tecnologia" (sin espacio) que nunca coincidia
+    # con "Tecnologia " del dict de la fila, y esa columna se escribia en
+    # blanco para las 278 filas de este import sin ningun aviso. ENCABEZADO
+    # ya usa las cadenas EXACTAS del archivo real, con o sin espacio.
+    headers = [str(ws.cell(1, c).value) if ws.cell(1, c).value else "" for c in range(1, ws.max_column + 1)]
     col_idx = {h: i + 1 for i, h in enumerate(headers)}
     col_modelo = col_idx["TipoPanel"]
 
@@ -174,6 +181,7 @@ def main():
         target_row = ws.max_row + 1
         for col_name, value in fila.items():
             if col_name not in col_idx:
+                print(f"  AVISO: columna '{col_name}' no encontrada en el catalogo real (se omite)")
                 continue
             ws.cell(row=target_row, column=col_idx[col_name], value=value)
         agregados += 1

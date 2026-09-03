@@ -2945,6 +2945,20 @@ Suite completa: 942/942 (verificado por archivo; la corrida completa en un solo 
 
 ────────────────────────────────────────────────────────────
 
+## 39. Anexo — Actualizaciones del 3 de septiembre de 2026 (catálogo ampliado con 1.255 paneles reales de Trina Solar; bug real: columna Tecnologia escrita en blanco para JA Solar y Trina)
+
+El catálogo de paneles pasó de 354 a **1.609** — 1.255 módulos reales de Trina Solar, mismas 2 fuentes que JA Solar (NREL/SAM `CEC Modules.csv` + paper Deville et al. 2025). El cruce por nombre exacto solo encontraba 269 módulos Trina; normalizando (quitando puntuación) subió a 1.312 — investigado con 2 casos reales contra ficha oficial de Trina para descartar colisiones falsas: la diferencia de puntuación NO es señal de colisión por sí sola (solo 57 de 960 pares con ese patrón fallan la auditoría física real). De los 1.312, se excluyeron 57 que fallan `validar_sdm_vs_ficha()` (tolerancia 6%) — algunos por error de traducción del paper en arquitecturas de alta potencia con strings en paralelo, otros por dato propio de CEC que no coincide con el fabricante. Quedaron **1.255 importados**.
+
+**Bug real encontrado y corregido (afecta también a JA Solar retroactivamente)**: los scripts de import (`agregar_paneles_ja_solar_nrel.py`, `agregar_paneles_trina_nrel.py`) construían el mapa de columnas con `.strip()` sobre los encabezados — pero la columna real que usa el cargador de producción es `"Tecnologia "` (con un espacio al final, typo histórico del Excel). Al stripear, esa clave nunca coincidía y la columna se escribía **en blanco, sin ningún aviso**, tanto para los 278 de JA Solar como para los 1.255 de Trina — 1.533 filas en total con `tecnologia='nan'` según `cargar_catalogo_paneles()`. La columna gemela con tilde (`"Tecnología"`) sí tenía el dato correcto, pero el cargador nunca llegaba a usarla como respaldo porque la columna primaria "existía" (vacía), no faltaba.
+
+**Corregido en 2 partes**: (1) se repararon las 1.533 filas ya escritas en el Excel real, copiando el valor correcto desde la columna con tilde; (2) ambos scripts ahora construyen el mapa de columnas SIN `.strip()` y avisan explícitamente (`AVISO: columna '...' no encontrada`) si algo no mapea — para que este tipo de problema nunca vuelva a pasar en silencio.
+
+⚠️ **Para no cometer errores**: si un import futuro a este catálogo Excel muestra paneles con tecnología vacía o `nan`, revisar primero si hay un problema de mapeo de columnas por espacios/tildes en los encabezados — ya pasó dos veces seguidas el mismo día.
+
+Suite completa: 942/942 (785s / 13 min con el catálogo de 1.609 paneles — `comparar_paneles()` completo mide 89.4s reales por llamada). Catálogo final: 76 originales + 278 JA Solar + 1.255 Trina Solar. Ver `DIAGNOSTICO_CATALOGO_TRINA_NREL.md`.
+
+────────────────────────────────────────────────────────────
+
 ## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
 
 El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de

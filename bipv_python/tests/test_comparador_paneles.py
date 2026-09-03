@@ -38,8 +38,13 @@ def test_paneles_excluidos_por_ficha_incompleta_refleja_el_catalogo_real():
     # optimization/variables.py) -- este NO es un catálogo con menos fichas
     # completas, es el mismo filtro real detectando un hueco de datos real
     # que antes no existía en ningún panel del catálogo Excel.
+    #
+    # ACTUALIZADO otra vez (3-sep-2026, mismo día): tras importar 1.255
+    # paneles reales de Trina Solar (datos/agregar_paneles_trina_nrel.py,
+    # mismas 2 fuentes), 437 más sin dimensiones -- 115 (JA Solar) + 437
+    # (Trina) = 552 excluidos reales hoy.
     excluidos = paneles_excluidos_por_ficha_incompleta()
-    assert len(excluidos) == 115
+    assert len(excluidos) == 552
     # Los 7 ASP-ST1 (con SDM calibrado, dimensiones reales) nunca deben
     # aparecer excluidos -- si alguno lo hiciera, sería una regresión real
     # de datos, no del import de JA Solar.
