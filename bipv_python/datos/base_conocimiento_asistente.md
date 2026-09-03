@@ -2983,6 +2983,16 @@ Suite completa: 942/942 (1081.66s / 18 min con el catálogo de 2.397 paneles). C
 
 ────────────────────────────────────────────────────────────
 
+## 42. Anexo — Actualizaciones del 3 de septiembre de 2026 (catálogo ampliado con 244 paneles reales de LONGi — cierre de los 5 fabricantes Tier 1)
+
+El catálogo de paneles pasó de 2.397 a **2.641** — 244 módulos reales de LONGi, mismas 2 fuentes. **Único de los 5 fabricantes importados hoy con 0 exclusiones eléctricas** (0/244 fuera de tolerancia real, 0 en revisión >2%) — pero también la peor cobertura de dimensiones: 209/244 (86%) sin `Length`/`Width`, verificado real en la fuente (consistente con el 14% de cobertura visto en el sondeo inicial de mercado).
+
+Sin bugs nuevos de código. Con este import quedan cubiertos los **5 fabricantes Tier 1** confirmados como dominantes en el mercado colombiano: Jinko (408), LONGi (244), Trina (1.255), Canadian Solar (380), JA Solar (278) — 2.565 paneles reales de marcas Tier 1.
+
+Suite completa: 942/942 (1133.28s / 19 min con el catálogo de 2.641 paneles). Ver `DIAGNOSTICO_CATALOGO_LONGI_NREL.md`.
+
+────────────────────────────────────────────────────────────
+
 ## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
 
 El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de
