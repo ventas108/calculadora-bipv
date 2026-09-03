@@ -2969,6 +2969,20 @@ Suite completa: 942/942 (1024.66s / 17 min con el catálogo de 2.017 paneles). C
 
 ────────────────────────────────────────────────────────────
 
+## 41. Anexo — Actualizaciones del 3 de septiembre de 2026 (catálogo ampliado con 380 paneles reales de Canadian Solar)
+
+El catálogo de paneles pasó de 2.017 a **2.397** — 380 módulos reales de Canadian Solar, mismas 2 fuentes. Hallazgo real: buscar "Canadian Solar" literal en las fuentes no da nada — el nombre legal real que usan ambas es **"CSI Solar Co Ltd"** (el brazo manufacturero de Canadian Solar Inc., confirmado por investigación de mercado el mismo día). El script filtra por ese nombre real.
+
+**Auditoría**: 384 candidatos con match normalizado; solo **4 excluidos (1%)** — el lote más limpio en tolerancia eléctrica de los 4 fabricantes importados hoy (vs. 4.3% Trina, 13.2% Jinko). Los 4 (familia `CS6X-3XXP`) son sobrepasos menores de ajuste, sin el patrón half-cut de Trina/Jinko. Quedaron **380 importados**.
+
+**El hueco más grande de dimensiones hasta ahora**: 310/384 (81%) sin `Length`/`Width` en CEC, solo área total — verificado directo en la fuente, no un error del script. Tasa más alta de los 4 fabricantes (JA Solar 41%, Trina 35%, Jinko 23%, Canadian Solar 81%).
+
+Sin bugs nuevos de código — reutiliza el patrón ya corregido en la sección 39.
+
+Suite completa: 942/942 (1081.66s / 18 min con el catálogo de 2.397 paneles). Catálogo final: 76 originales + 278 JA Solar + 1.255 Trina Solar + 408 Jinko Solar + 380 Canadian Solar. Con esto quedan cubiertos 4 de los 5 fabricantes Tier 1 confirmados como dominantes en Colombia (falta LONGi). Ver `DIAGNOSTICO_CATALOGO_CANADIAN_NREL.md`.
+
+────────────────────────────────────────────────────────────
+
 ## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
 
 El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de

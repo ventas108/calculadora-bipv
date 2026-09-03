@@ -46,10 +46,15 @@ def test_paneles_excluidos_por_ficha_incompleta_refleja_el_catalogo_real():
     #
     # ACTUALIZADO otra vez (3-sep-2026, mismo día): tras importar 408
     # paneles reales de Jinko Solar (datos/agregar_paneles_jinko_nrel.py,
-    # mismas 2 fuentes), 95 más sin dimensiones -- 552 + 95 = 647 excluidos
-    # reales hoy.
+    # mismas 2 fuentes), 95 más sin dimensiones -- 552 + 95 = 647 excluidos.
+    #
+    # ACTUALIZADO otra vez (3-sep-2026, mismo día): tras importar 380
+    # paneles reales de Canadian Solar (datos/agregar_paneles_canadian_nrel.py,
+    # mismas 2 fuentes -- fabricante real "CSI Solar Co Ltd"), 310 más sin
+    # dimensiones (81% de este lote, el más alto hasta ahora, verificado
+    # real en la fuente) -- 647 + 310 = 957 excluidos reales hoy.
     excluidos = paneles_excluidos_por_ficha_incompleta()
-    assert len(excluidos) == 647
+    assert len(excluidos) == 957
     # Los 7 ASP-ST1 (con SDM calibrado, dimensiones reales) nunca deben
     # aparecer excluidos -- si alguno lo hiciera, sería una regresión real
     # de datos, no del import de JA Solar.
