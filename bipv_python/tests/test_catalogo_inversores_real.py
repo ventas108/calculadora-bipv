@@ -249,16 +249,26 @@ def test_inversores_excluidos_por_ficha_incompleta_detecta_los_3_incompletos():
 
 
 def test_inversores_excluidos_por_ficha_incompleta_refleja_el_catalogo_real():
-    # Verificado 4-sep-2026 tras importar 2.343 inversores reales del
-    # dataset Sandia/CEC de NREL (datos/agregar_inversores_cec_nrel.py):
-    # TODOS quedan sin datos mecánicos (N_mppt/corriente por tracker), más
-    # 4 inversores YA existentes que también estaban incompletos
-    # (POWEST-1KVA-12V, POWEST-3KVA-24V, LSP 100K, Woodward IDS SOLO 500) --
-    # 2.343 + 4 = 2.347 excluidos reales hoy. Ver
-    # DIAGNOSTICO_CATALOGO_INVERSORES_CEC_NREL.md.
+    # Actualizado 4-sep-2026, mismo día, sesión posterior: el import masivo
+    # CEC/Sandia (2.343 inversores sin datos mecánicos, ver comentario que
+    # tenía este test antes) resultó impráctico en producción -- ficha sin
+    # datos mecánicos + catálogo 23x más grande volvía lento e inútil el
+    # selector de 📐 Dimensionamiento (2.455 opciones, la inmensa mayoría no
+    # evaluables). Se limpió el catálogo real (datos/inversores_catalogo.xlsx)
+    # a las 111 filas con "Datos completos"="Si" -- ver DIAGNOSTICO_TZ_TMY_
+    # SCRIPTS_URABA.md / progreso.md de esa sesión para el detalle completo.
+    #
+    # De esos 111, 3 siguen sin pasar ESTE filtro más estricto (Vdc_max +
+    # Vmppt_max + Isc/I_max_tracker + N_mppt/n_trackers): POWEST-1KVA-12V,
+    # POWEST-3KVA-24V, LSP 100K -- estaban marcados "Si" en el Excel pero de
+    # todas formas les falta un campo de este subconjunto. Woodward IDS
+    # SOLO 500 (el 4to que aparecía en la lista anterior) ya no está en el
+    # catálogo: tenía "Datos completos"="No" y se eliminó en la misma
+    # limpieza -- recuperable desde el historial de git si se decide
+    # completar su ficha y reincorporarlo.
     from calculos.comparador_inversores import inversores_excluidos_por_ficha_incompleta
     excluidos = inversores_excluidos_por_ficha_incompleta()
-    assert len(excluidos) == 2347
+    assert set(excluidos) == {"POWEST-1KVA-12V", "POWEST-3KVA-24V", "LSP 100K"}
 
 
 # ── catalogo_inversores_excel: desambiguación de clave por colisión real ───
