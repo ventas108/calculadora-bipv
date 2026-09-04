@@ -3047,6 +3047,22 @@ Suite completa: 942/942 (1270.26s / ~21m 10s con el catálogo de 3.127 paneles).
 
 ────────────────────────────────────────────────────────────
 
+## 47. Anexo — Actualizaciones del 4 de septiembre de 2026 (catálogo de INVERSORES ampliado con 2.343 modelos reales del dataset Sandia/CEC de NREL)
+
+Primera ampliación masiva de **inversores** (no paneles): 108 → **2.451**, usando `CEC Inverters.csv` de NREL/SAM (modelo eléctrico Sandia oficial, el mismo que usa `pvlib.inverter.sandia()`).
+
+**Diferencia crítica con los imports de paneles**: el modelo Sandia no incluye los datos MECÁNICOS que exige el chequeo de compatibilidad (`N Trackers`, `N Strings/Tracker`, `Corriente Máxima/Cortocircuito por Tracker`) — a diferencia de paneles, no existe una segunda fuente pública que complete justo eso (investigado: NREL/SAM no la publica; la base .OND completa de PVsyst es propietaria y no está disponible en bloque, solo descargable inversor-por-inversor desde dentro del programa). Por eso los 2.343 nuevos quedan con `Datos completos`="No".
+
+**Fix estructural real** (no solo para este import): se extendió `optimization/variables.py::variable_inversor()` con el mismo filtro que ya tenía `variable_panel()` — excluye del optimizador de Fase 4 cualquier inversor sin `Vdc_max`/`Vmppt_max`/`Isc_max_tracker` o `I_max_tracker`/`N_mppt` o `n_trackers`. Se agregó `calculos/comparador_inversores.py::inversores_excluidos_por_ficha_incompleta()`. Verificado: 4 de los 108 inversores YA existentes (`POWEST-1KVA-12V`, `POWEST-3KVA-24V`, `LSP 100K`, `Woodward IDS SOLO 500`) también estaban incompletos y expuestos al mismo riesgo — este fix los protege también a ellos, no solo a los nuevos.
+
+**Bug real encontrado y corregido**: 19 modelos CEC comparten el mismo string "Modelo" bajo 2 fabricantes distintos (rebadge/OEM real) — el diccionario de `catalogo_inversores_excel.py` los colisionaba en silencio (solo 2.432 de 2.451 sobrevivían). Corregido: desambiguación de clave (`"Modelo [Marca]"`) solo cuando hay colisión real, sin afectar ninguna clave existente.
+
+Verificado en vivo: `filtrar_inversores_compatibles()` contra ASP-ST1-T40/N_serie=8 marca los 2.347 incompletos con motivo "Ficha incompleta", sin colar ningún dato inventado.
+
+Ver `DIAGNOSTICO_CATALOGO_INVERSORES_CEC_NREL.md`.
+
+────────────────────────────────────────────────────────────
+
 ## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
 
 El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de

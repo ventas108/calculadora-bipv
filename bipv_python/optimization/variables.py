@@ -230,13 +230,47 @@ def variable_inversor(catalogo: dict | None = None) -> OptimizationVariable:
     dato real de eficiencia (el datasheet fuente no la reporta para esos
     105 modelos) -- scenario_generator solo sincroniza eta_inversor cuando
     el dato real existe, nunca lo inventa.
+
+    Filtro real, no arbitrario (agregado 4-sep-2026, mismo criterio que
+    variable_panel()): cuando se usa el catálogo por defecto, se excluyen
+    los inversores sin Vdc_max, sin Vmppt_max, sin (Isc_max_tracker o
+    I_max_tracker), o sin (N_mppt o n_trackers) -- son los mismos 4 campos
+    que calculos.comparador_inversores.filtrar_inversores_compatibles() ya
+    exige (`if not (vdc_max and vmppt_max and isc_lim and n_tr)`) para no
+    marcar "Ficha incompleta". Sin este filtro, calculos.dimensionamiento
+    cae en un default silencioso peligroso (`N_mppt or 1`, líneas 548/788)
+    que asumiría 1 solo tracker para un inversor real de 2, 3 o 4 MPPT --
+    el optimizador de Fase 4 podría recomendar un arreglo de strings
+    basado en un dato inventado, no en la ficha real. Encontrado al
+    investigar cómo importar en bloque el catálogo Sandia/CEC de NREL
+    (2.343 inversores reales, datos/agregar_inversores_cec_nrel.py): ese
+    catálogo no trae N_mppt/corriente por tracker (son datos mecánicos,
+    el modelo eléctrico Sandia no los necesita) -- por eso TODOS quedan
+    con "Datos completos"="No" y este filtro los excluye del optimizador
+    hasta completarlos contra una ficha real, en vez de arriesgar una
+    recomendación de stringing incorrecta.
+
+    Verificado el mismo día: 4 de los 108 inversores YA existentes en el
+    catálogo (POWEST-1KVA-12V, POWEST-3KVA-24V, LSP 100K, Woodward IDS
+    SOLO 500) también les faltaba alguno de estos 4 campos -- este filtro
+    los excluye también a ellos, cerrando una exposición real preexistente
+    al mismo bug, no solo previniéndolo para el import nuevo.
     """
     if catalogo is None:
         catalogo = _catalogo_inversores_real()
+        catalogo = {
+            k: v for k, v in catalogo.items()
+            if v.get("Vdc_max") is not None
+            and v.get("Vmppt_max") is not None
+            and (v.get("Isc_max_tracker") is not None or v.get("I_max_tracker") is not None)
+            and (v.get("N_mppt") is not None or v.get("n_trackers") is not None)
+        }
     return OptimizationVariable(
         "inversor", "categorica", opciones=tuple(catalogo.keys()),
         descripcion="Referencia del catálogo real de inversores (Excel si está disponible, "
-                    "si no datos.catalogo_inversores.INVERSORES).",
+                    "si no datos.catalogo_inversores.INVERSORES), solo entradas con ficha "
+                    "eléctrica/mecánica completa (Vdc_max, Vmppt_max, corriente e Isc por "
+                    "tracker, N_mppt).",
     )
 
 

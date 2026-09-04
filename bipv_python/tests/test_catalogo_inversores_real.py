@@ -189,3 +189,131 @@ def test_resolver_usa_el_mismo_catalogo_que_ofrecio_las_opciones(monkeypatch):
     for clave in var.opciones:
         resuelto = _resolver_categoricas_de_catalogo({"inversor": clave})
         assert resuelto["inversor"]["nombre"] == clave
+
+
+# ── variable_inversor(): filtro de ficha completa (4-sep-2026) ─────────────
+# Mismo patrón que variable_panel() (Pmax_stc/area_m2) -- agregado al
+# investigar cómo importar en bloque el catálogo Sandia/CEC de NREL (2.343
+# inversores reales, datos/agregar_inversores_cec_nrel.py): ese dataset no
+# trae N_mppt ni corriente por tracker (son datos mecánicos, el modelo
+# eléctrico Sandia no los necesita) -- sin este filtro, un inversor así
+# entraría al optimizador de Fase 4 y calculos.dimensionamiento le asumiría
+# N_mppt=1 por defecto (líneas 548/788), pudiendo recomendar un arreglo de
+# strings basado en un dato inventado, no en la ficha real.
+
+_CATALOGO_MIXTO_COMPLETITUD = {
+    "Completo-A": {
+        "nombre": "Completo-A", "Vdc_max": 1000.0, "Vmppt_max": 800.0,
+        "Isc_max_tracker": 20.0, "N_mppt": 2.0,
+    },
+    "Completo-B": {
+        "nombre": "Completo-B", "Vdc_max": 1100.0, "Vmppt_max": 900.0,
+        "I_max_tracker": 18.0, "n_trackers": 4.0,
+    },
+    "SinTrackers": {
+        "nombre": "SinTrackers", "Vdc_max": 1000.0, "Vmppt_max": 800.0,
+        "Isc_max_tracker": 20.0,
+        # sin N_mppt ni n_trackers -- exactamente el caso del import CEC/Sandia
+    },
+    "SinCorriente": {
+        "nombre": "SinCorriente", "Vdc_max": 1000.0, "Vmppt_max": 800.0,
+        "N_mppt": 2.0,
+        # sin Isc_max_tracker ni I_max_tracker
+    },
+    "SinVmpptMax": {
+        "nombre": "SinVmpptMax", "Vdc_max": 1000.0,
+        "Isc_max_tracker": 20.0, "N_mppt": 2.0,
+    },
+}
+
+
+def test_variable_inversor_excluye_fichas_sin_datos_mecanicos_completos(monkeypatch):
+    monkeypatch.setitem(sys.modules, "datos.catalogo_inversores_excel", _modulo_excel_falso(_CATALOGO_MIXTO_COMPLETITUD))
+    var = opt_vars.variable_inversor()
+    assert set(var.opciones) == {"Completo-A", "Completo-B"}
+
+
+def test_variable_inversor_con_catalogo_explicito_no_filtra():
+    # Mismo contrato que variable_panel(): pasar un catálogo explícito
+    # desactiva el filtro -- necesario para que
+    # inversores_excluidos_por_ficha_incompleta() pueda ver las entradas
+    # incompletas en vez de que ya vengan quitadas.
+    var = opt_vars.variable_inversor(_CATALOGO_MIXTO_COMPLETITUD)
+    assert set(var.opciones) == set(_CATALOGO_MIXTO_COMPLETITUD.keys())
+
+
+def test_inversores_excluidos_por_ficha_incompleta_detecta_los_3_incompletos():
+    from calculos.comparador_inversores import inversores_excluidos_por_ficha_incompleta
+    excluidos = inversores_excluidos_por_ficha_incompleta(_CATALOGO_MIXTO_COMPLETITUD)
+    assert set(excluidos) == {"SinTrackers", "SinCorriente", "SinVmpptMax"}
+
+
+def test_inversores_excluidos_por_ficha_incompleta_refleja_el_catalogo_real():
+    # Verificado 4-sep-2026 tras importar 2.343 inversores reales del
+    # dataset Sandia/CEC de NREL (datos/agregar_inversores_cec_nrel.py):
+    # TODOS quedan sin datos mecánicos (N_mppt/corriente por tracker), más
+    # 4 inversores YA existentes que también estaban incompletos
+    # (POWEST-1KVA-12V, POWEST-3KVA-24V, LSP 100K, Woodward IDS SOLO 500) --
+    # 2.343 + 4 = 2.347 excluidos reales hoy. Ver
+    # DIAGNOSTICO_CATALOGO_INVERSORES_CEC_NREL.md.
+    from calculos.comparador_inversores import inversores_excluidos_por_ficha_incompleta
+    excluidos = inversores_excluidos_por_ficha_incompleta()
+    assert len(excluidos) == 2347
+
+
+# ── catalogo_inversores_excel: desambiguación de clave por colisión real ───
+# Bug real encontrado 4-sep-2026 durante el import CEC: 19 modelos del
+# dataset comparten el mismo string "Modelo" bajo 2 fabricantes distintos
+# (rebadge/OEM real, ej. "MIN 10000TL-XH-US {240V}") -- el diccionario se
+# armaba con "Modelo" a secas como clave, así que un fabricante pisaba al
+# otro en silencio (2.343 filas escritas al Excel, solo 2.324 sobrevivían
+# en el dict). Corregido: desambiguación con "Modelo [Marca]" SOLO cuando
+# hay colisión real -- este test usa el Excel real de fixtures, no un mock,
+# porque el bug vivía en la lectura del propio archivo (pd.read_excel +
+# construcción del dict), no en una función aislada mockeable.
+
+def test_cargar_catalogo_inversores_desambigua_modelos_duplicados_entre_marcas():
+    import openpyxl
+    import tempfile
+    import os
+    from datos.catalogo_inversores_excel import cargar_catalogo_inversores as _cargar_real
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Catalogo_Inversores"
+    ws.append(["placeholder fila 1"])
+    ws.append(["placeholder fila 2"])
+    ws.append([
+        "Datos completos (Si/No)", "Modelo", "Costo Inversor ", "Archivo origen",
+        "Tension DC Maxima (V)", "Tension Arranque (V)", "Rango MPPT Min (V)",
+        "Rango MPPT Max (V)", "Tension Minima MPPT Activo (V)", "N Trackers",
+        "N Strings/Tracker", "Corriente Maxima Tracker (A)",
+        "Corriente Cortocircuito Max Tracker (A)", "Potencia FV Max Recomendada (W)",
+        "Potencia AC nominal (kW)", "Marca",
+    ])
+    # Mismo "Modelo" bajo 2 marcas distintas -- el caso real encontrado.
+    ws.append(["Si", "MISMO-MODELO", 100, "test", 1000, 200, 100, 900, 300, 2, 1, 20, 25, 5000, 5.0, "MarcaA"])
+    ws.append(["Si", "MISMO-MODELO", 200, "test", 1100, 250, 150, 950, 350, 4, 1, 18, 22, 6000, 6.0, "MarcaB"])
+    # Un tercer modelo sin colisión -- su clave NO debe cambiar.
+    ws.append(["Si", "UNICO", 300, "test", 900, 180, 90, 800, 250, 1, 1, 15, 18, 4000, 4.0, "MarcaC"])
+
+    with tempfile.TemporaryDirectory() as tmp:
+        ruta = os.path.join(tmp, "inversores_test.xlsx")
+        wb.save(ruta)
+        import datos.catalogo_inversores_excel as mod
+        _orig_excel = mod._EXCEL
+        mod._EXCEL = ruta
+        try:
+            _cargar_real.clear()
+            cat = _cargar_real()
+        finally:
+            mod._EXCEL = _orig_excel
+            _cargar_real.clear()
+
+    assert "MISMO-MODELO [MarcaA]" in cat
+    assert "MISMO-MODELO [MarcaB]" in cat
+    assert cat["MISMO-MODELO [MarcaA]"]["costo_usd"] == 100
+    assert cat["MISMO-MODELO [MarcaB]"]["costo_usd"] == 200
+    # El modelo sin colisión conserva su clave simple, sin sufijo de marca.
+    assert "UNICO" in cat
+    assert len(cat) == 3

@@ -49,6 +49,16 @@ def _cargar_catalogo_inversores_cached(mtime: float) -> dict:
     # excluye los args "_x" del hashing y el mtime no invalidaría nada.
     df = pd.read_excel(_EXCEL, sheet_name=_SHEET, header=2)
     df.columns = [str(c).strip() for c in df.columns]
+    # Bug real encontrado (4-sep-2026) al importar 2.343 inversores reales
+    # del modelo Sandia/CEC de NREL/SAM (datos/agregar_inversores_cec_nrel.py):
+    # el diccionario se armaba con "Modelo" a secas como clave -- 19 modelos
+    # de ese lote son el MISMO string de modelo bajo 2 fabricantes distintos
+    # (ej. rebadge/OEM real, "MIN 10000TL-XH-US {240V}"), así que uno pisaba
+    # al otro en silencio (2.343 filas escritas al Excel, pero solo 2.324
+    # sobrevivían en este dict). Se desambigua SOLO cuando hay colisión real
+    # -- las claves sin colisión (la inmensa mayoría, incluidos los 108
+    # inversores previos) quedan exactamente igual que antes.
+    _conteo_modelo = df.get("Modelo", pd.Series(dtype=str)).astype(str).str.strip().value_counts()
     inversores = {}
     for _, r in df.iterrows():
         modelo = str(r.get("Modelo", "")).strip()
@@ -62,7 +72,9 @@ def _cargar_catalogo_inversores_cached(mtime: float) -> dict:
         _p_ac_nom_W  = (_p_ac_nom_kW * 1000) if _p_ac_nom_kW else (
             _p_dc_max_W * 0.96 if _p_dc_max_W else None
         )
-        inversores[modelo] = {
+        _marca = str(r.get("Marca", "")).strip()
+        clave = f"{modelo} [{_marca}]" if _conteo_modelo.get(modelo, 0) > 1 and _marca else modelo
+        inversores[clave] = {
             "nombre":            modelo,
             "datos_completos":   completo,
             "costo_usd":         costo if (costo and costo > 0) else None,

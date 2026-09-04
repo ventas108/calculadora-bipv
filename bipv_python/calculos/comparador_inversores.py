@@ -116,6 +116,36 @@ def filtrar_inversores_compatibles(
     ).reset_index(drop=True)
 
 
+def inversores_excluidos_por_ficha_incompleta(catalogo: dict | None = None) -> list[str]:
+    """Nombres de inversores que optimization.variables.variable_inversor()
+    excluye del optimizador de Fase 4 por no traer Vdc_max, Vmppt_max,
+    (Isc_max_tracker o I_max_tracker), o (N_mppt o n_trackers) -- mismo
+    patrón que calculos.comparador_paneles.paneles_excluidos_por_ficha_incompleta().
+
+    No reusa variable_inversor(catalogo) aquí a propósito, mismo motivo que
+    la función homóloga de paneles: su filtro solo se aplica cuando NO se
+    pasa un catálogo explícito.
+
+    Agregada el 4-sep-2026 junto con el filtro real de variable_inversor()
+    -- antes de esto, un inversor con ficha incompleta simplemente
+    desaparecía en silencio del optimizador (o peor, calculos.dimensionamiento
+    le asumía N_mppt=1 por defecto) sin que el usuario supiera por qué. Ver
+    el docstring de variable_inversor() para el detalle completo, incluidos
+    los 4 inversores YA existentes en el catálogo (antes del import masivo
+    de CEC/NREL) que también caían en este filtro.
+    """
+    if catalogo is None:
+        from optimization.variables import _catalogo_inversores_real
+        catalogo = _catalogo_inversores_real()
+    return [
+        k for k, v in catalogo.items()
+        if v.get("Vdc_max") is None
+        or v.get("Vmppt_max") is None
+        or (v.get("Isc_max_tracker") is None and v.get("I_max_tracker") is None)
+        or (v.get("N_mppt") is None and v.get("n_trackers") is None)
+    ]
+
+
 def unidades_necesarias(n_strings_total: int, strings_max_por_equipo: int) -> int:
     """Número de inversores para alojar todos los strings (entradas)."""
     if strings_max_por_equipo <= 0:
