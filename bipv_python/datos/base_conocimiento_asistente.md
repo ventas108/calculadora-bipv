@@ -3063,6 +3063,18 @@ Ver `DIAGNOSTICO_CATALOGO_INVERSORES_CEC_NREL.md`.
 
 ────────────────────────────────────────────────────────────
 
+## 48. Anexo — Actualizaciones del 4 de septiembre de 2026 (4 inversores Sungrow con ficha mecánica real completa)
+
+Primer completado real de un fabricante de inversores tras el import masivo CEC/Sandia (sección 47): 4 modelos Sungrow (SG5.0RT/7.0RT/8.0RT/10RT, serie comercial 1000Vdc), con ficha oficial real (info-support.sungrowpower.com, dominio propio del fabricante) — quedan `Datos completos`="Si" y disponibles de inmediato en el optimizador de Fase 4, a diferencia de los 2.343 del import masivo.
+
+Sungrow elegido por evidencia real de mercado en Colombia: ~1.5 GW ya instalados, distribuidor oficial Bemco desde 2026 (expansión a residencial/comercial/industrial), 25 GW entregados en LatAm — más fuerte que Huawei (comprometido, sin cifra instalada) o Deye (entrando recién).
+
+**Decisión de diseño real**: la ficha confirma MPPT asimétrico en 3 de los 4 modelos (MPPT1 real: 2 strings/25A; MPPT2 real: 1 string/12.5A) — el esquema del catálogo solo tiene un campo por inversor (no por MPPT individual), así que se usó el valor más conservador (1 string, 12.5A) para no sobreestimar la capacidad real en el chequeo automático; la asimetría completa queda documentada en Notas para aprovechamiento manual.
+
+Catálogo: 2.451 → 2.455 inversores. Verificado en vivo: `filtrar_inversores_compatibles()` con SG5.0RT da `compatible=True`, `strings_max=2`. Ver `DIAGNOSTICO_INVERSORES_SUNGROW_FICHA_REAL.md`.
+
+────────────────────────────────────────────────────────────
+
 ## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
 
 El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de
