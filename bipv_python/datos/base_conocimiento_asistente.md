@@ -3035,6 +3035,18 @@ Suite completa: 942/942 (1240.98s / ~20m 40s con el catálogo de 3.028 paneles).
 
 ────────────────────────────────────────────────────────────
 
+## 46. Anexo — Actualizaciones del 3 de septiembre de 2026 (catálogo ampliado con 99 paneles reales de ZNSHINE)
+
+El catálogo de paneles pasó de 3.028 a **3.127** — 99 módulos reales de ZNSHINE. Se evaluó primero LG Electronics (proyecto real confirmado: Universidad EAN, Bogotá, instalación NeON2 operativa), pero el usuario objetó correctamente: LG salió del negocio de fabricación de paneles solares en 2022 — sin fabricante activo, sin garantía ni reposición real hoy. Se descartó.
+
+ZNSHINE resultó el candidato con mejor evidencia: oficina propia confirmada en Bogotá, 6 distribuidores colombianos nombrados y activos (Energitel Solar, Emergente Energía Sostenible, Ferragro, Solar On Colombia, Eco Green Solar, Colpilastiendasolar), fabricante actualmente activo, y aparece directamente en el listado real de marcas Tier-1 que comercializan los mayoristas colombianos en 2026 junto a los 6 fabricantes ya en el catálogo.
+
+99 candidatos, **0 excluidos** por tolerancia SDM — lote más limpio junto con LONGi. 76/99 (77%) sin dimensiones.
+
+Suite completa: 942/942 (1270.26s / ~21m 10s con el catálogo de 3.127 paneles). Catálogo final: 76 originales + 278 JA Solar + 1.255 Trina + 408 Jinko + 380 Canadian Solar + 244 LONGi + 170 First Solar + 80 SunPower + 137 Risen Energy + 99 ZNSHINE. Ver `DIAGNOSTICO_CATALOGO_ZNSHINE_NREL.md`.
+
+────────────────────────────────────────────────────────────
+
 ## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
 
 El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de

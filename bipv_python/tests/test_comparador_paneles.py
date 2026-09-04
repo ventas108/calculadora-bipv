@@ -83,8 +83,14 @@ def test_paneles_excluidos_por_ficha_incompleta_refleja_el_catalogo_real():
     # 11 candidatos excluidos por tolerancia SDM: mismo patrón half-cut
     # ya documentado en Trina/Jinko (RSM120-6/RSM144-6, V/celda≈0.33-
     # 0.34V, la mitad de lo real). Ver DIAGNOSTICO_CATALOGO_RISEN_NREL.md.
+    #
+    # ACTUALIZADO otra vez (3-sep-2026, mismo día): tras importar 99
+    # paneles reales de ZNSHINE (datos/agregar_paneles_znshine_nrel.py),
+    # 76 más sin dimensiones -- 1.430 + 76 = 1.506 excluidos reales hoy.
+    # 0 candidatos excluidos por tolerancia SDM -- lote más limpio junto
+    # con LONGi. Ver DIAGNOSTICO_CATALOGO_ZNSHINE_NREL.md.
     excluidos = paneles_excluidos_por_ficha_incompleta()
-    assert len(excluidos) == 1430
+    assert len(excluidos) == 1506
     # Los 7 ASP-ST1 (con SDM calibrado, dimensiones reales) nunca deben
     # aparecer excluidos -- si alguno lo hiciera, sería una regresión real
     # de datos, no del import de JA Solar.
