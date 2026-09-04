@@ -37,6 +37,15 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    # Límite de seguridad agregado 4-sep-2026: sin esto, GitHub aplica su
+    # default (360 min) antes de marcar el job como fallo si algo se cuelga
+    # de verdad. Auditoría real ese día (14 corridas consecutivas exitosas,
+    # 5-93 min) mostró que la duración varía mucho por contención del
+    # runner compartido gratuito -- no por el tamaño del catálogo (local se
+    # mantuvo estable en ~20-21 min con el mismo catálogo creciendo). 180
+    # min da margen generoso sobre el máximo real observado (93 min) sin
+    # dejar un colgado genuino corriendo silenciosamente por horas.
+    timeout-minutes: 180
     defaults:
       run:
         working-directory: bipv_python
