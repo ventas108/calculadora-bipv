@@ -3089,6 +3089,18 @@ El usuario reportó (con 3 capturas reales del proyecto Teusaquillo) que `T_mín
 
 ────────────────────────────────────────────────────────────
 
+## 50. Anexo — Actualizaciones del 4 de septiembre de 2026 (causa real de la lentitud de CI: catálogo unido sin caché en el muestreo de candidatos)
+
+El usuario notó que el CI venía tardando cada vez más (5→93 min en 14 corridas del día) y pidió auditar a fondo, con token real de solo lectura para ver logs crudos. Se encontró que 3 tests de `test_optimization_fase4.py` explicaban solos ~42 de los ~64 min de una corrida: `test_generar_candidatos_con_panel_e_inversor_varia_ambos` (1198.5s en CI vs 27.5s local), y 2 más — un factor ~44x, muy por encima del 2-5x normal del resto de la suite.
+
+**Causa real**: `optimization/variables.py::_catalogo_paneles_real()`/`_catalogo_inversores_real()` reconstruían el diccionario unido completo (hasta ~3.100 paneles/~2.450 inversores) en CADA llamada, y `_resolver_categoricas_de_catalogo()` las llama en CADA intento del muestreo de `generar_candidatos()` (hasta 1.800 veces por test). Trabajo puro de Python sin vectorizar — el tipo de carga que un runner compartido más débil penaliza mucho más que un desktop local.
+
+**Fix**: caché real por `mtime` del Excel (mismo patrón #26 ya usado en inversores; se agregó el helper `excel_mtime()` faltante para paneles). **Bug real encontrado en la primera versión del fix**: una clave de caché fija cuando el módulo está mockeado rompía el aislamiento entre tests con catálogos falsos distintos (6 tests fallaron). Corregido: sin módulo real disponible, se evita el caché por completo en vez de usar una clave inventada.
+
+Resultado: los 3 tests lentos pasaron de 56s a <1s combinados en local; el archivo completo de 62s a 7s. Ningún dato físico ni tolerancia de test cambió — es puramente una corrección de rendimiento interno. Ver `DIAGNOSTICO_CACHE_CATALOGO_UNIDO_SCENARIO_GENERATOR.md`.
+
+────────────────────────────────────────────────────────────
+
 ## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
 
 El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de

@@ -35,6 +35,22 @@ def _parse_area(dims):
     m = re.search(r'(\d+)\s*[xX×]\s*(\d+)', str(dims))
     return round(float(m.group(1)) * float(m.group(2)) / 1e6, 4) if m else None
 
+
+def excel_mtime() -> float:
+    """mtime del Excel de paneles -- mismo patrón #26 que ya usa
+    datos/catalogo_inversores_excel.py::excel_mtime_inv(). Agregado
+    4-sep-2026 para que optimization.variables._catalogo_paneles_real()
+    (y su equivalente de inversores) puedan cachear el catálogo UNIDO sin
+    reconstruirlo en cada llamada -- ver auditoría de rendimiento de CI en
+    DIAGNOSTICO_CACHE_CATALOGO_UNIDO_SCENARIO_GENERATOR.md: sin esto,
+    generar_candidatos() rehacía la unión completa (hasta ~3.100 paneles)
+    en cada intento del muestreo (hasta 1.800 veces en un solo test)."""
+    try:
+        return _os.path.getmtime(_EXCEL)
+    except OSError:
+        return 0.0
+
+
 @st.cache_data(ttl=3600)
 def cargar_catalogo_paneles() -> dict:
     df = pd.read_excel(_EXCEL, sheet_name=_SHEET, header=0)

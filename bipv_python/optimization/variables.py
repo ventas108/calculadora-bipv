@@ -13,6 +13,7 @@ este contrato explícito, cualquier optimizador tendría que adivinarlo o un
 agente de IA tendría que "inventar" límites — exactamente el tipo de
 alucinación que el plan original identificó como el riesgo a evitar.
 """
+import functools
 from dataclasses import dataclass
 from typing import Literal
 
@@ -108,7 +109,45 @@ def _catalogo_paneles_real() -> dict:
     _catalogo_inversores_real(): optimization/ se mantiene sin depender de
     streamlit -- si el Excel no carga, se usa solo el catálogo chico
     (comportamiento anterior a esta función, sin romper nada).
+
+    Cacheada por mtime del Excel desde 4-sep-2026 (ver
+    DIAGNOSTICO_CACHE_CATALOGO_UNIDO_SCENARIO_GENERATOR.md): sin esto, la
+    unión completa (hasta ~3.100 paneles) se reconstruía en cada llamada --
+    y optimization.scenario_generator._resolver_categoricas_de_catalogo()
+    la llama en CADA intento del muestreo de generar_candidatos() (hasta
+    1.800 veces en un solo test), un costo puramente de asignación de
+    objetos Python que un CPU compartido más débil penaliza mucho más que
+    un desktop local (auditado: 44x más lento en CI que en local para ese
+    camino específico). No cambia ningún dato ni criterio físico -- solo
+    evita reconstruir el mismo resultado determinista una y otra vez.
+
+    Bug real encontrado y corregido AL MISMO TIEMPO que se agregó este
+    caché (mismo día): si el módulo real datos.catalogo_paneles_excel no
+    está disponible (import falla) se cae directo a la versión SIN CACHÉ
+    -- nunca con una clave "0.0" inventada. Un fallback a una clave fija
+    habría hecho que TODOS los catálogos falsos que los tests monkeypatchean
+    en sys.modules (varios distintos, en varios tests) colisionaran en el
+    mismo slot de caché -- un test recibiría el catálogo falso de OTRO
+    test que corrió antes. Detectado de inmediato: 6 tests de
+    tests/test_catalogo_inversores_real.py fallaron con exactamente ese
+    síntoma al implementar la primera versión de este fix.
     """
+    try:
+        from datos.catalogo_paneles_excel import excel_mtime
+        _mtime = excel_mtime()
+    except Exception:
+        return _construir_catalogo_paneles_real()
+    return _catalogo_paneles_real_cached(_mtime)
+
+
+@functools.lru_cache(maxsize=4)
+def _catalogo_paneles_real_cached(_mtime: float) -> dict:
+    # _mtime SOLO es la clave de caché (invalida sola si el Excel cambia en
+    # disco, patrón #26 ya usado por catalogo_inversores_excel.py).
+    return _construir_catalogo_paneles_real()
+
+
+def _construir_catalogo_paneles_real() -> dict:
     from datos.tecnologias_bipv import MODULOS_BIPV
     catalogo = dict(MODULOS_BIPV)
     try:
@@ -201,7 +240,36 @@ def _catalogo_inversores_real() -> dict:
     en las entradas del Excel que no lo traigan, para que un consumidor
     (p.ej. scenario_generator, sus tests) no tenga que conocer cuál de las
     dos fuentes resolvió cada candidato.
+
+    Cacheada por mtime del Excel desde 4-sep-2026 -- mismo motivo y mismo
+    patrón que _catalogo_paneles_real() (ver su docstring): sin esto, este
+    diccionario (hasta ~2.450 inversores) se reconstruía en cada intento
+    del muestreo de generar_candidatos(), auditado como el cuello de
+    botella real detrás de la lentitud de CI (44x más lento que en local
+    para ese camino específico). No cambia ningún dato ni criterio físico.
+
+    Mismo bug real evitado que en _catalogo_paneles_real() (ver su
+    docstring): si el módulo real no está disponible (import falla,
+    incluido cuando un test lo reemplaza en sys.modules) se cae directo a
+    la versión SIN CACHÉ -- nunca con una clave "0.0" inventada que
+    colisionaría entre distintos catálogos falsos de distintos tests.
     """
+    try:
+        from datos.catalogo_inversores_excel import excel_mtime_inv
+        _mtime = excel_mtime_inv()
+    except Exception:
+        return _construir_catalogo_inversores_real()
+    return _catalogo_inversores_real_cached(_mtime)
+
+
+@functools.lru_cache(maxsize=4)
+def _catalogo_inversores_real_cached(_mtime: float) -> dict:
+    # _mtime SOLO es la clave de caché (invalida sola si el Excel cambia en
+    # disco, patrón #26) -- no se usa dentro de la función.
+    return _construir_catalogo_inversores_real()
+
+
+def _construir_catalogo_inversores_real() -> dict:
     try:
         from datos.catalogo_inversores_excel import cargar_catalogo_inversores
         catalogo = cargar_catalogo_inversores()
