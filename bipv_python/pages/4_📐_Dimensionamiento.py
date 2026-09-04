@@ -28,6 +28,7 @@ from datos.catalogo_inversores_excel import (
     cargar_catalogo_inversores as _cargar_cat_inv,
 )
 from datos.catalogo_inversores import INVERSORES, seleccionar_inversor
+from datos.ciudades_colombia import CIUDADES
 from calculos.panel_iv_check import analizar_panel_motiv as _check_iv_dim
 from calculos.compatibilidad_bateria import check_compatibilidad as _check_compat_bateria_dim
 
@@ -223,9 +224,26 @@ with col2:
     # No pasar value= junto con key= cuando session_state ya trae el valor:
     # Streamlit advierte "created with a default value but also had its value
     # set via the Session State API". Se siembra el default solo si falta.
-    st.session_state.setdefault("T_min_diseno", -5.0)
-    st.session_state.setdefault("T_cel_realista", 36.35)
-    st.session_state.setdefault("T_cel_extremo", 41.94)
+    #
+    # Bug real encontrado y corregido (4-sep-2026, ver
+    # FANTASMA NEGATIVO Y POSITIVO EN TEMPERATURA BMODULO PRODUCCION.docx):
+    # los 3 defaults eran valores mágicos fijos (-5.0/36.35/41.94) que
+    # coincidían por casualidad con 2 de los 3 reales de Bogotá (T_cel_
+    # realista/extremo), pero NO con T_min_diseno (el real de Bogotá en
+    # datos/ciudades_colombia.py es 5.0, no -5.0 -- quedó desincronizado del
+    # fix que ya corrigió ese mismo valor ahí). Para cualquier otra ciudad
+    # los 3 eran directamente incorrectos (ej. Cali real: 12.0/47.0/55.0).
+    # Se mostraban/usaban en cálculos reales (Voc_max, compatibilidad de
+    # string) cada vez que el usuario abría esta página ANTES de que
+    # ☀️ Recurso Solar cacheara el TMY completo (tmy_df en session_state) --
+    # el bloque de arriba solo recalcula desde el TMY real cuando ya existe.
+    # Corregido: el placeholder ahora es el valor real de la ciudad activa
+    # (mismo dato que ya usa 🏠 Proyecto), no un número universal inventado.
+    _ciudad_activa_dim = st.session_state.get("ciudad", "Bogotá")
+    _ciudad_defaults = CIUDADES.get(_ciudad_activa_dim, CIUDADES.get("Bogotá", {}))
+    st.session_state.setdefault("T_min_diseno", _ciudad_defaults.get("T_min_diseno", 5.0))
+    st.session_state.setdefault("T_cel_realista", _ciudad_defaults.get("T_cel_realista", 36.35))
+    st.session_state.setdefault("T_cel_extremo", _ciudad_defaults.get("T_cel_extremo", 41.94))
     T_frio   = st.number_input("T_mín diseño (°C)", key="T_min_diseno",
                 help="Auto-calculado como mínimo histórico del TMY. Determina Voc_max y riesgo sobre Vdc_max del inversor.")
     T_real   = st.number_input("T_celda caliente realista (°C)", key="T_cel_realista",

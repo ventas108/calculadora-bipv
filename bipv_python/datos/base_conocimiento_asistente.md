@@ -3075,6 +3075,20 @@ Catálogo: 2.451 → 2.455 inversores. Verificado en vivo: `filtrar_inversores_c
 
 ────────────────────────────────────────────────────────────
 
+## 49. Anexo — Actualizaciones del 4 de septiembre de 2026 (bug real: temperaturas de diseño con valor mágico fijo en 📐 Dimensionamiento)
+
+El usuario reportó (con 3 capturas reales del proyecto Teusaquillo) que `T_mín diseño` cambiaba solo entre visitas a la misma página (-5,00°C → 6,30°C), sospechando otro bug silencioso. Confirmado: `pages/4_📐_Dimensionamiento.py` sembraba un placeholder **universal, fijo para cualquier ciudad** (`-5.0/36.35/41.94`) vía `session_state.setdefault(...)` antes de que el TMY real (☀️ Recurso Solar) estuviera cacheado. Esos 3 números coincidían por casualidad con 2 de los 3 reales de Bogotá (`T_cel_realista`/`T_cel_extremo`), pero NO con `T_min_diseno` (el real de Bogotá en `datos/ciudades_colombia.py` es 5.0, no -5.0 — desincronizado de un fix ya aplicado ahí en otra fecha). Para cualquier otra ciudad los 3 eran directamente incorrectos (ej. Cali real: 12.0/47.0/55.0).
+
+**No era cosmético**: ese valor se pasa directo a `evaluar_compatibilidad_string()`/Voc_max/Vdc_max real si el usuario corre el dimensionamiento antes de visitar Recurso Solar en la sesión.
+
+**Fix**: el placeholder ahora deriva de `CIUDADES[ciudad activa]` (mismo dato real que ya usa 🏠 Proyecto), con Bogotá solo como último recurso. El bloque de auto-población desde el TMY real (más preciso, sin cambios) sigue aplicando después, cuando esté disponible.
+
+**Nota**: el 3er valor visto (Proyecto: 5.0°C vs Dimensionamiento TMY: 6.3°C) NO es un bug — son 2 metodologías reales distintas (tabla fija por ciudad vs. mínimo histórico del TMY específico), normal que difieran ligeramente.
+
+5 tests nuevos (AST/substring, sin sesión Streamlit). Ver `DIAGNOSTICO_TEMPERATURAS_DISENO_CIUDAD_DIMENSIONAMIENTO.md`.
+
+────────────────────────────────────────────────────────────
+
 ## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
 
 El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de
