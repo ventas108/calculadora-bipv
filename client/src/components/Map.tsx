@@ -40,6 +40,14 @@ function loadMapScript(): Promise<void> {
   if (_mapScriptFailed) {
     return Promise.reject(new Error("Google Maps script previously failed to load"));
   }
+  if (!API_KEY) {
+    // Sin VITE_FRONTEND_FORGE_API_KEY (solo la inyecta el hosting de Manus;
+    // en un despliegue propio como este nunca existe) -- evita el intento de
+    // red que siempre falla con key=undefined (bloqueado por CORS) y salta
+    // directo al fallback de Leaflet/OpenStreetMap, que ya funciona bien.
+    _mapScriptFailed = true;
+    return Promise.reject(new Error("VITE_FRONTEND_FORGE_API_KEY no configurada"));
+  }
   if (_mapScriptPromise) {
     return _mapScriptPromise;
   }
