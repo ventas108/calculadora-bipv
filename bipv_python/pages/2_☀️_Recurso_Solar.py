@@ -76,6 +76,7 @@ from calculos.solar import (
 )
 from calculos.tz_utils import utc_offset_latam, tz_label
 from calculos.invalidacion import KEYS_DERIVADOS_POA
+from calculos.pvwatts_crosscheck import obtener_produccion_pvwatts, comparar_poa_pvgis_vs_pvwatts
 
 st.set_page_config(page_title="Recurso Solar — BIPV", page_icon="☀️", layout="wide")
 
@@ -566,6 +567,36 @@ if _descarga_btn:
             "Esta POA alimenta el Motor Óptico, Producción, Financiero y el Reporte.",
             icon="🔄",
         )
+
+    # ── Verificación cruzada opcional: PVGIS vs PVWatts (NREL/NLR) ───────────
+    # No bloqueante, no reemplaza a PVGIS (sigue siendo la única fuente del
+    # cálculo real) -- solo avisa si hay una discrepancia grande, útil sobre
+    # todo en zonas rurales/montañosas donde PVGIS es menos confiable. Se
+    # desactiva solo (sin error visible) si no hay NREL_API_KEY configurada.
+    _pvwatts_datos = obtener_produccion_pvwatts(lat, lon, tilt, azimuth)
+    if _pvwatts_datos is not None:
+        _cmp_pvwatts = comparar_poa_pvgis_vs_pvwatts(
+            monthly["POA (kWh/m²)"].tolist(),
+            _pvwatts_datos["poa_monthly_kwh_m2"],
+        )
+        _delta_pvwatts = _cmp_pvwatts["diferencia_pct_anual"]
+        if _delta_pvwatts is not None:
+            _msg_pvwatts = (
+                f"🛰️ **Verificación cruzada PVGIS vs PVWatts (NREL/NLR)** — "
+                f"POA anual PVGIS: {_cmp_pvwatts['poa_pvgis_anual_kwh_m2']:,.0f} kWh/m² · "
+                f"PVWatts: {_cmp_pvwatts['poa_pvwatts_anual_kwh_m2']:,.0f} kWh/m² "
+                f"(fuente: {_pvwatts_datos.get('weather_data_source') or 'PVWatts/NSRDB'}) · "
+                f"diferencia: {_delta_pvwatts:+.1f}%."
+            )
+            if _cmp_pvwatts["alerta"]:
+                st.warning(
+                    _msg_pvwatts + f" Supera el umbral de {_cmp_pvwatts['umbral_alerta_pct']:.0f}% "
+                    "— considera revisar si esta ubicación es rural/montañosa, donde PVGIS "
+                    "puede ser menos confiable.",
+                    icon="🛰️",
+                )
+            else:
+                st.info(_msg_pvwatts, icon="🛰️")
 
     # ── Gráfica mensual ──────────────────────────────────────────────────────
     st.subheader("📅 Irradiancia mensual")
