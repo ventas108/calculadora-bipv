@@ -59,6 +59,30 @@ que antes del fix para ese caso, cero riesgo de contaminación cruzada entre tes
   aislamiento).
 - Suite completa ejecutada tras el fix final (ver resultado en el commit).
 
+## Segunda mejora real, misma sesión: recomputación redundante en test_comparador_paneles.py
+
+Con la causa de fondo ya resuelta, se verificó el CI en vivo (logs reales, mismo commit del fix):
+duración total **92.6min → 29.2min**. Los 3 tests de `generar_candidatos` ya no aparecían entre los
+más lentos — pero surgieron como nuevos "más lentos" 7 tests de `tests/test_comparador_paneles.py`
+(~181-182s cada uno en CI), porque **cada uno llama `comparar_paneles()` por separado** — un barrido
+físico real (SDM/curva IV) sobre los 3.127 paneles del catálogo, que sí es trabajo numérico legítimo,
+no un bug.
+
+Al revisar los 7, 6 de ellos usan **exactamente los mismos 2 juegos de argumentos reales** (4 con
+`_cfg_base()`/"BIPV fachada/pérgola", 2 con `N_serie=40`) — recomputando el mismo resultado
+determinista 6 veces de forma evitable. Se verificó que ni `comparar_paneles()` ni
+`formatear_comparacion_paneles()` mutan el DataFrame devuelto (ambas solo leen vía `.iterrows()`),
+así que es seguro compartirlo entre tests del mismo archivo.
+
+**Fix**: 2 fixtures `pytest` con `scope="module"` (`df_base`, `df_n_serie_40`) que calculan el
+DataFrame una sola vez cada una; los 6 tests las reciben como parámetro en vez de recalcular. El 7º
+test (`test_formatear_comparacion_declara_el_tipo_de_instalacion`, con `tipo_instalacion="Granja FV
+campo"` distinto) queda igual, sin compartir -- es un escenario genuinamente distinto.
+
+**Verificado en local**: 7 llamadas → 3 llamadas reales. El archivo bajó de ~945s (7×~135s) a
+**411.24s** (3×~135s + overhead) -- 9/9 tests pasan, mismas aserciones exactas, ningún dato físico
+ni tolerancia cambió.
+
 ## Qué NO cambió
 
 Ningún dato físico, tolerancia, criterio de compatibilidad eléctrica, ni el comportamiento

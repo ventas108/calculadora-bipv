@@ -4,6 +4,10 @@
 que test_simulation_pipeline.py). No usa datos inventados: si el catálogo
 cambia, estos tests deben reflejarlo, no al revés.
 """
+import dataclasses
+
+import pytest
+
 from datos.catalogo_inversores import INVERSORES
 from datos.tecnologias_bipv import ASP_ST1_T40
 from simulation.schemas import BIPVConfiguration
@@ -21,6 +25,37 @@ def _cfg_base():
     return BIPVConfiguration(
         lat=LAT, lon=LON, alt_m=ALT_M, tilt=90.0, azimuth=180.0, area_m2=100.0,
         panel=ASP_ST1_T40, inversor=GROWATT, N_serie=8, N_strings_tracker=8,
+    )
+
+
+# ── Fixtures de módulo: comparar_paneles() barre el catálogo real completo
+# (3.127 paneles, ~182s cada llamada en CI -- auditado 4-sep-2026, ver
+# DIAGNOSTICO_CACHE_CATALOGO_UNIDO_SCENARIO_GENERATOR.md). Antes, 7 tests de
+# este archivo llamaban comparar_paneles() por separado con los MISMOS 2
+# juegos de argumentos reales (4 con _cfg_base()/"BIPV fachada/pérgola", 2
+# con N_serie=40) -- 6 recomputaciones idénticas evitables, ~1.092s (~18 min
+# en CI) tirados en repetir el mismo barrido físico real palabra por palabra.
+# scope="module": comparar_paneles() no muta el DataFrame que devuelve (ver
+# formatear_comparacion_paneles(), solo lee vía .iterrows()) y cada test
+# tampoco lo muta (solo filtros/lecturas) -- compartir la instancia entre
+# tests del mismo módulo es seguro. No cambia ningún dato, tolerancia ni
+# aserción física -- solo evita recomputar un resultado determinista.
+@pytest.fixture(scope="module")
+def df_base():
+    tmy = _tmy_sintetico_offline(LAT, LON, ALT_M)
+    return comparar_paneles(
+        _cfg_base(), tmy, "BIPV fachada/pérgola",
+        tarifa_cop_kWh=750.0, tipo_cambio=4000.0,
+    )
+
+
+@pytest.fixture(scope="module")
+def df_n_serie_40():
+    tmy = _tmy_sintetico_offline(LAT, LON, ALT_M)
+    cfg = dataclasses.replace(_cfg_base(), N_serie=40)
+    return comparar_paneles(
+        cfg, tmy, "BIPV fachada/pérgola",
+        tarifa_cop_kWh=750.0, tipo_cambio=4000.0,
     )
 
 
@@ -103,18 +138,14 @@ def test_paneles_excluidos_por_ficha_incompleta_refleja_el_catalogo_real():
     assert all(catalogo[n].get("Pmax_stc") is not None for n in excluidos)
 
 
-def test_comparar_paneles_no_crashea_y_devuelve_todos_los_simulables():
+def test_comparar_paneles_no_crashea_y_devuelve_todos_los_simulables(df_base):
     # Desde que variable_panel() se conectó al catálogo Excel (27-ago-2026,
     # ver optimization/variables.py::_catalogo_paneles_real()) comparar_paneles()
     # ya no compara solo los 7 ASP-ST1 -- compara el catálogo real unido
     # completo (72: 7 + 65 del Excel). Este test verifica eso, no un
     # conjunto fijo de 7 nombres que ya no refleja el catálogo real.
     from optimization.variables import variable_panel
-    tmy = _tmy_sintetico_offline(LAT, LON, ALT_M)
-    df = comparar_paneles(
-        _cfg_base(), tmy, "BIPV fachada/pérgola",
-        tarifa_cop_kWh=750.0, tipo_cambio=4000.0,
-    )
+    df = df_base
     assert not df.empty
     assert set(df["Panel"]) == set(variable_panel().opciones)
     # La familia ASP-ST1 completa (SDM calibrado) sigue simulable dentro del
@@ -122,7 +153,7 @@ def test_comparar_paneles_no_crashea_y_devuelve_todos_los_simulables():
     assert {f"ASP-ST1-T{n}" for n in (10, 20, 30, 40, 50, 60, 70)} <= set(df["Panel"])
 
 
-def test_comparar_paneles_columnas_esperadas_y_valores_positivos():
+def test_comparar_paneles_columnas_esperadas_y_valores_positivos(df_base):
     # Con el catálogo unido (72 paneles) la mejor LCOE (df.iloc[0]) ya no es
     # necesariamente ASP-ST1-T40 -- N_serie/N_strings_tracker quedan FIJOS en
     # _cfg_base() para los 72, así que un panel con Voc/Vmp muy distinto
@@ -131,11 +162,7 @@ def test_comparar_paneles_columnas_esperadas_y_valores_positivos():
     # el único candidato de este archivo ya auditado contra el XLSM como
     # compatible con N_serie=8/Growatt (ver FICHA_PVSYST_TEUSAQUILLO.md) --
     # en vez de asumir que la primera fila lo es.
-    tmy = _tmy_sintetico_offline(LAT, LON, ALT_M)
-    df = comparar_paneles(
-        _cfg_base(), tmy, "BIPV fachada/pérgola",
-        tarifa_cop_kWh=750.0, tipo_cambio=4000.0,
-    )
+    df = df_base
     assert not df.empty
     for _, fila in df.iterrows():
         assert fila["N° módulos"] > 0
@@ -148,28 +175,16 @@ def test_comparar_paneles_columnas_esperadas_y_valores_positivos():
     assert fila_t40["Compatible"] == "✅"   # N_serie=8 con Growatt ya validado contra el XLSM
 
 
-def test_comparar_paneles_ordena_por_lcoe_ascendente():
-    tmy = _tmy_sintetico_offline(LAT, LON, ALT_M)
-    df = comparar_paneles(
-        _cfg_base(), tmy, "BIPV fachada/pérgola",
-        tarifa_cop_kWh=750.0, tipo_cambio=4000.0,
-    )
-    lcoe = df["LCOE (USD/kWh)"].tolist()
+def test_comparar_paneles_ordena_por_lcoe_ascendente(df_base):
+    lcoe = df_base["LCOE (USD/kWh)"].tolist()
     assert lcoe == sorted(lcoe)
 
 
-def test_comparar_paneles_marca_incompatibilidad_electrica_real():
+def test_comparar_paneles_marca_incompatibilidad_electrica_real(df_n_serie_40):
     # N_serie=40 (fuera de la ventana MPPT del Growatt para este panel) debe
     # marcar el candidato como incompatible -- sin inventar el criterio,
     # reusa optimization.constraints.evaluar_compatibilidad_electrica().
-    import dataclasses
-    tmy = _tmy_sintetico_offline(LAT, LON, ALT_M)
-    cfg = dataclasses.replace(_cfg_base(), N_serie=40)
-    df = comparar_paneles(
-        cfg, tmy, "BIPV fachada/pérgola",
-        tarifa_cop_kWh=750.0, tipo_cambio=4000.0,
-    )
-    assert df.iloc[0]["Compatible"] == "❌"
+    assert df_n_serie_40.iloc[0]["Compatible"] == "❌"
 
 
 # ── formatear_comparacion_paneles() -- contexto para agentes/analista_produccion.py
@@ -187,12 +202,8 @@ def test_formatear_comparacion_declara_el_tipo_de_instalacion():
     assert "Tipo de instalación: Granja FV campo" in texto
 
 
-def test_formatear_comparacion_cita_los_numeros_reales_del_dataframe():
-    tmy = _tmy_sintetico_offline(LAT, LON, ALT_M)
-    df = comparar_paneles(
-        _cfg_base(), tmy, "BIPV fachada/pérgola",
-        tarifa_cop_kWh=750.0, tipo_cambio=4000.0,
-    )
+def test_formatear_comparacion_cita_los_numeros_reales_del_dataframe(df_base):
+    df = df_base
     fila = df.iloc[0]
     texto = formatear_comparacion_paneles(df, "BIPV fachada/pérgola")
     assert fila["Panel"] in texto
@@ -200,16 +211,10 @@ def test_formatear_comparacion_cita_los_numeros_reales_del_dataframe():
     assert f"{fila['PR']:.3f}" in texto
 
 
-def test_formatear_comparacion_incluye_motivo_de_incompatibilidad():
+def test_formatear_comparacion_incluye_motivo_de_incompatibilidad(df_n_serie_40):
     # El agente necesita saber POR QUÉ un candidato se descartó, no solo
     # que salga marcado ❌, para no recomendarlo sin explicación.
-    import dataclasses
-    tmy = _tmy_sintetico_offline(LAT, LON, ALT_M)
-    cfg = dataclasses.replace(_cfg_base(), N_serie=40)
-    df = comparar_paneles(
-        cfg, tmy, "BIPV fachada/pérgola",
-        tarifa_cop_kWh=750.0, tipo_cambio=4000.0,
-    )
+    df = df_n_serie_40
     texto = formatear_comparacion_paneles(df, "BIPV fachada/pérgola")
     assert "❌" in texto
     assert df.iloc[0]["_motivo_electrico"] in texto
