@@ -783,9 +783,9 @@ export default function Home() {
         {heatmapEverShown && (
           <div style={{ display: view === 'heatmap' ? 'block' : 'none' }}>
             <IrradianceHeatmap
-              initialLat={selectedCity?.latitude || 6.25}
-              initialLng={selectedCity?.longitude || -75.56}
-              cityName={selectedCity?.cityName || 'Medellín'}
+              initialLat={selectedCity?.latitude || weatherData?.location.latitude || 6.25}
+              initialLng={selectedCity?.longitude || weatherData?.location.longitude || -75.56}
+              cityName={selectedCity?.cityName || weatherData?.location.city || 'Medellín'}
               onUseInSimulator={handleProspectorToSimulator}
               modelFacades={modelFacades}
             />
@@ -795,9 +795,9 @@ export default function Home() {
         {pvwattsEverShown && (
           <div style={{ display: view === 'pvwatts' ? 'block' : 'none' }}>
             <PVWattsSatellite
-              initialLat={selectedCity?.latitude || 6.25}
-              initialLng={selectedCity?.longitude || -75.56}
-              cityName={selectedCity?.cityName || 'Medellín'}
+              initialLat={selectedCity?.latitude || weatherData?.location.latitude || 6.25}
+              initialLng={selectedCity?.longitude || weatherData?.location.longitude || -75.56}
+              cityName={selectedCity?.cityName || weatherData?.location.city || 'Medellín'}
               onUseInSimulator={handleProspectorToSimulator}
               onSendPVWattsToSimulator={handlePVWattsToSimulator}
               modelFacades={modelFacades}
@@ -808,9 +808,9 @@ export default function Home() {
         {pvgisEverShown && (
           <div style={{ display: view === 'pvgis' ? 'block' : 'none' }}>
             <PVGISAnalyzer
-              initialLat={selectedCity?.latitude || 6.25}
-              initialLng={selectedCity?.longitude || -75.56}
-              cityName={selectedCity?.cityName || 'Medellín'}
+              initialLat={selectedCity?.latitude || weatherData?.location.latitude || 6.25}
+              initialLng={selectedCity?.longitude || weatherData?.location.longitude || -75.56}
+              cityName={selectedCity?.cityName || weatherData?.location.city || 'Medellín'}
               onSendToSimulator={(data) => {
                 setPvgisData(data);
                 handleSetView('energy');
