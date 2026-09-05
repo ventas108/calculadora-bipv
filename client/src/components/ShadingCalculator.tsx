@@ -543,6 +543,22 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
     }
   }, [evaluationModel, obstacleVertices3D]);
 
+  // Mantener la silueta angular del obstáculo (Diagrama de Trayectoria Solar)
+  // sincronizada con la fachada activa cada vez que cambian los obstáculos.
+  // Sin esto, confirmar un obstáculo nuevo o reajustar su offset no actualiza
+  // la proyección hasta que el usuario vuelve a hacer clic manualmente en el
+  // radio button de la fachada -- el diagrama se queda mostrando la silueta
+  // genérica (calculada desde groundLevel al importar, no desde el punto de
+  // evaluación real de la fachada) y deja de coincidir con lo que reporta el
+  // Motor Python oficial, que sí usa siempre facade.evaluationPoint.
+  useEffect(() => {
+    if (!evaluationModel || activeFacadeIdx === null) return;
+    const facade = evaluationModel.detectedFacades[activeFacadeIdx];
+    if (!facade || !obstacleVertices3D || obstacleVertices3D.length === 0) return;
+    const northOff = evaluationModel.config.northOffset;
+    setObstacles(recalculateForFacade(facade, obstacleVertices3D, northOff));
+  }, [evaluationModel, activeFacadeIdx, obstacleVertices3D]);
+
   const recalculateAllPositions = () => {
     if (!weatherData) {
       toast.error('Carga un archivo EPW primero para calcular posiciones solares');
