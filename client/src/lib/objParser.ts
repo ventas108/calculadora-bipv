@@ -398,8 +398,10 @@ const OBJ_COLORS = [
  * zona lejana" symptom, regardless of what coordinates the obstacle file uses.
  *
  * `anchor` must already be in real-world meters/orientation (e.g. the
- * building's mainObservationPoint) — it is NOT scaled/swapped, only the
- * obstacle's own vertices are.
+ * building's groundLevel — its centroid at true ground Z, NOT
+ * mainObservationPoint, which sits evaluationHeight meters above ground
+ * and would otherwise leave the obstacle floating above where it should
+ * sit) — it is NOT scaled/swapped, only the obstacle's own vertices are.
  *
  * `buildingRotationDeg` must match the `rotationDeg` applied to the evaluated
  * building (ImportConfig.rotationDeg in buildingModelImporter.ts). Why: when

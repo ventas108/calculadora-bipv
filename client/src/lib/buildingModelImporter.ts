@@ -75,6 +75,16 @@ export interface EvaluationModel {
   dimensions: Vertex3D;
   /** Punto de observación principal (centroide a nivel de suelo + 1.5m) */
   mainObservationPoint: Vertex3D;
+  /**
+   * Centroide del edificio AL NIVEL DEL SUELO real (misma X/Y que
+   * mainObservationPoint, pero Z = minZ, sin sumar evaluationHeight).
+   * Usar esto (no mainObservationPoint) como ancla al reposicionar un
+   * obstáculo importado por separado (ver transformOBJVertices en
+   * objParser.ts) — anclar a mainObservationPoint desplaza la base del
+   * obstáculo evaluationHeight metros (1.5m por defecto) por encima del
+   * suelo real del edificio, flotando de más sin motivo.
+   */
+  groundLevel: Vertex3D;
   /** Obstáculos recalculados desde la perspectiva del modelo */
   recalculatedObstacles: ObstaclePolygon[];
   /** Fachadas en formato compatible con CrossingConfig */
@@ -1354,6 +1364,14 @@ export function importBuildingModel(
     y: centroid.y,
     z: minZ + config.evaluationHeight,
   };
+  // Mismo centroide pero al nivel del suelo real (sin la altura de evaluación) —
+  // usar esto para anclar obstáculos importados por separado (ver docstring en
+  // la interfaz EvaluationModel).
+  const groundLevel: Vertex3D = {
+    x: centroid.x,
+    y: centroid.y,
+    z: minZ,
+  };
 
   // 10. Recalcular obstáculos desde la perspectiva del modelo
   let recalculatedObstacles: ObstaclePolygon[] = [];
@@ -1380,6 +1398,7 @@ export function importBuildingModel(
     centroid,
     dimensions,
     mainObservationPoint,
+    groundLevel,
     recalculatedObstacles,
     facadeDefinitions,
     config,
