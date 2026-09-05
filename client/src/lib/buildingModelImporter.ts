@@ -577,6 +577,114 @@ function detectCurvedSurfaces(
   return { curvedClusters, remainingFaces };
 }
 
+/**
+ * Agrupa caras de techo PLANO (ya filtradas con isRoofFace, tilt<15°) por
+ * conectividad de malla, ignorando el azimut para la decisión de agrupar.
+ *
+ * Por qué: azimuth = atan2(normal.x, normal.y). Para una normal casi vertical
+ * (componente horizontal minúscula), este cálculo es numéricamente inestable —
+ * el mismo problema que "polo" en coordenadas esféricas. Un techo real, aunque
+ * sea nominalmente plano, casi nunca es matemáticamente perfecto (ligera
+ * ondulación de la triangulación de SketchUp, tejas, imprecisión de modelado):
+ * cada triángulo puede inclinarse 1-10° en una dirección ligeramente distinta,
+ * y esa dirección se traduce en azimuts muy dispersos aunque el techo sea
+ * visualmente un solo plano continuo. `clusterFacesIntoFacades()` (agrupación
+ * por azimut ±30°) fragmenta esto en decenas de "fachadas" espurias — el mismo
+ * problema que `detectCurvedSurfaces()` ya resuelve para cúpulas/bóvedas usando
+ * conectividad en vez de azimut. Esta función aplica la misma solución a
+ * techos planos: dos caras vecinas (comparten arista) con normales que no
+ * difieren demasiado se fusionan sin importar su azimut individual.
+ */
+function clusterFlatRoofsByConnectivity(
+  faces: Face3D[],
+  northOffsetDeg: number
+): FacadeCluster[] {
+  if (faces.length === 0) return [];
+
+  const MAX_NEIGHBOR_ANGLE = 45; // mismo umbral que detectCurvedSurfaces
+  const COORD_PRECISION = 4;
+  function vertexKey(v: Vertex3D): string {
+    return `${v.x.toFixed(COORD_PRECISION)},${v.y.toFixed(COORD_PRECISION)},${v.z.toFixed(COORD_PRECISION)}`;
+  }
+  function edgeKey(v1: Vertex3D, v2: Vertex3D): string {
+    const k1 = vertexKey(v1);
+    const k2 = vertexKey(v2);
+    return k1 < k2 ? `${k1}|${k2}` : `${k2}|${k1}`;
+  }
+
+  const edgeToFaces = new Map<string, number[]>();
+  for (let i = 0; i < faces.length; i++) {
+    const verts = faces[i].vertices;
+    for (let j = 0; j < verts.length; j++) {
+      const ek = edgeKey(verts[j], verts[(j + 1) % verts.length]);
+      if (!edgeToFaces.has(ek)) edgeToFaces.set(ek, []);
+      edgeToFaces.get(ek)!.push(i);
+    }
+  }
+
+  const adjacency: Set<number>[] = faces.map(() => new Set<number>());
+  edgeToFaces.forEach((faceIndices) => {
+    if (faceIndices.length >= 2) {
+      for (let a = 0; a < faceIndices.length; a++) {
+        for (let b = a + 1; b < faceIndices.length; b++) {
+          adjacency[faceIndices[a]].add(faceIndices[b]);
+          adjacency[faceIndices[b]].add(faceIndices[a]);
+        }
+      }
+    }
+  });
+
+  const visited = new Set<number>();
+  const groups: number[][] = [];
+  for (let start = 0; start < faces.length; start++) {
+    if (visited.has(start)) continue;
+    const group: number[] = [];
+    const queue: number[] = [start];
+    visited.add(start);
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      group.push(current);
+      for (const neighbor of Array.from(adjacency[current])) {
+        if (visited.has(neighbor)) continue;
+        const n1 = faces[current].normal;
+        const n2 = faces[neighbor].normal;
+        const dot = Math.max(-1, Math.min(1, n1.x * n2.x + n1.y * n2.y + n1.z * n2.z));
+        const angleDeg = Math.acos(dot) * 180 / Math.PI;
+        if (angleDeg < MAX_NEIGHBOR_ANGLE) {
+          visited.add(neighbor);
+          queue.push(neighbor);
+        }
+      }
+    }
+    groups.push(group);
+  }
+
+  return groups.map(group => {
+    const groupFaces = group.map(i => faces[i]);
+    const totalArea = groupFaces.reduce((s, f) => s + f.area, 0);
+
+    // Azimut/tilt promedio (circular) solo para nombrar/mostrar — no afecta el agrupado
+    let sinSum = 0, cosSum = 0, tiltSum = 0;
+    for (const idx of group) {
+      const az = normalToSolarAzimuth(faces[idx].normal, northOffsetDeg);
+      const tilt = normalToTilt(faces[idx].normal);
+      const weight = faces[idx].area;
+      sinSum += Math.sin(az * Math.PI / 180) * weight;
+      cosSum += Math.cos(az * Math.PI / 180) * weight;
+      tiltSum += tilt * weight;
+    }
+    const avgAzimuth = Math.atan2(sinSum, cosSum) * 180 / Math.PI;
+    const avgTilt = tiltSum / totalArea;
+    const center: Vertex3D = {
+      x: groupFaces.reduce((s, f) => s + f.center.x * f.area, 0) / totalArea,
+      y: groupFaces.reduce((s, f) => s + f.center.y * f.area, 0) / totalArea,
+      z: groupFaces.reduce((s, f) => s + f.center.z * f.area, 0) / totalArea,
+    };
+
+    return { faces: groupFaces, avgAzimuth, avgTilt, totalArea, center };
+  });
+}
+
 function clusterFacesIntoFacades(
   faces: Face3D[],
   northOffsetDeg: number
@@ -1114,7 +1222,10 @@ export function importBuildingModel(
   const slopedRoofFaces = remainingFaces.filter(f => isSlopedRoofFace(f.normal));
   
   const verticalClusters = clusterFacesIntoFacades(verticalFaces, config.northOffset);
-  const flatRoofClusters = clusterFacesIntoFacades(flatRoofFaces, config.northOffset);
+  // Techos planos: agrupar por conectividad, no por azimut (ver docstring de la función) —
+  // el azimut de una normal casi vertical es numéricamente inestable y fragmenta un
+  // techo plano continuo en decenas de "fachadas" espurias.
+  const flatRoofClusters = clusterFlatRoofsByConnectivity(flatRoofFaces, config.northOffset);
   const slopedRoofClusters = clusterFacesIntoFacades(slopedRoofFaces, config.northOffset);
   
   // Combinar clusters curvos + verticales + techos planos + techos inclinados
