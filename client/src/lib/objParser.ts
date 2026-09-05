@@ -400,13 +400,27 @@ const OBJ_COLORS = [
  * `anchor` must already be in real-world meters/orientation (e.g. the
  * building's mainObservationPoint) — it is NOT scaled/swapped, only the
  * obstacle's own vertices are.
+ *
+ * `buildingRotationDeg` must match the `rotationDeg` applied to the evaluated
+ * building (ImportConfig.rotationDeg in buildingModelImporter.ts). Why: when
+ * the two files come from the same original scene (e.g. a wall and the
+ * facade it sits against, modeled together in SketchUp), their relative
+ * position — expressed here via `positionOffset` — is only valid in that
+ * scene's original orientation. If the building gets rotated to correct its
+ * compass alignment but the obstacle isn't rotated the same amount, the
+ * obstacle's shape and its offset keep pointing the old way while the
+ * building spins underneath it — the obstacle silhouette then misses the
+ * facade's field of view entirely ("0 obstáculos visibles" after rotating).
+ * Rotating both the obstacle's own vertices and its offset vector by the
+ * same angle keeps them rigidly attached through any building rotation.
  */
 export function transformOBJVertices(
   rawVertices: Vertex3D[],
   scaleFactor: number = 1.0,
   swapYZ: boolean = false,
   anchor?: Vertex3D,
-  positionOffset?: Vertex3D
+  positionOffset?: Vertex3D,
+  buildingRotationDeg: number = 0
 ): Vertex3D[] {
   let vertices = rawVertices;
   if (scaleFactor !== 1.0 || swapYZ) {
@@ -423,12 +437,19 @@ export function transformOBJVertices(
     });
   }
 
+  if (buildingRotationDeg !== 0) {
+    vertices = vertices.map(v => rotateAroundVerticalAxis(v, buildingRotationDeg));
+  }
+  const rotatedOffset = positionOffset && buildingRotationDeg !== 0
+    ? rotateAroundVerticalAxis(positionOffset, buildingRotationDeg)
+    : positionOffset;
+
   if (anchor) {
     const bbox = computeBoundingBox(vertices);
     const target = {
-      x: anchor.x + (positionOffset?.x ?? 0),
-      y: anchor.y + (positionOffset?.y ?? 0),
-      z: anchor.z + (positionOffset?.z ?? 0),
+      x: anchor.x + (rotatedOffset?.x ?? 0),
+      y: anchor.y + (rotatedOffset?.y ?? 0),
+      z: anchor.z + (rotatedOffset?.z ?? 0),
     };
     const shift = {
       x: target.x - bbox.center.x,
@@ -440,17 +461,36 @@ export function transformOBJVertices(
       y: v.y + shift.y,
       z: v.z + shift.z,
     }));
-  } else if (positionOffset && (positionOffset.x !== 0 || positionOffset.y !== 0 || positionOffset.z !== 0)) {
+  } else if (rotatedOffset && (rotatedOffset.x !== 0 || rotatedOffset.y !== 0 || rotatedOffset.z !== 0)) {
     // Sin edificio importado todavía: no hay ancla real, se aplica el offset
     // como traslación simple (mejor que nada, pero sin marco de referencia real).
     vertices = vertices.map(v => ({
-      x: v.x + positionOffset.x,
-      y: v.y + positionOffset.y,
-      z: v.z + positionOffset.z,
+      x: v.x + rotatedOffset.x,
+      y: v.y + rotatedOffset.y,
+      z: v.z + rotatedOffset.z,
     }));
   }
 
   return vertices;
+}
+
+/**
+ * Rotate a point/vector around the vertical (Z) axis, in the same sense
+ * (degrees, clockwise) as `rotateAroundVertical` in buildingModelImporter.ts.
+ * Kept as a separate copy (not imported) so objParser.ts has no dependency
+ * on the building importer — same rationale as the duplicated convex-hull
+ * helpers in buildingModelImporter.ts.
+ */
+function rotateAroundVerticalAxis(v: Vertex3D, degrees: number): Vertex3D {
+  if (degrees === 0) return v;
+  const rad = (degrees * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return {
+    x: v.x * cos - v.y * sin,
+    y: v.x * sin + v.y * cos,
+    z: v.z,
+  };
 }
 
 export function convertOBJToObstacles(
@@ -459,12 +499,16 @@ export function convertOBJToObstacles(
   northOffsetDeg: number = 0,
   swapYZ: boolean = false,
   scaleFactor: number = 1.0,
-  positionOffset?: Vertex3D
+  positionOffset?: Vertex3D,
+  buildingRotationDeg: number = 0
 ): OBJObstacleResult {
   // observerPoint, cuando se pasa, es el punto de evaluación REAL del
   // edificio (ya en metros/orientación reales) — se usa tanto para reubicar
   // el obstáculo (ancla) como para calcular su silueta angular vista desde ahí.
-  const vertices = transformOBJVertices(parseResult.vertices, scaleFactor, swapYZ, observerPoint, positionOffset);
+  // buildingRotationDeg debe ser el mismo ImportConfig.rotationDeg aplicado al
+  // edificio evaluado, para que el obstáculo gire junto con él (ver docstring
+  // de transformOBJVertices).
+  const vertices = transformOBJVertices(parseResult.vertices, scaleFactor, swapYZ, observerPoint, positionOffset, buildingRotationDeg);
 
   // Recompute bounding box with transformed vertices
   const bbox = computeBoundingBox(vertices);

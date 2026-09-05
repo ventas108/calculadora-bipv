@@ -1286,7 +1286,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
             setObjRawParse(parsed);
 
             const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
-            const result = convertOBJToObstacles(parsed, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ });
+            const result = convertOBJToObstacles(parsed, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ }, evaluationModel?.config.rotationDeg ?? 0);
             setObjPreview(result);
 
             toast.info(
@@ -1324,7 +1324,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
           setObjRawParse(parsed);
 
           const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
-          const result = convertOBJToObstacles(parsed, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ });
+          const result = convertOBJToObstacles(parsed, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ }, evaluationModel?.config.rotationDeg ?? 0);
           setObjPreview(result);
 
           const summary = getGLTFSummary(gltfResult);
@@ -1345,7 +1345,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
           setObjRawParse(parsed);
 
           const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
-          const result = convertOBJToObstacles(parsed, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ });
+          const result = convertOBJToObstacles(parsed, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ }, evaluationModel?.config.rotationDeg ?? 0);
           setObjPreview(result);
 
           const summary = getOBJSummary(parsed);
@@ -1376,7 +1376,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
   const reconvertOBJ = useCallback(() => {
     if (!objRawParse) return;
     const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
-    const result = convertOBJToObstacles(objRawParse, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ });
+    const result = convertOBJToObstacles(objRawParse, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ }, evaluationModel?.config.rotationDeg ?? 0);
     setObjPreview(result);
   }, [objRawParse, objSwapYZ, objScale, objNorthOffset, sunPath3DPreview, evaluationModel, objOffsetX, objOffsetY, objOffsetZ]);
 
@@ -1394,7 +1394,8 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
         objScale,
         objSwapYZ,
         evaluationModel?.mainObservationPoint,
-        { x: objOffsetX, y: objOffsetY, z: objOffsetZ }
+        { x: objOffsetX, y: objOffsetY, z: objOffsetZ },
+        evaluationModel?.config.rotationDeg ?? 0
       );
       const vertices3D: Vertex3D[][] = objRawParse.objects.map(obj => {
         const objVerts: Vertex3D[] = [];
@@ -1937,7 +1938,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                     setObjSwapYZ(e.target.checked);
                     if (objRawParse) {
                       const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
-                      const result = convertOBJToObstacles(objRawParse, evaluationModel?.mainObservationPoint, northOff, e.target.checked, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ });
+                      const result = convertOBJToObstacles(objRawParse, evaluationModel?.mainObservationPoint, northOff, e.target.checked, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ }, evaluationModel?.config.rotationDeg ?? 0);
                       setObjPreview(result);
                     }
                   }}
@@ -1954,7 +1955,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                     setObjScale(newScale);
                     if (objRawParse) {
                       const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
-                      const result = convertOBJToObstacles(objRawParse, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, newScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ });
+                      const result = convertOBJToObstacles(objRawParse, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, newScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ }, evaluationModel?.config.rotationDeg ?? 0);
                       setObjPreview(result);
                     }
                   }}
@@ -1976,7 +1977,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                     const newOffset = parseFloat(e.target.value) || 0;
                     setObjNorthOffset(newOffset);
                     if (objRawParse) {
-                      const result = convertOBJToObstacles(objRawParse, evaluationModel?.mainObservationPoint, newOffset, objSwapYZ, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ });
+                      const result = convertOBJToObstacles(objRawParse, evaluationModel?.mainObservationPoint, newOffset, objSwapYZ, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ }, evaluationModel?.config.rotationDeg ?? 0);
                       setObjPreview(result);
                     }
                   }}
@@ -2007,7 +2008,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                             y: label.startsWith('Y') ? newVal : objOffsetY,
                             z: label.startsWith('Z') ? newVal : objOffsetZ,
                           };
-                          const result = convertOBJToObstacles(objRawParse, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, objScale, nextOffset);
+                          const result = convertOBJToObstacles(objRawParse, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, objScale, nextOffset, evaluationModel?.config.rotationDeg ?? 0);
                           setObjPreview(result);
                         }
                       }}

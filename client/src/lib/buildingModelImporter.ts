@@ -742,15 +742,42 @@ function clusterFacesIntoFacades(
 
 /**
  * Nombra una fachada según su orientación e inclinación.
- * Distingue entre: muros verticales, techos planos y techos inclinados (aguas).
+ * Distingue entre: muros verticales (fachada o marquesina), techos planos/
+ * inclinados (techo o granja agrivoltaica), según el contexto del modelo
+ * completo — ver `hasRoofLikeSurface` / `hasWallLikeSurface` abajo.
+ *
+ * Por qué se necesita ese contexto: la inclinación por sí sola no alcanza
+ * para distinguir un muro real de una marquesina, ni un techo real de una
+ * granja agrivoltaica — geométricamente son indistinguibles (ambos pares son
+ * "plano vertical" y "plano horizontal/inclinado" respectivamente). La señal
+ * disponible es si esa superficie aparece SOLA (sin el resto del sobre de un
+ * edificio real) o acompañada:
+ * - Un edificio real casi siempre tiene AMBOS: paredes Y techo/cubierta.
+ * - Una marquesina (toldo, aleta, cartel) se modela típicamente como una
+ *   superficie vertical AISLADA, sin ningún techo en el mismo archivo.
+ * - Una granja agrivoltaica es una estructura de paneles AISLADA (plana o
+ *   inclinada) sin ninguna pared en el mismo archivo — un techo real nunca
+ *   aparece sin al menos algún muro que lo sostenga en el modelo.
+ * Esto es una heurística, no una certeza: si alguien importa solo un muro
+ * de un edificio real (sin su techo en el mismo archivo), se etiquetará como
+ * "Marquesina" aunque sea una fachada de verdad. Es el mismo tipo de
+ * ambigüedad que ya existe entre "techo plano" y "techo curvo": se resuelve
+ * con la evidencia geométrica disponible, no con certeza absoluta.
  */
-function nameFacade(azimuth: number, tilt: number): string {
-  // Techo plano (horizontal)
+function nameFacade(
+  azimuth: number,
+  tilt: number,
+  hasRoofLikeSurface: boolean,
+  hasWallLikeSurface: boolean
+): string {
+  // Techo plano (horizontal) o granja agrivoltaica (si no hay ninguna pared en el modelo)
   if (tilt < 15) {
-    if (tilt < 5) return 'Techo/Cubierta (Horizontal)';
-    return 'Techo/Cubierta (Casi Horizontal)';
+    if (hasWallLikeSurface) {
+      return tilt < 5 ? 'Techo/Cubierta (Horizontal)' : 'Techo/Cubierta (Casi Horizontal)';
+    }
+    return tilt < 5 ? 'Granja Agrivoltaica (Horizontal)' : 'Granja Agrivoltaica (Casi Horizontal)';
   }
-  
+
   // Determinar la dirección cardinal
   const az = ((azimuth + 360) % 360);
   let direction = '';
@@ -762,14 +789,14 @@ function nameFacade(azimuth: number, tilt: number): string {
   else if (az >= 202.5 && az < 247.5) direction = 'Noreste';
   else if (az >= 247.5 && az < 292.5) direction = 'Este';
   else direction = 'Sureste';
-  
-  // Techo inclinado (agua de techo): tilt entre 15° y 75°
+
+  // Techo inclinado (agua de techo), o granja agrivoltaica inclinada si no hay paredes
   if (tilt >= 15 && tilt <= 75) {
-    return `Techo Agua ${direction}`;
+    return hasWallLikeSurface ? `Techo Agua ${direction}` : `Granja Agrivoltaica ${direction}`;
   }
-  
-  // Fachada vertical (muro): tilt > 75°
-  return `Fachada ${direction}`;
+
+  // Fachada vertical (muro), o marquesina si no hay ningún techo en el modelo
+  return hasRoofLikeSurface ? `Fachada ${direction}` : `Marquesina ${direction}`;
 }
 
 // ─── Obstacle Recalculation ──────────────────────────────────────────────────
@@ -1239,6 +1266,13 @@ export function importBuildingModel(
     .filter(c => c.isCurved || c.totalArea > totalFacadeArea * 0.03)
     .sort((a, b) => b.totalArea - a.totalArea);
 
+  // 7b. Contexto para distinguir muro real vs. marquesina, y techo real vs.
+  // granja agrivoltaica (ver docstring de nameFacade): un edificio real trae
+  // AMBOS tipos de superficie en el mismo archivo; una marquesina o una
+  // granja agrivoltaica se modelan típicamente solas.
+  const hasRoofLikeSurface = significantClusters.some(c => c.isCurved || c.avgTilt <= 75);
+  const hasWallLikeSurface = significantClusters.some(c => !c.isCurved && c.avgTilt > 75);
+
   // 8. Generar DetectedFacade para cada cluster significativo
   const detectedFacades: DetectedFacade[] = significantClusters.map((cluster, idx) => {
     // Nombre especial para superficies curvas
@@ -1258,8 +1292,8 @@ export function importBuildingModel(
         uniqueName = `${uniqueName} (${curvedCount})`;
       }
     } else {
-      const name = nameFacade(cluster.avgAzimuth, cluster.avgTilt);
-      uniqueName = significantClusters.filter((c, i) => i <= idx && !c.isCurved && nameFacade(c.avgAzimuth, c.avgTilt) === name).length > 1
+      const name = nameFacade(cluster.avgAzimuth, cluster.avgTilt, hasRoofLikeSurface, hasWallLikeSurface);
+      uniqueName = significantClusters.filter((c, i) => i <= idx && !c.isCurved && nameFacade(c.avgAzimuth, c.avgTilt, hasRoofLikeSurface, hasWallLikeSurface) === name).length > 1
         ? `${name} (${idx + 1})`
         : name;
     }
