@@ -654,19 +654,16 @@ Hora,Mes,Dia,FS_geometrico,FS_climatico,FS_combinado,Fachada,...
 8,3,21,0.00,0.05,0.04,Fachada_Sur,...
 9,3,21,0.12,0.15,0.24,Fachada_Sur,...
 
-- FS_geometrico: factor de sombreado solo por obstáculos físicos (recomendado)
-- FS_climatico: incluye nubes → sobreestima el bypass
-- FS_combinado: combinación de ambos
+- FS_geometrico: factor de sombreado solo por obstáculos físicos — **la ÚNICA columna que la app acepta para bypass**
+- FS_climatico: incluye nubes → sobreestima el bypass. Se ignora siempre, nunca alimenta el cálculo
+- FS_combinado: combinación de ambos → también se ignora siempre, es solo diagnóstico en el CSV de origen
 - Convención: 0 = sin sombra, 1 = sombra total (p_shade directo)
 - Fachada: nombre de la fachada del análisis
 Pasos:
 
 - Arrastra el CSV al uploader
-- La app detecta automáticamente qué columna de FS usar (prioridad: FS_geometrico)
-- Revisa el banner de color:
-- 🟩 Verde: FS_geometrico detectado — resultados más precisos
-
-- 🟨 Amarillo: solo FS combinado disponible — puede sobreestimar bypass
+- La app exige la columna FS_geometrico — **si el CSV no la trae, se rechaza por completo** (no hay una versión "menos precisa" que se use como respaldo; las nubes no activan bypass diodes, así que un FS_climático/combinado nunca puede reemplazarla)
+- Si se acepta, verás: 🟩 Verde: FS_geometrico detectado — sombra por obstáculos físicos únicamente
 
 ────────────────────────────────────────────────────────────
 
@@ -3044,6 +3041,14 @@ ZNSHINE resultó el candidato con mejor evidencia: oficina propia confirmada en 
 99 candidatos, **0 excluidos** por tolerancia SDM — lote más limpio junto con LONGi. 76/99 (77%) sin dimensiones.
 
 Suite completa: 942/942 (1270.26s / ~21m 10s con el catálogo de 3.127 paneles). Catálogo final: 76 originales + 278 JA Solar + 1.255 Trina + 408 Jinko + 380 Canadian Solar + 244 LONGi + 170 First Solar + 80 SunPower + 137 Risen Energy + 99 ZNSHINE. Ver `DIAGNOSTICO_CATALOGO_ZNSHINE_NREL.md`.
+
+────────────────────────────────────────────────────────────
+
+## 51. Anexo — Corrección del manual: Sección 1 de Mismatch describía un comportamiento ya eliminado (4-sep-2026)
+
+A pedido explícito del usuario ("simplificar el flujo FS_geometrico/FS_climatico/FS_combinado para que FS_geometrico sea la única entrada real a Mismatch"), se investigó `calculos/mismatch_bypass.py` antes de tocar código — y se confirmó (`git log -S`) que esa simplificación **ya estaba implementada desde el 8-ago-2026** (commit `f579dde2`), de forma más estricta de lo pedido: si el CSV no trae `FS_geometrico`, se **rechaza por completo** (`ValueError`), no hay ningún respaldo a `FS_climatico`/`FS_combinado` en ningún escenario. No se cambió código porque no hacía falta.
+
+Lo que sí estaba desactualizado era este mismo manual (Sección 1): describía un banner "🟨 Amarillo: solo FS combinado disponible" y una detección "por prioridad" que ya no existen en el código real desde hace un mes. Corregido para reflejar el comportamiento real (exige `FS_geometrico`, rechaza sin él, banner único 🟩 Verde). Sin cambios de código, solo documentación.
 
 ────────────────────────────────────────────────────────────
 
