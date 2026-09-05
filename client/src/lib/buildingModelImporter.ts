@@ -48,6 +48,19 @@ export interface DetectedFacade {
   area: number;
   /** Punto de evaluación (a 1.5m del centro de la fachada hacia el exterior) */
   evaluationPoint: Vertex3D;
+  /**
+   * Varios puntos de evaluación distribuidos a lo largo del lado más largo
+   * de la fachada (siempre incluye evaluationPoint como uno de ellos).
+   * Por qué: un solo punto (el centro) representa mal la sombra de un
+   * arreglo largo de paneles -- un extremo puede estar mucho más sombreado
+   * que el resto sin que el punto central lo capture. El motor de
+   * ray-casting puede evaluar todos estos puntos y promediar el
+   * FS_geometrico como una fracción del área sombreada en vez de un
+   * binario de un solo punto. Para superficies curvas (isCurved) solo
+   * contiene evaluationPoint -- muestrear una superficie curva a lo largo
+   * de un eje recto no es geométricamente válido.
+   */
+  samplePoints: Vertex3D[];
   /** Color para visualización */
   color: string;
   /** Número de caras que componen esta fachada */
@@ -809,6 +822,95 @@ function nameFacade(
   return hasRoofLikeSurface ? `Fachada ${direction}` : `Marquesina ${direction}`;
 }
 
+// ─── Facade Sample Points (para no depender de un solo punto central) ────────
+
+const FACADE_SAMPLE_COUNT: number = 5;
+
+/**
+ * Extensión horizontal real de un cluster (min/max X e Y de todos sus
+ * vértices), usada para saber a lo largo de qué eje y en qué rango repartir
+ * los puntos de muestreo de `buildFacadeSamplePoints`.
+ */
+function clusterHorizontalExtent(cluster: FacadeCluster): { minX: number; maxX: number; minY: number; maxY: number } {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const face of cluster.faces) {
+    for (const v of face.vertices) {
+      if (v.x < minX) minX = v.x;
+      if (v.x > maxX) maxX = v.x;
+      if (v.y < minY) minY = v.y;
+      if (v.y > maxY) maxY = v.y;
+    }
+  }
+  return { minX, maxX, minY, maxY };
+}
+
+/**
+ * Genera FACADE_SAMPLE_COUNT puntos de evaluación repartidos a lo largo del
+ * lado más largo (X o Y) del cluster, en vez de un único punto central.
+ *
+ * Por qué: un solo punto (el centro) representa mal la sombra de un arreglo
+ * largo de paneles — un extremo puede estar mucho más sombreado que el resto
+ * sin que el punto central lo capture. El motor de ray-casting puede evaluar
+ * varios puntos y, aguas abajo, promediar el FS_geometrico como una fracción
+ * del área sombreada en vez de un binario de un solo punto.
+ *
+ * Cómo se calcula cada punto: se reutiliza el mismo desplazamiento (hacia
+ * afuera de la superficie, en la dirección de la normal) que ya trae
+ * `evaluationPoint` respecto a `cluster.center` — `offsetVector = evaluationPoint
+ * - cluster.center` — y se aplica ese mismo vector a otras posiciones sobre el
+ * eje largo del cluster. Así no hace falta re-derivar la fórmula de
+ * desplazamiento por tipo de superficie (plana/inclinada/vertical): cualquiera
+ * que haya sido, se respeta igual en cada punto de muestreo.
+ *
+ * El punto central (t=0.5) es exactamente `evaluationPoint` — no una
+ * aproximación — para que siga siendo válido usarlo solo si algo consume
+ * `samplePoints[Math.floor(n/2)]` esperando el comportamiento de antes.
+ *
+ * Limitación conocida: para techos inclinados, los puntos de muestreo se
+ * generan a la misma altura Z que evaluationPoint (no siguen la pendiente
+ * real punto a punto) — una aproximación razonable dado que la variación de
+ * altura a lo largo del ancho suele ser pequeña frente al resto de
+ * simplificaciones del modelo. Superficies curvas no se muestrean así en
+ * absoluto (ver el guard `cluster.isCurved` en el llamador).
+ */
+function buildFacadeSamplePoints(cluster: FacadeCluster, evalPoint: Vertex3D): Vertex3D[] {
+  const { minX, maxX, minY, maxY } = clusterHorizontalExtent(cluster);
+  const rangeX = maxX - minX;
+  const rangeY = maxY - minY;
+  const lengthAxis: 'x' | 'y' = rangeX >= rangeY ? 'x' : 'y';
+  const lo = lengthAxis === 'x' ? minX : minY;
+  const hi = lengthAxis === 'x' ? maxX : maxY;
+  const span = hi - lo;
+  // Márgenes del 15% a cada lado: el borde de una superficie real casi nunca
+  // es un rectángulo perfecto, así que evitamos muestrear justo en la orilla.
+  const margin = span * 0.15;
+
+  const offsetVector: Vertex3D = {
+    x: evalPoint.x - cluster.center.x,
+    y: evalPoint.y - cluster.center.y,
+    z: evalPoint.z - cluster.center.z,
+  };
+
+  const points: Vertex3D[] = [];
+  for (let i = 0; i < FACADE_SAMPLE_COUNT; i++) {
+    const t = FACADE_SAMPLE_COUNT === 1 ? 0.5 : i / (FACADE_SAMPLE_COUNT - 1);
+    if (Math.abs(t - 0.5) < 1e-9) {
+      points.push(evalPoint);
+      continue;
+    }
+    const coord = lo + margin + t * (span - 2 * margin);
+    const base: Vertex3D = lengthAxis === 'x'
+      ? { x: coord, y: cluster.center.y, z: cluster.center.z }
+      : { x: cluster.center.x, y: coord, z: cluster.center.z };
+    points.push({
+      x: base.x + offsetVector.x,
+      y: base.y + offsetVector.y,
+      z: base.z + offsetVector.z,
+    });
+  }
+  return points;
+}
+
 // ─── Obstacle Recalculation ──────────────────────────────────────────────────
 
 /**
@@ -1341,6 +1443,10 @@ export function importBuildingModel(
       };
     }
 
+    const samplePoints: Vertex3D[] = cluster.isCurved
+      ? [evalPoint]
+      : buildFacadeSamplePoints(cluster, evalPoint);
+
     return {
       name: uniqueName,
       azimuthNormal: Math.round(cluster.avgAzimuth * 10) / 10,
@@ -1348,6 +1454,7 @@ export function importBuildingModel(
       center: cluster.center,
       area: Math.round(cluster.totalArea * 100) / 100,
       evaluationPoint: evalPoint,
+      samplePoints,
       color: FACADE_COLORS[idx % FACADE_COLORS.length],
       faceCount: cluster.faces.length,
       ...(cluster.isCurved ? {

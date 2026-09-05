@@ -349,13 +349,25 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
     if (!weatherData || !evaluationModel || !obstacleVertices3D?.length) {
       throw new Error('Carga el EPW, un modelo 3D con obstáculos y fachadas detectadas antes de ejecutar el motor oficial.');
     }
-    const points = evaluationModel.detectedFacades.map((facade, index) => ({
-      id: `facade_${index}_${facade.name}`,
-      facade: facade.name,
-      x_m: facade.evaluationPoint.x,
-      y_m: facade.evaluationPoint.y,
-      z_m: facade.evaluationPoint.z,
-    }));
+    // Cada fachada aporta varios puntos (facade.samplePoints) repartidos a lo
+    // largo de su lado más largo, no solo el punto central — así el
+    // FS_geometrico resultante se puede promediar como fracción de área
+    // sombreada en vez de depender del binario de un solo punto. Todos los
+    // puntos de una misma fachada comparten el mismo campo `facade`, así que
+    // cualquier consumidor que agrupe/filtre por esa columna sigue funcionando
+    // igual; solo cambia cuántas filas hay por fachada y hora.
+    const points = evaluationModel.detectedFacades.flatMap((facade, index) => {
+      const samples = facade.samplePoints?.length ? facade.samplePoints : [facade.evaluationPoint];
+      return samples.map((pt, sampleIdx) => ({
+        id: samples.length > 1
+          ? `facade_${index}_${facade.name}_p${sampleIdx}`
+          : `facade_${index}_${facade.name}`,
+        facade: facade.name,
+        x_m: pt.x,
+        y_m: pt.y,
+        z_m: pt.z,
+      }));
+    });
     if (points.length === 0) {
       throw new Error('El modelo 3D no tiene puntos de evaluación de fachada.');
     }
