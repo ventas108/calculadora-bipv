@@ -52,6 +52,15 @@ interface EvaluationModelImporterProps {
   }) => void;
   /** North offset actual (desde Sun Path 3D u otra fuente) */
   northOffset?: number;
+  /**
+   * Se dispara cada vez que el usuario selecciona una fachada en la tabla
+   * "Fachadas Detectadas" de ESTA vista previa de importación. Sin esto, el
+   * selector de fachada del Diagrama de Trayectoria Solar (en ShadingCalculator,
+   * un control totalmente separado) nunca se entera de la selección hecha
+   * aquí — el diagrama se queda proyectando siempre desde la fachada por
+   * defecto (índice 0) sin importar qué fachada marques en esta tabla.
+   */
+  onFacadeSelect?: (idx: number) => void;
 }
 
 interface AxisDetectionInfo {
@@ -65,6 +74,7 @@ export default function EvaluationModelImporter({
   existingObstacleVertices3D,
   onModelImported,
   northOffset = 0,
+  onFacadeSelect,
 }: EvaluationModelImporterProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [model, setModel] = useState<EvaluationModel | null>(null);
@@ -343,6 +353,9 @@ export default function EvaluationModelImporter({
 
   const handleFacadeSelect = (idx: number) => {
     setSelectedFacadeIdx(idx === selectedFacadeIdx ? null : idx);
+    // Propagar al selector real del Diagrama de Trayectoria Solar (en
+    // ShadingCalculator) -- ver docstring de onFacadeSelect en las props.
+    onFacadeSelect?.(idx);
 
     if (model && existingObstacleVertices3D && idx !== selectedFacadeIdx) {
       const facade = model.detectedFacades[idx];

@@ -499,9 +499,16 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
       );
     }
     
-    // Seleccionar la primera fachada por defecto para el diagrama solar
+    // Seleccionar la fachada que el usuario ya haya marcado en la tabla de
+    // importación (result.selectedFacade); si no marcó ninguna, usar la
+    // primera por defecto. Antes esto ignoraba result.selectedFacade y
+    // siempre forzaba el índice 0, dejando el Diagrama de Trayectoria Solar
+    // en la fachada equivocada aunque el usuario sí hubiera elegido otra.
     if (result.model.detectedFacades.length > 0) {
-      setActiveFacadeIdx(0);
+      const preselectedIdx = result.selectedFacade
+        ? result.model.detectedFacades.indexOf(result.selectedFacade)
+        : -1;
+      setActiveFacadeIdx(preselectedIdx >= 0 ? preselectedIdx : 0);
     }
     
     // Notificar al padre con la lista de fachadas para el selector del Simulador
@@ -2100,6 +2107,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
         existingObstacles={obstacles}
         existingObstacleVertices3D={obstacleVertices3D}
         onModelImported={handleModelImported}
+        onFacadeSelect={handleActiveFacadeChange}
         northOffset={sunPath3DPreview?.location.northOffset ?? objNorthOffset}
       />
 
