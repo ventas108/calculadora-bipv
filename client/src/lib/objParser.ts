@@ -26,7 +26,7 @@ import { ObstaclePolygon } from '@/components/SunPathDiagram';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
-interface Vertex3D {
+export interface Vertex3D {
   x: number;
   y: number;
   z: number;
@@ -384,17 +384,33 @@ const OBJ_COLORS = [
  * @param swapYZ Whether to swap Y and Z axes (common in some 3D tools where Y is up)
  * @param scaleFactor Scale factor to apply to all coordinates (e.g., 0.001 for mm→m)
  */
-export function convertOBJToObstacles(
-  parseResult: OBJParseResult,
-  observerPoint?: Vertex3D,
-  northOffsetDeg: number = 0,
+/**
+ * Apply scale, optional Y/Z swap, and (when an anchor point is given)
+ * reposition an obstacle's vertices so its footprint center + base sit at
+ * `anchor + positionOffset` in the SAME real-world coordinate space as the
+ * evaluated building.
+ *
+ * Why this is needed: the obstacle file (a tree, a neighboring building) is
+ * modeled independently in SketchUp/Blender/etc. and almost never shares an
+ * origin with the evaluated building's own file. Without this, the obstacle
+ * renders wherever its own local (0,0,0) happens to be, unrelated to where it
+ * actually sits relative to the building — the "aparece minimizado y en una
+ * zona lejana" symptom, regardless of what coordinates the obstacle file uses.
+ *
+ * `anchor` must already be in real-world meters/orientation (e.g. the
+ * building's mainObservationPoint) — it is NOT scaled/swapped, only the
+ * obstacle's own vertices are.
+ */
+export function transformOBJVertices(
+  rawVertices: Vertex3D[],
+  scaleFactor: number = 1.0,
   swapYZ: boolean = false,
-  scaleFactor: number = 1.0
-): OBJObstacleResult {
-  // Apply scale and optional Y/Z swap to vertices
-  let vertices = parseResult.vertices;
+  anchor?: Vertex3D,
+  positionOffset?: Vertex3D
+): Vertex3D[] {
+  let vertices = rawVertices;
   if (scaleFactor !== 1.0 || swapYZ) {
-    vertices = parseResult.vertices.map(v => {
+    vertices = rawVertices.map(v => {
       const scaled = {
         x: v.x * scaleFactor,
         y: v.y * scaleFactor,
@@ -407,16 +423,55 @@ export function convertOBJToObstacles(
     });
   }
 
+  if (anchor) {
+    const bbox = computeBoundingBox(vertices);
+    const target = {
+      x: anchor.x + (positionOffset?.x ?? 0),
+      y: anchor.y + (positionOffset?.y ?? 0),
+      z: anchor.z + (positionOffset?.z ?? 0),
+    };
+    const shift = {
+      x: target.x - bbox.center.x,
+      y: target.y - bbox.center.y,
+      z: target.z - bbox.min.z,
+    };
+    vertices = vertices.map(v => ({
+      x: v.x + shift.x,
+      y: v.y + shift.y,
+      z: v.z + shift.z,
+    }));
+  } else if (positionOffset && (positionOffset.x !== 0 || positionOffset.y !== 0 || positionOffset.z !== 0)) {
+    // Sin edificio importado todavía: no hay ancla real, se aplica el offset
+    // como traslación simple (mejor que nada, pero sin marco de referencia real).
+    vertices = vertices.map(v => ({
+      x: v.x + positionOffset.x,
+      y: v.y + positionOffset.y,
+      z: v.z + positionOffset.z,
+    }));
+  }
+
+  return vertices;
+}
+
+export function convertOBJToObstacles(
+  parseResult: OBJParseResult,
+  observerPoint?: Vertex3D,
+  northOffsetDeg: number = 0,
+  swapYZ: boolean = false,
+  scaleFactor: number = 1.0,
+  positionOffset?: Vertex3D
+): OBJObstacleResult {
+  // observerPoint, cuando se pasa, es el punto de evaluación REAL del
+  // edificio (ya en metros/orientación reales) — se usa tanto para reubicar
+  // el obstáculo (ancla) como para calcular su silueta angular vista desde ahí.
+  const vertices = transformOBJVertices(parseResult.vertices, scaleFactor, swapYZ, observerPoint, positionOffset);
+
   // Recompute bounding box with transformed vertices
   const bbox = computeBoundingBox(vertices);
 
   // Determine observation point
   const observer: Vertex3D = observerPoint
-    ? {
-        x: observerPoint.x * scaleFactor,
-        y: (swapYZ ? observerPoint.z : observerPoint.y) * scaleFactor,
-        z: (swapYZ ? observerPoint.y : observerPoint.z) * scaleFactor,
-      }
+    ? { x: observerPoint.x, y: observerPoint.y, z: observerPoint.z }
     : {
         x: bbox.center.x,
         y: bbox.center.y,

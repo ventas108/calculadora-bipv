@@ -30,6 +30,7 @@ import {
   parseOBJText,
   validateOBJText,
   convertOBJToObstacles,
+  transformOBJVertices,
   getOBJSummary,
 } from '@/lib/objParser';
 import CrossingModal from './CrossingModal';
@@ -91,6 +92,14 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
   const [objSwapYZ, setObjSwapYZ] = useState(false);
   const [objScale, setObjScale] = useState(1.0);
   const [objNorthOffset, setObjNorthOffset] = useState(0);
+  // Posición real del obstáculo relativa al punto de observación del edificio
+  // evaluado (metros). El archivo del obstáculo (árbol/edificio vecino) se
+  // modela por separado en SketchUp y casi nunca comparte origen con el
+  // edificio evaluado — sin esto, el obstáculo se ve "minimizado y lejano"
+  // en la Vista 3D sin importar qué coordenadas traiga su propio archivo.
+  const [objOffsetX, setObjOffsetX] = useState(0);
+  const [objOffsetY, setObjOffsetY] = useState(0);
+  const [objOffsetZ, setObjOffsetZ] = useState(0);
   const [isDraggingObj, setIsDraggingObj] = useState(false);
 
   // Crossing modal state
@@ -1277,7 +1286,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
             setObjRawParse(parsed);
 
             const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
-            const result = convertOBJToObstacles(parsed, undefined, northOff, objSwapYZ, objScale);
+            const result = convertOBJToObstacles(parsed, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ });
             setObjPreview(result);
 
             toast.info(
@@ -1315,7 +1324,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
           setObjRawParse(parsed);
 
           const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
-          const result = convertOBJToObstacles(parsed, undefined, northOff, objSwapYZ, objScale);
+          const result = convertOBJToObstacles(parsed, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ });
           setObjPreview(result);
 
           const summary = getGLTFSummary(gltfResult);
@@ -1336,7 +1345,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
           setObjRawParse(parsed);
 
           const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
-          const result = convertOBJToObstacles(parsed, undefined, northOff, objSwapYZ, objScale);
+          const result = convertOBJToObstacles(parsed, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ });
           setObjPreview(result);
 
           const summary = getOBJSummary(parsed);
@@ -1367,28 +1376,33 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
   const reconvertOBJ = useCallback(() => {
     if (!objRawParse) return;
     const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
-    const result = convertOBJToObstacles(objRawParse, undefined, northOff, objSwapYZ, objScale);
+    const result = convertOBJToObstacles(objRawParse, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ });
     setObjPreview(result);
-  }, [objRawParse, objSwapYZ, objScale, objNorthOffset, sunPath3DPreview]);
+  }, [objRawParse, objSwapYZ, objScale, objNorthOffset, sunPath3DPreview, evaluationModel, objOffsetX, objOffsetY, objOffsetZ]);
 
   const confirmOBJImport = () => {
     if (!objPreview) return;
     setObstacles(prev => [...prev, ...objPreview.obstacles]);
     
-    // Extraer vértices 3D de los objetos OBJ para poder recalcular desde otro punto de observación
+    // Extraer vértices 3D de los objetos OBJ para poder recalcular desde otro punto de observación.
+    // Se usa el mismo transformOBJVertices (escala + swap + ancla al punto real del
+    // edificio + offset) que convertOBJToObstacles, para que la posición 3D que ve el
+    // usuario en "Vista 3D del Modelo" coincida exactamente con la usada para FS_geometrico.
     if (objRawParse) {
+      const transformedVertices = transformOBJVertices(
+        objRawParse.vertices,
+        objScale,
+        objSwapYZ,
+        evaluationModel?.mainObservationPoint,
+        { x: objOffsetX, y: objOffsetY, z: objOffsetZ }
+      );
       const vertices3D: Vertex3D[][] = objRawParse.objects.map(obj => {
         const objVerts: Vertex3D[] = [];
         for (const face of obj.faces) {
           for (const idx of face.vertexIndices) {
-            const v = objRawParse.vertices[idx];
+            const v = transformedVertices[idx];
             if (v) {
-              const scaled = {
-                x: v.x * objScale,
-                y: objSwapYZ ? v.z * objScale : v.y * objScale,
-                z: objSwapYZ ? v.y * objScale : v.z * objScale,
-              };
-              objVerts.push(scaled);
+              objVerts.push(v);
             }
           }
         }
@@ -1905,7 +1919,11 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                 <p className="text-[11px] font-mono font-semibold text-emerald-800">
                   ({objPreview.observationPoint.x.toFixed(2)}, {objPreview.observationPoint.y.toFixed(2)}, {objPreview.observationPoint.z.toFixed(2)}) m
                 </p>
-                <p className="text-[9px] text-gray-400 mt-0.5">Centro bbox + 1.5 m altura</p>
+                <p className="text-[9px] text-gray-400 mt-0.5">
+                  {evaluationModel
+                    ? 'Punto de evaluación real del edificio importado'
+                    : 'Centro bbox del obstáculo + 1.5 m (importa primero el edificio para usar su punto real)'}
+                </p>
               </div>
             </div>
 
@@ -1919,7 +1937,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                     setObjSwapYZ(e.target.checked);
                     if (objRawParse) {
                       const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
-                      const result = convertOBJToObstacles(objRawParse, undefined, northOff, e.target.checked, objScale);
+                      const result = convertOBJToObstacles(objRawParse, evaluationModel?.mainObservationPoint, northOff, e.target.checked, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ });
                       setObjPreview(result);
                     }
                   }}
@@ -1936,7 +1954,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                     setObjScale(newScale);
                     if (objRawParse) {
                       const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
-                      const result = convertOBJToObstacles(objRawParse, undefined, northOff, objSwapYZ, newScale);
+                      const result = convertOBJToObstacles(objRawParse, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, newScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ });
                       setObjPreview(result);
                     }
                   }}
@@ -1958,7 +1976,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                     const newOffset = parseFloat(e.target.value) || 0;
                     setObjNorthOffset(newOffset);
                     if (objRawParse) {
-                      const result = convertOBJToObstacles(objRawParse, undefined, newOffset, objSwapYZ, objScale);
+                      const result = convertOBJToObstacles(objRawParse, evaluationModel?.mainObservationPoint, newOffset, objSwapYZ, objScale, { x: objOffsetX, y: objOffsetY, z: objOffsetZ });
                       setObjPreview(result);
                     }
                   }}
@@ -1967,6 +1985,38 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
                 />
                 <span className="text-gray-500">°</span>
               </label>
+              <div className="flex items-center gap-2 text-xs border-l border-gray-300 pl-4">
+                <span className="text-gray-700 font-medium">Posición relativa al edificio (m):</span>
+                {([
+                  { label: 'X (Este+)', value: objOffsetX, setter: setObjOffsetX },
+                  { label: 'Y (Norte+)', value: objOffsetY, setter: setObjOffsetY },
+                  { label: 'Z (Alto+)', value: objOffsetZ, setter: setObjOffsetZ },
+                ] as const).map(({ label, value, setter }) => (
+                  <label key={label} className="flex items-center gap-1">
+                    <span className="text-gray-500">{label}:</span>
+                    <input
+                      type="number"
+                      value={value}
+                      onChange={(e) => {
+                        const newVal = parseFloat(e.target.value) || 0;
+                        setter(newVal);
+                        if (objRawParse) {
+                          const northOff = sunPath3DPreview?.location.northOffset ?? objNorthOffset;
+                          const nextOffset = {
+                            x: label.startsWith('X') ? newVal : objOffsetX,
+                            y: label.startsWith('Y') ? newVal : objOffsetY,
+                            z: label.startsWith('Z') ? newVal : objOffsetZ,
+                          };
+                          const result = convertOBJToObstacles(objRawParse, evaluationModel?.mainObservationPoint, northOff, objSwapYZ, objScale, nextOffset);
+                          setObjPreview(result);
+                        }
+                      }}
+                      className="w-16 px-2 py-1 border border-gray-300 rounded text-xs font-mono bg-white"
+                      step="1"
+                    />
+                  </label>
+                ))}
+              </div>
             </div>
 
             {/* Objects table */}
@@ -2021,8 +2071,8 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
 
             {/* Nota sobre punto de origen de SketchUp */}
             <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded p-2 space-y-1">
-              <p><strong>📍 Punto de origen en SketchUp:</strong> Para que el observador coincida con el punto de análisis de tu proyecto, el modelo debe exportarse con el <strong>origen (0,0,0) ubicado en el punto de observación</strong> (ej: centro del panel BIPV a evaluar).</p>
-              <p>En SketchUp: selecciona el punto de referencia → <em>Axes &gt; Place</em> o usa el plugin <em>SketchUp Axes</em> para reubicar el origen antes de exportar a OBJ. El eje Y debe apuntar al Norte geográfico (ajusta con North Offset si es necesario).</p>
+              <p><strong>📍 Posición del obstáculo:</strong> el archivo del obstáculo (árbol, edificio vecino) casi nunca comparte origen con el archivo del edificio evaluado — cada uno se modela por separado en SketchUp. Usa los campos <strong>&quot;Posición relativa al edificio (m)&quot;</strong> de arriba para indicar dónde está realmente el obstáculo respecto al punto de evaluación (ej: 20 m al Este → X=20).</p>
+              <p>Alternativa (opcional): en SketchUp puedes reubicar el origen del obstáculo con <em>Axes &gt; Place</em> antes de exportar, dejando los campos de posición en 0 — pero no es necesario si usas los campos de arriba. El eje Y debe apuntar al Norte geográfico (ajusta con North Offset si es necesario).</p>
             </div>
           </div>
         )}
