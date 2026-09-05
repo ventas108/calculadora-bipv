@@ -87,6 +87,14 @@ export default function Home() {
   const [pvgisEverShown, setPvgisEverShown] = useState(false);
   const [heatmapEverShown, setHeatmapEverShown] = useState(false);
   const [pvwattsEverShown, setPvwattsEverShown] = useState(false);
+  // 'calculator' es la vista inicial (ya visible al montar) -- mismo patron
+  // "ever shown, luego mantener vivo" que las otras vistas, para que el
+  // modelo 3D importado, el EPW activo y los puntos de analisis de
+  // ShadingCalculator no se pierdan al navegar a otra pestana y volver
+  // (antes se desmontaba/remontaba entero con cada cambio de vista, unico
+  // caso sin este patron -- confirmado en vivo: las fachadas reales del
+  // modelo 3D se perdian tras visitar "Datos Meteorologicos" y regresar).
+  const [calculatorEverShown] = useState(true);
   // === PARÁMETROS POA COMPARTIDOS (sincronizados entre Análisis POA y Simulador) ===
   const [poaTilt, setPoaTilt] = useState<number | null>(null); // null = usar latitud
   const [poaAzimuth, setPoaAzimuth] = useState(0); // 0 = Sur
@@ -739,7 +747,12 @@ export default function Home() {
       </header>
 
       <main className="container py-12">
-        {view === 'calculator' && <ShadingCalculator initialPoints={shadingPoints} templateData={templateData} weatherData={weatherData} onPointsChange={handleShadingPointsChange} onWeatherDataOverride={setWeatherData} onFacadeAnalysis3D={setFacadeAnalysis3D} onModelDataReady={(data) => { setModelFacades(data.facades); setModelObstacles3D(data.obstacleVertices3D); setModelNorthOffset(data.northOffset); }} externalActiveFacadeIdx={externalFacadeIdx} />}
+        {/* ShadingCalculator: una vez montado, se mantiene vivo (oculto via CSS) -- mismo patron que Heatmap/PVWatts/PVGIS Analyzer, para no perder el modelo 3D/EPW/puntos al navegar a otra pestana */}
+        {calculatorEverShown && (
+          <div style={{ display: view === 'calculator' ? 'block' : 'none' }}>
+            <ShadingCalculator initialPoints={shadingPoints} templateData={templateData} weatherData={weatherData} onPointsChange={handleShadingPointsChange} onWeatherDataOverride={setWeatherData} onFacadeAnalysis3D={setFacadeAnalysis3D} onModelDataReady={(data) => { setModelFacades(data.facades); setModelObstacles3D(data.obstacleVertices3D); setModelNorthOffset(data.northOffset); }} externalActiveFacadeIdx={externalFacadeIdx} />
+          </div>
+        )}
         {view === 'templates' && <TemplateManager onLoadTemplate={handleLoadTemplate} />}
         {view === 'cities' && <CityWeatherLibrary onSelectCity={handleSelectCity} selectedCityId={selectedCity?.id || null} />}
         {view === 'map' && <CityMapExplorer cities={mapCities} onSelectCity={(city) => {
