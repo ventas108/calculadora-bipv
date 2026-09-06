@@ -153,8 +153,11 @@ _default_pts = pd.DataFrame([
         "x (m)": 0.0, "y (m)": 3.0, "z (m)": 1.0,
     },
 ])
+if "sk_puntos_df" not in st.session_state:
+    st.session_state["sk_puntos_df"] = _default_pts
+
 df_pts = st.data_editor(
-    st.session_state.get("sk_puntos_df", _default_pts),
+    st.session_state["sk_puntos_df"],
     num_rows="dynamic", use_container_width=True, key="sk_puntos_editor",
 )
 st.session_state["sk_puntos_df"] = df_pts
