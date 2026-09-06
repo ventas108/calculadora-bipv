@@ -447,6 +447,13 @@ if st.button("🌤️ Calcular Sky View Factor", disabled=(malla is None)):
                 st.session_state["factor_svf_isotropico"] = factor_svf
                 st.session_state["factor_svf_auditoria"] = auditoria_svf
                 st.session_state["factor_svf_tilt_az"] = (tilt_svf, azimuth_svf)
+                # Forzar que ☀️ Recurso Solar recalcule la próxima vez que se
+                # abra -- si ya tenía un POA calculado (recurso_solar_ok=True),
+                # se habría quedado mostrando ese resultado viejo sin el SVF
+                # nuevo hasta que el usuario tocara tilt/azimuth/albedo a mano.
+                # Con esto, el auto-restore de esa página recalcula solo,
+                # reutilizando el TMY ya en caché (sin volver a PVGIS).
+                st.session_state["recurso_solar_ok"] = False
             except Exception as e:
                 st.error(f"❌ Error en el cálculo de SVF: {e}")
 
@@ -477,9 +484,14 @@ if df_svf is not None and factor_svf_guardado is not None:
             "del domo celeste, o el obstáculo es angosto/lejano frente a los puntos.",
             icon="ℹ️",
         )
-    if st.button("📤 Usar este SVF en ☀️ Recurso Solar", type="primary"):
+    st.caption(
+        "El factor ya quedó guardado apenas calculaste el SVF arriba — no hace falta "
+        "ningún botón extra. Si ☀️ Recurso Solar ya tenía un resultado calculado, se "
+        "invalidó automáticamente y se recalculará solo (reutilizando el TMY en caché, "
+        "sin volver a PVGIS) la próxima vez que abras esa página."
+    )
+    if st.button("📤 Ir a ☀️ Recurso Solar a verificar"):
         st.success(
-            f"Factor SVF={factor_svf_guardado:.3f} guardado — abre ☀️ **Recurso Solar** y "
-            "vuelve a calcular (o simplemente entra a la página, se aplica automáticamente "
-            "la próxima vez que recalcule la POA)."
+            f"Factor SVF={factor_svf_guardado:.3f} listo — abre ☀️ **Recurso Solar** en el "
+            "menú de la izquierda y revisa el aviso 🌤️ en los resultados."
         )
