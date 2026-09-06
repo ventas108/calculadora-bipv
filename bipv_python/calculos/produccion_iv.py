@@ -102,6 +102,7 @@ def simular_produccion_iv(
     P_dc_stc_kW: float | None = None,
     k_bipv: float = 1.0,
     P_ac_nom_W: float | None = None,
+    poa_bruta_kWh_m2: float | None = None,
 ) -> dict:
     """
     Simulación de producción anual hora a hora usando la curva IV real (Motor IV).
@@ -125,9 +126,15 @@ def simular_produccion_iv(
                           calculos.produccion.simular_produccion_anual() para el
                           hallazgo real que lo motivó (29-ago-2026) -- este módulo
                           tenía el mismo hueco.
+    poa_bruta_kWh_m2    : POA bruta REAL (antes de Motor Óptico) para el Reference
+                          Yield (Y_r)/PR -- ver el mismo parámetro y el hallazgo real
+                          (6-sep-2026) en calculos.produccion.simular_produccion_anual().
+                          Este módulo tenía el mismo hueco (Y_r usaba poa_base, que con
+                          Motor Óptico activo ya viene post-IAM+soiling). None (default)
+                          = comportamiento histórico, retrocompatible.
 
     Retorna dict con las mismas claves que simular_produccion_anual (incluye
-    perdida_clipping_kWh, horas_con_clipping, E_ac_sin_recorte_kWh) más:
+    perdida_clipping_kWh, horas_con_clipping, E_ac_sin_recorte_kWh, Y_r_es_bruta_real) más:
       metodo : "curva_iv" (para trazabilidad)
 
     Lanza ValueError si el panel no tiene ficha completa para el Motor IV.
@@ -192,7 +199,10 @@ def simular_produccion_iv(
     horas_con_clipping   = int(np.sum(clipping_W > 1e-6))
 
     # ── Métricas IEC 61724 (idénticas al modelo simple) ───────────────────────
-    H_i  = float(G_raw.sum()) / 1000.0
+    # Y_r debe referenciarse a la POA bruta REAL -- ver docstring de
+    # "poa_bruta_kWh_m2" arriba (mismo bug/fix que produccion.py, 6-sep-2026).
+    Y_r_es_bruta_real = poa_bruta_kWh_m2 is not None
+    H_i  = float(poa_bruta_kWh_m2) if Y_r_es_bruta_real else float(G_raw.sum()) / 1000.0
     H_ef = float(G_eff.sum()) / 1000.0
     Y_r  = H_i
     Y_a  = E_dc_anual / P_dc_stc_kW if P_dc_stc_kW > 0 else 0.0
@@ -240,6 +250,7 @@ def simular_produccion_iv(
         "P_stc_kW":                round(P_dc_stc_kW, 3),
         "Y_f":                     round(Y_f, 0),
         "Y_r":                     round(Y_r, 0),
+        "Y_r_es_bruta_real":       Y_r_es_bruta_real,
         "Y_a":                     round(Y_a, 0),
         "PR":                      round(PR, 3),
         "CF_pct":                  round(CF * 100, 1),

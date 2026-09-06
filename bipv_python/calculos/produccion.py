@@ -136,6 +136,7 @@ def simular_produccion_anual(
     P_dc_stc_kW: float | None = None,
     k_bipv: float = 1.0,
     P_ac_nom_W: float | None = None,
+    poa_bruta_kWh_m2: float | None = None,
 ) -> dict:
     """
     Simulación de producción anual hora a hora — IEC 61724.
@@ -167,6 +168,24 @@ def simular_produccion_anual(
                           contra PVsyst esta sesión (Urabá 0.88, Teusaquillo 0.54)
                           porque AMBOS tienen relación DC/AC < 1 -- el recorte nunca se
                           disparaba en esos casos, no porque no hiciera falta.
+    poa_bruta_kWh_m2    : POA bruta REAL del sitio (kWh/m²/año), ANTES de cualquier
+                          corrección óptica (IAM/soiling del Motor Óptico) -- típicamente
+                          `poa_anual_kWh_m2` de ☀️ Recurso Solar. IEC 61724 define el
+                          Reference Yield (Y_r) respecto a la irradiancia incidente en el
+                          plano SIN corregir, no respecto a la POA ya optimizada.
+                          Si None (default, retrocompatible): Y_r se calcula sumando
+                          `poa_base` (comportamiento histórico) -- correcto cuando
+                          `poa_base` YA es la bruta real (sin Motor Óptico activo), pero
+                          bug real encontrado el 6-sep-2026 auditando este módulo: cuando
+                          `poa_base` viene post-IAM+soiling (Motor Óptico activo, que pasa
+                          `poa_sin_termico_df` aquí), Y_r quedaba "adelgazado" por esas
+                          pérdidas en vez de contarlas como pérdida real -- el PR mostrado
+                          salía más alto que un PR IEC 61724 estricto. La tabla de balance
+                          `perdidas_desglosadas()` nunca tuvo este bug (ya recibía la
+                          bruta real por su propio parámetro `poa_bruta_kWh_m2`) -- este
+                          parámetro homónimo alinea `simular_produccion_anual()` con el
+                          mismo criterio. Ningún kWh ni cifra financiera cambia con esto
+                          -- solo el % de PR reportado cuando Motor Óptico está activo.
 
     Retorna dict
     ────────────
@@ -174,7 +193,11 @@ def simular_produccion_anual(
     E_ac_anual_kWh       : energía AC anual (kWh) -- YA recortada si P_ac_nom_W se pasó
     P_stc_kW             : potencia instalada (kWp)
     Y_f                  : Final yield (kWh/kWp)
-    Y_r                  : Reference yield (h = kWh/m²)
+    Y_r                  : Reference yield (h = kWh/m²) -- ver poa_bruta_kWh_m2 arriba
+    Y_r_es_bruta_real    : True si Y_r usó la POA bruta real pasada (poa_bruta_kWh_m2);
+                          False si cayó al fallback histórico (suma de poa_base) --
+                          explícito para que quien consuma el resultado sepa cuál
+                          definición de PR está viendo, sin tener que inspeccionar código.
     Y_a                  : Array yield (kWh/kWp)
     PR                   : Performance Ratio IEC 61724
     CF_pct               : Capacity Factor (%)
@@ -242,7 +265,11 @@ def simular_produccion_anual(
     horas_con_clipping   = int(np.sum(clipping_W > 1e-6))
 
     # ── Métricas IEC 61724 ────────────────────────────────────────────────────
-    H_i  = float(G_raw.sum()) / 1000.0          # POA bruta kWh/m²
+    # Y_r (Reference Yield) debe referenciarse a la POA bruta REAL (ver
+    # docstring "poa_bruta_kWh_m2" arriba) -- si no se pasa, cae al histórico
+    # sum(poa_base), correcto solo cuando poa_base YA es la bruta real.
+    Y_r_es_bruta_real = poa_bruta_kWh_m2 is not None
+    H_i  = float(poa_bruta_kWh_m2) if Y_r_es_bruta_real else float(G_raw.sum()) / 1000.0
     H_ef = float(G_eff.sum()) / 1000.0          # POA efectiva kWh/m² (post-mismatch)
     Y_r  = H_i                                   # Reference yield [h] = H_t / G_STC (IEC 61724)
     # NOTA: Y_r usa POA bruta (H_i), no H_ef, para que el PR incluya las pérdidas
@@ -291,6 +318,7 @@ def simular_produccion_anual(
         "P_stc_kW":               round(P_dc_stc_kW, 3),
         "Y_f":                    round(Y_f, 0),
         "Y_r":                    round(Y_r, 0),
+        "Y_r_es_bruta_real":      Y_r_es_bruta_real,
         "Y_a":                    round(Y_a, 0),
         "PR":                     round(PR, 3),
         "CF_pct":                 round(CF * 100, 1),

@@ -495,6 +495,13 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 # capacidad de UN SOLO inversor (124,8kW) en vez del total real
                 # (374,4kW), subestimando la energía drásticamente.
                 P_ac_nom_W        = _p_ac_nom_w_total,
+                # Y_r/PR deben referenciarse a la POA bruta REAL, no a
+                # poa_base (que con Motor Óptico activo ya viene con
+                # IAM+soiling descontados) -- bug real encontrado el
+                # 6-sep-2026 auditando este módulo, ver docstring de
+                # "poa_bruta_kWh_m2" en calculos.produccion. Mismo valor
+                # que ya recibía perdidas_desglosadas() más abajo.
+                poa_bruta_kWh_m2  = poa_bruta_anual,
             )
             try:
                 res_base = simular_produccion_anual(**_sim_kwargs)
@@ -657,13 +664,23 @@ if btn_sim or st.session_state.get("produccion_ok"):
     m3.metric("Y_f (Final yield)", f"{res['Y_f']:,.0f} kWh/kWp",
               help="Producción normalizada — equivalente a horas a plena carga AC")
     m4.metric("Y_r (Ref. yield)",  f"{res['Y_r']:,.0f} h",
-              help="POA efectiva / 1 kW/m² — horas sol pico equivalentes")
+              help=(
+                  "POA BRUTA real del sitio / 1 kW/m² — horas sol pico equivalentes. "
+                  "IEC 61724 define Y_r respecto a la irradiancia incidente SIN corregir "
+                  "por IAM/soiling, para que esas pérdidas cuenten como pérdida real en el PR."
+                  + ("" if res.get("Y_r_es_bruta_real") else
+                     "  \n\n⚠️ Este resultado viene de un motor que no declaró la POA bruta "
+                     "real — Y_r cayó al valor histórico (suma de la POA de entrada), que "
+                     "puede estar post-corrección óptica si Motor Óptico participó.")
+              ))
     m5.metric("PR (Perf. Ratio)",  f"{res['PR']*100:.1f}%",
               help=(
                   "**Performance Ratio IEC 61724**  \n"
                   "PR = Y_f / Y_r = E_ac / (P_stc × H_POA_bruta)  \n\n"
                   "Mide la eficiencia global del sistema frente a su potencial teórico "
-                  "(irradiancia × potencia nominal).  \n\n"
+                  "(irradiancia bruta × potencia nominal) — incluye TODAS las pérdidas "
+                  "reales: IAM, soiling, térmica, mismatch, inversor. "
+                  f"Fuente de H_POA_bruta: {'POA bruta real de ☀️ Recurso Solar' if res.get('Y_r_es_bruta_real') else '⚠️ fallback histórico, ver Y_r arriba'}.  \n\n"
                   "**Rangos típicos Colombia BIPV:**  \n"
                   "· Fachada vertical: 55–70 %  \n"
                   "· Techo inclinado optimizado: 70–80 %  \n"

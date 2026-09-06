@@ -2358,6 +2358,8 @@ Página 7 / 11 / 12 / 10 leen:
 
 PR = Y_f / Y_r = (E_ac / P_STC) / (H_POA / G_STC)
 
+`H_POA` en esta fórmula es SIEMPRE la **POA bruta real del sitio** (la que muestra ☀️ Recurso Solar, ANTES de cualquier corrección de Motor Óptico) — nunca la POA ya corregida por IAM/soiling, aunque Motor Óptico esté activo. Así el PR cuenta esas pérdidas como pérdida real, igual que exige IEC 61724 (ver anexo "Corrección Y_r/PR" para el bug real que esto corrigió el 6-sep-2026). En la app, el tooltip de "Y_r (Ref. yield)" en 📊 Producción confirma la fuente usada; si alguna vez dice "⚠️ fallback histórico", significa que el motor que generó ese resultado no declaró la bruta real (revisar qué función lo llamó).
+
 - PR > 100%: Posible en Bogotá/Medellín (altitud, temperatura baja) — físicamente correcto
 - PR 80–100%: Rango normal para fachadas BIPV bien diseñadas
 - PR 60–80%: Revisar pérdidas ópticas, mismatch o sombreado
@@ -3181,6 +3183,24 @@ Hasta ahora la app solo modelaba sombra de **haz directo** (`FS_geometrico`, ray
 **Validación**: toda la implementación se probó contra un venv aislado con las versiones EXACTAS de producción (`pvlib==0.11.1`, `numpy==1.26.4`, `pandas==2.2.2`, Python 3.12), no contra lo que hubiera instalado localmente. `calcular_svf_difuso()` se validó contra un cierre analítico derivado a mano (pared delgada de ancho finito frente a un panel vertical: `f_svf = 1 - sin(psi_max)`) — la primera derivación analítica tenía un error real (asumía bloqueo proporcional al ángulo en vez de a `sin` del ángulo, por el peso coseno en azimut), detectado precisamente porque el ray-casting no coincidía con la fórmula ingenua, y confirmado con una integración numérica independiente antes de aceptar la fórmula corregida. 16 tests nuevos (`tests/test_svf_difuso.py`, `tests/test_solar_svf.py`). Suite completa del repo bajo las versiones pinneadas de producción: **982/982 passed**, cero regresiones.
 
 **Alcance explícito, no cubierto en esta v1**: la reducción de la difusa reflejada por el suelo (`poa_ground_diffuse`) que el mismo obstáculo también recorta — efecto normalmente más chico, pendiente de sumar si hace falta. El mismo hueco de fondo (todo-o-nada, sin reducción isotrópica permanente) sigue existiendo en el perfil de horizonte (sección 20, para montañas/edificios lejanos) — no corregido en esta sesión por estar fuera del alcance pedido (el obstáculo cercano de 🌳 Sombras SketchUp), documentado como pendiente si se quiere el mismo tratamiento allí. Ver secciones 4 y 8a.
+
+────────────────────────────────────────────────────────────
+
+## 60. Anexo — Actualizaciones del 6 de septiembre de 2026 (📊 Producción/Motor IV: corrección Y_r/PR — el Performance Ratio usaba la POA post-óptica como referencia, no la bruta real)
+
+Auditoría exhaustiva del motor de producción pedida explícitamente por el usuario (mismo día que el Sky View Factor de la sección 59) encontró un bug real, no documentado antes, en `calculos/produccion.py::simular_produccion_anual()` y su gemelo `calculos/produccion_iv.py::simular_produccion_iv()` (Motor IV).
+
+**El problema**: ambas funciones calculaban el Reference Yield (`Y_r`, denominador del PR) sumando `poa_base` — el DataFrame de POA que les pasa el caller. Pero `pages/6_📊_Produccion.py` le pasa DataFrames distintos según el escenario:
+- Sin 🔆 Motor Óptico: `poa_base = poa_df`, la POA bruta real — ahí `Y_r` siempre estuvo bien.
+- Con Motor Óptico activo: `poa_base = poa_sin_termico_df`, la POA YA con IAM+soiling descontados (para que el SDM no cuente la temperatura dos veces). En ese caso, `Y_r` quedaba "adelgazado" por esas mismas pérdidas ópticas en vez de contarlas como pérdida real frente a la referencia — el **PR mostrado en pantalla salía más alto que un PR IEC 61724 estricto** cuando Motor Óptico estaba activo.
+
+Importante: la tabla detallada de balance `perdidas_desglosadas()` (📋 "Ver tabla detallada de balance IEC 61724") **nunca tuvo este bug** — siempre recibió la POA bruta real por su propio parámetro `poa_bruta_kWh_m2` (`poa_anual_kWh_m2` de ☀️ Recurso Solar), independiente de `poa_base`. Tampoco afectó ningún kWh de energía ni ninguna cifra financiera — E_ac/E_dc/TIR/VPN se calculan de la cadena `G_eff` hacia adelante, nunca de `Y_r`. Era puramente el % de PR resumen mostrado con una definición no estándar en ese escenario.
+
+**Fix**: nuevo parámetro opcional `poa_bruta_kWh_m2` (mismo nombre que ya usaba `perdidas_desglosadas()`, por consistencia) en ambas funciones de simulación. `None` (default) conserva el comportamiento histórico exacto — retrocompatible con cualquier otro caller que no lo pase (ej. `simulation/bipv_simulator.py`, que nunca tuvo el bug porque su `poa` siempre es la bruta real, sin paso de Motor Óptico). `pages/6_📊_Produccion.py` ahora pasa `poa_bruta_kWh_m2=poa_bruta_anual` — el MISMO valor que ya usaba `perdidas_desglosadas()` — en ambas llamadas (Motor base y Motor IV comparten el mismo dict de argumentos).
+
+**Dato explícito, no solo corregido en silencio**: el resultado de ambas funciones ahora incluye `Y_r_es_bruta_real` (bool) — `True` cuando `Y_r` usó la bruta real declarada, `False` si cayó al fallback histórico. En la UI, el tooltip de la métrica "Y_r (Ref. yield)" en 📊 Producción muestra una advertencia explícita si algún día ese flag sale `False` ahí (indicaría que alguien llamó a la función sin declarar la bruta real). El tooltip de "PR" también nombra la fuente de `H_POA_bruta` usada.
+
+**Validación**: 4 tests nuevos (`tests/test_yr_bruta_real.py`) — retrocompatibilidad exacta sin el parámetro nuevo (para ambas funciones), y con el parámetro, que `Y_r` use la bruta declarada y NO la `poa_base` reducida (con un escenario sintético donde ambas difieren a propósito, para que el test detecte de verdad el cambio). Suite completa del repo bajo las versiones pinneadas de producción corrida de nuevo tras el fix.
 
 ────────────────────────────────────────────────────────────
 
