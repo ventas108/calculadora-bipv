@@ -30,7 +30,11 @@ NIVEL_POR_SCORE = {1: "no_recomendado", 2: "aceptable", 3: "optimo"}
 ICONO_POR_SCORE = {1: "🔴", 2: "🟡", 3: "🟢"}
 
 
-def clasificar_familia_regional(tecnologia_cruda: str | None) -> str | None:
+def clasificar_familia_regional(
+    tecnologia_cruda: str | None,
+    marca: str | None = None,
+    texto_adicional: str | None = None,
+) -> str | None:
     """
     Clasifica el texto libre de tecnología del catálogo (ej. "CdTe pelicula
     delgada", "Mono PERC Bifacial BIPV") hacia una de las 21 familias reales
@@ -39,37 +43,81 @@ def clasificar_familia_regional(tecnologia_cruda: str | None) -> str | None:
     busca palabras clave de familia DENTRO de esa tecnología -- nunca cruza
     entre tecnologías distintas.
 
-    Para CdTe y CIS, siempre hay una familia representativa razonable (pocas
-    familias, puntajes similares entre sí). Para Crystalline -- que en la
-    matriz real tiene familias con puntajes MUY distintos entre sí, ej.
-    bifacial=1 en Andina vs. teja BC=3 en Andina -- solo se asigna una
-    familia si hay una palabra clave positiva; si no, devuelve None (más
-    vale no responder que responder con falsa precisión).
+    Parámetros
+    ----------
+    tecnologia_cruda : campo "Tecnologia" del catálogo (obligatorio).
+    marca            : campo "Marca" del catálogo (opcional). Bug real
+                       encontrado el 6-sep-2026 auditando este módulo: sin
+                       marca, palabras como "flex" o "teja"/"tile" resolvían
+                       SIEMPRE a la misma familia hardcodeada sin importar
+                       qué producto real disparó el match -- 5 de las 21
+                       familias de la matriz eran estructuralmente
+                       inalcanzables (ver DIAGNOSTICO_COMPATIBILIDAD_
+                       REGIONAL_BIPV_v2.md). Con marca, se distingue
+                       primero por fabricante y solo después por keyword.
+    texto_adicional  : texto extra para desambiguar variantes de la MISMA
+                       marca (ej. "nombre"/"notas" del catálogo) -- la
+                       palabra que distingue "teja plana" de "teja BC" suele
+                       estar en Notas/TipoPanel, no en el campo Tecnologia
+                       (caso real: datos/panel_einnova_esm_ft_120w.json,
+                       Tecnologia="...BIPV Tile" pero Notas="Teja solar
+                       PLANA..." -- sin `texto_adicional` es indistinguible
+                       de "teja BC" con solo el campo Tecnologia).
+
+    Retrocompatible: sin `marca`/`texto_adicional` (ninguno de los callers
+    anteriores a este fix los pasaba), el resultado es IDÉNTICO al de antes
+    -- mismos defaults hardcodeados que ya estaban documentados y probados.
+
+    Para Crystalline -- que en la matriz real tiene familias con puntajes
+    MUY distintos entre sí, ej. bifacial=1 en Andina vs. teja BC=3 en Andina
+    -- solo se asigna una familia si hay una palabra clave positiva; si no,
+    devuelve None (más vale no responder que responder con falsa precisión).
     """
     tecnologia = clasificar_tecnologia_jrc(tecnologia_cruda) if tecnologia_cruda else None
     if tecnologia is None:
         return None
     t = tecnologia_cruda.lower()
+    extra = (texto_adicional or "").lower()
+    m = (marca or "").lower()
+    t_completo = f"{t} {extra}"
+
+    es_hiitio  = "hiitio"  in m
+    es_einnova = "einnova" in m
+    es_soltech = "soltech" in m or "soltech" in t or "asp-st1" in t or "asp st1" in t
 
     if tecnologia == "CdTe":
-        if "soltech" in t or "asp-st1" in t or "asp st1" in t:
-            return "soltech_transparente"
+        if es_soltech:
+            # 4 variantes SOLTECH reales con el mismo score hoy (ver docstring
+            # del módulo) -- desambiguadas por si la matriz cambia a futuro.
+            if "laminado" in t_completo:
+                return "soltech_laminado"
+            if "dvh" in t_completo or "doble vidrio" in t_completo or "double glass" in t_completo:
+                return "soltech_dvh"
+            if "opaco" in t_completo or "opaque" in t_completo:
+                return "soltech_opaco"
+            return "soltech_transparente"   # default SOLTECH sin más pistas
         if "vidrio" in t or "glass" in t:
             return "einnova_vidrio"
         return "cdte_semit"  # representante consensuado (HIITIO/EINNOVA comparten este puntaje)
 
     if tecnologia == "CIS":
-        return "cigs"  # única familia CIS/CIGS disponible en la matriz portada
+        if es_soltech:
+            return "soltech_teja"
+        return "cigs"   # default HIITIO/sin marca -- comportamiento previo preservado
 
     # Crystalline -- solo con evidencia positiva de familia específica.
     if "bifacial" in t:
         return "einnova_bifacial"
-    if "flex" in t:
-        return "topcon_flex"
+    if "flex" in t_completo:
+        return "einnova_flexible" if es_einnova else "topcon_flex"
     if "curtain" in t or "cortina" in t:
         return "hjt_curtain"
-    if "teja" in t or "tile" in t:
-        return "einnova_teja_bc"
+    if "teja" in t_completo or "tile" in t_completo:
+        if es_hiitio:
+            return "hjt_tile"
+        if es_einnova and ("plana" in t_completo or "flat" in t_completo):
+            return "einnova_teja_plana"
+        return "einnova_teja_bc"   # default EINNOVA/sin marca -- comportamiento previo preservado
     if "antirreflej" in t:
         return "einnova_antirreflejo"
     if "agri" in t or "invernadero" in t:
@@ -81,9 +129,29 @@ def clasificar_familia_regional(tecnologia_cruda: str | None) -> str | None:
     return None
 
 
-def evaluar_compatibilidad_regional(tecnologia_cruda: str, lat: float, lon: float) -> dict | None:
+# NOTA: "einnova_color_panel" queda sin palabra clave propia a propósito --
+# no se encontró evidencia de una palabra distintiva real en ningún producto
+# del catálogo actual para justificarla sin arriesgar un falso positivo
+# (mismo principio "nunca falsa precisión" del resto de este módulo).
+# Documentado como límite conocido, no corregido por falta de evidencia
+# real, no por descuido. Si aparece un producto real con esa evidencia,
+# agregar la rama aquí siguiendo el mismo patrón marca+keyword.
+
+
+def evaluar_compatibilidad_regional(
+    tecnologia_cruda: str,
+    lat: float,
+    lon: float,
+    marca: str | None = None,
+    texto_adicional: str | None = None,
+) -> dict | None:
     """
     Evalúa la compatibilidad regional real de un panel para un sitio dado.
+
+    `marca` y `texto_adicional` -- ver `clasificar_familia_regional()` para
+    el porqué (bug real de 5 familias inalcanzables sin ellos, corregido
+    6-sep-2026). Opcionales y retrocompatibles: si no se pasan, el resultado
+    es idéntico al de antes de este fix.
 
     Devuelve `None` (nunca inventa) si no se pudo clasificar ninguna familia
     (`clasificar_familia_regional()` devolvió None). En cualquier otro caso,
@@ -96,7 +164,7 @@ def evaluar_compatibilidad_regional(tecnologia_cruda: str, lat: float, lon: floa
       notas            : nota técnica real de la matriz portada.
       marca            : de qué catálogo real viene la familia (hiitio/einnova/soltech).
     """
-    familia = clasificar_familia_regional(tecnologia_cruda)
+    familia = clasificar_familia_regional(tecnologia_cruda, marca, texto_adicional)
     if familia is None:
         return None
 
@@ -117,7 +185,12 @@ def evaluar_compatibilidad_regional(tecnologia_cruda: str, lat: float, lon: floa
     }
 
 
-def evaluar_compatibilidad_regional_desde_ciudad(tecnologia_cruda: str, ciudad_nombre: str) -> dict | None:
+def evaluar_compatibilidad_regional_desde_ciudad(
+    tecnologia_cruda: str,
+    ciudad_nombre: str,
+    marca: str | None = None,
+    texto_adicional: str | None = None,
+) -> dict | None:
     """Igual que `evaluar_compatibilidad_regional()`, pero resolviendo lat/lon
     desde el nombre de ciudad vía `datos/ciudades_colombia.py` -- el punto de
     entrada más cómodo desde una página de la app, que solo tiene el nombre
@@ -127,4 +200,6 @@ def evaluar_compatibilidad_regional_desde_ciudad(tecnologia_cruda: str, ciudad_n
     ciudad = CIUDADES.get(ciudad_nombre)
     if not ciudad:
         return None
-    return evaluar_compatibilidad_regional(tecnologia_cruda, ciudad["lat"], ciudad["lon"])
+    return evaluar_compatibilidad_regional(
+        tecnologia_cruda, ciudad["lat"], ciudad["lon"], marca, texto_adicional
+    )

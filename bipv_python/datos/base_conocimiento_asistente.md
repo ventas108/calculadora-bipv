@@ -3200,7 +3200,29 @@ Importante: la tabla detallada de balance `perdidas_desglosadas()` (📋 "Ver ta
 
 **Dato explícito, no solo corregido en silencio**: el resultado de ambas funciones ahora incluye `Y_r_es_bruta_real` (bool) — `True` cuando `Y_r` usó la bruta real declarada, `False` si cayó al fallback histórico. En la UI, el tooltip de la métrica "Y_r (Ref. yield)" en 📊 Producción muestra una advertencia explícita si algún día ese flag sale `False` ahí (indicaría que alguien llamó a la función sin declarar la bruta real). El tooltip de "PR" también nombra la fuente de `H_POA_bruta` usada.
 
-**Validación**: 4 tests nuevos (`tests/test_yr_bruta_real.py`) — retrocompatibilidad exacta sin el parámetro nuevo (para ambas funciones), y con el parámetro, que `Y_r` use la bruta declarada y NO la `poa_base` reducida (con un escenario sintético donde ambas difieren a propósito, para que el test detecte de verdad el cambio). Suite completa del repo bajo las versiones pinneadas de producción corrida de nuevo tras el fix.
+**Validación**: 4 tests nuevos (`tests/test_yr_bruta_real.py`) — retrocompatibilidad exacta sin el parámetro nuevo (para ambas funciones), y con el parámetro, que `Y_r` use la bruta declarada y NO la `poa_base` reducida (con un escenario sintético donde ambas difieren a propósito, para que el test detecte de verdad el cambio). Suite completa del repo bajo las versiones pinneadas de producción corrida de nuevo tras el fix: **986/986 passed**, cero regresiones.
+
+────────────────────────────────────────────────────────────
+
+## 61. Anexo — Actualizaciones del 6 de septiembre de 2026 (Compatibilidad Regional BIPV: 5 de las 21 familias de la matriz eran estructuralmente inalcanzables sin verificar la marca)
+
+Auditoría rigurosa pedida explícitamente por el usuario sobre la función de compatibilidad regional (sección 25m, construida el 31-ago-2026: ¿el panel/tecnología encaja físicamente con la región del sitio?). La auditoría inicial de esa sesión ya verificó la detección de región bit-a-bit contra el TypeScript original y 2 ejemplos reales del RTF fuente, pero nunca recibió una auditoría rigurosa dedicada (a diferencia de Diagrama Unifilar/Ficha RETIE/el pipeline Financiero-CO2-TRM).
+
+**Hallazgo raíz**: `clasificar_familia_regional()` clasificaba por PALABRA CLAVE sin verificar la MARCA primero — cuando dos familias (de marcas distintas, o incluso de la MISMA marca) comparten una palabra descriptiva, el código siempre devolvía la primera hardcodeada, sin importar cuál producto real disparó el match. Resultado: **5 de las 21 familias de la matriz eran estructuralmente inalcanzables**.
+
+**Bug confirmado con un panel real del catálogo** (no solo teórico): `datos/panel_einnova_esm_ft_120w.json` — `Tecnologia="N-Type TOPCon Double Glass BIPV Tile"` contiene "Tile" → antes del fix SIEMPRE resolvía a `einnova_teja_bc`, nunca podía resolver a `einnova_teja_plana` (otra familia de teja de la MISMA marca EINNOVA). El campo `Notas` de ese mismo panel real dice explícitamente *"Teja solar **PLANA** doble vidrio BIPV"* — confirma que el panel es la variante "plana", no "BC". Sus puntajes reales difieren en Caribe (3 vs 2) e Insular (3 vs 2) — la app mostraba 🟢 óptimo en Caribe cuando el juicio experto real de ESE panel dice 🟡 aceptable.
+
+Otros 3 casos con el mismo patrón (sin daño numérico hoy porque el catálogo aún no tiene un producto real que los dispare, pero bombas de tiempo estructurales): `"flex"` siempre resolvía a `topcon_flex` (HIITIO), dejando `einnova_flexible` inalcanzable (puntajes MUY distintos en Orinoquía: 3 vs 1 real); tecnología CIS siempre resolvía a `cigs` (HIITIO), dejando `soltech_teja` inalcanzable; `"soltech"` en CdTe siempre resolvía a `soltech_transparente`, dejando `soltech_laminado`/`dvh`/`opaco` inalcanzables.
+
+**Fix**: `clasificar_familia_regional()`, `evaluar_compatibilidad_regional()` y `evaluar_compatibilidad_regional_desde_ciudad()` ganan 2 parámetros opcionales nuevos, retrocompatibles (`None`/sin pasar = comportamiento histórico exacto, todos los tests previos siguen pasando sin cambiar):
+- `marca`: el campo `Marca` real del catálogo (`panel["marca"]`, ej. "EINNOVA Solarline") — se verifica PRIMERO, antes de resolver por palabra clave.
+- `texto_adicional`: texto extra para desambiguar variantes de la MISMA marca — necesario porque la palabra que distingue "teja plana" de "teja BC" está en `Notas`/`TipoPanel`, no en `Tecnologia` (el caso real de arriba es indistinguible con solo el campo `Tecnologia`).
+
+`pages/4_📐_Dimensionamiento.py` ahora pasa `marca=panel.get("marca")` y `texto_adicional=f"{panel.get('nombre','')} {panel.get('notas','')}"` en su llamada — así aprovecha información que YA estaba en el catálogo pero que la función nunca recibía.
+
+**`einnova_color_panel` queda documentado como límite conocido, NO corregido** — no se encontró ningún producto real en el catálogo con una palabra clave distintiva que lo justifique sin arriesgar un falso positivo (mismo principio "nunca falsa precisión" del resto del módulo). Si aparece un producto real con esa evidencia, agregar la rama siguiendo el mismo patrón marca+keyword.
+
+**Validación**: verificado a mano contra el panel EINNOVA Tile real (ahora resuelve `einnova_teja_plana`, antes `einnova_teja_bc`) y contra los 3 casos latentes. 10 tests nuevos anclados al panel real y a cada rama de desambiguación (`tests/test_compatibilidad_regional.py`) — los 12 tests preexistentes siguen pasando sin cambios (retrocompatibilidad confirmada, no solo declarada). Suite dirigida: 22/22. Suite completa del repo relanzada tras el fix.
 
 ────────────────────────────────────────────────────────────
 

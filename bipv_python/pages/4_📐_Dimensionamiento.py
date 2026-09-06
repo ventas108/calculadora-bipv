@@ -629,8 +629,17 @@ else:
 _ciudad_dim = st.session_state.get("ciudad") or st.session_state.get("tmy_ciudad")
 if _ciudad_dim:
     from calculos.compatibilidad_regional import evaluar_compatibilidad_regional_desde_ciudad
+    # marca/texto_adicional -- bug real corregido 6-sep-2026: sin la marca,
+    # 5 de las 21 familias de la matriz eran inalcanzables (ej. un panel
+    # EINNOVA real con "Tile" en Tecnologia siempre resolvía a la familia
+    # HIITIO/EINNOVA por defecto, nunca a la variante correcta de su propia
+    # marca). "nombre"+"notas" llevan la palabra que a veces falta en
+    # "tecnologia" (ej. "plana" está en Notas, no en Tecnologia, para
+    # distinguir teja plana de teja BC). Ver calculos.compatibilidad_regional.
     _compat_regional = evaluar_compatibilidad_regional_desde_ciudad(
         panel.get("tecnologia"), _ciudad_dim,
+        marca=panel.get("marca"),
+        texto_adicional=f"{panel.get('nombre', '')} {panel.get('notas', '')}",
     )
     if _compat_regional:
         _msg_regional = (

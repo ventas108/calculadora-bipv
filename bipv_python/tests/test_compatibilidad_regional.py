@@ -107,3 +107,90 @@ def test_evaluar_desde_ciudad_resuelve_lat_lon_real():
 
 def test_evaluar_desde_ciudad_desconocida_devuelve_none():
     assert evaluar_compatibilidad_regional_desde_ciudad("CdTe", "Ciudad Inexistente XYZ") is None
+
+
+# ---------------------------------------------------------------------------
+# Fix real (6-sep-2026, auditoría pedida por el usuario): sin marca/texto
+# adicional, 5 de las 21 familias eran estructuralmente inalcanzables --
+# "flex"/"teja"/"tile"/CIS/CdTe-soltech siempre resolvían a la misma familia
+# hardcodeada sin importar la marca real del producto. Ver
+# calculos.compatibilidad_regional::clasificar_familia_regional() docstring.
+# ---------------------------------------------------------------------------
+
+
+def test_panel_einnova_real_con_tile_resuelve_a_teja_plana_no_teja_bc():
+    # Caso real encontrado auditando: datos/panel_einnova_esm_ft_120w.json
+    # -- Tecnologia="...BIPV Tile" (no distingue plana/BC por sí sola),
+    # pero Notas dice explícitamente "Teja solar PLANA doble vidrio BIPV".
+    # Antes del fix, esto SIEMPRE resolvía a "einnova_teja_bc" (puntajes
+    # reales distintos en Caribe 3 vs 2 e Insular 3 vs 2 -- falso positivo).
+    familia = clasificar_familia_regional(
+        "N-Type TOPCon Double Glass BIPV Tile",
+        marca="EINNOVA Solarline",
+        texto_adicional=(
+            "EINNOVA ESM-FT 120W Flat Tile Color "
+            "EINNOVA ESM-FT 120W — Teja solar plana doble vidrio BIPV."
+        ),
+    )
+    assert familia == "einnova_teja_plana"
+
+
+def test_panel_einnova_tile_sin_pista_de_plana_sigue_dando_teja_bc():
+    # Con marca EINNOVA pero SIN la palabra "plana"/"flat" en ningún lado,
+    # el default correcto sigue siendo teja_bc (no se inventa "plana" sin
+    # evidencia -- mismo principio "nunca falsa precisión" del resto).
+    assert clasificar_familia_regional(
+        "N-Type TOPCon Double Glass BIPV Tile", marca="EINNOVA Solarline",
+    ) == "einnova_teja_bc"
+
+
+def test_hiitio_tile_ya_no_se_confunde_con_einnova():
+    # Antes del fix, CUALQUIER "tile"/"teja" resolvía a "einnova_teja_bc"
+    # sin importar la marca -- un HIITIO real (familia "hjt_tile", puntajes
+    # propios) se habría reportado con los puntajes/notas de EINNOVA.
+    assert clasificar_familia_regional(
+        "N-Type TopCon Tile", marca="HIITIO",
+    ) == "hjt_tile"
+
+
+def test_einnova_flex_ya_no_se_confunde_con_topcon_flex_hiitio():
+    # Antes del fix, "flex" SIEMPRE resolvía a "topcon_flex" (HIITIO) --
+    # puntajes reales distintos en Orinoquía (3 vs 1) e Insular (3 vs 2).
+    assert clasificar_familia_regional(
+        "N-Type TopCon Flex", marca="EINNOVA",
+    ) == "einnova_flexible"
+    # Sin marca EINNOVA, el default previo (topcon_flex) se preserva --
+    # ver test_crystalline_con_palabras_clave_reales_del_catalogo arriba.
+
+
+def test_soltech_cis_ya_no_se_confunde_con_cigs_hiitio():
+    # Antes del fix, cualquier CIS/CIGS SIEMPRE resolvía a "cigs" (HIITIO).
+    assert clasificar_familia_regional("CIS", marca="SOLTECH") == "soltech_teja"
+    assert clasificar_familia_regional("CIGS") == "cigs"   # sin marca: default previo intacto
+
+
+@pytest.mark.parametrize("texto_adicional,familia_esperada", [
+    ("Laminado", "soltech_laminado"),
+    ("Doble Vidrio Hermetico DVH", "soltech_dvh"),
+    ("Modulo opaco premium", "soltech_opaco"),
+    ("", "soltech_transparente"),   # sin pista extra -- default SOLTECH previo
+])
+def test_soltech_cdte_desambigua_las_4_variantes_reales(texto_adicional, familia_esperada):
+    assert clasificar_familia_regional(
+        "CdTe", marca="SOLTECH", texto_adicional=texto_adicional,
+    ) == familia_esperada
+
+
+def test_evaluar_compatibilidad_regional_propaga_marca_y_texto_adicional():
+    # Verifica el pipeline completo (no solo el clasificador aislado): con
+    # la marca/notas reales del panel EINNOVA Tile, el score de Caribe debe
+    # ser el de "einnova_teja_plana" (2), no el de "einnova_teja_bc" (3).
+    r = evaluar_compatibilidad_regional(
+        "N-Type TOPCon Double Glass BIPV Tile", 10.4, -75.5,   # Cartagena, Caribe
+        marca="EINNOVA Solarline",
+        texto_adicional="Teja solar plana doble vidrio BIPV.",
+    )
+    assert r is not None
+    assert r["familia"] == "einnova_teja_plana"
+    assert r["region"] == "caribe"
+    assert r["score"] == 2
