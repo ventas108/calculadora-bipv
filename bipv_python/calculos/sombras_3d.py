@@ -294,7 +294,16 @@ def posiciones_solares(lat: float, lon: float,
     if indice_tmy is not None and len(indice_tmy) > 0:
         idx = pd.DatetimeIndex(indice_tmy)
         if idx.tz is None:
-            idx = idx.tz_localize("UTC")
+            # El indice del TMY del proyecto llega NAIVE en hora LOCAL (misma
+            # convencion que usa Produccion) -- localizarlo como UTC aqui
+            # etiquetaba cada hora con el numero de reloj local pero calculaba
+            # la posicion solar para ese mismo numero en UTC, corriendo todo
+            # el resultado 5h (offset Bogota) sin ningun aviso: hora=12
+            # terminaba mostrando la posicion solar real de las 7am. Se usa el
+            # mismo parametro `tz` que ya tiene esta funcion (y que el
+            # fallback de abajo ya usaba correctamente) para que "hora" en el
+            # CSV corresponda de verdad a la hora local que dice ser.
+            idx = idx.tz_localize(tz)
     else:
         idx = pd.date_range("2023-01-01 00:00", "2023-12-31 23:00",
                             freq="h", tz=tz)
