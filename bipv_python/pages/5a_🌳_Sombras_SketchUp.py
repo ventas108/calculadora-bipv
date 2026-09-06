@@ -11,6 +11,8 @@ El resultado es el mismo CSV de la Calculadora de Sombreado 3D web:
 entra directo a 🔀 Mismatch/Bypass → E_ac corregida → 💰 Financiero.
 Las dos rutas (web y SketchUp) conviven — nada de lo existente cambia.
 """
+import math
+
 import pandas as pd
 import streamlit as st
 
@@ -229,6 +231,16 @@ if st.button("▶️ Calcular sombras (ray-casting)", type="primary",
     puntos = []
     for _, fila in df_pts.iterrows():
         try:
+            x, y, z = float(fila["x (m)"]), float(fila["y (m)"]), float(fila["z (m)"])
+            if not (math.isfinite(x) and math.isfinite(y) and math.isfinite(z)):
+                # Fila en blanco (típicamente la fila vacía que st.data_editor
+                # deja siempre al final para "agregar nueva"): pandas la lee
+                # como NaN, y float(nan) NO lanza ValueError/TypeError -- se
+                # colaba silenciosamente al ray-casting con coordenadas NaN,
+                # reventando mas adelante con el críptico error de trimesh
+                # "Coordinates must not have minimums more than maximums".
+                # Se descarta aquí, igual que una fila con texto no numérico.
+                continue
             puntos.append({
                 "nombre": str(fila["Punto"]), "fachada": str(fila["Fachada"]),
                 "fila": str(fila.get("Fila", fila["Punto"])),
@@ -237,7 +249,7 @@ if st.button("▶️ Calcular sombras (ray-casting)", type="primary",
                 "potencia_instalada_kw": float(
                     fila.get("Potencia instalada (kW)", 0) or 0
                 ),
-                "x": float(fila["x (m)"]), "y": float(fila["y (m)"]), "z": float(fila["z (m)"]),
+                "x": x, "y": y, "z": z,
             })
         except (ValueError, TypeError):
             continue
