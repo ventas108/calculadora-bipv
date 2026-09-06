@@ -71,16 +71,25 @@ Datos de entrada requeridos:
 - Perfil de consumo energético del edificio (para balance con batería)
 ────────────────────────────────────────────────────────────
 
-## 2. Flujo de trabajo recomendado
+## 2. Flujo de trabajo recomendado  ACTUALIZADO (6-sep-2026 — incorpora 5a Sombras SketchUp y el ciclo del Sky View Factor)
 
 1 Proyecto → 2 Recurso Solar → (3 Motor IV) → 4 Dimensionamiento
+    → [5a Sombras SketchUp ← opcional, solo si hay obstáculos cercanos: edificios
+       vecinos, árboles, marquesinas, la propia edificación]
+        → si ahí calculaste el Sky View Factor (SVF, sección "4️⃣" de esa página):
+          VUELVE a 2 Recurso Solar antes de seguir — se invalida e invalida solo
+          (no hay que tocar nada más, reutiliza el TMY ya en caché, sin PVGIS)
     → (5b Motor Óptico) → 5 Mismatch/Bypass → 6 Producción
     → [9 Vista 3D Multi-Sup ← opcional]
     → 7 Financiero → 8 Presupuesto → 11 Baterías → 10 Reporte PDF
 
 Páginas obligatorias: 1, 2, 4, 6, 7, 10
 
-Páginas opcionales pero recomendadas para BIPV urbano: 3, 5b, 5, 9 (multi-sup), 11
+Páginas opcionales pero recomendadas para BIPV urbano: 3, 5a (si hay obstáculos cercanos), 5b, 5, 9 (multi-sup), 11
+
+Cuándo usar Página 5a — Sombras SketchUp: si el sitio tiene obstáculos cercanos que producen sombra (edificios vecinos, árboles, marquesinas, la propia edificación). Modela el sitio en SketchUp (ver sección 8a) y esta página calcula dos cosas independientes, cada una con su propio botón: (a) el CSV de `FS_geometrico` — sombra de HAZ DIRECTO, hora a hora — que alimenta la Página 5 Mismatch; y (b) opcionalmente el **Sky View Factor (SVF)** — cuánto le tapa ese MISMO obstáculo la difusa isotrópica de forma PERMANENTE (no depende de la hora), relevante sobre todo en climas tropicales/nublados donde la difusa domina la producción. Requiere haber corrido antes 2 Recurso Solar (necesita el TMY del proyecto — la página se bloquea si no lo encuentra).
+
+⚠️ Regla de orden con el SVF (nueva, 6-sep-2026, ver sección 59): a diferencia del resto del flujo (que es lineal), el SVF cierra un CICLO — se calcula en 5a pero se aplica en 2. Si calculas o recalculas el SVF en 5a Sombras SketchUp DESPUÉS de ya haber corrido 2 Recurso Solar, el resultado de Recurso Solar se invalida automáticamente solo (`recurso_solar_ok` se pone en falso) — no hace falta limpiar caché ni tocar tilt/azimut a mano, basta con volver a abrir 2 Recurso Solar y se recalcula. Si el SVF quedó en 1,000 (sin reducción), verifica antes con una resolución de grilla más fina (0,5-1,0°, campo en la misma sección) que no sea un obstáculo angosto colándose entre los rayos — un SVF real de 1,000 es válido y coherente (ej. si el obstáculo queda fuera del hemisferio frontal del panel), pero conviene descartar primero la otra causa.
 
 Cuándo usar Página 9 — Vista 3D: Si el proyecto tiene más de una superficie
 
