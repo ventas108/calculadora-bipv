@@ -471,6 +471,71 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
     URL.revokeObjectURL(url);
   };
 
+  /**
+   * Promedia los N puntos de muestreo de cada fachada en un solo valor por
+   * fachada-hora: FS_geometrico deja de ser el binario de un solo punto
+   * (0 o 1) y pasa a ser la FRACCI\u00D3N de los puntos muestreados que quedaron
+   * en sombra esa hora (ej. 0.4 = 2 de 5 puntos sombreados) \u2014 una mejor
+   * entrada para modelar sombra parcial de un arreglo real que un punto
+   * central \u00FAnico. Agrupa por (facade, timestamp_utc): todos los puntos de
+   * una misma fachada comparten la misma hora/posici\u00F3n solar, as\u00ED que el
+   * resto de columnas (mes/d\u00EDa/hora/altura/azimut) es id\u00E9ntico dentro del
+   * grupo y se toma de cualquiera de sus filas.
+   */
+  const computeAggregatedFacadeResults = () => {
+    if (!officialShadingResult) return [];
+    const groups = new Map<string, typeof officialShadingResult.results>();
+    for (const row of officialShadingResult.results) {
+      const key = `${row.facade} ${row.timestamp_utc}`;
+      const bucket = groups.get(key);
+      if (bucket) bucket.push(row);
+      else groups.set(key, [row]);
+    }
+    return Array.from(groups.values())
+      .map(rows => {
+        const first = rows[0];
+        const fsPromedio = rows.reduce((sum, r) => sum + r.fs_geometrico, 0) / rows.length;
+        return {
+          month: first.month,
+          day: first.day,
+          hour_utc: first.hour_utc,
+          solar_altitude_deg: first.solar_altitude_deg,
+          solar_azimuth_deg: first.solar_azimuth_deg,
+          facade: first.facade,
+          timestamp_utc: first.timestamp_utc,
+          fs_geometrico_promedio: Math.round(fsPromedio * 1000) / 1000,
+          n_puntos_muestreados: rows.length,
+        };
+      })
+      .sort((a, b) => a.timestamp_utc.localeCompare(b.timestamp_utc) || a.facade.localeCompare(b.facade));
+  };
+
+  const exportAggregatedOfficialCSV = () => {
+    if (!officialShadingResult) {
+      toast.error('Ejecuta primero el motor Python oficial.');
+      return;
+    }
+    const aggregated = computeAggregatedFacadeResults();
+    const headers = [
+      'Mes', 'Dia', 'Hora', 'Altura Solar (deg)', 'Acimut Solar (deg)',
+      'FS_geometrico_promedio', 'N_puntos_muestreados', 'Fachada', 'timestamp_utc',
+    ];
+    const rows = aggregated.map(row => [
+      row.month, row.day, row.hour_utc, row.solar_altitude_deg, row.solar_azimuth_deg,
+      row.fs_geometrico_promedio, row.n_puntos_muestreados, row.facade, row.timestamp_utc,
+    ]);
+    const csv = [headers, ...rows]
+      .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'FS_geometrico_promediado_motor_python.csv';
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Exportar PDF con resultados del cruce
   const exportCrossingPDF = () => {
     if (!lastCrossingResults || lastCrossingResults.length === 0) {
@@ -2330,6 +2395,17 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
               >
                 <Download size={16} />
                 CSV FS geométrico oficial
+              </Button>
+            )}
+            {officialShadingResult && (
+              <Button
+                onClick={exportAggregatedOfficialCSV}
+                variant="outline"
+                className="flex items-center gap-2 border-emerald-400 text-emerald-800"
+                title="Promedia los puntos de muestreo de cada fachada en una fracción de sombra por hora, en vez del binario de un solo punto"
+              >
+                <Download size={16} />
+                CSV FS geométrico promediado
               </Button>
             )}
             {lastCrossingResults && lastCrossingResults.length > 0 && (
