@@ -30,6 +30,7 @@ from calculos.sombras_3d import (
     MAX_RAYOS,
     TRIMESH_OK,
     calcular_fs_horario,
+    calcular_svf_difuso,
     cargar_malla,
     estimar_rayos,
     exportar_csv_fs,
@@ -37,6 +38,7 @@ from calculos.sombras_3d import (
     resumen_malla,
     validar_puntos,
 )
+from calculos.agregacion_fs import agregar_valor_por_puntos
 from calculos.sitedesigner_marsh import cargar_escena_sitedesigner, verificar_ubicacion
 
 st.title("🌳 Sombras desde tu modelo de SketchUp")
@@ -226,8 +228,11 @@ if st.session_state.get("sk_firma") not in (None, _firma):
     st.session_state.pop("csv_fs_sketchup_bytes", None)
     st.session_state.pop("csv_fs_sketchup_nombre", None)
 
-if st.button("▶️ Calcular sombras (ray-casting)", type="primary",
-             disabled=(malla is None)):
+def _construir_puntos(df_pts):
+    """Parsea la tabla de puntos del data_editor a la lista de dicts que
+    esperan calcular_fs_horario() y calcular_svf_difuso(). Descarta filas
+    en blanco/inválidas (ver nota sobre NaN abajo). Compartida por el botón
+    de sombras (haz directo) y el de SVF (difusa) para no duplicar el parseo."""
     puntos = []
     for _, fila in df_pts.iterrows():
         try:
@@ -253,6 +258,12 @@ if st.button("▶️ Calcular sombras (ray-casting)", type="primary",
             })
         except (ValueError, TypeError):
             continue
+    return puntos
+
+
+if st.button("▶️ Calcular sombras (ray-casting)", type="primary",
+             disabled=(malla is None)):
+    puntos = _construir_puntos(df_pts)
     if not puntos:
         st.error("Define al menos un punto de análisis válido.")
     elif estimar_rayos(len(puntos)) > MAX_RAYOS:
@@ -315,4 +326,84 @@ if df_fs is not None:
             "Listo — abre 🔀 **Mismatch** y oprime el botón «🌳 Usar el CSV generado en "
             "Sombras SketchUp». De ahí en adelante la cadena es la de siempre: "
             "bypass → E_ac corregida → Producción/Financiero."
+        )
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 4. Sky View Factor (SVF) — reducción de difusa por domo celeste tapado
+# ══════════════════════════════════════════════════════════════════════════════
+st.markdown("---")
+st.subheader("4️⃣ Sombra de difusa (Sky View Factor) — opcional")
+st.caption(
+    "A diferencia de la sombra de arriba (haz directo, cambia hora a hora), esto mide "
+    "cuánto domo celeste le tapa el obstáculo al arreglo de forma PERMANENTE — importa "
+    "sobre todo en climas nublados/tropicales, donde la difusa domina la producción. "
+    "Es un cálculo puramente geométrico (no depende de la hora ni del TMY)."
+)
+
+_tilt_svf = st.session_state.get("tilt_fachada", 90.0)
+_az_svf = st.session_state.get("azimuth_fachada", 180.0)
+cst1, cst2 = st.columns(2)
+with cst1:
+    tilt_svf = st.number_input(
+        "Inclinación del panel (°)", min_value=0.0, max_value=90.0,
+        value=float(_tilt_svf), step=1.0, key="svf_tilt_input",
+        help="Por defecto toma la de ☀️ Recurso Solar (tilt_fachada). Cámbiala aquí "
+             "solo si el panel de este análisis tiene una orientación distinta.",
+    )
+with cst2:
+    azimuth_svf = st.number_input(
+        "Azimut del panel (°, 0=N 90=E 180=S 270=O)", min_value=0.0, max_value=360.0,
+        value=float(_az_svf), step=1.0, key="svf_azimuth_input",
+    )
+
+if st.button("🌤️ Calcular Sky View Factor", disabled=(malla is None)):
+    puntos_svf = _construir_puntos(df_pts)
+    if not puntos_svf:
+        st.error("Define al menos un punto de análisis válido.")
+    else:
+        with st.spinner(f"Lanzando rayos de domo celeste para {len(puntos_svf)} punto(s)…"):
+            try:
+                df_svf = calcular_svf_difuso(malla, puntos_svf, tilt_svf, azimuth_svf)
+                factor_svf, auditoria_svf = agregar_valor_por_puntos(
+                    df_svf, columna_valor="f_svf"
+                )
+                st.session_state["sk_df_svf"] = df_svf
+                st.session_state["factor_svf_isotropico"] = factor_svf
+                st.session_state["factor_svf_auditoria"] = auditoria_svf
+                st.session_state["factor_svf_tilt_az"] = (tilt_svf, azimuth_svf)
+            except Exception as e:
+                st.error(f"❌ Error en el cálculo de SVF: {e}")
+
+df_svf = st.session_state.get("sk_df_svf")
+factor_svf_guardado = st.session_state.get("factor_svf_isotropico")
+if df_svf is not None and factor_svf_guardado is not None:
+    _tilt_usado, _az_usado = st.session_state.get("factor_svf_tilt_az", (tilt_svf, azimuth_svf))
+    if (_tilt_usado, _az_usado) != (tilt_svf, azimuth_svf):
+        st.warning(
+            "⚠️ La inclinación/azimut cambiaron desde el último cálculo de SVF — "
+            "vuelve a oprimir «Calcular Sky View Factor» antes de usar este resultado.",
+            icon="⚠️",
+        )
+    st.dataframe(
+        df_svf[["Punto", "Fachada", "f_svf"]].rename(columns={"f_svf": "SVF (1=libre)"}),
+        use_container_width=True, hide_index=True,
+    )
+    _aud = st.session_state.get("factor_svf_auditoria", {})
+    st.metric(
+        "Factor SVF del arreglo (ponderado)", f"{factor_svf_guardado:.3f}",
+        help=f"Ponderación: {_aud.get('etiqueta', 'promedio simple por punto')}. "
+             "1.0 = domo celeste totalmente libre; valores menores reducen la "
+             "componente isotrópica de la difusa en ☀️ Recurso Solar.",
+    )
+    if factor_svf_guardado >= 0.999:
+        st.info(
+            "El modelo no reduce nada de difusa (SVF≈1.0) — o no hay obstrucción real "
+            "del domo celeste, o el obstáculo es angosto/lejano frente a los puntos.",
+            icon="ℹ️",
+        )
+    if st.button("📤 Usar este SVF en ☀️ Recurso Solar", type="primary"):
+        st.success(
+            f"Factor SVF={factor_svf_guardado:.3f} guardado — abre ☀️ **Recurso Solar** y "
+            "vuelve a calcular (o simplemente entra a la página, se aplica automáticamente "
+            "la próxima vez que recalcule la POA)."
         )

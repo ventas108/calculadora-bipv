@@ -173,6 +173,57 @@ def verificar_consistencia_radiativa(
     return resultado
 
 
+# ── Reducción de difusa isotrópica por Sky View Factor (SVF) ────────────────
+# Ver calculos.sombras_3d.calcular_svf_difuso() para cómo se obtiene el
+# factor. Aislado en su propia función porque pvlib.irradiance.haydavies()
+# con return_components=True cambió el nombre de las claves entre versiones
+# -- verificado leyendo el código fuente real de AMBAS versiones relevantes:
+#   pvlib 0.11.1 (pin de producción, requirements.txt): claves
+#     'sky_diffuse' / 'isotropic' / 'circumsolar' / 'horizon' (SIN prefijo).
+#   pvlib >=0.13 (ej. 0.15.2): claves con prefijo 'poa_' agregado.
+# Sin este manejo defensivo, el código habría funcionado en un sandbox local
+# con pvlib nuevo y roto en el servidor real (pvlib==0.11.1) con un
+# KeyError -- exactamente el tipo de bug que la auditoría previa a esta
+# implementación buscaba evitar.
+def _aplicar_reduccion_svf_isotropica(
+    poa: pd.DataFrame,
+    tilt: float,
+    azimuth: float,
+    solar_pos: pd.DataFrame,
+    tmy: pd.DataFrame,
+    dni_extra: pd.Series,
+    factor_svf: float,
+) -> pd.DataFrame:
+    """Reduce SOLO poa_isotropic (Hay-Davies) por el factor SVF y recompone
+    poa_sky_diffuse/poa_diffuse/poa_global. poa_direct y poa_ground_diffuse
+    quedan intactos (ver docstring de calcular_poa)."""
+    componentes = pvlib.irradiance.haydavies(
+        surface_tilt=tilt,
+        surface_azimuth=azimuth,
+        dhi=tmy["Gd_h"],
+        dni=tmy["Gb_n"],
+        dni_extra=dni_extra,
+        solar_zenith=solar_pos["apparent_zenith"],
+        solar_azimuth=solar_pos["azimuth"],
+        return_components=True,
+    )
+    tiene_prefijo = "poa_isotropic" in componentes.columns
+    isotropic = componentes["poa_isotropic" if tiene_prefijo else "isotropic"]
+    circumsolar = componentes["poa_circumsolar" if tiene_prefijo else "circumsolar"]
+
+    isotropic_reducida = isotropic * factor_svf
+    sky_diffuse_reducida = (isotropic_reducida + circumsolar).fillna(0.0)
+
+    salida = poa.copy()
+    ground_diffuse = salida["poa_ground_diffuse"]
+    salida["poa_sky_diffuse"] = sky_diffuse_reducida
+    salida["poa_diffuse"] = sky_diffuse_reducida + ground_diffuse
+    salida["poa_global"] = (salida["poa_direct"] + salida["poa_diffuse"]).clip(lower=0.0)
+    salida.attrs["qcrad"] = poa.attrs.get("qcrad")
+    salida.attrs["factor_svf_isotropico"] = factor_svf
+    return salida
+
+
 def calcular_poa(
     tmy: pd.DataFrame,
     lat: float,
@@ -182,6 +233,7 @@ def calcular_poa(
     azimuth: float,
     albedo: float = 0.20,
     bifacial: dict | None = None,
+    reduccion_diffusa_isotropica: float = 1.0,
 ) -> pd.DataFrame:
     """
     Calcula irradiancia POA (Plane of Array) para la orientación dada.
@@ -206,6 +258,18 @@ def calcular_poa(
                                                 # llega al panel. 0 = fachada adosada al
                                                 # muro (trasera sellada, sin ganancia).
                  }
+    reduccion_diffusa_isotropica : 1.0 (default) = sin cambios -- CERO llamadas
+               nuevas a pvlib, comportamiento idéntico a antes de este
+               parámetro. <1.0 = Sky View Factor (ver
+               calculos.sombras_3d.calcular_svf_difuso()): fracción del domo
+               celeste que el arreglo ve realmente tras descontar un
+               obstáculo cercano (ej. un muro). Reduce SOLO el término
+               isotrópico de Hay-Davies (el que depende del domo celeste
+               completo) -- el circumsolar (que sigue al sol) y la difusa de
+               suelo NO se tocan aquí; ver docstring de calcular_svf_difuso()
+               para el porqué. Solo aplica al camino monofacial (bifacial usa
+               infinite_sheds con su propia geometría fila-a-fila, fuera de
+               alcance de esta reducción por ahora).
 
     Retorna DataFrame con columnas:
         poa_global, poa_direct, poa_diffuse, poa_sky_diffuse, poa_ground_diffuse
@@ -239,6 +303,16 @@ def calcular_poa(
         dni_extra=dni_extra,
     ).fillna(0.0)
     poa.attrs["qcrad"] = qcrad
+
+    factor_svf = float(np.clip(reduccion_diffusa_isotropica, 0.0, 1.0))
+    if factor_svf < 1.0 and not bifacial:
+        # Solo monofacial (ver docstring): en bifacial, poa_global se
+        # recalcula MÁS ABAJO íntegramente desde infinite_sheds, que no
+        # conoce el SVF -- aplicar la reducción aquí dejaría poa_diffuse
+        # reducida pero poa_global sin reducir, un DataFrame incoherente.
+        poa = _aplicar_reduccion_svf_isotropica(
+            poa, tilt, azimuth, solar_pos, tmy, dni_extra, factor_svf
+        )
 
     if not bifacial:
         return poa

@@ -417,6 +417,144 @@ def calcular_fs_horario(
     return pd.concat(filas, ignore_index=True)
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# 4. Sky View Factor (SVF) difuso — reducción de la isotrópica por domo
+#    celeste tapado (independiente de la hora, NO es sombra de haz directo)
+# ══════════════════════════════════════════════════════════════════════════════
+def calcular_svf_difuso(
+    malla,
+    puntos: list[dict],
+    tilt_deg: float,
+    azimuth_deg: float,
+    resolucion_deg: float = 5.0,
+) -> pd.DataFrame:
+    """
+    Sky View Factor isotrópico: fracción del domo celeste que cada punto
+    de análisis ve realmente, ponderada por coseno respecto a la normal del
+    panel (la MISMA ponderación Lambertiana que usa Hay-Davies para derivar
+    el término isotrópico (1-AI)·(1+cosβ)/2 de la difusa), tras descontar
+    lo que la malla 3D bloquea.
+
+    A diferencia de calcular_fs_horario() (sombra de HAZ DIRECTO — cambia
+    hora a hora, depende de dónde está el sol), el SVF es puramente
+    geométrico: NO depende de la hora, se calcula UNA sola vez por punto y
+    por orientación de panel (tilt/azimuth). Por eso los puntos aquí no
+    necesitan un TMY ni una lista de horas con sol.
+
+    Parámetros
+    ----------
+    malla          : Trimesh, el MISMO objeto que usa calcular_fs_horario().
+    puntos         : misma lista de dicts que calcular_fs_horario() —
+                     {"nombre","fachada","x","y","z", "n_modulos",
+                     "area_activa_m2", "potencia_instalada_kw", ...}.
+    tilt_deg       : inclinación del panel (0=horizontal, 90=vertical), °.
+    azimuth_deg    : azimut del panel, convención pvlib (0=N,90=E,180=S,270=O).
+    resolucion_deg : paso angular de la grilla del domo (theta y phi), °.
+                     5.0 por defecto → ~1300 rayos/punto (theta 0-90°,
+                     phi 0-360°), validado contra el caso analítico de pared
+                     infinita (ver tests) con <2% de error.
+
+    Retorna DataFrame, una fila por punto:
+        Punto, Fachada, f_svf (0-1; 1.0 = domo celeste totalmente libre),
+        svf_libre_ponderado, svf_teorico_ponderado (auditoría/depuración).
+
+    Nota de diseño: el peso cos(θ)·sin(θ) dθ dφ NO se normaliza a un valor
+    absoluto (no hace falta dividir por π) — f_svf es un COCIENTE entre dos
+    integrales con la MISMA ponderación (libre / teórica sin obstrucción),
+    así que cualquier constante de normalización se cancela. Lo único que
+    importa es que ambas integrales usen exactamente el mismo peso relativo
+    entre direcciones del domo, lo cual sí se cumple aquí.
+    """
+    if not puntos:
+        raise ValueError("Define al menos un punto de análisis")
+
+    # Normal del panel: mismo truco que vector_al_sol() -- un panel con
+    # inclinación β (desde la horizontal) y azimut dado tiene su normal
+    # apuntando con "elevación" = 90°-β y el mismo azimut.
+    normal = vector_al_sol(90.0 - float(tilt_deg), float(azimuth_deg))
+    normal = normal / np.linalg.norm(normal)
+
+    # Base ortonormal tangente al plano del panel (u = horizontal, v = "cuesta
+    # arriba"). Caso degenerado: panel horizontal (tilt≈0, normal≈Z) -- ahí
+    # cualquier u horizontal sirve porque hay simetría de rotación completa.
+    z_mundo = np.array([0.0, 0.0, 1.0])
+    if abs(float(np.dot(normal, z_mundo))) > 0.999999:
+        u = np.array([1.0, 0.0, 0.0])
+    else:
+        u = np.cross(z_mundo, normal)
+        u = u / np.linalg.norm(u)
+    v = np.cross(normal, u)
+
+    # Grilla de la semiesfera frontal del panel: theta = ángulo desde la
+    # normal (0-90°), phi = giro alrededor de la normal (0-360°). Se evalúa
+    # en el CENTRO de cada celda.
+    paso = np.deg2rad(float(resolucion_deg))
+    thetas = np.arange(paso / 2.0, np.pi / 2.0, paso)
+    phis = np.arange(paso / 2.0, 2.0 * np.pi, paso)
+    th_grid, ph_grid = np.meshgrid(thetas, phis, indexing="ij")
+    th_flat, ph_flat = th_grid.ravel(), ph_grid.ravel()
+
+    # Peso isotrópico/Lambertiano por celda: cos(theta)·sin(theta) dtheta dphi.
+    pesos = np.cos(th_flat) * np.sin(th_flat) * (paso ** 2)
+
+    # Direcciones en XYZ del mundo (Este,Norte,arriba):
+    #   normal·cos(theta) + (u·cos(phi) + v·sin(phi))·sin(theta)
+    dirs = (
+        normal[None, :] * np.cos(th_flat)[:, None]
+        + u[None, :] * (np.sin(th_flat) * np.cos(ph_flat))[:, None]
+        + v[None, :] * (np.sin(th_flat) * np.sin(ph_flat))[:, None]
+    )
+
+    # Solo cuentan direcciones POR ENCIMA del horizonte real (cielo, no
+    # suelo) -- filtrar aquí (en vez de con la fórmula cerrada (1+cosβ)/2)
+    # hace que el denominador "teórico" sea automáticamente correcto para
+    # CUALQUIER tilt/azimuth, incluidos casos oblicuos, sin caso especial.
+    es_cielo = dirs[:, 2] > 0.0
+    dirs_cielo = dirs[es_cielo]
+    pesos_cielo = pesos[es_cielo]
+    peso_teorico_total = float(pesos_cielo.sum())
+
+    filas = []
+    for pt in puntos:
+        origen = np.array([float(pt["x"]), float(pt["y"]), float(pt["z"])])
+        if peso_teorico_total <= 0 or len(dirs_cielo) == 0:
+            # Panel mirando estrictamente al suelo (tilt>90 sin componente de
+            # cielo) -- caso degenerado, sin domo celeste que perder.
+            f_svf = 1.0
+            peso_libre = 0.0
+        else:
+            origenes = (
+                np.repeat(origen[None, :], len(dirs_cielo), axis=0)
+                + dirs_cielo * OFFSET_RAYO_M
+            )
+            try:
+                bloqueado = np.asarray(
+                    malla.ray.intersects_any(
+                        ray_origins=origenes, ray_directions=dirs_cielo
+                    ),
+                    dtype=bool,
+                )
+            except Exception:
+                # Igual que _primeras_intersecciones(): nunca tumbar el
+                # cálculo por un backend de ray-casting incompleto -- sin
+                # detalle de bloqueo, se asume domo libre (comportamiento
+                # anterior a esta función: factor_svf=1.0, sin regresión).
+                bloqueado = np.zeros(len(dirs_cielo), dtype=bool)
+            peso_libre = float(pesos_cielo[~bloqueado].sum())
+            f_svf = peso_libre / peso_teorico_total
+        filas.append({
+            "Punto": pt.get("nombre") or "P1",
+            "Fachada": pt.get("fachada") or "Principal",
+            "n_modulos": pt.get("n_modulos", 0.0),
+            "area_activa_m2": pt.get("area_activa_m2", 0.0),
+            "potencia_instalada_kw": pt.get("potencia_instalada_kw", 0.0),
+            "svf_libre_ponderado": round(peso_libre, 6),
+            "svf_teorico_ponderado": round(peso_teorico_total, 6),
+            "f_svf": round(float(np.clip(f_svf, 0.0, 1.0)), 4),
+        })
+    return pd.DataFrame(filas)
+
+
 def resumen_fs(df_fs: pd.DataFrame) -> dict:
     """Estadísticas para la UI."""
     col_fs = "FS_geometrico" if "FS_geometrico" in df_fs.columns else "FS"

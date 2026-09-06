@@ -222,3 +222,40 @@ def promedio_fs_por_claves(
         "peso_total": round(float(trabajo["_peso_fs"].sum()), 6),
     }
     return resultado, auditoria
+
+
+def agregar_valor_por_puntos(
+    df: pd.DataFrame,
+    *,
+    modo: str = "auto",
+    columna_valor: str = "f_svf",
+) -> tuple[float, dict[str, Any]]:
+    """Promedia una métrica por-punto (ya no por hora) a un solo escalar de
+    arreglo, reutilizando el MISMO contrato de pesos que promedio_fs_por_claves()
+    (N módulos / área activa / potencia instalada) -- para no tener dos
+    criterios de ponderación distintos entre FS_geometrico (por hora) y
+    métricas geométricas puramente por-punto como el Sky View Factor difuso.
+
+    A diferencia de promedio_fs_por_claves(), no agrupa por (mes,dia,hora,...)
+    -- cada fila de ``df`` YA es un punto de análisis distinto, así que se
+    promedia directo sobre todas las filas.
+    """
+    if df.empty:
+        return 1.0, {
+            "modo_solicitado": modo, "modo_aplicado": "simple",
+            "columna_peso": None, "etiqueta": _ETIQUETAS["simple"],
+            "n_filas": 0, "n_pesos_validos": 0, "cobertura_peso_pct": 0.0,
+            "pesos_constantes": True, "advertencias": ["Sin puntos para agregar."],
+        }
+    pesos, auditoria = resolver_peso(df, modo)
+    valores = pd.to_numeric(df[columna_valor], errors="coerce").fillna(1.0).clip(0.0, 1.0)
+    peso_total = float(pesos.sum())
+    valor_agregado = (
+        float((valores * pesos).sum() / peso_total) if peso_total > 0 else 1.0
+    )
+    auditoria = {
+        **auditoria,
+        "columna_valor": columna_valor,
+        "peso_total": round(peso_total, 6),
+    }
+    return round(valor_agregado, 4), auditoria

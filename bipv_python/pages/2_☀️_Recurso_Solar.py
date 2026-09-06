@@ -192,6 +192,24 @@ with col_or3:
              "modelo bifacial, la luz que capta la cara trasera.",
     )
 
+# ── Sky View Factor (SVF) desde 🌳 Sombras SketchUp — reducción de difusa ────
+# Solo se aplica si la orientación con la que se calculó el SVF coincide con
+# la tilt/azimuth ACTUALES de esta página -- si el usuario cambió la
+# orientación después, ese factor ya no describe esta geometría y se ignora
+# (con aviso) en vez de aplicarse silenciosamente a una orientación distinta.
+_factor_svf_tilt_az = st.session_state.get("factor_svf_tilt_az")
+if _factor_svf_tilt_az is not None and tuple(_factor_svf_tilt_az) != (tilt, azimuth):
+    factor_svf = 1.0
+    st.info(
+        f"ℹ️ Hay un Sky View Factor calculado en 🌳 Sombras SketchUp para otra "
+        f"orientación ({_factor_svf_tilt_az[0]:.0f}°/{_factor_svf_tilt_az[1]:.0f}° az) — "
+        f"no se aplica aquí ({tilt}°/{azimuth}° az). Vuelve a calcularlo allí con la "
+        "orientación actual si quieres incluir la reducción de difusa.",
+        icon="ℹ️",
+    )
+else:
+    factor_svf = float(st.session_state.get("factor_svf_isotropico", 1.0))
+
 # ── Simulación bifacial (pvlib infinite_sheds) ────────────────────────────────
 _panel_bif   = st.session_state.get("panel_dict") or {}
 _bif_catalogo = float(_panel_bif.get("bifacialidad_pct") or 0)
@@ -336,6 +354,11 @@ _SOLAR_SS_KEYS = (
     "poa_anual_kWh_m2", "ghi_anual_kWh_m2", "t_media_anual",
     "zona_geo_coords", "poa_efectiva_df", "poa_sin_termico_df", "ganancia_bifacial_pct",
 )
+# NOTA: factor_svf_isotropico/factor_svf_tilt_az (de 🌳 Sombras SketchUp) NO
+# se limpian aquí a propósito -- viven en OTRA página y su propia validez ya
+# se verifica arriba comparando factor_svf_tilt_az contra (tilt,azimuth)
+# actuales, así que sobreviven un cambio de tilt/azimuth sin quedar
+# "colgando" de forma incoherente (si no coinciden, simplemente se ignoran).
 _GUARD_KEYS = (
     "_solar_lat_guardada", "_solar_lon_guardada", "_solar_alt_guardada",
     "_solar_tilt_guardado", "_solar_az_guardado", "_solar_albedo_guardado",
@@ -394,7 +417,11 @@ if st.session_state.get("recurso_solar_ok") and _s_lat is not None:
 # Si los parámetros actuales coinciden con un caché en disco y la sesión aún no
 # tiene datos, restaurar silenciosamente para evitar la descarga de PVGIS.
 if not st.session_state.get("recurso_solar_ok"):
-    _auto_cached = _leer_cache(lat, lon, tilt, azimuth, alt_m, albedo)
+    # Con SVF activo (factor_svf<1.0) no se usa el caché de disco de la POA
+    # -- esa caché no distingue factor SVF en su clave (ver _cache_path) y
+    # reutilizarla serviría una POA de otra reducción (o sin reducción)
+    # silenciosamente. El TMY sí se sigue cacheando (no depende del SVF).
+    _auto_cached = _leer_cache(lat, lon, tilt, azimuth, alt_m, albedo) if factor_svf >= 0.999 else None
     if _auto_cached is None:
         # ── #61: no hay caché de esta variante, pero puede haber TMY del predio
         # (descargado con otra inclinación/orientación) → recalcular POA local
@@ -403,8 +430,9 @@ if not st.session_state.get("recurso_solar_ok"):
         if _tmy_solo is not None:
             with st.spinner("📂 TMY en caché — recalculando POA para esta orientación..."):
                 _poa_var = calcular_poa(_tmy_solo, lat, lon, alt_m, tilt, azimuth,
-                                        albedo=albedo)
-                _guardar_cache(lat, lon, tilt, azimuth, alt_m, _tmy_solo, _poa_var, albedo)
+                                        albedo=albedo, reduccion_diffusa_isotropica=factor_svf)
+                if factor_svf >= 0.999:
+                    _guardar_cache(lat, lon, tilt, azimuth, alt_m, _tmy_solo, _poa_var, albedo)
             _auto_cached = {"tmy": _tmy_solo, "poa": _poa_var}
     if _auto_cached is not None:
         _tmy_r = _auto_cached["tmy"]
@@ -413,7 +441,8 @@ if not st.session_state.get("recurso_solar_ok"):
         # recalcular localmente la ganancia trasera (sin ir a PVGIS).
         if bifacial_cfg:
             _poa_r = calcular_poa(_tmy_r, lat, lon, alt_m, tilt, azimuth,
-                                  albedo=albedo, bifacial=bifacial_cfg)
+                                  albedo=albedo, bifacial=bifacial_cfg,
+                                  reduccion_diffusa_isotropica=factor_svf)
         _poa_anual_r = _poa_r["poa_global"].sum() / 1000.0
         _ghi_anual_r = _tmy_r["G_h"].sum() / 1000.0
         _t_media_r   = _tmy_r["T2m"].mean()
@@ -492,8 +521,9 @@ if _descarga_btn:
         f"predio en {ciudad} ({lat:.5f}°, {lon:.5f}°)"
         if _coord_personalizada else f"{ciudad} ({lat}°, {lon}°)"
     )
-    # Intentar caché de disco antes de ir a PVGIS
-    _disco = _leer_cache(lat, lon, tilt, azimuth, alt_m, albedo)
+    # Intentar caché de disco antes de ir a PVGIS (no con SVF activo, ver
+    # nota junto al bloque de auto-restauración arriba).
+    _disco = _leer_cache(lat, lon, tilt, azimuth, alt_m, albedo) if factor_svf >= 0.999 else None
     if _disco is not None:
         tmy = _disco["tmy"]
         poa = _disco["poa"]
@@ -514,10 +544,13 @@ if _descarga_btn:
                     st.stop()
 
         with st.spinner(f"Calculando irradiancia POA para {icono_tipo} {tipo_instalacion} ({tilt}°)..."):
-            poa = calcular_poa(tmy, lat, lon, alt_m, tilt, azimuth, albedo=albedo)
+            poa = calcular_poa(tmy, lat, lon, alt_m, tilt, azimuth, albedo=albedo,
+                                reduccion_diffusa_isotropica=factor_svf)
             # El caché de disco guarda SIEMPRE la POA monofacial; la ganancia
             # bifacial se recalcula localmente (es barata y depende de la config).
-            if not _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa, albedo):
+            # Con SVF activo NO se guarda -- ver nota junto al bloque de
+            # auto-restauración arriba (la clave del caché no distingue SVF).
+            if factor_svf >= 0.999 and not _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa, albedo):
                 # #61: antes fallaba en silencio → el usuario repetía la descarga
                 # en cada recarga sin saber por qué.
                 st.warning(
@@ -532,7 +565,8 @@ if _descarga_btn:
     if bifacial_cfg:
         with st.spinner("🔄 Calculando ganancia bifacial (pvlib infinite_sheds)..."):
             poa = calcular_poa(tmy, lat, lon, alt_m, tilt, azimuth,
-                               albedo=albedo, bifacial=bifacial_cfg)
+                               albedo=albedo, bifacial=bifacial_cfg,
+                               reduccion_diffusa_isotropica=factor_svf)
     monthly = resumen_mensual(tmy, poa)
     # ── Métricas anuales ─────────────────────────────────────────────────────
     ghi_anual  = tmy["G_h"].sum() / 1000.0
@@ -542,6 +576,14 @@ if _descarga_btn:
 
     st.markdown("---")
     st.subheader("📊 Resultados del recurso solar")
+
+    if factor_svf < 0.999:
+        st.info(
+            f"🌤️ Difusa reducida por Sky View Factor de 🌳 Sombras SketchUp: "
+            f"factor **{factor_svf:.3f}** aplicado al componente isotrópico. "
+            "Cámbialo o desactívalo recalculando allí.",
+            icon="🌤️",
+        )
 
     mc1, mc2, mc3, mc4, mc5 = st.columns(5)
     mc1.metric("GHI anual", f"{ghi_anual:,.0f} kWh/m²", help="Irradiancia Global Horizontal")
