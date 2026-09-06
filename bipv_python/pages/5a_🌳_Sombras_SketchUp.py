@@ -356,6 +356,16 @@ with cst2:
         value=float(_az_svf), step=1.0, key="svf_azimuth_input",
     )
 
+resolucion_svf = st.number_input(
+    "Resolución de la grilla del domo celeste (°)", min_value=0.5, max_value=10.0,
+    value=5.0, step=0.5, key="svf_resolucion_input",
+    help="Más fino (número menor) = más preciso pero más lento. Si el SVF te da "
+         "1.000 y sospechas que debería reducir algo (ej. el mismo obstáculo SÍ "
+         "produce sombra de haz directo en la sección de arriba), prueba con 1.0 "
+         "o 0.5 — un obstáculo angosto puede 'colarse' entre los rayos de una "
+         "grilla gruesa.",
+)
+
 if st.button("🌤️ Calcular Sky View Factor", disabled=(malla is None)):
     puntos_svf = _construir_puntos(df_pts)
     if not puntos_svf:
@@ -363,7 +373,8 @@ if st.button("🌤️ Calcular Sky View Factor", disabled=(malla is None)):
     else:
         with st.spinner(f"Lanzando rayos de domo celeste para {len(puntos_svf)} punto(s)…"):
             try:
-                df_svf = calcular_svf_difuso(malla, puntos_svf, tilt_svf, azimuth_svf)
+                df_svf = calcular_svf_difuso(malla, puntos_svf, tilt_svf, azimuth_svf,
+                                              resolucion_deg=resolucion_svf)
                 factor_svf, auditoria_svf = agregar_valor_por_puntos(
                     df_svf, columna_valor="f_svf"
                 )
