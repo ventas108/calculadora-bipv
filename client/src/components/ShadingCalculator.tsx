@@ -437,11 +437,30 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
     }
   };
 
+  /**
+   * El motor Python devuelve month/day/hour_utc en UTC (así corre pvlib
+   * internamente). Pero el resto del ecosistema BIPV (EPW, la otra app de
+   * Mismatch/bypass) trabaja siempre en hora LOCAL del sitio -- si
+   * exportamos hour_utc tal cual, cada hora de sombra queda corrida por el
+   * offset de zona horaria (5h en Bogotá) al compararla con cualquier otra
+   * serie horaria local, sin que nada avise del desfase. Se recalculan
+   * Mes/Dia/Hora en hora local a partir de timestamp_utc (que sí es
+   * inequívoco) antes de exportar; timestamp_utc se conserva en el CSV como
+   * referencia exacta sin ambigüedad de zona horaria.
+   */
+  const toLocalCalendarParts = (timestampUtcIso: string, tzOffsetHours: number) => {
+    const utcMs = new Date(timestampUtcIso).getTime();
+    const localMs = utcMs + tzOffsetHours * 3600000;
+    const d = new Date(localMs);
+    return { month: d.getUTCMonth() + 1, day: d.getUTCDate(), hour: d.getUTCHours() };
+  };
+
   const exportOfficialCSV = () => {
     if (!officialShadingResult) {
       toast.error('Ejecuta primero el motor Python oficial.');
       return;
     }
+    const tzOffset = weatherData?.location.timezone ?? 0;
     const headers = [
       'Mes', 'Dia', 'Hora', 'Altura Solar (deg)', 'Acimut Solar (deg)',
       'FS_geometrico', 'Fachada', 'Punto', 'timestamp_utc',
@@ -452,13 +471,16 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
     if (hasObstacleMetadata) {
       headers.push('obstacle_id', 'obstacle_name', 'first_hit_distance_m');
     }
-    const rows = officialShadingResult.results.map(row => [
-      row.month, row.day, row.hour_utc, row.solar_altitude_deg, row.solar_azimuth_deg,
-      row.fs_geometrico, row.facade, row.point_id, row.timestamp_utc,
-      ...(hasObstacleMetadata
-        ? [row.obstacle_id ?? '', row.obstacle_name ?? '', row.first_hit_distance_m ?? '']
-        : []),
-    ]);
+    const rows = officialShadingResult.results.map(row => {
+      const local = toLocalCalendarParts(row.timestamp_utc, tzOffset);
+      return [
+        local.month, local.day, local.hour, row.solar_altitude_deg, row.solar_azimuth_deg,
+        row.fs_geometrico, row.facade, row.point_id, row.timestamp_utc,
+        ...(hasObstacleMetadata
+          ? [row.obstacle_id ?? '', row.obstacle_name ?? '', row.first_hit_distance_m ?? '']
+          : []),
+      ];
+    });
     const csv = [headers, ...rows]
       .map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(','))
       .join('\n');
@@ -491,14 +513,16 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
       if (bucket) bucket.push(row);
       else groups.set(key, [row]);
     }
+    const tzOffset = weatherData?.location.timezone ?? 0;
     return Array.from(groups.values())
       .map(rows => {
         const first = rows[0];
         const fsPromedio = rows.reduce((sum, r) => sum + r.fs_geometrico, 0) / rows.length;
+        const local = toLocalCalendarParts(first.timestamp_utc, tzOffset);
         return {
-          month: first.month,
-          day: first.day,
-          hour_utc: first.hour_utc,
+          month: local.month,
+          day: local.day,
+          hour_local: local.hour,
           solar_altitude_deg: first.solar_altitude_deg,
           solar_azimuth_deg: first.solar_azimuth_deg,
           facade: first.facade,
@@ -521,7 +545,7 @@ export default function ShadingCalculator({ initialPoints, templateData, weather
       'FS_geometrico_promedio', 'N_puntos_muestreados', 'Fachada', 'timestamp_utc',
     ];
     const rows = aggregated.map(row => [
-      row.month, row.day, row.hour_utc, row.solar_altitude_deg, row.solar_azimuth_deg,
+      row.month, row.day, row.hour_local, row.solar_altitude_deg, row.solar_azimuth_deg,
       row.fs_geometrico_promedio, row.n_puntos_muestreados, row.facade, row.timestamp_utc,
     ]);
     const csv = [headers, ...rows]
