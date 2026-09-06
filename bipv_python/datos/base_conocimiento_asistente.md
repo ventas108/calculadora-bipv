@@ -3106,6 +3106,54 @@ Resultado: los 3 tests lentos pasaron de 56s a <1s combinados en local; el archi
 
 ────────────────────────────────────────────────────────────
 
+## 55. Anexo — Actualizaciones del 5 de septiembre de 2026 (Calculadora de Sombreado: rotación de obstáculos desincronizada, anclaje 1.5m sobre el suelo real, y selector de fachada que nunca se conectó al diagrama)
+
+Sesión de pruebas reales en `bipv.innovacionquimica.com.co` con una marquesina (fachada vertical delgada) y un muro vecino como obstáculo, modelados juntos en el mismo archivo SketchUp y exportados por separado. Se encontraron y corrigieron 3 bugs reales encadenados, todos en el flujo de importación de obstáculos:
+
+1. **Rotación desincronizada**: `Rotación Horizontal` del edificio evaluado giraba solo sus propios vértices; un obstáculo ya importado se quedaba con su orientación y offset relativo viejos, perdiendo de vista la fachada tras rotar ("0 obstáculos visibles"). Fix: `convertOBJToObstacles`/`transformOBJVertices` ahora reciben el `rotationDeg` del edificio y rotan también la geometría y el offset manual del obstáculo por el mismo ángulo.
+2. **Anclaje 1.5m por encima del suelo real**: el obstáculo se anclaba a `mainObservationPoint` (que ya incluye la altura de evaluación, 1.5m por defecto, sumada para simular el ojo del observador) en vez de al nivel de suelo real del edificio. Se agregó `EvaluationModel.groundLevel` (mismo centroide, Z = suelo real) y se usa como ancla en su lugar.
+3. **Selector de fachada de la tabla de importación desconectado del diagrama real**: había DOS selectores de fachada independientes — la tabla "Fachadas Detectadas" (dentro del importador, con su propio estado local que no se mostraba en ningún diagrama) y el selector real que alimenta el Diagrama de Trayectoria Solar (en el componente principal). Elegir una fachada en la tabla no cambiaba nada en el diagrama, sin importar cuántas veces se recargara la página. Se conectaron ambos selectores.
+
+También se corrigió la clasificación de superficies: antes toda superficie vertical se llamaba "Fachada" y toda horizontal/inclinada "Techo", sin importar el contexto. Ahora, si el archivo importado NO tiene ningún techo en el mismo modelo (típico de una marquesina o parasol aislado, modelado solo), la superficie vertical se llama "Marquesina"; si NO tiene ninguna pared (una estructura de paneles autoportante), la horizontal/inclinada se llama "Granja Agrivoltaica". Es una heurística basada en evidencia geométrica (coexistencia de pared+techo en el mismo archivo), no una certeza absoluta.
+
+Lección práctica confirmada en vivo: al importar un objeto delgado/aislado (marquesina, parasol), la detección automática de "Eje Vertical" falla con frecuencia (eligió Y-up y luego X-up en corridas distintas del mismo archivo) — hay que forzar manualmente **Z-up (SketchUp)** en Configuración Avanzada, nunca dejarlo en "Auto" para este tipo de geometría.
+
+────────────────────────────────────────────────────────────
+
+## 56. Anexo — Actualizaciones del 5 de septiembre de 2026 (Motor Solar Python: muestreo de 5 puntos por fachada + CSV promediado, en vez de un solo punto central)
+
+El Motor Solar Python (ray-casting oficial de `bipv.innovacionquimica.com.co`) evaluaba un único punto (el centro geométrico) por fachada. Para un arreglo largo de paneles esto representa mal la sombra real: un extremo puede estar mucho más sombreado que el resto sin que el punto central lo capture. Se agregó `DetectedFacade.samplePoints`: 5 puntos repartidos a lo largo del lado más largo de la superficie (reutilizando el mismo vector de desplazamiento hacia afuera que ya tenía el punto central — el punto de en medio de los 5 sigue siendo exactamente el mismo de antes). Superficies curvas no se muestrean así, conservan solo el punto central.
+
+Se agregó un segundo botón de exportación, **"CSV FS geométrico promediado"**, que agrupa los 5 puntos por (fachada, hora) y promedia su `FS_geometrico` binario (0 o 1 cada uno) en un solo valor continuo entre 0 y 1 — la fracción de los puntos muestreados que quedaron en sombra esa hora. Verificado con datos reales: aparecieron valores intermedios (0.2, 0.4, 0.6, 0.8) mostrando la sombra "retrocediendo" hora a hora a lo largo de un mismo día, algo que el punto único nunca hubiera capturado — y una fachada que antes daba 0% de sombra siempre (por estar el punto central lejos del obstáculo) pasó a mostrar sombra real en las horas donde el extremo cercano al muro sí queda tapado.
+
+**Advertencia sobre el CSV crudo**: con el muestreo múltiple, cada fachada-hora ahora tiene 5 filas (una por punto), no 1 — el CSV crudo (`FS_geometrico_motor_python.csv`) quedó ~5 veces más grande. Para subir a 🔀 Mismatch, usa el **CSV promediado**, no el crudo, salvo que quieras auditar punto por punto.
+
+────────────────────────────────────────────────────────────
+
+## 57. Anexo — Actualizaciones del 5 de septiembre de 2026 (CSV del Motor Python en hora UTC, no local — corrida 5h antes de compararla con cualquier dato de Mismatch/Producción; y por qué NO marcar "Invertir FS" con este CSV)
+
+El Motor Solar Python calcula `month/day/hour_utc` en UTC (así corre pvlib internamente) y los dos CSV exportados (crudo y promediado) sacaban esos campos tal cual. Confirmado con datos reales: una fila con "Hora"=12 tenía altura solar de 11.9° (sol bajo, propio de la mañana) — eso es 7am hora local en Bogotá (UTC-5), no mediodía. Sin corregir esto, cualquier hora de sombra habría quedado corrida 5h al compararla contra cualquier otra serie horaria local (como el TMY que usa 📊 Producción o 🔀 Mismatch), sin ningún aviso.
+
+**Fix**: ambos CSV ahora recalculan Mes/Dia/Hora en hora LOCAL a partir de `timestamp_utc` (que sí es inequívoco), usando el timezone del EPW cargado. `timestamp_utc` se conserva sin cambios como referencia exacta.
+
+**Sobre la casilla "Invertir FS (usar 1 − FS)" en 🔀 Mismatch → Opciones avanzadas del CSV**: esa opción existe para un formato de CSV distinto y más antiguo ("Puntos manuales"), que usa convención de transmitancia (1 = sin sombra). El CSV oficial del Motor Python (`FS_geometrico`/`FS_geometrico_promedio`) **ya usa la convención correcta de esta app** (0 = sin sombra, 1 = sombra total, la misma que espera `cargar_csv_fs`) — **no marcar esa casilla con este CSV**. Se comprobó en vivo el efecto de marcarla por error: un FS medio real de 0.080 se volvió 0.920 (inversión matemática exacta, 1−0.080), y una pérdida real de sombra parcial se infló a un falso "62.74% de pérdida por bypass diodes" que no correspondía a la realidad.
+
+**Sobre "Horas con sombra (FS > 5%): 0" a pesar de un FS medio > 0 en la tabla de arriba**: la simulación de bypass (`simular_bypass_horario`) solo cuenta una hora como "con sombra activa" si `p_shade > umbral` **Y** `G_eff > 5 W/m²` a esa misma hora (`mismatch_bypass.py`, `shade_mask`). Si el POA/G_eff que trae 🌞 Motor Óptico está desactualizado o en cero para la geometría/orientación actual (típico tras cambiar orientación/inclinación en ☀️ Recurso Solar sin recalcular Motor Óptico después — la propia app avisa "la POA... se invalidó y debe recalcularse"), el `&` de esa condición nunca se cumple aunque `p_shade` sea real, y el resultado sale en cero silenciosamente. Antes de confiar en un "0 horas con sombra", verifica que Motor Óptico esté recalculado con la orientación vigente.
+
+────────────────────────────────────────────────────────────
+
+## 58. Anexo — Actualizaciones del 5 de septiembre de 2026 (🌳 Sombras SketchUp: crash de coordenadas, sombra corrida 5h por timezone, y tip práctico de la tabla de puntos)
+
+Dos bugs reales encontrados y corregidos en `pages/5a_🌳_Sombras_SketchUp.py` / `calculos/sombras_3d.py`, probando el flujo con un muro real como obstáculo:
+
+1. **`ValueError: could not convert string to float: 'B'`** al abrir la página. Causa: el campo de Latitud/Longitud leía `st.session_state["zona_geo_coords"]` esperando una tupla (lat, lon), pero esa variable en realidad guarda una **etiqueta de zona climática en texto** (ej. "Bogotá / Sabana", usada en 💼 Presupuesto para el estimador rápido de precios) — indexar un string con `[0]` da su primer carácter ('B' de "Bogotá"), no un número. Fix: leer las coordenadas reales del proyecto (`lat_proyecto`/`lon_proyecto`, las mismas que usa ☀️ Recurso Solar) en vez de `zona_geo_coords`.
+
+2. **La sombra calculada quedaba corrida 5 horas** (mismo tipo de bug de timezone que la sección 53, pero en un módulo distinto e independiente): `posiciones_solares()` recibía el índice horario del TMY del proyecto (naive, en hora local — misma convención que usa Producción) y lo etiquetaba con `tz_localize("UTC")` en vez de con `tz_localize("America/Bogota")` (el parámetro `tz` que la propia función ya tenía, pero que solo se usaba en la ruta sin TMY). Confirmado con un CSV real: la altura solar máxima del año (89.87°, casi cenit) aparecía etiquetada como "Hora=17" en vez de mediodía solar real (~12-13). Ya corregido — si generaste un CSV con "Sombras SketchUp" **antes** del 5 de septiembre de 2026 y usaste el TMY del proyecto, sus horas están corridas 5h y conviene regenerarlo.
+
+3. **Tip práctico, no un bug de código**: la tabla "Puntos de análisis" (`st.data_editor` con filas dinámicas) a veces borra lo que se escribe en una celda si se llena una fila entera de corrido, por un problema de foco/timing del propio componente de Streamlit al rehacer la página en cada tecla. Workaround confiable: llenar **columna por columna** (todos los valores de "x" primero, presionando Enter después de cada uno, luego todos los de "y", luego los de "z"), no fila por fila. Además, revisa siempre el CSV exportado antes de usarlo: es fácil terminar con un espacio de más en el nombre de la Fachada (ej. "Principal" vs "Principal ", que la app trata como dos fachadas distintas) o con una fila duplicada/faltante tras varios reintentos de escritura.
+
+────────────────────────────────────────────────────────────
+
 ## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
 
 El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de
