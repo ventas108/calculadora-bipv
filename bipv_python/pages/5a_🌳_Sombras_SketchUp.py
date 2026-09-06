@@ -179,15 +179,14 @@ transparencia = st.slider(
 st.markdown("---")
 st.subheader("3️⃣ Calcular el Factor de Sombreado horario")
 
-_coords = st.session_state.get("zona_geo_coords")
 _tmy = st.session_state.get("tmy_df")
 cc1, cc2 = st.columns(2)
 with cc1:
     lat = st.number_input("Latitud", min_value=-60.0, max_value=60.0,
-                          value=float(_coords[0]) if _coords else 7.884, format="%.4f")
+                          value=float(st.session_state.get("lat_proyecto", 7.884)), format="%.4f")
 with cc2:
     lon = st.number_input("Longitud", min_value=-180.0, max_value=180.0,
-                          value=float(_coords[1]) if _coords else -76.635, format="%.4f")
+                          value=float(st.session_state.get("lon_proyecto", -76.635)), format="%.4f")
 
 if _meta_sd is not None:
     for _aviso_ubi in verificar_ubicacion(_meta_sd, lat, lon):
