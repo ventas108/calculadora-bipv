@@ -12,6 +12,7 @@ entra directo a 🔀 Mismatch/Bypass → E_ac corregida → 💰 Financiero.
 Las dos rutas (web y SketchUp) conviven — nada de lo existente cambia.
 """
 import math
+import re
 
 import pandas as pd
 import streamlit as st
@@ -160,9 +161,73 @@ _default_pts = pd.DataFrame([
 if "sk_puntos_df" not in st.session_state:
     st.session_state["sk_puntos_df"] = _default_pts
 
+with st.expander(
+    "📋 Pegar coordenadas en bloque (evita escribir celda por celda si la tabla "
+    "no te recibe el número a la primera)"
+):
+    st.caption(
+        "El editor de abajo a veces obliga a escribir un número varias veces antes de "
+        "aceptarlo (limitación conocida del componente de Streamlit con columnas "
+        "numéricas, no de tus datos). Esta caja lo evita por completo: pega o escribe "
+        "una fila por punto con **x, y, z** separados por coma, espacio o tab (tal cual "
+        "copiarías de una hoja de cálculo) y reemplaza la tabla de un solo golpe."
+    )
+    _cb1, _cb2 = st.columns([1, 2])
+    with _cb1:
+        _fachada_bloque = st.text_input(
+            "Fachada (se aplica a todas las filas pegadas)",
+            value=str(st.session_state["sk_puntos_df"]["Fachada"].iloc[0])
+            if len(st.session_state["sk_puntos_df"]) else "Principal",
+            key="sk_bloque_fachada",
+        )
+    with _cb2:
+        _texto_bloque = st.text_area(
+            "Coordenadas — una línea por punto",
+            placeholder="39.4, 6.0, 15.4\n41.0, 6.0, 15.4\n42.6, 6.0, 15.4",
+            key="sk_bloque_coords", height=120,
+        )
+    if st.button("✅ Aplicar y reemplazar la tabla de puntos"):
+        _filas_nuevas, _errores = [], []
+        for _i, _linea in enumerate(_texto_bloque.strip().splitlines(), start=1):
+            _partes = [p for p in re.split(r"[,;\t ]+", _linea.strip()) if p]
+            if not _partes:
+                continue
+            if len(_partes) < 3:
+                _errores.append(f"Fila {_i}: «{_linea}» no tiene 3 números (x, y, z).")
+                continue
+            try:
+                _x, _y, _z = float(_partes[0]), float(_partes[1]), float(_partes[2])
+            except ValueError:
+                _errores.append(f"Fila {_i}: «{_linea}» no se pudo convertir a números.")
+                continue
+            _nombre = f"Fila {len(_filas_nuevas) + 1}"
+            _filas_nuevas.append({
+                "Punto": _nombre, "Fila": _nombre, "Fachada": _fachada_bloque,
+                "N módulos": 1, "Área activa (m²)": 0.0, "Potencia instalada (kW)": 0.0,
+                "x (m)": _x, "y (m)": _y, "z (m)": _z,
+            })
+        for _e in _errores:
+            st.error(_e)
+        if _filas_nuevas:
+            st.session_state["sk_puntos_df"] = pd.DataFrame(_filas_nuevas)
+            st.success(f"{len(_filas_nuevas)} punto(s) cargados — revisa la tabla de abajo.")
+            st.rerun()
+        elif not _errores:
+            st.warning("Pega al menos una línea con 3 números (x, y, z).")
+
 df_pts = st.data_editor(
     st.session_state["sk_puntos_df"],
     num_rows="dynamic", use_container_width=True, key="sk_puntos_editor",
+    column_config={
+        "x (m)": st.column_config.NumberColumn("x (m)", format="%.2f", step=0.1),
+        "y (m)": st.column_config.NumberColumn("y (m)", format="%.2f", step=0.1),
+        "z (m)": st.column_config.NumberColumn("z (m)", format="%.2f", step=0.1),
+        "N módulos": st.column_config.NumberColumn("N módulos", format="%d", step=1),
+        "Área activa (m²)": st.column_config.NumberColumn("Área activa (m²)", format="%.2f", step=0.1),
+        "Potencia instalada (kW)": st.column_config.NumberColumn(
+            "Potencia instalada (kW)", format="%.2f", step=0.1
+        ),
+    },
 )
 st.session_state["sk_puntos_df"] = df_pts
 st.caption(
