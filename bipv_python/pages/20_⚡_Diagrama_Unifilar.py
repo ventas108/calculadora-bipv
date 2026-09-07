@@ -363,6 +363,7 @@ if tramos_dc_val or longitud_ac_val:
         n_inversores=int(n_inversores),
         tension_red_V=float(tension_red_V),
         tramos_dc=tramos_dc_val or None,
+        n_paneles_total=int(n_paneles) or None,
         longitud_ac_m=longitud_ac_val or None,
         calibre_ac_mm2=float(calibre_ac_val) if longitud_ac_val else None,
         T_diseno_C=45.0,
@@ -377,6 +378,14 @@ if tramos_dc_val or longitud_ac_val:
         "panel_nombre": panel_nombre,
         "inversor_nombre": inversor_nombre,
         "n_serie": int(n_serie),
+        # n_paneles_total, agregado en auditoría (7-sep-2026): la resistencia
+        # DC efectiva se calculó con `fraccion_paneles` normalizada contra
+        # ESTE total -- si el usuario cambia el número de paneles del
+        # proyecto después (en 📐 Dimensionamiento) sin volver aquí, esa
+        # fracción queda obsoleta. 📊 Producción debe verificar que el total
+        # sigue coincidiendo antes de reusar el cálculo, mismo criterio que
+        # ya usa para panel/inversor/N en serie.
+        "n_paneles_total": int(n_paneles),
         "tramos": perdida_ohmica_result.get("tramos"),
     }
     _resumen_ohm = []
@@ -391,6 +400,16 @@ if tramos_dc_val or longitud_ac_val:
             "% manual de 🔀 Mismatch, si panel/inversor/N en serie coinciden con "
             "este proyecto al simular."
         )
+        _n_pan_con_tramo = sum(t.get("n_paneles") or 0 for t in tramos_dc_val)
+        if tramos_dc_val and n_paneles and _n_pan_con_tramo < int(n_paneles):
+            st.warning(
+                f"⚠️ Declaraste cable DC para {_n_pan_con_tramo} de {int(n_paneles)} "
+                "módulos del proyecto. La pérdida óhmica DC calculada solo cubre esos "
+                "módulos -- los que faltan por declarar no aportan pérdida al cálculo "
+                "(subestimación deliberada: nunca se inventa un cableado para una "
+                "superficie sin datos). Completa longitud/calibre de las superficies "
+                "restantes arriba para un cálculo completo."
+            )
     else:
         st.info("ℹ️ Longitud registrada, pero falta el calibre para calcular la resistencia.")
 elif "perdida_ohmica_unifilar" in st.session_state:

@@ -68,8 +68,6 @@ Limitaciones conocidas (declaradas a propósito, no ocultas):
 """
 from __future__ import annotations
 
-import math
-
 import schemdraw
 import schemdraw.elements as elm
 
@@ -257,6 +255,7 @@ def calcular_perdida_ohmica(
     n_inversores: int = 1,
     tension_red_V: float | None = None,
     tramos_dc: list[dict] | None = None,
+    n_paneles_total: int | None = None,
     longitud_ac_m: float | None = None,
     calibre_ac_mm2: float | None = None,
     T_diseno_C: float = 45.0,
@@ -276,15 +275,31 @@ def calcular_perdida_ohmica(
       proyecto de un solo tramo DC -- mismo criterio de degradación que
       construir_config_unifilar() ya usa para 0/1 superficie.
 
+    n_paneles_total: total REAL de paneles del proyecto (no solo los de los
+      tramos declarados) -- usado como denominador de `fraccion_paneles` de
+      cada tramo. Si se omite, cae a la suma de los tramos declarados (única
+      opción retrocompatible antes de este parámetro, y sigue siendo
+      EXACTA cuando los tramos ya cubren el 100% de los paneles del
+      proyecto). Auditoría (7-sep-2026): si el usuario declara cable para
+      SOLO ALGUNAS superficies de un proyecto multi-superficie, normalizar
+      contra la suma de tramos declarados (en vez del total real) le
+      atribuye a esos tramos MÁS corriente de la que en verdad llevan --
+      el motor de producción escala I_total(t) contra el N_paneles REAL del
+      proyecto, no contra los paneles con tramo declarado, así que ambos
+      denominadores deben coincidir para que la física sea correcta. Pasar
+      n_paneles_total explícito corrige esto: los paneles sin tramo
+      declarado simplemente no aportan pérdida (subestima en vez de
+      sobreestimar -- el lado seguro, mismo principio de nunca inventar).
+
     Los tramos NO se combinan en una sola resistencia equivalente: cada uno
     lleva solo la corriente de SU PROPIA superficie, no la del proyecto
     completo -- por eso cada tramo devuelve su propia `resistencia_ohm` y
-    su `fraccion_paneles` (n_paneles del tramo / total de paneles con
-    tramo declarado). El motor reparte la corriente total hora a hora entre
-    tramos según esa fracción: I_tramo(t) = I_total(t) × fraccion_paneles --
-    una aproximación declarada (asume que todas las superficies reciben una
-    irradiancia proporcionalmente similar a la del conjunto), no una
-    simulación óptica independiente por superficie.
+    su `fraccion_paneles` (n_paneles del tramo / n_paneles_total). El motor
+    reparte la corriente total hora a hora entre tramos según esa fracción:
+    I_tramo(t) = I_total(t) × fraccion_paneles -- una aproximación declarada
+    (asume que todas las superficies reciben una irradiancia
+    proporcionalmente similar a la del conjunto), no una simulación óptica
+    independiente por superficie.
 
     Nunca inventa un número: un tramo sin longitud+calibre queda con
     resistencia_ohm=None (el llamador decide si avisa al usuario).
@@ -302,7 +317,11 @@ def calcular_perdida_ohmica(
     resistividad = _resistividad_cobre(T_diseno_C)
 
     tramos_in = [t for t in (tramos_dc or []) if t.get("n_paneles")]
-    n_paneles_total_tramos = sum(int(t["n_paneles"]) for t in tramos_in) or None
+    _suma_tramos = sum(int(t["n_paneles"]) for t in tramos_in) or None
+    # n_paneles_total explícito tiene prioridad -- ver docstring arriba de
+    # por qué normalizar contra la suma de tramos declarados sobreestima la
+    # pérdida cuando faltan superficies por declarar.
+    n_paneles_total_efectivo = int(n_paneles_total) if n_paneles_total else _suma_tramos
 
     tramos_out = []
     for tramo in tramos_in:
@@ -310,8 +329,8 @@ def calcular_perdida_ohmica(
         S = tramo.get("calibre_mm2")
         r_ohm = (2.0 * float(L) * resistividad / float(S)) if L and S else None
         fraccion = (
-            int(tramo["n_paneles"]) / n_paneles_total_tramos
-            if n_paneles_total_tramos else None
+            int(tramo["n_paneles"]) / n_paneles_total_efectivo
+            if n_paneles_total_efectivo else None
         )
         tramos_out.append({
             "nombre": tramo.get("nombre") or "Tramo DC",
@@ -337,8 +356,17 @@ def calcular_perdida_ohmica(
             (t["fraccion_paneles"] ** 2) * t["resistencia_ohm"] for t in tramos_out
         )
 
+    # Factor 3 (no 2): el tramo AC es trifásico -- la corriente que el motor
+    # de producción multiplica contra esta resistencia (I_ac = P/(√3·V), la
+    # corriente DE LÍNEA, misma convención que corriente_diseno_ac() usa en
+    # todo el resto de la app) fluye por 3 conductores de fase, cada uno con
+    # resistencia ρ·L/S -- la pérdida TOTAL es 3·I_línea²·(ρ·L/S), no
+    # 2·I²·(ρ·L/S) (esa duplicación es la convención de un circuito DC de 2
+    # hilos -- ida y vuelta -- que NO aplica aquí). Encontrado en auditoría
+    # (7-sep-2026): con el factor 2 original, la pérdida óhmica AC calculada
+    # quedaba subestimada ~33% frente al valor físico real.
     resistencia_ac_ohm = (
-        2.0 * float(longitud_ac_m) * resistividad / float(calibre_ac_mm2)
+        3.0 * float(longitud_ac_m) * resistividad / float(calibre_ac_mm2)
         if longitud_ac_m and calibre_ac_mm2 else None
     )
 

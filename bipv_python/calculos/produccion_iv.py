@@ -302,6 +302,9 @@ def simular_produccion_iv(
     perdida_ohmica_ac_modo = None
     perdida_ohmica_ac_por_hora_W = np.zeros_like(P_ac_W)
     if resistencia_ac_ohm is not None and resistencia_ac_ohm > 0 and tension_red_V:
+        # Trifásica, factor de potencia = 1 asumido (no se modela cosφ) --
+        # misma simplificación que ya usa corriente_diseno_ac() en todo el
+        # resto de la app para dimensionar breakers/protecciones.
         I_ac_A = P_ac_W / (np.sqrt(3.0) * tension_red_V)
         perdida_ohmica_ac_por_hora_W = (I_ac_A ** 2) * resistencia_ac_ohm
         P_ac_W = np.maximum(P_ac_W - perdida_ohmica_ac_por_hora_W, 0.0)

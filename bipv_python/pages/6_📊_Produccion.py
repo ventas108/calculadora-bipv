@@ -509,6 +509,14 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 _perd_ohm_unif.get("panel_nombre") == panel_nombre
                 and _perd_ohm_unif.get("inversor_nombre") == inversor_nombre
                 and _perd_ohm_unif.get("n_serie") == _n_serie_cfg
+                # N_paneles también debe coincidir: la resistencia DC
+                # efectiva de ⚡ Diagrama Unifilar se calculó con
+                # `fraccion_paneles` normalizada contra el total que había
+                # en esa página -- si cambió (ej. se agregaron strings en
+                # 📐 Dimensionamiento) sin volver a Página 20, esa fracción
+                # queda obsoleta y sobreestimaría la corriente real de cada
+                # tramo. Encontrado en auditoría (7-sep-2026).
+                and _perd_ohm_unif.get("n_paneles_total") == N_paneles
             )
             _resistencia_dc_ohm = _perd_ohm_unif.get("resistencia_dc_ohm") if _unif_vigente else None
             _resistencia_ac_ohm = _perd_ohm_unif.get("resistencia_ac_ohm") if _unif_vigente else None

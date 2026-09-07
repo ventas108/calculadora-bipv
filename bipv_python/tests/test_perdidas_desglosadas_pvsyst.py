@@ -53,6 +53,83 @@ def test_diccionario_vacio_de_motor_optico_se_comporta_como_sin_el():
     assert df_none["Etapa"].tolist() == df_vacio["Etapa"].tolist()
 
 
+# ── ②c/②d/④c -- mismatch fabricación + pérdida óhmica DC/AC (7-sep-2026) ──────
+def test_solo_ohmico_dc_activo_sin_mismatch_fab_igual_muestra_fila_2c():
+    # Bug real de auditoría: ②c debe aparecer SIEMPRE (real o informativa),
+    # incluso si el proyecto solo activó pérdida óhmica DC sin tocar el
+    # mismatch de fabricación -- antes de este fix, ②c desaparecía por
+    # completo en este caso.
+    res = _res_sintetico()
+    res["E_dc_antes_binning_ohmico_kWh"] = 9000.0
+    res["pct_mismatch_fab_aplicado"] = None
+    res["perdida_ohmica_dc_modo"] = "calculado"
+    res["perdida_ohmica_dc_kWh"] = 200.0
+    res["E_dc_anual_kWh"] = 8800.0  # 9000 - 200 (sin mismatch_fab de por medio)
+
+    df = perdidas_desglosadas(res, poa_bruta_kWh_m2=1000.0)
+    etapas = df["Etapa"].tolist()
+    assert any(e.startswith("②c") for e in etapas)
+    assert any("informativo" in e for e in etapas if e.startswith("②c"))
+    assert any(e.startswith("②d") for e in etapas)
+    fila_2d = df[df["Etapa"].str.startswith("②d")].iloc[0]
+    assert fila_2d["kWh"] == 8800.0  # reconcilia exacto con el E_dc final
+
+
+def test_solo_mismatch_fab_activo_sin_ohmico_dc_no_muestra_fila_2d():
+    res = _res_sintetico()
+    res["E_dc_antes_binning_ohmico_kWh"] = 9000.0
+    res["pct_mismatch_fab_aplicado"] = 1.5
+    res["perdida_mismatch_fab_kWh"] = 200.0
+    res["perdida_ohmica_dc_modo"] = None
+    res["E_dc_anual_kWh"] = 8800.0
+
+    df = perdidas_desglosadas(res, poa_bruta_kWh_m2=1000.0)
+    etapas = df["Etapa"].tolist()
+    assert any(e.startswith("②c") and "aplicado" in e for e in etapas)
+    assert not any(e.startswith("②d") for e in etapas)
+    fila_2c = df[df["Etapa"].str.startswith("②c")].iloc[0]
+    assert fila_2c["kWh"] == 8800.0  # única fila del bloque -> se fuerza al final exacto
+
+
+def test_mismatch_fab_y_ohmico_dc_juntos_reconcilian_exacto():
+    res = _res_sintetico()
+    res["E_dc_antes_binning_ohmico_kWh"] = 9000.0
+    res["pct_mismatch_fab_aplicado"] = 1.5
+    res["perdida_mismatch_fab_kWh"] = 150.0
+    res["perdida_ohmica_dc_modo"] = "calculado"
+    res["perdida_ohmica_dc_kWh"] = 50.0
+    res["E_dc_anual_kWh"] = 8800.0  # 9000 - 150 - 50
+
+    df = perdidas_desglosadas(res, poa_bruta_kWh_m2=1000.0)
+    fila_2c = df[df["Etapa"].str.startswith("②c")].iloc[0]
+    fila_2d = df[df["Etapa"].str.startswith("②d")].iloc[0]
+    fila_3  = df[df["Etapa"].str.startswith("③")].iloc[0]
+    # Los deltas de ②c y ②d deben sumar exacto la reducción total desde
+    # E_dc_antes_binning_ohmico_kWh hasta E_dc_anual_kWh -- ningún kWh
+    # inventado ni perdido en el desglose.
+    assert fila_2c["Δ kWh"] + fila_2d["Δ kWh"] == 8800.0 - 9000.0
+    assert fila_2d["kWh"] == fila_3["kWh"] == 8800.0
+
+
+def test_perdida_ohmica_ac_aparece_solo_si_hay_modo_y_reconcilia():
+    res = _res_sintetico()
+    res["E_ac_antes_ohmico_ac_kWh"] = 8600.0
+    res["perdida_ohmica_ac_modo"] = "manual"
+    res["perdida_ohmica_ac_kWh"] = 100.0
+    res["E_ac_anual_kWh"] = 8500.0
+
+    df = perdidas_desglosadas(res, poa_bruta_kWh_m2=1000.0)
+    assert any(e.startswith("④c") for e in df["Etapa"].tolist())
+    fila_4c = df[df["Etapa"].str.startswith("④c")].iloc[0]
+    fila_5  = df[df["Etapa"].str.startswith("⑤")].iloc[0]
+    assert fila_4c["kWh"] == fila_5["kWh"] == 8500.0
+
+    # Sin perdida_ohmica_ac_modo, la fila ④c no debe aparecer -- retrocompatible.
+    res_sin_ac = _res_sintetico()
+    df_sin_ac = perdidas_desglosadas(res_sin_ac, poa_bruta_kWh_m2=1000.0)
+    assert not any(e.startswith("④c") for e in df_sin_ac["Etapa"].tolist())
+
+
 def test_con_motor_optico_inserta_filas_iam_y_soiling():
     df = perdidas_desglosadas(
         _res_sintetico(), poa_bruta_kWh_m2=1000.0,

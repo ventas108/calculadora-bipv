@@ -397,6 +397,9 @@ def simular_produccion_anual(
     perdida_ohmica_ac_modo = None
     perdida_ohmica_ac_por_hora_W = np.zeros_like(P_ac_W)
     if resistencia_ac_ohm is not None and resistencia_ac_ohm > 0 and tension_red_V:
+        # Trifásica, factor de potencia = 1 asumido (no se modela cosφ) --
+        # misma simplificación que ya usa corriente_diseno_ac() en todo el
+        # resto de la app para dimensionar breakers/protecciones.
         I_ac_A = P_ac_W / (np.sqrt(3.0) * tension_red_V)
         perdida_ohmica_ac_por_hora_W = (I_ac_A ** 2) * resistencia_ac_ohm
         P_ac_W = np.maximum(P_ac_W - perdida_ohmica_ac_por_hora_W, 0.0)
@@ -690,46 +693,36 @@ def perdidas_desglosadas(
     # ── ②c/②d — Mismatch fabricación + pérdida óhmica DC, REALES (7-sep-2026) ──
     # Si `res` no trae estas claves (versión anterior), ②c queda EXACTAMENTE
     # como antes: informativa, PVsyst +0,75% de referencia, sin aplicar nada.
+    #
+    # ②c SIEMPRE aparece (real o informativa) -- INDEPENDIENTE de si ②d
+    # también aparece. Bug real de auditoría (7-sep-2026, agente de revisión
+    # independiente): la versión anterior solo mostraba ②c cuando el bloque
+    # binning+óhmico tenía AL MENOS una fila, así que un proyecto con SOLO
+    # pérdida óhmica DC activa (sin mismatch de fabricación) se quedaba sin
+    # ninguna fila ②c en absoluto -- ni real ni informativa -- perdiendo el
+    # disclaimer de PVsyst por completo. Ningún kWh salía mal (③ seguía
+    # reconciliando exacto), pero la tabla dejaba de ser auditable en ese caso.
     _pct_fab_aplicado = res.get("pct_mismatch_fab_aplicado")
     _modo_ohmico_dc    = res.get("perdida_ohmica_dc_modo")
-    _etapas_binning_dc = []
-    if _pct_fab_aplicado is not None:
-        _etapas_binning_dc.append((
-            "②c Mismatch fabricación  (aplicado)",
-            res.get("perdida_mismatch_fab_kWh", 0.0),
-            f"{_pct_fab_aplicado}% configurado en 🔀 Mismatch · PVsyst mostró +0,75% "
-            "(ganancia) en 2 papers independientes como valor por defecto sin datos "
-            "reales de binning -- compáralo contra tu propio reporte.",
-        ))
-    if _modo_ohmico_dc is not None:
-        _fuente_dc = (
-            "cálculo real del ⚡ Diagrama Unifilar, hora a hora con la corriente real"
-            if _modo_ohmico_dc == "calculado" else
-            "% manual configurado en 🔀 Mismatch"
-        )
-        _etapas_binning_dc.append((
-            "②d Pérdida óhmica DC  (cableado)",
-            res.get("perdida_ohmica_dc_kWh", 0.0),
-            f"Fuente: {_fuente_dc}",
-        ))
+    _kwh_prev = round(E_dc_pre_binning, 0)
 
-    if _etapas_binning_dc:
-        # La ÚLTIMA fila de este bloque se fuerza a E_dc_anual_kWh exacto
-        # (igual que ③ más abajo) -- cualquier residuo de redondeo entre
-        # pasos queda absorbido ahí, nunca "perdido" ni inventado.
-        _kwh_prev = round(E_dc_pre_binning, 0)
-        for _i, (_etapa, _delta_declarado, _nota) in enumerate(_etapas_binning_dc):
-            _es_ultima = _i == len(_etapas_binning_dc) - 1
-            _kwh_this = (
-                round(res["E_dc_anual_kWh"], 0) if _es_ultima
-                else round(_kwh_prev - _delta_declarado, 0)
-            )
-            filas.append({
-                "Etapa": _etapa, "kWh": _kwh_this,
-                "Δ kWh": round(_kwh_this - _kwh_prev, 0),
-                "Nota": _nota,
-            })
-            _kwh_prev = _kwh_this
+    if _pct_fab_aplicado is not None:
+        _es_ultima_fab = _modo_ohmico_dc is None
+        _kwh_fab = (
+            round(res["E_dc_anual_kWh"], 0) if _es_ultima_fab
+            else round(_kwh_prev - res.get("perdida_mismatch_fab_kWh", 0.0), 0)
+        )
+        filas.append({
+            "Etapa": "②c Mismatch fabricación  (aplicado)",
+            "kWh": _kwh_fab,
+            "Δ kWh": round(_kwh_fab - _kwh_prev, 0),
+            "Nota": (
+                f"{_pct_fab_aplicado}% configurado en 🔀 Mismatch · PVsyst mostró +0,75% "
+                "(ganancia) en 2 papers independientes como valor por defecto sin datos "
+                "reales de binning -- compáralo contra tu propio reporte."
+            ),
+        })
+        _kwh_prev = _kwh_fab
     else:
         filas.append({
             # Informativa, NUNCA aplicada al cálculo -- esta app no tiene datos
@@ -745,12 +738,32 @@ def perdidas_desglosadas(
             # algo que tu instalador midió. Δ kWh y kWh quedan iguales a la
             # fila anterior a propósito: cero efecto en el cálculo real.
             "Etapa":     "②c Módulo  (informativo — no aplicado por esta app)",
-            "kWh":       round(E_dc_pre_binning, 0),
+            "kWh":       round(_kwh_prev, 0),
             "Δ kWh":     0,
             "Nota":      ("PVsyst mostró +0,75% (ganancia) en 2 papers reales independientes -- "
                           "probable valor por defecto del software sin datos de binning propios. "
                           "Esta app no lo modela ni lo aplica; compáralo contra tu propio reporte."),
         })
+        # _kwh_prev NO cambia -- fila informativa, Δ=0 a propósito.
+
+    if _modo_ohmico_dc is not None:
+        _fuente_dc = (
+            "cálculo real del ⚡ Diagrama Unifilar, hora a hora con la corriente real"
+            if _modo_ohmico_dc == "calculado" else
+            "% manual configurado en 🔀 Mismatch"
+        )
+        # ②d, cuando aparece, siempre es la ÚLTIMA fila de este bloque --
+        # se fuerza a E_dc_anual_kWh exacto (igual que ③ más abajo)
+        # cualquier residuo de redondeo queda absorbido ahí, nunca
+        # "perdido" ni inventado.
+        _kwh_ohm = round(res["E_dc_anual_kWh"], 0)
+        filas.append({
+            "Etapa": "②d Pérdida óhmica DC  (cableado)",
+            "kWh": _kwh_ohm,
+            "Δ kWh": round(_kwh_ohm - _kwh_prev, 0),
+            "Nota": f"Fuente: {_fuente_dc}",
+        })
+        _kwh_prev = _kwh_ohm
 
     filas += [
         {

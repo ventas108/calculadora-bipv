@@ -48,6 +48,9 @@ def test_un_tramo_dc_resistencia_correcta_a_mano():
 
 
 def test_tramo_ac_resistencia_correcta_a_mano():
+    # Factor 3 (no 2): trifásico -- 3 conductores de fase, cada uno con
+    # resistencia ρL/S, pérdida total = 3·I_línea²·(ρL/S). El factor 2 es
+    # la convención DC de 2 hilos (ida/vuelta), que NO aplica en AC trifásico.
     r = calcular_perdida_ohmica(
         panel=PANEL, inversor=INVERSOR, N_strings_tracker=2, n_inversores=1,
         tension_red_V=400.0,
@@ -55,7 +58,7 @@ def test_tramo_ac_resistencia_correcta_a_mano():
         T_diseno_C=45.0,
     )
     rho_esperada = _rho(45.0)
-    r_ac_esperada = 2.0 * 15.0 * rho_esperada / 16.0
+    r_ac_esperada = 3.0 * 15.0 * rho_esperada / 16.0
     assert r["resistencia_ac_ohm"] == pytest.approx(r_ac_esperada)
 
 
@@ -118,6 +121,33 @@ def test_resistencia_dc_efectiva_es_suma_de_fraccion_cuadrado_por_r():
         T_diseno_C=45.0,
     )
     assert r_uno["resistencia_dc_efectiva_ohm"] == pytest.approx(r_uno["tramos"][0]["resistencia_ohm"])
+
+
+def test_fraccion_usa_n_paneles_total_no_solo_los_tramos_declarados():
+    # Bug real encontrado en auditoría (7-sep-2026): si el usuario declara
+    # cable DC para SOLO 30 de 100 paneles del proyecto (2 superficies, una
+    # sin cable declarado), la fracción del tramo declarado debe ser
+    # 30/100 -- NO 30/30 (que le atribuiría TODA la corriente del proyecto
+    # a ese único tramo, sobreestimando su pérdida).
+    r_incompleto = calcular_perdida_ohmica(
+        panel=PANEL, inversor=INVERSOR, N_strings_tracker=2, n_inversores=1,
+        tension_red_V=400.0,
+        tramos_dc=[{"nombre": "Sur", "longitud_m": 10.0, "calibre_mm2": 6.0, "n_paneles": 30}],
+        n_paneles_total=100,  # 70 paneles de otra superficie SIN cable declarado
+        T_diseno_C=45.0,
+    )
+    assert r_incompleto["tramos"][0]["fraccion_paneles"] == pytest.approx(30 / 100)
+
+    # Retrocompatible: sin n_paneles_total, cae a la suma de los tramos
+    # declarados (comportamiento anterior a este fix, correcto solo cuando
+    # los tramos ya cubren el 100% del proyecto).
+    r_sin_total = calcular_perdida_ohmica(
+        panel=PANEL, inversor=INVERSOR, N_strings_tracker=2, n_inversores=1,
+        tension_red_V=400.0,
+        tramos_dc=[{"nombre": "Sur", "longitud_m": 10.0, "calibre_mm2": 6.0, "n_paneles": 30}],
+        T_diseno_C=45.0,
+    )
+    assert r_sin_total["tramos"][0]["fraccion_paneles"] == 1.0
 
 
 def test_tramo_sin_longitud_o_calibre_queda_en_none_nunca_inventa():

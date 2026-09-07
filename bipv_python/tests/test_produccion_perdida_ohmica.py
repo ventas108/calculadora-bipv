@@ -168,6 +168,32 @@ def test_modo_calculado_dc_reduce_energia_y_requiere_n_serie(funcion, kwargs_ext
     assert res_sin_nserie["E_dc_anual_kWh"] == res_base["E_dc_anual_kWh"]
 
 
+@pytest.mark.parametrize("funcion, kwargs_extra", _MOTORES)
+def test_modo_calculado_ac_requiere_tension_red_v(funcion, kwargs_extra):
+    # Espejo de test_modo_calculado_dc_reduce_energia_y_requiere_n_serie:
+    # sin tension_red_V, resistencia_ac_ohm no puede activarse -- se ignora
+    # en vez de reventar (nunca inventa el dato que le falta).
+    tmy, poa_df = _tmy_poa_sintetico(800.0)
+    res_base = funcion(
+        tmy=tmy, poa_base=poa_df, panel=ASP_ST1_T40, N_paneles=N_PANELES,
+        eta_inversor=0.975, factor_pr_mismatch=1.0, **kwargs_extra,
+    )
+    res_con_tension = funcion(
+        tmy=tmy, poa_base=poa_df, panel=ASP_ST1_T40, N_paneles=N_PANELES,
+        eta_inversor=0.975, factor_pr_mismatch=1.0,
+        resistencia_ac_ohm=0.03, tension_red_V=400.0, **kwargs_extra,
+    )
+    res_sin_tension = funcion(
+        tmy=tmy, poa_base=poa_df, panel=ASP_ST1_T40, N_paneles=N_PANELES,
+        eta_inversor=0.975, factor_pr_mismatch=1.0,
+        resistencia_ac_ohm=0.03, **kwargs_extra,  # sin tension_red_V
+    )
+    assert res_con_tension["perdida_ohmica_ac_modo"] == "calculado"
+    assert res_con_tension["E_ac_anual_kWh"] < res_base["E_ac_anual_kWh"]
+    assert res_sin_tension["perdida_ohmica_ac_modo"] is None
+    assert res_sin_tension["E_ac_anual_kWh"] == res_base["E_ac_anual_kWh"]
+
+
 def test_calculo_hora_a_hora_pierde_menos_que_aplicar_pct_de_diseno_fijo():
     """
     La prueba central de la mejora sobre PVsyst: con la MISMA resistencia,

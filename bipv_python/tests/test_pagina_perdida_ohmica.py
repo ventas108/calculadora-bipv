@@ -64,14 +64,17 @@ def test_produccion_pasa_mismatch_fab_y_cableado_al_motor():
 
 
 def test_produccion_valida_vigencia_del_calculo_unifilar_antes_de_usarlo():
-    # No debe aplicar un cálculo de otro panel/inversor/N_serie como si
-    # fuera el vigente para este proyecto.
+    # No debe aplicar un cálculo de otro panel/inversor/N_serie/N_paneles
+    # como si fuera el vigente para este proyecto -- N_paneles importa
+    # porque la resistencia DC efectiva se calibró contra ese total
+    # (fraccion_paneles), un cambio posterior lo invalida (auditoría 7-sep-2026).
     src = _leer(_PAG_PRODUCCION)
     idx = src.index("_unif_vigente = bool(")
-    bloque = src[idx:idx + 300]
+    bloque = src[idx:idx + 900]
     assert 'panel_nombre") == panel_nombre' in bloque
     assert 'inversor_nombre") == inversor_nombre' in bloque
     assert 'n_serie") == _n_serie_cfg' in bloque
+    assert 'n_paneles_total") == N_paneles' in bloque
 
 
 # ── Página 20 — Diagrama Unifilar ────────────────────────────────────────────
@@ -85,9 +88,9 @@ def test_unifilar_persiste_el_resultado_en_session_state():
     src = _leer(_PAG_UNIFILAR)
     assert 'st.session_state["perdida_ohmica_unifilar"] = {' in src
     idx = src.index('st.session_state["perdida_ohmica_unifilar"] = {')
-    bloque = src[idx:idx + 500]
+    bloque = src[idx:idx + 900]
     for _clave in ("resistencia_dc_ohm", "resistencia_ac_ohm", "tension_red_V",
-                    "panel_nombre", "inversor_nombre", "n_serie"):
+                    "panel_nombre", "inversor_nombre", "n_serie", "n_paneles_total"):
         assert f'"{_clave}"' in bloque
 
 
