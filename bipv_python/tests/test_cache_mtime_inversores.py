@@ -9,7 +9,7 @@ import ast
 from pathlib import Path
 
 _BASE = Path(__file__).resolve().parent.parent
-_SRC = (_BASE / "datos" / "catalogo_inversores_excel.py").read_text()
+_SRC = (_BASE / "datos" / "catalogo_inversores_excel.py").read_text(encoding="utf-8")
 _TREE = ast.parse(_SRC)
 _FNS = {n.name: n for n in _TREE.body if isinstance(n, ast.FunctionDef)}
 
@@ -48,7 +48,7 @@ def test_clear_compatibilidad():
 def test_nadie_llama_con_mtime_con_guion_bajo():
     for rel in ("pages/4_📐_Dimensionamiento.py",
                 "datos/diagnostico_catalogo_inversores.py"):
-        src = (_BASE / rel).read_text()
+        src = (_BASE / rel).read_text(encoding="utf-8")
         assert "_mtime=" not in src, f"{rel} pasa _mtime= (kwarg obsoleto)"
 
 

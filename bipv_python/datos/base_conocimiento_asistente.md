@@ -1299,6 +1299,32 @@ Verificado con 4 casos reales: Urabá (220 kWp) → sin advertencia; exactamente
 
 ────────────────────────────────────────────────────────────
 
+### Modelo P90 bancable — metodología completa (7-sep-2026)
+
+Esta subsección documenta por primera vez, de forma dedicada, el modelo P90 del expander "📊 Modelo P90" dentro de 💰 Financiero — hasta ahora solo tenía menciones incidentales dispersas.
+
+**Qué es P90**: la energía anual que el proyecto excede el 90% de las veces (a diferencia de P50, la energía "esperada" o mediana). Es la cifra que un banco o inversor institucional exige para dimensionar el servicio de deuda — un flujo de caja calculado con P50 sobreestima sistemáticamente la probabilidad de cumplir las cuotas.
+
+**Fórmula** (EPRI TR-107348 / IEC 61724-3, la misma referencia estándar que cita el propio código, verificada contra la metodología pública de Solargis):
+
+```
+factor_P90 = z₉₀ × σ_total          (z₉₀ = 1,28 — score de excedencia al 90%)
+σ_total    = √(σ_irr² + σ_PR²)      (combinación cuadrática RSS)
+E_ac_P90   = E_ac_P50 × (1 − factor_P90/100)
+```
+
+**σ_irr — variabilidad interanual del recurso solar**: hasta el 7-sep-2026 venía SOLO de una tabla fija por ciudad (24 palabras clave colombianas → 4,0-6,5%, origen declarado "IDEAM Atlas 2022 + Solargis long-term variability dataset" pero sin cálculo real en tiempo de ejecución). Ahora existe además un botón "🔄 Calcular variabilidad real desde PVGIS (≈10s)" que descarga la serie horaria multi-año REAL de PVGIS (`pvlib.iotools.get_pvgis_hourly`, endpoint `/seriescalc` — distinto del endpoint `/tmy` que usa `calculos/solar.py` para el año típico) para las coordenadas EXACTAS del proyecto, y calcula la desviación estándar relativa de las sumas anuales de GHI horizontal sobre los años calendario completos disponibles (mínimo 5 años, si no, no se usa — nunca se inventa con pocos datos). Implementado en `calculos/incertidumbre_p90.py`, cacheado en disco por coordenadas (`datos/solar_cache/variabilidad_p90_*.pkl`), 12 tests en `tests/test_incertidumbre_p90.py`.
+
+**Regla de combinación — nunca silenciosamente más optimista**: `σ_irr_usado = max(σ_irr_tabla, σ_irr_real)` cuando el dato real está disponible. Si el real es MÁS ALTO que la tabla (el sitio es más variable de lo asumido) se usa el real — más protector. Si el real es MÁS BAJO, la tabla sigue mandando — un banco exigente sería escéptico de un σ "sorprendentemente bajo" controlado por el propio desarrollador del proyecto, sin más escrutinio independiente. Ambos valores se muestran SIEMPRE lado a lado en la tabla de metodología del expander, con años/base de datos citados — nunca se oculta ninguno, para que sea auditable por un tercero. Sin dato real disponible (botón no presionado, o PVGIS falló), cae exactamente al comportamiento histórico: solo la tabla.
+
+**σ_PR — incertidumbre del modelo de pérdidas** (sin cambios en este trabajo, ya era una decisión de ingeniería razonable): 3 niveles según qué correcciones están activas — 3,5% con Motor Óptico + Bypass Diodes, 4,2% con solo uno de los dos, 5,0% con el modelo base sin correcciones.
+
+**Caso de auditoría real documentado — Urabá** (7,884, -76,635): σ_irr real calculado con 11 años de datos PVGIS (2013-2023, base PVGIS-ERA5) = **2,18%**, frente al 6,5% de la tabla regional para esa zona climática. Por la regla del máximo, el modelo sigue usando 6,5% (la tabla) — el resultado final de P90 no cambia para este proyecto, pero ahora el dato real está calculado, mostrado y auditado explícitamente en vez de asumido.
+
+⚠️ Para no cometer errores: el cálculo real NO se dispara automáticamente en cada carga de página (~10s de latencia de red a PVGIS) — es una acción explícita del usuario vía el botón, y el resultado queda cacheado. Este módulo NO toca el pipeline paralelo del optimizador (`simulation/financial_simulator.py`/`FinancialConfiguration`, usado por Comparadores/Análisis IA) — ese pipeline no tiene ningún concepto de P90 hoy, límite conocido y declarado, no un descuido.
+
+────────────────────────────────────────────────────────────
+
 ## 11. Página 8 — Presupuesto Bancable
 
 Propósito: Construir el presupuesto completo del proyecto con estructura
@@ -3480,6 +3506,24 @@ Las secciones 64/65 y el manual de usuario declaraban explícitamente que el cal
 **Lo que se construyó en cambio**: un ranking de escenarios NOMBRADOS y reales, cada uno con su propio semáforo (verde ≤70% de margen, amarillo 70-100%, rojo >100%) — 3 condiciones de instalación reales para el tramo DC (ficha H1Z2Z2-K), 3 tipos de aislamiento para el tramo AC (NTC2050 60/75/90°C). El usuario ubica cuál escenario se parece a su instalación real; ningún 🟢 certifica la instalación real del proyecto. `calculos/diagrama_unifilar.py::calcular_semaforo_ampacidad()`, integrada en `calcular_perdida_ohmica()` — cada tramo DC compara su PROPIA fracción de corriente (no la del proyecto completo), mismo criterio ya usado para la pérdida óhmica.
 
 16 tests nuevos (`test_semaforo_ampacidad.py`): física a mano en ambas tablas, ranking ordenado, umbrales del semáforo en los bordes exactos, nunca inventa (sin corriente/calibre/tabla desconocida → lista vacía), calibre sin dato verificado (NTC2050 solo llega a 120mm² — no se extrapola), y la integración multi-tramo (corriente escalada por fracción, no la total). Documentado en la sección 13f. Suite completa relanzada antes de desplegar.
+
+────────────────────────────────────────────────────────────
+
+## 68. Anexo — Actualizaciones del 7 de septiembre de 2026 (P90 bancable: variabilidad interanual REAL desde PVGIS, complementando el modelo existente)
+
+El usuario pidió implementar un P50/P90 "auditable y bancarizable, 100% compatible y complementario con lo actualmente construido" — con la condición explícita de no duplicar ni romper nada. **Hallazgo clave de la investigación**: YA existía un mecanismo P90 completo y metodológicamente correcto en 💰 Financiero (fórmula `factor_P90 = z₉₀ × σ_total`, `σ_total = √(σ_irr² + σ_PR²)`, verificada contra EPRI TR-107348/IEC 61724-3 y la metodología pública de Solargis, alimentando TIR/VPN/LCOE/Payback-P90 completos). La brecha real no era la fórmula, sino que `σ_irr` (variabilidad interanual) venía de una tabla fija por ciudad, nunca de un cálculo con datos reales del sitio.
+
+**Construido**: `calculos/incertidumbre_p90.py` — descarga la serie horaria multi-año REAL de PVGIS vía `pvlib.iotools.get_pvgis_hourly()` (endpoint `/seriescalc`, distinto del `/tmy` que ya usa `calculos/solar.py`) para las coordenadas exactas del proyecto, y calcula la desviación estándar relativa de las sumas anuales de GHI horizontal sobre los años calendario completos (mínimo 5, si no hay suficientes no se usa). Cacheado en disco por coordenadas, mismo patrón que `pages/2_☀️_Recurso_Solar.py`.
+
+**Bug real encontrado y corregido en vivo, antes de terminar el módulo**: se asumió que "año actual − 1" era siempre un año final válido para pedirle a PVGIS; en la práctica PVGIS rechazó ese rango (`HTTPError: endyear... between 2005 and 2023`) — su cobertura real de datos actualmente llega solo hasta 2023, no hasta el año del sistema. Corregido con un reintento que lee el rango real del propio mensaje de error del servidor (nunca se inventa el límite) y reintenta una vez.
+
+**Regla de combinación — nunca silenciosamente más optimista**: `σ_irr_usado = max(σ_irr_tabla, σ_irr_real)`. Si el dato real es mayor que la tabla (sitio más variable de lo asumido), se usa el real — más protector. Si es menor, la tabla sigue mandando — un banco exigente sería escéptico de un σ "sorprendentemente bajo" controlado por el propio desarrollador del proyecto, sin más escrutinio independiente. Ambos valores se muestran siempre lado a lado en la tabla de metodología del expander, nunca se oculta ninguno.
+
+**Caso de auditoría real — Urabá** (7,884, -76,635, 11 años PVGIS 2013-2023, base PVGIS-ERA5): σ_irr real = **2,18%** frente al 6,5% de la tabla regional. Por la regla del máximo, el modelo sigue usando 6,5% — el P90 final no cambia para este proyecto, pero ahora el dato real está calculado, mostrado y auditado en vez de asumido. Este caso es exactamente el tipo de divergencia (número autoreportado más bajo de lo esperado) que motivó la regla del máximo en primer lugar.
+
+**Explícitamente fuera de alcance, declarado**: `σ_PR` no se tocó (ya era una decisión de ingeniería razonable). El pipeline paralelo del optimizador (`simulation/financial_simulator.py`/`FinancialConfiguration`, usado por Comparadores/Análisis IA) no tiene ningún concepto de P90 hoy — límite conocido, no se extendió aquí. El cálculo real no se auto-dispara en cada rerun (latencia de red ~10s) — es un botón explícito, cacheado.
+
+12 tests nuevos (`tests/test_incertidumbre_p90.py`): estadística verificada a mano con series sintéticas (incluyendo años bisiestos), exclusión correcta de años parciales, el gate de mínimo de años, el reintento de rango real de PVGIS, fallos de red sin patrón reconocible, caché (guarda/relee/corrupto/sin caché previo), y las 3 ramas de la regla de combinación. Documentado en la sección 10 (Página 7 — Financiero). Suite completa relanzada antes de desplegar.
 
 ────────────────────────────────────────────────────────────
 

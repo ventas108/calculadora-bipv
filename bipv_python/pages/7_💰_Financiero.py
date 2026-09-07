@@ -15,6 +15,7 @@ from calculos.financiero import (
 )
 from calculos.trm_utils import init_trm, trm_widget
 from calculos.tarifa_utils import init_tarifa, tarifa_widget
+from calculos.incertidumbre_p90 import calcular_variabilidad_interanual_real, elegir_sigma_irr
 from datos.ciudades_colombia import LEY_1715
 
 st.set_page_config(page_title="Financiero — BIPV", page_icon="💰", layout="wide")
@@ -687,11 +688,25 @@ with col_t2:
         "barranq": 4.0, "cartagena": 4.0, "santa marta": 4.0,
     }
     _ciu_low_fin = str(ciudad).lower()
-    _sigma_irr_fin = 5.0
+    _sigma_irr_tabla_fin = 5.0
     for _kw_fin, _sv_fin in _sigma_irr_map_fin.items():
         if _kw_fin in _ciu_low_fin:
-            _sigma_irr_fin = _sv_fin
+            _sigma_irr_tabla_fin = _sv_fin
             break
+
+    # σ_irr REAL (7-sep-2026) — calculada de datos horarios multi-año reales
+    # de PVGIS para las coordenadas EXACTAS del proyecto (no una tabla fija
+    # por ciudad) — ver calculos/incertidumbre_p90.py para la metodología
+    # completa y por qué NUNCA se usa el valor más bajo entre el real y el
+    # de tabla (un banco exigente sería escéptico de un σ "sorprendentemente
+    # bajo" sin más escrutinio). Se calcula solo cuando el usuario lo pide
+    # explícitamente (botón) — no en cada rerun, por la latencia de red
+    # (~10s) — y el resultado queda cacheado en disco por coordenadas.
+    _lat_p90 = st.session_state.get("lat_proyecto")
+    _lon_p90 = st.session_state.get("lon_proyecto")
+    _resultado_real_p90 = st.session_state.get("variabilidad_p90_real") or {"sigma_irr_real_pct": None, "error": None}
+    _combo_sigma_irr = elegir_sigma_irr(_sigma_irr_tabla_fin, _resultado_real_p90)
+    _sigma_irr_fin = _combo_sigma_irr["sigma_irr_usado_pct"]
 
     # σ_PR: incertidumbre del modelo de pérdidas — disminuye con cada corrección activa
     _motor_ok_p90  = st.session_state.get("poa_efectiva_df") is not None
@@ -719,23 +734,59 @@ with col_t2:
         f"→  P90 = {e_ac*(1-_f_p90_auto/100):,.0f} kWh/año",
         expanded=False,
     ):
+        _fila_irr_usada = (
+            f"| Variabilidad interanual **usada** | **{_sigma_irr_fin:.2f}** "
+            f"| {'Dato real (PVGIS, ver abajo)' if _combo_sigma_irr['fuente_usada']=='real' else 'Tabla regional (el dato real, si existe, era menor — se usa el más conservador)'} |\n"
+        )
         st.markdown(
             "**Metodología de incertidumbre combinada** *(EPRI TR-107348 / IEC 61724-3)*\n\n"
             f"| Fuente | σ (%) | Origen |\n"
             f"|---|---|---|\n"
-            f"| Variabilidad interanual TMY — {ciudad} | **{_sigma_irr_fin:.1f}** "
+            f"| Variabilidad interanual — tabla regional ({ciudad}) | **{_sigma_irr_tabla_fin:.1f}** "
             f"| IDEAM / Solargis — zona climática Colombia |\n"
+            + (
+                f"| Variabilidad interanual — dato REAL del sitio | **{_resultado_real_p90['sigma_irr_real_pct']:.2f}** "
+                f"| PVGIS, {_resultado_real_p90.get('n_anios','—')} años "
+                f"({_resultado_real_p90.get('anio_inicio','—')}-{_resultado_real_p90.get('anio_fin','—')}), "
+                f"base {_resultado_real_p90.get('raddatabase','—')} |\n"
+                if _resultado_real_p90.get("sigma_irr_real_pct") is not None else ""
+            )
+            + _fila_irr_usada +
             f"| Incertidumbre modelo de pérdidas | **{_sigma_pr_fin:.1f}** "
             f"| {_pr_label} |\n"
-            f"| **σ total combinado** | **{_sigma_tot_fin:.1f}** | √(σ_irr² + σ_PR²) |\n"
-            f"| **Factor P90** | **{_f_p90_auto:.1f}%** | z₉₀ × σ_total = 1.28 × {_sigma_tot_fin:.1f}% |\n\n"
+            f"| **σ total combinado** | **{_sigma_tot_fin:.2f}** | √(σ_irr² + σ_PR²) |\n"
+            f"| **Factor P90** | **{_f_p90_auto:.1f}%** | z₉₀ × σ_total = 1.28 × {_sigma_tot_fin:.2f}% |\n\n"
             f"**P90 = {e_ac:,.0f} × (1 − {_f_p90_auto/100:.3f}) = "
             f"{e_ac*(1-_f_p90_auto/100):,.0f} kWh/año**\n\n"
             f"*Una referencia estándar internacional aplica un factor P90 manual fijo sin diferenciación regional. "
             f"Este modelo ajusta automáticamente σ_irr según la zona climática colombiana "
             f"y reduce σ_PR a medida que se activan el Motor Óptico y los Bypass Diodes, "
-            f"premiando la profundidad de la simulación.*"
+            f"premiando la profundidad de la simulación.*\n\n"
+            f"*Regla del dato real: nunca se usa si es MÁS BAJO que la tabla (un banco exigente "
+            f"sería escéptico de un σ inusualmente bajo sin más escrutinio) — solo sustituye a la "
+            f"tabla cuando el sitio real resulta MÁS variable de lo asumido, para no subestimar el riesgo.*"
         )
+
+        if st.button("🔄 Calcular variabilidad real desde PVGIS (≈10s)", key="btn_calc_variabilidad_p90"):
+            if not _lat_p90 or not _lon_p90:
+                st.warning(
+                    "⚠️ No hay coordenadas del proyecto (🏠 Proyecto) — no se puede calcular "
+                    "la variabilidad real. Se sigue usando la tabla regional."
+                )
+            else:
+                with st.spinner("Descargando serie horaria multi-año de PVGIS…"):
+                    _res_p90 = calcular_variabilidad_interanual_real(float(_lat_p90), float(_lon_p90))
+                st.session_state["variabilidad_p90_real"] = _res_p90
+                if _res_p90.get("sigma_irr_real_pct") is not None:
+                    st.success(
+                        f"✅ Variabilidad interanual real: {_res_p90['sigma_irr_real_pct']:.2f}% "
+                        f"({_res_p90['n_anios']} años, {_res_p90['anio_inicio']}-{_res_p90['anio_fin']}, "
+                        f"base {_res_p90['raddatabase']})"
+                    )
+                else:
+                    st.warning(f"⚠️ No se pudo calcular: {_res_p90.get('error')} — se sigue usando la tabla regional.")
+                st.rerun()
+
         _usar_p90_man = st.checkbox(
             "Ajustar factor P90 manualmente", value=False, key="p90_manual_override"
         )
