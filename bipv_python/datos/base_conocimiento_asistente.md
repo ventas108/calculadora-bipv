@@ -1065,6 +1065,18 @@ Además del modelo hora a hora estándar, la página 6 puede calcular la producc
 
 ✅ Regla: usa el modo curva IV cuando el panel tenga ficha completa verificada — es más preciso en horas de baja irradiancia y en climas fríos, donde el modelo lineal subestima o sobreestima.
 
+### Corrección espectral CdTe  NUEVO (6-sep-2026)
+
+Si el panel seleccionado es **CdTe** (Soltech, First Solar, HIITIO, EINNOVA/vidrio — cualquier ficha que clasifique como CdTe, no solo un modelo puntual), la simulación aplica automáticamente una corrección por el espectro solar REAL del sitio, además de la temperatura y la irradiancia. No hace falta activar nada: se calcula solo cuando corresponde.
+
+**Por qué existe**: el espectro de la luz solar cambia hora a hora según cuánta atmósfera atraviesa (masa de aire) y cuánta humedad hay en el camino (agua precipitable) — más camino/humedad = espectro corrido hacia el rojo. La corriente que un módulo puede generar depende de qué tan bien su respuesta espectral cubre ESE espectro real, no el espectro estándar de laboratorio (AM1.5G) de la ficha técnica. Para silicio cristalino el efecto es pequeño (~1-2%, casi nadie lo modela); **para CdTe es varias veces mayor (~5-10%)** porque su respuesta espectral es más angosta — por eso PVsyst y la literatura técnica SÍ lo aplican específicamente para esta tecnología. La app usa el modelo **First Solar** (`pvlib.spectrum.spectral_factor_firstsolar`), el mismo enfoque/coeficientes que usa PVsyst para CdTe.
+
+**Qué necesita para funcionar**: el TMY del proyecto debe tener la columna de humedad relativa (RH) que PVGIS entrega — los TMY descargados ANTES del 6-sep-2026 no la tienen (quedaban en caché de disco sin ese dato). Si detecta un panel CdTe pero el TMY no tiene RH, la página muestra un aviso ⚠️ pidiendo ir a ☀️ Recurso Solar, presionar "🔄 Limpiar caché" y descargar el TMY de nuevo — un clic, sin perder nada más de la configuración del proyecto.
+
+**Qué se ve en pantalla**: cuando la corrección SÍ se aplicó, un aviso 🌈 muestra el factor promedio (ej. "0.972" = -2,8% neto por el espectro real de ese sitio específico frente al estándar). Un factor >1.0 significa que el espectro del sitio favorece más a la corriente de este panel que el estándar de fábrica (ganancia real, no error).
+
+**Qué SÍ cambia y qué NO**: afecta la energía calculada (E_dc/E_ac) del panel CdTe — solo eso. NO cambia la irradiancia POA reportada (H_ef sigue siendo la misma, la luz que llega físicamente al plano no cambió) ni la temperatura de celda (la sigue calentando toda la irradiancia, use o no toda la celda esa energía para generar corriente). Se aplica igual en el modo estándar y en 🔬 Motor IV (curva I-V real) — los dos motores quedan consistentes entre sí para paneles CdTe.
+
 ### Bug real corregido: la producción nunca se recortaba (clipping) al Pnom del inversor  NUEVO (29-ago-2026)
 
 El usuario reportó una advertencia de una referencia estándar internacional ("inversor sobredimensionado") en el proyecto Teusaquillo y preguntó, honestamente, si esa misma restricción existía en la app. Se investigó y la respuesta fue: no existía ningún filtro — pero al preguntarse si eso era un riesgo real, se encontró algo más serio que una advertencia faltante.
