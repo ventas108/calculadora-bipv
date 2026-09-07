@@ -34,6 +34,12 @@ def obtener_tmy_pvgis(lat: float, lon: float, timeout: int = 30) -> pd.DataFrame
         T2m    — Temperatura ambiente °C
         WS10m  — Velocidad viento m/s
         SP     — Presión superficial Pa
+        RH     — Humedad relativa 2m, % (6-sep-2026: PVGIS ya la entregaba en
+                 el JSON crudo, pero se descartaba silenciosamente. Necesaria
+                 para la corrección espectral CdTe -- calculos.
+                 correccion_espectral::calcular_factor_espectral_cdte()
+                 -- que deriva agua precipitable de T2m+RH. Columna nueva,
+                 aditiva: no rompe a ningún consumidor existente del TMY.)
     """
     params = {
         "lat": round(lat, 4),
@@ -63,9 +69,10 @@ def obtener_tmy_pvgis(lat: float, lon: float, timeout: int = 30) -> pd.DataFrame
         "T2m":   "T2m",
         "WS10m": "WS10m",
         "SP":    "SP",
+        "RH":    "RH",
     })
 
-    cols = ["G_h", "Gb_n", "Gd_h", "T2m", "WS10m", "SP"]
+    cols = ["G_h", "Gb_n", "Gd_h", "T2m", "WS10m", "SP", "RH"]
     return df[[c for c in cols if c in df.columns]].astype(float)
 
 

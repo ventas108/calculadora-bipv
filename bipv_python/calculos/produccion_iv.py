@@ -21,6 +21,7 @@ from calculos.modelo_iv import (
     preparar_panel_iv,
     calcular_pmax_vectorizado,
 )
+from calculos.modelo_jrc_huld import clasificar_tecnologia_jrc
 from calculos.temperatura import temperatura_celda_noct
 from calculos.agregador_anual import (
     agregar_anual_8760_poa,
@@ -103,6 +104,7 @@ def simular_produccion_iv(
     k_bipv: float = 1.0,
     P_ac_nom_W: float | None = None,
     poa_bruta_kWh_m2: float | None = None,
+    factor_espectral: pd.Series | np.ndarray | None = None,
 ) -> dict:
     """
     Simulación de producción anual hora a hora usando la curva IV real (Motor IV).
@@ -132,9 +134,18 @@ def simular_produccion_iv(
                           Este módulo tenía el mismo hueco (Y_r usaba poa_base, que con
                           Motor Óptico activo ya viene post-IAM+soiling). None (default)
                           = comportamiento histórico, retrocompatible.
+    factor_espectral    : corrección espectral CdTe (First Solar) -- ver el mismo
+                          parámetro y docstring completo en
+                          calculos.produccion.simular_produccion_anual() (6-sep-2026).
+                          Igual que ahí: solo se aplica si el panel es CdTe, y solo
+                          al cálculo eléctrico (nunca a G_eff/H_ef/T_cel). Este
+                          módulo usa el SDM completo para CdTe (no JRC/Huld como
+                          produccion.py), así que necesita la MISMA corrección para
+                          no divergir del motor base en paneles CdTe.
 
     Retorna dict con las mismas claves que simular_produccion_anual (incluye
-    perdida_clipping_kWh, horas_con_clipping, E_ac_sin_recorte_kWh, Y_r_es_bruta_real) más:
+    perdida_clipping_kWh, horas_con_clipping, E_ac_sin_recorte_kWh, Y_r_es_bruta_real,
+    factor_espectral_aplicado, factor_espectral_promedio) más:
       metodo : "curva_iv" (para trazabilidad)
 
     Lanza ValueError si el panel no tiene ficha completa para el Motor IV.
@@ -172,12 +183,27 @@ def simular_produccion_iv(
     # k_bipv eleva la temperatura de celda en fachadas con ventilación restringida
     T_cel = temperatura_celda_noct(G_eff, T_amb, NOCT=NOCT, k_bipv=k_bipv)
 
+    # ── Corrección espectral CdTe -- ver docstring "factor_espectral" arriba y
+    # el comentario completo en calculos.produccion.simular_produccion_anual().
+    factor_espectral_aplicado = False
+    factor_espectral_promedio = None
+    G_para_potencia = G_eff
+    if factor_espectral is not None and clasificar_tecnologia_jrc(panel.get("tecnologia")) == "CdTe":
+        fe = np.asarray(factor_espectral, dtype=float)
+        if fe.shape == G_eff.shape:
+            G_para_potencia = G_eff * fe
+            factor_espectral_aplicado = True
+            _mask_dia = G_eff > 5.0
+            factor_espectral_promedio = (
+                round(float(fe[_mask_dia].mean()), 4) if _mask_dia.any() else 1.0
+            )
+
     # ── Pmp por módulo desde la curva IV real (vectorizado) ───────────────────
-    pmp_mod = _pmp_iv_vectorizado(G_eff, T_cel, panel)
+    pmp_mod = _pmp_iv_vectorizado(G_para_potencia, T_cel, panel)
 
     # ── Pérdida por temperatura (referencia: mismo G_eff a T=25°C) ────────────
     T_ref_arr  = np.full_like(T_cel, 25.0)
-    pmp_stc_g  = _pmp_iv_vectorizado(G_eff, T_ref_arr, panel)
+    pmp_stc_g  = _pmp_iv_vectorizado(G_para_potencia, T_ref_arr, panel)
     perdida_temp_por_modulo = np.maximum(pmp_stc_g - pmp_mod, 0.0)
 
     # ── Escalar al sistema ─────────────────────────────────────────────────────
@@ -213,6 +239,10 @@ def simular_produccion_iv(
     # ── DataFrame horario ─────────────────────────────────────────────────────
     df_h = pd.DataFrame({
         "G_eff_Wm2":    G_eff,
+        "factor_espectral": (
+            G_para_potencia / np.where(G_eff > 0, G_eff, 1.0)
+            if factor_espectral_aplicado else np.ones_like(G_eff)
+        ),
         "T_cel_C":      T_cel,
         "Pmax_mod_W":   pmp_mod,
         "P_dc_kW":      P_dc_W / 1000.0,
@@ -258,6 +288,8 @@ def simular_produccion_iv(
         "perdida_inv_kWh":         round(perdida_inv_kWh, 0),
         "perdida_clipping_kWh":    round(perdida_clipping_kWh, 0),
         "horas_con_clipping":      horas_con_clipping,
+        "factor_espectral_aplicado":  factor_espectral_aplicado,
+        "factor_espectral_promedio":  factor_espectral_promedio,
         "E_ac_sin_recorte_kWh":    round(E_ac_sin_recorte_anual, 0),
         # Mismo campo que calculos.produccion.simular_produccion_anual() --
         # ver ahí el comentario completo. E_dc con G_eff real, T_cel=25°C fija.

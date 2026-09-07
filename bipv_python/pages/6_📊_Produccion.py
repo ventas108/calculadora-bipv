@@ -16,7 +16,8 @@ from calculos.dimensionamiento import (
     diseno_electrico_confirmado,
 )
 from calculos.graficos_compatibilidad import figura_compatibilidad_electrica
-from calculos.modelo_jrc_huld import resultado_jrc_desde_sesion
+from calculos.modelo_jrc_huld import resultado_jrc_desde_sesion, clasificar_tecnologia_jrc
+from calculos.correccion_espectral import calcular_factor_espectral_cdte
 from datos.tecnologias_bipv import MODULOS_BIPV
 from datos.catalogo_inversores import INVERSORES
 from datos.catalogo_paneles_excel import cargar_catalogo_excel, obtener_panel_excel
@@ -475,6 +476,25 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 _panel_sdm = dict(panel)          # copia superficial; no muta original
                 _panel_sdm["NOCT"] = _noct_mo
 
+            # Corrección espectral CdTe (6-sep-2026, pedido explícito del
+            # usuario tras la auditoría del motor de producción) -- modelo
+            # First Solar, aplica a CUALQUIER ficha CdTe del catálogo
+            # (Soltech, First Solar, HIITIO, EINNOVA/vidrio), no solo a un
+            # panel puntual, porque el factor depende del SITIO/TMY, no del
+            # panel. Se calcula SOLO si el panel es CdTe (evita el costo de
+            # cálculo para el resto). None si el TMY aún no tiene la
+            # columna RH (TMY descargado antes de este fix) -- ver
+            # calculos.correccion_espectral para el porqué.
+            _factor_espectral_serie = None
+            if clasificar_tecnologia_jrc(_panel_sdm.get("tecnologia")) == "CdTe":
+                _lat_esp = st.session_state.get("lat_proyecto")
+                _lon_esp = st.session_state.get("lon_proyecto")
+                _alt_esp = st.session_state.get("alt_proyecto")
+                if _lat_esp is not None and _lon_esp is not None:
+                    _factor_espectral_serie = calcular_factor_espectral_cdte(
+                        tmy, float(_lat_esp), float(_lon_esp), float(_alt_esp or 0)
+                    )
+
             _sim_kwargs = dict(
                 tmy               = tmy,
                 poa_base          = poa_base,
@@ -502,6 +522,7 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 # "poa_bruta_kWh_m2" en calculos.produccion. Mismo valor
                 # que ya recibía perdidas_desglosadas() más abajo.
                 poa_bruta_kWh_m2  = poa_bruta_anual,
+                factor_espectral  = _factor_espectral_serie,
             )
             try:
                 res_base = simular_produccion_anual(**_sim_kwargs)
@@ -689,6 +710,30 @@ if btn_sim or st.session_state.get("produccion_ok"):
               ))
     m6.metric("Factor de Planta",  f"{res['CF_pct']:.1f}%",
               help="Capacity Factor = E_ac / (P_STC × 8760 h)")
+
+    # ── Corrección espectral CdTe -- visible siempre que aplique, para que
+    # quede auditable de un vistazo si esta corrida la incluyó o no (pedido
+    # explícito del usuario, 6-sep-2026).
+    if clasificar_tecnologia_jrc(panel.get("tecnologia")) == "CdTe":
+        if res.get("factor_espectral_aplicado"):
+            _fe_prom = res["factor_espectral_promedio"]
+            _signo = "ganancia" if _fe_prom >= 1.0 else "pérdida"
+            st.info(
+                f"🌈 **Corrección espectral CdTe aplicada** (modelo First Solar): "
+                f"factor promedio en horas de sol **{_fe_prom:.3f}** — "
+                f"{_signo} neta de {abs(_fe_prom - 1.0) * 100:.1f}% por el espectro "
+                "real del sitio frente al estándar AM1.5G. Afecta solo el cálculo "
+                "eléctrico, no la POA efectiva reportada (H_ef).",
+                icon="🌈",
+            )
+        else:
+            st.warning(
+                "⚠️ Panel CdTe sin corrección espectral aplicada — el TMY de este "
+                "proyecto no tiene la columna RH (humedad relativa) necesaria. "
+                "Ve a ☀️ Recurso Solar, presiona '🔄 Limpiar caché' y descarga el "
+                "TMY de nuevo para activarla.",
+                icon="⚠️",
+            )
 
     # ── Alertas de rango PR IEC 61724 ─────────────────────────────────────────
     _pr_pct = res["PR"] * 100

@@ -137,6 +137,7 @@ def simular_produccion_anual(
     k_bipv: float = 1.0,
     P_ac_nom_W: float | None = None,
     poa_bruta_kWh_m2: float | None = None,
+    factor_espectral: pd.Series | np.ndarray | None = None,
 ) -> dict:
     """
     Simulación de producción anual hora a hora — IEC 61724.
@@ -186,6 +187,20 @@ def simular_produccion_anual(
                           parámetro homónimo alinea `simular_produccion_anual()` con el
                           mismo criterio. Ningún kWh ni cifra financiera cambia con esto
                           -- solo el % de PR reportado cuando Motor Óptico está activo.
+    factor_espectral    : factor multiplicativo horario (Series/array, mismo índice que
+                          `tmy`) de corrección espectral -- ver `calculos.
+                          correccion_espectral.calcular_factor_espectral_cdte()`.
+                          Se aplica SOLO si el panel clasifica como tecnología CdTe
+                          (`modelo_jrc_huld.clasificar_tecnologia_jrc`); para cualquier
+                          otra tecnología se ignora por completo aunque se pase (defensa
+                          ante mal uso -- el factor First Solar 'cdte' no es válido para
+                          silicio cristalino ni CIS). Se aplica SOLO al cálculo eléctrico
+                          (Pmax) -- NUNCA a `G_eff`/`H_ef`/`T_cel`: el efecto espectral
+                          es una limitación de cuánta corriente puede extraer la CELDA
+                          del espectro real, no un cambio en la irradiancia física que
+                          llega al plano (esa irradiancia sigue calentando el módulo y
+                          contando como "POA efectiva" igual). None (default) = sin
+                          corrección, retrocompatible.
 
     Retorna dict
     ────────────
@@ -206,7 +221,14 @@ def simular_produccion_anual(
     perdida_clipping_kWh : energía perdida por recorte al Pnom del inversor (0 si no
                           se pasó P_ac_nom_W, o si el array nunca superó el inversor)
     horas_con_clipping   : nº de horas del año con recorte activo (0-8760)
-    df_horario           : DataFrame horario (G_eff, T_cel, Pmax, P_dc, P_ac, clipping_kW)
+    factor_espectral_aplicado  : True si el panel es CdTe Y se pasó factor_espectral
+                          -- explícito para auditar de un vistazo si esta corrida
+                          incluyó la corrección espectral o no.
+    factor_espectral_promedio : promedio del factor en horas de sol (None si no se
+                          aplicó) -- >1.0 = ganancia neta por espectro más azul de lo
+                          estándar en el sitio; <1.0 = pérdida neta.
+    df_horario           : DataFrame horario (G_eff, factor_espectral [1.0 si no se
+                          aplicó], T_cel, Pmax, P_dc, P_ac, clipping_kW)
     df_mensual           : DataFrame mensual con E_dc, E_ac, kWh/kWp
     """
     if P_dc_stc_kW is None:
@@ -234,12 +256,36 @@ def simular_produccion_anual(
     # IEA-PVPS T15: 1.0=ventilado libre, 1.3=confinado típico, 1.5=sellado total.
     T_cel = temperatura_celda_noct(G_eff, T_amb, NOCT=NOCT, k_bipv=k_bipv)
 
+    # ── Corrección espectral CdTe (6-sep-2026, ver calculos.correccion_espectral) ──
+    # Se aplica SOLO a la irradiancia que ve el modelo eléctrico (G_para_potencia),
+    # NUNCA a G_eff -- el efecto espectral es una limitación de cuánta corriente
+    # extrae la CELDA del espectro real, no un cambio en la irradiancia física
+    # (esa irradiancia real sigue siendo la que calienta el módulo y la que se
+    # reporta como POA efectiva/H_ef). Defensa: se ignora por completo si el
+    # panel no es CdTe, aunque el caller pase un factor (el modelo First Solar
+    # 'cdte' no es válido para otras tecnologías).
+    factor_espectral_aplicado = False
+    factor_espectral_promedio = None
+    G_para_potencia = G_eff
+    if factor_espectral is not None and clasificar_tecnologia_jrc(panel.get("tecnologia")) == "CdTe":
+        fe = np.asarray(factor_espectral, dtype=float)
+        if fe.shape == G_eff.shape:
+            G_para_potencia = G_eff * fe
+            factor_espectral_aplicado = True
+            _mask_dia = G_eff > 5.0
+            factor_espectral_promedio = (
+                round(float(fe[_mask_dia].mean()), 4) if _mask_dia.any() else 1.0
+            )
+        # Forma distinta (ej. índice desalineado) -- se ignora en vez de
+        # reventar o aplicar mal alineado; ningún caller actual dispara esto,
+        # es una defensa ante uso futuro incorrecto.
+
     # ── SDM vectorizado — Pmax por módulo ─────────────────────────────────────
-    pmax_mod = _calcular_pmax_vectorizado(G_eff, T_cel, panel)
+    pmax_mod = _calcular_pmax_vectorizado(G_para_potencia, T_cel, panel)
 
     # ── Pérdida por temperatura (referencia: Pmax a T=25°C con mismo G_eff) ───
     T_ref_arr = np.full_like(T_cel, 25.0)
-    pmax_stc_g = _calcular_pmax_vectorizado(G_eff, T_ref_arr, panel)
+    pmax_stc_g = _calcular_pmax_vectorizado(G_para_potencia, T_ref_arr, panel)
     perdida_temp_por_modulo = np.maximum(pmax_stc_g - pmax_mod, 0.0)
 
     # ── Escalar al sistema ─────────────────────────────────────────────────────
@@ -282,6 +328,10 @@ def simular_produccion_anual(
     # ── DataFrame horario ─────────────────────────────────────────────────────
     df_h = pd.DataFrame({
         "G_eff_Wm2":    G_eff,
+        "factor_espectral": (
+            G_para_potencia / np.where(G_eff > 0, G_eff, 1.0)
+            if factor_espectral_aplicado else np.ones_like(G_eff)
+        ),
         "T_cel_C":      T_cel,
         "Pmax_mod_W":   pmax_mod,
         "P_dc_kW":      P_dc_W  / 1000.0,
@@ -326,6 +376,8 @@ def simular_produccion_anual(
         "perdida_inv_kWh":        round(perdida_inv_kWh, 0),
         "perdida_clipping_kWh":   round(perdida_clipping_kWh, 0),
         "horas_con_clipping":     horas_con_clipping,
+        "factor_espectral_aplicado":  factor_espectral_aplicado,
+        "factor_espectral_promedio":  factor_espectral_promedio,
         "E_ac_sin_recorte_kWh":   round(E_ac_sin_recorte_anual, 0),
         # E_dc con la MISMA G_eff real pero T_cel fija en 25°C (STC) para las
         # 8760 h -- ya se calculaba internamente como paso intermedio
