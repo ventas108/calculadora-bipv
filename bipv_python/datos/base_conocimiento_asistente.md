@@ -326,6 +326,29 @@ El control "GCR (cobertura del suelo)" del modelo bifacial ahora arranca con el 
 
 **Verificado con datos reales antes de integrar**: TMY real de PVGIS para Bogotá (proyecto Teusaquillo, coordenadas reales de `datos/ciudades_colombia.py`) → 0% de horas inconsistentes, diferencia media 0,3 W/m², máxima 2,8 W/m². El mismo TMY desfasado artificialmente 30 minutos → 20,2% de horas inconsistentes, dispara el warning correctamente. 7 tests nuevos en `tests/test_solar_qcrad.py`, incluyendo un caso mínimo calculado a mano (3 "horas" con el resultado esperado derivado manualmente, no solo verificado con `isinstance`).
 
+────────────────────────────────────────────────────────────
+
+### Verificación cruzada PVGIS vs PVWatts (NREL/NLR)  NUEVO (4-sep-2026, persistencia corregida 6-sep-2026)
+
+Justo debajo del resultado principal de POA/GHI, si hay una key de NREL configurada en el servidor, aparece un aviso 🛰️ **"Verificación cruzada PVGIS vs PVWatts"**. Esto responde a una pregunta real que cualquier ingeniero se hace con datos climáticos: *"¿este número de irradiancia es razonable, o depende demasiado de una sola fuente?"*
+
+**Qué es PVWatts y por qué existe esta verificación**: PVWatts es la calculadora pública del NREL (Laboratorio Nacional de Energías Renovables de EE.UU., ahora bajo el dominio `developer.nlr.gov` tras la migración NREL→NLR del 29-may-2026). A diferencia de PVGIS (que usa el modelo satelital CM SAF de EUMETSAT + estaciones SYNOP), PVWatts usa **NSRDB** (National Solar Radiation Database), una base de datos satelital DISTINTA — confirmado en vivo que para Colombia sí tiene cobertura real (`weather_data_source: "NSRDB PSM V3 GOES tmy-2020 3.2.0"`, no un valor genérico o interpolado de lejos). Tener DOS fuentes independientes que coincidan razonablemente es una señal de confianza real; que diverjan mucho es una alerta real — sobre todo en sitios rurales o montañosos donde cualquier fuente satelital pierde precisión.
+
+**Qué calcula exactamente, y por qué así**: compara el **POA anual y mensual YA transpuesto** a la inclinación/azimut de tu proyecto (no GHI/DNI/DHI crudos) porque PVWatts, a diferencia de PVGIS, **no expone la irradiancia cruda por componentes** — solo entrega el resultado ya proyectado sobre el plano inclinado que le pidas. Esto se confirmó revisando el módulo VBA original del optimizador Excel (`Mod_Importar_PVWatts.bas`) antes de portarlo, para no inventar un supuesto sobre qué compara PVWatts realmente.
+
+**Qué significa el resultado que ves**:
+- Aviso azul (`st.info`): la diferencia anual está dentro del umbral (15% por defecto) — ambas fuentes son razonablemente consistentes para este sitio.
+- Aviso amarillo (`st.warning`): la diferencia supera el umbral — vale la pena revisar si el sitio es rural/montañoso (donde PVGIS es menos confiable) antes de confiar ciegamente en el número oficial.
+
+**Qué NO hace (a propósito, para no generar una falsa sensación de precisión)**:
+- **No reemplaza a PVGIS.** PVGIS sigue siendo la ÚNICA fuente que alimenta el cálculo real de energía (SDM/JRC-Huld) — esto es un chequeo de sanidad, informativo, nunca bloqueante.
+- **No promedia ni combina** los dos valores en un número "mejorado" — cada uno queda visible por separado, para que decidas tú con criterio de ingeniería, no una fórmula automática.
+- **No alimenta (todavía) un análisis de incertidumbre P50/P90** — sería el paso natural para convertir esto en algo más que una alarma, pero es un cambio de diseño más grande, evaluado y pendiente, no implementado.
+
+**Requisito**: una `NREL_API_KEY` gratuita (se comparte con la app hermana del mismo servidor, un solo archivo `.env`, no hay que sacar una segunda). Si no está configurada, el aviso simplemente no aparece — el resto de Recurso Solar funciona exactamente igual, sin ningún error visible.
+
+**Corrección de persistencia (6-sep-2026, ver sección 63 para el detalle completo)**: hasta esa fecha, este aviso desaparecía apenas se recargaba la página o se restauraba desde caché, aunque la POA mostrada siguiera siendo la misma — corregido para que persista en `session_state` mientras la ciudad/orientación no cambien, y ahora también aparece como una sección propia en 📄 Reporte PDF.
+
 ## 5. Página 3 — Motor IV
 
 Propósito: Modelar la curva corriente-voltaje (I-V) del panel usando el modelo de 5 parámetros (SDM).
