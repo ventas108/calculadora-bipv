@@ -802,6 +802,27 @@ Interpretación del % de pérdida bypass:
 - > 10%: Muy alto — el sistema BIPV tiene un problema de sombreado serio
 ────────────────────────────────────────────────────────────
 
+### Sección 3 — Otras pérdidas del sistema  ACTUALIZADO (7-sep-2026)
+
+Debajo de la cascada de bypass, un bloque separado con 4 sliders que se guardan solos al moverlos (no hay botón "Guardar"):
+
+- 🔩 **Mismatch de fabricación (%)** — 0 a 3%, default 1.0%. Tolerancia de fábrica entre módulos del mismo lote. No depende del clima, no varía hora a hora. No existe ningún dato real de tolerancia por panel en el catálogo (~2.600+ paneles), así que sigue siendo 100% manual — inventar una fórmula desde un "±3%" genérico sería la falsa precisión que esta app evita en todos lados.
+- 🌫️ **Suciedad — Soiling (%)** — 0 a 6%, default 2.0%. Sin cambios este cambio.
+- 🔌 **Cableado DC (%)** — 0 a 4%, default 1.5%. Se usa SOLO si no hay un cálculo real vigente desde ⚡ Diagrama Unifilar (ver más abajo) — es el respaldo manual, no un modo "de segunda".
+- 🔌 **Cableado AC (%)** — 0 a 4%, default **0%**, nuevo. Antes del 7-sep-2026 esta pérdida no tenía ninguna representación en la app — por eso el default es 0%, nunca un número inventado para algo que no existía.
+
+✅ Regla de oro: si ⚡ Diagrama Unifilar tiene un cálculo real vigente (mismo panel/inversor/N en serie/N de paneles que el proyecto actual), ese cálculo **sustituye automáticamente** a los sliders de cableado de aquí — nunca se suman los dos. Mismatch de fabricación y soiling no tienen modo calculado, siempre salen de estos sliders.
+
+📊 Producción es quien realmente aplica estos 4 valores al cálculo (como parámetros explícitos del motor, no como reductor de irradiancia) — ver la subsección "Mismatch de fabricación + pérdida óhmica de cableado DC/AC" en la sección 9 (Página 6) para cómo se ven los resultados.
+
+### Sección 4 — Cascada de pérdidas (POA bruta → POA efectiva)
+
+Botón "📉 Calcular cascada completa de pérdidas" — combina sombreado de horizonte + mismatch de orientación (entre superficies con distinta orientación) + soiling en un único `factor_global_mismatch`, aplicado en Producción como reductor de irradiancia antes del modelo eléctrico.
+
+⚠️ Desde el 7-sep-2026, el mismatch de fabricación y el cableado (DC/AC) de la Sección 3 **ya NO forman parte de esta cascada** — se excluyen a propósito (se pasan en 0% a esta cascada) porque ahora se aplican directamente en el motor de Producción, y contarlos aquí también los duplicaría. Esta cascada solo sigue cubriendo sombreado de horizonte + mismatch de orientación + soiling.
+
+────────────────────────────────────────────────────────────
+
 ### Alarma de validación SDM (Motor IV)  NUEVO (21-ago-2026)
 
 El modelo de bypass diodes de esta página resuelve el circuito IV panel por panel usando el mismo SDM (De Soto) que 🔬 Motor IV. Si ese panel no validó contra su ficha técnica (error > 5% en Voc/Isc/Vmp/Imp/Pmax), verás la misma alarma 🔴 con el texto técnico de causa probable apenas abras esta página — porque la pérdida por bypass que calculas aquí depende directamente de esos mismos parámetros del modelo. Ver la sección "Validación automática SDM vs ficha técnica" en Página 3 — Motor IV para el detalle completo.
@@ -1108,11 +1129,24 @@ En la tabla desglosada de pérdidas (expander "📋 Ver tabla detallada de balan
 
 **Pérdida óhmica DC/AC (②d/④c) — 2 modos, nunca los 2 a la vez**:
 - **Manual**: sliders "🔌 Cableado DC (%)" y "🔌 Cableado AC (%)" de 🔀 Mismatch (sección 3) — el de AC es nuevo, antes esa pérdida no tenía ninguna representación en la app.
-- **Calculado (real, más preciso)**: si configuraste longitud + calibre reales del proyecto en ⚡ Diagrama Unifilar (Página 20, un tramo por superficie si el proyecto es multi-superficie, más el tramo AC), la app calcula la resistencia real del cableado y la pérdida se computa **hora a hora**, con la corriente real de cada hora — no un % fijo. Esto es más preciso que PVsyst, que solo aplica un % fijo calculado a condiciones de diseño (alta irradiancia) a las 8.760 horas del año, sobreestimando la pérdida en las horas de baja irradiancia (la mayoría del año). El modo calculado SUSTITUYE al manual cuando el panel/inversor/N en serie de Página 20 coinciden con el proyecto vigente — si cambiaste de panel o inversor después de configurar el cableado, la app lo detecta y vuelve al modo manual en vez de aplicar un número desactualizado.
+- **Calculado (real, más preciso)**: si configuraste longitud + calibre reales del proyecto en ⚡ Diagrama Unifilar (Página 20, un tramo por superficie si el proyecto es multi-superficie, más el tramo AC), la app calcula la resistencia real del cableado y la pérdida se computa **hora a hora**, con la corriente real de cada hora — no un % fijo. Esto es más preciso que PVsyst, que solo aplica un % fijo calculado a condiciones de diseño (alta irradiancia) a las 8.760 horas del año, sobreestimando la pérdida en las horas de baja irradiancia (la mayoría del año). El modo calculado SUSTITUYE al manual cuando el panel/inversor/N en serie/N total de paneles de Página 20 coinciden con el proyecto vigente — si cambiaste cualquiera de esos 4 datos después de configurar el cableado, la app lo detecta y vuelve al modo manual en vez de aplicar un número desactualizado (el total de paneles se sumó a esta verificación el 7-sep-2026, en la auditoría rigurosa que también corrigió el factor de la resistencia AC — ver sección 13f para el detalle).
 
 **Cómo saber cuál se está usando**: la nota de cada fila en la tabla desglosada dice la fuente ("% manual configurado en 🔀 Mismatch" o "cálculo real del ⚡ Diagrama Unifilar, hora a hora con la corriente real"). Si ninguno de los 2 modos está activo, las filas quedan exactamente como antes de este cambio (②c informativa, sin fila ②d/④c) — nada se activa solo.
 
 **Límite declarado**: el cálculo real usa una temperatura de diseño fija para la resistividad del cobre (no la temperatura de celda hora a hora) — mismo criterio que usa la ingeniería real (RETIE/NEC evalúan caída de tensión a una condición de diseño fija). Tampoco sugiere automáticamente el calibre por ampacidad — elige entre secciones comerciales estándar, la validación de seguridad del calibre elegido sigue siendo responsabilidad del ingeniero del proyecto.
+
+### Errores comunes al usar mismatch/cableado, y cómo evitarlos  NUEVO (7-sep-2026)
+
+Complemento al manual de usuario "Cableado y Mismatch" — los 6 errores de interpretación/uso más probables, para que el Asistente pueda resolverlos directamente si un usuario pregunta por qué su resultado cambió o parece raro:
+
+1. **Leer "②c Módulo (informativo)" como si fuera una pérdida real aplicada.** El +0,75% que muestra por defecto es la referencia de PVsyst, con Δ kWh = 0 siempre. → Revisa el texto de la fila: "aplicado" = real, "informativo" = solo referencia.
+2. **Cambiar panel, inversor, N en serie o número de paneles y no volver a ⚡ Página 20.** El cálculo vigente se invalida solo, y la app cae al modo manual (o a 0%) sin una alerta grande. → Ante un cambio de producción inexplicado, revisa primero si alguno de esos 4 datos cambió y si el aviso verde de Página 20 sigue apareciendo.
+3. **Declarar cable para una sola superficie de un proyecto multi-superficie y asumir que cubre todo.** Los paneles sin tramo declarado quedan sin pérdida registrada — el total calculado subestima la pérdida real. → Revisa el aviso amarillo de "declaraste cable para X de Y módulos".
+4. **Esperar que el % calculado coincida exacto con un reporte de PVsyst.** PVsyst usa un % fijo a condiciones de diseño para las 8.760 horas; esta app calcula hora a hora con la corriente real, así que el resultado agregado suele ser MENOR que el de PVsyst para la misma resistencia de cable. → Una diferencia moderada en esta línea específica es esperable, no un error.
+5. **Asumir que el calibre elegido ya fue validado por seguridad (ampacidad).** La app solo calcula la pérdida de energía para el calibre que el usuario eligió, no valida que sea seguro para la corriente. → La validación de ampacidad sigue siendo responsabilidad del ingeniero eléctrico del proyecto.
+6. **Pensar que el cálculo usa la temperatura real de cada hora.** Usa una temperatura de diseño fija (45°C), no la temperatura de celda horaria — simplificación intencional (mismo criterio que RETIE/NEC), no un dato faltante.
+
+Nota aparte para quien compare contra una calculadora de caída de tensión genérica de internet: muchas usan el factor "×2" (circuito monofásico/DC de 2 hilos) para el tramo AC. Esta app usa "×3" (trifásico, 3 conductores de fase) — una diferencia de hasta 33% frente a esas calculadoras genéricas no es un error de ninguno de los 2 lados, son topologías distintas.
 
 ### Bug real corregido: la producción nunca se recortaba (clipping) al Pnom del inversor  NUEVO (29-ago-2026)
 
@@ -2267,6 +2301,31 @@ Todos los campos son opcionales y por defecto inactivos — un proyecto que no l
 
 ⚠️ Para no cometer errores: **no es un documento certificado**. Es un borrador técnico auto-poblado — el diagrama unifilar para trámite RETIE formal requiere firma de un ingeniero electricista matriculado. La página lo advierte explícitamente arriba del todo. Con más de 1 inversor, se muestran como un solo bloque con multiplicador ("2 × Growatt...") en vez de ramas paralelas dibujadas — simplificación deliberada, no un error. Multi-superficie asume que todas las superficies alimentan el/los mismo(s) inversor(es) — no modela strings de distinta orientación compartiendo un mismo MPPT (eso ya lo resuelve Página 9, sección 6, como cálculo aparte).
 
+### Pérdida óhmica de cableado (real, hora a hora)  NUEVO (7-sep-2026)
+
+Nueva sección "🔌 Pérdida óhmica de cableado" al final de la página, después del bloque de multi-superficie — la tercera capa de este módulo (dato → **cálculo eléctrico real** → dibujo), agregada junto con la funcionalidad completa de mismatch/cableado que 📊 Producción ya aplica (ver la subsección homónima en la sección 9).
+
+**Qué pide**: longitud (m) y calibre (mm²) del cableado real del proyecto.
+- Con 1 sola superficie: un tramo DC único (array → inversor).
+- Con multi-superficie activo: **un tramo DC por cada superficie activa** — cada una puede tener su propia longitud/calibre, porque cada una tiene su propio recorrido físico real hasta el punto de convergencia.
+- Siempre: un tramo AC (inversor → punto de conexión).
+
+**Qué calcula**: la resistencia real (Ω) de cada tramo, con la resistividad del cobre estándar (IEC 60228) corregida por una temperatura de diseño fija de 45°C — mismo criterio que usa RETIE/NEC (evaluar a una condición de diseño fija, no con clima horario). Esa resistencia queda guardada para que 📊 Producción calcule la pérdida real **hora a hora**, con la corriente real de cada hora — más preciso que PVsyst, que aplica un % fijo a condiciones de diseño (alta irradiancia) para las 8.760 horas del año, sobreestimando la pérdida en las horas de baja irradiancia.
+
+⚠️ **Declaración parcial en multi-superficie**: si declaras cable solo para ALGUNAS superficies, la app no le inventa pérdida a las que dejaste sin declarar — esos paneles simplemente no aportan pérdida al cálculo (subestimación deliberada, nunca una sobreestimación). Un aviso amarillo indica cuántos módulos de cuántos totales del proyecto quedaron con cable declarado.
+
+⚠️ **Vigencia**: el cálculo guardado aquí solo lo usa Producción si el panel, el inversor, el N en serie **y el número total de paneles** del proyecto siguen siendo los mismos que cuando lo configuraste en esta página — si cambias cualquiera de los cuatro después (por ejemplo, agregas strings en 📐 Dimensionamiento) sin volver aquí, la app cae sola al slider manual de 🔀 Mismatch en vez de aplicar una resistencia calibrada para un array distinto al actual. No hay una alerta grande para este caso específico — si tu producción cambió sin que tocaras el cableado, revisa que el aviso verde "R calculada" de esta página siga vigente.
+
+### Auditoría rigurosa post-despliegue (7-sep-2026) — 1 bug real que subestimaba la pérdida AC ~33%
+
+El usuario pidió una verificación rigurosa del código antes de reiniciar el servidor de producción (con la funcionalidad ya desplegada y corriendo). Se hizo con 2 frentes independientes (un agente de revisión adversarial + una re-derivación de la física desde cero), que confirmaron el mismo hallazgo:
+
+La resistencia del tramo AC se calculaba con el factor "×2" (convención de un circuito DC de 2 hilos, ida y vuelta) — pero el tramo AC es **trifásico**, y la corriente que se usa para calcular la pérdida ya se obtiene con `√3` en el denominador (misma convención que el resto de la app usa para dimensionar breakers). La pérdida real en 3 conductores de fase es `3·I²·R`, no `2·I²·R` — con el factor "×2" original, la pérdida óhmica AC calculada quedaba **subestimada en ~33%**. Corregido a "×3", con la derivación completa documentada en el código. Esto solo afecta al **modo calculado** del tramo AC (el slider manual de 🔀 Mismatch nunca tuvo este problema).
+
+Un segundo hallazgo, relacionado con la declaración parcial de superficies descrita arriba: originalmente, la fracción de corriente de cada tramo se normalizaba contra la suma de los tramos DECLARADOS, no contra el total real de paneles del proyecto — si declarabas cable para 30 de 100 paneles, ese tramo se llevaba el 100% de la corriente del proyecto en vez del 30% real, sobreestimando su pérdida. Corregido para normalizar siempre contra el total real del proyecto (de ahí sale también el aviso amarillo de declaración incompleta).
+
+Cerrado con 9 tests nuevos/actualizados y la suite completa relanzada (1053/1053 passed) antes de reiniciar el servidor.
+
 ## 13g. Página 21 — 📋 Ficha de Validación RETIE  NUEVO (27-ago-2026)
 
 Segundo aporte del usuario en la misma sesión: un script aparte con dataclasses `frozen` fijas al proyecto Urabá (2 inversores exactos), motor SVG propio sin dependencias, y un TIPO de documento que la app no tenía todavía: no un esquema eléctrico de línea única (eso es ⚡ Diagrama Unifilar, Página 20), sino una **ficha ejecutiva de una sola página** — tarjetas KPI, un flujo simplificado de 5 bloques, una tabla de cargas/protecciones, y sobre todo un **motor de validación eléctrica** que antes no existía en la app: Voc del string en frío vs Vdc máxima del inversor, ventana MPPT, balance DC/AC entre inversores, selección de breaker por calibre comercial, y banderas OK/PENDIENTE/ERROR cuando falta un dato de ficha técnica (nunca inventa el valor).
@@ -3335,6 +3394,26 @@ El usuario recordó haber instalado PVWatts como segunda fuente de validación (
 - **Alcance NO ampliado, declarado**: el pipeline separado del optimizador (`simulation/bipv_simulator.py`, usado por Comparadores de Página 4c/4d y 🤖 Análisis IA) sigue con su propio `pct_mismatch_fab`/`pct_cableado` planos, sin tocar — es una aproximación más gruesa para comparar muchos escenarios rápido, un cambio de diseño más grande que no era lo pedido aquí. Tampoco se auto-sugiere el calibre por ampacidad (no existe en el repo ninguna tabla de ampacidad/derateo verificada — RETIE/NTC 2050 — construir una sin fuente citable sería inventar precisión).
 
 **Validación**: nuevos tests de física con casos a mano (`test_perdida_ohmica_cableado.py`), integración en ambos motores incluyendo el test hora-a-hora-vs-fijo (`test_produccion_perdida_ohmica.py`), y de las 3 páginas (`test_pagina_perdida_ohmica.py`) — mismo patrón AST/substring del resto del repo. Suite completa relanzada, cero regresiones.
+
+────────────────────────────────────────────────────────────
+
+## 65. Anexo — Actualizaciones del 7 de septiembre de 2026 (auditoría rigurosa de la pérdida óhmica: factor AC ×2→×3, y 2 hallazgos más, antes de reiniciar el servidor)
+
+Con la sección 64 ya desplegada y corriendo en producción, el usuario pidió una verificación rigurosa del código — que el resultado quedara "limpio y auditable sin errores" — antes de reiniciar el sistema operativo del servidor (que tenía una actualización pendiente). Se hizo en 2 frentes independientes en paralelo: un agente de revisión adversarial (con instrucciones explícitas de no solo re-confirmar que los tests pasan) y una re-derivación propia de la física desde cero, sin confiar en el razonamiento original de la sección 64.
+
+**Hallazgo BLOCKER, confirmado por los 2 frentes de forma independiente**: `calcular_perdida_ohmica()` calculaba la resistencia del tramo AC con el factor "×2" (convención de un circuito DC de 2 hilos, ida y vuelta) en vez de "×3" (trifásico real). La corriente que el motor de producción multiplica contra esa resistencia ya se calcula como `P_ac/(√3·V)` — la corriente DE LÍNEA, misma convención que `corriente_diseno_ac()` usa en todo el resto de la app. Esa corriente fluye por 3 conductores de fase, cada uno con resistencia `ρ·L/S` — la pérdida total real es `3·I²·(ρ·L/S)`, no `2·I²·(ρ·L/S)`. Con el factor original, la pérdida óhmica AC calculada (modo real, Página 20) quedaba **subestimada en ~33%**. Corregido a 3.0, con la derivación completa documentada en el código. Solo afectaba al modo calculado del tramo AC — el slider manual nunca tuvo este problema.
+
+**2 hallazgos MEDIUM adicionales, reales, corregidos**:
+1. La fila "②c" (mismatch de fabricación) del Loss Diagram desaparecía por completo (ni real ni informativa) cuando un proyecto solo activaba pérdida óhmica DC sin tocar el mismatch de fabricación — perdía el disclaimer de PVsyst sin necesidad. Ningún kWh salía mal, pero la tabla dejaba de ser auditable en ese caso puntual. Reestructurado: ②c ahora SIEMPRE aparece (real o informativa), independiente de si ②d también aparece — la última fila del bloque sigue forzándose al valor exacto de `E_dc_anual_kWh` para que la reconciliación nunca se rompa.
+2. La verificación de "vigencia" en Producción (antes de reusar el cálculo de Página 20) comparaba panel/inversor/N en serie, pero NO el número total de paneles del proyecto — como la resistencia DC efectiva se calcula con una fracción normalizada contra ese total, un cambio posterior de N_paneles (sin volver a Página 20) dejaba aplicándose una fracción obsoleta que sobreestimaría la corriente de cada tramo. Corregido: se agregó `n_paneles_total` a la verificación de vigencia (ver sección 13f).
+
+**1 hallazgo adicional propio, no reportado por el agente** (encontrado en la re-derivación desde cero): si el usuario declara cable DC para SOLO ALGUNAS superficies de un proyecto multi-superficie, la fracción de corriente de los tramos declarados se normalizaba contra la suma de esos tramos únicamente, no contra el total real de paneles del proyecto — atribuyéndoles más corriente de la real y sobreestimando su pérdida. Corregido: nuevo parámetro `n_paneles_total` explícito en `calcular_perdida_ohmica()`; los paneles sin tramo declarado simplemente no aportan pérdida (subestimación deliberada, nunca sobreestimación — mismo principio de nunca inventar), más un aviso amarillo visible en Página 20 cuando la declaración está incompleta.
+
+**Limpieza adicional**: import `math` sin usar eliminado de `diagrama_unifilar.py` (quedó huérfano tras delegar la fórmula de corriente AC al helper compartido de la sección 64). Nota de documentación agregada sobre el factor de potencia = 1 asumido en el cálculo AC (simplificación ya existente en el resto de la app, ahora declarada explícitamente donde se usa para esta pérdida).
+
+**Validación**: 9 tests nuevos/actualizados (fila ②c siempre presente en sus 2 variantes, reconciliación exacta con ambos mecanismos activos a la vez, fila ④c AC condicional, modo calculado AC requiere tensión de red, fracción normalizada contra el total real, resistencia AC corregida ×2→×3 en el valor esperado). Suite completa relanzada dos veces (una corrida pareció "colgada" al 41% durante ~10 min en un test preexistente y lento que recorre todo el catálogo real de paneles — se relanzó por precaución, la re-corrida confirmó que era solo timing de monitoreo, no un problema real): **1053/1053 passed**. Commiteado (`7ea919f6`, sobre `e0c76cc9`), desplegado, confirmado en producción, y recién ahí el usuario procedió con el reinicio del servidor — con verificación previa de que PM2 estuviera configurado para resucitar los procesos solo (`pm2 save` + `pm2 startup` → servicio systemd `pm2-root.service`, con historial real de haberlo hecho correctamente en el reinicio anterior). Confirmado tras el reinicio: ambos procesos `online` sin intervención manual.
+
+Documentado además en un manual de usuario dedicado ("Cableado y Mismatch") — publicado como artefacto y como `.docx` — con foco en prevenir errores de configuración e interpretación, no en el historial de implementación; su contenido de errores comunes y preguntas frecuentes se incorporó también a las secciones 8, 9 y 13f de este documento.
 
 ────────────────────────────────────────────────────────────
 
