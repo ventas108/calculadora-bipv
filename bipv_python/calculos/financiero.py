@@ -17,6 +17,8 @@ Métricas:
 import numpy as np
 from scipy.optimize import brentq
 
+from calculos.degradacion import resolver_factor_degradacion
+
 
 # ─── Piso de O&M por tamaño (#72) ────────────────────────────────────────────
 
@@ -125,6 +127,7 @@ def calcular_flujo_caja(
     tasa_escalacion_opex: float = 0.0,  # % anual de aumento del O&M (#177)
     frac_exportada: float = 0.0,
     tarifa_excedentes_cop_kWh: float | None = None,
+    config_degradacion: dict | None = None,
 ) -> list[dict]:
     """
     Genera el flujo de caja anual del proyecto (USD).
@@ -143,6 +146,13 @@ def calcular_flujo_caja(
         (típicamente menor que la tarifa de compra bajo Ley 1715/CREG 174).
         None (default) usa la misma tarifa_cop_kWh -- resultado idéntico al
         comportamiento anterior si frac_exportada también es 0.0.
+    config_degradacion : dict | None -- modelo de degradación no lineal
+        (curva real de garantía del fabricante, ver calculos/degradacion.py).
+        None (default) reproduce EXACTAMENTE el comportamiento histórico:
+        decaimiento geométrico con tasa_degradacion_pct. Pasar
+        {"modo": "curva_fabricante", "caida_anio1_pct": ..., "tasa_lineal_pct_anio": ...}
+        o {"modo": "tabla_fabricante", "tabla_anio_pct": {...}} para usar la
+        ficha real del panel en vez de la tasa fija.
 
     Retorna lista de dicts con: año, ingreso_kWh, ingreso_usd, opex_usd, flujo_usd,
     flujo_acum_usd, factor_descuento, flujo_desc_usd, flujo_desc_acum_usd
@@ -153,6 +163,7 @@ def calcular_flujo_caja(
     tarifa_exced_base = (
         tarifa_excedentes_cop_kWh if tarifa_excedentes_cop_kWh is not None else tarifa_cop_kWh
     )
+    _config_deg = config_degradacion or {"modo": "geometrica", "tasa_pct": tasa_degradacion_pct}
 
     flujos = []
 
@@ -171,8 +182,8 @@ def calcular_flujo_caja(
     flujo_acum = -capex_neto_usd
 
     for t in range(1, n_anos + 1):
-        # Degradación acumulada
-        factor_deg   = (1 - tasa_degradacion_pct / 100) ** (t - 1)
+        # Degradación acumulada (geométrica por defecto -- ver config_degradacion)
+        factor_deg   = resolver_factor_degradacion(t, _config_deg)["factor"]
         prod_kWh     = e_ac_kWh_anual * factor_deg
         exportada_kWh    = prod_kWh * frac_exportada
         autoconsumo_kWh  = prod_kWh - exportada_kWh
@@ -305,6 +316,7 @@ def comparativo_ley_1715(
     tasa_escalacion_opex: float = 0.0,  # % anual de aumento del O&M (#177)
     frac_exportada: float = 0.0,
     tarifa_excedentes_cop_kWh: float | None = None,
+    config_degradacion: dict | None = None,
 ) -> dict:
     """
     Calcula métricas SIN y CON beneficios Ley 1715 para comparación.
@@ -312,6 +324,9 @@ def comparativo_ley_1715(
     frac_exportada / tarifa_excedentes_cop_kWh: ver calcular_flujo_caja().
     Se aplican igual en ambos escenarios (sin/con Ley 1715) -- solo afectan
     el CAPEX neto, no la valoración de la energía.
+    config_degradacion: ver calcular_flujo_caja() -- None (default) reproduce
+    el comportamiento histórico con tasa_degradacion; se aplica igual en
+    ambos escenarios.
     """
     # Sin Ley 1715 — CAPEX completo
     flujos_sin = calcular_flujo_caja(
@@ -327,6 +342,7 @@ def comparativo_ley_1715(
         tasa_escalacion_opex = tasa_escalacion_opex,
         frac_exportada     = frac_exportada,
         tarifa_excedentes_cop_kWh = tarifa_excedentes_cop_kWh,
+        config_degradacion = config_degradacion,
     )
     met_sin = calcular_metricas(flujos_sin, tasa_descuento, capex_usd,
                                 e_ac_kWh_anual, tipo_cambio)
@@ -345,6 +361,7 @@ def comparativo_ley_1715(
         tasa_escalacion_opex = tasa_escalacion_opex,
         frac_exportada     = frac_exportada,
         tarifa_excedentes_cop_kWh = tarifa_excedentes_cop_kWh,
+        config_degradacion = config_degradacion,
     )
     met_con = calcular_metricas(flujos_con, tasa_descuento, capex_usd,
                                 e_ac_kWh_anual, tipo_cambio)

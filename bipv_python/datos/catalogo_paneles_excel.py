@@ -1,4 +1,5 @@
 """Loader Catalogo_Paneles_FV — estructura unificada con costos y parámetros IV."""
+import json
 import math
 import re
 import pandas as pd
@@ -28,6 +29,22 @@ def _f(val, default=None):
         return v if math.isfinite(v) else default
     except (TypeError, ValueError):
         return default
+
+def _parse_tabla_degradacion(val):
+    """Parsea la columna DegradacionTablaJSON -- texto JSON opcional con la
+    tabla año-por-año de garantía del fabricante ({"1": 98.0, "25": 84.8}).
+    Nunca lanza excepción: una celda vacía o mal formada da None (el panel
+    simplemente no tiene ese dato, no se inventa ni se rompe la carga del
+    catálogo completo por un error de tipeo en una celda). Ver
+    calculos/degradacion.py::factor_tabla_fabricante()."""
+    if not val or (isinstance(val, float) and math.isnan(val)):
+        return None
+    try:
+        crudo = json.loads(str(val))
+        return {int(k): float(v) for k, v in crudo.items()}
+    except (ValueError, TypeError, AttributeError):
+        return None
+
 
 def _parse_area(dims):
     if not dims or str(dims).strip() in ('', 'N/D', 'Variable'):
@@ -82,6 +99,13 @@ def cargar_catalogo_paneles() -> dict:
             "CoefVoc_C":         _f(r.get("CoefVoc_C")),
             "transparencia_pct": _f(r.get("TransparenciaPct"), 0),
             "bifacialidad_pct":  _f(r.get("BifacialidadPct"), 0),
+            # Degradación no lineal -- curva real de garantía del fabricante
+            # (7-sep-2026). Todas opcionales: un panel sin estos datos sigue
+            # usando el modo geométrico manual de 💰 Financiero, igual que
+            # antes. Ver calculos/degradacion.py.
+            "degradacion_anio1_pct":       _f(r.get("DegradacionAno1Pct")),
+            "degradacion_lineal_pct_anio": _f(r.get("DegradacionLinealPctAnio")),
+            "degradacion_tabla_anio_pct":  _parse_tabla_degradacion(r.get("DegradacionTablaJSON")),
             "Voc": Voc, "Vmp": Vmp,
             "Isc": Isc, "Imp": Imp,
             "N_s":         _f(r.get("Ns (Celdas Serie)")),

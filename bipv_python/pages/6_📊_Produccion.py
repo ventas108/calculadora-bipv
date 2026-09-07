@@ -1611,11 +1611,14 @@ if btn_sim or st.session_state.get("produccion_ok"):
 # SECCIÓN — #28 TASA DE DEGRADACIÓN ANUAL DESDE HISTORIAL DE PR
 # ═══════════════════════════════════════════════════════════════════════════════
 st.markdown("---")
-st.subheader("📉 Tasa de degradación anual del sistema")
+st.subheader("📉 Degradación MEDIDA en campo (histórico real)")
 st.caption(
     "Ingresa el **PR corregido por temperatura** de cada año operativo para detectar "
     "la degradación real de los módulos mediante regresión lineal. "
-    "Requiere al menos **2 años** de datos."
+    "Requiere al menos **2 años** de datos. "
+    "Esta es una tasa **empírica, medida DESPUÉS de instalar** el sistema — distinta "
+    "de la curva de garantía que promete la ficha del fabricante ANTES de instalar "
+    "(disponible en 💰 Financiero si el panel elegido tiene esos datos en el catálogo)."
 )
 
 n_anos_hist = st.number_input(

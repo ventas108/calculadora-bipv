@@ -665,10 +665,53 @@ with col_t2:
             st.caption(
                 f"✅ Degradación activa: **{_tasa_calc:.2f}%/año** — desde historial PR real"
             )
+    # ── Degradación no lineal — curva real de garantía del fabricante (7-sep-2026)
+    # A diferencia de la tasa del slider (paramétrica) o del historial real
+    # (medida en campo, post-instalación), esta viene de la FICHA del panel
+    # elegido en 📐 Dimensionamiento -- ver calculos/degradacion.py. Ambas
+    # tasas anteriores siguen intactas y disponibles; esta es una TERCERA
+    # opción, nunca reemplaza a las otras silenciosamente.
+    _panel_dict_fin = st.session_state.get("panel_dict", {}) or {}
+    _deg_caida1  = _panel_dict_fin.get("degradacion_anio1_pct")
+    _deg_lineal  = _panel_dict_fin.get("degradacion_lineal_pct_anio")
+    _deg_tabla   = _panel_dict_fin.get("degradacion_tabla_anio_pct")
+    _config_degradacion = None
+    if _deg_tabla:
+        _usar_curva_fab = st.toggle(
+            "Usar tabla de garantía del fabricante (curva no lineal completa)",
+            value=False, key="usar_deg_tabla_fabricante",
+            help="Interpola la tabla año-por-año publicada en la ficha del panel "
+                 "elegido — el mismo tipo de curva que PVsyst permite cargar.",
+        )
+        if _usar_curva_fab:
+            _config_degradacion = {"modo": "tabla_fabricante", "tabla_anio_pct": _deg_tabla}
+            st.caption("✅ Degradación activa: **tabla de garantía del fabricante** (curva no lineal)")
+    elif _deg_caida1 is not None and _deg_lineal is not None:
+        _usar_curva_fab = st.toggle(
+            f"Usar curva de garantía del fabricante — **{_deg_caida1:.1f}% año 1 + "
+            f"{_deg_lineal:.2f}%/año después**",
+            value=False, key="usar_deg_curva_fabricante",
+            help="Curva de 2 tramos de la ficha del panel elegido en 📐 Dimensionamiento "
+                 "(caída inicial por LID + tasa lineal) en vez de una tasa fija todo el "
+                 "período — el mismo criterio que PVsyst para garantías reales.",
+        )
+        if _usar_curva_fab:
+            _config_degradacion = {
+                "modo": "curva_fabricante",
+                "caida_anio1_pct": _deg_caida1,
+                "tasa_lineal_pct_anio": _deg_lineal,
+            }
+            st.caption(
+                f"✅ Degradación activa: **curva de garantía del fabricante** "
+                f"({_deg_caida1:.1f}% año 1 + {_deg_lineal:.2f}%/año)"
+            )
+
     # ── #52 — Trazabilidad para el Reporte PDF: qué degradación se usó ────────
     st.session_state["tasa_degradacion_usada"] = float(tasa_deg)
     st.session_state["fuente_degradacion"] = (
-        "historial PR real — regresión lineal"
+        "curva de garantía del fabricante (no lineal)"
+        if _config_degradacion is not None
+        else "historial PR real — regresión lineal"
         if (_tasa_calc is not None and _tasa_calc > 0
             and st.session_state.get("usar_deg_historico", False))
         else "valor paramétrico del slider"
@@ -1162,6 +1205,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
             tasa_escalacion_opex = esc_opex,
             frac_exportada    = frac_exportada,
             tarifa_excedentes_cop_kWh = tarifa_excedentes_cop,
+            config_degradacion = _config_degradacion,
         )
         # Escenario P90 (conservador — mismo CAPEX, menos producción, misma
         # fracción de exportación que P50 -- no hay forma de recalcular el
@@ -1180,6 +1224,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
             tasa_escalacion_opex = esc_opex,
             frac_exportada    = frac_exportada,
             tarifa_excedentes_cop_kWh = tarifa_excedentes_cop,
+            config_degradacion = _config_degradacion,
         )
         st.session_state["comp_financiero"]    = comp
         st.session_state["comp_financiero_p90"] = comp_p90
@@ -1350,6 +1395,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
             n_anos           = n_anos,
             beneficios_1715  = _ben_sinbat,
             tasa_escalacion_opex = esc_opex,
+            config_degradacion = _config_degradacion,
         )
         _m_sinbat = _comp_sinbat["con"]["metricas"]
 
@@ -1576,6 +1622,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
                     n_anos           = n_anos,
                     beneficios_1715  = ben,
                     tasa_escalacion_opex = esc_opex,
+                    config_degradacion = _config_degradacion,
                 )
                 return _c["con"]["metricas"]
             except Exception:

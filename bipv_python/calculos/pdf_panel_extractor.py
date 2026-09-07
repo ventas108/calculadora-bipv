@@ -1148,6 +1148,45 @@ def _coef_fallback(texto: str, result: dict) -> None:
             return
 
 
+# ── Garantía de potencia (degradación no lineal, 7-sep-2026) ─────────────────
+# Casi todas las fichas Tier 1 publican una garantía lineal de 2 tramos:
+# caída inicial por LID en el año 1, luego una tasa lineal constante hasta
+# el año 25. Ver calculos/degradacion.py para el modelo que consume esto.
+# Nunca inventa: si no matchea con confianza, deja los campos en None para
+# revisión manual -- mismo criterio que el resto de este extractor.
+_GARANTIA_ANIO1_PATTERNS = [
+    r"(?:1st|first|year\s*1)\s*year[^%\n]{0,40}?(\d{1,2}(?:[.,]\d+)?)\s*%",
+    r"(?:año|ano)\s*1\b[^%\n]{0,40}?(\d{1,2}(?:[.,]\d+)?)\s*%",
+    r"(\d{1,2}(?:[.,]\d+)?)\s*%[^%\n]{0,40}?(?:end of|al final del)?\s*(?:1st|first)?\s*(?:year|año|ano)\s*1\b",
+]
+_GARANTIA_LINEAL_PATTERNS = [
+    r"(?:annual|linear|lineal)[^%\n]{0,60}?degrad\w*[^%\n]{0,40}?(\d{1,2}(?:[.,]\d+)?)\s*%",
+    r"(\d{1,2}(?:[.,]\d+)?)\s*%\s*(?:per year|/\s*year|anual|por año|por ano)",
+    r"degradaci[oó]n[^%\n]{0,40}?(\d{1,2}(?:[.,]\d+)?)\s*%[^%\n]{0,20}?año",
+]
+
+
+def _extraer_garantia_potencia(texto: str) -> dict:
+    """Extrae la garantía de potencia lineal (2 tramos) de la ficha, si el
+    texto la publica con una redacción reconocible. Retorna
+    {"degradacion_anio1_pct": float|None, "degradacion_lineal_pct_anio": float|None}.
+
+    Rango plausible: caída año 1 entre 0% y 5% (LID típico); tasa lineal
+    entre 0.1%/año y 1.2%/año (fuera de eso, probablemente el regex capturó
+    otro número de la ficha -- se descarta, no se fuerza).
+    """
+    caida1 = _find_first(texto, _GARANTIA_ANIO1_PATTERNS)
+    if caida1 is not None and not (0.0 <= caida1 <= 5.0):
+        caida1 = None
+    lineal = _find_first(texto, _GARANTIA_LINEAL_PATTERNS)
+    if lineal is not None and not (0.1 <= lineal <= 1.2):
+        lineal = None
+    return {
+        "degradacion_anio1_pct": caida1,
+        "degradacion_lineal_pct_anio": lineal,
+    }
+
+
 def _apply_patterns(texto: str) -> dict:
     """Aplica todos los patrones de extracción al texto y retorna dict de resultados."""
     result = {}
@@ -1225,6 +1264,7 @@ def extraer_parametros_panel(pdf_bytes: bytes) -> dict:
 
     vals = _apply_patterns(texto)
     result.update(vals)
+    result.update(_extraer_garantia_potencia(texto))
 
     # Sanity checks (parámetros base del texto completo)
     if result.get("Voc") and result["Voc"] > 300:
