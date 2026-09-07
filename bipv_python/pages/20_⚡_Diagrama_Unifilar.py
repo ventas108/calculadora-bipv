@@ -22,6 +22,51 @@ from calculos.compatibilidad_bateria import check_compatibilidad
 from calculos import ledger_auditoria as _ledger
 
 
+_EMOJI_SEMAFORO = {"verde": "🟢", "amarillo": "🟡", "rojo": "🔴"}
+
+
+def _mostrar_semaforo_ampacidad(titulo: str, resultado: dict, corriente_A: float | None):
+    """
+    Ranking de escenarios de ampacidad reales y citables -- NUNCA una luz
+    verde certificando la instalación real del proyecto. La ampacidad real
+    depende del método de instalación, el agrupamiento de circuitos y la
+    temperatura ambiente real, ninguno de los cuales se le pregunta al
+    usuario hoy -- dar un semáforo único fingiría un juicio de ingeniería
+    sin datos para hacerlo. Ver docstring completo de
+    calculos.diagrama_unifilar.calcular_semaforo_ampacidad() (7-sep-2026).
+    """
+    escenarios = resultado.get("escenarios") or []
+    if not escenarios:
+        if resultado.get("sin_dato_calibre"):
+            st.caption(
+                f"ℹ️ {titulo}: sin dato de ampacidad verificado para este calibre "
+                f"todavía (fuente: {resultado.get('fuente')})."
+            )
+        return
+    peor = min(escenarios, key=lambda e: e["margen_pct"] if e["margen_pct"] is not None else -1)
+    with st.expander(
+        f"{_EMOJI_SEMAFORO[peor['semaforo']]} {titulo} — corriente de diseño "
+        f"{corriente_A:.1f} A"
+    ):
+        st.caption(
+            f"Fuente: {resultado['fuente']}. Cada fila es un escenario de instalación "
+            "REAL y distinto -- ubica cuál se parece más a tu proyecto; esta app no "
+            "sabe cuál es tu instalación real (método, agrupamiento, temperatura "
+            "ambiente). Ningún semáforo de aquí certifica seguridad -- es una "
+            "referencia para tu criterio o el de tu ingeniero, no un reemplazo."
+        )
+        for e in escenarios:
+            _nota_riesgo = (
+                " · ⚠️ el calibre elegido NO alcanza para este escenario"
+                if e["semaforo"] == "rojo" else ""
+            )
+            st.markdown(
+                f"{_EMOJI_SEMAFORO[e['semaforo']]} **{e['nombre']}** — "
+                f"ampacidad {e['ampacidad_A']:.0f} A · margen {e['margen_pct']:.0f}%"
+                f"{_nota_riesgo}"
+            )
+
+
 def _nombre_archivo_seguro(nombre: str) -> str:
     """Nombre de proyecto -> nombre de archivo válido en cualquier SO.
     `nombre_proyecto` es texto libre del usuario (puede traer '/', ':',
@@ -409,6 +454,23 @@ if tramos_dc_val or longitud_ac_val:
                 "(subestimación deliberada: nunca se inventa un cableado para una "
                 "superficie sin datos). Completa longitud/calibre de las superficies "
                 "restantes arriba para un cálculo completo."
+            )
+
+        # Semáforo de ampacidad -- un ranking por tramo DC (usando la
+        # corriente YA escalada por la fracción de paneles de ese tramo, no
+        # la corriente total del proyecto) y uno para el tramo AC.
+        for _tr in perdida_ohmica_result.get("tramos", []):
+            if _tr.get("semaforo_ampacidad"):
+                _mostrar_semaforo_ampacidad(
+                    f"Ampacidad DC — {_tr['nombre']}",
+                    _tr["semaforo_ampacidad"],
+                    _tr.get("corriente_diseno_A"),
+                )
+        if perdida_ohmica_result.get("semaforo_ampacidad_ac"):
+            _mostrar_semaforo_ampacidad(
+                "Ampacidad AC",
+                perdida_ohmica_result["semaforo_ampacidad_ac"],
+                perdida_ohmica_result.get("corriente_ac_diseno_A"),
             )
     else:
         st.info("ℹ️ Longitud registrada, pero falta el calibre para calcular la resistencia.")

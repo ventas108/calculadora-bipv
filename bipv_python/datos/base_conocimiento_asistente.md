@@ -1133,7 +1133,7 @@ En la tabla desglosada de pérdidas (expander "📋 Ver tabla detallada de balan
 
 **Cómo saber cuál se está usando**: la nota de cada fila en la tabla desglosada dice la fuente ("% manual configurado en 🔀 Mismatch" o "cálculo real del ⚡ Diagrama Unifilar, hora a hora con la corriente real"). Si ninguno de los 2 modos está activo, las filas quedan exactamente como antes de este cambio (②c informativa, sin fila ②d/④c) — nada se activa solo.
 
-**Límite declarado**: el cálculo real usa una temperatura de diseño fija para la resistividad del cobre (no la temperatura de celda hora a hora) — mismo criterio que usa la ingeniería real (RETIE/NEC evalúan caída de tensión a una condición de diseño fija). Tampoco sugiere automáticamente el calibre por ampacidad — elige entre secciones comerciales estándar, la validación de seguridad del calibre elegido sigue siendo responsabilidad del ingeniero del proyecto.
+**Límite declarado**: el cálculo real usa una temperatura de diseño fija para la resistividad del cobre (no la temperatura de celda hora a hora) — mismo criterio que usa la ingeniería real (RETIE/NEC evalúan caída de tensión a una condición de diseño fija). El calibre lo elige el usuario entre secciones comerciales estándar — la app no lo auto-asigna, pero desde el 7-sep-2026 sí muestra un **semáforo de ampacidad** de referencia junto al calibre elegido en ⚡ Diagrama Unifilar (ver sección 13f) — nunca una certificación de que el calibre sea seguro para la instalación real; la validación de seguridad definitiva sigue siendo responsabilidad del ingeniero del proyecto.
 
 ### Errores comunes al usar mismatch/cableado, y cómo evitarlos  NUEVO (7-sep-2026)
 
@@ -1143,7 +1143,7 @@ Complemento al manual de usuario "Cableado y Mismatch" — los 6 errores de inte
 2. **Cambiar panel, inversor, N en serie o número de paneles y no volver a ⚡ Página 20.** El cálculo vigente se invalida solo, y la app cae al modo manual (o a 0%) sin una alerta grande. → Ante un cambio de producción inexplicado, revisa primero si alguno de esos 4 datos cambió y si el aviso verde de Página 20 sigue apareciendo.
 3. **Declarar cable para una sola superficie de un proyecto multi-superficie y asumir que cubre todo.** Los paneles sin tramo declarado quedan sin pérdida registrada — el total calculado subestima la pérdida real. → Revisa el aviso amarillo de "declaraste cable para X de Y módulos".
 4. **Esperar un % idéntico a un reporte de PVsyst con la misma resistencia de cable.** La física de fondo es la misma (I²R hora a hora, igual que PVsyst/HelioScope) — pero esta app usa una temperatura de diseño FIJA de 45°C, mientras que PVsyst deja elegirla al usuario; si el proyecto real en PVsyst usó otra temperatura, el % difiere un poco por eso, no por un error de método. → Una diferencia pequeña por esta razón es esperable; para comparar igual, ajusta la temperatura de diseño en PVsyst a 45°C.
-5. **Asumir que el calibre elegido ya fue validado por seguridad (ampacidad).** La app solo calcula la pérdida de energía para el calibre que el usuario eligió, no valida que sea seguro para la corriente. → La validación de ampacidad sigue siendo responsabilidad del ingeniero eléctrico del proyecto.
+5. **Confundir el semáforo de ampacidad de ⚡ Diagrama Unifilar (7-sep-2026) con una certificación de que el calibre es seguro.** Muestra un ranking de escenarios reales y citables (ficha H1Z2Z2-K para DC, NTC 2050 para AC), pero NUNCA una luz verde única — la ampacidad real depende del método de instalación, el agrupamiento de circuitos y la temperatura ambiente real, datos que esta app no pide hoy. → Ubica el escenario que más se parece a tu instalación real y lee el margen ahí; la validación definitiva sigue siendo responsabilidad del ingeniero eléctrico del proyecto.
 6. **Pensar que el cálculo usa la temperatura real de cada hora.** Usa una temperatura de diseño fija (45°C), no la temperatura de celda horaria — simplificación intencional (mismo criterio que RETIE/NEC), no un dato faltante.
 
 Nota aparte para quien compare contra una calculadora de caída de tensión genérica de internet: muchas usan el factor "×2" (circuito monofásico/DC de 2 hilos) para el tramo AC. Esta app usa "×3" (trifásico, 3 conductores de fase) — una diferencia de hasta 33% frente a esas calculadoras genéricas no es un error de ninguno de los 2 lados, son topologías distintas.
@@ -2326,6 +2326,21 @@ Un segundo hallazgo, relacionado con la declaración parcial de superficies desc
 
 Cerrado con 9 tests nuevos/actualizados y la suite completa relanzada (1053/1053 passed) antes de reiniciar el servidor.
 
+### Semáforo de ampacidad — referencia, nunca una certificación  NUEVO (7-sep-2026)
+
+El usuario preguntó explícitamente si era seguro auto-sugerir el calibre por ampacidad. La respuesta, tras investigar, fue: **no en la forma de un semáforo único "✅ seguro"** — la ampacidad real depende del método de instalación (enterrado, bandeja, tubería, aire libre), de cuántos circuitos comparten la misma canalización, y de la temperatura ambiente real del sitio, ninguno de los cuales esta app le pregunta al usuario hoy. Dar una luz verde única habría fingido un juicio de ingeniería sin la información para hacerlo.
+
+**Lo que sí se construyó, en cada tramo con calibre elegido (DC por superficie, AC)**: un **ranking de escenarios reales y citables**, cada uno con su propio semáforo independiente (🟢 margen ≤70% de la ampacidad de ESE escenario, 🟡 70-100%, 🔴 la corriente de diseño ya supera la ampacidad de ese escenario):
+
+- **Tramo DC**: 3 condiciones reales publicadas en la ficha técnica del fabricante Eland Cables para el cable solar H1Z2Z2-K (norma EN 50618, el mismo cable que ya aparece como opción en el detalle RETIE de esta página) — cable único al aire libre, cable único sobre superficie, 2 cables juntos sobre superficie.
+- **Tramo AC**: 3 tipos de aislamiento del conductor (60°C/75°C/90°C) según NTC 2050 (Código Eléctrico Colombiano) / NEC Tabla 310-16, condición de referencia ≤3 conductores por canalización a 30°C ambiente.
+
+La corriente de diseño usada es la misma que ya calculaba `corriente_diseno_dc()`/`corriente_diseno_ac()` (Isc×FS para DC, 1,25×P/(√3·V) para AC) — en proyectos multi-superficie, cada tramo DC se compara contra SU PROPIA fracción de esa corriente (no la del proyecto completo), mismo criterio que ya usa la pérdida óhmica.
+
+⚠️ Para no cometer errores: cada fila del semáforo es un escenario NOMBRADO y distinto — el usuario (o su ingeniero) debe ubicar cuál se parece más a la instalación real del proyecto y leer el margen ahí. Ningún 🟢 de esta tabla certifica que la instalación real sea segura; es una referencia de apoyo, no un reemplazo del criterio del ingeniero eléctrico responsable.
+
+Fuentes verificadas contra los documentos originales (ficha técnica del fabricante y tabla NTC2050/NEC) el 7-sep-2026, no de memoria. 16 tests nuevos (`test_semaforo_ampacidad.py`).
+
 ## 13g. Página 21 — 📋 Ficha de Validación RETIE  NUEVO (27-ago-2026)
 
 Segundo aporte del usuario en la misma sesión: un script aparte con dataclasses `frozen` fijas al proyecto Urabá (2 inversores exactos), motor SVG propio sin dependencias, y un TIPO de documento que la app no tenía todavía: no un esquema eléctrico de línea única (eso es ⚡ Diagrama Unifilar, Página 20), sino una **ficha ejecutiva de una sola página** — tarjetas KPI, un flujo simplificado de 5 bloques, una tabla de cargas/protecciones, y sobre todo un **motor de validación eléctrica** que antes no existía en la app: Voc del string en frío vs Vdc máxima del inversor, ventana MPPT, balance DC/AC entre inversores, selección de breaker por calibre comercial, y banderas OK/PENDIENTE/ERROR cuando falta un dato de ficha técnica (nunca inventa el valor).
@@ -3432,6 +3447,20 @@ El usuario preguntó, con honestidad, si el diseño del cálculo de pérdida óh
 **Corregido**: la afirmación se reemplazó en las 5 ubicaciones donde vivía (sección 9, sección 13f, Anexo 64, el manual/artefacto, y el `.docx`) por la comparación correcta (paridad con PVsyst/HelioScope, no superioridad), republicados los 3 documentos externos. Ningún cálculo ni número del código cambió — era un error de comunicación/documentación, no un bug de `calcular_perdida_ohmica()` ni de los motores de producción.
 
 Lección para el Asistente: no repetir una comparación contra una herramienta externa (PVsyst, HelioScope, o cualquier otra) sin haberla verificado contra su documentación oficial primero — mismo principio de "nunca inventar un número" aplicado a afirmaciones sobre terceros, no solo a cifras propias.
+
+────────────────────────────────────────────────────────────
+
+## 67. Anexo — Actualizaciones del 7 de septiembre de 2026 (semáforo de ampacidad: por qué NO es un "✅ seguro" único, y qué se construyó en su lugar)
+
+Las secciones 64/65 y el manual de usuario declaraban explícitamente que el calibre de cable no se auto-sugería por ampacidad, "por no existir en el repo ninguna tabla de ampacidad/derateo verificada". El usuario pidió verificar si era viable construir esa validación, **con la condición explícita de que solo se hiciera si era seguro implementarla y con fuentes serias y auditables**.
+
+**Investigación (WebSearch, antes de construir)**: sí existen fuentes reales y citables — NTC 2050 (Código Eléctrico Colombiano)/NEC Tabla 310-16 (RETIE la referencia directamente para selección de conductores), y la ficha técnica del fabricante Eland Cables para el cable solar H1Z2Z2-K (norma EN 50618) — este último es literalmente el mismo cable que ya aparece como opción en el detalle RETIE de ⚡ Diagrama Unifilar. Ambas tablas se verificaron contra el documento fuente antes de codificar ningún valor (no de memoria).
+
+**Por qué NO se construyó como un semáforo único "seguro/inseguro"**: la ampacidad real de un calibre depende de 3 datos que esta app no le pide al usuario hoy — método de instalación (enterrado, bandeja, tubería, aire libre), cuántos circuitos comparten la misma canalización, y la temperatura ambiente real del sitio. Dar una luz verde única habría fingido un juicio de ingeniería sin la información real para hacerlo — exactamente el tipo de falsa precisión que este código evita en todos lados.
+
+**Lo que se construyó en cambio**: un ranking de escenarios NOMBRADOS y reales, cada uno con su propio semáforo (verde ≤70% de margen, amarillo 70-100%, rojo >100%) — 3 condiciones de instalación reales para el tramo DC (ficha H1Z2Z2-K), 3 tipos de aislamiento para el tramo AC (NTC2050 60/75/90°C). El usuario ubica cuál escenario se parece a su instalación real; ningún 🟢 certifica la instalación real del proyecto. `calculos/diagrama_unifilar.py::calcular_semaforo_ampacidad()`, integrada en `calcular_perdida_ohmica()` — cada tramo DC compara su PROPIA fracción de corriente (no la del proyecto completo), mismo criterio ya usado para la pérdida óhmica.
+
+16 tests nuevos (`test_semaforo_ampacidad.py`): física a mano en ambas tablas, ranking ordenado, umbrales del semáforo en los bordes exactos, nunca inventa (sin corriente/calibre/tabla desconocida → lista vacía), calibre sin dato verificado (NTC2050 solo llega a 120mm² — no se extrapola), y la integración multi-tramo (corriente escalada por fracción, no la total). Documentado en la sección 13f. Suite completa relanzada antes de desplegar.
 
 ────────────────────────────────────────────────────────────
 

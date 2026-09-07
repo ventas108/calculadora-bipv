@@ -105,6 +105,25 @@ def test_unifilar_soporta_un_tramo_por_superficie():
     assert "if superficies_val:" in src
 
 
+def test_unifilar_muestra_semaforo_ampacidad_por_tramo_y_para_ac():
+    src = _leer(_PAG_UNIFILAR)
+    assert "_mostrar_semaforo_ampacidad" in src
+    assert 'semaforo_ampacidad_ac' in src
+    # Se llama al menos 2 veces: una en el loop por tramo DC, otra para AC.
+    assert src.count("_mostrar_semaforo_ampacidad(") >= 3  # 1 def + ≥2 llamadas
+
+
+def test_semaforo_ampacidad_nunca_certifica_la_instalacion_real():
+    # El disclaimer central de por qué NO hay un semáforo único "seguro" debe
+    # estar en el propio texto que ve el usuario, no solo en un comentario.
+    src = _leer(_PAG_UNIFILAR)
+    # Frases dentro de un único literal de texto (el f-string real concatena
+    # varias líneas adyacentes -- se buscan fragmentos que no crucen ese
+    # límite entre literales, para no depender de cómo se parte el string).
+    assert "esta app no" in src
+    assert "certifica seguridad" in src
+
+
 # ── calculos/invalidacion.py ─────────────────────────────────────────────────
 def test_perdida_ohmica_unifilar_esta_en_la_lista_de_invalidacion():
     ruta = os.path.join(_ROOT, "calculos", "invalidacion.py")

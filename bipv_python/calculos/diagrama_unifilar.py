@@ -247,6 +247,157 @@ def _resistividad_cobre(T_C: float) -> float:
     return RESISTIVIDAD_COBRE_OHM_MM2_M_20C * (1 + COEF_TEMP_COBRE_POR_C * (T_C - 20.0))
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# 1c. Semáforo de ampacidad — referencia informativa, nunca una certificación
+#     de seguridad (7-sep-2026)
+# ══════════════════════════════════════════════════════════════════════════════
+# Fuente DC: Eland Cables, ficha técnica "Photovoltaic Solar H1Z2Z2-K Cable"
+# (norma EN 50618 -- el mismo cable que ya aparece como opción en el detalle
+# RETIE de esta página), tabla "Current Carrying Capacity", verificada
+# 7-sep-2026 contra el PDF publicado por el fabricante. 3 condiciones reales
+# de instalación, cada una con su propio valor -- nunca se promedia ni se
+# elige una sola "la correcta" por el usuario, porque esta app no sabe cuál
+# de las 3 corresponde a la instalación real del proyecto.
+AMPACIDAD_H1Z2Z2K_A: dict[float, tuple[float, float, float]] = {
+    # calibre_mm2: (cable_unico_aire_libre_A, cable_unico_superficie_A, dos_cables_superficie_A)
+    1.5:  (30,  29,  24),
+    2.5:  (41,  39,  33),
+    4.0:  (55,  52,  44),
+    6.0:  (70,  67,  57),
+    10.0: (98,  93,  79),
+    16.0: (132, 125, 107),
+    25.0: (176, 167, 142),
+    35.0: (218, 207, 176),
+    50.0: (276, 262, 221),
+    70.0: (347, 330, 278),
+    95.0: (416, 395, 333),
+    120.0: (488, 464, 390),
+    150.0: (566, 538, 453),
+    185.0: (644, 612, 515),
+    240.0: (775, 736, 620),
+}
+_ESCENARIOS_H1Z2Z2K = (
+    ("Cable único, al aire libre", 0),
+    ("Cable único, sobre superficie", 1),
+    ("2 cables juntos, sobre superficie", 2),
+)
+_FUENTE_H1Z2Z2K = (
+    "Eland Cables, ficha técnica H1Z2Z2-K (norma EN 50618) -- tabla "
+    "\"Current Carrying Capacity\""
+)
+
+# Fuente AC: NTC 2050 (Código Eléctrico Colombiano) / NEC Tabla 310-16 --
+# condición de referencia ≤3 conductores portadores de corriente por
+# canalización, 30°C ambiente, verificada 7-sep-2026 contra 2 fuentes. Los 3
+# valores son por TIPO DE AISLAMIENTO del conductor (60/75/90°C) -- no por
+# método de instalación como en la tabla DC; el usuario/instalador sabe cuál
+# aislamiento tiene el cable AC real que va a usar, esta app no lo pregunta
+# hoy. Solo hasta 120 mm² -- sin dato verificado para calibres mayores, no se
+# inventa (proyectos que necesiten más que eso quedan sin esta referencia,
+# igual que antes de este cambio).
+AMPACIDAD_NTC2050_A: dict[float, tuple[float, float, float]] = {
+    1.5:  (10, 15, 20),
+    2.5:  (15, 20, 25),
+    4.0:  (20, 25, 30),
+    6.0:  (30, 35, 40),
+    10.0: (40, 50, 55),
+    16.0: (55, 65, 75),
+    25.0: (70, 85, 95),
+    35.0: (95, 115, 130),
+    50.0: (125, 150, 170),
+    70.0: (145, 175, 195),
+    95.0: (165, 200, 225),
+    120.0: (195, 230, 260),
+}
+_ESCENARIOS_NTC2050 = (
+    ("Aislamiento 60°C (ej. TW)", 0),
+    ("Aislamiento 75°C (ej. THWN)", 1),
+    ("Aislamiento 90°C (ej. THHN/THWN-2)", 2),
+)
+_FUENTE_NTC2050 = (
+    "NTC 2050 (Código Eléctrico Colombiano) / NEC Tabla 310-16 -- "
+    "≤3 conductores por canalización, 30°C ambiente"
+)
+
+UMBRAL_SEMAFORO_VERDE_PCT = 70.0
+UMBRAL_SEMAFORO_AMARILLO_PCT = 100.0
+
+
+def calcular_semaforo_ampacidad(
+    calibre_mm2: float | None,
+    corriente_diseno_A: float | None,
+    tabla: str,
+) -> dict:
+    """
+    Compara la corriente de DISEÑO (Isc×FS para DC, 1,25×P/(√3·V) para AC --
+    la misma que ya calcula corriente_diseno_dc()/corriente_diseno_ac(), NO
+    la corriente de operación real hora a hora) contra la ampacidad publicada
+    del calibre elegido, en varios escenarios reales y citables (ver las 2
+    tablas arriba) -- nunca certifica que el calibre sea "seguro" para la
+    instalación real del proyecto.
+
+    Por qué nunca hay una sola respuesta "seguro/inseguro": la ampacidad real
+    depende del método de instalación (enterrado, en bandeja, en tubería, al
+    aire libre), de cuántos circuitos comparten la misma canalización, y de
+    la temperatura ambiente real del sitio -- ninguno de esos 3 datos se le
+    pide al usuario hoy. Dar un semáforo único fingiría un juicio de
+    ingeniería que esta app no tiene información para hacer. En cambio, se
+    devuelve un RANKING de escenarios NOMBRADOS (cada uno con su propia
+    ampacidad real de tabla) para que el usuario -- o su ingeniero -- ubique
+    cuál escenario se parece más a su instalación real y lea el margen ahí.
+
+    tabla: "h1z2z2k" (tramo DC -- cable solar EN 50618) o "ntc2050" (tramo AC).
+
+    Semáforo por escenario (comparando la corriente de diseño contra la
+    ampacidad de ESE escenario, no contra la instalación real desconocida):
+      verde    margen ≤ 70% de la ampacidad del escenario
+      amarillo margen entre 70% y 100%
+      rojo     la corriente de diseño YA supera la ampacidad de ese escenario
+
+    Nunca inventa: sin corriente de diseño, o sin dato de tabla para ese
+    calibre, devuelve una lista de escenarios vacía.
+    """
+    resultado = {"escenarios": [], "fuente": None, "sin_dato_calibre": False}
+    if not corriente_diseno_A or corriente_diseno_A <= 0 or not calibre_mm2:
+        return resultado
+
+    if tabla == "h1z2z2k":
+        datos = AMPACIDAD_H1Z2Z2K_A.get(float(calibre_mm2))
+        nombres_escenarios = _ESCENARIOS_H1Z2Z2K
+        resultado["fuente"] = _FUENTE_H1Z2Z2K
+    elif tabla == "ntc2050":
+        datos = AMPACIDAD_NTC2050_A.get(float(calibre_mm2))
+        nombres_escenarios = _ESCENARIOS_NTC2050
+        resultado["fuente"] = _FUENTE_NTC2050
+    else:
+        return resultado
+
+    if not datos:
+        resultado["sin_dato_calibre"] = True
+        return resultado
+
+    escenarios = []
+    for nombre, idx in nombres_escenarios:
+        ampacidad_A = datos[idx]
+        margen_pct = round(corriente_diseno_A / ampacidad_A * 100.0, 1)
+        if margen_pct <= UMBRAL_SEMAFORO_VERDE_PCT:
+            semaforo = "verde"
+        elif margen_pct <= UMBRAL_SEMAFORO_AMARILLO_PCT:
+            semaforo = "amarillo"
+        else:
+            semaforo = "rojo"
+        escenarios.append({
+            "nombre": nombre,
+            "ampacidad_A": ampacidad_A,
+            "margen_pct": margen_pct,
+            "semaforo": semaforo,
+        })
+    # Rankeado de mayor a menor ampacidad -- el escenario más favorable primero.
+    escenarios.sort(key=lambda e: e["ampacidad_A"], reverse=True)
+    resultado["escenarios"] = escenarios
+    return resultado
+
+
 def calcular_perdida_ohmica(
     *,
     panel: dict,
@@ -315,6 +466,7 @@ def calcular_perdida_ohmica(
     decide cuál usar.
     """
     resistividad = _resistividad_cobre(T_diseno_C)
+    corriente_dc_diseno_A = corriente_diseno_dc(panel.get("Isc_stc"), N_strings_tracker)
 
     tramos_in = [t for t in (tramos_dc or []) if t.get("n_paneles")]
     _suma_tramos = sum(int(t["n_paneles"]) for t in tramos_in) or None
@@ -332,6 +484,15 @@ def calcular_perdida_ohmica(
             int(tramo["n_paneles"]) / n_paneles_total_efectivo
             if n_paneles_total_efectivo else None
         )
+        # Corriente de diseño DE ESTE TRAMO -- cada tramo lleva solo su
+        # fracción de la corriente total del proyecto (mismo criterio que
+        # fraccion_paneles usa para la pérdida óhmica), así que el semáforo
+        # de ampacidad compara contra la corriente REAL de ese tramo, no
+        # contra la del proyecto completo.
+        corriente_tramo_A = (
+            corriente_dc_diseno_A * fraccion
+            if corriente_dc_diseno_A and fraccion is not None else None
+        )
         tramos_out.append({
             "nombre": tramo.get("nombre") or "Tramo DC",
             "n_paneles": int(tramo["n_paneles"]),
@@ -339,6 +500,8 @@ def calcular_perdida_ohmica(
             "calibre_mm2": S,
             "resistencia_ohm": r_ohm,
             "fraccion_paneles": fraccion,
+            "corriente_diseno_A": corriente_tramo_A,
+            "semaforo_ampacidad": calcular_semaforo_ampacidad(S, corriente_tramo_A, "h1z2z2k"),
         })
 
     # Resistencia DC EFECTIVA para pérdida total, Σ(fracción_i² · R_i): la
@@ -370,7 +533,6 @@ def calcular_perdida_ohmica(
         if longitud_ac_m and calibre_ac_mm2 else None
     )
 
-    corriente_dc_diseno_A = corriente_diseno_dc(panel.get("Isc_stc"), N_strings_tracker)
     p_ac_unidad_kW = (
         float(inversor["P_ac_nom_W"]) / 1000.0 if inversor.get("P_ac_nom_W")
         else float(inversor["P_ac_nom_kW"]) if inversor.get("P_ac_nom_kW") else None
@@ -383,6 +545,7 @@ def calcular_perdida_ohmica(
         "resistencia_ac_ohm": resistencia_ac_ohm,
         "corriente_dc_diseno_A": corriente_dc_diseno_A,
         "corriente_ac_diseno_A": corriente_ac_diseno_A,
+        "semaforo_ampacidad_ac": calcular_semaforo_ampacidad(calibre_ac_mm2, corriente_ac_diseno_A, "ntc2050"),
         "resistividad_ohm_mm2_m": round(resistividad, 6),
         "T_diseno_C": T_diseno_C,
         "fuente": "IEC 60228 (cobre recocido, 0.0172 Ω·mm²/m a 20°C) + coef. temp. 0.393%/°C",
