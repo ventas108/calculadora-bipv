@@ -60,6 +60,11 @@ KEYS_DERIVADOS_POA = (
 KEYS_RECURSO_SOLAR_POA = (
     "recurso_solar_ok", "poa_df", "poa_anual_kWh_m2",
     "ganancia_bifacial_pct",
+    # Verificación cruzada PVGIS vs PVWatts (6-sep-2026) -- depende del sitio
+    # (lat/lon) Y de la geometría (tilt/azimuth), igual que poa_df; debe
+    # caducar junto con él para no mostrar una comparación de otra
+    # ubicación/orientación como si fuera la vigente.
+    "pvwatts_cross_check",
 )
 
 # ── Recurso solar completo — incluye el TMY del sitio ────────────────────────

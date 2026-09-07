@@ -712,6 +712,36 @@ def generar_html_reporte() -> str:
             nota="Con el modelo bifacial activo, la POA global ya integra el aporte de la cara trasera "
                  "calculado por pvlib (infinite_sheds). La ganancia anual mostrada indica cuánta "
                  "irradiación adicional aporta la cara posterior respecto a un módulo monofacial.")
+
+        # ── Verificación cruzada PVGIS vs PVWatts (6-sep-2026) ─────────────────
+        # Solo si se calculó para la MISMA ciudad/orientación que este reporte
+        # -- evita mostrar una comparación de otra corrida como si fuera la
+        # vigente. Antes de este fix, esta verificación cruzada (que ya existía
+        # desde el 4-sep-2026) nunca llegaba al informe -- vivía solo como un
+        # aviso de pantalla que desaparecía al recargar la página.
+        _pvwatts_pdf = st.session_state.get("pvwatts_cross_check")
+        if (
+            _pvwatts_pdf
+            and _pvwatts_pdf.get("tmy_ciudad") == st.session_state.get("tmy_ciudad")
+            and _pvwatts_pdf.get("tilt_fachada") == st.session_state.get("tilt_fachada")
+            and _pvwatts_pdf.get("azimuth_fachada") == st.session_state.get("azimuth_fachada")
+        ):
+            _cmp_pdf = _pvwatts_pdf["cmp"]
+            _delta_pdf = _cmp_pdf.get("diferencia_pct_anual")
+            if _delta_pdf is not None:
+                html += tabla_kv([
+                    ("POA PVGIS (fuente oficial)", _fmt(_cmp_pdf["poa_pvgis_anual_kwh_m2"], 0), "kWh/m²/año", ""),
+                    ("POA PVWatts (NREL/NLR)",     _fmt(_cmp_pdf["poa_pvwatts_anual_kwh_m2"], 0), "kWh/m²/año",
+                     f"Fuente: {_pvwatts_pdf.get('fuente') or 'PVWatts/NSRDB'}"),
+                    ("Diferencia anual",           _fmt(_delta_pdf, 1, "%"), "",
+                     "Positivo = PVWatts mayor que PVGIS"),
+                ],
+                nota="Verificación cruzada, no bloqueante: PVGIS sigue siendo la ÚNICA fuente que "
+                     "alimenta el cálculo real de este informe (SDM/producción). PVWatts usa NSRDB, "
+                     "una base satelital independiente, para dar una segunda referencia de sanidad "
+                     f"sobre la irradiancia del sitio. Umbral de alerta: {_cmp_pdf['umbral_alerta_pct']:.0f}%"
+                     + (" -- SUPERADO en esta corrida, revisar si el sitio es rural/montañoso."
+                        if _cmp_pdf["alerta"] else " -- dentro de rango."))
         html += cierre()
 
     # ── 2b. Compatibilidad Eléctrica String–Inversor ──────────────────────────

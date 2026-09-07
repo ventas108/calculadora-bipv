@@ -78,6 +78,34 @@ from calculos.tz_utils import utc_offset_latam, tz_label
 from calculos.invalidacion import KEYS_DERIVADOS_POA
 from calculos.pvwatts_crosscheck import obtener_produccion_pvwatts, comparar_poa_pvgis_vs_pvwatts
 
+
+def _mostrar_banner_pvwatts(cmp: dict, fuente: str | None) -> None:
+    """Renderiza el aviso de verificación cruzada PVGIS vs PVWatts. Factorizado
+    (6-sep-2026, auditoría pedida por el usuario) para poder mostrarlo tanto
+    justo después de calcular como al restaurar un resultado ya calculado --
+    antes solo aparecía en el primer caso y "desaparecía" al recargar la
+    página o cambiar de pestaña, aunque los mismos números de POA siguieran
+    vigentes (ver sección 63 del manual)."""
+    delta = cmp.get("diferencia_pct_anual")
+    if delta is None:
+        return
+    msg = (
+        f"🛰️ **Verificación cruzada PVGIS vs PVWatts (NREL/NLR)** — "
+        f"POA anual PVGIS: {cmp['poa_pvgis_anual_kwh_m2']:,.0f} kWh/m² · "
+        f"PVWatts: {cmp['poa_pvwatts_anual_kwh_m2']:,.0f} kWh/m² "
+        f"(fuente: {fuente or 'PVWatts/NSRDB'}) · "
+        f"diferencia: {delta:+.1f}%."
+    )
+    if cmp["alerta"]:
+        st.warning(
+            msg + f" Supera el umbral de {cmp['umbral_alerta_pct']:.0f}% "
+            "— considera revisar si esta ubicación es rural/montañosa, donde PVGIS "
+            "puede ser menos confiable.",
+            icon="🛰️",
+        )
+    else:
+        st.info(msg, icon="🛰️")
+
 st.set_page_config(page_title="Recurso Solar — BIPV", page_icon="☀️", layout="wide")
 
 from calculos.auth import requerir_login
@@ -353,6 +381,7 @@ _SOLAR_SS_KEYS = (
     "tilt_fachada", "tilt_default", "azimuth_fachada", "orientacion_label",
     "poa_anual_kWh_m2", "ghi_anual_kWh_m2", "t_media_anual",
     "zona_geo_coords", "poa_efectiva_df", "poa_sin_termico_df", "ganancia_bifacial_pct",
+    "pvwatts_cross_check",
 )
 # NOTA: factor_svf_isotropico/factor_svf_tilt_az (de 🌳 Sombras SketchUp) NO
 # se limpian aquí a propósito -- viven en OTRA página y su propia validez ya
@@ -621,24 +650,18 @@ if _descarga_btn:
             monthly["POA (kWh/m²)"].tolist(),
             _pvwatts_datos["poa_monthly_kwh_m2"],
         )
-        _delta_pvwatts = _cmp_pvwatts["diferencia_pct_anual"]
-        if _delta_pvwatts is not None:
-            _msg_pvwatts = (
-                f"🛰️ **Verificación cruzada PVGIS vs PVWatts (NREL/NLR)** — "
-                f"POA anual PVGIS: {_cmp_pvwatts['poa_pvgis_anual_kwh_m2']:,.0f} kWh/m² · "
-                f"PVWatts: {_cmp_pvwatts['poa_pvwatts_anual_kwh_m2']:,.0f} kWh/m² "
-                f"(fuente: {_pvwatts_datos.get('weather_data_source') or 'PVWatts/NSRDB'}) · "
-                f"diferencia: {_delta_pvwatts:+.1f}%."
-            )
-            if _cmp_pvwatts["alerta"]:
-                st.warning(
-                    _msg_pvwatts + f" Supera el umbral de {_cmp_pvwatts['umbral_alerta_pct']:.0f}% "
-                    "— considera revisar si esta ubicación es rural/montañosa, donde PVGIS "
-                    "puede ser menos confiable.",
-                    icon="🛰️",
-                )
-            else:
-                st.info(_msg_pvwatts, icon="🛰️")
+        if _cmp_pvwatts["diferencia_pct_anual"] is not None:
+            # Persistir -- antes de este fix (6-sep-2026) el aviso solo vivía
+            # en esta ejecución del script y desaparecía al recargar la
+            # página o restaurar desde caché, aunque la POA fuera la misma.
+            st.session_state["pvwatts_cross_check"] = {
+                "cmp": _cmp_pvwatts,
+                "fuente": _pvwatts_datos.get("weather_data_source"),
+                "tmy_ciudad": ciudad,
+                "tilt_fachada": tilt,
+                "azimuth_fachada": azimuth,
+            }
+            _mostrar_banner_pvwatts(_cmp_pvwatts, _pvwatts_datos.get("weather_data_source"))
 
     # ── Gráfica mensual ──────────────────────────────────────────────────────
     st.subheader("📅 Irradiancia mensual")
@@ -757,6 +780,18 @@ elif st.session_state.get("recurso_solar_ok") and st.session_state.get("tmy_ciud
         f"POA: **{poa_prev:,.0f} kWh/m²/año**  |  "
         f"GHI: **{ghi_prev:,.0f} kWh/m²/año**"
     )
+    # Reaparece aquí el aviso de verificación cruzada PVGIS vs PVWatts si se
+    # calculó para ESTA misma ciudad/orientación -- antes de este fix
+    # (6-sep-2026) desaparecía apenas la página se recargaba o se restauraba
+    # desde caché, aunque la POA mostrada arriba fuera la misma.
+    _pvwatts_guardado = st.session_state.get("pvwatts_cross_check")
+    if (
+        _pvwatts_guardado
+        and _pvwatts_guardado.get("tmy_ciudad") == ciudad
+        and _pvwatts_guardado.get("tilt_fachada") == tilt_prev
+        and _pvwatts_guardado.get("azimuth_fachada") == st.session_state.get("azimuth_fachada")
+    ):
+        _mostrar_banner_pvwatts(_pvwatts_guardado["cmp"], _pvwatts_guardado.get("fuente"))
     st.info("Cambia la orientación o inclinación y presiona el botón para recalcular.")
 
 else:
