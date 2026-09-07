@@ -2341,6 +2341,25 @@ La corriente de diseño usada es la misma que ya calculaba `corriente_diseno_dc(
 
 Fuentes verificadas contra los documentos originales (ficha técnica del fabricante y tabla NTC2050/NEC) el 7-sep-2026, no de memoria. 16 tests nuevos (`test_semaforo_ampacidad.py`).
 
+#### Cómo explicarle al usuario que saque provecho real del semáforo (guía para el Asistente)
+
+Cuando un usuario pregunte "¿qué hago con esto?" o "¿cuál escenario me aplica?", el Asistente debe guiarlo con estos 4 pasos, en este orden — no basta con decir "es informativo":
+
+**1. Identifica cuál escenario se parece a TU instalación real.** Pregúntale al usuario (o ayúdalo a pensar):
+   - Tramo DC: ¿el cable va suelto al aire (bandeja abierta, sobre estructura ventilada), pegado a una superficie, o corre junto a otro cable del mismo circuito? Eso decide entre las 3 filas del semáforo DC.
+   - Tramo AC: ¿qué tipo de cable/aislamiento especificó el instalador (o va a especificar)? Un cable económico tipo TW es 60°C; uno THWN estándar es 75°C; uno THHN/THWN-2 (más común en instalaciones nuevas) es 90°C. Si no lo sabe todavía, ver el punto 2.
+
+**2. Si el usuario NO sabe con certeza cuál es (o será) su instalación real, la recomendación es usar el escenario MÁS CONSERVADOR (el de menor ampacidad de la lista) como el que manda para decidir el calibre.** Es la fila que va de última en el ranking (el semáforo ya las muestra ordenadas de mayor a menor ampacidad) — si el calibre da 🟢 o al menos 🟡 incluso en ese escenario más exigente, hay margen para casi cualquier instalación real razonable. Nunca recomendar quedarse con el escenario más favorable "porque dio verde ahí" sin saber si aplica al proyecto.
+
+**3. Qué hacer según el color, en el escenario elegido (paso 1 o 2):**
+   - 🟢 **Verde**: margen cómodo (la corriente de diseño usa ≤70% de la ampacidad de ese escenario) — el calibre probablemente alcanza para esa condición.
+   - 🟡 **Amarillo**: margen ajustado (70-100%) — vale la pena considerar el siguiente calibre comercial hacia arriba, o confirmar con el instalador/ingeniero antes de cerrar la decisión. No es automáticamente un problema, pero no sobra margen para imprevistos (temperatura más alta de lo esperado, más circuitos agrupados después).
+   - 🔴 **Rojo**: la corriente de diseño YA supera la ampacidad de ese escenario — el calibre elegido no alcanza para esa condición, hay que subir de calibre. Esto no es una sugerencia, es un límite físico real de la tabla citada.
+
+**4. Estrategia práctica de iteración**: si el escenario relevante (paso 1/2) da amarillo o rojo, el usuario puede volver arriba en Página 20, cambiar el calibre elegido (`Calibre DC (mm²)` o `Calibre AC (mm²)`) a la siguiente sección comercial disponible, y el semáforo se recalcula solo (es dinámico) — repetir hasta llegar a verde o amarillo cómodo en el escenario que le aplica. Esto también sube ligeramente `R` y por tanto la pérdida óhmica calculada (el trade-off real: más calibre = menos pérdida de energía Y más margen de ampacidad, ambos van en la misma dirección, nunca se contraponen).
+
+Cierre siempre con el mismo recordatorio, sin excepción: esto es una referencia técnica de apoyo con fuentes reales, no una certificación — la decisión final de calibre para la instalación real sigue siendo del ingeniero eléctrico responsable del proyecto.
+
 ## 13g. Página 21 — 📋 Ficha de Validación RETIE  NUEVO (27-ago-2026)
 
 Segundo aporte del usuario en la misma sesión: un script aparte con dataclasses `frozen` fijas al proyecto Urabá (2 inversores exactos), motor SVG propio sin dependencias, y un TIPO de documento que la app no tenía todavía: no un esquema eléctrico de línea única (eso es ⚡ Diagrama Unifilar, Página 20), sino una **ficha ejecutiva de una sola página** — tarjetas KPI, un flujo simplificado de 5 bloques, una tabla de cargas/protecciones, y sobre todo un **motor de validación eléctrica** que antes no existía en la app: Voc del string en frío vs Vdc máxima del inversor, ventana MPPT, balance DC/AC entre inversores, selección de breaker por calibre comercial, y banderas OK/PENDIENTE/ERROR cuando falta un dato de ficha técnica (nunca inventa el valor).
