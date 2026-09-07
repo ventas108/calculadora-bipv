@@ -38,6 +38,7 @@ import pandas as pd
 from calculos.modelo_iv import calcular_pmax_vectorizado
 from calculos.modelo_jrc_huld import clasificar_tecnologia_jrc, potencia_jrc
 from calculos.temperatura import temperatura_celda_noct
+from calculos.dimensionamiento import calcular_vmp_string
 from calculos.agregador_anual import (
     agregar_anual_8760_poa,
     validar_entradas_horarias_8760,
@@ -138,6 +139,13 @@ def simular_produccion_anual(
     P_ac_nom_W: float | None = None,
     poa_bruta_kWh_m2: float | None = None,
     factor_espectral: pd.Series | np.ndarray | None = None,
+    pct_mismatch_fab: float | None = None,
+    resistencia_dc_ohm: float | None = None,
+    pct_cableado_dc: float | None = None,
+    resistencia_ac_ohm: float | None = None,
+    pct_cableado_ac: float | None = None,
+    N_serie: int | None = None,
+    tension_red_V: float | None = None,
 ) -> dict:
     """
     Simulación de producción anual hora a hora — IEC 61724.
@@ -201,6 +209,50 @@ def simular_produccion_anual(
                           llega al plano (esa irradiancia sigue calentando el módulo y
                           contando como "POA efectiva" igual). None (default) = sin
                           corrección, retrocompatible.
+    pct_mismatch_fab    : % de pérdida por tolerancia de fabricación / "calidad de
+                          módulo" (binning) -- 7-sep-2026, ver
+                          DIAGNOSTICO_PERDIDA_OHMICA_BINNING.md. Antes se aplicaba
+                          (con otro nombre, "pct_mismatch_fab" del slider de Página
+                          5 Mismatch) como reductor de G_eff ANTES del modelo
+                          eléctrico -- físicamente impreciso (es una pérdida
+                          eléctrica post-conversión, no una reducción de
+                          irradiancia) y quedaba escondido dentro de "② Efecto
+                          SDM" del Loss Diagram, sin fila propia. Ahora se aplica
+                          aquí, como multiplicador directo sobre Pmax (no varía
+                          hora a hora -- es tolerancia de fábrica, no un efecto
+                          eléctrico dependiente de corriente). None (default) =
+                          sin pérdida, retrocompatible.
+    resistencia_dc_ohm  : resistencia DC efectiva (Ω) de todo el tramo de
+                          cableado del array al inversor -- ver calculos.
+                          diagrama_unifilar.calcular_perdida_ohmica()
+                          ("resistencia_dc_efectiva_ohm", ya agregada de todos
+                          los tramos/superficies). Si se pasa, la pérdida óhmica
+                          se calcula HORA A HORA con la corriente real
+                          I(t)=P_dc(t)/V_string(t) (más preciso que el % fijo
+                          de PVsyst, que sobreestima la pérdida en horas de baja
+                          irradiancia) -- requiere también N_serie. Tiene
+                          prioridad sobre pct_cableado_dc; nunca se aplican
+                          ambos a la vez.
+    pct_cableado_dc      : % fijo de pérdida óhmica DC -- modo manual, usado
+                          SOLO si resistencia_dc_ohm es None (no hay datos
+                          reales de cableado del proyecto todavía). None
+                          (default) = sin pérdida, retrocompatible.
+    resistencia_ac_ohm  : igual que resistencia_dc_ohm pero para el tramo
+                          inversor→punto de conexión -- requiere también
+                          tension_red_V. Se aplica DESPUÉS del recorte del
+                          inversor (ahí ya no hay no-linealidad aguas abajo).
+    pct_cableado_ac      : % fijo de pérdida óhmica AC -- modo manual, usado
+                          SOLO si resistencia_ac_ohm es None. None (default) =
+                          sin pérdida (a diferencia de pct_cableado_dc, esta
+                          pérdida no tenía NINGUNA representación antes de
+                          7-sep-2026 -- nunca inventar un valor por defecto
+                          distinto de cero para algo que antes no existía).
+    N_serie              : paneles en serie por string -- necesario SOLO para
+                          calcular V_string(t) en el modo DC calculado. Si es
+                          None, resistencia_dc_ohm se ignora (queda como si no
+                          se hubiera pasado) en vez de reventar.
+    tension_red_V        : tensión de red (V) -- necesaria SOLO para el modo AC
+                          calculado. Si es None, resistencia_ac_ohm se ignora.
 
     Retorna dict
     ────────────
@@ -288,6 +340,44 @@ def simular_produccion_anual(
     pmax_stc_g = _calcular_pmax_vectorizado(G_para_potencia, T_ref_arr, panel)
     perdida_temp_por_modulo = np.maximum(pmax_stc_g - pmax_mod, 0.0)
 
+    # ── Mismatch fabricación + pérdida óhmica DC (7-sep-2026) ─────────────────
+    # Se aplican DESPUÉS de perdida_temp_por_modulo (que debe medir solo el
+    # efecto SDM puro, sin mezclarse con estos 2) -- ver docstrings arriba.
+    # pmax_stc_g NO se toca: sigue siendo la referencia T=25°C pura para la
+    # fila ②a/②b del Loss Diagram.
+    E_dc_antes_binning_ohmico_kWh = float(pmax_mod.sum()) * N_paneles / 1000.0
+
+    pct_mismatch_fab_aplicado = None
+    if pct_mismatch_fab:
+        pmax_mod = pmax_mod * (1.0 - pct_mismatch_fab / 100.0)
+        pct_mismatch_fab_aplicado = pct_mismatch_fab
+    E_dc_despues_mismatch_kWh = float(pmax_mod.sum()) * N_paneles / 1000.0
+
+    perdida_ohmica_dc_modo = None
+    perdida_ohmica_dc_por_hora_W = np.zeros_like(pmax_mod)
+    if resistencia_dc_ohm is not None and resistencia_dc_ohm > 0 and N_serie:
+        Vmp_mod_t = calcular_vmp_string(
+            1, float(panel.get("Vmp_stc") or 0.0), float(panel.get("Tk_beta") or 0.0), T_cel
+        )
+        V_string_t = Vmp_mod_t * N_serie
+        P_dc_bruta_W = pmax_mod * N_paneles
+        I_total_A = np.divide(
+            P_dc_bruta_W, V_string_t,
+            out=np.zeros_like(P_dc_bruta_W), where=(V_string_t > 1.0),
+        )
+        perdida_ohmica_dc_por_hora_W = (I_total_A ** 2) * resistencia_dc_ohm
+        pmax_mod = np.maximum(
+            pmax_mod - perdida_ohmica_dc_por_hora_W / N_paneles, 0.0
+        )
+        perdida_ohmica_dc_modo = "calculado"
+    elif pct_cableado_dc:
+        pmax_mod = pmax_mod * (1.0 - pct_cableado_dc / 100.0)
+        perdida_ohmica_dc_modo = "manual"
+    E_dc_despues_ohmico_dc_kWh = float(pmax_mod.sum()) * N_paneles / 1000.0
+
+    perdida_mismatch_fab_kWh = round(E_dc_antes_binning_ohmico_kWh - E_dc_despues_mismatch_kWh, 0)
+    perdida_ohmica_dc_kWh    = round(E_dc_despues_mismatch_kWh - E_dc_despues_ohmico_dc_kWh, 0)
+
     # ── Escalar al sistema ─────────────────────────────────────────────────────
     P_dc_W       = pmax_mod * N_paneles
     P_ac_sin_recorte_W = P_dc_W * eta_inversor
@@ -299,6 +389,25 @@ def simular_produccion_anual(
         P_ac_W = P_ac_sin_recorte_W
     clipping_W = P_ac_sin_recorte_W - P_ac_W   # siempre >= 0
 
+    # ── Pérdida óhmica AC (7-sep-2026) ─────────────────────────────────────────
+    # Después del recorte -- ahí ya no hay no-linealidad aguas abajo (el
+    # recorte es intrínseco al inversor, no depende de lo que pase con el
+    # cable después de sus bornes de salida).
+    E_ac_antes_ohmico_ac_kWh = float(P_ac_W.sum()) / 1000.0
+    perdida_ohmica_ac_modo = None
+    perdida_ohmica_ac_por_hora_W = np.zeros_like(P_ac_W)
+    if resistencia_ac_ohm is not None and resistencia_ac_ohm > 0 and tension_red_V:
+        I_ac_A = P_ac_W / (np.sqrt(3.0) * tension_red_V)
+        perdida_ohmica_ac_por_hora_W = (I_ac_A ** 2) * resistencia_ac_ohm
+        P_ac_W = np.maximum(P_ac_W - perdida_ohmica_ac_por_hora_W, 0.0)
+        perdida_ohmica_ac_modo = "calculado"
+    elif pct_cableado_ac:
+        _perdida_pct_ac_W = P_ac_W * (pct_cableado_ac / 100.0)
+        perdida_ohmica_ac_por_hora_W = _perdida_pct_ac_W
+        P_ac_W = P_ac_W - _perdida_pct_ac_W
+        perdida_ohmica_ac_modo = "manual"
+    perdida_ohmica_ac_kWh = round(E_ac_antes_ohmico_ac_kWh - float(P_ac_W.sum()) / 1000.0, 0)
+
     # ── Energías anuales (Wh → kWh) ───────────────────────────────────────────
     E_dc_anual  = float(P_dc_W.sum()) / 1000.0
     E_ac_anual  = float(P_ac_W.sum()) / 1000.0
@@ -307,7 +416,10 @@ def simular_produccion_anual(
     # Pérdida de eficiencia PURA (sin recorte) -- separada del recorte para que
     # cada pérdida se pueda reportar por su causa real, como hace PVsyst.
     perdida_inv_kWh      = E_dc_anual - E_ac_sin_recorte_anual
-    perdida_clipping_kWh = E_ac_sin_recorte_anual - E_ac_anual
+    # E_ac_antes_ohmico_ac_kWh (post-recorte, PRE pérdida óhmica AC) -- no
+    # E_ac_anual, que ya incluye la pérdida óhmica AC nueva -- si no, el
+    # recorte del inversor "se comería" también la pérdida de cableado AC.
+    perdida_clipping_kWh = E_ac_sin_recorte_anual - E_ac_antes_ohmico_ac_kWh
     horas_con_clipping   = int(np.sum(clipping_W > 1e-6))
 
     # ── Métricas IEC 61724 ────────────────────────────────────────────────────
@@ -338,6 +450,8 @@ def simular_produccion_anual(
         "P_ac_kW":      P_ac_W  / 1000.0,
         "perdida_T_kW": perdida_temp_por_modulo * N_paneles / 1000.0,
         "clipping_kW":  clipping_W / 1000.0,
+        "perdida_ohmica_dc_W": perdida_ohmica_dc_por_hora_W,
+        "perdida_ohmica_ac_W": perdida_ohmica_ac_por_hora_W,
     }, index=idx)
 
     # ── Contrato anual oficial: suma directa de las 8760 horas ───────────────
@@ -379,6 +493,19 @@ def simular_produccion_anual(
         "factor_espectral_aplicado":  factor_espectral_aplicado,
         "factor_espectral_promedio":  factor_espectral_promedio,
         "E_ac_sin_recorte_kWh":   round(E_ac_sin_recorte_anual, 0),
+        # Mismatch fabricación + pérdida óhmica DC/AC (7-sep-2026) -- ver
+        # docstrings de pct_mismatch_fab/resistencia_dc_ohm/resistencia_ac_ohm
+        # arriba. E_dc_antes_binning_ohmico_kWh es el punto de referencia que
+        # usa perdidas_desglosadas() para las nuevas filas ②c/②d del Loss
+        # Diagram -- reconciliación exacta, ningún kWh se pierde ni se inventa.
+        "E_dc_antes_binning_ohmico_kWh": round(E_dc_antes_binning_ohmico_kWh, 0),
+        "pct_mismatch_fab_aplicado":     pct_mismatch_fab_aplicado,
+        "perdida_mismatch_fab_kWh":      perdida_mismatch_fab_kWh,
+        "perdida_ohmica_dc_kWh":         perdida_ohmica_dc_kWh,
+        "perdida_ohmica_dc_modo":        perdida_ohmica_dc_modo,
+        "E_ac_antes_ohmico_ac_kWh":      round(E_ac_antes_ohmico_ac_kWh, 0),
+        "perdida_ohmica_ac_kWh":         perdida_ohmica_ac_kWh,
+        "perdida_ohmica_ac_modo":        perdida_ohmica_ac_modo,
         # E_dc con la MISMA G_eff real pero T_cel fija en 25°C (STC) para las
         # 8760 h -- ya se calculaba internamente como paso intermedio
         # (pmax_stc_g) para "perdida_temp_kWh", pero nunca se exponía sumado.
@@ -430,14 +557,30 @@ def perdidas_desglosadas(
     (resultado de una versión anterior, o un caller propio), la fila ②
     queda combinada como antes -- mismo principio de nunca inventar.
 
-    Categorías del Loss Diagram de PVsyst que esta tabla NO modela hoy
-    (a propósito, sin inventar un número): "Module quality loss" y "Ohmic
-    wiring loss" -- ver el diagnóstico arriba para el detalle.
+    Mismatch de fabricación / calidad de módulo y pérdida óhmica DC/AC
+    (7-sep-2026, antes declaradas explícitamente como NO modeladas): si
+    `res` trae "pct_mismatch_fab_aplicado"/"perdida_ohmica_dc_modo"/
+    "perdida_ohmica_ac_modo" (simular_produccion_anual()/simular_produccion_iv()
+    ya las exponen desde esa fecha), se insertan como filas REALES ②c/②d/④c
+    con su Δ kWh efectivo -- ya no son solo informativas. Si `res` no trae
+    esas claves (resultado de una versión anterior), "②c Módulo" queda
+    exactamente como antes (informativa, PVsyst +0,75% de referencia, sin
+    aplicar nada) -- mismo principio de nunca inventar un desglose que no se
+    calculó de verdad para esta corrida. Las filas ②/②a/②b usan
+    "E_dc_antes_binning_ohmico_kWh" como referencia (no
+    "E_dc_anual_kWh", que ahora YA viene neto de estas 2 pérdidas) para que
+    el efecto SDM/temperatura no se mezcle con ellas -- mismo principio que
+    ya evita el doble conteo entre ①a/①b y ②.
     """
     P_stc  = res["P_stc_kW"]
     ref_dc = P_stc * poa_bruta_kWh_m2   # kWh teóricos a STC (Pmax_nom × POA bruta)
     if ref_dc == 0:
         return pd.DataFrame()
+    # Referencia "pura SDM" -- antes de mismatch fabricación / óhmico DC
+    # (que ahora ya están restados de E_dc_anual_kWh). Sin estas claves
+    # (res de una versión anterior), cae exactamente en E_dc_anual_kWh --
+    # ningún cambio de comportamiento para quien no usa la función nueva.
+    E_dc_pre_binning = res.get("E_dc_antes_binning_ohmico_kWh", res["E_dc_anual_kWh"])
 
     filas = [
         {
@@ -477,7 +620,7 @@ def perdidas_desglosadas(
     else:
         ref_sdm = ref_dc
 
-    delta_sdm = res["E_dc_anual_kWh"] - ref_sdm         # positivo = ganancia temperatura
+    delta_sdm = E_dc_pre_binning - ref_sdm              # positivo = ganancia temperatura
     delta_t   = -res["perdida_temp_kWh"]                 # horas T > 25 °C (siempre ≤ 0)
     delta_inv = -res["perdida_inv_kWh"]                  # pérdida inversor (siempre ≤ 0)
 
@@ -496,7 +639,7 @@ def perdidas_desglosadas(
     filas += [
         {
             "Etapa":     "② Efecto SDM  (T° + baja irradiancia)",
-            "kWh":       round(res["E_dc_anual_kWh"], 0),
+            "kWh":       round(E_dc_pre_binning, 0),
             "Δ kWh":     round(delta_sdm, 0),
             "Nota":      ("🟢 Ganancia por T_cel < 25°C (clima frío / alta altitud)"
                           if delta_sdm >= 0
@@ -510,7 +653,7 @@ def perdidas_desglosadas(
 
     if _tiene_split_temp:
         delta_irr  = E_dc_a_T25 - ref_sdm
-        delta_temp_neto = res["E_dc_anual_kWh"] - E_dc_a_T25
+        delta_temp_neto = E_dc_pre_binning - E_dc_a_T25
         filas += [
             {
                 "Etapa":     "②a Pérdida por nivel de irradiancia  (T=25°C fijo)",
@@ -520,7 +663,7 @@ def perdidas_desglosadas(
             },
             {
                 "Etapa":     "②b Efecto temperatura  (T real vs. 25°C)",
-                "kWh":       round(res["E_dc_anual_kWh"], 0),
+                "kWh":       round(E_dc_pre_binning, 0),
                 "Δ kWh":     round(delta_temp_neto, 0),
                 "Nota":      ("🟢 Ganancia neta por T_cel < 25°C (clima frío / alta altitud)"
                               if delta_temp_neto >= 0
@@ -538,11 +681,57 @@ def perdidas_desglosadas(
             # solo las horas calientes?"), no es un paso acumulado de la
             # cascada -- la kWh muestra E_dc (mismo que fila ②).
             "Etapa":     "   ↳ Solo horas calientes  (T_cel > 25°C, sin compensar por frío)",
-            "kWh":       round(res["E_dc_anual_kWh"], 0),
+            "kWh":       round(E_dc_pre_binning, 0),
             "Δ kWh":     round(delta_t, 0),
             "Nota":      f"Sub-componente de ②  ·  Tk_gamma={res.get('Tk_gamma_pct','—')}%/°C",
         },
-        {
+    ]
+
+    # ── ②c/②d — Mismatch fabricación + pérdida óhmica DC, REALES (7-sep-2026) ──
+    # Si `res` no trae estas claves (versión anterior), ②c queda EXACTAMENTE
+    # como antes: informativa, PVsyst +0,75% de referencia, sin aplicar nada.
+    _pct_fab_aplicado = res.get("pct_mismatch_fab_aplicado")
+    _modo_ohmico_dc    = res.get("perdida_ohmica_dc_modo")
+    _etapas_binning_dc = []
+    if _pct_fab_aplicado is not None:
+        _etapas_binning_dc.append((
+            "②c Mismatch fabricación  (aplicado)",
+            res.get("perdida_mismatch_fab_kWh", 0.0),
+            f"{_pct_fab_aplicado}% configurado en 🔀 Mismatch · PVsyst mostró +0,75% "
+            "(ganancia) en 2 papers independientes como valor por defecto sin datos "
+            "reales de binning -- compáralo contra tu propio reporte.",
+        ))
+    if _modo_ohmico_dc is not None:
+        _fuente_dc = (
+            "cálculo real del ⚡ Diagrama Unifilar, hora a hora con la corriente real"
+            if _modo_ohmico_dc == "calculado" else
+            "% manual configurado en 🔀 Mismatch"
+        )
+        _etapas_binning_dc.append((
+            "②d Pérdida óhmica DC  (cableado)",
+            res.get("perdida_ohmica_dc_kWh", 0.0),
+            f"Fuente: {_fuente_dc}",
+        ))
+
+    if _etapas_binning_dc:
+        # La ÚLTIMA fila de este bloque se fuerza a E_dc_anual_kWh exacto
+        # (igual que ③ más abajo) -- cualquier residuo de redondeo entre
+        # pasos queda absorbido ahí, nunca "perdido" ni inventado.
+        _kwh_prev = round(E_dc_pre_binning, 0)
+        for _i, (_etapa, _delta_declarado, _nota) in enumerate(_etapas_binning_dc):
+            _es_ultima = _i == len(_etapas_binning_dc) - 1
+            _kwh_this = (
+                round(res["E_dc_anual_kWh"], 0) if _es_ultima
+                else round(_kwh_prev - _delta_declarado, 0)
+            )
+            filas.append({
+                "Etapa": _etapa, "kWh": _kwh_this,
+                "Δ kWh": round(_kwh_this - _kwh_prev, 0),
+                "Nota": _nota,
+            })
+            _kwh_prev = _kwh_this
+    else:
+        filas.append({
             # Informativa, NUNCA aplicada al cálculo -- esta app no tiene datos
             # de binning/clasificación de fábrica del panel, así que no hay
             # ningún número propio que agregar aquí (mismo principio de nunca
@@ -556,12 +745,14 @@ def perdidas_desglosadas(
             # algo que tu instalador midió. Δ kWh y kWh quedan iguales a la
             # fila anterior a propósito: cero efecto en el cálculo real.
             "Etapa":     "②c Módulo  (informativo — no aplicado por esta app)",
-            "kWh":       round(res["E_dc_anual_kWh"], 0),
+            "kWh":       round(E_dc_pre_binning, 0),
             "Δ kWh":     0,
             "Nota":      ("PVsyst mostró +0,75% (ganancia) en 2 papers reales independientes -- "
                           "probable valor por defecto del software sin datos de binning propios. "
                           "Esta app no lo modela ni lo aplica; compáralo contra tu propio reporte."),
-        },
+        })
+
+    filas += [
         {
             "Etapa":     "③ E_dc  (salida del array)",
             "kWh":       round(res["E_dc_anual_kWh"], 0),
@@ -576,7 +767,7 @@ def perdidas_desglosadas(
         },
         {
             "Etapa":     "④b Recorte inversor (Pnom, clipping)",
-            "kWh":       round(res["E_ac_anual_kWh"], 0),
+            "kWh":       round(res.get("E_ac_antes_ohmico_ac_kWh", res["E_ac_anual_kWh"]), 0),
             "Δ kWh":     round(-res.get("perdida_clipping_kWh", 0.0), 0),
             "Nota":      (
                 f"{res.get('horas_con_clipping', 0):,} h/año recortadas"
@@ -584,13 +775,30 @@ def perdidas_desglosadas(
                 else "Sin recorte -- DC/AC dentro del rango del inversor"
             ),
         },
-        {
-            "Etapa":     "⑤ E_ac  (energía a la red / edificio)",
-            "kWh":       round(res["E_ac_anual_kWh"], 0),
-            "Δ kWh":     0,
-            "Nota":      "",
-        },
     ]
+
+    # ── ④c — Pérdida óhmica AC, REAL (7-sep-2026) ──────────────────────────────
+    _modo_ohmico_ac = res.get("perdida_ohmica_ac_modo")
+    if _modo_ohmico_ac is not None:
+        _fuente_ac = (
+            "cálculo real del ⚡ Diagrama Unifilar" if _modo_ohmico_ac == "calculado"
+            else "% manual configurado en 🔀 Mismatch"
+        )
+        _kwh_prev_ac = round(res.get("E_ac_antes_ohmico_ac_kWh", res["E_ac_anual_kWh"]), 0)
+        _kwh_ac_final = round(res["E_ac_anual_kWh"], 0)
+        filas.append({
+            "Etapa":     "④c Pérdida óhmica AC  (cableado)",
+            "kWh":       _kwh_ac_final,
+            "Δ kWh":     round(_kwh_ac_final - _kwh_prev_ac, 0),
+            "Nota":      f"Fuente: {_fuente_ac}",
+        })
+
+    filas.append({
+        "Etapa":     "⑤ E_ac  (energía a la red / edificio)",
+        "kWh":       round(res["E_ac_anual_kWh"], 0),
+        "Δ kWh":     0,
+        "Nota":      "",
+    })
     df = pd.DataFrame(filas)
     df["% de E_ref"] = (df["Δ kWh"].abs() / ref_dc * 100).round(2)
     return df

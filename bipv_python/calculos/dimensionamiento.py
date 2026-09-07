@@ -74,6 +74,37 @@ def semaforo(valor: float, limite: float, invertir=False) -> EstadoVerif:
         return "ALERTA" if margen < UMBRAL_ALERTA_PCT else "OK"
 
 
+def corriente_diseno_dc(Isc_stc: float, N_strings_tracker: int, FS_isc: float = 1.25) -> float | None:
+    """Corriente de diseño DC (cruda, sin redondear) = Isc_stc × N_strings × FS.
+
+    Extraída de evaluar_compatibilidad_string() (mismo cálculo que ya usaba
+    esa función) para que diagrama_unifilar.py y la nueva pérdida óhmica la
+    reutilicen en vez de tener cada quien su propia copia -- evita el tipo de
+    divergencia de redondeo ya documentado en
+    ficha_validacion_retie.py::calcular_retie() (360,9 A vs 360,8 A para el
+    mismo proyecto real, por calcular la corriente de diseño a partir de un
+    valor ya redondeado en un lado y del crudo en el otro).
+    """
+    if not Isc_stc or not N_strings_tracker:
+        return None
+    return float(Isc_stc) * int(N_strings_tracker) * float(FS_isc)
+
+
+def corriente_diseno_ac(P_ac_kW_unidad: float, n_inversores: int, tension_V: float,
+                         factor_continuo: float = 1.25) -> float | None:
+    """Corriente de diseño AC trifásica (cruda, sin redondear) = FC·P_total/(√3·V).
+
+    Misma fórmula que ya vivía duplicada, con ligeras variaciones de
+    redondeo, en calculos/diagrama_unifilar.py y
+    calculos/ficha_validacion_retie.py -- centralizada aquí por el mismo
+    motivo que corriente_diseno_dc().
+    """
+    if not P_ac_kW_unidad or not n_inversores or not tension_V:
+        return None
+    p_ac_total_kW = float(P_ac_kW_unidad) * int(n_inversores)
+    return factor_continuo * p_ac_total_kW * 1000.0 / (math.sqrt(3) * float(tension_V))
+
+
 def calcular_voc_string(N, Voc_stc, Tk_beta, T_cel):
     return N * Voc_stc * (1 + Tk_beta / 100.0 * (T_cel - 25.0))
 

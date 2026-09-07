@@ -495,6 +495,25 @@ if btn_sim or st.session_state.get("produccion_ok"):
                         tmy, float(_lat_esp), float(_lon_esp), float(_alt_esp or 0)
                     )
 
+            # ── Mismatch fabricación + pérdida óhmica DC/AC (7-sep-2026) ─────
+            # pct_mismatch_fab/pct_cableado_dc/pct_cableado_ac: sliders
+            # manuales de Página 5 Mismatch (respaldo cuando no hay datos
+            # reales del proyecto). Si Página 20 (Diagrama Unifilar) tiene un
+            # cálculo VIGENTE (mismo panel/inversor/N_serie que este proyecto
+            # -- si no coincide, se ignora en vez de aplicar un número de
+            # otro proyecto), ese cálculo real sustituye al slider
+            # correspondiente -- nunca se aplican ambos a la vez (ver
+            # calculos.produccion.simular_produccion_anual()).
+            _perd_ohm_unif = st.session_state.get("perdida_ohmica_unifilar") or {}
+            _unif_vigente = bool(
+                _perd_ohm_unif.get("panel_nombre") == panel_nombre
+                and _perd_ohm_unif.get("inversor_nombre") == inversor_nombre
+                and _perd_ohm_unif.get("n_serie") == _n_serie_cfg
+            )
+            _resistencia_dc_ohm = _perd_ohm_unif.get("resistencia_dc_ohm") if _unif_vigente else None
+            _resistencia_ac_ohm = _perd_ohm_unif.get("resistencia_ac_ohm") if _unif_vigente else None
+            _tension_red_V_prod = _perd_ohm_unif.get("tension_red_V") if _unif_vigente else None
+
             _sim_kwargs = dict(
                 tmy               = tmy,
                 poa_base          = poa_base,
@@ -504,6 +523,13 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 factor_pr_mismatch= factor_pr,
                 P_dc_stc_kW       = P_stc_kW,
                 k_bipv            = _k_bipv_sim,
+                pct_mismatch_fab   = st.session_state.get("pct_mismatch_fab"),
+                resistencia_dc_ohm = _resistencia_dc_ohm,
+                pct_cableado_dc    = st.session_state.get("pct_cableado_dc"),
+                resistencia_ac_ohm = _resistencia_ac_ohm,
+                pct_cableado_ac    = st.session_state.get("pct_cableado_ac"),
+                N_serie            = _n_serie_cfg,
+                tension_red_V      = _tension_red_V_prod,
                 # Recorte real al Pnom del inversor (PVsyst siempre lo aplica) --
                 # ver docstring de "P_ac_nom_W" en calculos.produccion. None si
                 # la ficha del inversor no trae el dato -- no recorta, igual que
@@ -1087,21 +1113,51 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 "corriendo el mismo SDM ya validado una segunda vez a T=25°C fijo — "
                 "no es una estimación aparte, los dos deltas suman exacto el de la fila ②."
             )
-            st.caption(
-                "ℹ️ Fila ②c \"Módulo\" es **solo informativa** — muestra +0,75% porque eso "
-                "fue lo que PVsyst reportó, idéntico, en 2 papers reales independientes "
-                "(probable valor por defecto del software sin datos de binning propios), "
-                "pero **esta app no lo aplica** al cálculo (Δ kWh = 0 a propósito). Compárala "
-                "contra tu propio reporte de PVsyst — si el tuyo también trae +0,75% ahí, "
-                "confirma que es el default, no algo medido de tu proyecto."
-            )
+            # ②c "Módulo" (mismatch de fabricación / calidad de módulo) --
+            # 7-sep-2026: deja de ser SIEMPRE informativa. Es real y aplicada
+            # si el usuario configuró un % en 🔀 Mismatch (sección 3); si no,
+            # sigue siendo solo la referencia de PVsyst, sin aplicar nada.
+            if res.get("pct_mismatch_fab_aplicado") is not None:
+                st.caption(
+                    f"ℹ️ Fila ②c \"Mismatch fabricación\" **sí se aplica** al cálculo -- "
+                    f"{res['pct_mismatch_fab_aplicado']}% configurado en 🔀 Mismatch "
+                    "(sección 3). PVsyst mostró +0,75% (ganancia) en 2 papers "
+                    "independientes como valor por defecto del software sin datos "
+                    "reales de binning -- compáralo contra tu propio reporte."
+                )
+            else:
+                st.caption(
+                    "ℹ️ Fila ②c \"Módulo\" es **solo informativa** — muestra +0,75% porque eso "
+                    "fue lo que PVsyst reportó, idéntico, en 2 papers reales independientes "
+                    "(probable valor por defecto del software sin datos de binning propios), "
+                    "pero **esta app no lo aplica** al cálculo (Δ kWh = 0 a propósito). Compárala "
+                    "contra tu propio reporte de PVsyst — si el tuyo también trae +0,75% ahí, "
+                    "confirma que es el default, no algo medido de tu proyecto. Configura un "
+                    "% real en 🔀 Mismatch (sección 3) para que se aplique de verdad."
+                )
+            # "Ohmic wiring loss" (PVsyst) -- 7-sep-2026: deja de ser una
+            # categoría no modelada en absoluto. Se aplica de verdad (filas
+            # ②d/④c) si hay un % manual en 🔀 Mismatch o un cálculo real
+            # configurado en ⚡ Diagrama Unifilar (Página 20).
+            if res.get("perdida_ohmica_dc_modo") or res.get("perdida_ohmica_ac_modo"):
+                st.caption(
+                    "ℹ️ Filas ②d/④c \"Pérdida óhmica\" (antes *\"Ohmic wiring loss\"* de "
+                    "PVsyst, categoría que esta app NO modelaba antes del 7-sep-2026) ya "
+                    "se aplican de verdad -- ver la fuente (manual o calculada) en la "
+                    "nota de cada fila."
+                )
+            else:
+                st.caption(
+                    "ℹ️ Categoría del Loss Diagram de PVsyst *\"Ohmic wiring loss\"* "
+                    "todavía sin activar en este proyecto (a propósito, sin inventar un "
+                    "número): configura un % en 🔀 Mismatch (sección 3), o longitud + "
+                    "calibre reales en ⚡ Diagrama Unifilar (Página 20) para un cálculo "
+                    "real hora a hora."
+                )
             if _motor_ok:
                 st.caption(
                     "ℹ️ Filas ①a/①b (IAM, soiling) disponibles porque 🔆 Motor Óptico "
-                    "corrió en esta sesión. Categoría del Loss Diagram de PVsyst que "
-                    "esta app **no modela en absoluto** hoy (a propósito, sin inventar un "
-                    "número): *\"Ohmic wiring loss\"* — si comparas contra un reporte real "
-                    "de PVsyst, esa línea no tendrá equivalente de este lado."
+                    "corrió en esta sesión."
                 )
             else:
                 st.caption(

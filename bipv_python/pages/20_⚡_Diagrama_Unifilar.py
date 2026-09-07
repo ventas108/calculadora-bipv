@@ -14,6 +14,8 @@ from calculos.diagrama_unifilar import (
     construir_config_unifilar,
     generar_diagrama_unifilar,
     exportar_unifilar_bytes,
+    calcular_perdida_ohmica,
+    CALIBRES_COMERCIALES_MM2,
 )
 from calculos.dimensionamiento import diseno_electrico_confirmado
 from calculos.compatibilidad_bateria import check_compatibilidad
@@ -298,6 +300,103 @@ if incluir_multisup:
                 continue
             if _n_s > 0:
                 superficies_val.append({"nombre": _nombre_s.strip(), "n_paneles": _n_s})
+
+st.subheader("🔌 Pérdida óhmica de cableado (opcional, real y auditable — 7-sep-2026)")
+st.caption(
+    "Longitud + calibre reales del proyecto -- si los completas, 📊 Producción "
+    "calcula la pérdida óhmica DC/AC de verdad (hora a hora, con la corriente "
+    "real), en vez del % manual de 🔀 Mismatch. Déjalo en 0 para no activar "
+    "este cálculo (comportamiento histórico, sin cambios)."
+)
+tramos_dc_val: list[dict] = []
+if superficies_val:
+    st.caption("Un tramo DC por superficie activa (detectadas arriba):")
+    for _i_tr, sup in enumerate(superficies_val):
+        col_t1, col_t2, col_t3 = st.columns([2, 1, 1])
+        with col_t1:
+            st.caption(f"**{sup.get('nombre') or 'Superficie'}** — {sup.get('n_paneles')} módulos")
+        with col_t2:
+            _long_tr = st.number_input(
+                "Longitud (m)", min_value=0.0, step=1.0, value=0.0,
+                key=f"unif_ohm_long_{_i_tr}_{sup.get('nombre')}",
+                label_visibility="collapsed",
+            )
+        with col_t3:
+            _calibre_tr = st.selectbox(
+                "Calibre (mm²)", CALIBRES_COMERCIALES_MM2, index=3,
+                key=f"unif_ohm_calibre_{_i_tr}_{sup.get('nombre')}",
+                label_visibility="collapsed",
+            )
+        if _long_tr:
+            tramos_dc_val.append({
+                "nombre": sup.get("nombre"), "n_paneles": sup.get("n_paneles"),
+                "longitud_m": _long_tr, "calibre_mm2": float(_calibre_tr),
+            })
+else:
+    col_dc1, col_dc2 = st.columns(2)
+    with col_dc1:
+        _long_dc_unico = st.number_input(
+            "Longitud tramo DC — array → inversor (m)",
+            min_value=0.0, step=1.0, value=0.0,
+        )
+    with col_dc2:
+        _calibre_dc_unico = st.selectbox("Calibre DC (mm²)", CALIBRES_COMERCIALES_MM2, index=3)
+    if _long_dc_unico and n_paneles:
+        tramos_dc_val.append({
+            "nombre": "Tramo único", "n_paneles": int(n_paneles),
+            "longitud_m": _long_dc_unico, "calibre_mm2": float(_calibre_dc_unico),
+        })
+
+col_ac1, col_ac2 = st.columns(2)
+with col_ac1:
+    longitud_ac_val = st.number_input(
+        "Longitud tramo AC — inversor → punto de conexión (m)",
+        min_value=0.0, step=1.0, value=0.0,
+    )
+with col_ac2:
+    calibre_ac_val = st.selectbox("Calibre AC (mm²)", CALIBRES_COMERCIALES_MM2, index=5)
+
+if tramos_dc_val or longitud_ac_val:
+    perdida_ohmica_result = calcular_perdida_ohmica(
+        panel=panel_dict, inversor=inversor_dict,
+        N_strings_tracker=int(_diseno_unif.get("N_strings_tracker") or 1),
+        n_inversores=int(n_inversores),
+        tension_red_V=float(tension_red_V),
+        tramos_dc=tramos_dc_val or None,
+        longitud_ac_m=longitud_ac_val or None,
+        calibre_ac_mm2=float(calibre_ac_val) if longitud_ac_val else None,
+        T_diseno_C=45.0,
+    )
+    # Persistido para que 📊 Producción lo reutilice -- con verificación de
+    # vigencia (mismo panel/inversor/N en serie) antes de aplicarlo, mismo
+    # patrón que pvwatts_cross_check (6-sep-2026).
+    st.session_state["perdida_ohmica_unifilar"] = {
+        "resistencia_dc_ohm": perdida_ohmica_result.get("resistencia_dc_efectiva_ohm"),
+        "resistencia_ac_ohm": perdida_ohmica_result.get("resistencia_ac_ohm"),
+        "tension_red_V": float(tension_red_V),
+        "panel_nombre": panel_nombre,
+        "inversor_nombre": inversor_nombre,
+        "n_serie": int(n_serie),
+        "tramos": perdida_ohmica_result.get("tramos"),
+    }
+    _resumen_ohm = []
+    if perdida_ohmica_result.get("resistencia_dc_efectiva_ohm") is not None:
+        _resumen_ohm.append(f"DC: R = {perdida_ohmica_result['resistencia_dc_efectiva_ohm']:.4f} Ω")
+    if perdida_ohmica_result.get("resistencia_ac_ohm") is not None:
+        _resumen_ohm.append(f"AC: R = {perdida_ohmica_result['resistencia_ac_ohm']:.4f} Ω")
+    if _resumen_ohm:
+        st.success(
+            "✅ " + " · ".join(_resumen_ohm) +
+            " — 📊 Producción usará este cálculo real (hora a hora) en vez del "
+            "% manual de 🔀 Mismatch, si panel/inversor/N en serie coinciden con "
+            "este proyecto al simular."
+        )
+    else:
+        st.info("ℹ️ Longitud registrada, pero falta el calibre para calcular la resistencia.")
+elif "perdida_ohmica_unifilar" in st.session_state:
+    # El usuario vació los campos -- no dejar un cálculo de otra corrida
+    # aplicándose por accidente en Producción.
+    del st.session_state["perdida_ohmica_unifilar"]
 
 st.subheader("🧾 Detalle RETIE (opcional)")
 with st.expander(

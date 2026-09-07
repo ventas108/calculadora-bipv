@@ -20,6 +20,7 @@ from calculos.modelo_iv import (
     tiene_sdm_completo,
     preparar_panel_iv,
     calcular_pmax_vectorizado,
+    calcular_iv_vectorizado,
 )
 from calculos.modelo_jrc_huld import clasificar_tecnologia_jrc
 from calculos.temperatura import temperatura_celda_noct
@@ -93,6 +94,25 @@ def _pmp_iv_vectorizado(
     return pmp
 
 
+def _iv_completo_vectorizado(G: np.ndarray, T_cel: np.ndarray, panel: dict) -> dict:
+    """
+    Igual que _pmp_iv_vectorizado(), pero también expone i_mp (A) por módulo
+    -- usa calcular_iv_vectorizado() (modelo_iv.py, 7-sep-2026) en vez de
+    calcular_pmax_vectorizado(), así que resuelve el single-diode UNA sola
+    vez para obtener p_mp E i_mp juntos (no llama dos veces al solver).
+    Solo se usa cuando hace falta la corriente real (pérdida óhmica DC en
+    modo calculado) -- el resto de llamadas sigue usando el camino barato
+    _pmp_iv_vectorizado(), que no necesita i_mp.
+    """
+    G     = np.asarray(G, dtype=float)
+    T_cel = np.asarray(T_cel, dtype=float)
+    iv = calcular_iv_vectorizado(G, T_cel, panel)
+    mask = G < 5.0
+    p_mp = np.maximum(np.where(mask, 0.0, iv["p_mp"]), 0.0)
+    i_mp = np.maximum(np.where(mask, 0.0, iv["i_mp"]), 0.0)
+    return {"p_mp": p_mp, "i_mp": i_mp}
+
+
 def simular_produccion_iv(
     tmy: pd.DataFrame,
     poa_base: pd.DataFrame,
@@ -105,6 +125,13 @@ def simular_produccion_iv(
     P_ac_nom_W: float | None = None,
     poa_bruta_kWh_m2: float | None = None,
     factor_espectral: pd.Series | np.ndarray | None = None,
+    pct_mismatch_fab: float | None = None,
+    resistencia_dc_ohm: float | None = None,
+    pct_cableado_dc: float | None = None,
+    resistencia_ac_ohm: float | None = None,
+    pct_cableado_ac: float | None = None,
+    N_serie: int | None = None,
+    tension_red_V: float | None = None,
 ) -> dict:
     """
     Simulación de producción anual hora a hora usando la curva IV real (Motor IV).
@@ -142,6 +169,18 @@ def simular_produccion_iv(
                           módulo usa el SDM completo para CdTe (no JRC/Huld como
                           produccion.py), así que necesita la MISMA corrección para
                           no divergir del motor base en paneles CdTe.
+    pct_mismatch_fab, resistencia_dc_ohm, pct_cableado_dc, resistencia_ac_ohm,
+    pct_cableado_ac, N_serie, tension_red_V : mismo significado y mismo
+                          criterio (retrocompatible, None = sin pérdida) que en
+                          calculos.produccion.simular_produccion_anual() -- ver
+                          el docstring completo ahí (7-sep-2026). Única
+                          diferencia real entre motores: este módulo SÍ resuelve
+                          la curva I-V completa, así que la corriente I(t) del
+                          modo calculado DC es la i_mp REAL que devuelve
+                          pvlib.singlediode/bishop88_mpp (calculos.modelo_iv.
+                          calcular_iv_vectorizado()), no una aproximación vía
+                          Vmp nominal como en produccion.py (que usa JRC/Huld,
+                          un modelo power-only sin curva I-V) -- más preciso.
 
     Retorna dict con las mismas claves que simular_produccion_anual (incluye
     perdida_clipping_kWh, horas_con_clipping, E_ac_sin_recorte_kWh, Y_r_es_bruta_real,
@@ -199,12 +238,55 @@ def simular_produccion_iv(
             )
 
     # ── Pmp por módulo desde la curva IV real (vectorizado) ───────────────────
-    pmp_mod = _pmp_iv_vectorizado(G_para_potencia, T_cel, panel)
+    # Solo se pide también i_mp (más caro -- ver _iv_completo_vectorizado())
+    # cuando el modo calculado de pérdida óhmica DC lo necesita.
+    i_mp_mod = None
+    if resistencia_dc_ohm is not None and resistencia_dc_ohm > 0 and N_serie:
+        _iv_pot = _iv_completo_vectorizado(G_para_potencia, T_cel, panel)
+        pmp_mod, i_mp_mod = _iv_pot["p_mp"], _iv_pot["i_mp"]
+    else:
+        pmp_mod = _pmp_iv_vectorizado(G_para_potencia, T_cel, panel)
 
     # ── Pérdida por temperatura (referencia: mismo G_eff a T=25°C) ────────────
     T_ref_arr  = np.full_like(T_cel, 25.0)
     pmp_stc_g  = _pmp_iv_vectorizado(G_para_potencia, T_ref_arr, panel)
     perdida_temp_por_modulo = np.maximum(pmp_stc_g - pmp_mod, 0.0)
+
+    # ── Mismatch fabricación + pérdida óhmica DC (7-sep-2026) ─────────────────
+    # Mismo criterio y mismo orden que calculos.produccion.simular_produccion_anual()
+    # -- ver ese docstring/comentarios para el detalle completo. pmp_stc_g NO
+    # se toca (sigue siendo la referencia T=25°C pura para ②a/②b).
+    E_dc_antes_binning_ohmico_kWh = float(pmp_mod.sum()) * N_paneles / 1000.0
+
+    pct_mismatch_fab_aplicado = None
+    if pct_mismatch_fab:
+        factor_fab = 1.0 - pct_mismatch_fab / 100.0
+        pmp_mod = pmp_mod * factor_fab
+        if i_mp_mod is not None:
+            i_mp_mod = i_mp_mod * factor_fab  # misma reducción proporcional de corriente
+        pct_mismatch_fab_aplicado = pct_mismatch_fab
+    E_dc_despues_mismatch_kWh = float(pmp_mod.sum()) * N_paneles / 1000.0
+
+    perdida_ohmica_dc_modo = None
+    perdida_ohmica_dc_por_hora_W = np.zeros_like(pmp_mod)
+    if i_mp_mod is not None:
+        # Corriente REAL resuelta por el modelo (i_mp por módulo = i_mp por
+        # string, ya que los módulos en serie comparten corriente) escalada
+        # al número total de strings en paralelo del proyecto.
+        N_strings_total = N_paneles / N_serie
+        I_total_A = i_mp_mod * N_strings_total
+        perdida_ohmica_dc_por_hora_W = (I_total_A ** 2) * resistencia_dc_ohm
+        pmp_mod = np.maximum(
+            pmp_mod - perdida_ohmica_dc_por_hora_W / N_paneles, 0.0
+        )
+        perdida_ohmica_dc_modo = "calculado"
+    elif pct_cableado_dc:
+        pmp_mod = pmp_mod * (1.0 - pct_cableado_dc / 100.0)
+        perdida_ohmica_dc_modo = "manual"
+    E_dc_despues_ohmico_dc_kWh = float(pmp_mod.sum()) * N_paneles / 1000.0
+
+    perdida_mismatch_fab_kWh = round(E_dc_antes_binning_ohmico_kWh - E_dc_despues_mismatch_kWh, 0)
+    perdida_ohmica_dc_kWh    = round(E_dc_despues_mismatch_kWh - E_dc_despues_ohmico_dc_kWh, 0)
 
     # ── Escalar al sistema ─────────────────────────────────────────────────────
     P_dc_W = pmp_mod * N_paneles
@@ -215,13 +297,29 @@ def simular_produccion_iv(
         P_ac_W = P_ac_sin_recorte_W
     clipping_W = P_ac_sin_recorte_W - P_ac_W
 
+    # ── Pérdida óhmica AC (7-sep-2026) ─────────────────────────────────────────
+    E_ac_antes_ohmico_ac_kWh = float(P_ac_W.sum()) / 1000.0
+    perdida_ohmica_ac_modo = None
+    perdida_ohmica_ac_por_hora_W = np.zeros_like(P_ac_W)
+    if resistencia_ac_ohm is not None and resistencia_ac_ohm > 0 and tension_red_V:
+        I_ac_A = P_ac_W / (np.sqrt(3.0) * tension_red_V)
+        perdida_ohmica_ac_por_hora_W = (I_ac_A ** 2) * resistencia_ac_ohm
+        P_ac_W = np.maximum(P_ac_W - perdida_ohmica_ac_por_hora_W, 0.0)
+        perdida_ohmica_ac_modo = "calculado"
+    elif pct_cableado_ac:
+        _perdida_pct_ac_W = P_ac_W * (pct_cableado_ac / 100.0)
+        perdida_ohmica_ac_por_hora_W = _perdida_pct_ac_W
+        P_ac_W = P_ac_W - _perdida_pct_ac_W
+        perdida_ohmica_ac_modo = "manual"
+    perdida_ohmica_ac_kWh = round(E_ac_antes_ohmico_ac_kWh - float(P_ac_W.sum()) / 1000.0, 0)
+
     # ── Energías anuales (Wh → kWh) ───────────────────────────────────────────
     E_dc_anual       = float(P_dc_W.sum()) / 1000.0
     E_ac_anual       = float(P_ac_W.sum()) / 1000.0
     E_ac_sin_recorte_anual = float(P_ac_sin_recorte_W.sum()) / 1000.0
     perdida_temp_kWh = float(perdida_temp_por_modulo.sum()) * N_paneles / 1000.0
     perdida_inv_kWh      = E_dc_anual - E_ac_sin_recorte_anual
-    perdida_clipping_kWh = E_ac_sin_recorte_anual - E_ac_anual
+    perdida_clipping_kWh = E_ac_sin_recorte_anual - E_ac_antes_ohmico_ac_kWh
     horas_con_clipping   = int(np.sum(clipping_W > 1e-6))
 
     # ── Métricas IEC 61724 (idénticas al modelo simple) ───────────────────────
@@ -249,6 +347,8 @@ def simular_produccion_iv(
         "P_ac_kW":      P_ac_W / 1000.0,
         "perdida_T_kW": perdida_temp_por_modulo * N_paneles / 1000.0,
         "clipping_kW":  clipping_W / 1000.0,
+        "perdida_ohmica_dc_W": perdida_ohmica_dc_por_hora_W,
+        "perdida_ohmica_ac_W": perdida_ohmica_ac_por_hora_W,
     }, index=idx)
 
     # ── Contrato anual oficial: suma directa de las 8760 horas ───────────────
@@ -291,6 +391,14 @@ def simular_produccion_iv(
         "factor_espectral_aplicado":  factor_espectral_aplicado,
         "factor_espectral_promedio":  factor_espectral_promedio,
         "E_ac_sin_recorte_kWh":    round(E_ac_sin_recorte_anual, 0),
+        "E_dc_antes_binning_ohmico_kWh": round(E_dc_antes_binning_ohmico_kWh, 0),
+        "pct_mismatch_fab_aplicado":     pct_mismatch_fab_aplicado,
+        "perdida_mismatch_fab_kWh":      perdida_mismatch_fab_kWh,
+        "perdida_ohmica_dc_kWh":         perdida_ohmica_dc_kWh,
+        "perdida_ohmica_dc_modo":        perdida_ohmica_dc_modo,
+        "E_ac_antes_ohmico_ac_kWh":      round(E_ac_antes_ohmico_ac_kWh, 0),
+        "perdida_ohmica_ac_kWh":         perdida_ohmica_ac_kWh,
+        "perdida_ohmica_ac_modo":        perdida_ohmica_ac_modo,
         # Mismo campo que calculos.produccion.simular_produccion_anual() --
         # ver ahí el comentario completo. E_dc con G_eff real, T_cel=25°C fija.
         "E_dc_a_T25_kWh":          round(float(pmp_stc_g.sum()) * N_paneles / 1000.0, 0),

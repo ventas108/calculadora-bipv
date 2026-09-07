@@ -49,9 +49,8 @@ matriculado exigida por RETIE.
 from __future__ import annotations
 
 from html import escape
-from math import sqrt
 
-from calculos.dimensionamiento import calcular_voc_string, calcular_vmp_string
+from calculos.dimensionamiento import calcular_voc_string, calcular_vmp_string, corriente_diseno_ac
 
 
 CALIBRES_COMERCIALES_A = (
@@ -179,15 +178,16 @@ def calcular_retie(cfg: dict) -> dict:
     # se derivan tanto la cifra a mostrar (redondeada a 1 decimal) como la
     # corriente de diseño y el breaker -- calcular la de diseño a partir de
     # la ya redondeada (doble redondeo) daba un resultado distinto al que
-    # muestra Página 20 (calculos/diagrama_unifilar.py) para el MISMO
+    # mostraba Página 20 (calculos/diagrama_unifilar.py) para el MISMO
     # proyecto (360,9 A aquí vs 360,8 A allá) -- encontrado en auditoría
-    # (27-ago-2026) comparando ambos documentos del proyecto Urabá.
+    # (27-ago-2026) comparando ambos documentos del proyecto Urabá. Corregido
+    # de raíz (7-sep-2026): ambos módulos ahora comparten
+    # calculos.dimensionamiento.corriente_diseno_ac(), una sola fórmula.
     tension = inv["tension_salida_v"]
-    i_inversor_crudo = (
-        inv["potencia_ac_kw_unidad"] * 1000.0 / (sqrt(3) * tension)
-        if inv["potencia_ac_kw_unidad"] and tension else None
+    i_inversor_crudo = corriente_diseno_ac(
+        inv["potencia_ac_kw_unidad"], 1, tension, factor_continuo=1.0
     )
-    i_total_crudo = pac * 1000.0 / (sqrt(3) * tension) if pac and tension else None
+    i_total_crudo = corriente_diseno_ac(pac, 1, tension, factor_continuo=1.0)
 
     i_inversor = round(i_inversor_crudo, 1) if i_inversor_crudo is not None else None
     i_total = round(i_total_crudo, 1) if i_total_crudo is not None else None

@@ -47,6 +47,11 @@ KEYS_DERIVADOS_POA = (
     # Multi-superficie (Página 9)
     "E_ac_anual_kWh_multisup", "poa_df_multisup",
     "area_total_multisup", "multisup_desglose", "multisup_activo",
+    # Pérdida óhmica de cableado calculada (Página 20, 7-sep-2026) -- la
+    # vigencia (mismo panel/inversor/N_serie) ya se verifica en Producción
+    # antes de aplicarla, pero también debe caducar aquí para no dejar un
+    # cálculo de otro escenario vivo indefinidamente en session_state.
+    "perdida_ohmica_unifilar",
     # Financiero cacheado (Página 7)
     "financiero_ok", "comp_financiero", "comp_financiero_p90",
     "metricas_financiero", "metricas_financiero_p90",

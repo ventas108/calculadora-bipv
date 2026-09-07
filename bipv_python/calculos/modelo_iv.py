@@ -328,25 +328,30 @@ def _parametros_recombinacion(panel: dict) -> tuple[float, float]:
     return d2mutau, V_bi * N_s
 
 
-def calcular_pmax_vectorizado(G, T_cel_C, panel: dict) -> np.ndarray:
+def _resolver_mpp_vectorizado(G, T_cel_C, panel: dict) -> dict:
     """
-    Pmax (W) vectorizado -- centraliza trasladar_parametros_gt() + la
-    resolución del punto de máxima potencia. Usa `pvlib.singlediode.
-    bishop88_mpp` (que soporta el término de recombinación PVsyst/Merten
-    1998) cuando el panel trae `d2mutau` calibrado; si no, usa el mismo
-    `pvlib.pvsystem.singlediode` de siempre (comportamiento idéntico al
-    anterior a este cambio). Ver DIAGNOSTICO_RECOMBINACION_CDTE.md.
+    Resuelve el punto de máxima potencia vectorizado y devuelve los 3
+    valores que pvlib ya calcula internamente (p_mp, i_mp, v_mp) -- helper
+    interno compartido por calcular_pmax_vectorizado() (que solo expone
+    p_mp, por compatibilidad con sus ~10 llamadores existentes) y
+    calcular_iv_vectorizado() (que expone los 3, para el cálculo de
+    pérdida óhmica hora a hora -- ver calculos/diagrama_unifilar.py::
+    calcular_perdida_ohmica(), 7-sep-2026).
     """
     I_L, I_o, R_s, R_sh, nNsVth = trasladar_parametros_gt(G, T_cel_C, panel)
     d2mutau, NsVbi = _parametros_recombinacion(panel)
 
     if d2mutau > 0:
-        _, _, p_mp = bishop88_mpp(
+        i_mp, v_mp, p_mp = bishop88_mpp(
             photocurrent=I_L, saturation_current=I_o,
             resistance_series=R_s, resistance_shunt=R_sh, nNsVth=nNsVth,
             d2mutau=d2mutau, NsVbi=NsVbi,
         )
-        return np.array(p_mp, dtype=float)  # copia -- ver nota de solo-lectura abajo
+        return {
+            "p_mp": np.array(p_mp, dtype=float),
+            "i_mp": np.array(i_mp, dtype=float),
+            "v_mp": np.array(v_mp, dtype=float),
+        }
 
     resultado = pvlib.pvsystem.singlediode(
         photocurrent       = I_L,
@@ -357,10 +362,42 @@ def calcular_pmax_vectorizado(G, T_cel_C, panel: dict) -> np.ndarray:
         method             = 'lambertw',
     )
     # np.array() (copia), no np.asarray(): el array que devuelve pvlib puede
-    # venir de solo lectura, y los 3 llamadores mutan el resultado in-place
-    # (pmax[G < 5.0] = 0.0) -- con np.asarray() eso lanzaba
-    # "ValueError: assignment destination is read-only".
-    return np.array(resultado["p_mp"], dtype=float)
+    # venir de solo lectura, y los llamadores de calcular_pmax_vectorizado()
+    # mutan el resultado in-place (pmax[G < 5.0] = 0.0) -- con np.asarray()
+    # eso lanzaba "ValueError: assignment destination is read-only".
+    return {
+        "p_mp": np.array(resultado["p_mp"], dtype=float),
+        "i_mp": np.array(resultado["i_mp"], dtype=float),
+        "v_mp": np.array(resultado["v_mp"], dtype=float),
+    }
+
+
+def calcular_pmax_vectorizado(G, T_cel_C, panel: dict) -> np.ndarray:
+    """
+    Pmax (W) vectorizado -- centraliza trasladar_parametros_gt() + la
+    resolución del punto de máxima potencia. Usa `pvlib.singlediode.
+    bishop88_mpp` (que soporta el término de recombinación PVsyst/Merten
+    1998) cuando el panel trae `d2mutau` calibrado; si no, usa el mismo
+    `pvlib.pvsystem.singlediode` de siempre (comportamiento idéntico al
+    anterior a este cambio). Ver DIAGNOSTICO_RECOMBINACION_CDTE.md.
+    """
+    return _resolver_mpp_vectorizado(G, T_cel_C, panel)["p_mp"]
+
+
+def calcular_iv_vectorizado(G, T_cel_C, panel: dict) -> dict:
+    """
+    Igual que calcular_pmax_vectorizado(), pero expone también i_mp (A) y
+    v_mp (V) por módulo -- pvlib ya los resuelve internamente al buscar el
+    punto de máxima potencia, calcular_pmax_vectorizado() simplemente los
+    descartaba. Se agregó (7-sep-2026) para que el motor de producción
+    pueda calcular la pérdida óhmica de cableado con la corriente REAL
+    resuelta por el modelo hora a hora, en vez de aproximarla desde
+    Pmax/Vmp_nominal -- ver calculos/produccion_iv.py.
+
+    Devuelve {"p_mp": ndarray W, "i_mp": ndarray A, "v_mp": ndarray V},
+    mismas unidades y misma forma (una fila por hora) que G/T_cel_C.
+    """
+    return _resolver_mpp_vectorizado(G, T_cel_C, panel)
 
 
 def resolver_curva_iv(G, T_cel_C, panel: dict, n_puntos=100):

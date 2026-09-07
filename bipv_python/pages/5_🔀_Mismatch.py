@@ -989,7 +989,7 @@ else:
 st.markdown("---")
 st.subheader("⚙️ 3. Otras pérdidas del sistema")
 
-col_s1, col_s2, col_s3 = st.columns(3)
+col_s1, col_s2, col_s3, col_s4 = st.columns(4)
 
 with col_s1:
     pct_mismatch_fab = st.slider(
@@ -1021,10 +1021,41 @@ with col_s3:
     )
     st.caption("Minimizar con sección de cable adecuada")
 
-# Guardar sliders en session_state
+with col_s4:
+    # Nuevo (7-sep-2026): el lado AC no tenía NINGUNA representación antes --
+    # default 0% a propósito (nunca inventar un valor por defecto distinto
+    # de cero para algo que no existía). Ver Página 20 (Diagrama Unifilar)
+    # para calcular esto de verdad a partir de longitud + calibre reales.
+    pct_cableado_ac = st.slider(
+        "🔌 Cableado AC (%)",
+        min_value=0.0, max_value=4.0,
+        value=st.session_state.get("pct_cableado_ac", 0.0),
+        step=0.5,
+        help="Pérdidas óhmicas en el tramo inversor→punto de conexión. Antes de "
+             "7-sep-2026 esta app no lo modelaba en absoluto.",
+    )
+    st.caption("0% = sin modelar (comportamiento histórico)")
+
+st.caption(
+    "🧮 Si configuraste longitud + calibre reales en 20 ⚡ Diagrama Unifilar, "
+    "Producción usa ese cálculo real (hora a hora) en vez de estos sliders "
+    "manuales para el cableado -- estos quedan como respaldo cuando no hay "
+    "datos del proyecto."
+)
+
+# Guardar sliders en session_state -- pct_mismatch_fab/pct_cableado se
+# mantienen con su nombre histórico porque el pipeline del optimizador
+# (Comparadores de Página 4c/4d, Análisis IA) los sigue leyendo tal cual
+# via simulation.schemas.BIPVConfiguration -- fuera de alcance de este
+# cambio. pct_cableado_dc/pct_cableado_ac (mismo valor donde aplica) son las
+# claves NUEVAS que lee Producción para el motor real -- ver más abajo por
+# qué cascada_perdidas() (que arma factor_global_mismatch) deja de recibir
+# estos 3 factores.
 st.session_state["pct_mismatch_fab"] = pct_mismatch_fab
 st.session_state["pct_soiling"]      = pct_soiling
 st.session_state["pct_cableado"]     = pct_cableado
+st.session_state["pct_cableado_dc"]  = pct_cableado
+st.session_state["pct_cableado_ac"]  = pct_cableado_ac
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 4 — CASCADA DE PÉRDIDAS
@@ -1051,13 +1082,24 @@ btn_cascada = st.button(
 )
 
 if btn_cascada or st.session_state.get("cascada_ok"):
+    # pct_mismatch_fab y pct_cableado se pasan en 0 aquí a propósito
+    # (7-sep-2026): antes se combinaban con sombreado + mismatch de
+    # orientación + soiling en un único factor_global_mismatch, aplicado
+    # como reductor de irradiancia ANTES del modelo eléctrico en Producción
+    # -- físicamente impreciso para pérdidas eléctricas post-conversión, y
+    # quedaban escondidos dentro de "② Efecto SDM" del Loss Diagram sin fila
+    # propia. Ahora Producción los aplica DIRECTO como parámetros explícitos
+    # del motor (ver calculos.produccion.simular_produccion_anual()) --
+    # dejarlos también aquí los contaría DOS VECES. factor_global_mismatch
+    # sigue cubriendo sombreado de horizonte + mismatch de orientación +
+    # soiling exactamente igual que antes (fuera de alcance de este cambio).
     cascada = cascada_perdidas(
         poa_bruta_kWh_m2       = poa_anual,
         factor_sombra          = factor_sombra_anual,
         factor_mismatch_orient = factor_mismatch_or_pct,
-        pct_mismatch_fab       = pct_mismatch_fab,
+        pct_mismatch_fab       = 0.0,
         pct_soiling            = pct_soiling,
-        pct_cableado           = pct_cableado,
+        pct_cableado           = 0.0,
     )
     fg = factor_global_perdidas(cascada)
     st.session_state["cascada_mismatch"] = cascada

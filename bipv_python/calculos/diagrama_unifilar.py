@@ -73,6 +73,8 @@ import math
 import schemdraw
 import schemdraw.elements as elm
 
+from calculos.dimensionamiento import corriente_diseno_dc, corriente_diseno_ac
+
 schemdraw.use("matplotlib")  # necesario para exportar PNG/PDF (SVG no requiere esto)
 
 
@@ -165,11 +167,13 @@ def construir_config_unifilar(
 
     # Corriente AC estimada (trifásica, FS=1.25 NEC) SOLO si no la dio el usuario.
     # Es una referencia de dimensionamiento preliminar del breaker -- no
-    # reemplaza el cálculo del ingeniero responsable del proyecto.
-    if proteccion_ac_A is None and p_ac_total_kW and tension_red_V:
-        proteccion_ac_A = round(
-            1.25 * p_ac_total_kW * 1000 / (math.sqrt(3) * tension_red_V), 1
-        )
+    # reemplaza el cálculo del ingeniero responsable del proyecto. Delegada
+    # (7-sep-2026) a calculos.dimensionamiento.corriente_diseno_ac(), la misma
+    # fórmula que ya usaba calculos.ficha_validacion_retie.py con una
+    # divergencia de redondeo distinta -- ver el comentario de esa función.
+    if proteccion_ac_A is None and p_ac_unidad_kW and n_inversores and tension_red_V:
+        _i_ac = corriente_diseno_ac(p_ac_unidad_kW, n_inversores, tension_red_V, factor_continuo=1.25)
+        proteccion_ac_A = round(_i_ac, 1) if _i_ac is not None else None
 
     cap_unidad = capacidad_kWh_unidad or bateria.get("capacidad_kWh") or None
     cap_total_kWh = (
@@ -229,6 +233,131 @@ def construir_config_unifilar(
             "notas": list(notas_retie) if notas_retie else [],
             "pendientes": list(pendientes_retie) if pendientes_retie else [],
         },
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 1b. Pérdida óhmica — capa de cálculo eléctrico real, sin dibujo (7-sep-2026)
+# ══════════════════════════════════════════════════════════════════════════════
+RESISTIVIDAD_COBRE_OHM_MM2_M_20C = 0.0172  # Ω·mm²/m a 20°C, cobre recocido (IEC 60228)
+COEF_TEMP_COBRE_POR_C = 0.00393            # 1/°C, coeficiente de temperatura del cobre
+
+CALIBRES_COMERCIALES_MM2 = (1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240)
+
+
+def _resistividad_cobre(T_C: float) -> float:
+    return RESISTIVIDAD_COBRE_OHM_MM2_M_20C * (1 + COEF_TEMP_COBRE_POR_C * (T_C - 20.0))
+
+
+def calcular_perdida_ohmica(
+    *,
+    panel: dict,
+    inversor: dict,
+    N_strings_tracker: int = 1,
+    n_inversores: int = 1,
+    tension_red_V: float | None = None,
+    tramos_dc: list[dict] | None = None,
+    longitud_ac_m: float | None = None,
+    calibre_ac_mm2: float | None = None,
+    T_diseno_C: float = 45.0,
+) -> dict:
+    """
+    Calcula la resistencia (Ω) de cada tramo DC declarado (uno por superficie
+    activa) y del tramo AC, a partir de longitud + calibre real del proyecto.
+    Capa de cálculo eléctrico puro (sin Streamlit, sin dibujo) -- pensada
+    para alimentar el motor de producción (calculos/produccion.py,
+    calculos/produccion_iv.py), que aplica esta resistencia a la corriente
+    REAL hora a hora (P_pérdida(t) = I(t)² · R) en vez de un % fijo anual a
+    condiciones STC como hace PVsyst -- ver docstring de esos módulos.
+
+    tramos_dc: uno por superficie activa, ej. [{"nombre": "Fachada Sur",
+      "longitud_m": 25.0, "calibre_mm2": 6.0, "n_paneles": 40}, ...]. Con un
+      único tramo (o ningún dato multi-superficie) se comporta como un
+      proyecto de un solo tramo DC -- mismo criterio de degradación que
+      construir_config_unifilar() ya usa para 0/1 superficie.
+
+    Los tramos NO se combinan en una sola resistencia equivalente: cada uno
+    lleva solo la corriente de SU PROPIA superficie, no la del proyecto
+    completo -- por eso cada tramo devuelve su propia `resistencia_ohm` y
+    su `fraccion_paneles` (n_paneles del tramo / total de paneles con
+    tramo declarado). El motor reparte la corriente total hora a hora entre
+    tramos según esa fracción: I_tramo(t) = I_total(t) × fraccion_paneles --
+    una aproximación declarada (asume que todas las superficies reciben una
+    irradiancia proporcionalmente similar a la del conjunto), no una
+    simulación óptica independiente por superficie.
+
+    Nunca inventa un número: un tramo sin longitud+calibre queda con
+    resistencia_ohm=None (el llamador decide si avisa al usuario).
+
+    Fuente de la resistividad: IEC 60228, cobre recocido, 0,0172 Ω·mm²/m a
+    20°C, corregida por temperatura con el coeficiente estándar del cobre
+    (0,393%/°C). T_diseno_C es una temperatura de diseño FIJA (no la
+    T_celda horaria) -- mismo criterio que usa la práctica real de
+    ingeniería (RETIE/NEC evalúan caída de tensión a una condición de
+    diseño fija, no con clima horario); el motor de producción puede
+    sustituir esta T fija por T_celda(t) si quiere mayor precisión hora a
+    hora -- esta función solo entrega la resistencia a esa temperatura, no
+    decide cuál usar.
+    """
+    resistividad = _resistividad_cobre(T_diseno_C)
+
+    tramos_in = [t for t in (tramos_dc or []) if t.get("n_paneles")]
+    n_paneles_total_tramos = sum(int(t["n_paneles"]) for t in tramos_in) or None
+
+    tramos_out = []
+    for tramo in tramos_in:
+        L = tramo.get("longitud_m")
+        S = tramo.get("calibre_mm2")
+        r_ohm = (2.0 * float(L) * resistividad / float(S)) if L and S else None
+        fraccion = (
+            int(tramo["n_paneles"]) / n_paneles_total_tramos
+            if n_paneles_total_tramos else None
+        )
+        tramos_out.append({
+            "nombre": tramo.get("nombre") or "Tramo DC",
+            "n_paneles": int(tramo["n_paneles"]),
+            "longitud_m": L,
+            "calibre_mm2": S,
+            "resistencia_ohm": r_ohm,
+            "fraccion_paneles": fraccion,
+        })
+
+    # Resistencia DC EFECTIVA para pérdida total, Σ(fracción_i² · R_i): la
+    # potencia perdida en cada tramo es (I_total·fracción_i)²·R_i, así que
+    # la pérdida TOTAL de todos los tramos es exactamente
+    # I_total² · Σ(fracción_i²·R_i) -- una sola resistencia escalar que el
+    # motor de producción puede multiplicar por I_total(t)² hora a hora sin
+    # tener que iterar tramo por tramo dentro del cálculo vectorizado.
+    # (OJO: NO es la combinación en paralelo 1/Σ(1/R_i) -- esa fórmula solo
+    # es correcta si todos los tramos llevan la MISMA corriente total, y
+    # aquí cada tramo lleva solo su propia fracción.)
+    resistencia_dc_efectiva_ohm = None
+    if tramos_out and all(t["resistencia_ohm"] is not None for t in tramos_out):
+        resistencia_dc_efectiva_ohm = sum(
+            (t["fraccion_paneles"] ** 2) * t["resistencia_ohm"] for t in tramos_out
+        )
+
+    resistencia_ac_ohm = (
+        2.0 * float(longitud_ac_m) * resistividad / float(calibre_ac_mm2)
+        if longitud_ac_m and calibre_ac_mm2 else None
+    )
+
+    corriente_dc_diseno_A = corriente_diseno_dc(panel.get("Isc_stc"), N_strings_tracker)
+    p_ac_unidad_kW = (
+        float(inversor["P_ac_nom_W"]) / 1000.0 if inversor.get("P_ac_nom_W")
+        else float(inversor["P_ac_nom_kW"]) if inversor.get("P_ac_nom_kW") else None
+    )
+    corriente_ac_diseno_A = corriente_diseno_ac(p_ac_unidad_kW, n_inversores, tension_red_V)
+
+    return {
+        "tramos": tramos_out,
+        "resistencia_dc_efectiva_ohm": resistencia_dc_efectiva_ohm,
+        "resistencia_ac_ohm": resistencia_ac_ohm,
+        "corriente_dc_diseno_A": corriente_dc_diseno_A,
+        "corriente_ac_diseno_A": corriente_ac_diseno_A,
+        "resistividad_ohm_mm2_m": round(resistividad, 6),
+        "T_diseno_C": T_diseno_C,
+        "fuente": "IEC 60228 (cobre recocido, 0.0172 Ω·mm²/m a 20°C) + coef. temp. 0.393%/°C",
     }
 
 
