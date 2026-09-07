@@ -1325,6 +1325,31 @@ E_ac_P90   = E_ac_P50 × (1 − factor_P90/100)
 
 ────────────────────────────────────────────────────────────
 
+### Degradación no lineal — curva real de garantía del fabricante (7-sep-2026)
+
+Esta subsección documenta, de forma dedicada, las 3 fuentes de degradación anual que coexisten hoy en la app — para que el Asistente pueda orientar con precisión sobre CUÁL usar y por qué, sin que el usuario confunda una con otra.
+
+**Las 3 fuentes, nunca se fusionan entre sí**:
+
+1. **Tasa fija paramétrica** (slider en 💰 Financiero, "Degradación módulos... %/año") — un valor manual de referencia por tecnología (Si mono 0,45-0,60%/año, etc.). Es el comportamiento histórico de la app, sigue siendo el default si no se activa nada más.
+2. **Degradación MEDIDA en campo** (sección "📉 Degradación MEDIDA en campo (histórico real)" en 📊 Producción) — se calcula por regresión lineal sobre PR_corr_T real de 2+ años de operación de un sistema YA INSTALADO. Es un dato EMPÍRICO, POSTERIOR a la instalación. Si existe, aparece como toggle en Financiero ("Usar degradación del historial real") y sustituye la tasa del slider.
+3. **Curva de garantía del fabricante** (NUEVA, 7-sep-2026) — viene de la FICHA del panel, un dato de diseño ANTERIOR a la instalación. Modela la forma real de la garantía, casi nunca lineal: la inmensa mayoría de fichas Tier 1 publican una caída inicial única en el año 1 por LID (light-induced degradation, típico 1-3%) y luego una tasa lineal constante los años 2-25 (típico 0,35-0,55%/año) — NO el mismo decaimiento geométrico compuesto que asume la tasa fija. Un puñado de fabricantes (algunos CdTe, algunos premium) publican en cambio una tabla año-por-año completa, que se interpola en vez de asumir un modelo de 2 tramos.
+
+**Dónde vive el cálculo real**: `calculos/degradacion.py` (`factor_geometrico`, `factor_curva_fabricante`, `factor_tabla_fabricante`, `resolver_factor_degradacion`) — un solo módulo, consumido por el único punto real de cálculo en toda la app, `calculos/financiero.py::calcular_flujo_caja()`. El resto de referencias a "degradación" en el código (~25 archivos: optimizador, Reporte PDF, Ledger, tests) solo reenvían el mismo parámetro, nunca duplican la fórmula.
+
+⚠️ **Para no cometer errores de implementación**:
+- El selector de curva de fabricante en 💰 Financiero **solo aparece si el panel elegido en 📐 Dimensionamiento tiene esos datos en el catálogo** (`degradacion_anio1_pct` + `degradacion_lineal_pct_anio`, o `degradacion_tabla_anio_pct`). **A la fecha de esta nota, NINGÚN panel del catálogo (~3.139 modelos) tiene estos campos llenos** — las 3 columnas (`DegradacionAno1Pct`, `DegradacionLinealPctAnio`, `DegradacionTablaJSON`) se agregaron vacías al Excel. Si el usuario pregunta "¿por qué no veo la opción de curva real?", la respuesta correcta es "porque el panel elegido todavía no tiene ese dato cargado en el catálogo, no un error" — hay que cargarlo primero (a mano en el Excel, con la ficha real del fabricante en la mano, o subiendo el PDF de la ficha en 📋 Catálogo de Paneles, que ahora intenta extraerlo automáticamente vía `_extraer_garantia_potencia()` en `calculos/pdf_panel_extractor.py` — nunca inventa, si no encuentra el texto con confianza deja el campo en blanco para completar a mano).
+- `DegradacionTablaJSON` debe ser JSON válido con AÑOS COMO CLAVES DE TEXTO y porcentaje GARANTIZADO (no la pérdida) como valor, ej. `{"1": 98.0, "10": 91.0, "25": 84.8}` — un JSON mal formado no rompe la carga del catálogo (se captura y da `None`), pero tampoco activa el selector; revisar la sintaxis si no aparece.
+- Nunca se reemplaza silenciosamente la tasa fija por la curva real sin que el usuario lo active explícitamente con el toggle — el comportamiento por defecto de cualquier proyecto (nuevo o ya calculado) es idéntico al de antes de este cambio.
+
+⚠️ **Para no cometer errores de interpretación**:
+- La curva de garantía y la tasa fija **NO son comparables punto a punto en el año 1**: la tasa fija geométrica no degrada nada en el año 1 (`factor=1.0`), mientras que la curva real SÍ aplica la caída LID completa desde el año 1. Es normal y esperado que el año 1 de energía sea menor con la curva real activada — no es un error del cálculo.
+- El **año 25 tampoco coincide** entre ambos modelos aunque la tasa "parezca" similar: una tasa fija de 0,5%/año geométrica da ≈88,6% en el año 25 (0,995²⁴), mientras que una curva real típica (2% año 1 + 0,55%/año) da ≈84,8% — más conservadora. Esta diferencia es la razón de ser de la feature, no un bug.
+- La curva de garantía del fabricante y la degradación MEDIDA en campo responden preguntas DISTINTAS: "¿qué promete el fabricante?" vs. "¿qué está pasando realmente en mi sistema ya instalado?". Un proyecto en etapa de diseño/venta solo puede usar la primera (o la tasa fija); la segunda solo existe si ya hay 2+ años de datos operativos reales.
+- Fuera de alcance, a propósito: la curva de garantía se define siempre por AÑO CALENDARIO, igual que el estándar de la industria y que PVsyst — no depende de horas de operación reales ni de ciclos térmicos del sitio.
+
+────────────────────────────────────────────────────────────
+
 ## 11. Página 8 — Presupuesto Bancable
 
 Propósito: Construir el presupuesto completo del proyecto con estructura
@@ -3524,6 +3549,28 @@ El usuario pidió implementar un P50/P90 "auditable y bancarizable, 100% compati
 **Explícitamente fuera de alcance, declarado**: `σ_PR` no se tocó (ya era una decisión de ingeniería razonable). El pipeline paralelo del optimizador (`simulation/financial_simulator.py`/`FinancialConfiguration`, usado por Comparadores/Análisis IA) no tiene ningún concepto de P90 hoy — límite conocido, no se extendió aquí. El cálculo real no se auto-dispara en cada rerun (latencia de red ~10s) — es un botón explícito, cacheado.
 
 12 tests nuevos (`tests/test_incertidumbre_p90.py`): estadística verificada a mano con series sintéticas (incluyendo años bisiestos), exclusión correcta de años parciales, el gate de mínimo de años, el reintento de rango real de PVGIS, fallos de red sin patrón reconocible, caché (guarda/relee/corrupto/sin caché previo), y las 3 ramas de la regla de combinación. Documentado en la sección 10 (Página 7 — Financiero). Suite completa relanzada antes de desplegar.
+
+────────────────────────────────────────────────────────────
+
+## 69. Anexo — Actualizaciones del 7 de septiembre de 2026 (degradación no lineal: curva real de garantía del fabricante, vía Plan Mode)
+
+El usuario pidió verificar qué recursos/herramientas hay disponibles para implementar degradación no lineal (curva real de garantía del fabricante, como PVsyst) en vez del %/año plano actual, y entregar un plan — no construirlo directamente. Plan presentado y aprobado vía EnterPlanMode/ExitPlanMode antes de tocar código.
+
+**Investigación previa que definió el diseño**: `calculos/financiero.py::calcular_flujo_caja()` es el ÚNICO punto real de cálculo en toda la app que aplica degradación (`(1 - tasa/100)**(t-1)`, decaimiento geométrico) — los otros ~25 archivos que la mencionan solo reenvían el mismo parámetro, sin duplicar la fórmula. **pvlib 0.11.1 (la versión pineada) no tiene ningún submódulo de degradación** (confirmado enumerando los 24 submódulos reales) — no hay librería que resuelva esto, se implementó con datos + una función propia, sin dependencia nueva. Ni el catálogo de paneles ni el extractor de PDF tenían ningún dato de garantía/degradación antes de este cambio.
+
+**Construido**: `calculos/degradacion.py` — `factor_geometrico()` (el modelo histórico, extraído tal cual para blindar retrocompatibilidad exacta), `factor_curva_fabricante()` (modelo real de 2 tramos: caída LID año 1 + tasa lineal años 2-25, el caso más común en fichas Tier 1), `factor_tabla_fabricante()` (interpolación lineal para los fabricantes con tabla año-por-año completa), y `resolver_factor_degradacion()` (despachador único que nunca falla en silencio — si el modo pedido no tiene datos suficientes, cae a geométrica con `fallback=True` en vez de romper o inventar).
+
+**Integración sin romper nada existente**: `calcular_flujo_caja()` y `comparativo_ley_1715()` reciben un nuevo parámetro opcional `config_degradacion=None` — con `None` (comportamiento de TODOS los llamadores existentes) reproducen EXACTAMENTE el resultado histórico. Verificado con un test dedicado que compara, campo por campo, el flujo de caja sin el parámetro nuevo contra el flujo con `config_degradacion=None` explícito y contra `{"modo": "geometrica", "tasa_pct": ...}` explícito — los 3 dan resultados idénticos.
+
+**Catálogo de paneles ampliado**: 3 columnas opcionales nuevas en el Excel real (`paneles_catalogo.xlsx`, 3.139 filas de datos preservadas sin pérdida) — `DegradacionAno1Pct`, `DegradacionLinealPctAnio`, `DegradacionTablaJSON`. A la fecha de este anexo, las 3 columnas están vacías para todos los paneles — el selector de curva real en la UI de Financiero por tanto no aparece todavía para ningún panel del catálogo hasta que se pueblen con fichas reales (a mano o vía el extractor).
+
+**Extractor de PDF ampliado**: nueva función `_extraer_garantia_potencia()` en `calculos/pdf_panel_extractor.py`, mismo patrón de regex tolerante a redacciones variadas (inglés/español) que el resto del extractor — nunca inventa, deja los campos en blanco si no matchea con confianza dentro de rangos físicamente plausibles (caída año 1: 0-5%; tasa lineal: 0,1-1,2%/año).
+
+**UI en 💰 Financiero**: junto al slider de tasa fija, un nuevo toggle condicional que solo aparece si el panel elegido en 📐 Dimensionamiento trae datos de garantía en el catálogo. Trazabilidad ampliada (`fuente_degradacion`) para dejar explícito cuál de las 3 fuentes se usó (paramétrica / histórico real medido / curva de fabricante) — nunca se oculta ni se mezcla silenciosamente.
+
+**Error propio corregido antes de cerrar la tarea**: el primer test de `factor_curva_fabricante()` en el año 25 tenía un valor esperado (87,4%) que no coincidía con el resultado matemáticamente correcto de sus propios parámetros de entrada (84,3%) — error de cálculo a mano del autor del test, no un bug de la función. Corregido usando parámetros y resultado consistentes entre sí (2,0% año 1 + 0,55%/año → 84,8% año 25, el valor real que publican varios fabricantes Tier 1) antes de dar la suite por buena.
+
+25 tests nuevos (`tests/test_degradacion.py` y `tests/test_extraccion_garantia_potencia.py`). Documentado en la sección 10 (Página 7 — Financiero), incluyendo advertencias explícitas de implementación e interpretación para que el Asistente pueda orientar sin ambigüedad. Regresión dirigida (86 tests) + suite completa relanzadas antes de desplegar: **1113/1113 passed**. Commiteado (`55c3477e`), pusheado, sincronizado en los 2 clones locales y en el servidor (`pm2 restart` ↺5→↺6, confirmado online).
 
 ────────────────────────────────────────────────────────────
 
