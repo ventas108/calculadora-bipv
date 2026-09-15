@@ -56,19 +56,31 @@ const REQUIRED_SECTIONS: Record<SpecDocument, string[]> = {
 
 const LAYERS = ["cálculo", "API", "estado", "interfaz"];
 
+function matchAllGroups(content: string, pattern: RegExp): string[] {
+  const results: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(content)) !== null) {
+    results.push(match[1]);
+    if (match.index === pattern.lastIndex) {
+      pattern.lastIndex += 1;
+    }
+  }
+  return results;
+}
+
 function hasSection(content: string, section: string): boolean {
   const escaped = section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^##\\s+${escaped}\\s*$`, "imu").test(content);
+  return new RegExp(`^##\\s+${escaped}\\s*$`, "im").test(content);
 }
 
 function nonEmptySection(content: string, section: string): boolean {
   const escaped = section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = content.match(new RegExp(`^##\\s+${escaped}\\s*$([\\s\\S]*?)(?=^##\\s|$)`, "imu"));
-  return Boolean(match && !/\bpendiente\b|\(_\)|^\s*-\s*$|^\s*-\s*\[ \]\s*$/imu.test(match[1]));
+  const match = content.match(new RegExp(`^##\\s+${escaped}\\s*$([\\s\\S]*?)(?=^##\\s|$)`, "im"));
+  return Boolean(match && !/\bpendiente\b|\(_\)|^\s*-\s*$|^\s*-\s*\[ \]\s*$/im.test(match[1]));
 }
 
 function readState(content: string): SpecState | null {
-  const match = content.match(/^\*\*Estado:\*\*\s*(.+?)\s*$/imu);
+  const match = content.match(/^\*\*Estado:\*\*\s*(.+?)\s*$/im);
   const state = match?.[1].toLowerCase() as SpecState | undefined;
   return state && [
     "idea",
@@ -94,7 +106,7 @@ export async function auditSpec(specPath: string): Promise<SpecAudit> {
     try {
       const content = await fs.readFile(path.join(specPath, document), "utf8");
       contents.set(document, content);
-      if (/\bpendiente\b|\(_\)|^-\s*$|^-\s*\[ \]\s*$/imu.test(content)) {
+      if (/\bpendiente\b|\(_\)|^-\s*$|^-\s*\[ \]\s*$/im.test(content)) {
         incompleteDocuments.push(document);
       }
       for (const section of REQUIRED_SECTIONS[document]) {
@@ -137,14 +149,15 @@ export async function auditSpec(specPath: string): Promise<SpecAudit> {
   const design = contents.get("diseno.md") ?? "";
   const validation = contents.get("validacion.md") ?? "";
   const implementation = contents.get("implementacion.md") ?? "";
-  const affectedLayers = LAYERS.filter(layer => new RegExp(`\\b${layer}\\b`, "iu").test(
+  const affectedLayers = LAYERS.filter(layer => new RegExp(`\\b${layer}\\b`, "i").test(
     `${design}\n${implementation}`,
   ));
-  const affectedFiles = [...implementation.matchAll(/`([^`]+\.(?:ts|tsx|py|md|json|sql|env))`/g)].map(
-    match => match[1],
+  const affectedFiles = matchAllGroups(
+    implementation,
+    /`([^`]+\.(?:ts|tsx|py|md|json|sql|env))`/g,
   );
   const integrationRisks: string[] = [];
-  if (/m[oó]dulos dependientes|m[oó]dulos previos/iu.test(design)) {
+  if (/m[oó]dulos dependientes|m[oó]dulos previos/i.test(design)) {
     integrationRisks.push("La Spec tiene dependencias entre módulos; comprobar contratos antes de implementar.");
   }
   if (affectedLayers.length > 1) {
@@ -153,7 +166,7 @@ export async function auditSpec(specPath: string): Promise<SpecAudit> {
   if (specPath.includes("09-despliegue")) {
     integrationRisks.push("Despliegue: revisar migraciones, variables de entorno, artefactos y rollback.");
   }
-  const validationCommands = [...validation.matchAll(/`([^`]+)`/g)].map(match => match[1]);
+  const validationCommands = matchAllGroups(validation, /`([^`]+)`/g);
 
   return {
     specPath,

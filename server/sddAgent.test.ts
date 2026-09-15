@@ -6,18 +6,17 @@ describe("SDD agent gate", () => {
     const audit = await auditSpec("CodeSpecs/01-datos-proyecto");
 
     expect(audit.canRequestReview).toBe(false);
+    expect(audit.canRunPreparation).toBe(false);
     expect(audit.canAdvanceToImplementation).toBe(false);
     expect(audit.state).toBe("idea");
-    expect(audit.missingDocuments).toContain("propuesta.md");
+    expect(audit.missingDocuments).toEqual([]);
     expect(audit.incompleteDocuments).toContain("problema.md");
+    expect(audit.incompleteDocuments).toContain("propuesta.md");
     expect(audit.advanceBlockingReasons).toEqual(
       expect.arrayContaining([expect.stringContaining("aprobación humana")]),
     );
     expect(audit.blockingReasons).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining("Faltan documentos"),
-        expect.stringContaining("Documentos incompletos"),
-      ]),
+      expect.arrayContaining([expect.stringContaining("Documentos incompletos")]),
     );
   });
 });
