@@ -9,6 +9,24 @@ import type { Express, Request, Response } from 'express';
 
 const PVGIS_BASE_URL = 'https://re.jrc.ec.europa.eu/api/v5_3';
 
+// PVGIS resetea conexiones (ECONNRESET) cuando recibe ráfagas de peticiones.
+// Reintentamos los fallos de red (no los códigos de error HTTP) con backoff.
+async function fetchWithRetry(url: string, options: RequestInit, retries = 2): Promise<Awaited<ReturnType<typeof fetch>>> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fetch(url, options);
+    } catch (error: any) {
+      if (attempt >= retries) throw error;
+      const delayMs = 500 * (attempt + 1);
+      console.warn(
+        `[PVGIS Proxy] Fetch falló (intento ${attempt + 1}/${retries + 1}), reintentando en ${delayMs}ms:`,
+        error.message, error.cause ?? ''
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 // Endpoints permitidos de PVGIS
 const ALLOWED_ENDPOINTS = ['MRcalc', 'PVcalc', 'seriescalc', 'printhorizon', 'tmy'];
 
@@ -53,7 +71,7 @@ export function registerPVGISProxy(app: Express) {
       
       console.log(`[PVGIS Proxy] Fetching: ${pvgisUrl}`);
 
-      const response = await fetch(pvgisUrl, {
+      const response = await fetchWithRetry(pvgisUrl, {
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'SolarShadingCalculator/1.0',

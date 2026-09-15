@@ -137,8 +137,10 @@ export default function IrradianceHeatmap({ initialLat, initialLng, cityName, on
 
     setProgress({ current: 0, total: coords.length });
 
-    // Consultar PVGIS en lotes de 5 para no saturar
+    // Consultar PVGIS en lotes de 5 para no saturar, con pausa entre lotes:
+    // PVGIS resetea conexiones (ECONNRESET) ante ráfagas sostenidas de peticiones.
     const batchSize = 5;
+    const batchDelayMs = 600;
     for (let i = 0; i < coords.length; i += batchSize) {
       const batch = coords.slice(i, i + batchSize);
       const results = await Promise.all(
@@ -162,6 +164,10 @@ export default function IrradianceHeatmap({ initialLat, initialLng, cityName, on
       }
 
       setProgress({ current: completed, total: coords.length });
+
+      if (i + batchSize < coords.length) {
+        await new Promise((resolve) => setTimeout(resolve, batchDelayMs));
+      }
     }
 
     // Calcular estadísticas
