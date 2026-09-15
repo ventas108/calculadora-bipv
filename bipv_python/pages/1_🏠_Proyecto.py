@@ -368,6 +368,30 @@ with col1:
     init_tarifa(ciudad, CIUDADES)   # no-op si ya fue inicializada
     tarifa_kwh = tarifa_widget("proy")
 
+    # ── Aviso de tarifa de referencia distinta tras cambio de ciudad ─────────
+    # set_tarifa_from_ciudad() NO sobreescribe una tarifa manual (fuente
+    # "Proyecto"/"Financiero"): en vez de eso deja el valor de referencia de
+    # la nueva ciudad en tarifa_sugerida_ciudad. Se avisa aquí (no en el
+    # bloque de cambio de ciudad más arriba, porque ese bloque termina en
+    # st.rerun() y nunca llegaría a pintar el aviso).
+    _tarifa_sugerida = st.session_state.get("tarifa_sugerida_ciudad")
+    if _tarifa_sugerida is not None and abs(float(_tarifa_sugerida) - tarifa_kwh) > 0.01:
+        st.info(
+            f"💡 **{ciudad}** tiene una tarifa de referencia de "
+            f"**{_tarifa_sugerida:,.0f} COP/kWh** en el catálogo, distinta a tu "
+            f"valor manual actual (**{tarifa_kwh:,.0f} COP/kWh**). "
+            "Se conservó tu valor manual — actualízalo solo si corresponde."
+        )
+        if st.button("Usar tarifa de referencia de la nueva ciudad", key="btn_usar_tarifa_sugerida"):
+            st.session_state["tarifa_cop_kwh"] = float(_tarifa_sugerida)
+            st.session_state["tarifa_cop_kWh"] = float(_tarifa_sugerida)
+            st.session_state["tarifa_fuente"]  = "catálogo"
+            st.session_state.pop("tarifa_sugerida_ciudad", None)
+            st.rerun()
+    elif _tarifa_sugerida is not None:
+        # El valor manual ya coincide con la referencia — aviso resuelto.
+        st.session_state.pop("tarifa_sugerida_ciudad", None)
+
     # ── Aviso si las tarifas del catálogo llevan más de 6 meses sin actualizar ─
     try:
         _fv = date.fromisoformat(FECHA_VALIDACION_TARIFAS)

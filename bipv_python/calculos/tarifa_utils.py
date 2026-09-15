@@ -9,6 +9,9 @@ Keys de session_state:
   tarifa_ciudad_origen    — ciudad donde se pre-cargó la tarifa
   tarifa_operador         — operador local (EPM, Codensa, EDEQ…)
   tarifa_fuente           — "catálogo", "Proyecto", "Financiero", "valor por defecto"
+  tarifa_sugerida_ciudad  — valor de referencia (catálogo) de la ciudad actual
+                            cuando NO se aplicó porque tarifa_fuente es manual;
+                            la UI lo usa para mostrar un aviso (01-datos-proyecto).
 
 Uso:
     from calculos.tarifa_utils import init_tarifa, set_tarifa_from_ciudad, tarifa_widget
@@ -35,6 +38,9 @@ _KEY_VALOR_LEGACY = "tarifa_cop_kWh"       # alias legacy
 _KEY_CIUDAD       = "tarifa_ciudad_origen"
 _KEY_OPERADOR     = "tarifa_operador"
 _KEY_FUENTE       = "tarifa_fuente"
+_KEY_SUGERIDA     = "tarifa_sugerida_ciudad"
+
+_FUENTES_MANUALES = ("Proyecto", "Financiero")
 
 _ALERTA_MUY_BAJA  = 300.0   # error — casi con certeza incorrecto
 _ALERTA_BAJA      = 500.0   # warning — puede ser residencial subsidiada
@@ -87,8 +93,13 @@ def init_tarifa(ciudad: str = "", ciudades_dict: dict | None = None) -> None:
 def set_tarifa_from_ciudad(ciudad: str, ciudades_dict: dict) -> None:
     """Actualizar tarifa cuando el usuario cambia de ciudad en Proyecto.
 
-    A diferencia de init_tarifa, SIEMPRE sobreescribe — la ciudad
-    cambió, por lo que la tarifa del operador anterior ya no aplica.
+    Si la tarifa actual viene del catálogo o del valor por defecto, se
+    sobreescribe con la del operador de la nueva ciudad (comportamiento
+    original). Pero si el usuario ya la corrigió a mano (tarifa_fuente ==
+    "Proyecto" o "Financiero", con su factura real), esa corrección NO se
+    descarta silenciosamente: se conserva, y el valor de referencia de la
+    nueva ciudad queda disponible en tarifa_sugerida_ciudad para que la UI
+    muestre un aviso ofreciendo actualizar (sin aplicarlo automáticamente).
 
     Args:
         ciudad: Nueva ciudad seleccionada.
@@ -97,14 +108,23 @@ def set_tarifa_from_ciudad(ciudad: str, ciudades_dict: dict) -> None:
     c        = ciudades_dict.get(ciudad, {})
     operador = c.get("operador", "")
 
+    fuente_actual = st.session_state.get(_KEY_FUENTE, "valor por defecto")
+    es_manual     = fuente_actual in _FUENTES_MANUALES
+
     if "tarifa_comercial_cop_kwh" in c:
-        valor = float(c["tarifa_comercial_cop_kwh"])
-        st.session_state[_KEY_VALOR]        = valor
-        st.session_state[_KEY_VALOR_LEGACY] = valor
+        valor_ciudad = float(c["tarifa_comercial_cop_kwh"])
+        if es_manual:
+            st.session_state[_KEY_SUGERIDA] = valor_ciudad
+        else:
+            st.session_state[_KEY_VALOR]        = valor_ciudad
+            st.session_state[_KEY_VALOR_LEGACY] = valor_ciudad
+            st.session_state[_KEY_FUENTE]       = "catálogo"
+            st.session_state.pop(_KEY_SUGERIDA, None)
+    else:
+        st.session_state.pop(_KEY_SUGERIDA, None)
 
     st.session_state[_KEY_CIUDAD]   = ciudad
     st.session_state[_KEY_OPERADOR] = operador
-    st.session_state[_KEY_FUENTE]   = "catálogo"
 
 
 # ── Widget reutilizable ───────────────────────────────────────────────────────
