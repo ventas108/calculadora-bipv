@@ -77,8 +77,8 @@ export function registerPVGISProxy(app: Express) {
       res.setHeader('Cache-Control', 'public, max-age=86400'); // 24 horas
       res.json(data);
     } catch (error: any) {
-      console.error('[PVGIS Proxy] Error:', error.message);
-      
+      console.error('[PVGIS Proxy] Error:', error.message, error.cause ?? '');
+
       if (error.name === 'TimeoutError' || error.name === 'AbortError') {
         res.status(504).json({
           error: 'Timeout: PVGIS no respondió en 30 segundos. Intenta de nuevo.',
