@@ -119,3 +119,112 @@ pnpm build
 - No es necesario ejecutar `pnpm build` a menos que modifiques el código fuente
 - La base de datos debe existir antes de ejecutar `pnpm db:push`
 - El servidor sirve el frontend automáticamente — no necesitas nginx/apache para los assets estáticos
+
+---
+
+## Comandos para PowerShell — actualización manual en DigitalOcean
+
+Esta sección sirve como referencia cuando se necesite publicar un cambio
+validado en el servidor de producción.
+
+### Datos operativos confirmados
+
+| Dato | Valor |
+|---|---|
+| Servidor | `198.199.75.160` |
+| Usuario SSH | `root` |
+| Hostname | `bipv-colombia` |
+| Proyecto web | `/var/www/bipv/calculadora` |
+| Rama de producción | `main` |
+| Proceso PM2 web | `calculadora-bipv` |
+| Entrada PM2 | `/var/www/bipv/calculadora/dist/index.js` |
+| Puerto interno web | `3000` |
+| Proceso PM2 Python | `streamlit-bipv` |
+| Puerto interno Python | `8501` |
+
+### 1. Conectarse desde Windows PowerShell
+
+Usando una clave SSH:
+
+```powershell
+ssh -i "$env:USERPROFILE\.ssh\NOMBRE_DE_TU_CLAVE" root@198.199.75.160
+```
+
+Si la clave ya está configurada por defecto en OpenSSH:
+
+```powershell
+ssh root@198.199.75.160
+```
+
+### 2. Comprobar el estado antes de actualizar
+
+Ejecutar dentro del servidor DigitalOcean:
+
+```bash
+cd /var/www/bipv/calculadora
+git status --short --branch
+git log -1 --oneline
+pm2 status
+```
+
+No continuar si hay cambios locales importantes o si `calculadora-bipv` no
+aparece como `online`.
+
+### 3. Actualizar la aplicación web
+
+Ejecutar dentro del servidor, después de validar el cambio localmente y subirlo
+a GitHub:
+
+```bash
+cd /var/www/bipv/calculadora
+git pull --ff-only origin main
+pnpm build
+pm2 restart calculadora-bipv
+pm2 status
+```
+
+### 4. Comprobar la publicación
+
+```bash
+pm2 logs calculadora-bipv --lines 50
+ss -tulpn | grep -E ':80|:443|:3000'
+```
+
+Después, abrir el dominio de producción en el navegador y comprobar la función
+modificada con un caso conocido.
+
+### 5. Actualizar Streamlit solo si el cambio le corresponde
+
+La aplicación Streamlit es independiente de la aplicación web:
+
+```bash
+cd /var/www/bipv/calculadora-bipv
+git pull --ff-only origin main
+pm2 restart streamlit-bipv
+pm2 status
+```
+
+No reiniciar `streamlit-bipv` al publicar únicamente cambios de la aplicación
+web.
+
+### 6. Si el despliegue falla
+
+No repetir comandos a ciegas. Revisar primero:
+
+```bash
+pm2 status
+pm2 logs calculadora-bipv --lines 100
+git status --short --branch
+```
+
+Si el proceso quedó detenido y el build anterior sigue disponible, se puede
+volver temporalmente a la versión anterior solo después de revisar el log y
+confirmar el commit correcto.
+
+### Seguridad
+
+- Nunca guardar contraseñas, tokens de GitHub, claves privadas SSH, `DATABASE_URL`, `JWT_SECRET` ni `NREL_API_KEY` en este archivo.
+- Nunca pegar esos secretos en el chat ni en un commit.
+- La clave privada debe permanecer en el equipo local, normalmente dentro de `%USERPROFILE%\.ssh`.
+- Si un token aparece dentro de `git remote -v`, revocarlo inmediatamente y reemplazar el remoto por una URL sin credenciales.
+- Antes de desplegar, ejecutar `pnpm check` y `pnpm build` en el entorno local.
