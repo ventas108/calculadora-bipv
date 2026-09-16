@@ -1,0 +1,61 @@
+id: dimensionamiento-codespec
+title: CodeSpec del módulo Dimensionamiento
+status: proposed
+author: copilot
+
+inputs:
+  panel:
+    required: [Voc_stc, Vmp_stc, Isc_stc, Tk_beta, area_m2]
+    optional: [Pmax_stc, NOCT, confianza, tecnologia, marca]
+  inverter:
+    required: [Vdc_max, Vmppt_max]
+    alternatives:
+      mppt_min: [Vmppt_activo_min, Vmppt_min]
+      current_max: [Isc_max_tracker, I_max_tracker]
+    sizing: [n_trackers, N_mppt, n_strings_tracker, P_ac_nom_W]
+  design_environment:
+    required: [T_min_diseno, T_cel_realista, T_cel_extremo]
+    sources: [TMY, CIUDADES, manual_user_override]
+  project:
+    required: [area_fachada_m2, factor_ocupacion_pct]
+    optional: [tipo_instalacion, bateria_dict]
+
+outputs:
+  compatibility:
+    - Voc_frio
+    - Vmp_real
+    - Vmp_extremo
+    - Isc_equiv_tracker
+    - compatible
+    - alerta_margen
+  confirmed_design:
+    - N_serie
+    - N_str_tr_usado
+    - N_serie_panel_ref
+    - N_serie_inversor_ref
+  project_totals:
+    - N_paneles_granja
+    - N_inv_total
+    - P_dc_total_kWp
+  diagnostics:
+    - motor_iv_validacion_ok
+    - compatibilidad_regional_bipv
+    - bateria_compatibilidad
+    - vigente
+
+invariants:
+  - "N_serie confirmado solo cambia tras optimización o adopción explícita de una configuración compatible."
+  - "N_str_tr_usado es la fuente downstream; N_str_tr es solo el widget vivo."
+  - "N_serie_panel_ref y N_serie_inversor_ref deben identificar el panel/inversor que produjo N_serie."
+  - "Las temperaturas deben pertenecer a la ciudad/TMY activa o ser un ajuste manual visible."
+  - "Voc_frio <= Vdc_max, Vmp_real/Vmp_extremo dentro de MPPT y Isc_equiv <= límite son condiciones eléctricas separadas."
+  - "La relación DC/AC no sustituye la compatibilidad eléctrica."
+  - "Un cambio de panel o inversor invalida la vigencia del diseño confirmado hasta reconfirmar."
+  - "La falta de datos IV no bloquea el dimensionamiento eléctrico, pero impide presentar Motor IV como validado."
+
+validation:
+  - bipv_python/tests/test_compatibilidad_string.py
+  - bipv_python/tests/test_validacion_vba.py
+  - bipv_python/tests/test_pagina_dimensionamiento_temperaturas_ciudad.py
+  - bipv_python/tests/test_pagina_dimensionamiento_compat_bateria.py
+  - bipv_python/tests/test_simulation_pipeline.py
