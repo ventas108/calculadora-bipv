@@ -6,6 +6,8 @@ Equivalente Python de: Mod_ModeloDiodo + SimuladorIV_CdTe_v2 (VBA).
 Validación numérica disponible en tests/test_validacion_vba.py:
   FF @ G=200 W/m² debe ser 76.28% ± 0.5% (hoja FF_vs_Irradiancia del XLSM)
 """
+import math
+
 import numpy as np
 import pvlib
 from pvlib.singlediode import bishop88_mpp, bishop88_i_from_v, bishop88_v_from_i
@@ -652,11 +654,39 @@ def verificar_ns_halfcut(panel: dict) -> "dict | None":
     }
 
 
+def _valor_flotante_positivo(valor, alternativo=None):
+    """Convierte un valor a float con comprobación de finitud y positividad."""
+    for raw in (valor, alternativo):
+        if raw in (None, "", "nan", "NaN"):
+            continue
+        try:
+            v = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(v) and v > 0:
+            return v
+    return 0.0
+
+
+def _valor_entero_positivo(valor, alternativo=None):
+    """Convierte un valor a entero positivo, rechazando ceros/NoN/strings inválidas."""
+    for raw in (valor, alternativo):
+        if raw in (None, "", "nan", "NaN"):
+            continue
+        try:
+            v = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(v) and v > 0:
+            return int(round(v))
+    return 0
+
+
 def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
     """
     Estima parámetros SDM (De Soto 2006) a partir de datos básicos de ficha técnica.
 
-    Requiere: Voc_stc, Isc_stc, Vmp_stc, Imp_stc, N_s o NsA, tecnologia.
+    Requiere: Voc_stc, Isc_stc, Vmp_stc, Imp_stc, N_s o NsA, tecnología.
     Opcional: Tk_beta (coef. Voc %/°C), Tk_gamma (coef. Pmax %/°C).
 
     Retorna dict compatible con resolver_curva_iv() o None si faltan datos.
@@ -664,14 +694,16 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
     """
     from datos.tecnologias_bipv import CONSTANTES_TECNOLOGIA
 
-    Voc = float(panel.get("Voc_stc") or panel.get("Voc") or 0)
-    Isc = float(panel.get("Isc_stc") or panel.get("Isc") or 0)
-    Vmp = float(panel.get("Vmp_stc") or panel.get("Vmp") or 0)
-    Imp = float(panel.get("Imp_stc") or panel.get("Imp") or 0)
-    N_s = panel.get("N_s")
-    NsA = panel.get("NsA")
+    Voc = _valor_flotante_positivo(panel.get("Voc_stc"), panel.get("Voc"))
+    Isc = _valor_flotante_positivo(panel.get("Isc_stc"), panel.get("Isc"))
+    Vmp = _valor_flotante_positivo(panel.get("Vmp_stc"), panel.get("Vmp"))
+    Imp = _valor_flotante_positivo(panel.get("Imp_stc"), panel.get("Imp"))
+    N_s = _valor_entero_positivo(panel.get("N_s"), panel.get("NsA"))
+    NsA = _valor_entero_positivo(panel.get("NsA"), panel.get("N_s"))
 
     if not all([Voc > 0, Isc > 0, Vmp > 0, Imp > 0]):
+        return None
+    if N_s <= 0 and NsA <= 0:
         return None
 
     # ── Normalizar tecnología ──────────────────────────────────────────────────

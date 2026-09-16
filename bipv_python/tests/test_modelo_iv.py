@@ -103,6 +103,16 @@ def test_estimar_sdm_desde_ficha_devuelve_a_ref_en_convencion_unitless():
     )
 
 
+def test_estimar_sdm_desde_ficha_rechaza_ns_invalido():
+    # Un N_s = 0 o un valor no numérico debe invalidar la estimación del SDM
+    # en vez de generar un modelo físicamente absurdo con a_ref=0 o N_s=0.
+    panel = {
+        "Voc_stc": 37.5, "Vmp_stc": 30.5, "Isc_stc": 8.5, "Imp_stc": 8.0,
+        "N_s": "0", "tecnologia": "Mono-Si", "Tk_beta": -0.35, "Tk_alfa": 0.05,
+    }
+    assert estimar_sdm_desde_ficha(panel) is None
+
+
 def test_panel_real_uraba_activa_motor_iv_y_reproduce_ficha_stc():
     # El caso concreto que expuso ambos bugs (Imp_stc y unidades de a_ref):
     # antes de corregirlos, preparar_panel_iv() devolvía None para este
