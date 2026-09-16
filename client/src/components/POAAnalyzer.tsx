@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { EPWData } from '@/lib/epwParser';
-import { SolarRigorReport, dayOfYear } from '@/lib/solarRigor';
+import { SolarRigorReport } from '@/lib/solarRigor';
 import SolarRigorBanner from './SolarRigorBanner';
-import { calculateHourlyPOA } from '@/lib/liuJordanModel';
+import { calculateMonthlyPOA } from '@/lib/poaMonthly';
 import {
   BarChart,
   Bar,
@@ -20,8 +20,6 @@ import {
 } from 'recharts';
 import { Zap, Settings } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
-
-const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
 interface POAAnalyzerProps {
   weatherData: EPWData;
@@ -62,67 +60,8 @@ export default function POAAnalyzer({ weatherData, tiltAngle: initialTilt = 0, s
 
   const poaData = useMemo(() => {
     if (solarRigorReport && !solarRigorReport.canCalculate) return [];
-    const tiltRad = (tilt * Math.PI) / 180;
-    const azimuthRad = (azimuth * Math.PI) / 180;
-
-    const monthlyData = MONTHS.map((month, monthIdx) => {
-      const monthWeatherData = weatherData.weatherData.filter(w => w.month === monthIdx + 1);
-
-      if (monthWeatherData.length === 0) {
-        return {
-          month,
-          directPOA: 0,
-          diffusePOA: 0,
-          reflectedPOA: 0,
-          totalPOA: 0,
-          avgTemp: 0,
-        };
-      }
-
-      let totalDirectPOA = 0;
-      let totalDiffusePOA = 0;
-      let totalReflectedPOA = 0;
-      let totalTotalPOA = 0;
-      let totalTemp = 0;
-
-      monthWeatherData.forEach(w => {
-        // Calcular día del año
-        const day = dayOfYear(w.month, w.day);
-
-        const poa = calculateHourlyPOA(
-          weatherData.location.latitude,
-          weatherData.location.longitude,
-          weatherData.location.timezone * 15,
-          day,
-          w.hour - 1,
-          w.minute,
-          w.directNormalIrradiance,
-          w.diffuseHorizontalIrradiance,
-          w.globalHorizontalIrradiance,
-          tiltRad,
-          azimuthRad,
-          albedo,
-          usePerezModel
-        );
-
-        totalDirectPOA += poa.directPOA;
-        totalDiffusePOA += poa.diffusePOA;
-        totalReflectedPOA += poa.reflectedPOA;
-        totalTotalPOA += poa.totalPOA;
-        totalTemp += w.temperature;
-      });
-
-      return {
-        month,
-        directPOA: Math.round(totalDirectPOA / monthWeatherData.length),
-        diffusePOA: Math.round(totalDiffusePOA / monthWeatherData.length),
-        reflectedPOA: Math.round(totalReflectedPOA / monthWeatherData.length),
-        totalPOA: Math.round(totalTotalPOA / monthWeatherData.length),
-        avgTemp: Math.round((totalTemp / monthWeatherData.length) * 10) / 10,
-      };
-    });
-
-    return monthlyData;
+    // Fuente única compartida con Home.tsx (CodeSpecs/02-recurso-solar/react).
+    return calculateMonthlyPOA(weatherData, tilt, azimuth, albedo, usePerezModel);
   }, [weatherData, tilt, azimuth, albedo, usePerezModel, solarRigorReport]);
 
   const stats = useMemo(() => {

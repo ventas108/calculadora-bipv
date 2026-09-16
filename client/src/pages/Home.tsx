@@ -20,6 +20,7 @@ import { EPWData } from '@/lib/epwParser';
 import { runBIPVSimulation, type WeatherHourData, type BIPVSimulationConfig } from '@/lib/iamSoilingEngine';
 import { BIPV_GLASS_CATALOG } from '@/lib/bipvGlassCatalog';
 import { calculateHourlyPOA } from '@/lib/liuJordanModel';
+import { calculateMonthlyPOA } from '@/lib/poaMonthly';
 import { ProspectorToSimulatorData } from '@/components/SolarProspector';
 import { FacadeFullAnalysis, calculateMonthlyShadingFactorsForFacade } from '@/lib/facadeShadingAnalysis';
 import { normalizeMonthToAbbr } from '@/lib/monthHelper';
@@ -408,79 +409,8 @@ export default function Home() {
     }
 
     // === RUTA MEJORADA: Cálculo POA horario real con Liu-Jordan/Perez ===
-    const lat = weatherData.location.latitude;
-    const lon = weatherData.location.longitude;
-    const stdMeridian = weatherData.location.timezone * 15; // Convertir zona horaria a meridiano estándar
-    const tiltRad = (effectiveTilt * Math.PI) / 180;
-    const azimuthRad = (poaAzimuth * Math.PI) / 180;
-
-    return MONTHS.map((month, monthIdx) => {
-      const monthData = weatherData.weatherData.filter(w => w.month === monthIdx + 1);
-
-      if (monthData.length === 0) {
-        return {
-          month,
-          directPOA: 0,
-          diffusePOA: 0,
-          reflectedPOA: 0,
-          totalPOA: 0,
-          avgTemp: 0,
-          avgWindSpeed: 1,
-        };
-      }
-
-      // Calcular POA horario real para cada registro del mes
-      let sumDirect = 0, sumDiffuse = 0, sumReflected = 0, sumTotal = 0;
-      let sumTemp = 0, sumWind = 0;
-      let validCount = 0;
-
-      for (const w of monthData) {
-        // Solo calcular para horas con irradiancia > 0
-        if (w.globalHorizontalIrradiance > 0 || w.directNormalIrradiance > 0) {
-          // EPW conserva el día calendario exacto; no aproximar el mes.
-          const dayOfYear = Math.floor(
-            (Date.UTC(2023, w.month - 1, w.day || 15) - Date.UTC(2023, 0, 0)) / 86400000,
-          );
-          const hourlyPOA = calculateHourlyPOA(
-            lat, lon, stdMeridian,
-            dayOfYear,
-            w.hour - 1, // EPW usa 1-24, calculateHourlyPOA usa 0-23
-            w.minute || 0,
-            w.directNormalIrradiance,
-            w.diffuseHorizontalIrradiance,
-            w.globalHorizontalIrradiance,
-            tiltRad,
-            azimuthRad,
-            poaAlbedo,
-            poaUsePerez
-          );
-          sumDirect += hourlyPOA.directPOA;
-          sumDiffuse += hourlyPOA.diffusePOA;
-          sumReflected += hourlyPOA.reflectedPOA;
-          sumTotal += hourlyPOA.totalPOA;
-          validCount++;
-        }
-        sumTemp += w.temperature;
-        sumWind += w.windSpeed;
-      }
-
-      // Dividir por TODAS las horas del mes (monthData.length) para obtener
-      // el promedio horario real (incluyendo noche=0). Esto es consistente con
-      // calculateAnnualProduction que multiplica avgPOA × daysInMonth × 24.
-      const n = monthData.length || 1;
-      const avgTemp = sumTemp / monthData.length;
-      const avgWindSpeed = sumWind / monthData.length;
-
-      return {
-        month,
-        directPOA: Math.round(sumDirect / n),
-        diffusePOA: Math.round(sumDiffuse / n),
-        reflectedPOA: Math.round(sumReflected / n),
-        totalPOA: Math.round(sumTotal / n),
-        avgTemp: Math.round(avgTemp * 10) / 10,
-        avgWindSpeed: Math.round(avgWindSpeed * 10) / 10,
-      };
-    });
+    // Fuente única compartida con POAAnalyzer.tsx (CodeSpecs/02-recurso-solar/react).
+    return calculateMonthlyPOA(weatherData, effectiveTilt, poaAzimuth, poaAlbedo, poaUsePerez);
   }, [weatherData, prospectorData, effectiveTilt, poaAzimuth, poaAlbedo, poaUsePerez, solarRigorReport.canCalculate]);
 
   // Datos para el mapa

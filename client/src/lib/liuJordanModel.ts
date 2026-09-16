@@ -178,7 +178,12 @@ export const calculatePOARadiationPerez = (
 
   // Índice de claridad
   const kt = globalHorizontalIrradiance / (solarAngles.airmass * 1367 * Math.cos(solarAngles.zenithAngle));
-  const kd = diffuseHorizontalIrradiance / globalHorizontalIrradiance;
+  // GHI<=0 (hora sin irradiancia horizontal, o dato con DNI>0 pero GHI=0):
+  // kd=0 evita una división por cero (NaN/Infinity) que contaminaría f1/f2 y,
+  // por tanto, diffusePOA/totalPOA para toda la hora.
+  const kd = globalHorizontalIrradiance > 0
+    ? diffuseHorizontalIrradiance / globalHorizontalIrradiance
+    : 0;
 
   // Coeficientes Perez
   let f1 = 0, f2 = 0;
