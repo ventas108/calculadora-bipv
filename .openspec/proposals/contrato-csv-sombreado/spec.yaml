@@ -1,0 +1,54 @@
+id: contrato-csv-sombreado
+title: Contrato del CSV de Factor de Sombreado entre apps hermanas
+status: proposed
+author: copilot
+
+objective:
+  - Formalizar el contrato de datos del CSV de sombreado que cruza entre bipv.innovacionquimica.com.co (productor) y calc.innovacionquimica.com.co (consumidor).
+  - Documentar la arquitectura real de 3 capas (client React, server proxy, Motor Solar Python) para evitar confusión sobre dónde vive el cálculo.
+  - Prevenir regresiones silenciosas si cambia el formato de columnas, la convención de rango, o la zona horaria del CSV.
+
+current_state:
+  - El cálculo real vive en bipv_python/calculos/contrato_sombreado.py + scripts/run_shading_contract.py (Motor Solar Python).
+  - Node (server/shadingEngineProxy.ts) es un proxy de proceso, sin física propia.
+  - Existe doble validación (Python + TypeScript) del contrato JSON bipv.shading.v1.
+  - El consumidor real del CSV derivado es mismatch_bypass.py::cargar_csv_fs(), usado en la página 5_Mismatch.py.
+  - Documentación dispersa en base_conocimiento_asistente.md (Anexos 56-57); borrador centralizado ya redactado en CONTRATO_CSV_SOMBREADO_ENTRE_APPS.md.
+
+affected_modules:
+  - shared/shading-engine-contract.ts
+  - bipv_python/calculos/contrato_sombreado.py
+  - server/shadingEngineProxy.ts
+  - bipv_python/scripts/run_shading_contract.py
+  - bipv_python/calculos/sombras_3d.py
+  - bipv_python/calculos/mismatch_bypass.py
+  - client/src/lib/buildingModelImporter.ts
+  - client/src/components/CrossingModal.tsx
+  - bipv_python/pages/5_🔀_Mismatch.py
+  - bipv_python/pages/6_📊_Produccion.py
+  - bipv_python/pages/7_💰_Financiero.py
+  - bipv_python/pages/5b_🔆_Motor_Optico.py
+  - bipv_python/pages/9_🗺️_Vista_3D.py
+
+constraints:
+  - No modificar la lógica de rechazo ya implementada (falta de FS_geometrico → rechazo total del CSV).
+  - No permitir que FS_climatico o FS combinado activen bypass diodes.
+  - No introducir cambios de columnas sin versión explícita documentada.
+  - Node/React nunca debe convertirse en fuente de verdad de la física solar.
+  - No agregar dependencias nuevas.
+
+expected_behavior:
+  - El CSV exportado por la app productora siempre incluye FS_geometrico, Mes, Dia, Hora como columnas mínimas.
+  - El parser consumidor rechaza explícitamente cualquier CSV sin FS_geometrico, sin caer a FS climático/combinado como sustituto silencioso.
+  - La conversión UTC→hora local se documenta y se localiza con precisión en el código cliente.
+  - Cualquier cambio futuro al contrato JSON oficial (bipv.shading.v1) dispara revisión obligatoria de este contrato CSV derivado.
+
+validation:
+  - Revisión de mismatch_bypass.py::cargar_csv_fs() contra el formato documentado.
+  - Confirmar con prueba existente o nueva que el rechazo por falta de FS_geometrico sigue vigente.
+  - Revisión manual de que Producción/Financiero siguen leyendo factor_sombra_anual sin cambios de contrato.
+
+risks:
+  - Cambio de nombre/convención de FS_geometrico en el lado productor sin aviso, rompiendo el parser consumidor.
+  - Conversión de zona horaria rota silenciosamente (ya ocurrió una vez, corregido el 5-sep-2026).
+  - Confusión entre CSV crudo (5 puntos/hora) y promediado, si un usuario sube el equivocado.
