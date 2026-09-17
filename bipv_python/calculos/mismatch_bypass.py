@@ -28,6 +28,7 @@ from calculos.agregacion_fs import (
 )
 from pvlib.singlediode import bishop88_mpp, bishop88_i_from_v
 from calculos.modelo_iv import trasladar_parametros_gt, _parametros_recombinacion
+from calculos.temperatura import temperatura_celda_noct
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -94,6 +95,7 @@ def simular_bypass_horario(
     N_parallel: int,
     panel: dict,
     NOCT: float | None = None,
+    k_bipv: float = 1.0,
     umbral_shade: float = 0.05,
 ) -> dict:
     """
@@ -101,7 +103,14 @@ def simular_bypass_horario(
 
     Parámetros
     ----------
-    G_eff        : irradiancia efectiva W/m² (post-óptico) — 8760 horas
+    G_eff        : irradiancia efectiva W/m² — 8760 horas. Debe ser la MISMA serie
+                   que alimenta el SDM en Producción (poa_sin_termico_df, SIN el
+                   factor térmico multiplicativo del Motor Óptico): ese factor ya
+                   representa el efecto de la temperatura sobre la eficiencia, y
+                   T_cel más abajo lo vuelve a aplicar vía el SDM -- pasar
+                   poa_efectiva_df (con el factor térmico ya aplicado) duplica la
+                   corrección térmica. Ver calculos/produccion.py y
+                   pages/6_📊_Produccion.py (comentario "evita doble conteo térmico").
     T_amb        : temperatura ambiente °C
     p_shade      : fracción de módulos sombreados [0–1] por hora
                    (del CSV de la Calculadora de Sombreado)
@@ -109,6 +118,9 @@ def simular_bypass_horario(
     N_parallel   : strings en paralelo
     panel        : dict del catálogo MODULOS_BIPV (SDM parameters)
     NOCT         : temperatura nominal de operación °C; si None usa panel["NOCT"]
+    k_bipv       : factor de confinamiento térmico BIPV (IEA-PVPS T15) — MISMA
+                   fuente que usa Producción (temperatura_celda_noct); default 1.0
+                   (ventilado libre) si no se conoce el montaje del array.
     umbral_shade : FS mínimo para tratar como sombra activa (filtra ruido)
 
     Física del modelo
@@ -139,7 +151,7 @@ def simular_bypass_horario(
     n       = len(G_eff)
 
     NOCT_val = float(NOCT if NOCT is not None else panel.get("NOCT", 45.0))
-    T_cel    = T_amb + (NOCT_val - 20.0) / 800.0 * G_eff
+    T_cel    = temperatura_celda_noct(G_eff, T_amb, NOCT=NOCT_val, k_bipv=k_bipv)
 
     # ── Referencia: producción uniforme (sin corrección bypass) ───────────────
     Pmp_full, _, _, _ = _sdm_vectorizado(G_eff, T_cel, panel)
