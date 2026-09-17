@@ -1,0 +1,64 @@
+id: motor-optico-codespec
+title: CodeSpec del Motor Óptico BIPV
+status: proposed
+author: copilot
+
+inputs:
+  solar:
+    required: [tmy_df, poa_df, poa_global, poa_direct, poa_diffuse_or_sky_ground]
+    context: [tilt_fachada, azimuth_fachada, ciudad, recurso_solar_ok]
+  panel:
+    optional: [tecnologia, NOCT, gamma_mp, beta_mp, transparencia_pct]
+    defaults: [b0_by_technology, noct_50_if_missing, gamma_minus_0_45_if_missing]
+  mounting:
+    required: [tipo_instalacion]
+    parameters: [k_BIPV, k_soiling_vert]
+  optical:
+    parameters: [b0, f_iam_dif, transparencia, soiling_config]
+
+outputs:
+  hourly:
+    - poa_bruta
+    - poa_optica
+    - poa_post_soil
+    - poa_post_term
+    - poa_efectiva
+    - poa_efectiva_celda
+    - f_iam
+    - f_iam_dif
+    - f_soil
+    - f_term
+    - perdida_iam
+    - perdida_soil
+    - perdida_term
+    - perdida_tau
+  downstream_state:
+    - poa_sin_termico_df
+    - poa_efectiva_df
+    - motor_optico_summary
+    - motor_optico_k_bipv
+    - motor_optico_noct
+    - motor_optico_coef_temp
+
+invariants:
+  - "IAM directa se aplica solo a poa_direct; IAM difusa usa f_iam_dif."
+  - "Soiling se aplica después de IAM y antes del factor térmico."
+  - "Producción SDM recibe poa_sin_termico_df para no contar la temperatura dos veces."
+  - "poa_efectiva_df puede incluir térmico para visualización y Financiero, pero no debe entrar otra vez al SDM térmico."
+  - "tau no se resta de poa_efectiva cuando Isc_stc/Pmax_stc ya son del panel real semitransparente."
+  - "factor_global = poa_efectiva_anual / poa_bruta_anual."
+  - "Cambiar ciudad o coordenadas invalida recurso solar, POA y Motor Óptico."
+  - "k_BIPV=1.15 se reporta como estimación, no como medición."
+  - "Y_r y PR se referencian a POA bruta real IEC 61724 cuando está disponible."
+
+limitations:
+  thermal_model: "NOCT multiplicado por k_BIPV; Faiman Uc/Uv no implementado en esta versión."
+  transparency: "Informativa en la cascada; no se aplica como reducción adicional al SDM."
+
+validation:
+  - bipv_python/tests/test_motor_optico.py
+  - bipv_python/tests/test_perdidas_desglosadas_pvsyst.py
+  - bipv_python/tests/test_pagina_produccion_loss_diagram.py
+  - bipv_python/tests/test_invalidacion_ciudad.py
+  - bipv_python/tests/test_yr_bruta_real.py
+  - bipv_python/tests/test_solar_svf.py
