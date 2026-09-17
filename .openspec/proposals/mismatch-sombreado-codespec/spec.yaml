@@ -1,0 +1,78 @@
+id: mismatch-sombreado-codespec
+title: CodeSpec de Mismatch y Pérdidas de Sombreado
+status: proposed
+author: copilot
+validated_scope:
+  name: thermal-coherence-and-downstream-validity
+  validated_at: "2026-09-17"
+  implementation_commit: f7402f70
+  production_commit: e6b76069b
+
+inputs:
+  csv:
+    required: [Mes, Dia, Hora, FS_geometrico]
+    optional: [Fachada, Fila, Punto, Obstaculo, obstacle_id, obstacle_name, n_modulos, area_activa_m2, potencia_instalada_kw]
+    convention: "FS_geometrico 0=sin sombra, 1=sombra total"
+  alignment:
+    modes: [mensual, exacto]
+    default: mensual
+    index: tmy_df.index
+    aggregation: [auto, modulos, area, potencia, simple]
+  bypass:
+    required: [G_eff, T_amb, N_series, N_parallel, panel]
+    optional: [NOCT, k_bipv, umbral_shade]
+  additional_sources:
+    horizon: optional_boolean_mask
+    orientation_mismatch: optional_fractional_configurations
+
+outputs:
+  normalized_csv:
+    - df_fs_raw
+    - meta_fs
+  aligned:
+    - bypass_p_shade
+    - bypass_modo_usado
+    - bypass_modo_agregacion_usado
+  bypass:
+    - bypass_result
+    - bypass_n_series_usado
+    - bypass_n_parallel_usado
+    - bypass_panel_usado
+    - E_dc_bypass
+    - kwh_bypass_anual
+    - pct_bypass_anual
+  cascade:
+    - cascada_mismatch
+    - factor_global_mismatch
+    - factor_sombra_anual
+    - factor_mismatch_or_pct
+    - poa_efectiva_kWh_m2
+
+invariants:
+  - "Sin FS_geometrico el CSV se rechaza; no hay fallback climático/combinado."
+  - "FS_climatico nunca activa bypass ni reduce su referencia uniforme."
+  - "La serie p_shade debe compartir exactamente el índice del TMY."
+  - "Horizonte + FS 3D se combinan por máximo, nunca por suma."
+  - "La pérdida bypass es adicional a la producción uniforme y no equivale a pérdida POA."
+  - "La cascada visual no debe duplicar pérdidas eléctricas que Producción aplica explícitamente."
+  - "Con Motor Óptico activo, bypass y Producción usan poa_sin_termico_df; poa_efectiva_df y poa_df no son fallbacks válidos para el SDM."
+  - "Si falta poa_sin_termico_df con Motor Óptico activo, el cálculo se bloquea y el bypass obsoleto se invalida."
+  - "Recalcular Motor Óptico invalida resultados monofaciales downstream y la producción persistida antes de publicar la nueva POA."
+  - "KEYS_BYPASS_RESULTADO debe ser subconjunto de KEYS_DERIVADOS_POA."
+  - "Cambiar fachada, inversión, modo, agregación, strings, panel o POA invalida el bypass anterior."
+  - "El resultado de bypass debe conservar qué configuración y horizonte se usaron."
+
+risks:
+  - "La coherencia interna y el ciclo de vida del bypass multi-superficie no se auditaron en este alcance."
+  - "Modo exacto puede dejar casi todo el año en FS=0 si el CSV solo contiene días críticos."
+  - "Puntos con pesos distintos pueden alterar el FS si se usa promedio simple."
+  - "Invertir FS solo es válido para formatos antiguos de transmitancia, no para CSV oficial del Motor Python."
+
+validation:
+  - bipv_python/tests/test_seleccion_poa_bypass_pagina5.py
+  - bipv_python/tests/test_mismatch_bypass_termico.py
+  - bipv_python/tests/test_contrato_sombreado.py
+  - bipv_python/tests/test_metricas_escenarios.py
+  - bipv_python/tests/test_simulation_pipeline.py
+  - bipv_python/tests/test_pagina_perdida_ohmica.py
+  - bipv_python/tests/test_comparativo_sketchup_marsh.py
