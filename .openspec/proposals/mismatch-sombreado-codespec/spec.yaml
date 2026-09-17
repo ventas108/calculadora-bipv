@@ -33,8 +33,10 @@ outputs:
     - bypass_p_shade
     - bypass_modo_usado
     - bypass_modo_agregacion_usado
+    - factor_mismatch_sin_soiling
   bypass:
     - bypass_result
+    - bypass_run_signature_v1
     - bypass_n_series_usado
     - bypass_n_parallel_usado
     - bypass_panel_usado
@@ -59,6 +61,8 @@ invariants:
   - "Si falta poa_sin_termico_df con Motor Óptico activo, el cálculo se bloquea y el bypass obsoleto se invalida."
   - "Recalcular Motor Óptico invalida resultados monofaciales downstream y la producción persistida antes de publicar la nueva POA."
   - "KEYS_BYPASS_RESULTADO debe ser subconjunto de KEYS_DERIVADOS_POA."
+  - "factor_mismatch_sin_soiling contiene solo sombra de horizonte y mismatch de orientación; factor_global_mismatch se conserva por compatibilidad."
+  - "bypass_run_signature_v1 identifica todos los argumentos efectivos: panel, topología, módulos, G_eff, T_amb, p_shade final, NOCT, k_bipv y umbral."
   - "Cambiar fachada, inversión, modo, agregación, strings, panel o POA invalida el bypass anterior."
   - "El resultado de bypass debe conservar qué configuración y horizonte se usaron."
 

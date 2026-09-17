@@ -1,0 +1,115 @@
+id: produccion-codespec
+title: CodeSpec del Módulo Producción
+status: proposed
+author: copilot
+
+owners:
+  page: bipv_python/pages/6_📊_Produccion.py
+  engines:
+    - bipv_python/calculos/produccion.py
+    - bipv_python/calculos/produccion_iv.py
+    - bipv_python/calculos/modelo_iv.py
+    - bipv_python/calculos/temperatura.py
+
+inputs:
+  solar: [tmy_df, poa_df, poa_anual_kWh_m2]
+  optical: [motor_optico_ok, poa_sin_termico_df, motor_optico_noct, motor_optico_k_bipv]
+  mismatch: [factor_global_mismatch, pct_mismatch_fab, pct_cableado_dc, pct_cableado_ac]
+  design: [panel, inversor, N_paneles, N_serie, N_strings_tracker, P_dc_stc_kW, P_ac_nom_W]
+  controls: [eta_inversor, produccion_usar_iv]
+  optional: [factor_espectral, perdida_ohmica_unifilar, bypass_result, poa_df_multisup]
+
+phase_1:
+  scope: [run-validity, single-soiling, bypass-validity, persistence-signature]
+  compatibility_keys:
+    preserved: [factor_global_mismatch, E_ac_anual_kWh, E_ac_anual_kWh_bypass]
+    added: [factor_mismatch_sin_soiling, produccion_run_signature_v1, bypass_run_signature_v1]
+  base_signature:
+    version: 1
+    digest: sha256
+    serialization: json-utf8-sort-keys-compact-ascii
+    float_encoding: finite-float-hex
+    hourly_fingerprint: sha256-timezone-utc-int64le-index-float64le-values
+    stored_in: [res_produccion, session_state, persisted-results]
+    includes:
+      - signature_version
+      - panel_fingerprint
+      - panel_nombre
+      - inverter_fingerprint
+      - inversor_nombre
+      - N_paneles
+      - N_serie
+      - N_strings_tracker
+      - n_inversores
+      - P_dc_stc_kW
+      - eta_inversor
+      - P_ac_nom_W_total
+      - produccion_usar_iv
+      - source_mode
+      - tmy_T2m_fingerprint
+      - poa_source
+      - poa_global_fingerprint
+      - factor_mismatch_aplicado
+      - NOCT
+      - k_bipv
+      - factor_espectral_fingerprint
+      - pct_mismatch_fab
+      - pct_cableado_dc
+      - pct_cableado_ac
+      - perdida_ohmica_fingerprint
+  bypass_signature:
+    version: 1
+    excludes: [produccion_run_signature_v1, multisurface-state]
+    includes:
+      - panel_fingerprint
+      - N_series
+      - N_parallel
+      - total_modules
+      - g_eff_hourly_fingerprint
+      - t_amb_hourly_fingerprint
+      - p_shade_final_hourly_fingerprint
+      - NOCT
+      - k_bipv
+      - umbral_shade
+  persistence:
+    legacy_without_signature: reject
+    missing_active_inputs: reject
+    restore_condition: exact-signature-match
+  zero_bypass:
+    preserve: [bypass_ok, bypass_result]
+    delete: [E_ac_anual_kWh_bypass, kwh_bypass_anual]
+
+outputs:
+  base: [res_produccion, res_produccion_base, res_produccion_iv]
+  energy: [E_dc_anual_kWh, E_ac_anual_kWh, Y_f_kWh_kWp, PR_sistema]
+  temporal: [df_horario, df_mensual_produccion]
+  metadata: [source_mode, produccion_run_signature_v1, bypass_run_signature_v1]
+  annual_adjustment: [E_ac_anual_kWh_bypass]
+  annual_estimate: [E_ac_anual_kWh_multisup]
+
+invariants:
+  - "Una configuración nueva nunca puede republicar un res_produccion anterior."
+  - "IAM, soiling, temperatura, fabricación, cableado, bypass y clipping se aplican una sola vez."
+  - "Con Motor Óptico activo, el SDM usa poa_sin_termico_df con NOCT y k_BIPV coherentes."
+  - "La suma horaria y mensual debe coincidir con la energía anual de la fuente oficial."
+  - "Bypass solo es vigente si coincide con panel, strings, módulos y POA de Producción."
+  - "Todo resultado declara el método físico que lo produjo."
+  - "Los consumidores downstream usan una única fuente oficial de energía."
+
+risks:
+  - "factor_global_mismatch duplica soiling cuando Motor Óptico ya lo incorporó."
+  - "produccion_ok no demuestra que la configuración visible coincida con la corrida guardada."
+  - "Una pérdida bypass nueva igual a cero puede dejar viva E_ac_anual_kWh_bypass anterior."
+  - "Bypass puede consumirse sin contrastar panel, strings, módulos ni POA."
+  - "El anual multi-superficie puede provenir de un modelo distinto a las series base."
+  - "La persistencia por ciudad/coordenadas puede aceptar otra configuración eléctrica."
+  - "La corrección espectral puede aplicarse por posición con un índice temporal distinto."
+
+validation:
+  - bipv_python/tests/test_agregador_anual.py
+  - bipv_python/tests/test_consistencia_sdm_entre_modulos.py
+  - bipv_python/tests/test_produccion_perdida_ohmica.py
+  - bipv_python/tests/test_perdidas_desglosadas_pvsyst.py
+  - bipv_python/tests/test_mismatch_bypass_termico.py
+  - bipv_python/tests/test_seleccion_poa_bypass_pagina5.py
+  - bipv_python/tests/test_simulation_multisuperficie.py
