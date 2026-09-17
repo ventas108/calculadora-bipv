@@ -17,6 +17,7 @@ of uniform shading in large photovoltaic arrays".
 from __future__ import annotations
 
 import io
+from typing import MutableMapping
 
 import numpy as np
 import pandas as pd
@@ -27,6 +28,7 @@ from calculos.agregacion_fs import (
     promedio_fs_por_claves,
 )
 from pvlib.singlediode import bishop88_mpp, bishop88_i_from_v
+from calculos.invalidacion import KEYS_BYPASS_RESULTADO
 from calculos.modelo_iv import trasladar_parametros_gt, _parametros_recombinacion
 from calculos.temperatura import temperatura_celda_noct
 
@@ -81,6 +83,156 @@ def _sdm_vectorizado(
     Pmp[low] = Isc[low] = Imp[low] = Vmp[low] = 0.0
 
     return Pmp, Isc, Imp, Vmp
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 1b. Selección de POA (G_eff) para el bypass — Página 5 Mismatch
+# ══════════════════════════════════════════════════════════════════════════════
+
+def seleccionar_poa_bypass(
+    motor_optico_ok: bool,
+    poa_sin_termico_df: pd.DataFrame | None,
+    poa_df: pd.DataFrame,
+    factor_global_mismatch: float,
+    motor_optico_k_bipv: float = 1.0,
+) -> tuple[np.ndarray | None, str, float]:
+    """
+    Selecciona la serie G_eff (poa_global) que alimenta simular_bypass_horario()
+    en Página 5, y el k_bipv coherente con esa fuente.
+
+    Prioridad estricta (ver docstring de simular_bypass_horario para la razón
+    física de por qué G_eff debe estar SIN el factor térmico):
+      1. Motor Óptico activo + poa_sin_termico_df disponible → esa serie
+         (IAM + soiling, SIN térmico) y motor_optico_k_bipv.
+      2. Motor Óptico activo pero SIN poa_sin_termico_df → estado
+         inconsistente (normalmente ambos se escriben/invalidan juntos, ver
+         calculos/invalidacion.py::KEYS_DERIVADOS_POA). Nunca cae a
+         poa_efectiva_df: esa serie ya trae el término térmico aplicado y
+         simular_bypass_horario() lo volvería a introducir vía T_cel(k_BIPV)
+         -- doble conteo silencioso. Se bloquea devolviendo G_eff=None.
+      3. Motor Óptico inactivo → POA bruta × factor_global_mismatch, con
+         k_bipv=1.0 (comportamiento legado, ventilado libre).
+
+    Retorna (G_eff, fuente_legible, k_bipv). G_eff es None solo en el caso 2
+    -- el llamador debe bloquear el cálculo en vez de sustituirlo.
+    """
+    if motor_optico_ok:
+        k_bipv = float(motor_optico_k_bipv)
+        if poa_sin_termico_df is not None:
+            g_eff = poa_sin_termico_df["poa_global"].values
+            fuente = (
+                "Motor Óptico — POA sin térmico (IAM + Soiling; "
+                "térmico vía SDM con k_BIPV)"
+            )
+        else:
+            g_eff = None
+            fuente = (
+                "⛔ Motor Óptico activo pero falta poa_sin_termico_df — "
+                "recalcula 🔆 Motor Óptico antes de simular el bypass"
+            )
+        return g_eff, fuente, k_bipv
+
+    g_eff = poa_df["poa_global"].values * float(factor_global_mismatch)
+    fuente = f"POA bruta × factor mismatch ({factor_global_mismatch * 100:.1f}%)"
+    return g_eff, fuente, 1.0
+
+
+def invalidar_resultados_bypass(session_state: MutableMapping) -> list[str]:
+    """
+    Elimina de session_state todo resultado de bypass calculado con una POA
+    que ya dejó de ser válida (ver seleccionar_poa_bypass(): G_eff=None).
+
+    Debe llamarse ANTES de cualquier lectura de `bypass_ok` en Página 5 --
+    sin esto, `if btn_bypass or session_state.get("bypass_ok")` sigue viendo
+    bypass_ok=True de una corrida anterior y muestra/reutiliza bypass_result
+    obsoleto (Producción también lo consume vía las mismas claves).
+
+    Usa calculos.invalidacion.KEYS_BYPASS_RESULTADO -- un subconjunto de
+    KEYS_DERIVADOS_POA acotado al bypass, para no invalidar de paso
+    motor_optico_ok/summary ni otros resultados del Motor Óptico que siguen
+    siendo válidos.
+
+    Acepta cualquier MutableMapping (session_state de Streamlit o un dict
+    plano en pruebas). Es idempotente: llamarla sobre un estado ya limpio no
+    hace nada. Retorna las claves que existían y fueron eliminadas.
+    """
+    eliminadas = [k for k in KEYS_BYPASS_RESULTADO if k in session_state]
+    for k in eliminadas:
+        session_state.pop(k, None)
+    return eliminadas
+
+
+def exigir_poa_sin_termico(
+    session_state: MutableMapping,
+) -> tuple[pd.DataFrame | None, list[str]]:
+    """
+    Gate reutilizable para CUALQUIER consumidor del SDM que dependa del
+    Motor Óptico (Producción en pages/6_📊_Produccion.py, además del bypass
+    de Página 5): cuando motor_optico_ok=True, exige poa_sin_termico_df y
+    nunca hace fallback a poa_efectiva_df (ya tiene el térmico aplicado --
+    duplicaría la corrección vía T_cel(k_BIPV) dentro del propio SDM) ni a
+    la POA bruta (sin IAM/soiling -- subestimaría las pérdidas ópticas).
+
+    A diferencia de resolver_poa_bypass() (pensado para Página 5, que
+    siempre se ejecuta ANTES de que el usuario pueda ver un bypass_result),
+    este gate existe porque Producción puede visitarse DIRECTAMENTE, sin
+    pasar nunca por Página 5 -- no se puede depender de que esa página se
+    ejecute para sanear session_state. Por eso, si el estado queda
+    inconsistente, invalida aquí mismo cualquier bypass_result de una
+    corrida anterior (ver invalidar_resultados_bypass).
+
+    session_state debe soportar .get/.pop/`in` (session_state de Streamlit
+    o un dict plano en pruebas).
+
+    Retorna (poa_sin_termico_df, claves_bypass_invalidadas):
+      - motor_optico_ok=False → (None, []). El llamador decide su propio
+        comportamiento legado (POA bruta, etc.); este gate no interviene.
+      - motor_optico_ok=True y poa_sin_termico_df disponible → (esa serie, []).
+      - motor_optico_ok=True y poa_sin_termico_df ausente → (None, claves
+        bypass invalidadas). El llamador DEBE bloquear el cálculo -- nunca
+        sustituir por poa_efectiva_df ni poa_df.
+    """
+    if not session_state.get("motor_optico_ok", False):
+        return None, []
+    poa_st = session_state.get("poa_sin_termico_df")
+    if poa_st is not None:
+        return poa_st, []
+    return None, invalidar_resultados_bypass(session_state)
+
+
+def resolver_poa_bypass(
+    session_state: MutableMapping,
+    poa_df: pd.DataFrame,
+) -> tuple[np.ndarray | None, str, float, list[str]]:
+    """
+    Orquestación única para Página 5: selecciona G_eff con
+    seleccionar_poa_bypass() y, si queda bloqueado (G_eff=None), invalida de
+    inmediato cualquier bypass_result derivado de una POA que ya no es
+    válida -- ANTES de que la página pueda volver a leer `bypass_ok`.
+
+    Concentrar selección + invalidación aquí (en vez de repetir
+    `if poa_bp is None: invalidar_resultados_bypass(...)` en la página)
+    hace estructuralmente imposible leer un bypass_result obsoleto: no hay
+    ningún orden de líneas en la página del que depender.
+
+    session_state debe soportar .get/.pop/`in` (session_state de Streamlit
+    o un dict plano en pruebas). poa_df es la POA bruta del sitio (siempre
+    presente si se llegó hasta la sección de bypass de la página).
+
+    Retorna (G_eff, fuente_legible, k_bipv, claves_bypass_invalidadas).
+    claves_bypass_invalidadas está vacía cuando G_eff no es None.
+    """
+    g_eff, fuente, k_bipv = seleccionar_poa_bypass(
+        motor_optico_ok=session_state.get("motor_optico_ok", False),
+        poa_sin_termico_df=session_state.get("poa_sin_termico_df"),
+        poa_df=poa_df,
+        factor_global_mismatch=session_state.get("factor_global_mismatch", 1.0),
+        motor_optico_k_bipv=session_state.get("motor_optico_k_bipv", 1.0),
+    )
+    claves_invalidadas: list[str] = []
+    if g_eff is None:
+        claves_invalidadas = invalidar_resultados_bypass(session_state)
+    return g_eff, fuente, k_bipv, claves_invalidadas
 
 
 # ══════════════════════════════════════════════════════════════════════════════

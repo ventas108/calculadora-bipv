@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 
 from calculos.produccion import simular_produccion_anual, perdidas_desglosadas, panel_tiene_sdm_completo
+from calculos.mismatch_bypass import exigir_poa_sin_termico
 from calculos.produccion_iv import simular_produccion_iv, panel_apto_para_iv, preparar_para_iv
 from calculos.modelo_iv import resolver_panel_calibrado
 from calculos.dimensionamiento import (
@@ -82,14 +83,36 @@ if _motor_ok:
     #   La corrección térmica la aplica el SDM internamente vía T_cell(k_bipv).
     #   Usar poa_efectiva_df (con f_term) causaría doble conteo térmico.
     # • poa_efectiva_df → visualización waterfall, Financiero y resúmenes.
-    # NOTA: no usar 'or' con DataFrames — pandas lanza ValueError en bool context.
-    def _get_poa_df(*keys):
-        for k in keys:
-            v = st.session_state.get(k)
-            if v is not None:
-                return v
-        return None
-    poa_base = _get_poa_df("poa_sin_termico_df", "poa_efectiva_df", "poa_df")
+    #
+    # exigir_poa_sin_termico() (calculos.mismatch_bypass) NUNCA hace fallback
+    # a poa_efectiva_df ni a poa_df bruta -- Producción puede visitarse
+    # DIRECTAMENTE, sin pasar por 🔀 Mismatch, así que no se puede depender
+    # de esa página para sanear session_state. Si falta poa_sin_termico_df,
+    # invalida además cualquier bypass_result de una corrida anterior (ya no
+    # sería coherente con este estado) y bloquea el cálculo aquí mismo.
+    _poa_sin_term_df, _bypass_claves_invalidadas_prod = exigir_poa_sin_termico(
+        st.session_state
+    )
+    if _poa_sin_term_df is None:
+        st.error(
+            "⛔ **Estado inconsistente del Motor Óptico.** `motor_optico_ok` "
+            "está activo pero falta `poa_sin_termico_df` (la POA con IAM + "
+            "soiling, sin térmico, que necesita el SDM). Usar `poa_efectiva_df` "
+            "o la POA bruta aquí duplicaría o eliminaría correcciones ópticas "
+            "reales.\n\n"
+            "👉 Vuelve a 🔆 Motor Óptico y pulsa **«Calcular cascada óptica»** "
+            "de nuevo para regenerar `poa_sin_termico_df` antes de simular "
+            "Producción."
+        )
+        if _bypass_claves_invalidadas_prod:
+            st.warning(
+                "🧹 Se invalidó el resultado de bypass diodes de una corrida "
+                "anterior (ya no es coherente con este estado) — vuelve a "
+                "calcularlo en 🔀 Mismatch después de regenerar "
+                "`poa_sin_termico_df`."
+            )
+        st.stop()
+    poa_base = _poa_sin_term_df
     poa_base_label    = "POA IAM+soiling — Motor Óptico (sin térmico, para SDM)"
     poa_display_anual = st.session_state.get("poa_efectiva_anual_kWh_m2", poa_bruta_anual)
     _factor_global_mo = _mo_summary.get("factor_global", 1.0)

@@ -16,6 +16,7 @@ from calculos.mismatch_bypass import (
     alinear_fs_con_tmy,
     combinar_fs_con_horizonte,
     cobertura_csv,
+    resolver_poa_bypass,
     simular_bypass_horario,
     estadisticas_fs,
 )
@@ -106,6 +107,24 @@ else:
         f"📍 **{ciudad}** — POA fachada {or_label} / {tilt_def}°: "
         f"**{poa_anual:,.0f} kWh/m²/año**"
     )
+
+# ── Saneamiento del bypass — SIEMPRE, ANTES de cualquier lectura de
+# bypass_ok/bypass_result ─────────────────────────────────────────────────────
+# resolver_poa_bypass() concentra selección de POA + invalidación (calculos.
+# mismatch_bypass): nunca cae en silencio a poa_efectiva_df (que ya trae el
+# térmico aplicado) cuando el Motor Óptico está activo pero falta
+# poa_sin_termico_df, y si queda bloqueada (G_eff=None) invalida de una vez
+# cualquier bypass_result de una corrida anterior. Debe ejecutarse aquí, ANTES
+# de la sección "Métricas separadas" (más abajo, lee bypass_result vía
+# metricas_electricas()) y del bloque `if btn_bypass or bypass_ok` de la
+# sección 5 -- NO dentro de `if csv_ok and df_fs_raw is not None:` como antes:
+# si el usuario nunca sube un CSV, ese bloque nunca se ejecuta y el
+# saneamiento no alcanzaría a correr, dejando bypass_ok/bypass_result
+# obsoletos vigentes para las métricas y para Producción.
+poa_bp, poa_src, _k_bipv_bp, _bypass_claves_invalidadas = resolver_poa_bypass(
+    st.session_state,
+    st.session_state["poa_df"],
+)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # FASE 4.2 — BASE ÚNICA DE COMPARACIÓN
@@ -1440,30 +1459,31 @@ if csv_ok and df_fs_raw is not None:
         )
 
     # ── POA base para el cálculo ──────────────────────────────────────────
-    _motor_ok = st.session_state.get("motor_optico_ok", False)
-    _mismatch_factor = st.session_state.get("factor_global_mismatch", 1.0)
-    if _motor_ok:
-        # poa_sin_termico_df (IAM + soiling, SIN el factor térmico multiplicativo)
-        # -- misma serie que usa Producción para el SDM. El factor térmico del
-        # Motor Óptico NO se aplica aquí: T_cel más abajo (con k_BIPV) lo vuelve
-        # a introducir vía el SDM, y usar poa_efectiva_df duplicaría la
-        # corrección térmica (ver pages/6_📊_Produccion.py y
-        # calculos/mismatch_bypass.py::simular_bypass_horario).
-        _poa_sin_term_df = st.session_state.get("poa_sin_termico_df")
-        if _poa_sin_term_df is not None:
-            poa_bp = _poa_sin_term_df["poa_global"].values
-            poa_src = "Motor Óptico — POA sin térmico (IAM + Soiling; térmico vía SDM con k_BIPV)"
-        else:
-            poa_bp = st.session_state["poa_efectiva_df"]["poa_global"].values
-            poa_src = "Motor Óptico (IAM + Soiling + Térmico) — sin poa_sin_termico_df disponible"
-        _k_bipv_bp = float(st.session_state.get("motor_optico_k_bipv", 1.0))
-    else:
-        poa_bp = st.session_state["poa_df"]["poa_global"].values * _mismatch_factor
-        poa_src = f"POA bruta × factor mismatch ({_mismatch_factor*100:.1f}%)"
-        _k_bipv_bp = 1.0
-
+    # poa_bp/poa_src/_k_bipv_bp/_bypass_claves_invalidadas ya se calcularon
+    # arriba (justo tras "Prioridad POA", antes de cualquier lectura de
+    # bypass_ok/bypass_result) -- ver el bloque resolver_poa_bypass() cerca
+    # del inicio de la página. Aquí solo se muestra el resultado.
     T_amb_bp = tmy["T2m"].values
-    st.caption(f"📡 POA de referencia: **{poa_src}**")
+    if poa_bp is None:
+        st.error(
+            "⛔ **Estado inconsistente del Motor Óptico.** `motor_optico_ok` "
+            "está activo pero falta `poa_sin_termico_df` (la POA con IAM + "
+            "soiling, sin térmico, que necesita el modelo de bypass diodes). "
+            "Usar `poa_efectiva_df` aquí duplicaría la corrección térmica, "
+            "porque el bypass ya la vuelve a aplicar internamente vía NOCT + "
+            "k_BIPV.\n\n"
+            "👉 Vuelve a 🔆 Motor Óptico y pulsa **«Calcular cascada óptica»** "
+            "de nuevo para regenerar `poa_sin_termico_df` antes de simular el "
+            "bypass."
+        )
+        if _bypass_claves_invalidadas:
+            st.warning(
+                "🧹 Se invalidó el resultado de bypass diodes de una corrida "
+                "anterior (ya no es coherente con la POA actual) — vuelve a "
+                "calcularlo después de regenerar `poa_sin_termico_df`."
+            )
+    else:
+        st.caption(f"📡 POA de referencia: **{poa_src}**")
 
     # ── #36 · Cobertura temporal y modo de alineación ─────────────────────
     st.markdown("#### 📅 Cobertura temporal del CSV")
@@ -1576,12 +1596,22 @@ if csv_ok and df_fs_raw is not None:
         type="primary",
         use_container_width=True,
         key="btn_bypass",
+        disabled=(poa_bp is None),
     )
 
     if btn_bypass or st.session_state.get("bypass_ok"):
         if btn_bypass:
             with st.spinner("Alineando FS con TMY y simulando bypass diodes hora a hora..."):
                 try:
+                    if poa_bp is None:
+                        # Defensa en profundidad: el botón ya queda deshabilitado
+                        # (disabled=poa_bp is None) cuando falta poa_sin_termico_df,
+                        # pero nunca se ejecuta el SDM con una POA térmicamente
+                        # ambigua aunque cambie la lógica del botón más adelante.
+                        raise ValueError(
+                            "Falta poa_sin_termico_df con el Motor Óptico activo — "
+                            "recalcula 🔆 Motor Óptico antes de simular el bypass."
+                        )
                     # Alinear FS con el TMY (df_fs_work: filtrado por fachada e invertido si aplica)
                     tmy_idx  = st.session_state["tmy_df"].index
                     _modo    = st.session_state.get("bypass_modo_alineacion", "mensual")
@@ -1852,6 +1882,12 @@ if csv_ok and df_fs_raw is not None:
                 use_container_width=True,
             ):
                 try:
+                    if poa_bp is None:
+                        raise ValueError(
+                            "Falta poa_sin_termico_df con el Motor Óptico activo — "
+                            "recalcula 🔆 Motor Óptico antes de ejecutar los "
+                            "escenarios (ver el aviso de POA de referencia arriba)."
+                        )
                     # eta_inversor solo existe tras correr Producción; en una
                     # sesión nueva usar el valor congelado en la base (es el
                     # mismo contra el que el ejecutor verifica coherencia).

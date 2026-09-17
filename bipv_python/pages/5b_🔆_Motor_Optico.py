@@ -15,6 +15,7 @@ from calculos.motor_optico import (
     indice_montaje_default,
     SOILING_COLOMBIA,
 )
+from calculos.invalidacion import invalidar_downstream_motor_optico
 
 st.set_page_config(page_title="Motor Óptico — BIPV", page_icon="🔆", layout="wide")
 
@@ -410,6 +411,26 @@ if run_btn:
             # Usar poa_efectiva (con f_term) en el SDM daría doble conteo térmico.
             poa_st_df = poa_df.copy()
             poa_st_df["poa_global"] = result_df["poa_post_soil"].reindex(poa_st_df.index).fillna(0.0)
+
+            # Cualquier resultado downstream de la POA ANTERIOR (Producción,
+            # bypass monofacial, pérdida óhmica, Financiero, CO₂) deja de
+            # ser válido en cuanto esta cascada recalcula -- invalidarlo
+            # ANTES de publicar la nueva poa_efectiva_df/poa_sin_termico_df,
+            # para que ninguna página downstream arrastre un resultado
+            # calculado con una POA que dejó de existir. NO toca el estado
+            # multi-superficie (POA independiente, ver
+            # calculos/invalidacion.py::KEYS_DOWNSTREAM_MOTOR_OPTICO).
+            invalidar_downstream_motor_optico(st.session_state)
+            # La huella de calculos/persistencia_resultados.py (ciudad +
+            # coordenadas) NO cambia cuando solo cambia la POA óptica, así
+            # que el JSON persistido a disco sobreviviría a la invalidación
+            # de arriba y Financiero lo "restauraría" con E_ac/E_dc de la
+            # POA anterior (restaurar_resultados_produccion() solo escribe
+            # claves AUSENTES -- y tras invalidar, sí quedan ausentes).
+            # Mismo patrón que pages/1_🏠_Proyecto.py: invalidar estado en
+            # memoria primero, limpiar el archivo persistido después.
+            from calculos.persistencia_resultados import limpiar_resultados_produccion
+            limpiar_resultados_produccion(st.session_state.get("auth_email", ""))
 
             st.session_state["motor_optico_ok"]            = True
             st.session_state["motor_optico_result_df"]     = result_df
