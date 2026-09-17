@@ -140,6 +140,7 @@ def _simular_escenario(
     eta_inversor: float,
     base_id: str,
     fuente_p_shade: str,
+    k_bipv: float,
 ) -> dict[str, Any]:
     if "NOCT" not in panel:
         raise ValueError(
@@ -153,6 +154,7 @@ def _simular_escenario(
         N_parallel=int(n_paralelo),
         panel=dict(panel),
         NOCT=float(panel["NOCT"]),
+        k_bipv=k_bipv,
         umbral_shade=0.05,
     )
     e_dc_kwh = float(np.sum(np.asarray(res["P_dc_kW"], dtype=float)))
@@ -186,6 +188,7 @@ def ejecutar_escenarios(
     modo_alineacion: str = "mensual",
     modo_agregacion: str = "auto",
     mascara_horizonte: pd.Series | None = None,
+    k_bipv: float = 1.0,
 ) -> dict[str, Any]:
     """Ejecuta los tres escenarios sobre la base congelada de ``definicion``.
 
@@ -195,7 +198,16 @@ def ejecutar_escenarios(
     base_estado_actual  : base recapturada del estado vivo; debe coincidir con
                           la base congelada (mismo ``base_id``) o se aborta.
     tmy                 : DataFrame TMY 8760 con columna ``T2m``.
-    poa_global          : irradiancia POA efectiva W/m² (8760).
+    poa_global          : irradiancia POA horaria W/m² (8760) para el SDM del
+                          bypass. Cuando el Motor Óptico está activo debe ser
+                          ``poa_sin_termico`` (IAM + soiling, SIN el factor
+                          térmico multiplicativo) -- el mismo insumo que usa
+                          Producción -- y NUNCA ``poa_efectiva`` (que ya trae
+                          el factor térmico aplicado): pasar ``poa_efectiva``
+                          duplicaría la corrección térmica, porque ``k_bipv``
+                          la vuelve a introducir aquí vía el SDM (ver
+                          calculos/mismatch_bypass.py::simular_bypass_horario
+                          y pages/6_📊_Produccion.py).
     panel               : ficha del panel (parámetros SDM + NOCT).
     n_serie, n_paralelo : configuración eléctrica del array.
     eta_inversor        : eficiencia del inversor (0 < η ≤ 1).
@@ -203,6 +215,10 @@ def ejecutar_escenarios(
                           (columnas mes/dia/hora/FS_geometrico).
     df_fs_optimizada    : FS de la alternativa optimizada; si es None el
                           escenario queda explícitamente pendiente.
+    k_bipv              : factor de confinamiento térmico BIPV (IEA-PVPS T15),
+                          misma fuente que ``motor_optico_k_bipv``; default 1.0
+                          (ventilado libre) para compatibilidad si no se conoce
+                          el montaje del array.
 
     Retorna un dict ``resultados`` (no muta ``definicion``):
     ``{"schema_version", "base_id", "parametros", "referencia", "actual",
@@ -261,6 +277,7 @@ def ejecutar_escenarios(
         panel=panel,
         eta_inversor=eta,
         base_id=base_id,
+        k_bipv=float(k_bipv),
     )
 
     # Referencia: se elimina únicamente la sombra geométrica (FS = 0).

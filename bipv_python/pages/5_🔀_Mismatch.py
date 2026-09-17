@@ -1443,11 +1443,24 @@ if csv_ok and df_fs_raw is not None:
     _motor_ok = st.session_state.get("motor_optico_ok", False)
     _mismatch_factor = st.session_state.get("factor_global_mismatch", 1.0)
     if _motor_ok:
-        poa_bp = st.session_state["poa_efectiva_df"]["poa_global"].values
-        poa_src = "Motor Óptico (IAM + Soiling + Térmico)"
+        # poa_sin_termico_df (IAM + soiling, SIN el factor térmico multiplicativo)
+        # -- misma serie que usa Producción para el SDM. El factor térmico del
+        # Motor Óptico NO se aplica aquí: T_cel más abajo (con k_BIPV) lo vuelve
+        # a introducir vía el SDM, y usar poa_efectiva_df duplicaría la
+        # corrección térmica (ver pages/6_📊_Produccion.py y
+        # calculos/mismatch_bypass.py::simular_bypass_horario).
+        _poa_sin_term_df = st.session_state.get("poa_sin_termico_df")
+        if _poa_sin_term_df is not None:
+            poa_bp = _poa_sin_term_df["poa_global"].values
+            poa_src = "Motor Óptico — POA sin térmico (IAM + Soiling; térmico vía SDM con k_BIPV)"
+        else:
+            poa_bp = st.session_state["poa_efectiva_df"]["poa_global"].values
+            poa_src = "Motor Óptico (IAM + Soiling + Térmico) — sin poa_sin_termico_df disponible"
+        _k_bipv_bp = float(st.session_state.get("motor_optico_k_bipv", 1.0))
     else:
         poa_bp = st.session_state["poa_df"]["poa_global"].values * _mismatch_factor
         poa_src = f"POA bruta × factor mismatch ({_mismatch_factor*100:.1f}%)"
+        _k_bipv_bp = 1.0
 
     T_amb_bp = tmy["T2m"].values
     st.caption(f"📡 POA de referencia: **{poa_src}**")
@@ -1605,6 +1618,7 @@ if csv_ok and df_fs_raw is not None:
                         N_parallel = int(N_parallel_bp),
                         panel      = panel_bp,
                         NOCT       = float(panel_bp.get("NOCT", 45.0)),
+                        k_bipv     = _k_bipv_bp,
                         umbral_shade = 0.05,
                     )
                     st.session_state["bypass_result"]     = res_bp
@@ -1878,6 +1892,7 @@ if csv_ok and df_fs_raw is not None:
                             modo_agregacion=st.session_state.get(
                                 "bypass_modo_agregacion", "auto"
                             ),
+                            k_bipv=_k_bipv_bp,
                             # Horizonte (#232): obligatorio si la definición
                             # lo declara; el ejecutor valida coherencia.
                             mascara_horizonte=(
