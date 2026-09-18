@@ -45,6 +45,13 @@
 ### ✅ Señal de éxito
 La página muestra un bloque verde con: ciudad, coordenadas, GHI, temperatura media y una **estimación preliminar** de energía anual en kWh.
 
+### 🕒 Zona horaria estimada del sitio
+La app detecta la zona horaria del proyecto en función de la ciudad y/o del archivo EPW asociado. Si la ubicación corresponde a Colombia, suele estimarse **UTC-5**. Ese dato se usa para mostrar los heatmaps y diagramas solares en **hora local**, no en UTC.
+
+> **Zona horaria estimada para este sitio: UTC-5** — los heatmaps y diagramas solares se mostrarán en hora local. **Guarda el proyecto para aplicarla**.
+
+Esto no cambia la física del recurso solar, pero sí cambia la escala temporal en la que se leen los gráficos. La configuración se guarda con el proyecto para que se mantenga al abrirlo de nuevo. Si cambias la ciudad o las coordenadas, vuelve a revisar esta información antes de ejecutar el análisis solar.
+
 ### ⚠️ ALERTAS — No cometer estos errores
 
 > 🔴 **NO ingrese el área del lote completo.** Solo ingrese el área NETA disponible para paneles (sin pasillos de mantenimiento, sin sombras de paredes, sin zonas de exclusión).

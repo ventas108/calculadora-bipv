@@ -1,6 +1,10 @@
 # Módulo 02 — Recurso solar
 
-**Estado:** idea
+**Estado:** archivado (reemplazado)
+
+> Este módulo se dividió en dos Specs verticales independientes — ver
+> [`vision.md`](vision.md) sección 5. Documentos activos:
+> [`react/problema.md`](react/problema.md) y [`streamlit/problema.md`](streamlit/problema.md).
 
 ## Alcance de la fase
 
