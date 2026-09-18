@@ -1,5 +1,5 @@
 # Tareas — Recurso solar
 
-**Estado:** idea
+**Estado:** archivado (reemplazado — ver `vision.md` sección 5, `react/tareas.md` y `streamlit/tareas.md`)
 
 - [ ] 

@@ -1,6 +1,6 @@
 # Propuesta — Datos del proyecto
 
-**Estado:** completado
+en**Estado:** completado
 
 ## Objetivo
 

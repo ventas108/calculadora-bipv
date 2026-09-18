@@ -1,6 +1,6 @@
 # Diseño — Recurso solar
 
-**Estado:** idea
+**Estado:** archivado (reemplazado — ver `vision.md` sección 5, `react/diseno.md` y `streamlit/diseno.md`)
 
 ## Entradas
 

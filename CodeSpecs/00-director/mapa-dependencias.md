@@ -22,9 +22,10 @@
 
 ## Reglas
 
-- Un módulo solo puede pasar a `en implementación` cuando sus dependencias directas
   tienen `diseno.md` en estado `aprobado`.
-- Un cambio en el contrato de un módulo obliga a revisar los módulos dependientes
   antes de archivar la Spec.
-- El director es responsable de detectar y resolver conflictos entre módulos que
   calculen la misma magnitud de forma distinta.
+- `02-recurso-solar` se divide en dos Specs verticales independientes (app React
+      en producción y app Streamlit hermana) — ver `CodeSpecs/02-recurso-solar/vision.md`.
+- El motor óptico (IAM/soiling) es alcance de `04-produccion-energia` /
+      `05-perdidas-y-temperatura`, no de `02-recurso-solar` (decisión 2026-09-15).

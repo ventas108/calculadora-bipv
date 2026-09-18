@@ -141,6 +141,18 @@ Cuando las coordenadas mostradas corresponden al centroide de la ciudad (no al p
 
 **Resultado:** Al guardar, la app persiste el tipo de instalación, el área, la densidad, el PR y el tilt por defecto en memoria de sesión. Estos valores se usan en Página 2, Página 4, Página 6 y el Reporte PDF.
 
+### Zona horaria estimada del sitio
+
+Cuando el proyecto tiene una ciudad o coordenadas asociadas, la app estima automáticamente la zona horaria del sitio a partir de la ubicación geográfica y/o del archivo EPW cargado. Este dato se usa para describir el comportamiento temporal del recurso solar y para que los heatmaps y los diagramas solares se muestren en **hora local** del sitio, no en UTC.
+
+Ejemplo típico:
+
+> **Zona horaria estimada para este sitio: UTC-5** — los heatmaps y diagramas solares se mostrarán en hora local.
+
+Esto es especialmente importante para países como Colombia, donde la diferencia horaria con UTC afecta la interpretación del mediodía solar y de la secuencia diurna de irradiancia. La zona horaria se toma de la ubicación del proyecto y se aplica en el cálculo de trayectorias solares, gráficos de irradiancia y vistas temporales del recurso solar.
+
+**Importante:** Si el proyecto se guarda con esa zona horaria estimada, la configuración queda aplicada al proyecto para futuras sesiones. Si cambias la ciudad o las coordenadas, revisa esta información antes de continuar con el cálculo del recurso solar.
+
 ---
 
 ## 4. Página 2 — Recurso Solar

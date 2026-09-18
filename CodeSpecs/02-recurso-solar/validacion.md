@@ -1,6 +1,6 @@
 # Validación — Recurso solar
 
-**Estado:** idea
+**Estado:** archivado (reemplazado — ver `vision.md` sección 5, `react/validacion.md` y `streamlit/validacion.md`)
 
 ## Checklist de validación del módulo
 
