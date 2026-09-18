@@ -22,10 +22,17 @@ import os
 _DIR_DATOS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "datos")
 DIR_PERSISTENCIA = os.path.join(_DIR_DATOS, "persistencia")
 
-# Claves de session_state que se persisten al terminar Producción
+# Claves de session_state que se persisten al terminar Producción.
+# produccion_run_signature_v1 (produccion-codespec Fase 1, "Persistencia")
+# viaja junto con los agregados: guardar_resultados_produccion() la escribe
+# igual que cualquier otra clave de esta tupla, y restaurar_resultados_
+# produccion() exige que coincida EXACTAMENTE con la firma que el llamador
+# ya reconstruyó en su propio session_state antes de restaurar el resto --
+# ver esa función más abajo.
 CLAVES_RESULTADOS = (
     "E_ac_anual_kWh", "E_dc_anual_kWh", "PR_sistema", "Y_f_kWh_kWp",
     "P_stc_kW_sistema", "N_paneles_final", "panel_nombre_final", "eta_inversor",
+    "produccion_run_signature_v1",
 )
 
 # Huella del proyecto: si cambia, los resultados guardados NO aplican
@@ -133,6 +140,22 @@ def restaurar_resultados_produccion(session_state, usuario: str) -> bool:
     if not isinstance(resultados, dict) or not resultados:
         return False
     if not _huella_coincide(data.get("huella"), session_state):
+        return False
+    # Firma de vigencia (produccion-codespec Fase 1, "Persistencia"):
+    # - Un archivo persistido SIN firma es legacy (guardado antes de esta
+    #   ronda) -- se rechaza en vez de asumir que la configuración sigue
+    #   siendo la misma; el usuario debe recalcular Producción una vez.
+    # - Restaurar exige que quien llama YA haya reconstruido la firma
+    #   ESPERADA en su propio session_state (calculos.produccion_vigencia.
+    #   calcular_produccion_run_signature_v1(), con sus entradas actuales:
+    #   panel, inversor, TMY, POA, etc.) antes de invocar esta función. Si
+    #   no pudo reconstruirla (p.ej. porque tmy_df/panel aún no están
+    #   disponibles en esta pestaña), produccion_run_signature_v1 simplemente
+    #   no está en session_state -- nunca se infiere un default ni se
+    #   restaura "por si acaso".
+    firma_persistida = resultados.get("produccion_run_signature_v1")
+    firma_esperada = session_state.get("produccion_run_signature_v1")
+    if not firma_persistida or not firma_esperada or firma_persistida != firma_esperada:
         return False
     restauro_clave = False
     for k in CLAVES_RESULTADOS:

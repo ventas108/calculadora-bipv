@@ -1091,13 +1091,20 @@ def test_financiero_no_restaura_energia_anterior_tras_recalculo(_pr_aislado):
 #     (demuestra que el test 33 realmente ejercita la limpieza, y no un
 #     comportamiento por default de restaurar_resultados_produccion()).
 def test_sin_limpiar_persistencia_financiero_si_restauraria(_pr_aislado):
+    # produccion-codespec Fase 1 ("Persistencia", ronda posterior a esta):
+    # restaurar ahora ADEMÁS exige produccion_run_signature_v1 coincidente
+    # (ver tests/test_produccion_vigencia.py). Este control negativo sigue
+    # probando específicamente que "sin limpiar" restauraría -- por eso la
+    # MISMA firma se fija en ambos lados, para aislar esa única variable.
     pr = _pr_aislado
     usuario = "ronda5-test-control@example.com"
+    firma = "c" * 64
     sesion_guardada = {
         "E_ac_anual_kWh": 12345.6, "E_dc_anual_kWh": 13000.0,
         "PR_sistema": 0.81, "Y_f_kWh_kWp": 1500.0,
         "P_stc_kW_sistema": 10.0, "N_paneles_final": 20,
         "panel_nombre_final": "ASP-ST1-T40", "eta_inversor": 0.96,
+        "produccion_run_signature_v1": firma,
         "ciudad": "Bogotá", "lat_proyecto": 4.7110, "lon_proyecto": -74.0721,
     }
     pr.guardar_resultados_produccion(sesion_guardada, usuario)
@@ -1105,6 +1112,7 @@ def test_sin_limpiar_persistencia_financiero_si_restauraria(_pr_aislado):
     estado_nuevo = {
         "auth_email": usuario, "ciudad": "Bogotá",
         "lat_proyecto": 4.7110, "lon_proyecto": -74.0721,
+        "produccion_run_signature_v1": firma,  # misma firma -- el llamador la reconstruyó igual
     }
     restauro = pr.restaurar_resultados_produccion(estado_nuevo, usuario)
     assert restauro is True

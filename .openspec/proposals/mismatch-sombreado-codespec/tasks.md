@@ -20,13 +20,14 @@
 - [x] Bloquear el mismo fallback térmico al entrar directamente a Producción.
 - [x] Invalidar Producción, bypass, Financiero, CO₂ y persistencia en disco al recalcular Motor Óptico.
 - [x] Verificar que Producción no duplique la corrección térmica del Motor Óptico.
-- [ ] Verificar que Producción/Financiero no dupliquen otras pérdidas de la cascada visual.
+- [x] Verificar que Producción/Financiero no dupliquen soiling: `factor_mismatch_sin_soiling` (Página 5) cubre solo sombra de horizonte + mismatch de orientación; Producción lo usa en vez de `factor_global_mismatch` cuando Motor Óptico está activo (produccion-codespec Fase 1, commit posterior a `f7402f70`). Fabricación/cableado/otras pérdidas de la cascada visual quedan fuera de este alcance.
 
 ## Implementación posterior
 
 - [x] Corregir la incoherencia térmica reproducida en el camino normal: Página 5 selecciona POA sin térmico y bypass/escenarios Fase 4 propagan `k_BIPV` (commit `95388cd4`).
 - [x] Añadir invalidación del bypass y resultados downstream cuando cambia la POA del Motor Óptico (commit `f7402f70`; desplegado en `main` como `e6b76069b`).
-- [ ] Añadir registro reproducible del CSV, modo, agregación, fachada, strings y panel usados.
+- [x] Registrar `bypass_run_signature_v1` (panel, topología, módulos, `G_eff`, `T_amb`, `p_shade` final, `NOCT`, `k_bipv`, `umbral_shade`) al simular bypass en Página 5, y exigir que Producción reconstruya la MISMA firma desde su propia configuración vigente antes de restar esa energía (produccion-codespec Fase 1). `G_eff` del bypass sigue siendo la POA óptica sin térmico -- nunca se multiplica por `factor_mismatch_sin_soiling`, que pertenece solo a la corrida base de Producción.
+- [ ] Añadir registro reproducible del CSV, modo, agregación, fachada, strings y panel usados (más allá de lo que ya captura `bypass_run_signature_v1` como huella).
 - [ ] Cambiar `status` a `validated` solo con evidencia fresca.
 
 ## Evidencia térmica validada (2026-09-17)
@@ -39,3 +40,11 @@
 - [x] Pruebas de Producción y Motor Óptico: 10 aprobadas.
 - [x] Scripts de fuente térmica única, invalidación y persistencia: aprobados.
 - [x] Despliegue verificado: PM2 `online` y `/_stcore/health` respondió `ok`.
+
+## Evidencia Fase 1 de produccion-codespec (2026-09-17, mismo día, commit base `7cc47b49`)
+
+`factor_mismatch_sin_soiling` y `bypass_run_signature_v1` (ya declarados como
+outputs/invariantes en `spec.yaml` de este CodeSpec) quedaron implementados
+en esta ronda -- ver evidencia completa en
+`.openspec/proposals/produccion-codespec/tasks.md` § "Evidencia Fase 1".
+Sin commit ni push todavía; pendiente de autorización.

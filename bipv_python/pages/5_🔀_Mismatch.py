@@ -10,6 +10,7 @@ from calculos.mismatch import (
     calcular_mismatch_orientacion,
     cascada_perdidas,
     factor_global_perdidas,
+    calcular_factor_mismatch_sin_soiling,
 )
 from calculos.mismatch_bypass import (
     cargar_csv_fs,
@@ -20,6 +21,7 @@ from calculos.mismatch_bypass import (
     simular_bypass_horario,
     estadisticas_fs,
 )
+from calculos.produccion_vigencia import calcular_bypass_run_signature_v1
 from calculos.solar import calcular_poa, ORIENTACIONES, posiciones_solares_representativas
 from datos.ciudades_colombia import CIUDADES
 from calculos.tz_utils import utc_offset_latam, tz_label
@@ -1199,6 +1201,17 @@ if btn_cascada or st.session_state.get("cascada_ok"):
     # ── Guardar en session_state para Producción ──────────────────────────────
     st.session_state["poa_efectiva_kWh_m2"]       = round(poa_efectiva, 1)
     st.session_state["factor_global_mismatch"]    = fg
+    # factor_mismatch_sin_soiling (produccion-codespec Fase 1, "Soiling
+    # único"): SOLO sombra de horizonte + mismatch de orientación, SIN
+    # soiling -- Motor Óptico ya lo incorpora dentro de poa_sin_termico_df.
+    # Producción usa este factor (no factor_global_mismatch, que sí incluye
+    # soiling) cuando Motor Óptico está activo, para no aplicarlo dos veces.
+    # Se recalcula/invalida junto con factor_global_mismatch (misma sección,
+    # mismo botón) -- factor_global_mismatch se conserva sin cambios por
+    # compatibilidad con los demás consumidores (Página 4b/4c/4d, IA, etc.).
+    st.session_state["factor_mismatch_sin_soiling"] = calcular_factor_mismatch_sin_soiling(
+        factor_sombra_anual, factor_mismatch_or_pct,
+    )
     st.session_state["factor_sombra_anual"]       = factor_sombra_anual
     st.session_state["factor_mismatch_or_pct"]    = factor_mismatch_or_pct
     st.session_state["mismatch_ok"]               = True
@@ -1659,6 +1672,24 @@ if csv_ok and df_fs_raw is not None:
                     st.session_state["bypass_n_series_usado"]   = int(N_series_bp)
                     st.session_state["bypass_n_parallel_usado"] = int(N_parallel_bp)
                     st.session_state["bypass_panel_usado"]      = panel_bp_nombre
+                    # bypass_run_signature_v1 (produccion-codespec Fase 1,
+                    # "Vigencia de bypass"): huella de los argumentos EFECTIVOS
+                    # que se acaban de pasar a simular_bypass_horario() arriba
+                    # -- Producción la reconstruye desde SU configuración
+                    # vigente antes de restar esta energía de la anual.
+                    st.session_state["bypass_run_signature_v1"] = calcular_bypass_run_signature_v1(
+                        panel=panel_bp,
+                        N_series=int(N_series_bp),
+                        N_parallel=int(N_parallel_bp),
+                        total_modules=int(N_series_bp) * int(N_parallel_bp),
+                        tmy_index=tmy_idx,
+                        G_eff=poa_bp,
+                        T_amb=T_amb_bp,
+                        p_shade_final=p_shade.values,
+                        NOCT=float(panel_bp.get("NOCT", 45.0)),
+                        k_bipv=_k_bipv_bp,
+                        umbral_shade=0.05,
+                    )
                     st.session_state["bypass_ok"]         = True
                 except Exception as e:
                     st.error(f"❌ Error en simulación bypass: {e}")
