@@ -179,3 +179,16 @@ def test_buscar_adoptar_orientacion_recalcula_poa_e_invalida_derivados():
     )
     tokens = set(_normalizar(seccion["texto"]))
     assert {"adoptar", "recalcula", "poa", "invalida", "compatibilidad"} <= tokens
+
+
+def test_buscar_auditoria_integral_recupera_anexo_72_con_comparadores():
+    seccion = _seccion_recuperada(
+        "como audito un proyecto completo antes de entregarlo y reviso los comparadores",
+        "esquema practico de auditoria",
+    )
+    texto = seccion["texto"]
+    tokens = set(_normalizar(texto))
+    assert {"panel", "inversor", "orientacion", "adoptar", "version", "anterior"} <= tokens
+    assert "P_ac_sin_recorte_kW" not in texto  # la guía usa lenguaje operativo
+    assert "multi-superficie" in texto
+    assert "firma común de entradas" in texto
