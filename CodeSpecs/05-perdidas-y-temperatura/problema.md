@@ -1,6 +1,6 @@
 # Módulo 05 — Pérdidas y temperatura
 
-**Estado:** en validación
+**Estado:** completado
 
 ## Alcance de la fase
 

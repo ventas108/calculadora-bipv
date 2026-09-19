@@ -1,6 +1,6 @@
 # Módulo 04 — Producción de energía
 
-**Estado:** en validación
+**Estado:** completado
 
 ## Alcance de la fase
 

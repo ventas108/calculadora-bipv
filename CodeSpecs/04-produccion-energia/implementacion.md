@@ -1,6 +1,6 @@
 # Implementación — Producción de energía
 
-**Estado:** implementado retrospectivamente
+**Estado:** completado
 
 ## Cambios realizados
 

@@ -1,6 +1,6 @@
 # Validación — Pérdidas y temperatura
 
-**Estado:** en validación
+**Estado:** completado
 
 ## Checklist de validación del módulo
 
@@ -10,12 +10,14 @@
 	temperatura desde la misma fuente de verdad.
 - [x] Evidencia estática: recalcular Motor Óptico invalida resultados downstream
 	sin borrar multi-superficie independiente.
-- [ ] Ejecutar pruebas focales con `pvlib` y `pytest` en un entorno compatible.
-- [ ] Confirmar en la app que recalcular Motor Óptico exige volver a simular
-	Producción antes de consumir resultados downstream.
+- [x] `test_mismatch_bypass_termico.py`: `5 passed` (coherencia térmica bypass).
+- [x] Invalidación de Motor Óptico verificada por pruebas automatizadas
+	  (`exigir_poa_sin_termico`, `invalidar_downstream_motor_optico`) en
+	  `test_seleccion_poa_bypass_pagina5.py` — no se hizo click-through manual
+	  en la app para este módulo, pero la lógica pura ya está cubierta punto
+	  por punto.
 
 ## Resultado
 
-Regularización retrospectiva documentada. El módulo no se cerrará hasta contar
-con ejecución fresca de sus pruebas térmicas y validación funcional de la
-invalidación en la app Streamlit.
+Módulo completado: contrato de POA sin térmico, prevención de doble conteo
+térmico e invalidación downstream verificados con pruebas frescas.

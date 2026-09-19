@@ -1,6 +1,6 @@
 # Diseño — Producción de energía
 
-**Estado:** en validación
+**Estado:** completado
 
 ## Entradas
 

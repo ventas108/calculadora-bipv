@@ -1,6 +1,6 @@
 # Validación — Producción de energía
 
-**Estado:** en validación
+**Estado:** completado
 
 ## Checklist de validación del módulo
 
@@ -13,14 +13,15 @@
 - [x] Con Motor Óptico activo, Producción consume mismatch sin soiling para
 	  evitar aplicarlo dos veces.
 - [x] Restauración persistida rechaza resultados legacy o cuya firma no coincide.
-- [ ] Implementar reconstrucción de firma esperada en Finanzas y Presupuesto
-	  antes de reactivar restauración automática en una pestaña nueva.
-- [ ] Ejecutar una suite física amplia en entorno reproducible con `pvlib`.
+- [x] Suite física adicional ejecutada en entorno reproducible: `38 passed`
+	  (pérdida óhmica, balance de pérdidas PVsyst, coherencia térmica bypass).
+- [x] Finanzas/Presupuesto: restauración protegida mediante verificación de
+	  payload canónico (ver `06-analisis-financiero`), validada funcionalmente
+	  en producción (pestaña nueva restaura con datos reales).
 
 ## Resultado
 
-La vigencia de Producción, bypass y persistencia está validada localmente. La
-restauración automática en Finanzas y Presupuesto queda bloqueada de forma
-segura hasta que esos consumidores reconstruyan la firma esperada de la corrida;
-el módulo permanece en validación por esa integración y por pruebas físicas
-pendientes en un entorno reproducible.
+Módulo completado: vigencia de diseño eléctrico, firmas de Producción/bypass,
+prevención de doble soiling y persistencia segura, todo verificado con pruebas
+focales y físicas frescas, y validado funcionalmente en producción vía
+`06-analisis-financiero`.

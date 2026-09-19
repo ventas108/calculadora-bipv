@@ -1,6 +1,6 @@
 # Propuesta — Pérdidas y temperatura
 
-**Estado:** en validación
+**Estado:** completado
 
 ## Objetivo
 

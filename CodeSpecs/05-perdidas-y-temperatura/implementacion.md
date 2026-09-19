@@ -1,6 +1,6 @@
 # Implementación — Pérdidas y temperatura
 
-**Estado:** implementado retrospectivamente
+**Estado:** completado
 
 ## Cambios realizados
 

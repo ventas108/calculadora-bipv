@@ -1,6 +1,6 @@
 # Propuesta — Producción de energía
 
-**Estado:** en validación
+**Estado:** completado
 
 ## Objetivo
 
