@@ -1,0 +1,52 @@
+id: motor-iv-case
+title: Módulo 3 — Motor IV
+status: proposed
+author: copilot
+
+objective:
+  - Definir y proteger el contrato real del motor de curva I-V para paneles BIPV.
+  - Mantener la validación SDM y la activación automática del panel coherentes con el catálogo.
+  - Garantizar que el Motor IV siga siendo consistente con producción, mismatch y visualización técnica.
+
+current_state:
+  - El repositorio ya tiene una implementación real del modelo de un diodo en `bipv_python/calculos/modelo_iv.py`.
+  - El motor se reutiliza en producción IV, mismatch y otros cálculos técnicos.
+  - La UI de Motor IV y Dimensionamiento ya expone la activación automática y los diagnósticos asociados.
+  - La validación técnica depende de la coherencia entre ficha del panel, parámetros estimados y la salida real del modelo.
+
+affected_modules:
+  - shared/shading-engine-contract.ts
+  - shared/colombianRegions.ts
+  - bipv_python/calculos/modelo_iv.py
+  - bipv_python/calculos/produccion_iv.py
+  - bipv_python/calculos/panel_iv_check.py
+  - bipv_python/calculos/validador_panel.py
+  - bipv_python/pages/3_🔬_Motor_IV.py
+  - bipv_python/pages/4_📐_Dimensionamiento.py
+  - bipv_python/pages/6_📊_Produccion.py
+  - bipv_python/tests/test_modelo_iv.py
+  - bipv_python/tests/test_validacion_sdm_alarma.py
+
+constraints:
+  - No romper la arquitectura shared/server/client.
+  - No tratar la UI como fuente de verdad del cálculo.
+  - Mantener la validación SDM y la respuesta del motor en el punto de entrada del panel.
+  - No introducir dependencias nuevas salvo que haya una causa técnica documentada.
+  - Mantener compatibilidad con los paneles del catálogo y los casos ya validados.
+
+expected_behavior:
+  - El panel debe activarse automáticamente si tiene datos IV suficientes y coherentes.
+  - Un panel incompleto o inconsistente debe mostrar diagnóstico claro, sin activación silenciosa.
+  - El modelo SDM debe reproducir valores físicos plausibles contra la ficha técnica.
+  - El mismo modelo debe mantenerse consistente entre IV, producción y análisis técnico.
+
+validation:
+  - Revisión de la ruta de cálculo en `modelo_iv.py` y módulos asociados.
+  - Pruebas de validación del panel y del SDM.
+  - Verificación de la activación automática en Dimensionamiento y la vista técnica de Motor IV.
+  - Registro explícito del resultado y riesgos si la validación es parcial.
+
+risks:
+  - Desalineación entre la ficha técnica y la calibración del SDM.
+  - Activación incorrecta por `N_s` o valores thermal inconsistentes.
+  - Diagnóstico visual discordante con la lógica real del cálculo.

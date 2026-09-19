@@ -1,0 +1,52 @@
+id: uraba-agrivoltaica-case
+title: Caso concreto de granja agrivoltaica en Urabá
+status: proposed
+author: ventas108
+
+objective:
+  - Documentar y proteger el caso real de granja agrivoltaica de Urabá.
+  - Mantener la lógica de ocupación del terreno y área útil coherente con el cálculo real.
+  - Garantizar que los resultados de producción y financiero sigan alineados con la arquitectura actual.
+
+current_state:
+  - El repositorio ya incluye evidencias reales del caso de Urabá en varios documentos y scripts.
+  - Existe lógica específica de agrivoltaica para factor de ocupación y área útil.
+  - El flujo de cálculo cruza páginas de proyecto, solar, dimensionamiento y producción.
+
+affected_modules:
+  - shared/shading-engine-contract.ts
+  - shared/colombianRegions.ts
+  - bipv_python/pages/1_🏠_Proyecto.py
+  - bipv_python/pages/2_☀️_Recurso_Solar.py
+  - bipv_python/pages/4_📐_Dimensionamiento.py
+  - bipv_python/pages/5b_🔆_Motor_Optico.py
+  - bipv_python/pages/6_📊_Produccion.py
+  - bipv_python/pages/7_💰_Financiero.py
+  - bipv_python/pages/8_💼_Presupuesto.py
+  - bipv_python/pages/9_🗺️_Vista_3D.py
+  - bipv_python/calculos/dimensionamiento.py
+  - bipv_python/calculos/produccion.py
+  - bipv_python/calculos/solar.py
+
+constraints:
+  - No romper el contrato de sombreado ni las validaciones existentes.
+  - No tratar la UI como fuente de verdad del cálculo.
+  - Mantener la arquitectura frontend/shared/backend intacta.
+  - Minimizar cambios y priorizar compatibilidad retroactiva.
+
+expected_behavior:
+  - El factor de ocupación debe reflejar el terreno útil para agrivoltaica.
+  - Los paneles y la producción deben calcularse sobre el área útil y no sobre terreno bruto.
+  - La lógica de dimensionamiento y producción debe permanecer consistente con el caso Urabá ya documentado.
+  - Cualquier ajuste visual debe venir después de validar la lógica base.
+
+validation:
+  - Shared contract review.
+  - Server-side calculation review.
+  - Focused project validation or regression checks tied to the Urabá case.
+  - Report the result honestly if the validation path is only partial.
+
+risks:
+  - Sobrecontar paneles si se usa terreno bruto en lugar de área útil.
+  - Desalinear producción y financieras con la base real del proyecto.
+  - Ocultar un bug real detrás de un cambio visual aislado.

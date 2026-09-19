@@ -57,6 +57,7 @@ coverage/
 jspm_packages/
 
 # Python virtual environments (incompatible across systems — never commit)
+.venv/
 bipv_python/venv/
 **/venv/
 **/__pycache__/

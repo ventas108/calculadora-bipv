@@ -1,0 +1,63 @@
+id: sombras-sketchup-codespec
+title: CodeSpec del módulo Sombras SketchUp
+status: proposed
+author: copilot
+
+inputs:
+  geometry:
+    accepted_formats: [obj, stl, dae, ply, glb]
+    site_designer_json: [Location, Blocks]
+    units: [meters, centimeters, millimeters, inches, feet]
+    site_designer_units: millimeters_fixed
+  orientation:
+    model_axes: [x_east, y_north, z_up]
+    north_rotation_deg: [-180, 180]
+  analysis_points:
+    required: [Punto, Fachada, x_m, y_m, z_m]
+    optional: [Fila, n_modulos, area_activa_m2, potencia_instalada_kw]
+  solar:
+    required: [lat, lon, tmy_index]
+    tmy_rule: project_tmy_required_for_hourly_alignment
+  shading:
+    transparency_range: [0.0, 0.8]
+    direct_sun_min_altitude_deg: 1.0
+  svf:
+    optional_inputs: [tilt_deg, azimuth_deg, resolution_deg]
+
+outputs:
+  hourly_csv:
+    required_columns: [Mes, Dia, Hora, FS_geometrico, FS, Fachada, Fila, Punto]
+    optional_columns: [Altura Solar (deg), Acimut Solar (deg), N módulos, Área activa (m²), Potencia instalada (kW), obstacle_id, obstacle_name, first_hit_distance_m]
+    convention: "FS_geometrico 0=sin sombra, 1=sombra total"
+  state:
+    - sk_df_fs
+    - sk_firma
+    - csv_fs_sketchup_bytes
+    - csv_fs_sketchup_nombre
+    - fs_fuente
+  diffuse:
+    - sk_df_svf
+    - factor_svf_isotropico
+    - factor_svf_tilt_az
+
+invariants:
+  - "La malla se convierte a metros antes de calcular o validar dimensiones."
+  - "La orientación norte se aplica exactamente una vez."
+  - "El cálculo horario usa el mismo índice TMY que Producción."
+  - "FS_climatico no se exporta como fuente de bypass; FS_geometrico es la columna autorizada."
+  - "Los paneles no forman parte de la malla de obstáculos."
+  - "Cambiar cualquier entrada de la firma invalida el resultado horario anterior."
+  - "Site Designer y OBJ equivalentes producen FS horario equivalente."
+  - "SVF no se mezcla con sombra directa y obliga a recalcular Recurso Solar."
+
+limits:
+  max_triangles: 300000
+  max_rays: 6000000
+  max_site_designer_blocks: 5000
+
+validation:
+  - bipv_python/tests/test_comparativo_sketchup_marsh.py
+  - bipv_python/tests/test_contrato_sombreado.py
+  - bipv_python/tests/test_sitedesigner_marsh.py
+  - bipv_python/tests/test_svf_difuso.py
+  - bipv_python/scripts/test_sombras_3d.py
