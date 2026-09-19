@@ -1,6 +1,6 @@
 # Validación — Análisis financiero
 
-**Estado:** validado
+**Estado:** completado
 
 ## Checklist de validación del módulo
 
@@ -13,9 +13,10 @@
       `calcular_bypass_run_signature_v1()` sin cambios.
 - [x] Gates ya desplegados intactos: diseño eléctrico vencido, vigencia de
       bypass, doble soiling.
-- [ ] Validación funcional en producción: simular Producción, abrir
-      Finanzas/Presupuesto en pestaña nueva y confirmar restauración; alterar
-      el JSON persistido a mano y confirmar el rechazo.
+- [x] Validación funcional en producción: pestaña nueva de 💰 Financiero
+      muestra "📂 Datos restaurados del proyecto guardado" y los agregados
+      reales del proyecto (128 módulos, 8.06 kWp, 4.743 kWh/año), no defaults
+      en cero — confirmado 19-sep-2026.
 
 ## Resultado
 

@@ -1,6 +1,6 @@
 # Diseño — Análisis financiero
 
-**Estado:** aprobado
+**Estado:** completado
 
 ## Entradas
 

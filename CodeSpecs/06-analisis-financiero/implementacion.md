@@ -1,6 +1,6 @@
 # Implementación — Análisis financiero
 
-**Estado:** implementado
+**Estado:** completado
 
 ## Cambios realizados
 

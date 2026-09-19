@@ -1,6 +1,6 @@
 # Módulo 06 — Análisis financiero
 
-**Estado:** aprobado
+**Estado:** completado
 
 ## Alcance de la fase
 

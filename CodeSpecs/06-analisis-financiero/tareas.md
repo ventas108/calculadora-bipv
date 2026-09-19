@@ -1,6 +1,6 @@
 # Tareas — Análisis financiero
 
-**Estado:** aprobado
+**Estado:** completado
 
 - [x] Aprobación humana explícita del diseño (payload canónico persistido +
       verificación de integridad) antes de tocar código — confirmada 19-sep-2026.

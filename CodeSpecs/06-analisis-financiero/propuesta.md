@@ -1,6 +1,6 @@
 # Propuesta — Análisis financiero
 
-**Estado:** aprobado
+**Estado:** completado
 
 ## Objetivo
 

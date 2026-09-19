@@ -49,9 +49,11 @@ Salida:
 	`produccion_run_signature_v1`.
 
 Regla de consumo:
-- Una restauración downstream solo es válida cuando el consumidor reconstruye y
-	hace coincidir la firma de la configuración actual. Sin firma coincidente no
-	se restaura ningún agregado de Producción.
+- Producción valida la vigencia reconstruyendo la firma en vivo desde su propia
+	configuración visible. Consumidores que no tienen esos insumos en sesión
+	(Finanzas/Presupuesto, ver `06-analisis-financiero`) no reconstruyen la firma:
+	verifican la integridad del payload canónico persistido junto a ella. Sin esa
+	verificación exitosa, ningún agregado de Producción se restaura.
 
 ### 05-perdidas-y-temperatura
 
@@ -68,7 +70,21 @@ Regla de consumo:
 	SDM. Recalcular la cascada invalida resultados dependientes de su POA.
 
 ### 06-analisis-financiero
-_(pendiente — ver [../06-analisis-financiero/diseno.md](../06-analisis-financiero/diseno.md))_
+
+Entrada:
+- Resultados persistidos de Producción (`04-produccion-energia`): agregados
+	(`E_ac_anual_kWh`, `P_stc_kW_sistema`, etc.), `produccion_run_signature_v1` y
+	su payload canónico (`payload_firma`).
+
+Salida:
+- Agregados restaurados en `session_state` de Finanzas/Presupuesto, solo
+	cuando el payload persistido verifica contra la firma persistida.
+
+Regla de consumo:
+- Finanzas y Presupuesto nunca reconstruyen la firma en vivo (no cargan
+	panel/inversor/TMY/POA). Restauran únicamente si
+	`firma_desde_payload(payload_persistido) == firma_persistida`; payload
+	ausente (legacy) o alterado nunca restaura.
 
 ### 07-informes
 _(pendiente — ver [../07-informes/diseno.md](../07-informes/diseno.md))_
