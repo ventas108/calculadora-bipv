@@ -6,10 +6,16 @@ import shutil
 import sys
 import tempfile
 
+import numpy as np
+import pandas as pd
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from calculos import persistencia_resultados as pr
 from calculos import presupuesto_store as pstore
+from calculos.produccion_vigencia import (
+    construir_payload_produccion_run_signature_v1, firma_desde_payload,
+)
 
 # Aislar todo en un directorio temporal
 _TMPDIR = tempfile.mkdtemp()
@@ -31,24 +37,42 @@ def check(nombre, cond, detalle=""):
 
 
 # ── #89: resultados de Producción ────────────────────────────────────────────
-# produccion-codespec Fase 1 ("Persistencia"): restaurar ahora exige que
-# quien llama YA haya reconstruido produccion_run_signature_v1 en su propio
-# session_state y que coincida EXACTAMENTE con la persistida -- ver
-# tests/test_produccion_vigencia.py para la cobertura completa (legacy sin
-# firma, firma ausente, firma distinta). Aquí se simula el caso feliz: la
-# pestaña nueva SÍ pudo reconstruir la misma firma.
-_FIRMA_89 = "f" * 64
+# CodeSpecs/06-analisis-financiero/diseno.md: Financiero/Presupuesto
+# restauran en una pestaña que NUNCA tuvo tmy_df/panel/POA en session_state,
+# así que no pueden reconstruir produccion_run_signature_v1 desde cero para
+# compararla. guardar_resultados_produccion() persiste TAMBIÉN el payload
+# canónico que produjo la firma, y restaurar_resultados_produccion()
+# recalcula su SHA-256 (firma_desde_payload()) exigiendo que coincida
+# EXACTAMENTE con la persistida -- ver tests/test_produccion_vigencia.py
+# para la cobertura completa (legacy sin firma/payload, payload alterado).
+# Aquí se simula el caso feliz con un payload canónico REAL y consistente.
+_IDX_89 = pd.date_range("2001-01-01", periods=5, freq="h", tz="UTC")
+_PAYLOAD_89 = construir_payload_produccion_run_signature_v1(
+    panel={"nombre": "PANEL-89", "Pmax_stc": 63.0, "NOCT": 45.0},
+    panel_nombre="PANEL-89",
+    inversor={"modelo": "INV-89", "P_ac_nom_W": 15000},
+    inversor_nombre="INV-89",
+    N_paneles=15, N_serie=5, N_strings_tracker=3, n_inversores=1,
+    P_dc_stc_kW=0.945, eta_inversor=0.975, P_ac_nom_W_total=15000.0,
+    NOCT=45.0, k_bipv=1.3, produccion_usar_iv=False, source_mode="sdm_pvsyst",
+    tmy_index=_IDX_89, tmy_T2m=np.array([20.0, 21.0, 22.0, 21.0, 20.0]),
+    poa_source="poa_sin_termico_df", poa_index=_IDX_89,
+    poa_global=np.array([300.0, 500.0, 700.0, 500.0, 300.0]),
+    factor_mismatch_aplicado=0.92,
+)
+_FIRMA_89 = firma_desde_payload(_PAYLOAD_89)
 ss = {"E_ac_anual_kWh": 12345.6, "P_stc_kW_sistema": 8.1, "N_paneles_final": 15,
       "PR_sistema": 0.82, "produccion_ok": True,
       "produccion_run_signature_v1": _FIRMA_89,
+      pr.CLAVE_PAYLOAD_FIRMA: _PAYLOAD_89,
       "ciudad": "Bogotá", "lat_proyecto": 4.6097, "lon_proyecto": -74.0817}
 check("#89 guardar resultados", pr.guardar_resultados_produccion(ss, USR_A))
 check("#89 sin usuario → no guarda", not pr.guardar_resultados_produccion(ss, ""))
 
-# Pestaña nueva del MISMO usuario → restaurar (con la MISMA firma ya
-# reconstruida por el llamador -- sin ella, restaurar_resultados_produccion()
-# rechaza por diseño, ver test_restaurar_rechaza_si_falta_firma_esperada_en_sesion).
-ss2 = {"produccion_run_signature_v1": _FIRMA_89}
+# Pestaña nueva del MISMO usuario → restaurar (sin tmy_df/panel/POA en
+# sesión -- la integridad se verifica contra el payload YA persistido, no
+# contra una firma reconstruida por el llamador).
+ss2 = {}
 check("#89 restaurar en pestaña nueva", pr.restaurar_resultados_produccion(ss2, USR_A))
 check("#89 valores restaurados", ss2.get("E_ac_anual_kWh") == 12345.6
       and ss2.get("N_paneles_final") == 15)

@@ -555,8 +555,20 @@ def test_determinar_source_mode_sin_sdm_completo_es_lineal():
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# 7) Persistencia con firma (calculos.persistencia_resultados) -- objetivo 5.
-#    tmp_path/monkeypatch aíslan el directorio -- nunca tocan datos reales.
+# 7) Persistencia con verificación de integridad (calculos.persistencia_
+#    resultados) -- objetivo 5. tmp_path/monkeypatch aíslan el directorio --
+#    nunca tocan datos reales.
+#
+#    Diseño (CodeSpecs/06-analisis-financiero/diseno.md): Financiero y
+#    Presupuesto restauran en una pestaña que NUNCA tuvo tmy_df/panel/POA en
+#    session_state, así que no pueden reconstruir produccion_run_signature_v1
+#    desde cero para compararla contra la persistida (a diferencia de
+#    Producción, que sí revalida así su propio res_produccion). En su lugar,
+#    guardar_resultados_produccion() persiste TAMBIÉN el payload canónico
+#    (pre-hash) que produjo la firma, y restaurar_resultados_produccion()
+#    recalcula su SHA-256 con calculos.produccion_vigencia.firma_desde_
+#    payload() exigiendo que coincida EXACTAMENTE con la firma persistida --
+#    ni payload ausente (legacy) ni alterado restauran.
 # ══════════════════════════════════════════════════════════════════════════
 
 @pytest.fixture
@@ -575,6 +587,22 @@ _SESION_GUARDAR_BASE = {
 }
 
 
+def _sesion_con_payload_real(**overrides_firma) -> tuple[dict, str, dict]:
+    """Sesión de Producción con firma + payload canónico REALES y
+    mutuamente consistentes (el mismo par que pages/6_📊_Produccion.py deja
+    en session_state antes de llamar guardar_resultados_produccion())."""
+    from calculos.produccion_vigencia import (
+        construir_payload_produccion_run_signature_v1, firma_desde_payload,
+    )
+    import calculos.persistencia_resultados as pr
+
+    payload = construir_payload_produccion_run_signature_v1(**_kwargs_firma_base(**overrides_firma))
+    firma = firma_desde_payload(payload)
+    sesion = dict(_SESION_GUARDAR_BASE, produccion_run_signature_v1=firma)
+    sesion[pr.CLAVE_PAYLOAD_FIRMA] = payload
+    return sesion, firma, payload
+
+
 def test_guardar_resultados_produccion_persiste_la_firma(_pr_aislado):
     pr = _pr_aislado
     usuario = "vigencia-test-1@example.com"
@@ -589,71 +617,142 @@ def test_guardar_resultados_produccion_persiste_la_firma(_pr_aislado):
     assert data["resultados"].get("produccion_run_signature_v1") == "a" * 64
 
 
-def test_restaurar_rechaza_archivo_legacy_sin_firma(_pr_aislado):
-    """Un archivo guardado ANTES de esta ronda (sin produccion_run_signature_v1)
-    debe rechazarse -- nunca se asume que sigue vigente."""
+def test_guardar_resultados_produccion_persiste_el_payload_canonico(_pr_aislado):
+    pr = _pr_aislado
+    usuario = "vigencia-test-payload@example.com"
+    sesion, _firma, payload = _sesion_con_payload_real()
+
+    assert pr.guardar_resultados_produccion(sesion, usuario) is True
+
+    ruta = pr._ruta_resultados(usuario)
+    with open(ruta, "r", encoding="utf-8") as f:
+        import json
+        data = json.load(f)
+    assert data.get("payload_firma") == payload
+
+
+def test_restaurar_rechaza_archivo_legacy_sin_firma_ni_payload(_pr_aislado):
+    """Un archivo guardado ANTES de esta ronda (sin produccion_run_signature_v1
+    ni payload canónico) debe rechazarse -- nunca se asume que sigue vigente."""
     pr = _pr_aislado
     usuario = "vigencia-test-2@example.com"
-    sesion_legacy = dict(_SESION_GUARDAR_BASE)  # SIN firma
+    sesion_legacy = dict(_SESION_GUARDAR_BASE)  # SIN firma NI payload
     assert pr.guardar_resultados_produccion(sesion_legacy, usuario) is True
 
     estado_nuevo = {
         "auth_email": usuario, "ciudad": "Bogotá",
         "lat_proyecto": 4.7110, "lon_proyecto": -74.0721,
-        "produccion_run_signature_v1": "b" * 64,  # el llamador SÍ pudo reconstruirla
     }
     assert pr.restaurar_resultados_produccion(estado_nuevo, usuario) is False
     assert "E_ac_anual_kWh" not in estado_nuevo
 
 
-def test_restaurar_rechaza_si_falta_firma_esperada_en_sesion(_pr_aislado):
-    """El archivo SÍ tiene firma, pero quien llama no pudo reconstruir la
-    esperada (p.ej. tmy_df/panel aún no disponibles en esta pestaña) --
-    nunca se infiere un default ni se restaura de todos modos."""
+def test_restaurar_rechaza_si_falta_payload_persistido(_pr_aislado):
+    """La firma SÍ quedó persistida, pero sin el payload canónico no hay
+    forma de re-verificar su SHA-256 -- se rechaza igual que legacy, nunca
+    se confía en la firma sola (caso: guardado con una ronda anterior a
+    esta, que ya escribía la firma pero no el payload)."""
     pr = _pr_aislado
     usuario = "vigencia-test-3@example.com"
-    sesion_con_firma = dict(_SESION_GUARDAR_BASE, produccion_run_signature_v1="c" * 64)
-    assert pr.guardar_resultados_produccion(sesion_con_firma, usuario) is True
+    sesion_sin_payload = dict(_SESION_GUARDAR_BASE, produccion_run_signature_v1="c" * 64)
+    assert pr.guardar_resultados_produccion(sesion_sin_payload, usuario) is True
 
     estado_nuevo = {
         "auth_email": usuario, "ciudad": "Bogotá",
         "lat_proyecto": 4.7110, "lon_proyecto": -74.0721,
-        # SIN produccion_run_signature_v1 -- no se pudo reconstruir.
     }
     assert pr.restaurar_resultados_produccion(estado_nuevo, usuario) is False
     assert "E_ac_anual_kWh" not in estado_nuevo
 
 
-def test_restaurar_rechaza_si_firma_esperada_no_coincide(_pr_aislado):
+def test_restaurar_rechaza_si_payload_alterado_no_coincide_con_la_firma(_pr_aislado):
+    """Payload persistido pero MODIFICADO respecto al que produjo la firma
+    (archivo editado a mano, corrupción parcial, etc.) -- el SHA-256
+    recalculado no coincide, no se restaura."""
     pr = _pr_aislado
     usuario = "vigencia-test-4@example.com"
-    sesion_con_firma = dict(_SESION_GUARDAR_BASE, produccion_run_signature_v1="d" * 64)
-    assert pr.guardar_resultados_produccion(sesion_con_firma, usuario) is True
+    sesion, _firma, _payload = _sesion_con_payload_real()
+    assert pr.guardar_resultados_produccion(sesion, usuario) is True
+
+    import json
+    ruta = pr._ruta_resultados(usuario)
+    with open(ruta, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    data["payload_firma"]["N_paneles"] = (data["payload_firma"].get("N_paneles") or 0) + 1
+    with open(ruta, "w", encoding="utf-8") as f:
+        json.dump(data, f)
 
     estado_nuevo = {
         "auth_email": usuario, "ciudad": "Bogotá",
         "lat_proyecto": 4.7110, "lon_proyecto": -74.0721,
-        "produccion_run_signature_v1": "e" * 64,  # distinta -- config cambió
     }
     assert pr.restaurar_resultados_produccion(estado_nuevo, usuario) is False
     assert "E_ac_anual_kWh" not in estado_nuevo
 
 
-def test_restaurar_acepta_si_firma_coincide_exactamente(_pr_aislado):
+def test_restaurar_rechaza_si_payload_persistido_tiene_tipo_no_soportado(_pr_aislado):
+    """Payload corrupto con un tipo que firma_desde_payload() no puede
+    normalizar (p.ej. edición manual del JSON) -- la excepción se trata
+    como "no verifica", nunca como crash ni como "restaurar igual"."""
     pr = _pr_aislado
-    usuario = "vigencia-test-5@example.com"
-    firma = "f" * 64
-    sesion_con_firma = dict(_SESION_GUARDAR_BASE, produccion_run_signature_v1=firma)
-    assert pr.guardar_resultados_produccion(sesion_con_firma, usuario) is True
+    usuario = "vigencia-test-tipo-invalido@example.com"
+    sesion, _firma, _payload = _sesion_con_payload_real()
+    assert pr.guardar_resultados_produccion(sesion, usuario) is True
+
+    import json
+    ruta = pr._ruta_resultados(usuario)
+    with open(ruta, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    data["payload_firma"]["N_paneles"] = {"objeto": "no soportado en la firma"}
+    with open(ruta, "w", encoding="utf-8") as f:
+        json.dump(data, f)
 
     estado_nuevo = {
         "auth_email": usuario, "ciudad": "Bogotá",
         "lat_proyecto": 4.7110, "lon_proyecto": -74.0721,
-        "produccion_run_signature_v1": firma,  # EXACTAMENTE la misma
+    }
+    assert pr.restaurar_resultados_produccion(estado_nuevo, usuario) is False
+    assert "E_ac_anual_kWh" not in estado_nuevo
+
+
+def test_restaurar_acepta_si_payload_persistido_verifica_la_firma(_pr_aislado):
+    """Caso feliz: pestaña NUEVA de Financiero/Presupuesto, sin tmy_df/panel
+    en sesión -- restaurar NO depende de que el llamador reconstruya la
+    firma, solo del payload canónico ya persistido junto a ella."""
+    pr = _pr_aislado
+    usuario = "vigencia-test-5@example.com"
+    sesion, _firma, _payload = _sesion_con_payload_real()
+    assert pr.guardar_resultados_produccion(sesion, usuario) is True
+
+    estado_nuevo = {
+        "auth_email": usuario, "ciudad": "Bogotá",
+        "lat_proyecto": 4.7110, "lon_proyecto": -74.0721,
+        # SIN produccion_run_signature_v1 ni tmy_df/panel -- pestaña nueva real.
     }
     assert pr.restaurar_resultados_produccion(estado_nuevo, usuario) is True
     assert estado_nuevo["E_ac_anual_kWh"] == 12345.6
     assert estado_nuevo["E_dc_anual_kWh"] == 13000.0
+
+
+def test_restaurar_bloquea_por_huella_de_ciudad_antes_de_evaluar_el_payload(_pr_aislado):
+    """La huella de ciudad/coordenadas se evalúa ANTES del payload -- otra
+    ciudad u otras coordenadas bloquean aunque el payload sea perfectamente
+    válido (datos de otro proyecto, no una corrida desactualizada)."""
+    pr = _pr_aislado
+    usuario = "vigencia-test-6@example.com"
+    sesion, _firma, _payload = _sesion_con_payload_real()
+    assert pr.guardar_resultados_produccion(sesion, usuario) is True
+
+    estado_otra_ciudad = {"auth_email": usuario, "ciudad": "Medellín"}
+    assert pr.restaurar_resultados_produccion(estado_otra_ciudad, usuario) is False
+    assert "E_ac_anual_kWh" not in estado_otra_ciudad
+
+    estado_otras_coord = {
+        "auth_email": usuario, "ciudad": "Bogotá",
+        "lat_proyecto": 4.9, "lon_proyecto": -74.0721,
+    }
+    assert pr.restaurar_resultados_produccion(estado_otras_coord, usuario) is False
+    assert "E_ac_anual_kWh" not in estado_otras_coord
 
 
 if __name__ == "__main__":

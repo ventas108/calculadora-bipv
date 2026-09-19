@@ -120,8 +120,14 @@ def test_pagina6_selecciona_factor_mismatch_sin_soiling_cuando_motor_activo():
 # ══════════════════════════════════════════════════════════════════════════
 
 def test_pagina6_importa_firma_de_produccion():
+    """Página 6 arma la firma en dos pasos reutilizables (payload canónico +
+    hash) en vez de calcular_produccion_run_signature_v1() de un tirón --
+    ver CodeSpecs/06-analisis-financiero/diseno.md: el payload se persiste
+    junto a la firma para que Financiero/Presupuesto puedan re-verificarla
+    sin tmy_df/panel/POA en sesión."""
     src = _leer(_PAGINA_6)
-    assert "calcular_produccion_run_signature_v1" in src
+    assert "construir_payload_produccion_run_signature_v1" in src
+    assert "firma_desde_payload" in src
     assert "determinar_source_mode" in src
 
 
@@ -129,7 +135,7 @@ def test_pagina6_guarda_firma_al_simular_antes_de_marcar_produccion_ok():
     lineas = _lineas(_PAGINA_6)
     idx_firma_calculada = next(
         (i for i, ln in enumerate(lineas)
-         if "_firma_produccion = _firma_produccion_config_actual()" in ln), None
+         if "_payload_produccion, _firma_produccion = _payload_y_firma_produccion_config_actual()" in ln), None
     )
     idx_produccion_ok_true = next(
         (i for i, ln in enumerate(lineas)
@@ -173,15 +179,16 @@ def test_pagina6_valida_firma_antes_de_usar_res_en_rama_reutilizada():
 
 def test_pagina6_rechazo_de_vigencia_limpia_produccion_ok_y_energia():
     """El bloque de rechazo (firma no coincide) debe limpiar produccion_ok,
-    E_ac_anual_kWh y produccion_run_signature_v1 -- no solo mostrar un
-    error."""
+    E_ac_anual_kWh, produccion_run_signature_v1 y el payload canónico
+    persistible -- no solo mostrar un error."""
     src = _leer(_PAGINA_6)
     idx = src.index("_firma_guardada != _firma_actual")
-    bloque = src[idx: idx + 900]
+    bloque = src[idx: idx + 1100]
     assert '"produccion_ok"] = False' in bloque
     assert "st.stop()" in bloque
     assert '"E_ac_anual_kWh"' in bloque
     assert '"produccion_run_signature_v1"' in bloque
+    assert "CLAVE_PAYLOAD_FIRMA" in bloque
 
 
 # ══════════════════════════════════════════════════════════════════════════

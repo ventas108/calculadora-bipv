@@ -10,9 +10,11 @@ from calculos.produccion import (
     determinar_source_mode,
 )
 from calculos.produccion_vigencia import (
-    calcular_produccion_run_signature_v1,
     calcular_bypass_run_signature_v1,
+    construir_payload_produccion_run_signature_v1,
+    firma_desde_payload,
 )
+from calculos.persistencia_resultados import CLAVE_PAYLOAD_FIRMA
 from calculos.mismatch_bypass import exigir_poa_sin_termico, seleccionar_poa_bypass
 from calculos.produccion_iv import simular_produccion_iv, panel_apto_para_iv, preparar_para_iv
 from calculos.modelo_iv import resolver_panel_calibrado
@@ -572,19 +574,21 @@ _resistencia_ac_ohm = _perd_ohm_unif.get("resistencia_ac_ohm") if _unif_vigente 
 _tension_red_V_prod = _perd_ohm_unif.get("tension_red_V") if _unif_vigente else None
 
 
-def _firma_produccion_config_actual() -> str | None:
+def _payload_y_firma_produccion_config_actual() -> tuple[dict | None, str | None]:
     """
-    Huella (`produccion_run_signature_v1`) de la configuración VISIBLE
-    actual -- panel, inversor, módulos, eficiencia, modo IV, POA y
-    parámetros de pérdidas. Se usa tanto para guardarla junto al resultado
-    recién simulado como para validar, sin volver a simular, si un
-    res_produccion ya guardado sigue siendo consumible.
+    Payload canónico (pre-hash) y huella (`produccion_run_signature_v1`) de
+    la configuración VISIBLE actual -- panel, inversor, módulos, eficiencia,
+    modo IV, POA y parámetros de pérdidas. Se usan tanto para guardarlos
+    junto al resultado recién simulado (persistencia con verificación de
+    integridad, ver calculos/persistencia_resultados.py) como para validar,
+    sin volver a simular, si un res_produccion ya guardado sigue siendo
+    consumible.
 
-    None si algún insumo no permite reconstruirla (p.ej. una serie horaria
-    con NaN) -- nunca se infiere un default en ese caso.
+    (None, None) si algún insumo no permite reconstruirla (p.ej. una serie
+    horaria con NaN) -- nunca se infiere un default en ese caso.
     """
     try:
-        return calcular_produccion_run_signature_v1(
+        payload = construir_payload_produccion_run_signature_v1(
             panel=_panel_sdm,
             panel_nombre=panel_nombre,
             inversor=inversor,
@@ -612,8 +616,14 @@ def _firma_produccion_config_actual() -> str | None:
             pct_cableado_ac=st.session_state.get("pct_cableado_ac"),
             perdida_ohmica_unifilar=_perd_ohm_unif if _unif_vigente else None,
         )
+        return payload, firma_desde_payload(payload)
     except (ValueError, TypeError, KeyError):
-        return None
+        return None, None
+
+
+def _firma_produccion_config_actual() -> str | None:
+    """Ver `_payload_y_firma_produccion_config_actual()` -- solo la firma."""
+    return _payload_y_firma_produccion_config_actual()[1]
 
 
 if btn_sim or st.session_state.get("produccion_ok"):
@@ -682,6 +692,7 @@ if btn_sim or st.session_state.get("produccion_ok"):
                     "produccion_run_signature_v1",
                 ):
                     st.session_state[_key] = None
+                st.session_state[CLAVE_PAYLOAD_FIRMA] = None
                 st.session_state["produccion_ok"] = False
                 st.session_state["produccion_modo_iv"] = False
                 st.error(
@@ -697,8 +708,11 @@ if btn_sim or st.session_state.get("produccion_ok"):
         # de Producción"): se calcula con la MISMA configuración recién
         # usada para simular y se guarda junto al resultado -- una
         # publicación atómica: res, la firma y produccion_ok cambian juntos,
-        # nunca energía nueva con metadatos viejos ni viceversa.
-        _firma_produccion = _firma_produccion_config_actual()
+        # nunca energía nueva con metadatos viejos ni viceversa. El payload
+        # canónico que produjo la firma viaja junto a ella en session_state
+        # (CLAVE_PAYLOAD_FIRMA) para que guardar_resultados_produccion() lo
+        # persista -- ver CodeSpecs/06-analisis-financiero/diseno.md.
+        _payload_produccion, _firma_produccion = _payload_y_firma_produccion_config_actual()
         res = dict(res)
         res["produccion_run_signature_v1"] = _firma_produccion
 
@@ -714,6 +728,7 @@ if btn_sim or st.session_state.get("produccion_ok"):
         st.session_state["E_ac_anual_kWh"]         = res["E_ac_anual_kWh"]
         st.session_state["PR_sistema"]             = res["PR"]
         st.session_state["produccion_run_signature_v1"] = _firma_produccion
+        st.session_state[CLAVE_PAYLOAD_FIRMA]      = _payload_produccion
     else:
         res       = st.session_state.get("res_produccion", {})
         res_base  = st.session_state.get("res_produccion_base", res)
@@ -727,7 +742,7 @@ if btn_sim or st.session_state.get("produccion_ok"):
         # se compara contra la que quedó guardada junto al resultado --
         # nunca se asume que produccion_ok=True basta por sí solo.
         _firma_guardada = res.get("produccion_run_signature_v1") if isinstance(res, dict) else None
-        _firma_actual   = _firma_produccion_config_actual()
+        _payload_actual, _firma_actual = _payload_y_firma_produccion_config_actual()
         if not _firma_guardada or not _firma_actual or _firma_guardada != _firma_actual:
             for _key in (
                 "res_produccion",
@@ -738,6 +753,7 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 "produccion_run_signature_v1",
             ):
                 st.session_state[_key] = None
+            st.session_state[CLAVE_PAYLOAD_FIRMA] = None
             st.session_state["produccion_ok"] = False
             st.session_state["produccion_modo_iv"] = False
             st.error(
@@ -748,6 +764,10 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 "👉 Pulsa **«Simular producción anual»** de nuevo."
             )
             st.stop()
+        # Firma vigente: el payload que la reproduce también lo está -- se
+        # mantiene en session_state para que guardar_resultados_produccion()
+        # lo vuelva a persistir aunque el usuario no haya pulsado "Simular".
+        st.session_state[CLAVE_PAYLOAD_FIRMA] = _payload_actual
 
     if not res:
         st.stop()

@@ -181,6 +181,107 @@ def _float_o_none(v) -> float | None:
 # 3. produccion_run_signature_v1
 # ══════════════════════════════════════════════════════════════════════════
 
+def construir_payload_produccion_run_signature_v1(
+    *,
+    panel: dict,
+    panel_nombre: str,
+    inversor: dict,
+    inversor_nombre: str,
+    N_paneles: int | None,
+    N_serie: int | None,
+    N_strings_tracker: int | None,
+    n_inversores: int | None,
+    P_dc_stc_kW: float | None,
+    eta_inversor: float | None,
+    P_ac_nom_W_total: float | None,
+    NOCT: float | None,
+    k_bipv: float | None,
+    produccion_usar_iv: bool,
+    source_mode: str,
+    tmy_index: pd.DatetimeIndex,
+    tmy_T2m,
+    poa_source: str,
+    poa_index: pd.DatetimeIndex,
+    poa_global,
+    factor_mismatch_aplicado: float,
+    factor_espectral=None,
+    pct_mismatch_fab: float | None = None,
+    pct_cableado_dc: float | None = None,
+    pct_cableado_ac: float | None = None,
+    perdida_ohmica_unifilar: dict | None = None,
+) -> dict:
+    """
+    Payload canónico (PRE-hash) de la corrida BASE de Producción -- el mismo
+    dict que `calcular_produccion_run_signature_v1()` arma antes de
+    serializar y hashear. Ver .openspec/proposals/produccion-codespec/
+    design.md § "Contrato propuesto de entrada" para la justificación de
+    cada campo.
+
+    panel/inversor: el mapping completo tal como se usó en la simulación
+      (p.ej. el panel YA con el NOCT de Motor Óptico inyectado, si aplica --
+      la firma debe capturar los parámetros EFECTIVOS, no los nominales).
+    source_mode: uno de SOURCE_MODES_VALIDOS.
+    poa_source: uno de POA_SOURCES_VALIDAS.
+    tmy_T2m / poa_global: arrays 1D alineados a tmy_index / poa_index
+      respectivamente.
+    factor_espectral: array 1D alineado a tmy_index, o None si no se aplicó.
+
+    El resultado solo contiene tipos JSON nativos (str/int/float/bool/None
+    y dict/list de esos) -- las series horarias ya quedan reducidas a su
+    huella SHA-256 (`huella_horaria()`), así que el payload es serializable
+    y persistible sin arrastrar los DataFrames de origen (tmy_df/poa_df).
+    calculos/persistencia_resultados.py persiste este payload junto a la
+    firma para poder RE-VERIFICAR su integridad en una pestaña que nunca
+    tuvo esos DataFrames en sesión (Financiero/Presupuesto) -- ver
+    `firma_desde_payload()`.
+    """
+    return {
+        "signature_version": 1,
+        "panel_fingerprint": fingerprint_mapping(panel),
+        "panel_nombre": str(panel_nombre),
+        "inverter_fingerprint": fingerprint_mapping(inversor),
+        "inversor_nombre": str(inversor_nombre),
+        "N_paneles": _int_o_none(N_paneles),
+        "N_serie": _int_o_none(N_serie),
+        "N_strings_tracker": _int_o_none(N_strings_tracker),
+        "n_inversores": _int_o_none(n_inversores),
+        "P_dc_stc_kW": _float_o_none(P_dc_stc_kW),
+        "eta_inversor": _float_o_none(eta_inversor),
+        "P_ac_nom_W_total": _float_o_none(P_ac_nom_W_total),
+        "produccion_usar_iv": bool(produccion_usar_iv),
+        "source_mode": _validar_enum(source_mode, SOURCE_MODES_VALIDOS, "source_mode"),
+        "tmy_T2m_fingerprint": huella_horaria(tmy_index, tmy_T2m),
+        "poa_source": _validar_enum(poa_source, POA_SOURCES_VALIDAS, "poa_source"),
+        "poa_global_fingerprint": huella_horaria(poa_index, poa_global),
+        "factor_mismatch_aplicado": float(factor_mismatch_aplicado),
+        "NOCT": _float_o_none(NOCT),
+        "k_bipv": _float_o_none(k_bipv),
+        "factor_espectral_fingerprint": huella_horaria_opcional(tmy_index, factor_espectral),
+        "pct_mismatch_fab": _float_o_none(pct_mismatch_fab),
+        "pct_cableado_dc": _float_o_none(pct_cableado_dc),
+        "pct_cableado_ac": _float_o_none(pct_cableado_ac),
+        "perdida_ohmica_fingerprint": fingerprint_mapping(perdida_ohmica_unifilar),
+    }
+
+
+def firma_desde_payload(payload: dict) -> str:
+    """
+    SHA-256 hex de un payload YA CONSTRUIDO (p.ej. por
+    `construir_payload_produccion_run_signature_v1()`) -- misma
+    normalización/serialización canónica que usa
+    `calcular_produccion_run_signature_v1()`, expuesta por separado para que
+    calculos/persistencia_resultados.py pueda re-verificar la integridad de
+    un payload persistido en disco sin duplicar esta lógica ni reconstruir
+    el payload desde cero (lo que requeriría tmy_df/panel/POA, ausentes en
+    una pestaña nueva de Financiero/Presupuesto).
+
+    Lanza ValueError/TypeError si `payload` contiene valores no finitos o
+    tipos no soportados (p.ej. un archivo persistido corrupto/alterado a
+    mano) -- el llamador debe tratar esa excepción como "no verifica".
+    """
+    return _sha256_hex(_serializar_canonico(payload))
+
+
 def calcular_produccion_run_signature_v1(
     *,
     panel: dict,
@@ -226,36 +327,40 @@ def calcular_produccion_run_signature_v1(
     factor_espectral: array 1D alineado a tmy_index, o None si no se aplicó.
 
     Retorna el digest SHA-256 hex (64 caracteres) — este es literalmente el
-    valor de `produccion_run_signature_v1`.
+    valor de `produccion_run_signature_v1`. Construye el payload con
+    `construir_payload_produccion_run_signature_v1()` y lo hashea con
+    `firma_desde_payload()` -- misma huella de siempre, ahora en dos pasos
+    reutilizables por separado.
     """
-    payload = {
-        "signature_version": 1,
-        "panel_fingerprint": fingerprint_mapping(panel),
-        "panel_nombre": str(panel_nombre),
-        "inverter_fingerprint": fingerprint_mapping(inversor),
-        "inversor_nombre": str(inversor_nombre),
-        "N_paneles": _int_o_none(N_paneles),
-        "N_serie": _int_o_none(N_serie),
-        "N_strings_tracker": _int_o_none(N_strings_tracker),
-        "n_inversores": _int_o_none(n_inversores),
-        "P_dc_stc_kW": _float_o_none(P_dc_stc_kW),
-        "eta_inversor": _float_o_none(eta_inversor),
-        "P_ac_nom_W_total": _float_o_none(P_ac_nom_W_total),
-        "produccion_usar_iv": bool(produccion_usar_iv),
-        "source_mode": _validar_enum(source_mode, SOURCE_MODES_VALIDOS, "source_mode"),
-        "tmy_T2m_fingerprint": huella_horaria(tmy_index, tmy_T2m),
-        "poa_source": _validar_enum(poa_source, POA_SOURCES_VALIDAS, "poa_source"),
-        "poa_global_fingerprint": huella_horaria(poa_index, poa_global),
-        "factor_mismatch_aplicado": float(factor_mismatch_aplicado),
-        "NOCT": _float_o_none(NOCT),
-        "k_bipv": _float_o_none(k_bipv),
-        "factor_espectral_fingerprint": huella_horaria_opcional(tmy_index, factor_espectral),
-        "pct_mismatch_fab": _float_o_none(pct_mismatch_fab),
-        "pct_cableado_dc": _float_o_none(pct_cableado_dc),
-        "pct_cableado_ac": _float_o_none(pct_cableado_ac),
-        "perdida_ohmica_fingerprint": fingerprint_mapping(perdida_ohmica_unifilar),
-    }
-    return _sha256_hex(_serializar_canonico(payload))
+    payload = construir_payload_produccion_run_signature_v1(
+        panel=panel,
+        panel_nombre=panel_nombre,
+        inversor=inversor,
+        inversor_nombre=inversor_nombre,
+        N_paneles=N_paneles,
+        N_serie=N_serie,
+        N_strings_tracker=N_strings_tracker,
+        n_inversores=n_inversores,
+        P_dc_stc_kW=P_dc_stc_kW,
+        eta_inversor=eta_inversor,
+        P_ac_nom_W_total=P_ac_nom_W_total,
+        NOCT=NOCT,
+        k_bipv=k_bipv,
+        produccion_usar_iv=produccion_usar_iv,
+        source_mode=source_mode,
+        tmy_index=tmy_index,
+        tmy_T2m=tmy_T2m,
+        poa_source=poa_source,
+        poa_index=poa_index,
+        poa_global=poa_global,
+        factor_mismatch_aplicado=factor_mismatch_aplicado,
+        factor_espectral=factor_espectral,
+        pct_mismatch_fab=pct_mismatch_fab,
+        pct_cableado_dc=pct_cableado_dc,
+        pct_cableado_ac=pct_cableado_ac,
+        perdida_ohmica_unifilar=perdida_ohmica_unifilar,
+    )
+    return firma_desde_payload(payload)
 
 
 # ══════════════════════════════════════════════════════════════════════════

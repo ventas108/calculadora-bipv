@@ -1091,25 +1091,45 @@ def test_financiero_no_restaura_energia_anterior_tras_recalculo(_pr_aislado):
 #     (demuestra que el test 33 realmente ejercita la limpieza, y no un
 #     comportamiento por default de restaurar_resultados_produccion()).
 #
-#     produccion-codespec Fase 1 ("Persistencia", integrado 19-sep-2026):
-#     restaurar ahora exige ADEMÁS que produccion_run_signature_v1 coincida
-#     exactamente entre lo persistido y lo que el llamador ya reconstruyó en
-#     su propio session_state -- ver tests/test_produccion_vigencia.py para
-#     esa cobertura completa. Este control sigue siendo válido incluyendo
-#     una firma que coincide en ambos lados: el punto del test (que el "no
-#     restaura" del test 33 viene de limpiar_resultados_produccion(), no de
-#     un default) no depende de la firma, así que se mantiene el mismo caso
-#     feliz salvo por ese requisito nuevo.
+#     produccion-codespec Fase 1 ("Persistencia", integrado 19-sep-2026) +
+#     CodeSpecs/06-analisis-financiero/diseno.md (payload de integridad,
+#     20-sep-2026): restaurar exige ADEMÁS que el SHA-256 recalculado del
+#     payload canónico PERSISTIDO coincida exactamente con
+#     produccion_run_signature_v1 -- ver tests/test_produccion_vigencia.py
+#     para esa cobertura completa. Este control sigue siendo válido con un
+#     payload real y consistente: el punto del test (que el "no restaura"
+#     del test 33 viene de limpiar_resultados_produccion(), no de un
+#     default) no depende de la firma/payload en sí, así que se mantiene el
+#     mismo caso feliz salvo por ese requisito nuevo.
 def test_sin_limpiar_persistencia_financiero_si_restauraria(_pr_aislado):
+    from calculos.produccion_vigencia import (
+        construir_payload_produccion_run_signature_v1, firma_desde_payload,
+    )
+
     pr = _pr_aislado
     usuario = "ronda5-test-control@example.com"
-    _firma_control = "c" * 64
+    _idx_control = pd.date_range("2001-01-01", periods=5, freq="h", tz="UTC")
+    _payload_control = construir_payload_produccion_run_signature_v1(
+        panel={"nombre": "PANEL-CONTROL", "Pmax_stc": 63.0, "NOCT": 45.0},
+        panel_nombre="PANEL-CONTROL",
+        inversor={"modelo": "INV-CONTROL", "P_ac_nom_W": 15000},
+        inversor_nombre="INV-CONTROL",
+        N_paneles=20, N_serie=5, N_strings_tracker=4, n_inversores=1,
+        P_dc_stc_kW=1.26, eta_inversor=0.975, P_ac_nom_W_total=15000.0,
+        NOCT=45.0, k_bipv=1.3, produccion_usar_iv=False, source_mode="sdm_pvsyst",
+        tmy_index=_idx_control, tmy_T2m=np.array([20.0, 21.0, 22.0, 21.0, 20.0]),
+        poa_source="poa_sin_termico_df", poa_index=_idx_control,
+        poa_global=np.array([300.0, 500.0, 700.0, 500.0, 300.0]),
+        factor_mismatch_aplicado=0.92,
+    )
+    _firma_control = firma_desde_payload(_payload_control)
     sesion_guardada = {
         "E_ac_anual_kWh": 12345.6, "E_dc_anual_kWh": 13000.0,
         "PR_sistema": 0.81, "Y_f_kWh_kWp": 1500.0,
         "P_stc_kW_sistema": 10.0, "N_paneles_final": 20,
         "panel_nombre_final": "ASP-ST1-T40", "eta_inversor": 0.96,
         "produccion_run_signature_v1": _firma_control,
+        pr.CLAVE_PAYLOAD_FIRMA: _payload_control,
         "ciudad": "Bogotá", "lat_proyecto": 4.7110, "lon_proyecto": -74.0721,
     }
     pr.guardar_resultados_produccion(sesion_guardada, usuario)
@@ -1117,7 +1137,8 @@ def test_sin_limpiar_persistencia_financiero_si_restauraria(_pr_aislado):
     estado_nuevo = {
         "auth_email": usuario, "ciudad": "Bogotá",
         "lat_proyecto": 4.7110, "lon_proyecto": -74.0721,
-        "produccion_run_signature_v1": _firma_control,  # el llamador SÍ la reconstruyó igual
+        # SIN produccion_run_signature_v1 -- pestaña nueva real, la
+        # verificación depende solo del payload ya persistido.
     }
     restauro = pr.restaurar_resultados_produccion(estado_nuevo, usuario)
     assert restauro is True

@@ -13,11 +13,20 @@ Diseño (auditoría de seguridad):
 - Los resultados guardan una huella (ciudad + coordenadas): si al restaurar
   la sesión ya tiene otra ciudad/coordenadas, NO se restauran (datos de otro
   proyecto).
+- Integridad de produccion_run_signature_v1 (CodeSpecs/06-analisis-
+  financiero/diseno.md): junto a la firma se persiste el payload canónico
+  que la produjo; restaurar recalcula su SHA-256
+  (calculos.produccion_vigencia.firma_desde_payload()) y exige que
+  coincida EXACTAMENTE -- payload ausente (legacy) o alterado nunca
+  restaura, sin depender de que Financiero/Presupuesto puedan reconstruir
+  la firma desde su propia sesión (no tienen tmy_df/panel/POA).
 - Escritura atómica con tmp único por proceso (sin carreras de os.replace).
 """
 import hashlib
 import json
 import os
+
+from calculos.produccion_vigencia import firma_desde_payload
 
 _DIR_DATOS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "datos")
 DIR_PERSISTENCIA = os.path.join(_DIR_DATOS, "persistencia")
@@ -25,15 +34,29 @@ DIR_PERSISTENCIA = os.path.join(_DIR_DATOS, "persistencia")
 # Claves de session_state que se persisten al terminar Producción.
 # produccion_run_signature_v1 (produccion-codespec Fase 1, "Persistencia")
 # viaja junto con los agregados: guardar_resultados_produccion() la escribe
-# igual que cualquier otra clave de esta tupla, y restaurar_resultados_
-# produccion() exige que coincida EXACTAMENTE con la firma que el llamador
-# ya reconstruyó en su propio session_state antes de restaurar el resto --
-# ver esa función más abajo.
+# igual que cualquier otra clave de esta tupla. La vigencia de esa firma NO
+# se verifica contra una firma "esperada" reconstruida por el llamador --
+# Financiero/Presupuesto restauran en una pestaña que NUNCA tuvo tmy_df/
+# panel/POA en sesión y no pueden reconstruirla. En su lugar se persiste
+# TAMBIÉN el payload canónico (CLAVE_PAYLOAD_FIRMA, fuera de esta tupla:
+# viaja por separado en el JSON) y restaurar_resultados_produccion()
+# recalcula su SHA-256 con calculos.produccion_vigencia.firma_desde_payload()
+# exigiendo que coincida EXACTAMENTE con la firma persistida -- ver esa
+# función más abajo.
 CLAVES_RESULTADOS = (
     "E_ac_anual_kWh", "E_dc_anual_kWh", "PR_sistema", "Y_f_kWh_kWp",
     "P_stc_kW_sistema", "N_paneles_final", "panel_nombre_final", "eta_inversor",
     "produccion_run_signature_v1",
 )
+
+# Clave de session_state con el payload canónico (pre-hash) que produjo
+# produccion_run_signature_v1 -- pages/6_📊_Produccion.py la calcula junto a
+# la firma (calculos.produccion_vigencia.construir_payload_produccion_run_
+# signature_v1()) y la deja en session_state para que guardar_resultados_
+# produccion() la persista. No es un resultado a restaurar en session_state
+# (Financiero/Presupuesto no la necesitan): solo sirve para verificar
+# integridad al restaurar, por eso vive fuera de CLAVES_RESULTADOS.
+CLAVE_PAYLOAD_FIRMA = "produccion_run_signature_v1_payload"
 
 # Huella del proyecto: si cambia, los resultados guardados NO aplican
 CLAVES_HUELLA = ("ciudad", "lat_proyecto", "lon_proyecto")
@@ -101,10 +124,11 @@ def guardar_resultados_produccion(session_state, usuario: str) -> bool:
         return False
     huella = {k: session_state.get(k) for k in CLAVES_HUELLA
               if session_state.get(k) is not None}
-    return _escribir_json_atomico(
-        _ruta_resultados(usuario),
-        {"resultados": resultados, "huella": huella},
-    )
+    data = {"resultados": resultados, "huella": huella}
+    payload_firma = session_state.get(CLAVE_PAYLOAD_FIRMA)
+    if isinstance(payload_firma, dict):
+        data["payload_firma"] = payload_firma
+    return _escribir_json_atomico(_ruta_resultados(usuario), data)
 
 
 def _huella_coincide(huella: dict, session_state) -> bool:
@@ -141,21 +165,31 @@ def restaurar_resultados_produccion(session_state, usuario: str) -> bool:
         return False
     if not _huella_coincide(data.get("huella"), session_state):
         return False
-    # Firma de vigencia (produccion-codespec Fase 1, "Persistencia"):
-    # - Un archivo persistido SIN firma es legacy (guardado antes de esta
-    #   ronda) -- se rechaza en vez de asumir que la configuración sigue
-    #   siendo la misma; el usuario debe recalcular Producción una vez.
-    # - Restaurar exige que quien llama YA haya reconstruido la firma
-    #   ESPERADA en su propio session_state (calculos.produccion_vigencia.
-    #   calcular_produccion_run_signature_v1(), con sus entradas actuales:
-    #   panel, inversor, TMY, POA, etc.) antes de invocar esta función. Si
-    #   no pudo reconstruirla (p.ej. porque tmy_df/panel aún no están
-    #   disponibles en esta pestaña), produccion_run_signature_v1 simplemente
-    #   no está en session_state -- nunca se infiere un default ni se
-    #   restaura "por si acaso".
+    # Integridad de la firma de vigencia (produccion-codespec Fase 1,
+    # "Persistencia"; ver también CodeSpecs/06-analisis-financiero/diseno.md):
+    # - Un archivo persistido SIN firma o SIN payload es legacy (guardado
+    #   antes de esta ronda, o antes de la ronda que agregó el payload) --
+    #   se rechaza en vez de asumir que la configuración sigue siendo la
+    #   misma; el usuario debe recalcular Producción una vez.
+    # - Financiero/Presupuesto restauran en una pestaña que NUNCA tuvo
+    #   tmy_df/panel/POA en session_state, así que NO pueden reconstruir la
+    #   firma "esperada" para compararla (a diferencia de Producción, que sí
+    #   revalida así contra su configuración visible). En vez de eso, se
+    #   recalcula el SHA-256 del payload canónico YA PERSISTIDO junto a la
+    #   firma (calculos.produccion_vigencia.firma_desde_payload()) y se
+    #   exige que coincida EXACTAMENTE con produccion_run_signature_v1
+    #   persistida -- un payload ausente, alterado o de otra corrida nunca
+    #   pasa esta verificación.
     firma_persistida = resultados.get("produccion_run_signature_v1")
-    firma_esperada = session_state.get("produccion_run_signature_v1")
-    if not firma_persistida or not firma_esperada or firma_persistida != firma_esperada:
+    payload_persistido = data.get("payload_firma")
+    try:
+        firma_recalculada = (
+            firma_desde_payload(payload_persistido)
+            if isinstance(payload_persistido, dict) else None
+        )
+    except (ValueError, TypeError):
+        firma_recalculada = None
+    if not firma_persistida or not firma_recalculada or firma_recalculada != firma_persistida:
         return False
     restauro_clave = False
     for k in CLAVES_RESULTADOS:
