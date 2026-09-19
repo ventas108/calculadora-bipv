@@ -101,7 +101,17 @@ Regla de consumo:
 	garantiza aguas arriba, en `04-produccion-energia` y `06-analisis-financiero`.
 
 ### 08-interfaz
-_(pendiente — ver [../08-interfaz/diseno.md](../08-interfaz/diseno.md))_
+
+Entrada:
+- `session_state` ya poblado por módulos previos; sesión autenticada.
+
+Salida:
+- Bloqueo de traducción del navegador y banner de proyecto activo.
+
+Regla de consumo:
+- Interfaz no restaura ni invalida datos por su cuenta; toda vigencia se
+	garantiza en `03`–`06` antes de que estas claves lleguen a `session_state`.
+	Cualquier texto de usuario interpolado en HTML debe quedar escapado.
 
 ### 09-despliegue
 _(pendiente — ver [../09-despliegue/diseno.md](../09-despliegue/diseno.md))_
