@@ -1698,7 +1698,11 @@ if btn_fin or st.session_state.get("financiero_ok"):
     # ── Tabla flujo de caja completo ─────────────────────────────────────────
     with st.expander("📋 Ver tabla de flujo de caja anual"):
         df_fc = pd.DataFrame(fc_con)
-        df_fc.columns = ["Año", "Producción (kWh)", "Ingreso energía (USD)",
+        # calcular_flujo_caja() devuelve 8 campos por año (incluye el split
+        # autoconsumo/exportación de CREG 174) -- lista de nombres desactualizada
+        # desde que se agregó ese split, causaba ValueError de longitud (18-sep-2026).
+        df_fc.columns = ["Año", "Producción (kWh)", "Autoconsumo (kWh)",
+                          "Exportación (kWh)", "Ingreso energía (USD)",
                           "O&M (USD)", "Flujo (USD)", "Flujo acum. (USD)"]
         df_fc["Ingreso (M COP)"]    = (df_fc["Ingreso energía (USD)"] * tipo_cambio / 1e6).round(3)
         df_fc["Flujo acum. (M COP)"] = (df_fc["Flujo acum. (USD)"] * tipo_cambio / 1e6).round(3)
