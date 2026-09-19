@@ -1,18 +1,23 @@
 // PM2 ecosystem — Calculadora BIPV Python (Streamlit)
-// Uso: pm2 start ecosystem.config.cjs
+// Fuente de verdad única (corregida 19-sep-2026 tras confirmar por SSH el
+// proceso real en producción: `pm2 describe streamlit-bipv` mostraba
+// exec cwd=/var/www/bipv/calculadora-bipv y script args con rutas relativas
+// bipv_python/venv/... — ni este archivo ni ecosystem.config.js coincidían
+// exactamente antes de esta corrección).
+// Guardar en: /var/www/bipv/calculadora-bipv/bipv_python/ecosystem.config.cjs
+// Uso: cd /var/www/bipv/calculadora-bipv && pm2 start bipv_python/ecosystem.config.cjs
 
 module.exports = {
   apps: [
     {
-      name: "bipv-streamlit",
-      script: "/var/www/bipv/calculadora-bipv/bipv_python/venv/bin/streamlit",
-      args: "run app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true",
-      cwd: "/var/www/bipv/calculadora-bipv/bipv_python",
+      name: "streamlit-bipv",
+      script: "bipv_python/venv/bin/streamlit",
+      args: "run bipv_python/app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true --server.maxUploadSize 200 --server.maxMessageSize 200",
+      cwd: "/var/www/bipv/calculadora-bipv",
       interpreter: "none",
       env: {
         PYTHONPATH: "/var/www/bipv/calculadora-bipv/bipv_python",
         PYTHONUNBUFFERED: "1",
-        PATH: "/var/www/bipv/calculadora-bipv/bipv_python/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
       },
       watch: false,
       max_memory_restart: "1G",
@@ -21,3 +26,4 @@ module.exports = {
     },
   ],
 };
+
