@@ -87,7 +87,18 @@ Regla de consumo:
 	ausente (legacy) o alterado nunca restaura.
 
 ### 07-informes
-_(pendiente — ver [../07-informes/diseno.md](../07-informes/diseno.md))_
+
+Entrada:
+- Banderas `_ok` (`produccion_ok`, `financiero_ok`, `impacto_co2_ok`, etc.) y
+	energía anual con prioridad `multisuperficie > bypass > base`.
+
+Salida:
+- Reporte HTML/PDF descargable y, opcionalmente, un eslabón en el Ledger de
+	Auditoría con hash de insumos+resultados al momento de generación.
+
+Regla de consumo:
+- Informes no restaura resultados persistidos por su cuenta; toda vigencia se
+	garantiza aguas arriba, en `04-produccion-energia` y `06-analisis-financiero`.
 
 ### 08-interfaz
 _(pendiente — ver [../08-interfaz/diseno.md](../08-interfaz/diseno.md))_
