@@ -22,6 +22,10 @@
 
 ## Reglas
 
+ - El orden de fases no sustituye las dependencias de datos en ejecución: aunque
+       `04-produccion-energia` antecede a `05-perdidas-y-temperatura` en la hoja de
+       ruta, el Motor Óptico de `05` publica POA sin térmico que `04` consume para
+       su simulación. Esa dependencia de runtime es `05 → 04`.
   tienen `diseno.md` en estado `aprobado`.
   antes de archivar la Spec.
   calculen la misma magnitud de forma distinta.

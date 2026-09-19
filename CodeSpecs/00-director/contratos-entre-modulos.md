@@ -42,7 +42,18 @@ Regla de consumo:
 _(pendiente — ver [../04-produccion-energia/diseno.md](../04-produccion-energia/diseno.md))_
 
 ### 05-perdidas-y-temperatura
-_(pendiente — ver [../05-perdidas-y-temperatura/diseno.md](../05-perdidas-y-temperatura/diseno.md))_
+
+Entrada:
+- TMY/POA bruta y parámetros ópticos/térmicos.
+
+Salida:
+- `poa_sin_termico_df`, `poa_efectiva_df`, `k_BIPV`, resumen óptico y estado
+	de vigencia.
+
+Regla de consumo:
+- Con Motor Óptico activo, Producción y bypass consumen solo
+	`poa_sin_termico_df`; el término térmico se calcula una única vez dentro del
+	SDM. Recalcular la cascada invalida resultados dependientes de su POA.
 
 ### 06-analisis-financiero
 _(pendiente — ver [../06-analisis-financiero/diseno.md](../06-analisis-financiero/diseno.md))_

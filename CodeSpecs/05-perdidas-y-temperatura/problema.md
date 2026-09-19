@@ -1,6 +1,6 @@
 # Módulo 05 — Pérdidas y temperatura
 
-**Estado:** idea
+**Estado:** en validación
 
 ## Alcance de la fase
 
@@ -8,8 +8,14 @@ Temperatura de célula, sombreado, suciedad, IAM, mismatch y degradación.
 
 ## Problema a resolver
 
-_(Pendiente de definir. Describir el problema concreto que motiva abrir una Spec en este módulo.)_
+El Motor Óptico y el bypass podían usar una POA con el término térmico ya
+aplicado, mientras Producción volvía a calcular la temperatura de célula. Esto
+generaba doble conteo térmico y podía conservar resultados derivados de una POA
+óptica anterior.
 
 ## Contexto
 
-_(Qué parte del sistema se ve afectada y por qué se aborda ahora.)_
+`pages/5b_🔆_Motor_Optico.py`, `calculos/mismatch_bypass.py` y
+`calculos/invalidacion.py` publican e invalidan el estado que consume
+Producción. Esta Spec regulariza cambios ya implementados; no autoriza nuevas
+fórmulas ni cambios de interfaz.
