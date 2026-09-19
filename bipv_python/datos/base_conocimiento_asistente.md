@@ -4124,6 +4124,25 @@ Continuación directa de la sección 70: además del gate de diseño eléctrico,
 
 191 pruebas focales + 21/21 del script de persistencia antes de la primera ronda de despliegue; 124 pruebas adicionales tras agregar la verificación de payload. Suite completa relanzada varias veces durante la sesión, sin regresiones. Desplegado en producción (`streamlit-bipv`, commits `e876c48d` → `ccd60c29` → `81f5279b`).
 
+## 72. Anexo — Esquema práctico de auditoría al correr un proyecto (real o de prueba), para orientar al usuario paso a paso (19-sep-2026)
+
+Complementa la sección 25g. ("El procedimiento correcto por módulos") con una versión ejecutable, pensada para que el Asistente pueda guiar a un usuario que pregunte "¿cómo verifico que este proyecto está bien calculado antes de entregarlo?" o similar. No sustituye el criterio técnico del usuario sobre el resultado financiero de un proyecto — solo confirma que los datos que la app usó son los vigentes.
+
+**Antes de empezar (una sola vez por sesión)**: usar una pestaña nueva del navegador por cada proyecto/cliente, nunca reutilizar una pestaña que ya tenía otro proyecto cargado.
+
+**Recorrido y "pruebas de fuego" recomendadas, en orden**:
+
+1. 🏠 Proyecto — cargar ciudad/área/tarifa. Si la tarifa se editó a mano, cambiar de ciudad y volver: el valor manual no debe sobrescribirse solo.
+2. ☀️ Recurso Solar — ejecutar y confirmar que no hay error (POA/TMY visibles).
+3. 📐 Dimensionamiento — elegir panel/inversor y pulsar "▶️ Optimizar N paneles/string" (debe aparecer "✅ Diseño confirmado vigente..."). **Prueba de fuego**: cambiar panel/inversor SIN volver a pulsar el botón — debe aparecer `⚠️ El panel o inversor cambió...`. Confirmar de nuevo y el aviso debe desaparecer.
+4. 📊 Producción — simular. **Prueba de fuego**: cambiar panel/inversor y pulsar Simular otra vez sin reconfirmar en Dimensionamiento — debe bloquear con `⛔ Simulación bloqueada: el diseño eléctrico confirmado... quedó desactualizado` (ver sección 70). Reconfirmar en Dimensionamiento y volver a simular debe funcionar sin bloqueo.
+5. 🔆 Motor Óptico (si se usa) — tras recalcularlo, Producción debe exigir volver a simular; no debe quedar un resultado viejo mostrado como vigente.
+6. 🔀 Mismatch/Bypass (si aplica sombreado parcial) — si se cambia la configuración eléctrica sin recalcular el bypass, la corrección de bypass debe desaparecer sola de Producción, nunca quedar restando energía de una corrida obsoleta (ver sección 71).
+7. 💼 Presupuesto y 💰 Financiero — calcular TIR/VPN/Payback. **Prueba de fuego**: abrir Financiero en una pestaña NUEVA (sesión limpia) — debe aparecer `📂 Datos restaurados del proyecto guardado` con los mismos agregados. Si NO aparece ese aviso, el usuario no debe confiar en los valores mostrados: debe volver a 📊 Producción y simular antes de continuar (ver sección 71).
+8. 📄 Reporte PDF — revisar el checklist de "Estado del proyecto" (todas las secciones a incluir en ✅) y confirmar visualmente panel/inversor/N correctos justo antes de generar: esta página no se autoverifica, es la última revisión manual del usuario. Generar con el sello del Ledger de Auditoría activado si se quiere trazabilidad verificable.
+
+**Regla de cierre para el Asistente**: si alguna de las 4 "pruebas de fuego" (pasos 3, 4, 6, 7) no se comporta como se describe arriba, orientar al usuario a NO entregar ese proyecto todavía — es una señal de que algo en esa sesión quedó en un estado inconsistente, y debe recalcularse desde el módulo donde falló la prueba antes de continuar.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
