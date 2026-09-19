@@ -1,6 +1,6 @@
 # Módulo 04 — Producción de energía
 
-**Estado:** idea
+**Estado:** en validación
 
 ## Alcance de la fase
 
@@ -8,8 +8,11 @@ Potencia instalada, energía mensual, energía anual, PR y pérdidas.
 
 ## Problema a resolver
 
-_(Pendiente de definir. Describir el problema concreto que motiva abrir una Spec en este módulo.)_
+Producción podía simular y persistir resultados cuando el diseño eléctrico
+confirmado ya estaba vencido por un cambio posterior de panel o inversor.
 
 ## Contexto
 
-_(Qué parte del sistema se ve afectada y por qué se aborda ahora.)_
+La página `bipv_python/pages/6_📊_Produccion.py` consume el contrato de
+Dimensionamiento. Esta regularización vertical protege el paso `03 → 04`; no
+pretende documentar todavía todo el motor de producción.

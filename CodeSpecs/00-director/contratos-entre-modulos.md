@@ -26,7 +26,17 @@ _(pendiente — ver [../01-datos-proyecto/diseno.md](../01-datos-proyecto/diseno
 _(pendiente — ver [../02-recurso-solar/diseno.md](../02-recurso-solar/diseno.md))_
 
 ### 03-dimensionamiento
-_(pendiente — ver [../03-dimensionamiento/diseno.md](../03-dimensionamiento/diseno.md))_
+
+Entrada:
+- Catálogo eléctrico, temperaturas de diseño, área y configuración de strings.
+
+Salida:
+- Diseño confirmado (`N_serie`, `N_strings_tracker`), compatibilidad y vigencia.
+
+Regla de consumo:
+- Los módulos downstream usan exclusivamente
+	`diseno_electrico_confirmado(session_state)`. Un diseño no vigente no puede
+	producir resultados persistibles.
 
 ### 04-produccion-energia
 _(pendiente — ver [../04-produccion-energia/diseno.md](../04-produccion-energia/diseno.md))_

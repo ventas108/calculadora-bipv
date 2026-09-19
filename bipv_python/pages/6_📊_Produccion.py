@@ -464,10 +464,18 @@ btn_sim = st.button(
     use_container_width=True,
 )
 
-if btn_sim and not _compat_inversor_ok:
+if btn_sim and (not _compat_inversor_ok or not _diseno_cfg["vigente"]):
     # La eficiencia del inversor no corrige una incompatibilidad de tensión,
     # corriente o ventana MPPT. No permitir que el resultado llegue a
     # Financiero como si fuera una configuración de diseño válida.
+    #
+    # Un diseño NO vigente (panel/inversor cambiaron desde la última
+    # confirmación en Dimensionamiento, ver diseno_electrico_confirmado())
+    # tampoco puede persistir resultados: _compat_inversor_ok se evalúa con
+    # el panel/inversor EN VIVO de esta misma página contra N_serie/
+    # N_strings_tracker CONGELADOS del último diseño confirmado, así que
+    # puede dar "compatible" por coincidencia aunque el diseño confirmado ya
+    # no corresponda a la selección actual.
     for _key in (
         "res_produccion",
         "res_produccion_base",
@@ -478,11 +486,19 @@ if btn_sim and not _compat_inversor_ok:
         st.session_state[_key] = None
     st.session_state["produccion_ok"] = False
     st.session_state["produccion_modo_iv"] = False
-    st.error(
-        "⛔ **Simulación bloqueada:** corrige la incompatibilidad del inversor "
-        "en 📐 **Dimensionamiento** antes de usar este resultado para diseño o "
-        "análisis financiero."
-    )
+    if not _diseno_cfg["vigente"]:
+        st.error(
+            "⛔ **Simulación bloqueada:** el diseño eléctrico confirmado en "
+            "📐 **Dimensionamiento** quedó desactualizado (cambiaste el panel "
+            "o el inversor). Vuelve a Dimensionamiento y confirma un nuevo "
+            "diseño antes de simular."
+        )
+    else:
+        st.error(
+            "⛔ **Simulación bloqueada:** corrige la incompatibilidad del inversor "
+            "en 📐 **Dimensionamiento** antes de usar este resultado para diseño o "
+            "análisis financiero."
+        )
     st.stop()
 
 if btn_sim or st.session_state.get("produccion_ok"):
