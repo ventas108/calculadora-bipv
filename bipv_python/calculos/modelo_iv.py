@@ -740,7 +740,14 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
         # #67): para CIGS n_mediana=1.35 ≠ n_typ 1.05 y usar la equivocada
         # clasificaría mal paneles legítimos.
         _n_med = const.get("n_mediana", n_typ)
-        _N_s_deriv = N_s or int(round(float(NsA) / _n_med))
+        # N_s (arriba) ya cayó al fallback de NsA cuando el panel no trae N_s
+        # explícito -- usarlo aquí duplicaría ese fallback en vez de derivar
+        # desde NsA/n_mediana. Se re-evalúa panel.get("N_s") SIN el fallback
+        # cruzado para distinguir "N_s explícito en la ficha" de "N_s inferido
+        # de NsA" (bug real: sin esto, un panel solo-con-NsA nunca deriva
+        # correctamente y verificar_ns_halfcut() sugiere un N_s equivocado).
+        _N_s_explicito = _valor_entero_positivo(panel.get("N_s"))
+        _N_s_deriv = _N_s_explicito or int(round(float(NsA) / _n_med))
         _panel_chk = dict(panel)
         _panel_chk["N_s"] = _N_s_deriv
         _hc = verificar_ns_halfcut(_panel_chk)
