@@ -3,6 +3,9 @@
 **Estado:** política vigente, de cumplimiento obligatorio para cualquier cambio,
 despliegue o documentación en este repositorio.
 
+El agente SDD debe cargar este documento junto con los demás archivos del Director
+antes de preparar cualquier Spec para revisión.
+
 ## 1. Por qué existe este documento
 
 El repositorio contiene **dos aplicaciones hermanas independientes** del
@@ -44,7 +47,21 @@ Streamlit.
 6. Si se tocan textos de UX o manuales, especificar si corresponden a `calc` o
    a la app hermana.
 
-## 5. Si hay duda
+## 5. Funciones exclusivas actuales de Streamlit
+
+Los comparadores de paneles, inversores y orientación, sus botones de adopción, el
+Asistente general y los Analistas de Producción locales pertenecen actualmente a
+`bipv_python/`. Su documentación en el director define contratos del ecosistema, pero
+no implica que `client/` o `server/` deban replicarlos.
+
+Si una Spec futura propone paridad en la app web principal, debe:
+
+1. declarar explícitamente que afecta a ambas apps;
+2. reutilizar un contrato o motor común aprobado, o justificar cualquier modelo distinto;
+3. definir persistencia, vigencia e invalidación para el estado propio de React;
+4. validar cada app y desplegar cada proceso por separado.
+
+## 6. Si hay duda
 
 Orden de prioridad:
 
@@ -52,12 +69,12 @@ Orden de prioridad:
 2. No ejecutar despliegues sin confirmar la app correcta.
 3. Cerrar la ambigüedad (preguntar al responsable) antes de tocar producción.
 
-## 6. Objetivo
+## 7. Objetivo
 
 Transparencia total, separación de responsabilidades, y evitar despliegues
 cruzados, confusiones de entorno y modificaciones no autorizadas.
 
-## 7. Referencias
+## 8. Referencias
 
 - Detalle técnico de ambas implementaciones de recurso solar:
   [`CodeSpecs/02-recurso-solar/vision.md`](../02-recurso-solar/vision.md)

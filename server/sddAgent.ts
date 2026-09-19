@@ -186,25 +186,43 @@ export async function auditSpec(specPath: string): Promise<SpecAudit> {
   };
 }
 
+export const DIRECTOR_DOCUMENTS = [
+  "vision.md",
+  "arquitectura-global.md",
+  "contratos-entre-modulos.md",
+  "mapa-dependencias.md",
+  "registro-de-decisiones.md",
+  "separacion-apps.md",
+] as const;
+
+export function resolveDirectorDirectory(specPath: string): string {
+  let current = path.resolve(specPath);
+  while (path.dirname(current) !== current) {
+    if (path.basename(current) === "CodeSpecs") {
+      return path.join(current, "00-director");
+    }
+    current = path.dirname(current);
+  }
+  throw new Error(`La Spec no está dentro de CodeSpecs: ${specPath}`);
+}
+
+export async function readDirectorContext(specPath: string): Promise<string[]> {
+  const directorDirectory = resolveDirectorDirectory(specPath);
+  return Promise.all(
+    DIRECTOR_DOCUMENTS.map(async document => {
+      const content = await fs.readFile(path.join(directorDirectory, document), "utf8");
+      return `## Director: ${document}\n\n${content}`;
+    }),
+  );
+}
+
 export async function readSpecForReview(specPath: string): Promise<string> {
   const audit = await auditSpec(specPath);
   if (!audit.canRunPreparation) {
     throw new Error(`Spec bloqueada: ${audit.advanceBlockingReasons.join("; ")}`);
   }
 
-  const directorFiles = [
-    "vision.md",
-    "arquitectura-global.md",
-    "contratos-entre-modulos.md",
-    "mapa-dependencias.md",
-    "registro-de-decisiones.md",
-  ];
-  const directorContext = await Promise.all(
-    directorFiles.map(async document => {
-      const content = await fs.readFile(path.join(specPath, "..", "00-director", document), "utf8");
-      return `## Director: ${document}\n\n${content}`;
-    }),
-  );
+  const directorContext = await readDirectorContext(specPath);
   const sections = await Promise.all(
     SPEC_DOCUMENTS.map(async document => {
       const content = await fs.readFile(path.join(specPath, document), "utf8");

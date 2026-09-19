@@ -90,9 +90,10 @@ ANTHROPIC_API_KEY=... pnpm exec tsx scripts/sdd-agent.ts \
   --spec CodeSpecs/01-datos-proyecto --review
 ```
 
-Claude recibe la Spec junto con el contexto del director central y devuelve un
-informe organizado con hallazgos, contratos, dependencias, tareas propuestas,
-archivos afectados, riesgos y validaciones faltantes.
+Claude recibe la Spec junto con el contexto completo del director central
+(`vision`, arquitectura global, contratos, dependencias, decisiones y separación
+obligatoria entre apps) y devuelve un informe organizado con hallazgos, contratos,
+dependencias, tareas propuestas, archivos afectados, riesgos y validaciones faltantes.
 
 La respuesta de Claude no constituye aprobación ni autorización automática.
 

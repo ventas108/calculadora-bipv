@@ -22,6 +22,13 @@ Problema -> Propuesta -> Diseño -> Aprobación -> Agente de preparación -> Tar
 5. Una Spec no se marca `completado` sin validación del módulo y validación de integración.
 6. El agente de preparación verifica y ordena el trabajo, pero no modifica código,
    contratos o estados; la aprobación humana y las validaciones reales son obligatorias.
+7. El director conserva invariantes arquitectónicas y contratos entre módulos; los
+   manuales y bases de conocimiento conservan instrucciones operativas. Una regla que
+   afecte vigencia, invalidación, propiedad del cálculo o límites entre apps debe existir
+   en el director, aunque también se explique al usuario en otro documento.
+8. La arquitectura híbrida comparte contratos aprobados, no implementaciones por
+   defecto. Una función presente en Streamlit no se replica automáticamente en React
+   ni crea una obligación de paridad sin una Spec vertical aprobada para esa app.
 
 ## Estados de una Spec
 

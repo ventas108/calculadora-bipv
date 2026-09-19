@@ -39,3 +39,14 @@ Finanzas e informes
   decisión en [registro-de-decisiones.md](registro-de-decisiones.md).
 - Los contratos vigentes que otros módulos consumen se resumen en
   [contratos-entre-modulos.md](contratos-entre-modulos.md).
+
+## Propiedad de comparadores y asistentes
+
+- Los comparadores de paneles, inversores y orientación, el Asistente general y
+      los Analistas locales pertenecen hoy a la app Streamlit (`bipv_python/`).
+- Los comparadores consumen los motores Python vigentes; no constituyen fuentes
+      de verdad adicionales para POA, energía, PR, compatibilidad o finanzas.
+- React y Streamlit son aplicaciones independientes. Compartir una magnitud exige
+      un contrato aprobado; no autoriza copiar fórmulas ni asumir paridad funcional.
+- La frontera operativa y de despliegue obligatoria está en
+      [separacion-apps.md](separacion-apps.md) y forma parte del contexto del agente SDD.

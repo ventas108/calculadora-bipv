@@ -122,7 +122,8 @@ Corregir Spec              APROBACIÓN HUMANA
 - `CodeSpecs/00-director/contratos-entre-modulos.md`.
 - `CodeSpecs/00-director/mapa-dependencias.md`.
 - `CodeSpecs/00-director/registro-de-decisiones.md`.
-- Estado actual del repositorio y referencias documentales disponibles.
+- `CodeSpecs/00-director/separacion-apps.md`.
+- Referencias documentales incluidas en esos archivos y en la propia Spec.
 
 ### Salidas
 
