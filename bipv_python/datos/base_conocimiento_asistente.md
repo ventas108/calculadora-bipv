@@ -515,6 +515,11 @@ Nueva página (agosto 2026) ubicada entre Dimensionamiento y Mismatch. Compara v
 - 1️⃣ Compatibilidad: evalúa TODO el catálogo contra tu string (Voc en frío ≤ V máx., ventana MPPT, corriente Isc×1,25 por tracker). La columna "modo" indica cómo conectar: normal, o "1 string/tracker" cuando el panel tiene tanta corriente que solo cabe un string por entrada MPPT (típico con paneles de 700+ W). La columna "motivo" explica cada rechazo.
 - 2️⃣ Comparativa: eliges 2–4 modelos; la app calcula sola las unidades necesarias según las entradas de cada equipo y muestra E_ac con clipping, CAPEX, TIR, VPN, Payback y LCOE. Exportable a CSV. Incluye el botón "✅ Adoptar esta configuración".
 - 3️⃣ Barrido DC/AC: curva completa de ratio DC/AC (1,0 a 2,2) con el óptimo por LCOE marcado con ⭐. Te dice cuántos kW AC realmente necesita tu campo solar.
+
+### Clipping imparcial y resultados horarios anteriores
+
+Para que la comparación de clipping sea imparcial, cada candidato se recalcula desde la potencia AC horaria previa al límite del inversor actual (columna técnica `P_ac_sin_recorte_kW`) y se le aplica su propio límite AC. Nunca se estima esa potencia a partir de la serie ya recortada. Si el resultado horario guardado proviene de una versión anterior y no trae la serie previa al recorte, el comparador se detiene: vuelve a ejecutar 📊 Producción y después repite la comparación de inversores.
+
 ### Pautas para elegir bien antes de oprimir "Adoptar"
 
 Aplícalas en este orden — primero descartar, luego comparar, luego desempatar:
@@ -549,9 +554,14 @@ Además de comparar 2-4 modelos elegidos a mano (sección 2️⃣), la página t
 
 Propósito: Comparar varios modelos de panel del catálogo (o combinaciones panel×orientación) usando la misma simulación horaria del proyecto, con E_ac, Performance Ratio (PR) y compatibilidad eléctrica de cada opción, más un botón de Analista de Producción que redacta la recomendación técnica.
 
-- Compatibilidad eléctrica: ✅/❌ (dos estados, igual que Inversores) — evalúa la ventana de voltaje/corriente del panel contra el string y el inversor ya configurados.
+- Compatibilidad eléctrica: tiene tres estados. ✅ significa compatible y adoptable; ❌ significa evaluado e incompatible; — significa no evaluable y no adoptable, acompañado del motivo (por ejemplo, faltan datos eléctricos suficientes). Solo los paneles con ✅ aparecen como opciones para adoptar.
 - E_ac y PR: para paneles se calculan ambos (a diferencia de Inversores, donde el PR no aplica).
 - Botón "🤖 Analista de Producción": redacta la recomendación citando E_ac, PR y compatibilidad eléctrica de cada panel comparado.
+
+### Resultado guardado y adopción segura
+
+- Si una comparación quedó guardada en la sesión por una versión anterior y no conserva la ficha exacta usada para simular cada fila (`_panel_dict`) o el motivo detallado de compatibilidad (`_motivo_electrico`), la app la descarta con un aviso. No intenta reconstruirla desde catálogos que pudieron cambiar: pulsa **▶️ Comparar paneles** otra vez.
+- Al adoptar, la app usa la ficha exacta del candidato que se comparó, no otra ficha resuelta después solo por nombre. Luego invalida POA, Producción, Financiero, CO₂ y los demás resultados derivados del panel anterior para que se recalculen con el nuevo panel.
 
 ### Perfil de costos CAPEX (referencia) — no confundir con el tipo de instalación real  ACTUALIZADO (21-ago-2026)
 
@@ -568,15 +578,17 @@ Propósito: Comparar varias orientaciones/tilts candidatos (por ejemplo distinta
 - Solo evalúa E_ac y PR (no aplica compatibilidad eléctrica — la orientación no cambia el string ni el inversor).
 - Botón "🤖 Analista de Producción": redacta la recomendación técnica citando E_ac y PR de cada orientación comparada, y cuál conviene según el objetivo del proyecto (más energía total vs. mejor aprovechamiento del área disponible).
 - Útil para decidir ENTRE fachadas candidatas de un mismo edificio, o para justificar ante el cliente por qué se eligió una orientación sobre otra.
+- Al adoptar una orientación, la app recalcula primero la POA con el mismo TMY y la geometría elegida, guarda el nuevo tilt/azimuth y después invalida Producción, Financiero, CO₂ y demás derivados para obligar su recálculo. No cambia el panel, el string, el inversor ni su compatibilidad eléctrica.
+- Este comparador adopta la geometría de un proyecto de una sola superficie. Si el proyecto tiene varias superficies con orientaciones distintas, cada geometría y su POA se configuran y calculan por separado en 🗺️ Vista 3D y Multi-Superficie (Página 9); adoptar aquí no reconfigura esas superficies.
 
 ────────────────────────────────────────────────────────────
 
-## 6e. Página 18 — 🤖 Análisis IA: los 4 Analistas de Producción  NUEVO (ACTUALIZADO 21-ago-2026)
+## 6e. Página 18 — 🤖 Análisis IA y accesos a los Analistas de Producción  NUEVO (ACTUALIZADO 19-sep-2026)
 
-Página central que reúne los accesos directos a los 4 Analistas de Producción de la app: 🧩 Comparador de Paneles, 🧭 Comparador de Orientación, 🔋 Baterías y Balance, y ⚖️ Comparador de Inversores. Desde aquí puedes leer qué evalúa cada uno y saltar directamente a la página correspondiente con un clic.
+La página central ejecuta el **Analista Técnico-Financiero** y el **Asesor de Inversión** sobre el único diseño vigente, usando sus resultados ya calculados de 📊 Producción y 💰 Financiero. No recibe las tablas actuales de los comparadores ni ejecuta un barrido de alternativas. También ofrece accesos directos a los Analistas de Producción que viven en 🧩 Comparador de Paneles, 🧭 Comparador de Orientación, 🔋 Baterías y Balance, y ⚖️ Comparador de Inversores.
 
 - Los 4 accesos están organizados en una cuadrícula 2×2 con etiquetas cortas ("Comparador de Paneles →", "Comparador de Orientación →", "Baterías y Balance →", "Comparador de Inversores →") para que no se encimen visualmente.
-- Cada uno de los 4 agentes tiene un alcance distinto y no debe confundirse con los otros: paneles y orientación evalúan E_ac/PR/compatibilidad eléctrica (orientación sin compatibilidad); baterías evalúa autonomía, profundidad de descarga (DoD), vida útil y compatibilidad de voltaje; inversores evalúa E_ac con clipping/%clipping y compatibilidad eléctrica, explícitamente SIN Performance Ratio.
+- Cada Analista de Producción local recibe la tabla actual de su propia página. Sus alcances no deben confundirse: Paneles evalúa E_ac, PR y compatibilidad eléctrica; Orientación evalúa E_ac y PR, pero **no** compatibilidad eléctrica; Baterías evalúa autonomía, profundidad de descarga (DoD), vida útil y compatibilidad de voltaje; Inversores evalúa E_ac con clipping, porcentaje de clipping y compatibilidad eléctrica, explícitamente sin Performance Ratio.
 - Todos son llamadas de IA bajo demanda (requieren clave configurada en el servidor y se activan solo al oprimir su botón) — no corren automáticamente ni tienen costo si no los usas.
 ⚠️ Para no cometer errores: cada Analista de Producción solo conoce los resultados de SU propia página de comparación (la tabla que ves en pantalla en ese momento) — no tiene memoria de comparaciones anteriores ni de otras páginas. Si cambias algo (panel, string, inversor), vuelve a generar la comparación antes de volver a pedirle la recomendación.
 

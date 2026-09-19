@@ -133,3 +133,49 @@ def test_buscar_real_variante_de_la_pregunta_tambien_encuentra_25f():
     assert any("manual consolidado" in t.lower() or "vigencia" in t.lower() or
                ("dimensionamiento" in t.lower() and "alerta" in t.lower())
                for t in titulos), titulos
+
+
+def _seccion_recuperada(pregunta: str, titulo: str) -> dict:
+    resultado = BaseConocimiento.cargar().buscar(pregunta, k=6)
+    titulo_tokens = set(_normalizar(titulo))
+    candidatas = [s for s in resultado if titulo_tokens <= set(_normalizar(s["titulo"]))]
+    assert candidatas, [s["titulo"] for s in resultado]
+    return candidatas[0]
+
+
+def test_buscar_panel_no_evaluable_y_adopcion_recupera_comparador_paneles():
+    seccion = _seccion_recuperada(
+        "por que un panel sale no evaluable con una raya y puedo adoptarlo",
+        "comparador de paneles",
+    )
+    tokens = set(_normalizar(seccion["texto"]))
+    assert {"tres", "estado", "evaluable", "adoptable", "motivo"} <= tokens
+
+
+def test_buscar_comparacion_antigua_pide_repetir_paneles():
+    seccion = _seccion_recuperada(
+        "la comparacion de paneles guardada es de una version anterior debo repetirla",
+        "resultado guardado y adopcion segura",
+    )
+    tokens = set(_normalizar(seccion["texto"]))
+    assert {"version", "anterior", "descarta", "comparar"} <= tokens
+    assert any(token.startswith("reconstruir") for token in tokens)
+
+
+def test_buscar_clipping_imparcial_pide_volver_a_produccion():
+    seccion = _seccion_recuperada(
+        "como comparo el clipping de cada inversor sin sesgo si mi produccion es antigua",
+        "clipping imparcial y resultados horarios anteriores",
+    )
+    tokens = set(_normalizar(seccion["texto"]))
+    assert {"clipping", "imparcial", "previa", "recorte", "produccion"} <= tokens
+    assert "P_ac_sin_recorte_kW" in seccion["texto"]
+
+
+def test_buscar_adoptar_orientacion_recalcula_poa_e_invalida_derivados():
+    seccion = _seccion_recuperada(
+        "al adoptar una orientacion recalcula la poa y cambia la compatibilidad electrica",
+        "comparador de orientacion",
+    )
+    tokens = set(_normalizar(seccion["texto"]))
+    assert {"adoptar", "recalcula", "poa", "invalida", "compatibilidad"} <= tokens
