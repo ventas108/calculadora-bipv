@@ -39,7 +39,19 @@ Regla de consumo:
 	producir resultados persistibles.
 
 ### 04-produccion-energia
-_(pendiente — ver [../04-produccion-energia/diseno.md](../04-produccion-energia/diseno.md))_
+
+Entrada:
+- Recurso solar, diseño eléctrico confirmado y, cuando aplique, POA sin térmico
+	del Motor Óptico.
+
+Salida:
+- Energía AC/DC, PR, pérdidas, resultados persistidos y firma
+	`produccion_run_signature_v1`.
+
+Regla de consumo:
+- Una restauración downstream solo es válida cuando el consumidor reconstruye y
+	hace coincidir la firma de la configuración actual. Sin firma coincidente no
+	se restaura ningún agregado de Producción.
 
 ### 05-perdidas-y-temperatura
 

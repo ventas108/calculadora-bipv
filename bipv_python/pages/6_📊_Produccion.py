@@ -5,8 +5,15 @@ import plotly.express as px
 import pandas as pd
 import numpy as np
 
-from calculos.produccion import simular_produccion_anual, perdidas_desglosadas, panel_tiene_sdm_completo
-from calculos.mismatch_bypass import exigir_poa_sin_termico
+from calculos.produccion import (
+    simular_produccion_anual, perdidas_desglosadas, panel_tiene_sdm_completo,
+    determinar_source_mode,
+)
+from calculos.produccion_vigencia import (
+    calcular_produccion_run_signature_v1,
+    calcular_bypass_run_signature_v1,
+)
+from calculos.mismatch_bypass import exigir_poa_sin_termico, seleccionar_poa_bypass
 from calculos.produccion_iv import simular_produccion_iv, panel_apto_para_iv, preparar_para_iv
 from calculos.modelo_iv import resolver_panel_calibrado
 from calculos.dimensionamiento import (
@@ -73,8 +80,16 @@ _motor_ok       = st.session_state.get("motor_optico_ok", False)
 _mo_summary     = st.session_state.get("motor_optico_summary", {})
 _mismatch_ok    = st.session_state.get("mismatch_ok", False)
 
-# Factor de pérdidas de la página Mismatch (default 1.0 si no se ejecutó)
-factor_pr = st.session_state.get("factor_global_mismatch", 1.0)
+# Factor de pérdidas de la página Mismatch (default 1.0 si no se ejecutó).
+# produccion-codespec Fase 1 ("Soiling único"): con Motor Óptico activo,
+# poa_sin_termico_df YA incluye soiling -- multiplicar además por
+# factor_global_mismatch (que también lo incluye) lo aplicaría dos veces.
+# Con Motor Óptico activo se usa factor_mismatch_sin_soiling (solo sombra de
+# horizonte + mismatch de orientación); sin él, factor_global_mismatch tal
+# como antes (comportamiento histórico sin cambios).
+factor_pr = st.session_state.get(
+    "factor_mismatch_sin_soiling" if _motor_ok else "factor_global_mismatch", 1.0,
+)
 poa_ef    = st.session_state.get("poa_efectiva_kWh_m2", poa_bruta_anual)
 
 if _motor_ok:
@@ -482,6 +497,7 @@ if btn_sim and (not _compat_inversor_ok or not _diseno_cfg["vigente"]):
         "res_produccion_iv",
         "E_ac_anual_kWh",
         "PR_sistema",
+        "produccion_run_signature_v1",
     ):
         st.session_state[_key] = None
     st.session_state["produccion_ok"] = False
@@ -501,66 +517,111 @@ if btn_sim and (not _compat_inversor_ok or not _diseno_cfg["vigente"]):
         )
     st.stop()
 
+# ── Preparación compartida: usada tanto al simular como al validar la
+# vigencia de un res_produccion ya guardado (produccion-codespec Fase 1,
+# "Vigencia de Producción") ─────────────────────────────────────────────────
+# Cuando Motor Óptico está activo, el NOCT usado en cascada_optica() es la
+# fuente de verdad. Se inyecta en el panel para garantizar que el SDM
+# calcula T_cell con los mismos parámetros térmicos.
+_panel_sdm = panel
+if _motor_ok and _noct_mo is not None:
+    _panel_sdm = dict(panel)          # copia superficial; no muta original
+    _panel_sdm["NOCT"] = _noct_mo
+
+# Corrección espectral CdTe (6-sep-2026, pedido explícito del usuario tras
+# la auditoría del motor de producción) -- modelo First Solar, aplica a
+# CUALQUIER ficha CdTe del catálogo (Soltech, First Solar, HIITIO,
+# EINNOVA/vidrio), no solo a un panel puntual, porque el factor depende del
+# SITIO/TMY, no del panel. Se calcula SOLO si el panel es CdTe (evita el
+# costo de cálculo para el resto). None si el TMY aún no tiene la columna RH
+# (TMY descargado antes de este fix) -- ver calculos.correccion_espectral
+# para el porqué.
+_factor_espectral_serie = None
+if clasificar_tecnologia_jrc(_panel_sdm.get("tecnologia")) == "CdTe":
+    _lat_esp = st.session_state.get("lat_proyecto")
+    _lon_esp = st.session_state.get("lon_proyecto")
+    _alt_esp = st.session_state.get("alt_proyecto")
+    if _lat_esp is not None and _lon_esp is not None:
+        _factor_espectral_serie = calcular_factor_espectral_cdte(
+            tmy, float(_lat_esp), float(_lon_esp), float(_alt_esp or 0)
+        )
+
+# ── Mismatch fabricación + pérdida óhmica DC/AC (7-sep-2026) ─────────────
+# pct_mismatch_fab/pct_cableado_dc/pct_cableado_ac: sliders manuales de
+# Página 5 Mismatch (respaldo cuando no hay datos reales del proyecto). Si
+# Página 20 (Diagrama Unifilar) tiene un cálculo VIGENTE (mismo
+# panel/inversor/N_serie que este proyecto -- si no coincide, se ignora en
+# vez de aplicar un número de otro proyecto), ese cálculo real sustituye al
+# slider correspondiente -- nunca se aplican ambos a la vez (ver
+# calculos.produccion.simular_produccion_anual()).
+_perd_ohm_unif = st.session_state.get("perdida_ohmica_unifilar") or {}
+_unif_vigente = bool(
+    _perd_ohm_unif.get("panel_nombre") == panel_nombre
+    and _perd_ohm_unif.get("inversor_nombre") == inversor_nombre
+    and _perd_ohm_unif.get("n_serie") == _n_serie_cfg
+    # N_paneles también debe coincidir: la resistencia DC efectiva de
+    # ⚡ Diagrama Unifilar se calculó con `fraccion_paneles` normalizada
+    # contra el total que había en esa página -- si cambió (ej. se
+    # agregaron strings en 📐 Dimensionamiento) sin volver a Página 20, esa
+    # fracción queda obsoleta y sobreestimaría la corriente real de cada
+    # tramo. Encontrado en auditoría (7-sep-2026).
+    and _perd_ohm_unif.get("n_paneles_total") == N_paneles
+)
+_resistencia_dc_ohm = _perd_ohm_unif.get("resistencia_dc_ohm") if _unif_vigente else None
+_resistencia_ac_ohm = _perd_ohm_unif.get("resistencia_ac_ohm") if _unif_vigente else None
+_tension_red_V_prod = _perd_ohm_unif.get("tension_red_V") if _unif_vigente else None
+
+
+def _firma_produccion_config_actual() -> str | None:
+    """
+    Huella (`produccion_run_signature_v1`) de la configuración VISIBLE
+    actual -- panel, inversor, módulos, eficiencia, modo IV, POA y
+    parámetros de pérdidas. Se usa tanto para guardarla junto al resultado
+    recién simulado como para validar, sin volver a simular, si un
+    res_produccion ya guardado sigue siendo consumible.
+
+    None si algún insumo no permite reconstruirla (p.ej. una serie horaria
+    con NaN) -- nunca se infiere un default en ese caso.
+    """
+    try:
+        return calcular_produccion_run_signature_v1(
+            panel=_panel_sdm,
+            panel_nombre=panel_nombre,
+            inversor=inversor,
+            inversor_nombre=inversor_nombre,
+            N_paneles=N_paneles,
+            N_serie=_n_serie_cfg,
+            N_strings_tracker=_n_strings_tracker_cfg,
+            n_inversores=_n_inversores_dcac,
+            P_dc_stc_kW=P_stc_kW,
+            eta_inversor=eta_inv_frac,
+            P_ac_nom_W_total=_p_ac_nom_w_total,
+            NOCT=_panel_sdm.get("NOCT"),
+            k_bipv=_k_bipv_sim,
+            produccion_usar_iv=bool(usar_iv and _panel_apto_iv),
+            source_mode=determinar_source_mode(_panel_sdm, bool(usar_iv and _panel_apto_iv)),
+            tmy_index=tmy.index,
+            tmy_T2m=tmy["T2m"].to_numpy(dtype=float),
+            poa_source="poa_sin_termico_df" if _motor_ok else "poa_df",
+            poa_index=poa_base.index,
+            poa_global=poa_base["poa_global"].to_numpy(dtype=float),
+            factor_mismatch_aplicado=factor_pr,
+            factor_espectral=_factor_espectral_serie,
+            pct_mismatch_fab=st.session_state.get("pct_mismatch_fab"),
+            pct_cableado_dc=st.session_state.get("pct_cableado_dc"),
+            pct_cableado_ac=st.session_state.get("pct_cableado_ac"),
+            perdida_ohmica_unifilar=_perd_ohm_unif if _unif_vigente else None,
+        )
+    except (ValueError, TypeError, KeyError):
+        return None
+
+
 if btn_sim or st.session_state.get("produccion_ok"):
 
     if btn_sim:
         with st.spinner(
             f"Simulando 8.760 horas para {N_paneles} módulos {panel_nombre} en {ciudad}..."
         ):
-            # Cuando Motor Óptico está activo, el NOCT usado en cascada_optica()
-            # es la fuente de verdad. Se inyecta en el panel para garantizar que
-            # el SDM calcula T_cell con los mismos parámetros térmicos.
-            _panel_sdm = panel
-            if _motor_ok and _noct_mo is not None:
-                _panel_sdm = dict(panel)          # copia superficial; no muta original
-                _panel_sdm["NOCT"] = _noct_mo
-
-            # Corrección espectral CdTe (6-sep-2026, pedido explícito del
-            # usuario tras la auditoría del motor de producción) -- modelo
-            # First Solar, aplica a CUALQUIER ficha CdTe del catálogo
-            # (Soltech, First Solar, HIITIO, EINNOVA/vidrio), no solo a un
-            # panel puntual, porque el factor depende del SITIO/TMY, no del
-            # panel. Se calcula SOLO si el panel es CdTe (evita el costo de
-            # cálculo para el resto). None si el TMY aún no tiene la
-            # columna RH (TMY descargado antes de este fix) -- ver
-            # calculos.correccion_espectral para el porqué.
-            _factor_espectral_serie = None
-            if clasificar_tecnologia_jrc(_panel_sdm.get("tecnologia")) == "CdTe":
-                _lat_esp = st.session_state.get("lat_proyecto")
-                _lon_esp = st.session_state.get("lon_proyecto")
-                _alt_esp = st.session_state.get("alt_proyecto")
-                if _lat_esp is not None and _lon_esp is not None:
-                    _factor_espectral_serie = calcular_factor_espectral_cdte(
-                        tmy, float(_lat_esp), float(_lon_esp), float(_alt_esp or 0)
-                    )
-
-            # ── Mismatch fabricación + pérdida óhmica DC/AC (7-sep-2026) ─────
-            # pct_mismatch_fab/pct_cableado_dc/pct_cableado_ac: sliders
-            # manuales de Página 5 Mismatch (respaldo cuando no hay datos
-            # reales del proyecto). Si Página 20 (Diagrama Unifilar) tiene un
-            # cálculo VIGENTE (mismo panel/inversor/N_serie que este proyecto
-            # -- si no coincide, se ignora en vez de aplicar un número de
-            # otro proyecto), ese cálculo real sustituye al slider
-            # correspondiente -- nunca se aplican ambos a la vez (ver
-            # calculos.produccion.simular_produccion_anual()).
-            _perd_ohm_unif = st.session_state.get("perdida_ohmica_unifilar") or {}
-            _unif_vigente = bool(
-                _perd_ohm_unif.get("panel_nombre") == panel_nombre
-                and _perd_ohm_unif.get("inversor_nombre") == inversor_nombre
-                and _perd_ohm_unif.get("n_serie") == _n_serie_cfg
-                # N_paneles también debe coincidir: la resistencia DC
-                # efectiva de ⚡ Diagrama Unifilar se calculó con
-                # `fraccion_paneles` normalizada contra el total que había
-                # en esa página -- si cambió (ej. se agregaron strings en
-                # 📐 Dimensionamiento) sin volver a Página 20, esa fracción
-                # queda obsoleta y sobreestimaría la corriente real de cada
-                # tramo. Encontrado en auditoría (7-sep-2026).
-                and _perd_ohm_unif.get("n_paneles_total") == N_paneles
-            )
-            _resistencia_dc_ohm = _perd_ohm_unif.get("resistencia_dc_ohm") if _unif_vigente else None
-            _resistencia_ac_ohm = _perd_ohm_unif.get("resistencia_ac_ohm") if _unif_vigente else None
-            _tension_red_V_prod = _perd_ohm_unif.get("tension_red_V") if _unif_vigente else None
-
             _sim_kwargs = dict(
                 tmy               = tmy,
                 poa_base          = poa_base,
@@ -618,6 +679,7 @@ if btn_sim or st.session_state.get("produccion_ok"):
                     "res_produccion_iv",
                     "E_ac_anual_kWh",
                     "PR_sistema",
+                    "produccion_run_signature_v1",
                 ):
                     st.session_state[_key] = None
                 st.session_state["produccion_ok"] = False
@@ -631,6 +693,15 @@ if btn_sim or st.session_state.get("produccion_ok"):
         # El modo IV es opt-in: si está activo y disponible, queda como oficial.
         res = res_iv if (usar_iv and res_iv is not None) else res_base
 
+        # produccion_run_signature_v1 (produccion-codespec Fase 1, "Vigencia
+        # de Producción"): se calcula con la MISMA configuración recién
+        # usada para simular y se guarda junto al resultado -- una
+        # publicación atómica: res, la firma y produccion_ok cambian juntos,
+        # nunca energía nueva con metadatos viejos ni viceversa.
+        _firma_produccion = _firma_produccion_config_actual()
+        res = dict(res)
+        res["produccion_run_signature_v1"] = _firma_produccion
+
         st.session_state["res_produccion"]         = res
         st.session_state["res_produccion_base"]    = res_base
         st.session_state["res_produccion_iv"]      = res_iv
@@ -642,10 +713,41 @@ if btn_sim or st.session_state.get("produccion_ok"):
         # aguas abajo). Al elegir IV como oficial, la base pasa a ser la IV.
         st.session_state["E_ac_anual_kWh"]         = res["E_ac_anual_kWh"]
         st.session_state["PR_sistema"]             = res["PR"]
+        st.session_state["produccion_run_signature_v1"] = _firma_produccion
     else:
         res       = st.session_state.get("res_produccion", {})
         res_base  = st.session_state.get("res_produccion_base", res)
         res_iv    = st.session_state.get("res_produccion_iv", None)
+
+        # Vigencia (produccion-codespec Fase 1): un res_produccion de una
+        # corrida anterior NUNCA se republica si la configuración VISIBLE
+        # actual (panel, inversor, módulos, eficiencia, modo IV, POA o
+        # parámetros de pérdidas) ya cambió desde que se calculó. Se
+        # recalcula la firma esperada con la configuración de ESTE render y
+        # se compara contra la que quedó guardada junto al resultado --
+        # nunca se asume que produccion_ok=True basta por sí solo.
+        _firma_guardada = res.get("produccion_run_signature_v1") if isinstance(res, dict) else None
+        _firma_actual   = _firma_produccion_config_actual()
+        if not _firma_guardada or not _firma_actual or _firma_guardada != _firma_actual:
+            for _key in (
+                "res_produccion",
+                "res_produccion_base",
+                "res_produccion_iv",
+                "E_ac_anual_kWh",
+                "PR_sistema",
+                "produccion_run_signature_v1",
+            ):
+                st.session_state[_key] = None
+            st.session_state["produccion_ok"] = False
+            st.session_state["produccion_modo_iv"] = False
+            st.error(
+                "⛔ **La configuración cambió desde la última simulación** "
+                "(panel, inversor, módulos, eficiencia, modo IV, POA o "
+                "parámetros de pérdidas) — el resultado anterior ya no es "
+                "válido y no se puede reutilizar.\n\n"
+                "👉 Pulsa **«Simular producción anual»** de nuevo."
+            )
+            st.stop()
 
     if not res:
         st.stop()
@@ -1048,8 +1150,55 @@ if btn_sim or st.session_state.get("produccion_ok"):
     delta_sdm = e_dc - e_ref   # positivo = ganancia
 
     # ── Incluir pérdida bypass diodes si está disponible ─────────────────
-    _bypass_ok  = st.session_state.get("bypass_ok", False)
-    _res_bp     = st.session_state.get("bypass_result", {})
+    # Vigencia de bypass (produccion-codespec Fase 1, "Vigencia de bypass"):
+    # Producción reconstruye bypass_run_signature_v1 desde SU configuración
+    # VIGENTE (panel/strings/módulos/POA propios -- no lo que Página 5 diga
+    # haber usado) y solo resta bypass_result si coincide exactamente con la
+    # firma guardada -- nunca resta una pérdida calculada con otro panel,
+    # otra topología de string o una POA que ya cambió.
+    _bypass_ok_raw         = st.session_state.get("bypass_ok", False)
+    _res_bp                = st.session_state.get("bypass_result", {})
+    _bypass_sig_guardada   = st.session_state.get("bypass_run_signature_v1")
+    _bypass_p_shade_serie  = st.session_state.get("bypass_p_shade")
+    _bypass_vigente = False
+    if _bypass_ok_raw and _bypass_sig_guardada and _bypass_p_shade_serie is not None:
+        try:
+            _panel_bp_prod = MODULOS_BIPV.get(panel_nombre)
+            _n_par_bp_prod = max(1, round(N_paneles / _n_serie_cfg)) if _n_serie_cfg else None
+            # Misma función que usa Página 5 (calculos.mismatch_bypass) para
+            # derivar G_eff/k_bipv del bypass -- garantiza que "vigente"
+            # significa exactamente lo mismo en las dos páginas, sin
+            # reimplementar la lógica de prioridad Motor Óptico/POA bruta.
+            _g_eff_bp_prod, _, _k_bipv_bp_prod = seleccionar_poa_bypass(
+                motor_optico_ok=_motor_ok,
+                poa_sin_termico_df=st.session_state.get("poa_sin_termico_df"),
+                poa_df=st.session_state["poa_df"],
+                factor_global_mismatch=st.session_state.get("factor_global_mismatch", 1.0),
+                motor_optico_k_bipv=st.session_state.get("motor_optico_k_bipv", 1.0),
+            )
+            if (
+                _panel_bp_prod is not None
+                and _n_serie_cfg
+                and _n_par_bp_prod
+                and _g_eff_bp_prod is not None
+            ):
+                _firma_bypass_esperada = calcular_bypass_run_signature_v1(
+                    panel=_panel_bp_prod,
+                    N_series=int(_n_serie_cfg),
+                    N_parallel=int(_n_par_bp_prod),
+                    total_modules=int(_n_serie_cfg) * int(_n_par_bp_prod),
+                    tmy_index=tmy.index,
+                    G_eff=_g_eff_bp_prod,
+                    T_amb=tmy["T2m"].to_numpy(dtype=float),
+                    p_shade_final=_bypass_p_shade_serie.to_numpy(dtype=float),
+                    NOCT=float(_panel_bp_prod.get("NOCT", 45.0)),
+                    k_bipv=_k_bipv_bp_prod,
+                    umbral_shade=0.05,
+                )
+                _bypass_vigente = (_firma_bypass_esperada == _bypass_sig_guardada)
+        except Exception:
+            _bypass_vigente = False
+    _bypass_ok  = _bypass_ok_raw and _bypass_vigente
     kwh_bypass  = _res_bp.get("kwh_bypass_anual", 0.0) if _bypass_ok else 0.0
     kwh_bypass_ac = kwh_bypass * eta_inv_frac   # pérdida AC equivalente
 
@@ -1107,6 +1256,16 @@ if btn_sim or st.session_state.get("produccion_ok"):
             "🧭 Fuente del sombreado aplicado: "
             f"**{_etq_fs(st.session_state.get('fs_fuente'))}**"
         )
+    else:
+        # Bypass cero (produccion-codespec Fase 1, "Bypass cero") o bypass ya
+        # no vigente (firma no coincide): bypass_ok y bypass_result se
+        # CONSERVAN tal cual para trazabilidad -- Página 5 los sigue
+        # mostrando -- pero cualquier energía corregida de una corrida
+        # ANTERIOR con pérdida > 0 debe eliminarse aquí. Los consumidores
+        # (Financiero, Balance, Reporte) deben caer a E_ac_anual_kWh base en
+        # cuanto la clave desaparece.
+        for _k_bp_stale in ("E_ac_anual_kWh_bypass", "kwh_bypass_anual"):
+            st.session_state.pop(_k_bp_stale, None)
 
     st.caption(
         f"E ref (P_STC × POA): **{e_ref:,.0f} kWh** | "

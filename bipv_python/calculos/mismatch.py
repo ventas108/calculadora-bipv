@@ -222,3 +222,30 @@ def factor_global_perdidas(cascada: list[dict]) -> float:
     bruta   = next(r["energia"] for r in cascada if r["etapa"] == "POA bruta")
     efectiva = next(r["energia"] for r in cascada if r["etapa"] == "POA efectiva final")
     return round(efectiva / bruta, 4) if bruta > 0 else 0.0
+
+
+def calcular_factor_mismatch_sin_soiling(
+    factor_sombra_anual: float | None,
+    factor_mismatch_or_pct: float | None,
+) -> float:
+    """
+    Factor de pérdidas de Mismatch SIN soiling -- solo sombra de horizonte y
+    mismatch de orientación (produccion-codespec Fase 1, "Soiling único").
+
+    Motor Óptico ya incorpora IAM + soiling dentro de poa_sin_termico_df; si
+    Producción, con Motor Óptico activo, multiplicara además por
+    factor_global_mismatch (que sí incluye soiling -- ver cascada_perdidas()
+    arriba), el soiling se aplicaría dos veces. Producción debe usar ESTE
+    factor en ese caso; factor_global_mismatch se conserva para cuando Motor
+    Óptico está inactivo (comportamiento histórico, sin cambios).
+
+    Fórmula exacta: (1 - factor_sombra_anual) * (1 - factor_mismatch_or_pct / 100),
+    limitada a [0, 1]. Una entrada ausente (None) equivale a pérdida cero
+    para ese término -- factor_sombra_anual=None se trata como 0 (sin
+    sombra) y factor_mismatch_or_pct=None como 0 (sin mismatch de
+    orientación), nunca como "sin dato disponible, aplicar 100%".
+    """
+    fs = float(factor_sombra_anual) if factor_sombra_anual is not None else 0.0
+    fm = float(factor_mismatch_or_pct) if factor_mismatch_or_pct is not None else 0.0
+    factor = (1.0 - fs) * (1.0 - fm / 100.0)
+    return round(min(1.0, max(0.0, factor)), 4)

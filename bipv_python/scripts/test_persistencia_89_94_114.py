@@ -31,14 +31,24 @@ def check(nombre, cond, detalle=""):
 
 
 # ── #89: resultados de Producción ────────────────────────────────────────────
+# produccion-codespec Fase 1 ("Persistencia"): restaurar ahora exige que
+# quien llama YA haya reconstruido produccion_run_signature_v1 en su propio
+# session_state y que coincida EXACTAMENTE con la persistida -- ver
+# tests/test_produccion_vigencia.py para la cobertura completa (legacy sin
+# firma, firma ausente, firma distinta). Aquí se simula el caso feliz: la
+# pestaña nueva SÍ pudo reconstruir la misma firma.
+_FIRMA_89 = "f" * 64
 ss = {"E_ac_anual_kWh": 12345.6, "P_stc_kW_sistema": 8.1, "N_paneles_final": 15,
       "PR_sistema": 0.82, "produccion_ok": True,
+      "produccion_run_signature_v1": _FIRMA_89,
       "ciudad": "Bogotá", "lat_proyecto": 4.6097, "lon_proyecto": -74.0817}
 check("#89 guardar resultados", pr.guardar_resultados_produccion(ss, USR_A))
 check("#89 sin usuario → no guarda", not pr.guardar_resultados_produccion(ss, ""))
 
-# Pestaña nueva del MISMO usuario → restaurar
-ss2 = {}
+# Pestaña nueva del MISMO usuario → restaurar (con la MISMA firma ya
+# reconstruida por el llamador -- sin ella, restaurar_resultados_produccion()
+# rechaza por diseño, ver test_restaurar_rechaza_si_falta_firma_esperada_en_sesion).
+ss2 = {"produccion_run_signature_v1": _FIRMA_89}
 check("#89 restaurar en pestaña nueva", pr.restaurar_resultados_produccion(ss2, USR_A))
 check("#89 valores restaurados", ss2.get("E_ac_anual_kWh") == 12345.6
       and ss2.get("N_paneles_final") == 15)

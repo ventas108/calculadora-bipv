@@ -63,6 +63,30 @@ def panel_tiene_sdm_completo(panel: dict) -> bool:
     )
 
 
+def determinar_source_mode(panel: dict, produccion_modo_iv: bool) -> str:
+    """
+    Método físico EFECTIVO que produce la energía oficial de esta corrida
+    (produccion-codespec Fase 1, campo `source_mode` de
+    produccion_run_signature_v1) -- mismo orden de prioridad que ya aplica
+    esta página al elegir `res` entre res_iv/res_base:
+
+      1. produccion_modo_iv=True  → "motor_iv"   (curva I-V real, opt-in,
+         tiene prioridad incluso para CdTe -- reemplaza tanto al SDM como a
+         JRC/Huld cuando el usuario lo activa explícitamente).
+      2. Panel CdTe                → "jrc_huld"   (motor PRIMARIO de energía
+         para CdTe, ver nota "Motor CdTe" en el docstring del módulo).
+      3. Panel con SDM completo    → "sdm_pvsyst" (De Soto/PVsyst v6).
+      4. Cualquier otro caso       → "lineal"     (fallback simplificado).
+    """
+    if produccion_modo_iv:
+        return "motor_iv"
+    if clasificar_tecnologia_jrc(panel.get("tecnologia")) == "CdTe":
+        return "jrc_huld"
+    if panel_tiene_sdm_completo(panel):
+        return "sdm_pvsyst"
+    return "lineal"
+
+
 def _calcular_pmax_vectorizado(
     G: np.ndarray,
     T_cel: np.ndarray,

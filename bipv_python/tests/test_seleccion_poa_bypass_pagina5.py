@@ -1090,14 +1090,26 @@ def test_financiero_no_restaura_energia_anterior_tras_recalculo(_pr_aislado):
 # 34) Salvaguarda: sin limpiar la persistencia, Financiero SÍ restauraría
 #     (demuestra que el test 33 realmente ejercita la limpieza, y no un
 #     comportamiento por default de restaurar_resultados_produccion()).
+#
+#     produccion-codespec Fase 1 ("Persistencia", integrado 19-sep-2026):
+#     restaurar ahora exige ADEMÁS que produccion_run_signature_v1 coincida
+#     exactamente entre lo persistido y lo que el llamador ya reconstruyó en
+#     su propio session_state -- ver tests/test_produccion_vigencia.py para
+#     esa cobertura completa. Este control sigue siendo válido incluyendo
+#     una firma que coincide en ambos lados: el punto del test (que el "no
+#     restaura" del test 33 viene de limpiar_resultados_produccion(), no de
+#     un default) no depende de la firma, así que se mantiene el mismo caso
+#     feliz salvo por ese requisito nuevo.
 def test_sin_limpiar_persistencia_financiero_si_restauraria(_pr_aislado):
     pr = _pr_aislado
     usuario = "ronda5-test-control@example.com"
+    _firma_control = "c" * 64
     sesion_guardada = {
         "E_ac_anual_kWh": 12345.6, "E_dc_anual_kWh": 13000.0,
         "PR_sistema": 0.81, "Y_f_kWh_kWp": 1500.0,
         "P_stc_kW_sistema": 10.0, "N_paneles_final": 20,
         "panel_nombre_final": "ASP-ST1-T40", "eta_inversor": 0.96,
+        "produccion_run_signature_v1": _firma_control,
         "ciudad": "Bogotá", "lat_proyecto": 4.7110, "lon_proyecto": -74.0721,
     }
     pr.guardar_resultados_produccion(sesion_guardada, usuario)
@@ -1105,6 +1117,7 @@ def test_sin_limpiar_persistencia_financiero_si_restauraria(_pr_aislado):
     estado_nuevo = {
         "auth_email": usuario, "ciudad": "Bogotá",
         "lat_proyecto": 4.7110, "lon_proyecto": -74.0721,
+        "produccion_run_signature_v1": _firma_control,  # el llamador SÍ la reconstruyó igual
     }
     restauro = pr.restaurar_resultados_produccion(estado_nuevo, usuario)
     assert restauro is True
