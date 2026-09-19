@@ -4154,7 +4154,11 @@ Complementa la sección 25g. ("El procedimiento correcto por módulos") con una 
 8. 💼 Presupuesto y 💰 Financiero — calcular TIR/VPN/Payback. **Prueba de fuego**: abrir Financiero en una pestaña NUEVA (sesión limpia) — debe aparecer `📂 Datos restaurados del proyecto guardado` con los mismos agregados. Si NO aparece ese aviso, el usuario no debe confiar en los valores mostrados: debe volver a 📊 Producción y simular antes de continuar (ver sección 71).
 9. 📄 Reporte PDF — revisar el checklist de "Estado del proyecto" (todas las secciones a incluir en ✅) y confirmar visualmente panel/inversor/N correctos justo antes de generar: esta página no se autoverifica, es la última revisión manual del usuario. Generar con el sello del Ledger de Auditoría activado si se quiere trazabilidad verificable.
 
-**Límites vigentes de los comparadores**: (1) al adoptar inversor, por seguridad vuelve a ejecutar Motor Óptico si estaba activo, porque la implementación aún conserva solo una parte de su estado; (2) no uses la adopción global de Orientación para decidir un proyecto multi-superficie — configura cada superficie en su flujo específico; (3) las tablas y respuestas IA de los comparadores todavía no tienen una firma común de entradas, así que cualquier cambio de panel, inversor, orientación, TMY o diseño obliga a repetir la comparación antes de confiar en ella.
+**Límites vigentes de los comparadores**:
+
+- **Adopción de inversor:** por seguridad vuelve a ejecutar Motor Óptico si estaba activo, porque la implementación aún conserva solo una parte de su estado.
+- **Orientación multi-superficie:** no uses la adopción global de Orientación para decidir este tipo de proyecto; configura cada superficie en su flujo específico.
+- **Vigencia de tablas y respuestas IA:** los comparadores todavía no tienen una firma común de entradas. Cualquier cambio de panel, inversor, orientación, TMY o diseño obliga a repetir la comparación antes de confiar en ella.
 
 **Regla de cierre para el Asistente**: si alguna de las 5 "pruebas de fuego" (pasos 3, 4, 6, 7, 8) no se comporta como se describe arriba, orientar al usuario a NO entregar ese proyecto todavía — es una señal de que algo en esa sesión quedó en un estado inconsistente, y debe recalcularse desde el módulo donde falló la prueba antes de continuar.
 
