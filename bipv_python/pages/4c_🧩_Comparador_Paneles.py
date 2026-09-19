@@ -207,10 +207,42 @@ if st.button("▶️ Comparar paneles", type="primary"):
         st.session_state["_df_comparador_paneles"] = df_cmp
 
 df_cmp = st.session_state.get("_df_comparador_paneles")
+
+# Guard de resultado legacy (19-sep-2026): un df_cmp que ya estaba en
+# session_state ANTES de que comparar_paneles() empezara a publicar
+# "_panel_dict"/"_motivo_electrico" -- o generado con una versión intermedia
+# que solo traía una de las dos -- no puede reutilizarse con seguridad. Ni
+# para renderizar (drop(columns=[...]) de una columna que no existe lanza
+# KeyError y rompe la página) ni para adoptar (la ficha exacta de cada
+# panel ya no es recuperable: nunca se reconstruye buscando el nombre en
+# MODULOS_BIPV, el catálogo Excel ni ningún otro catálogo -- eso es
+# exactamente el bug que _panel_dict corrigió). "_motivo_electrico" tampoco
+# se reconstruye aunque falte solo ella: requeriría re-evaluar
+# compatibilidad eléctrica con el inversor/N_serie vigentes AHORA, que
+# pueden no ser los mismos que produjeron la comparación guardada -- el
+# mismo riesgo de "ficha distinta de la comparada", solo que del lado del
+# inversor. Se descarta el resultado completo y se pide repetir la
+# comparación, nunca se oculta el problema ni se sigue de largo.
+_COLS_INTERNAS_REQUERIDAS = ("_panel_dict", "_motivo_electrico")
+if df_cmp is not None and not df_cmp.empty and not all(
+    c in df_cmp.columns for c in _COLS_INTERNAS_REQUERIDAS
+):
+    st.session_state.pop("_df_comparador_paneles", None)
+    st.warning(
+        "⚠️ La comparación guardada en esta sesión se generó con una versión "
+        "anterior de este comparador y ya no se puede reutilizar con "
+        "seguridad (falta la ficha exacta o el motivo de compatibilidad "
+        "eléctrica de cada panel). Pulsa **▶️ Comparar paneles** de nuevo "
+        "para regenerarla.",
+        icon="⚠️",
+    )
+    df_cmp = None
+
 if df_cmp is not None and not df_cmp.empty:
+    _cols_internas = ["_motivo_electrico", "_panel_dict"]
     st.subheader("Resultados — ordenado por LCOE (menor primero)")
     st.dataframe(
-        df_cmp.drop(columns=["_motivo_electrico"]).style.format({
+        df_cmp.drop(columns=_cols_internas).style.format({
             "P_dc (kWp)": "{:,.2f}", "E_ac (kWh/año)": "{:,.0f}", "PR": "{:.3f}",
             "CAPEX (USD)": "{:,.0f}", "VPN (USD)": "{:,.0f}", "TIR (%)": "{:.1f}",
             "Payback (años)": "{:.1f}", "LCOE (USD/kWh)": "{:.4f}",
@@ -218,14 +250,24 @@ if df_cmp is not None and not df_cmp.empty:
         use_container_width=True, hide_index=True,
     )
 
+    # Todas las filas quedan visibles en la tabla de arriba (nunca se
+    # ocultan) -- estos avisos solo repiten el motivo en texto para lo que
+    # no es ✅, igual que ya hacía para ❌. "—" (no evaluable, p.ej. sin
+    # inversor comparable en la ficha) es DISTINTO de "❌" (evaluado e
+    # incompatible): no se puede convertir uno en otro por omisión.
     _incompatibles = df_cmp[df_cmp["Compatible"] == "❌"]
     if not _incompatibles.empty:
         for _, r in _incompatibles.iterrows():
             st.warning(f"**{r['Panel']}**: {r['_motivo_electrico']}", icon="⚠️")
 
+    _no_evaluables = df_cmp[df_cmp["Compatible"] == "—"]
+    if not _no_evaluables.empty:
+        for _, r in _no_evaluables.iterrows():
+            st.info(f"**{r['Panel']}** — compatibilidad no evaluable: {r['_motivo_electrico']}", icon="ℹ️")
+
     st.download_button(
         "⬇️ Descargar comparativa (CSV)",
-        df_cmp.drop(columns=["_motivo_electrico"]).to_csv(index=False).encode("utf-8-sig"),
+        df_cmp.drop(columns=_cols_internas).to_csv(index=False).encode("utf-8-sig"),
         "comparativa_paneles.csv", "text/csv",
     )
 
@@ -282,13 +324,22 @@ if df_cmp is not None and not df_cmp.empty:
 
     st.divider()
 
-    _elegibles = df_cmp[df_cmp["Compatible"] != "❌"]["Panel"].tolist()
+    # Adopción exige compatibilidad EXACTAMENTE "✅" -- "—" (no evaluable) y
+    # "❌" (evaluado e incompatible) quedan igual de fuera; ninguno de los
+    # dos significa "compatible por defecto" (bug real encontrado auditando
+    # esta página: antes bastaba con no ser "❌" para poder adoptar).
+    _elegibles = df_cmp[df_cmp["Compatible"] == "✅"]["Panel"].tolist()
     if _elegibles:
         _elegido = st.selectbox("Panel a adoptar en el proyecto", _elegibles)
         if st.button("✅ Adoptar este panel", type="primary"):
-            from datos.tecnologias_bipv import MODULOS_BIPV
             fila = df_cmp[df_cmp["Panel"] == _elegido].iloc[0]
-            st.session_state["panel_dict"] = MODULOS_BIPV[_elegido]
+            # La MISMA ficha (dict) que comparar_paneles() usó para simular
+            # esta fila -- nunca se vuelve a resolver "_elegido" contra
+            # MODULOS_BIPV (7 paneles) ni contra ningún otro catálogo: el
+            # candidato puede venir del catálogo Excel/NREL unido, y
+            # buscarlo solo en MODULOS_BIPV podía lanzar KeyError o adoptar
+            # una ficha DISTINTA de la que realmente se comparó.
+            st.session_state["panel_dict"] = fila["_panel_dict"]
             st.session_state["panel_nombre_dim"] = _elegido
             # "N° módulos"/"P_dc (kWp)" ya son el PROYECTO COMPLETO (× N_inversores,
             # ver comparar_paneles()) -- para un proyecto multi-inversor van en las

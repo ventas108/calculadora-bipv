@@ -53,6 +53,9 @@ def comparar_paneles(
 
     Devuelve un DataFrame con una fila por panel, ordenado por LCOE
     ascendente (mejor primero) -- vacío si no hay ningún panel simulable.
+    Incluye "_panel_dict" (la ficha exacta usada en esa simulación) para que
+    quien adopte un panel no tenga que volver a resolverlo contra ningún
+    catálogo.
     """
     var_panel = variable_panel(catalogo)
     if catalogo is None:
@@ -97,6 +100,13 @@ def comparar_paneles(
             "Payback (años)": fin.payback_simple_anos,
             "LCOE (USD/kWh)": fin.metricas["lcoe_usd_kWh"],
             "_motivo_electrico": compat.mensaje,
+            # La MISMA ficha (dict) que se usó para simular esta fila -- quien
+            # adopte un panel debe reusar este objeto directamente, nunca
+            # volver a resolver "nombre" contra un catálogo (p.ej. solo
+            # MODULOS_BIPV, que no incluye el catálogo Excel/NREL unido):
+            # eso podía lanzar KeyError o adoptar una ficha DISTINTA de la
+            # comparada -- bug real encontrado auditando el comparador.
+            "_panel_dict": panel,
         })
 
     df = pd.DataFrame(filas)

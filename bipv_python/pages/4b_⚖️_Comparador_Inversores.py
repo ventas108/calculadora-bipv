@@ -83,11 +83,24 @@ if res_prod is None or "df_horario" not in res_prod:
     st.stop()
 
 df_h = res_prod["df_horario"]
-# Producción publica la serie horaria como P_ac_kW (ver calculos/produccion.py)
-_col_ac = "P_ac_kW" if "P_ac_kW" in df_h.columns else ("P_ac" if "P_ac" in df_h.columns else None)
-if _col_ac is None:
-    st.error("La simulación guardada no tiene la columna horaria P_ac_kW — vuelve a correr 📊 Producción.")
+# P_ac_kW YA tiene aplicado el recorte (Pnom) del inversor ACTUALMENTE
+# seleccionado -- reusarla aquí como si fuera "sin límite" le impediría a
+# este comparador recuperar la energía que ese inversor recortó cuando un
+# candidato tiene mayor potencia AC (bug real encontrado auditando este
+# módulo). calculos/produccion.py y calculos/produccion_iv.py publican
+# aparte "P_ac_sin_recorte_kW" -- la misma serie física, sin el límite --
+# específicamente para este uso. Un resultado GUARDADO ANTES de esta
+# columna (legacy) no la tiene: nunca se reconstruye a partir de P_ac_kW
+# (eso reintroduciría el mismo bug en silencio), se exige volver a simular.
+if "P_ac_sin_recorte_kW" not in df_h.columns:
+    st.error(
+        "La simulación guardada en 📊 Producción es de una versión anterior y no "
+        "trae la columna horaria `P_ac_sin_recorte_kW` (serie previa al recorte del "
+        "inversor) que este comparador necesita para reclippear correctamente contra "
+        "cada candidato. Vuelve a **▶️ Simular producción** en 📊 Producción y regresa aquí."
+    )
     st.stop()
+_col_ac = "P_ac_sin_recorte_kW"
 
 # ── Modos donde la serie base NO es la energía oficial del proyecto ──────────
 if st.session_state.get("multisup_activo"):
@@ -99,9 +112,8 @@ if st.session_state.get("multisup_activo"):
     )
     st.stop()
 
-# Serie AC horaria SIN límite (W) — el clipping se aplica aquí por configuración
-_factor_kW = 1000.0 if _col_ac == "P_ac_kW" else 1.0
-p_ac_W = df_h[_col_ac].to_numpy(dtype=float) * _factor_kW
+# Serie AC horaria SIN recorte (W) — el clipping se aplica aquí por configuración
+p_ac_W = df_h[_col_ac].to_numpy(dtype=float) * 1000.0
 
 # Corrección bypass: si Producción registró pérdida por diodos de bypass, la
 # energía oficial es E_ac_anual_kWh_bypass — se aplica el mismo derating uniforme

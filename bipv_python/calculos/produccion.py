@@ -304,7 +304,9 @@ def simular_produccion_anual(
                           aplicó) -- >1.0 = ganancia neta por espectro más azul de lo
                           estándar en el sitio; <1.0 = pérdida neta.
     df_horario           : DataFrame horario (G_eff, factor_espectral [1.0 si no se
-                          aplicó], T_cel, Pmax, P_dc, P_ac, clipping_kW)
+                          aplicó], T_cel, Pmax, P_dc, P_ac, P_ac_sin_recorte_kW
+                          [previa al clipping del inversor -- ver comentario junto
+                          a esa columna], clipping_kW)
     df_mensual           : DataFrame mensual con E_dc, E_ac, kWh/kWp
     """
     if P_dc_stc_kW is None:
@@ -475,6 +477,15 @@ def simular_produccion_anual(
         "Pmax_mod_W":   pmax_mod,
         "P_dc_kW":      P_dc_W  / 1000.0,
         "P_ac_kW":      P_ac_W  / 1000.0,
+        # Previa al clipping del inversor (Pnom) -- para comparadores de
+        # inversor que necesitan reclippear contra OTRO P_ac_nom_W sin
+        # heredar el límite del inversor actualmente seleccionado. Conserva
+        # todas las pérdidas físicas DC (térmica, mismatch, óhmica DC) y la
+        # eficiencia del inversor (eta_inversor); NO incluye la pérdida
+        # óhmica AC/cableado, que ocurre aguas abajo del recorte (ver
+        # comentario en "Pérdida óhmica AC" más arriba) y no depende de qué
+        # inversor se esté comparando.
+        "P_ac_sin_recorte_kW": P_ac_sin_recorte_W / 1000.0,
         "perdida_T_kW": perdida_temp_por_modulo * N_paneles / 1000.0,
         "clipping_kW":  clipping_W / 1000.0,
         "perdida_ohmica_dc_W": perdida_ohmica_dc_por_hora_W,

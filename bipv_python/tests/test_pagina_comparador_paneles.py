@@ -192,6 +192,151 @@ def test_adopcion_invalida_poa_efectiva_a_diferencia_del_comparador_de_inversore
     assert 'if k != "poa_efectiva_df"' not in src
 
 
+# ── Coherencia de adopción (19-sep-2026) ─────────────────────────────────────
+# Hallazgo (auditoría de coherencia de comparadores): la adopción resolvía el
+# panel elegido SOLO contra MODULOS_BIPV (7 fichas) aunque comparar_paneles()
+# ya compara el catálogo unido real (miles de fichas Excel/NREL) -- KeyError
+# o, peor, adoptar una ficha DISTINTA de la comparada si el nombre coincidía
+# por casualidad. Además, "Compatible" != "❌" dejaba adoptar filas "—" (no
+# evaluable) como si fueran compatibles. Ver tests/test_comparador_paneles.py
+# para la cobertura de que _panel_dict trae la MISMA ficha usada al simular.
+
+def test_adopcion_exige_compatible_exactamente_ok():
+    src = _leer(_PAGINA)
+    assert '_elegibles = df_cmp[df_cmp["Compatible"] == "✅"]["Panel"].tolist()' in src
+    # Nunca el criterio laxo original (cualquier cosa que no sea "❌").
+    assert '!= "❌"' not in src
+
+
+def test_adopcion_nunca_resuelve_el_panel_contra_modulos_bipv():
+    src = _leer(_PAGINA)
+    # El módulo docstring de cabecera todavía MENCIONA MODULOS_BIPV en
+    # prosa (contexto histórico del catálogo) -- lo que no debe existir es
+    # un import ni un uso real en el flujo de adopción.
+    assert "from datos.tecnologias_bipv import MODULOS_BIPV" not in src
+    assert "MODULOS_BIPV[" not in src
+    assert 'st.session_state["panel_dict"] = fila["_panel_dict"]' in src
+
+
+def test_filas_no_evaluables_muestran_su_motivo():
+    src = _leer(_PAGINA)
+    assert '_no_evaluables = df_cmp[df_cmp["Compatible"] == "—"]' in src
+    idx_no_eval = src.index("_no_evaluables = df_cmp")
+    idx_elegibles = src.index("_elegibles = df_cmp")
+    bloque = src[idx_no_eval:idx_elegibles]
+    assert "_motivo_electrico" in bloque
+    assert "st.info(" in bloque or "st.warning(" in bloque
+
+
+def test_columnas_internas_nunca_llegan_a_la_tabla_ni_al_csv():
+    # _panel_dict (dict de Python) rompería el render/format de st.dataframe
+    # y ensuciaría el CSV exportado -- debe quedar fuera de ambos, igual que
+    # _motivo_electrico ya quedaba fuera.
+    src = _leer(_PAGINA)
+    assert '_cols_internas = ["_motivo_electrico", "_panel_dict"]' in src
+    assert "df_cmp.drop(columns=_cols_internas)" in src
+    assert src.count("df_cmp.drop(columns=_cols_internas)") >= 2
+
+
+# ── Guard de resultado legacy (19-sep-2026) ──────────────────────────────────
+# Hallazgo (arreglo urgente post-coherencia): un df_cmp que ya estaba en
+# session_state["_df_comparador_paneles"] ANTES de que comparar_paneles()
+# empezara a publicar "_panel_dict"/"_motivo_electrico" no trae esas
+# columnas -- df_cmp.drop(columns=[...]) lanza KeyError y rompe la página.
+# El guard debe descartar ese resultado (nunca reconstruirlo desde ningún
+# catálogo) ANTES de que el bloque de render/adopción lo toque.
+
+def test_guard_legacy_verifica_ambas_columnas_internas_antes_de_renderizar():
+    src = _leer(_PAGINA)
+    assert '_COLS_INTERNAS_REQUERIDAS = ("_panel_dict", "_motivo_electrico")' in src
+    idx_declara = src.index("_COLS_INTERNAS_REQUERIDAS = ")
+    idx_guard = src.index("if df_cmp is not None and not df_cmp.empty and not all(")
+    idx_render = src.index('if df_cmp is not None and not df_cmp.empty:\n    _cols_internas')
+    assert idx_declara < idx_guard < idx_render, (
+        "el guard de legacy debe declararse y ejecutarse ANTES del bloque "
+        "que renderiza/adopta df_cmp"
+    )
+
+
+def test_guard_legacy_descarta_sin_reconstruir_desde_ningun_catalogo():
+    src = _leer(_PAGINA)
+    idx_guard = src.index("if df_cmp is not None and not df_cmp.empty and not all(")
+    idx_render = src.index('if df_cmp is not None and not df_cmp.empty:\n    _cols_internas')
+    bloque = src[idx_guard:idx_render]
+
+    # Descarta el resultado guardado y detiene ESE flujo (df_cmp = None),
+    # nunca lo repara.
+    assert 'st.session_state.pop("_df_comparador_paneles", None)' in bloque
+    assert "st.warning(" in bloque
+    assert "df_cmp = None" in bloque
+    assert "se generó con una versión" in bloque
+
+    # Nunca intenta resolver/reconstruir la ficha o el motivo desde ningún
+    # catálogo dentro de este bloque -- ese es exactamente el bug original.
+    assert "MODULOS_BIPV" not in bloque
+    assert "catalogo" not in bloque.lower()
+    assert "_catalogo_paneles_real" not in bloque
+
+
+def test_guard_legacy_no_dispara_con_dataframe_vacio():
+    # Un df_cmp vacío (ningún panel simulable) es un caso YA manejado por el
+    # "elif df_cmp is not None: st.error(...)" de más abajo -- no es un
+    # problema de esquema legacy, y el guard no debe confundir los dos.
+    src = _leer(_PAGINA)
+    idx_guard = src.index("if df_cmp is not None and not df_cmp.empty and not all(")
+    linea_guard = src[idx_guard: src.index(")", idx_guard) + 1]
+    assert "not df_cmp.empty" in linea_guard or "not df_cmp.empty" in src[idx_guard:idx_guard + 80]
+
+
+def test_guard_predicate_detecta_legacy_sin_columnas_internas():
+    # Mismo predicado que usa la página, ejercido directamente contra
+    # pandas real (sin depender de Streamlit) -- confirma el comportamiento,
+    # no solo el texto fuente.
+    import pandas as pd
+    cols_requeridas = ("_panel_dict", "_motivo_electrico")
+
+    df_legacy_total = pd.DataFrame([{"Panel": "ASP-ST1-T40", "Compatible": "✅"}])
+    es_legacy = not df_legacy_total.empty and not all(
+        c in df_legacy_total.columns for c in cols_requeridas
+    )
+    assert es_legacy is True
+
+    # Solo falta _motivo_electrico (versión intermedia) -- también legacy,
+    # nunca se reconstruye aunque _panel_dict SÍ esté presente.
+    df_legacy_parcial = pd.DataFrame([
+        {"Panel": "ASP-ST1-T40", "Compatible": "✅", "_panel_dict": {"Pmax_stc": 63.0}}
+    ])
+    es_legacy_parcial = not df_legacy_parcial.empty and not all(
+        c in df_legacy_parcial.columns for c in cols_requeridas
+    )
+    assert es_legacy_parcial is True
+
+
+def test_guard_predicate_caso_normal_no_es_legacy_y_tabla_csv_excluyen_internas():
+    # Resultado NORMAL (con ambas columnas internas): el guard no lo
+    # descarta, y drop(columns=[...]) sigue funcionando sin KeyError --
+    # exactamente lo que rompería si el guard fuera demasiado agresivo.
+    import pandas as pd
+    cols_requeridas = ("_panel_dict", "_motivo_electrico")
+    df_ok = pd.DataFrame([{
+        "Panel": "ASP-ST1-T40", "Compatible": "✅",
+        "E_ac (kWh/año)": 12345.0,
+        "_panel_dict": {"Pmax_stc": 63.0}, "_motivo_electrico": "",
+    }])
+
+    es_legacy = not df_ok.empty and not all(c in df_ok.columns for c in cols_requeridas)
+    assert es_legacy is False
+
+    _cols_internas = ["_motivo_electrico", "_panel_dict"]
+    tabla = df_ok.drop(columns=_cols_internas)
+    csv = tabla.to_csv(index=False)
+    assert "_panel_dict" not in tabla.columns
+    assert "_motivo_electrico" not in tabla.columns
+    assert "_panel_dict" not in csv
+    assert "_motivo_electrico" not in csv
+    assert "ASP-ST1-T40" in csv  # el resto de los datos SÍ debe seguir ahí
+
+
 def test_page_link_a_analisis_ia_apunta_a_un_archivo_real():
     # El usuario reportó que no encontraba el Analista de Producción -- se
     # agregó un st.page_link() de vuelta hacia 🤖 Análisis IA (donde viven

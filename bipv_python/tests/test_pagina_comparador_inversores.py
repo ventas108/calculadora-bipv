@@ -128,6 +128,51 @@ def test_analisis_ia_enlaza_de_vuelta_a_comparador_de_inversores():
     assert "pages/4b_⚖️_Comparador_Inversores.py" in src_ia
 
 
+# ── Coherencia P_ac_sin_recorte_kW (19-sep-2026) ─────────────────────────────
+# Ver tests/test_produccion_p_ac_sin_recorte.py para la cobertura a nivel de
+# motor (calculos/produccion.py, calculos/produccion_iv.py) de por qué esta
+# columna existe. Aquí solo se verifica que LA PÁGINA la usa correctamente:
+# nunca reintroduce el bug reusando P_ac_kW (ya recortada) como si fuera la
+# serie sin límite, y nunca sigue de largo en silencio si un resultado
+# guardado antes de este fix no la trae.
+
+def test_usa_p_ac_sin_recorte_kw_como_fuente_de_p_ac_w():
+    src = _leer()
+    assert '_col_ac = "P_ac_sin_recorte_kW"' in src
+    assert 'p_ac_W = df_h[_col_ac].to_numpy(dtype=float) * 1000.0' in src
+
+
+def test_nunca_asigna_p_ac_kw_como_col_ac():
+    # La página puede MENCIONAR "P_ac_kW" en comentarios explicativos, pero
+    # nunca debe volver a asignarla a _col_ac (eso es exactamente el bug
+    # original: tratar la serie ya recortada como si fuera la serie base).
+    src = _leer()
+    assert '_col_ac = "P_ac_kW"' not in src
+    assert '"P_ac"' not in src.split("_col_ac")[0]  # sin el fallback legado a "P_ac"
+
+
+def test_detiene_con_error_claro_si_falta_p_ac_sin_recorte_kw():
+    src = _leer()
+    idx_check = src.index('if "P_ac_sin_recorte_kW" not in df_h.columns:')
+    idx_col_ac = src.index('_col_ac = "P_ac_sin_recorte_kW"')
+    # El chequeo debe ocurrir ANTES de fijar _col_ac (nunca se sigue de largo
+    # con una columna que no existe).
+    assert idx_check < idx_col_ac
+
+    bloque = src[idx_check: idx_col_ac]
+    assert "st.error(" in bloque
+    assert "st.stop()" in bloque
+    assert "vuelve a" in bloque.lower() or "simular" in bloque.lower()
+    # El error y el stop() deben estar indentados (dentro del cuerpo del
+    # if), no al mismo nivel que el propio "if" -- si no, se ejecutarían
+    # siempre, no solo cuando falta la columna.
+    for linea in bloque.splitlines()[1:]:
+        if linea.strip():
+            assert linea.startswith("    "), f"línea fuera del cuerpo del if: {linea!r}"
+
+    ast.parse(src)  # la página sigue siendo Python válido tras el chequeo
+
+
 def test_claves_de_session_state_propias_no_chocan_con_otras_paginas():
     # _df_comparador_inversores / ia_inversor_texto / ia_inversor_uso son
     # propias de esta sección -- confirmar que no las escribe ninguna otra

@@ -348,6 +348,10 @@ def simular_produccion_iv(
         "Pmax_mod_W":   pmp_mod,
         "P_dc_kW":      P_dc_W / 1000.0,
         "P_ac_kW":      P_ac_W / 1000.0,
+        # Previa al clipping del inversor -- mismo criterio que produccion.py
+        # (ver ese comentario): conserva pérdidas físicas DC + eficiencia del
+        # inversor, excluye Pnom y la pérdida óhmica AC downstream.
+        "P_ac_sin_recorte_kW": P_ac_sin_recorte_W / 1000.0,
         "perdida_T_kW": perdida_temp_por_modulo * N_paneles / 1000.0,
         "clipping_kW":  clipping_W / 1000.0,
         "perdida_ohmica_dc_W": perdida_ohmica_dc_por_hora_W,

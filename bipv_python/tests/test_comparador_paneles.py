@@ -220,6 +220,49 @@ def test_formatear_comparacion_incluye_motivo_de_incompatibilidad(df_n_serie_40)
     assert df.iloc[0]["_motivo_electrico"] in texto
 
 
+# ── _panel_dict -- coherencia de adopción (19-sep-2026) ──────────────────────
+# Hallazgo (auditoría de comparadores): la página resolvía el panel a
+# adoptar SOLO contra MODULOS_BIPV (7 fichas), aunque comparar_paneles() ya
+# compara el catálogo Excel/NREL unido -- KeyError, o peor, adoptar una
+# ficha DISTINTA de la comparada si el nombre coincidía por casualidad.
+# comparar_paneles() ahora expone "_panel_dict": la MISMA ficha usada para
+# simular esa fila, para que la adopción nunca tenga que volver a resolver
+# nada contra ningún catálogo.
+
+def _catalogo_chico():
+    from datos.tecnologias_bipv import MODULOS_BIPV
+    return {k: MODULOS_BIPV[k] for k in ("ASP-ST1-T40", "ASP-ST1-T30")}
+
+
+def test_panel_dict_es_exactamente_la_ficha_pasada_al_catalogo():
+    tmy = _tmy_sintetico_offline(LAT, LON, ALT_M)
+    catalogo = _catalogo_chico()
+    df = comparar_paneles(
+        _cfg_base(), tmy, "BIPV fachada/pérgola",
+        tarifa_cop_kWh=750.0, tipo_cambio=4000.0, catalogo=catalogo,
+    )
+    assert set(df["Panel"]) == set(catalogo.keys())
+    for _, fila in df.iterrows():
+        assert fila["_panel_dict"] == catalogo[fila["Panel"]]
+
+
+def test_panel_dict_incluye_paneles_fuera_de_modulos_bipv(df_base):
+    # df_base compara el catálogo REAL unido (miles de fichas Excel/NREL,
+    # no solo los 7 de MODULOS_BIPV) -- confirma que un candidato de ESE
+    # universo trae su ficha completa lista para adoptar, sin depender de
+    # que también exista en MODULOS_BIPV.
+    from datos.tecnologias_bipv import MODULOS_BIPV
+    fuera = df_base[~df_base["Panel"].isin(MODULOS_BIPV.keys())]
+    assert not fuera.empty, (
+        "el catálogo comparado debe incluir paneles fuera de MODULOS_BIPV "
+        "para que este test verifique algo real"
+    )
+    fila = fuera.iloc[0]
+    assert isinstance(fila["_panel_dict"], dict)
+    assert fila["_panel_dict"].get("Pmax_stc") is not None
+    assert fila["_panel_dict"].get("nombre", fila["Panel"])  # ficha no vacía
+
+
 def test_formatear_comparacion_dataframe_vacio_no_crashea():
     import pandas as pd
     texto = formatear_comparacion_paneles(pd.DataFrame(), "Granja FV campo")
