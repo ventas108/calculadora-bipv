@@ -108,7 +108,7 @@ def cargar_catalogo_paneles() -> dict:
             "degradacion_tabla_anio_pct":  _parse_tabla_degradacion(r.get("DegradacionTablaJSON")),
             "Voc": Voc, "Vmp": Vmp,
             "Isc": Isc, "Imp": Imp,
-            "N_s":         _f(r.get("Ns (Celdas Serie)")),
+            "N_s":         _f(r.get("SDM_N_s")) or _f(r.get("Ns (Celdas Serie)")),
             "n_idealidad": _f(r.get("n (Factor Idealidad)")),
             "NsA":         _f(r.get("NsA = n × Ns")),
             "fuente_NsA":  str(r.get("Fuente NsA", "")).strip(),
@@ -134,8 +134,19 @@ def cargar_catalogo_paneles() -> dict:
             # aviso "🟢 se activará automáticamente" en Dimensionamiento.
             "Tk_beta":  _f(r.get("CoefVoc_C")),       # coef. temp. Voc  (%/°C)
             "Tk_gamma": _f(r.get("CoefT_C")),         # coef. temp. Pmax (%/°C)
-            "I_L_ref": None, "I_o_ref": None,
-            "R_s": None, "R_sh_ref": None,
+            # SDM opcional introducido por el usuario. Si no existe la columna
+            # (catálogos antiguos), permanece vacío y preparar_panel_iv()
+            # estima desde la ficha cuando sea posible.
+            "I_L_ref": _f(r.get("SDM_I_L_ref")),
+            "I_o_ref": _f(r.get("SDM_I_o_ref")),
+            "R_s": _f(r.get("SDM_R_s")),
+            "R_sh_ref": _f(r.get("SDM_R_sh_ref")),
+            "R_sh_0": _f(r.get("SDM_R_sh_0")),
+            "a_ref": _f(r.get("SDM_a_ref")),
+            "mu_gamma": _f(r.get("SDM_mu_gamma")),
+            "sdm_origen": str(r.get("SDM_Origen", "") or "").strip(),
+            "sdm_fuente": str(r.get("SDM_Fuente", "") or "").strip(),
+            "sdm_advertencia": str(r.get("SDM_Advertencia", "") or "").strip(),
         }
     return paneles
 
@@ -195,10 +206,17 @@ def guardar_panel_excel(datos: dict, merge_conservador: bool = False) -> str:
     if fila_existente is None:
         fila_existente = ws.max_row + 1
 
-    # Escribir datos — solo columnas que existen en el encabezado
+    # Crear columnas SDM/metadatos si el Excel histórico aún no las tiene.
+    # Así el guardado manual es persistente sin romper catálogos antiguos.
+    columnas_nuevas = [
+        k for k in datos if k not in headers
+    ]
+    for nombre_columna in columnas_nuevas:
+        headers.append(nombre_columna)
+        ws.cell(row=1, column=len(headers), value=nombre_columna)
+
+    # Escribir datos
     for col_nombre, valor in datos.items():
-        if col_nombre not in headers:
-            continue
         # Merge conservador: si el panel ya existía y el nuevo valor es None,
         # no sobreescribir — preservar lo que había en el Excel.
         if merge_conservador and es_actualizacion and valor is None:

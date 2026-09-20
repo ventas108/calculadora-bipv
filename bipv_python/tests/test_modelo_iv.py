@@ -23,6 +23,7 @@ import pytest
 from calculos.modelo_iv import (
     estimar_sdm_desde_ficha,
     preparar_panel_iv,
+    resolver_sdm_con_origen,
     resolver_curva_iv,
     tiene_sdm_completo,
     validar_sdm_vs_ficha,
@@ -30,6 +31,7 @@ from calculos.modelo_iv import (
 from calculos.dimensionamiento import calcular_voc_string, calcular_vmp_string
 from datos.catalogo_paneles_excel import cargar_catalogo_paneles
 from datos.tecnologias_bipv import ASP_ST1_T40
+from datos.tecnologias_bipv import SUNPOWER_E20_327
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +58,29 @@ def test_catalogo_excel_incluye_imp_stc_para_todo_panel_con_imp():
         f"el alias 'Imp_stc' -- volvió el bug que bloqueaba preparar_panel_iv() "
         f"con un KeyError silencioso: {sin_alias[:5]}"
     )
+
+
+def test_sunpower_e20_estimado_no_se_etiqueta_como_calibrado():
+    panel, origen = __import__("calculos.produccion_iv", fromlist=["preparar_para_iv"]).preparar_para_iv(
+        SUNPOWER_E20_327
+    )
+    assert origen == "estimado_ficha"
+    assert panel["_estimado"] is True
+
+
+def test_resolver_sdm_prioriza_manual_y_bloquea_ficha_incompleta():
+    base = {
+        k: v for k, v in ASP_ST1_T40.items()
+        if k not in {"I_L_ref", "I_o_ref", "R_s", "R_sh_ref", "R_sh_0", "a_ref", "gamma_ref", "mu_gamma"}
+    }
+    manual = {k: ASP_ST1_T40[k] for k in ("I_L_ref", "I_o_ref", "R_s", "R_sh_ref", "a_ref", "N_s")}
+    res, meta = resolver_sdm_con_origen(base, manual)
+    assert meta["origen"] == "manual_real"
+    assert meta["validacion"]["validacion_ok"] is True
+    assert res["sdm_origen"] == "manual_real"
+
+    with pytest.raises(ValueError, match="valores de placa suficientes"):
+        resolver_sdm_con_origen({"nombre": "Sin ficha"})
 
 
 def test_validar_sdm_vs_ficha_no_lanza_keyerror_sin_alias_imp_stc():

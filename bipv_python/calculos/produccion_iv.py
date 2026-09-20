@@ -49,7 +49,12 @@ def preparar_para_iv(panel: dict) -> tuple:
     except Exception:
         _prep = None
     if _prep is not None and tiene_sdm_completo(_prep):
-        if _prep.get("_estimado") or panel.get("_sdm_estimado"):
+        if (
+            _prep.get("_estimado")
+            or panel.get("_sdm_estimado")
+            or panel.get("sdm_estimado")
+            or _prep.get("sdm_origen") == "estimado_ficha"
+        ):
             return {**panel, **_prep, "_sdm_estimado": True}, "estimado_ficha"
         return _prep, "calibrado"
     return None, None

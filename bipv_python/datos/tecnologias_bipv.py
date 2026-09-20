@@ -118,6 +118,52 @@ ASP_ST1_T40 = {
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Panel de referencia East2 — SunPower SPR-E20-327 (E20-327NE-WHT-D)
+# Ficha pública verificada; parámetros SDM estimados por el mismo resolvedor
+# PVsyst v6 usado por calculos.modelo_iv.estimar_sdm_desde_ficha().
+# ──────────────────────────────────────────────────────────────────────────────
+SUNPOWER_E20_327 = {
+    "nombre": "SPR-E20-327 (E20-327NE-WHT-D)",
+    "fabricante": "SunPower",
+    "tecnologia": "Mono-Si",
+    "transparencia_pct": 0,
+    "descripcion": "Panel SunPower E20-327 para referencia científica East2; SDM estimado desde ficha.",
+    "fuente_datos": "Ficha SunPower E20-327NE-WHT-D verificada; SDM estimado por pvsyst_v6_defaults.",
+    "sdm_estimado": True,
+
+    # Datos STC de ficha: 1000 W/m², AM 1.5, 25 °C.
+    "Voc_stc": 64.9,
+    "Vmp_stc": 54.7,
+    "Isc_stc": 6.46,
+    "Imp_stc": 5.98,
+    "Pmax_stc": 327.106,
+    "FF_stc": 327.106 / (64.9 * 6.46),
+
+    # Coeficientes de ficha en las unidades del catálogo.
+    "Tk_beta": -0.272111,
+    "Tk_alfa": 0.054180,
+    "Tk_gamma": -0.38,
+    "NOCT": 45.0,
+
+    # SDM estimado a partir de Voc/Isc/Vmp/Imp y coeficientes de ficha.
+    "I_L_ref": 6.466438,
+    "I_o_ref": 2.373983e-11,
+    "R_s": 0.567833,
+    "R_sh_ref": 569.791667,
+    "R_sh_0": 2279.166667,
+    "a_ref": 96.0,
+    "N_s": 96,
+    "gamma_ref": 1.0,
+    "mu_gamma": -7.614743e-4,
+
+    # Dimensiones de ficha: 1559 x 1046 x 46 mm.
+    "largo_mm": 1559,
+    "ancho_mm": 1046,
+    "area_m2": 1.630714,
+}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Familia completa ASP-ST1 (misma Voc/Vmp/Ns/a_ref -- Isc/Pmax varían con
 # transparencia).
 #
@@ -175,7 +221,10 @@ FAMILIA_ASP_ST1 = {
 }
 
 # Catálogo unificado
-MODULOS_BIPV = {**FAMILIA_ASP_ST1}
+MODULOS_BIPV = {
+    **FAMILIA_ASP_ST1,
+    "SPR-E20-327 (E20-327NE-WHT-D)": SUNPOWER_E20_327,
+}
 
 
 def obtener_panel(nombre: str) -> dict:

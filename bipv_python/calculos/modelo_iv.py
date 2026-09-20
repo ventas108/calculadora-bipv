@@ -498,6 +498,50 @@ def tiene_sdm_completo(panel: dict) -> bool:
     return all(panel.get(k) not in (None, 0, "", "nan") for k in _SDM_KEYS)
 
 
+def resolver_sdm_con_origen(panel: dict, sdm_manual: dict | None = None) -> tuple[dict, dict]:
+    """Resuelve SDM priorizando parámetros manuales/reales sobre estimaciones.
+
+    No escribe en catálogos. Devuelve una copia del panel y metadatos de
+    procedencia para que la interfaz y los informes distingan SDM real,
+    estimado desde placa o panel no resoluble.
+    """
+    base = dict(panel or {})
+    if sdm_manual is not None:
+        requeridos = ("I_L_ref", "I_o_ref", "R_s", "R_sh_ref", "a_ref", "N_s")
+        faltan = [clave for clave in requeridos if sdm_manual.get(clave) in (None, 0, "")]
+        if faltan:
+            raise ValueError(f"Faltan parámetros SDM manuales: {', '.join(faltan)}")
+        candidato = {**base, **sdm_manual, "_estimado": False}
+        validacion = validar_sdm_vs_ficha(candidato)
+        if not validacion["validacion_ok"]:
+            raise ValueError("Los parámetros SDM manuales no reproducen la ficha dentro del 6%.")
+        candidato["sdm_origen"] = "manual_real"
+        candidato["sdm_advertencia"] = "Parámetros SDM introducidos por el usuario y validados contra la ficha."
+        return candidato, {"origen": "manual_real", "validacion": validacion}
+
+    calibrado = resolver_panel_calibrado(base)
+    if tiene_sdm_completo(calibrado) and not calibrado.get("_estimado"):
+        calibrado["sdm_origen"] = "catalogo_calibrado"
+        return calibrado, {"origen": "catalogo_calibrado"}
+
+    estimado = estimar_sdm_desde_ficha(base)
+    if estimado is None:
+        raise ValueError("No hay valores de placa suficientes para estimar el SDM.")
+    candidato = {**base, **estimado, "_estimado": True}
+    validacion = validar_sdm_vs_ficha(candidato)
+    if not validacion["validacion_ok"]:
+        raise ValueError("El SDM estimado no reproduce la ficha dentro del 6%.")
+    candidato["sdm_origen"] = "estimado_ficha"
+    candidato["sdm_advertencia"] = (
+        "Parámetros calculados desde valores de placa; no publicados ni medidos "
+        "directamente por el fabricante."
+    )
+    return candidato, {
+        "origen": "estimado_ficha", "metodo": estimado.get("_metodo", "estimado"),
+        "validacion": validacion,
+    }
+
+
 def resolver_panel_calibrado(panel: dict) -> dict:
     """
     Devuelve la versión calibrada canónica cuando el nombre del panel existe
@@ -511,6 +555,14 @@ def resolver_panel_calibrado(panel: dict) -> dict:
     nombre = str(panel.get("nombre", "")).strip()
     if not nombre:
         return panel
+
+    # Un SDM real introducido y guardado por el usuario tiene prioridad sobre
+    # la ficha canónica del catálogo Python, incluso si comparten nombre.
+    if panel.get("sdm_origen") == "manual_real":
+        validacion = validar_sdm_vs_ficha(panel)
+        if not validacion["validacion_ok"]:
+            raise ValueError("El SDM manual guardado ya no reproduce la ficha dentro del 6%.")
+        return {**panel, "_estimado": False, "_sdm_estimado": False}
 
     # Import local para evitar acoplar la carga del catálogo interno al módulo.
     from datos.tecnologias_bipv import MODULOS_BIPV
@@ -533,6 +585,17 @@ def resolver_panel_calibrado(panel: dict) -> dict:
         if valor not in (None, "", "nan"):
             resultado[clave] = valor
     resultado["_sdm_calibrado_canonico"] = True
+    # El catálogo Python puede contener fichas con SDM estimado (por ejemplo,
+    # derivado de valores de placa). No etiquetarlas como calibradas solo por
+    # estar en MODULOS_BIPV.
+    if calibrado.get("sdm_estimado") or calibrado.get("_sdm_estimado"):
+        resultado["_estimado"] = True
+        resultado["_sdm_estimado"] = True
+        resultado["sdm_origen"] = "estimado_ficha"
+        resultado["sdm_advertencia"] = calibrado.get(
+            "sdm_advertencia",
+            "Parámetros calculados desde valores de placa; no publicados ni medidos directamente por el fabricante.",
+        )
     return resultado
 
 

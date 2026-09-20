@@ -15,12 +15,13 @@ from calculos.modelo_iv import (
     estimar_sdm_desde_ficha,
     verificar_ns_halfcut,
     preparar_panel_iv,
+    resolver_sdm_con_origen,
     explicar_fallo_validacion_sdm,
 )
 from calculos.panel_iv_check import analizar_panel_motiv as _analizar_panel_motiv
 from calculos.temperatura import temperatura_celda_noct
 from datos.tecnologias_bipv import ASP_ST1_T40, MODULOS_BIPV
-from datos.catalogo_paneles_excel import cargar_catalogo_paneles
+from datos.catalogo_paneles_excel import cargar_catalogo_paneles, guardar_panel_excel
 
 st.set_page_config(page_title="Motor IV — BIPV", page_icon="🔬", layout="wide")
 
@@ -258,6 +259,87 @@ if _panel_activo is None:
             "la simulación está usando el panel de referencia **ASP-ST1-T40 (SDM calibrado)**.  \n"
             "Selecciona manualmente un panel con ficha completa en el selector de abajo."
         )
+
+# ── Entrada manual de SDM real y persistencia opcional ───────────────────────
+# Los parámetros introducidos por el usuario tienen prioridad sobre cualquier
+# estimación. El catálogo conserva la ficha de placa separada del SDM.
+_manual_sdm = st.session_state.get("motor_iv_sdm_manual", {})
+if _manual_sdm.get("panel") == _panel_nom_ss:
+    try:
+        _panel_activo, _manual_meta = resolver_sdm_con_origen(
+            _panel_ss or _panel_activo, _manual_sdm.get("valores")
+        )
+        _estimado = False
+        _sdm_origen = "manual_real"
+    except ValueError as _manual_error:
+        st.error(f"❌ SDM manual guardado no válido: {_manual_error}")
+
+with st.expander("🧪 Introducir parámetros SDM reales (opcional)", expanded=False):
+    st.caption(
+        "Si dispones de una ficha o curva IV con parámetros reales, introdúcelos. "
+        "La app validará Voc, Isc, Vmp, Imp y Pmax antes de usarlos."
+    )
+    _p_base_manual = _panel_ss or _panel_activo or {}
+    _val_manual = _manual_sdm.get("valores", {}) if _manual_sdm.get("panel") == _panel_nom_ss else {}
+    _mcols = st.columns(3)
+    _manual_fields = (
+        ("I_L_ref", "Iph / I_L_ref (A)"),
+        ("I_o_ref", "I0 / I_o_ref (A)"),
+        ("R_s", "Rs (ohm)"),
+        ("R_sh_ref", "Rsh (ohm)"),
+        ("a_ref", "a_ref (n x Ns)"),
+        ("N_s", "N_s (celdas)"),
+    )
+    _manual_values = {}
+    for _idx, (_key, _label) in enumerate(_manual_fields):
+        _old = _val_manual.get(_key, _p_base_manual.get(_key))
+        _manual_values[_key] = _mcols[_idx % 3].number_input(
+            _label, value=float(_old or 0.0), min_value=0.0,
+            format="%.8g", key=f"motor_iv_manual_{_key}",
+        )
+    _manual_source = st.text_input(
+        "Fuente de los parámetros reales",
+        value=_val_manual.get("fuente", "Ficha técnica / curva IV proporcionada por el usuario"),
+        key="motor_iv_manual_fuente",
+    )
+    _apply_manual = st.button("✅ Validar y usar SDM real", key="btn_aplicar_sdm_manual")
+    if _apply_manual:
+        try:
+            _manual_panel, _manual_result = resolver_sdm_con_origen(
+                _p_base_manual, _manual_values
+            )
+            st.session_state["motor_iv_sdm_manual"] = {
+                "panel": _panel_nom_ss,
+                "fuente": _manual_source,
+                "valores": _manual_values,
+            }
+            st.session_state["motor_iv_sdm_manual_validacion"] = _manual_result["validacion"]
+            st.success("✅ Parámetros SDM reales validados para esta sesión.")
+            st.rerun()
+        except (ValueError, KeyError, TypeError) as _manual_error:
+            st.error(f"❌ No se pueden usar estos parámetros: {_manual_error}")
+
+    _manual_ready = (
+        _manual_sdm.get("panel") == _panel_nom_ss
+        and st.session_state.get("motor_iv_sdm_manual_validacion", {}).get("validacion_ok") is True
+    )
+    if _manual_ready:
+        st.info("Origen actual: **manual_real**. Estos parámetros tienen prioridad sobre cualquier estimación.")
+        _confirm_save = st.checkbox(
+            "Confirmo que estos parámetros provienen de una fuente real y deseo guardarlos permanentemente",
+            key="motor_iv_confirmar_guardado_sdm",
+        )
+        if st.button("💾 Guardar SDM real en el catálogo Excel", key="btn_guardar_sdm_excel", disabled=not _confirm_save):
+            _v = _manual_sdm["valores"]
+            guardar_panel_excel({
+                "TipoPanel": _panel_nom_ss,
+                "SDM_I_L_ref": _v["I_L_ref"], "SDM_I_o_ref": _v["I_o_ref"],
+                "SDM_R_s": _v["R_s"], "SDM_R_sh_ref": _v["R_sh_ref"],
+                "SDM_a_ref": _v["a_ref"], "SDM_N_s": _v["N_s"],
+                "SDM_Origen": "manual_real", "SDM_Fuente": _manual_sdm.get("fuente", ""),
+                "SDM_Advertencia": "Parámetros SDM introducidos por el usuario y validados contra la ficha.",
+            }, merge_conservador=True)
+            st.success("💾 SDM real guardado en el catálogo. La ficha de placa original no fue modificada.")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 2. CONDICIONES DE SIMULACIÓN
