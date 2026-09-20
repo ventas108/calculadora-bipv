@@ -152,8 +152,6 @@ def construir():
         "No certificar estos puntos como resueltos hasta cerrar una Spec vertical:",
     )
     for item in [
-        "Adopción de inversor: conserva la POA solar base y poa_efectiva_df, "
-        "pero todavía invalida parte del estado del Motor Óptico.",
         "Orientación multi-superficie: la adopción global puede eliminar estado "
         "multi-superficie; falta decidir bloqueo o adopción por superficie.",
         "Vigencia de tablas e IA: los resultados de los comparadores todavía no "

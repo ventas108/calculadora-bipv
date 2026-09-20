@@ -137,10 +137,10 @@ Invariantes:
 	recortada nunca se usa para reconstruir potencia perdida.
 - Un resultado legacy sin la serie previa al recorte bloquea la comparación y exige
 	volver a ejecutar Producción.
-- Como regla física, cambiar de inversor no cambia la POA. La implementación actual
-	conserva la POA solar base y `poa_efectiva_df`, pero todavía invalida parte del
-	estado óptico; se aplica la desviación activa documentada más abajo. Producción,
-	Financiero, CO₂ y demás resultados dependientes del inversor sí deben invalidarse.
+- Como regla física, cambiar de inversor no cambia la POA. La adopción conserva como
+  conjunto atómico el estado del Motor Óptico, incluidas `poa_efectiva_df` y
+  `poa_sin_termico_df`; Producción, bypass, pérdida óhmica, Financiero, CO₂ y demás
+  resultados dependientes del inversor o `N_serie` sí se invalidan.
 
 #### Comparador de paneles
 
@@ -187,10 +187,6 @@ Invariantes:
 
 #### Desviaciones activas que bloquean declarar cumplimiento total
 
-- **Adopción de inversor:** la implementación conserva `poa_efectiva_df`, pero elimina
-	otras claves del Motor Óptico, incluida `poa_sin_termico_df`. Debe resolverse mediante
-	una Spec vertical que defina y pruebe el conjunto atómico de estado óptico que se
-	conserva; hasta entonces no se presume que toda la POA efectiva quede reutilizable.
 - **Orientación con multi-superficie:** la página no bloquea actualmente este modo y la
 	adopción elimina estado multi-superficie mediante la invalidación general. Una Spec
 	debe decidir entre bloquear/derivar al flujo Multi-Superficie o implementar adopción

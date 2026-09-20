@@ -42,7 +42,7 @@ from calculos.comparador_inversores import (
     formatear_comparacion_inversores,
     unidades_necesarias,
 )
-from calculos.invalidacion import KEYS_DERIVADOS_POA
+from calculos.invalidacion import invalidar_por_cambio_inversor
 
 try:
     from datos.catalogo_inversores_excel import cargar_catalogo_inversores
@@ -320,18 +320,15 @@ if _sel:
             st.session_state["N_serie_inversor_ref"] = _modelo_full
             # Adopción atómica: la producción/bypass/financiero/CO₂ guardados
             # corresponden al inversor ANTERIOR → se invalidan (misma filosofía
-            # de calculos/invalidacion.py; POA no depende del inversor).
-            _KEYS_DERIVADOS_INVERSOR = tuple(
-                k for k in KEYS_DERIVADOS_POA if k != "poa_efectiva_df"
-            )
-            _limpiadas = [k for k in _KEYS_DERIVADOS_INVERSOR if k in st.session_state]
-            for k in _limpiadas:
-                st.session_state.pop(k, None)
+            # de calculos/invalidacion.py). El Motor Óptico y sus dos POA no
+            # dependen del inversor y se conservan como un conjunto atómico.
+            _limpiadas = invalidar_por_cambio_inversor(st.session_state)
             st.success(
                 f"Adoptado: **{_elegida}** (N={int(N_serie)} en serie, "
                 f"{configs[_idx]['n_unidades']} unidades). Se invalidaron "
                 f"{len(_limpiadas)} resultados derivados: vuelve a correr "
-                "📊 Producción y 💰 Financiero con la nueva configuración."
+                "📊 Producción y 💰 Financiero con la nueva configuración. "
+                "El Motor Óptico vigente se conservó."
             )
 
 # ══════════════════════════════════════════════════════════════════════════════

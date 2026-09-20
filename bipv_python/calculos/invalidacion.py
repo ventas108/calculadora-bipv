@@ -20,13 +20,11 @@ entregarían TIR/payback calculados con el sol o la geometría de otro escenario
 """
 from typing import MutableMapping
 
-# ── Derivados de la POA: producción y todo lo que cuelga de ella ─────────────
-KEYS_DERIVADOS_POA = (
-    # Motor Óptico (Página 5b) — estado, parámetros y POA corregidas
-    # poa_efectiva_df    : POA tras IAM + soiling + térmico (visualización / Financiero)
-    # poa_sin_termico_df : POA tras IAM + soiling SIN térmico (G_eff del SDM)
-    # Ambas deben invalidarse juntas para evitar que Producción use la POA
-    # antigua cuando cambian coordenadas o geometría.
+# ── Estado propio del Motor Óptico: independiente del inversor ───────────────
+# Fuente única para conservar la corrida óptica cuando solo cambia el inversor
+# o N_serie. Cambios de sitio, geometría, panel o parámetros ópticos siguen
+# invalidando estas claves mediante KEYS_DERIVADOS_POA.
+ESTADO_MOTOR_OPTICO = (
     "motor_optico_ok",
     "motor_optico_result_df",
     "motor_optico_summary",
@@ -40,6 +38,18 @@ KEYS_DERIVADOS_POA = (
     "motor_optico_coef_temp",
     "motor_optico_f_iam_dif",
     "motor_optico_k_soil_vert",
+    "motor_optico_soiling_custom",
+    "motor_optico_soiling_config",
+)
+
+# ── Derivados de la POA: producción y todo lo que cuelga de ella ─────────────
+KEYS_DERIVADOS_POA = (
+    # Motor Óptico (Página 5b) — estado, parámetros y POA corregidas
+    # poa_efectiva_df    : POA tras IAM + soiling + térmico (visualización / Financiero)
+    # poa_sin_termico_df : POA tras IAM + soiling SIN térmico (G_eff del SDM)
+    # Ambas deben invalidarse juntas para evitar que Producción use la POA
+    # antigua cuando cambian coordenadas o geometría.
+    *ESTADO_MOTOR_OPTICO,
     # Producción (Página 6)
     "produccion_ok", "produccion_modo_iv", "E_ac_anual_kWh", "PR_sistema",
     "res_produccion", "res_produccion_base", "res_produccion_iv",
@@ -84,14 +94,6 @@ KEYS_DERIVADOS_POA = (
     "diag_total_sim_kwh", "diag_total_stc_kwh", "diag_pr_conv_global",
     "diag_pr_corr_global", "diag_perdida_t_pct", "diag_perdida_t_kwh",
     "diag_gamma_pct",
-    # Motor Óptico (Página 5b) -- soiling personalizado, persistido COMO
-    # RESULTADO de la corrida (no solo como key de widget -- las keys de
-    # widget, p. ej. mo_soiling_custom/mo_soil_0.._11, desaparecen tras F5 y
-    # dejaban la base de Fase 4 "incompleta" sin motivo real). Misma
-    # categoría que motor_optico_b0/tau/k_bipv/noct/coef_temp/f_iam_dif/
-    # k_soil_vert (arriba, sección Motor Óptico) -- agregadas aquí y no ahí
-    # solo por la restricción de ventana de caracteres explicada arriba.
-    "motor_optico_soiling_custom", "motor_optico_soiling_config",
     # Financiero cacheado (Página 7)
     "financiero_ok", "comp_financiero", "comp_financiero_p90",
     "metricas_financiero", "metricas_financiero_p90",
@@ -100,6 +102,25 @@ KEYS_DERIVADOS_POA = (
     "co2_total_marg_t", "co2_arboles_equiv", "co2_hogares_equiv",
     "co2_km_vehiculo_equiv", "co2_valor_bonos_usd",
 )
+
+# Cambiar inversor/N_serie no cambia sitio, panel, geometría, IAM, soiling,
+# NOCT ni POA. Sí caduca toda salida eléctrica, energética y financiera
+# calculada con la configuración anterior.
+KEYS_DERIVADOS_INVERSOR = tuple(
+    k for k in KEYS_DERIVADOS_POA if k not in ESTADO_MOTOR_OPTICO
+)
+
+
+def invalidar_por_cambio_inversor(session_state: MutableMapping) -> list[str]:
+    """Invalida resultados dependientes del inversor conservando Motor Óptico.
+
+    Es idempotente, acepta ``st.session_state`` o un diccionario de prueba y
+    retorna únicamente las claves que existían y fueron eliminadas.
+    """
+    eliminadas = [k for k in KEYS_DERIVADOS_INVERSOR if k in session_state]
+    for k in eliminadas:
+        session_state.pop(k, None)
+    return eliminadas
 
 # ── Resultado de bypass diodes MONOFACIAL (Página 5) — POA inconsistente ─────
 # seleccionar_poa_bypass() (calculos/mismatch_bypass.py) devuelve G_eff=None

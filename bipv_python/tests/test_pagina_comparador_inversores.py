@@ -188,3 +188,21 @@ def test_claves_de_session_state_propias_no_chocan_con_otras_paginas():
                 f"{nombre} también escribe st.session_state['{clave}'] -- colisión de caché"
             )
     assert 'st.session_state["_df_comparador_inversores"] = df_inv_cmp' in src
+
+
+# ── Conservación óptica al adoptar inversor (20-sep-2026) ───────────────────
+
+def test_adopcion_delega_invalidacion_y_no_define_exclusion_local():
+    src = _leer()
+    assert "from calculos.invalidacion import invalidar_por_cambio_inversor" in src
+    assert "invalidar_por_cambio_inversor(st.session_state)" in src
+    assert "KEYS_DERIVADOS_POA" not in src
+    assert "_KEYS_DERIVADOS_INVERSOR" not in src
+    assert 'if k != "poa_efectiva_df"' not in src
+
+
+def test_adopcion_informa_que_motor_optico_se_conserva():
+    src = _leer()
+    idx_adopcion = src.index('if st.button("✅ Adoptar esta configuración"')
+    bloque = src[idx_adopcion: src.index("# ══", idx_adopcion)]
+    assert "El Motor Óptico vigente se conservó" in bloque

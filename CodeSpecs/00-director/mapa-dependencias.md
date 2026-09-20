@@ -49,7 +49,7 @@
 
 adoptar panel ────────────────────> conserva POA solar base; invalida POA efectiva y 04 -> 06 -> 07
 adoptar orientación ──────────────> recalcula POA solar base; invalida POA efectiva y 04 -> 06 -> 07
-adoptar inversor ─────────────────> conserva POA solar base; invalida 04 -> 06 -> 07
+adoptar inversor ─────────────────> conserva Motor Óptico; invalida 04 -> 06 -> 07
 ```
 
 - Los comparadores consumen el motor físico vigente; no mantienen una segunda
@@ -59,7 +59,7 @@ adoptar inversor ─────────────────> conserva P
   ni puede adoptar alternativas.
 - Estas dependencias pertenecen a Streamlit. React solo las incorpora mediante una
   Spec propia que defina contrato, implementación y validación de integración.
-- Las desviaciones activas de adopción de inversor, orientación multi-superficie y
-  vigencia de tablas están registradas en
+- Las desviaciones activas de orientación multi-superficie y vigencia de tablas están
+      registradas en
   [contratos-entre-modulos.md](contratos-entre-modulos.md). Toda Spec que toque esos
   flujos debe tratarlas como riesgos de integración, no como comportamiento resuelto.
