@@ -183,6 +183,24 @@ def test_asignaciones_desincronizadas_de_superficies_es_rechazado():
     assert any("asignaciones" in error for error in resultado.errores)
 
 
+@pytest.mark.parametrize(
+    ("mutacion", "mensaje"),
+    [
+        (lambda payload: payload.pop("results"), "results"),
+        (lambda payload: payload.update({"schema_version": 999}), "Version de schema"),
+        (lambda payload: payload.pop("payload_signature"), "payload_signature"),
+    ],
+)
+def test_payload_incompleto_schema_no_soportado_o_legacy_rechazado(mutacion, mensaje):
+    payload = construir_payload_multisuperficie(_estado(), {})
+    mutacion(payload)
+
+    resultado = validar_payload_multisuperficie(payload)
+
+    assert not resultado.ok
+    assert any(mensaje in error for error in resultado.errores)
+
+
 def test_superficie_incompleta_no_usa_defaults():
     estado = _estado()
     del estado["superficies_bipv"][0]["uid"]
@@ -193,6 +211,20 @@ def test_superficie_incompleta_no_usa_defaults():
 
 def test_restauracion_valida_publica_superficies_y_resultados_permitidos():
     estado = _estado()
+    proyecto_fisico = {
+        "superficies": {
+            "Cubierta": {
+                "resultados_dc": {
+                    "P_dc_kW": np.array([1.0, 2.0]),
+                    "poa_anual_kWh_m2": 1200.0,
+                },
+                "resultados_ac": {
+                    "P_ac_kW": np.array([0.9, 1.8]),
+                    "E_ac_anual_kWh": 2.7,
+                },
+            }
+        }
+    }
     payload = construir_payload_multisuperficie(
         estado,
         {
@@ -202,6 +234,7 @@ def test_restauracion_valida_publica_superficies_y_resultados_permitidos():
                     {"poa_global": [1.0, 2.0]},
                     index=pd.date_range("2025-01-01", periods=2, freq="h", tz="UTC"),
                 ),
+                "proyecto_fisico": proyecto_fisico,
             }
         },
     )
@@ -215,6 +248,9 @@ def test_restauracion_valida_publica_superficies_y_resultados_permitidos():
     assert isinstance(destino["superficies_bipv"][0]["p_shade"], np.ndarray)
     assert destino["multisup_desglose"] == [{"nombre": "Cubierta"}]
     assert isinstance(destino["poa_df_multisup"], pd.DataFrame)
+    restaurado = destino["_multisup_proyecto_fisico"]
+    assert isinstance(restaurado["superficies"]["Cubierta"]["resultados_dc"]["P_dc_kW"], np.ndarray)
+    assert restaurado["superficies"]["Cubierta"]["resultados_ac"]["E_ac_anual_kWh"] == 2.7
     assert destino["valor_no_tocable"] == "conservado"
 
 
@@ -258,6 +294,14 @@ def test_guardar_y_cargar_difiere_hasta_verificar_tmy(tmp_path, monkeypatch):
         "E_ac_anual_kWh_multisup": 100.0,
         "area_total_multisup": 40.0,
         "multisup_desglose": [{"nombre": "Cubierta"}],
+        "_multisup_proyecto_fisico": {
+            "superficies": {
+                "Cubierta": {
+                    "resultados_dc": {"P_dc_kW": np.array([1.0, 2.0])},
+                    "resultados_ac": {"P_ac_kW": np.array([0.9, 1.8])},
+                }
+            }
+        },
         "poa_df_multisup": pd.DataFrame(
             {"poa_global": [1.0, 2.0]},
             index=pd.date_range("2025-01-01", periods=2, freq="h", tz="UTC"),
@@ -270,6 +314,7 @@ def test_guardar_y_cargar_difiere_hasta_verificar_tmy(tmp_path, monkeypatch):
         guardado = json.load(archivo)
     assert "multisuperficie" in guardado
     assert guardado["multisuperficie"]["payload_signature"]
+    assert "proyecto_fisico" in guardado["multisuperficie"]["results"]["session_state"]
 
     session_state.clear()
     session_state["auth_email"] = "cliente@example.com"
@@ -283,6 +328,7 @@ def test_guardar_y_cargar_difiere_hasta_verificar_tmy(tmp_path, monkeypatch):
     )
     assert resultado.ok
     assert session_state["multisup_activo"] is True
+    assert "_multisup_proyecto_fisico" in session_state
 
 
 def test_cargar_proyecto_sin_multisuperficie_limpia_estado_fisico_previo(

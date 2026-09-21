@@ -48,19 +48,24 @@ def _canonico(valor: Any) -> Any:
     if isinstance(valor, np.integer):
         return int(valor)
     if isinstance(valor, np.ndarray):
-        return [_canonico(v) for v in valor.tolist()]
+        return {
+            "__bipv_type__": "ndarray",
+            "data": [_canonico(v) for v in valor.tolist()],
+        }
     if isinstance(valor, pd.Timestamp):
         return valor.isoformat()
     if isinstance(valor, pd.DatetimeIndex):
         return [_canonico(v) for v in valor]
     if isinstance(valor, pd.DataFrame):
         return {
+            "__bipv_type__": "dataframe",
             "columns": [str(c) for c in valor.columns],
             "index": [_canonico(v) for v in valor.index],
             "data": [[_canonico(v) for v in fila] for fila in valor.to_numpy().tolist()],
         }
     if isinstance(valor, pd.Series):
         return {
+            "__bipv_type__": "series",
             "name": str(valor.name) if valor.name is not None else None,
             "index": [_canonico(v) for v in valor.index],
             "data": [_canonico(v) for v in valor.to_numpy().tolist()],
@@ -87,13 +92,32 @@ def _sin_firma_global(payload: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _restaurar_dataframe(valor: Any) -> Any:
-    if not isinstance(valor, Mapping):
-        return valor
-    if not {"columns", "index", "data"}.issubset(valor):
-        return valor
-    frame = pd.DataFrame(valor["data"], columns=valor["columns"])
-    frame.index = pd.to_datetime(valor["index"], errors="raise")
-    return frame
+    return _restaurar_canonico(valor)
+
+
+def _restaurar_canonico(valor: Any) -> Any:
+    if isinstance(valor, Mapping):
+        tipo = valor.get("__bipv_type__")
+        if tipo == "ndarray":
+            return np.asarray([_restaurar_canonico(v) for v in valor["data"]])
+        if tipo == "dataframe":
+            frame = pd.DataFrame(
+                [[_restaurar_canonico(v) for v in fila] for fila in valor["data"]],
+                columns=valor["columns"],
+            )
+            frame.index = pd.to_datetime(valor["index"], errors="raise")
+            return frame
+        if tipo == "series":
+            serie = pd.Series(
+                [_restaurar_canonico(v) for v in valor["data"]],
+                name=valor.get("name"),
+            )
+            serie.index = pd.to_datetime(valor["index"], errors="raise")
+            return serie
+        return {str(k): _restaurar_canonico(v) for k, v in valor.items()}
+    if isinstance(valor, list):
+        return [_restaurar_canonico(v) for v in valor]
+    return valor
 
 
 def firmar_payload_multisuperficie(payload: Mapping[str, Any]) -> str:
@@ -294,11 +318,11 @@ def restaurar_multisuperficie(
         entradas = payload["inputs"]
         superficies = []
         for superficie in entradas["surfaces"]:
-            restaurada = dict(superficie)
+            restaurada = _restaurar_canonico(superficie)
             restaurada["activa"] = True
             restaurada["p_shade"] = np.asarray(restaurada["p_shade"], dtype=float)
             superficies.append(restaurada)
-        inversores = _canonico(entradas["electrical"]["inversores"])
+        inversores = _restaurar_canonico(entradas["electrical"]["inversores"])
         resultados = payload["results"].get("session_state", {})
         if not isinstance(resultados, Mapping):
             return ResultadoValidacion(
@@ -323,6 +347,10 @@ def restaurar_multisuperficie(
             "multisup_activo": True,
             **resultados_permitidos,
         }
+        if "proyecto_fisico" in resultados:
+            candidato["_multisup_proyecto_fisico"] = _restaurar_canonico(
+                resultados["proyecto_fisico"]
+            )
     except (KeyError, TypeError, ValueError, PayloadMultisuperficieError) as exc:
         return ResultadoValidacion(False, (f"No se pudo preparar restauracion: {exc}",))
 

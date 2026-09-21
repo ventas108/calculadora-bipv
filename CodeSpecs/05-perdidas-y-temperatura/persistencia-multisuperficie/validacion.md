@@ -5,8 +5,8 @@
 ## Pruebas unitarias obligatorias
 
 - [x] Payload válido produce JSON determinista y firma estable.
-- [x] Restauración válida recupera superficies, asignaciones y resultados `multisup_*` permitidos.
-- [x] DataFrame/series se serializan en formato canónico.
+- [x] Restauración válida recupera superficies, asignaciones, resultados `multisup_*` permitidos y el snapshot físico adoptado con resultados DC/AC.
+- [x] DataFrame/Series/arrays se serializan en formato canónico etiquetado y se reconstruyen.
 - [x] Payload alterado es rechazado.
 - [x] Firma global alterada es rechazada.
 - [x] Firma de sombra alterada es rechazada durante la validación contextual.

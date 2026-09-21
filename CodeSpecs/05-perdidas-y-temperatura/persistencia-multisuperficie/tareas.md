@@ -9,11 +9,11 @@
 - [x] Implementar `firmar_payload_multisuperficie`.
 - [x] Implementar validación de schema, campos obligatorios y firma global.
 - [x] Implementar validación de TMY, geometría, tilt, azimuth, sombra, POA y configuración eléctrica cuando el contexto actual está disponible.
-- [x] Implementar primera restauración todo-o-nada sin mutación parcial; queda pendiente reconstruir todas las tablas físicas canónicas.
+- [x] Implementar restauración todo-o-nada sin mutación parcial, incluyendo el snapshot físico adoptado y sus resultados DC/AC etiquetados.
 - [x] Conectar Guardar proyecto con escritura atómica por usuario y sección `multisuperficie` firmada.
 - [x] Conectar Cargar proyecto con validación estructural y restauración diferida hasta disponer de TMY.
 - [ ] Rechazar explícitamente payload incompleto, alterado, legacy o de versión no soportada.
-- [x] Añadir pruebas unitarias de payload, firmas, serialización y rollback; la batería focal actual es de 23 pruebas.
+- [x] Añadir pruebas unitarias de payload, firmas, serialización y rollback; la batería focal actual es de 26 pruebas.
 - [ ] Añadir pruebas de consumidores: Finanzas, CO₂, Presupuesto, Baterías y Reporte no consumen estado invalidado.
 - [ ] Verificar que el modelo simplificado no cambia cuando `multisup_activo` es falso.
 - [ ] Actualizar contratos, mapa de dependencias, registro de decisiones y base del Asistente.

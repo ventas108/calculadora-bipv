@@ -62,6 +62,7 @@ def aplicar_proyecto_a_session_state(proyecto: Mapping[str, Any], session_state:
     session_state["multisup_desglose"] = desglose
     session_state["multisup_activo"] = True
     session_state["poa_df_multisup"] = _poa_ponderada(proyecto)
+    session_state["_multisup_proyecto_fisico"] = dict(proyecto)
 
 
 def _poa_ponderada(proyecto: Mapping[str, Any]) -> pd.DataFrame | None:

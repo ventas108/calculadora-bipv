@@ -47,6 +47,7 @@ _CLAVES_EXCLUIR: set[str] = {
     "superficies_bipv", "multisup_inversores", "multisup_activo",
     "E_ac_anual_kWh_multisup", "area_total_multisup", "multisup_desglose",
     "poa_df_multisup", "_multisup_payload_pendiente",
+    "_multisup_proyecto_fisico",
 }
 
 # Prefijos de claves temporales que se omiten siempre
@@ -242,6 +243,10 @@ def guardar_proyecto_actual(nombre: str | None = None) -> str:
             )
             if clave in st.session_state
         }
+        if st.session_state.get("_multisup_proyecto_fisico") is not None:
+            resultados_multisup["proyecto_fisico"] = st.session_state[
+                "_multisup_proyecto_fisico"
+            ]
         payload_multisup = construir_payload_multisuperficie(
             st.session_state, {"session_state": resultados_multisup}
         )
@@ -352,6 +357,7 @@ def cargar_proyecto(slug: str) -> str:
         "multisup_activo", "superficies_bipv", "multisup_inversores",
         "E_ac_anual_kWh_multisup", "area_total_multisup", "multisup_desglose",
         "poa_df_multisup", "_multisup_payload_pendiente",
+        "_multisup_proyecto_fisico",
         "_multisup_restaurado", "_multisup_restauracion_error",
     }
     for k in _claves_reset:
