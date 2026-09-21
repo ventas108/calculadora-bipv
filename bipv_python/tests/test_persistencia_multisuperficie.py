@@ -258,7 +258,12 @@ def test_restauracion_rechazada_no_escribe_estado_parcial():
     estado = _estado()
     payload = construir_payload_multisuperficie(estado, {})
     payload["payload_signature"] = "firma-alterada"
-    destino = {"multisup_activo": False, "marca": "antes"}
+    destino = {
+        "multisup_activo": False,
+        "E_ac_anual_kWh_multisup": 999.0,
+        "multisup_desglose": [{"nombre": "previa"}],
+        "marca": "antes",
+    }
     antes = copy.deepcopy(destino)
 
     resultado = restaurar_multisuperficie(payload, destino)

@@ -84,6 +84,15 @@ restaurar_multisuperficie(payload, session_state) -> ResultadoRestauracion
 
 `schema_version` usa una lista explícita de versiones soportadas. Una versión no soportada se rechaza; no se migra implícitamente. Toda migración futura debe ser función pura, versionada, probada y separada de la restauración.
 
+## Integridad y HMAC
+
+La versión actual usa SHA-256 sobre el payload canónico para detectar corrupción
+accidental y modificaciones que no recalculen la firma. No se presenta como una
+protección contra un usuario con acceso de escritura al JSON, porque ese actor
+podría recalcular un SHA-256 válido. HMAC con un secreto del servidor queda como
+decisión futura separada: exigiría gestión de secretos, rotación, recuperación y
+una nueva versión de schema; no se introduce en esta ronda.
+
 ## Integración
 
 Guardar proyecto: `session_state -> construir_payload -> firma -> escritura atómica`.

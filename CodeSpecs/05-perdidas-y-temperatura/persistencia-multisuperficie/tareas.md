@@ -12,7 +12,7 @@
 - [x] Implementar restauración todo-o-nada sin mutación parcial, incluyendo el snapshot físico adoptado y sus resultados DC/AC etiquetados.
 - [x] Conectar Guardar proyecto con escritura atómica por usuario y sección `multisuperficie` firmada.
 - [x] Conectar Cargar proyecto con validación estructural y restauración diferida hasta disponer de TMY.
-- [ ] Rechazar explícitamente payload incompleto, alterado, legacy o de versión no soportada.
+- [x] Rechazar explícitamente payload incompleto, alterado, legacy o de versión no soportada; cubierto por pruebas focales.
 - [x] Añadir pruebas unitarias de payload, firmas, serialización y rollback; la batería focal actual es de 26 pruebas.
 - [x] Añadir contrato estático de consumidores: Finanzas, CO₂, Baterías, Mismatch, Reporte, Diagrama Unifilar y Comparador de Inversores respetan `multisup_activo` y fallback.
 - [x] Verificar que el modelo simplificado no cambia cuando `multisup_activo` es falso mediante regresión existente.

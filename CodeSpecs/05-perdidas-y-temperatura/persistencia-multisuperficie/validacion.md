@@ -15,10 +15,10 @@
 - [x] Geometría, tilt o azimuth cambiados son rechazados.
 - [x] Inversor, asignación, `N_serie` o `N_paralelo` cambiados son rechazados cuando el contexto actual los proporciona.
 - [x] Superficie eliminada o inversor inexistente es rechazado.
-- [ ] Payload incompleto y schema no soportado son rechazados.
+- [x] Payload incompleto, legacy sin firma y schema no soportado son rechazados.
 - [x] Firma global alterada deja `session_state` idéntico al snapshot previo.
 - [x] Restauración rechazada no escribe ninguna clave `multisup_*`.
-- [ ] Resultados rechazados no llegan a Finanzas, CO₂, Presupuesto, Baterías ni Reporte.
+- [x] Restauración rechazada no publica claves consumibles; los consumidores solo seleccionan multi-superficie con `multisup_activo=True`.
 - [x] Modelo simplificado permanece intacto sin multi-superficie, según la regresión de los consumidores existentes.
 
 ## Validación de integración
