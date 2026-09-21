@@ -208,31 +208,16 @@ Invariantes:
 
 #### Desviaciones activas que bloquean declarar cumplimiento total
 
-- **Orientación con multi-superficie:** la página no bloquea actualmente este modo y la
-	adopción elimina estado multi-superficie mediante la invalidación general. Una Spec
-	debe decidir entre bloquear/derivar al flujo Multi-Superficie o implementar adopción
-	por superficie; no se permite asumir que la geometría global representa el proyecto.
 - **Vigencia de tablas y análisis IA:** los DataFrames y textos de los tres comparadores
-	no tienen todavía una firma común de entradas. Una Spec debe invalidarlos al cambiar
-	sus insumos y al recalcular, antes de afirmar que una tabla guardada sigue siendo la
-	comparación actual.
-- **Multi-superficie sin UI de captura de sombra/inversor por superficie:**
-  el backend puro (`calculos.sombras_3d.calcular_fs_horario_por_superficie`,
-  `calculos/vinculador_sombra_multisuperficie.py`,
-  `calculos/inversores_multisuperficie.py`) está implementado, **corregido
-  tras una auditoría del 2026-09-21 (firma TMY real, bloqueo real de sombra
-  incompleta, validación de inversores conectada, invalidación geométrica
-  completa, revalidación en la adopción — ver `registro-de-decisiones.md` y
-  `references/correccion-auditoria-multisuperficie.md`)** y probado
-  (116 pruebas focales, regresión completa sin fallos nuevos), pero
-  `pages/9_🗺️_Vista_3D.py` todavía no tiene widgets para que el usuario
-  capture puntos de análisis/malla por superficie ni para asignar inversor
-  dedicado/compartido por superficie (mockup pendiente de aprobación, ver
-  `05-perdidas-y-temperatura/transicion-multisuperficie/diseno.md`, punto
-  6). Sin esa UI, ninguna superficie real del modo físico llega a estar
-  completa — el toggle `multisup_usar_fisico` ya existe, y tanto "calcular
-  comparación" como "adoptar" bloquean con mensaje explícito (nombrando
-  superficie, estado y acción requerida) en cualquier proyecto real.
+	todavía no tienen una firma común de entradas. No deben tratarse como resultados
+	persistidos vigentes después de cambiar sus insumos; deben recalcularse.
+- **Validación operativa multi-superficie:** el backend y la UI opt-in están implementados
+	y probados, pero la prueba manual real de dos superficies sigue siendo evidencia
+	pendiente. No se debe declarar validación operativa completa solo por pasar pruebas
+	unitarias.
+- **Integridad externa del archivo:** la firma actual SHA-256 detecta corrupción y
+	cambios sin recalcular, pero no protege contra un actor con acceso de escritura al
+	JSON. HMAC queda fuera de esta versión y requiere una decisión separada.
 
 ### 09-despliegue
 _(pendiente — ver [../09-despliegue/diseno.md](../09-despliegue/diseno.md))_

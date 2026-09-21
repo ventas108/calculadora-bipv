@@ -926,9 +926,10 @@ opt-in. El modelo simplificado sigue siendo el comportamiento por defecto.
 - El Motor Óptico es global en esta primera versión; no afirmes que existe
   IAM/soiling independiente por superficie.
 
-El flujo físico fue validado con 110 pruebas focales. La regresión completa
-conserva un fallo ambiental preexistente de compatibilidad de versión de
-`pvlib`; no lo presentes como una validación completa en verde.
+El flujo físico y su persistencia tienen pruebas focales automatizadas. La batería
+publicada más reciente de persistencia/downstream ejecuta **73 pruebas verdes**;
+esto no sustituye la prueba manual real de dos superficies ni autoriza a afirmar
+que toda la regresión ambiental está en verde.
 
 Regla del Asistente: explicar, diagnosticar y orientar, pero no adoptar
 resultados ni modificar el proyecto. La adopción solo ocurre mediante el
@@ -947,6 +948,27 @@ botón explícito de Vista 3D.
   Finanzas, CO₂, Presupuesto, Baterías y Reporte no deben consumir ese estado.
 - Una carga rechazada no activa `multisup_activo` ni debe interpretarse como
   una restauración parcial.
+
+### Procedimiento seguro para usar la APP
+
+1. Crear o cargar el proyecto en 🏠 Proyecto y confirmar ciudad, coordenadas,
+  área, panel e inversor.
+2. Ejecutar ☀️ Recurso Solar y esperar el TMY/POA vigente antes de consultar
+  Producción o resultados económicos.
+3. Para una sola superficie, usar el flujo normal de Dimensionamiento →
+  Producción. El comparador de orientación puede explorar candidatos y adoptar
+  solo en ese modo.
+4. Para varias superficies, configurar cada superficie en 🗺️ Vista 3D y activar
+  `multisup_usar_fisico` únicamente si se desea comparar el cálculo físico.
+5. No adoptar una orientación desde el comparador global cuando
+  `multisup_activo=True`; hacerlo superficie por superficie en Vista 3D.
+6. Antes de Finanzas, CO₂, Presupuesto, Baterías o Reporte, confirmar que el
+  estado físico está vigente y que no aparece un aviso de restauración rechazada.
+7. Al cargar otro proyecto, volver a revisar los prerequisitos. El estado físico
+  anterior se limpia y una restauración pendiente solo se publica después de
+  verificar el TMY, geometría, sombra, POA y configuración eléctrica.
+8. Si una firma falla, no copiar cifras manualmente ni continuar con números
+  obsoletos: recalcular el módulo que produjo el dato.
 
 Tipos de superficie disponibles:
 
