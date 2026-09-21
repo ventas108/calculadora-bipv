@@ -43,6 +43,10 @@ _CLAVES_EXCLUIR: set[str] = {
     "ss_materiales_df", "ss_mano_df", "ss_fv_df",
     "ss_inversor_df", "ss_blando_df", "ss_opex_df",
     "insumos_df", "insumos_template_df",
+    # Estado físico multi-superficie: viaja en el payload firmado propio.
+    "superficies_bipv", "multisup_inversores", "multisup_activo",
+    "E_ac_anual_kWh_multisup", "area_total_multisup", "multisup_desglose",
+    "poa_df_multisup", "_multisup_payload_pendiente",
 }
 
 # Prefijos de claves temporales que se omiten siempre
@@ -226,6 +230,21 @@ def guardar_proyecto_actual(nombre: str | None = None) -> str:
     os.makedirs(DIR_PROYECTOS, exist_ok=True)
 
     estado: dict = {}
+    payload_multisup = None
+    if st.session_state.get("multisup_activo", False):
+        from calculos.persistencia_multisuperficie import construir_payload_multisuperficie
+
+        resultados_multisup = {
+            clave: st.session_state[clave]
+            for clave in (
+                "E_ac_anual_kWh_multisup", "area_total_multisup",
+                "multisup_desglose", "poa_df_multisup",
+            )
+            if clave in st.session_state
+        }
+        payload_multisup = construir_payload_multisuperficie(
+            st.session_state, {"session_state": resultados_multisup}
+        )
     for k, v in st.session_state.items():
         # Omitir claves excluidas o temporales
         if k in _CLAVES_EXCLUIR:
@@ -258,10 +277,14 @@ def guardar_proyecto_actual(nombre: str | None = None) -> str:
         "ciudad":   st.session_state.get("tmy_ciudad",
                         st.session_state.get("ciudad", "—")),
         "area_m2":  float(st.session_state.get("area_fachada_m2", 0.0)),
-        "e_ac_kWh": float(st.session_state.get("E_ac_anual_kWh", 0.0)),
+        "e_ac_kWh": float(st.session_state.get(
+            "E_ac_anual_kWh_multisup", st.session_state.get("E_ac_anual_kWh", 0.0)
+        )),
     }
 
     payload = {"_meta": meta, "estado": estado_limpio}
+    if payload_multisup is not None:
+        payload["multisuperficie"] = payload_multisup
     ruta = _ruta_proyecto(slug)
     # Escritura atómica: nunca dejar un JSON a medias si el proceso muere
     tmp = f"{ruta}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
@@ -288,6 +311,17 @@ def cargar_proyecto(slug: str) -> str:
     with open(ruta, "r", encoding="utf-8") as f:
         data = json.load(f)
 
+    payload_multisup = data.get("multisuperficie")
+    if payload_multisup is not None:
+        from calculos.persistencia_multisuperficie import validar_payload_multisuperficie
+
+        validacion_multisup = validar_payload_multisuperficie(payload_multisup)
+        if not validacion_multisup:
+            raise ValueError(
+                "Payload multi-superficie rechazado: "
+                + "; ".join(validacion_multisup.errores)
+            )
+
     estado: dict = data.get("estado", {})
     meta:   dict = data.get("_meta", {})
 
@@ -305,6 +339,20 @@ def cargar_proyecto(slug: str) -> str:
         "horizonte_df", "balance_mensual_df", "tmy_df", "poa_df",
         "res_produccion", "res_sombra", "bypass_result", "cascada_mismatch",
         "motor_optico_summary",
+        # Estado físico multi-superficie del proyecto ANTERIOR (#audit sep-2026):
+        # nunca viaja en `estado` (está en _CLAVES_EXCLUIR), así que sin este
+        # reset explícito sobrevivía intacto al cambiar de proyecto. Si el
+        # proyecto nuevo no trae su propio payload "multisuperficie" (o el
+        # que trae es rechazado más adelante en ☀️ Recurso Solar), Finanzas,
+        # CO₂, Presupuesto, Baterías y Reporte seguían viendo el resultado
+        # físico y las superficies del proyecto ANTERIOR como si fueran del
+        # actual. `_multisup_payload_pendiente` también se limpia aquí para
+        # que un payload aún no resuelto del proyecto anterior no termine
+        # restaurándose contra el TMY del proyecto nuevo.
+        "multisup_activo", "superficies_bipv", "multisup_inversores",
+        "E_ac_anual_kWh_multisup", "area_total_multisup", "multisup_desglose",
+        "poa_df_multisup", "_multisup_payload_pendiente",
+        "_multisup_restaurado", "_multisup_restauracion_error",
     }
     for k in _claves_reset:
         st.session_state.pop(k, None)
@@ -340,6 +388,11 @@ def cargar_proyecto(slug: str) -> str:
     # y Producción falla con un tmy_df inexistente.
     for k in _claves_reset:
         st.session_state.pop(k, None)
+
+    # El TMY aun no existe necesariamente en esta página. Se difiere la
+    # publicación física hasta que Recurso Solar pueda verificar su huella.
+    if payload_multisup is not None:
+        st.session_state["_multisup_payload_pendiente"] = payload_multisup
 
     # Nota: ☀️ Recurso Solar tiene auto-restore desde el caché de disco (#61) —
     # si las coordenadas del proyecto coinciden, se revalida al abrir la página

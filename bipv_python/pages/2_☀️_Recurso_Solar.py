@@ -106,6 +106,34 @@ def _mostrar_banner_pvwatts(cmp: dict, fuente: str | None) -> None:
     else:
         st.info(msg, icon="🛰️")
 
+
+def _intentar_restaurar_multisuperficie(tmy) -> None:
+    """Publica el payload pendiente solo contra el TMY ya cargado."""
+    payload = st.session_state.get("_multisup_payload_pendiente")
+    if payload is None or tmy is None:
+        return
+    from calculos.persistencia_multisuperficie import restaurar_multisuperficie
+
+    resultado = restaurar_multisuperficie(
+        payload, st.session_state, {"tmy_df": tmy}
+    )
+    st.session_state.pop("_multisup_payload_pendiente", None)
+    if resultado.ok:
+        st.session_state["_multisup_restaurado"] = True
+    else:
+        st.session_state["_multisup_restauracion_error"] = "; ".join(resultado.errores)
+
+
+def _mostrar_resultado_restauracion_multisuperficie() -> None:
+    if st.session_state.pop("_multisup_restaurado", False):
+        st.success("📂 Estado multi-superficie restaurado con TMY y firmas verificadas.")
+    error = st.session_state.pop("_multisup_restauracion_error", None)
+    if error:
+        st.warning(
+            f"📂 Estado multi-superficie rechazado; no se restauraron resultados físicos: {error}",
+            icon="🔒",
+        )
+
 st.set_page_config(page_title="Recurso Solar — BIPV", page_icon="☀️", layout="wide")
 
 from calculos.auth import requerir_login
@@ -503,6 +531,8 @@ if not st.session_state.get("recurso_solar_ok"):
             "_solar_az_guardado":     azimuth,
             "_solar_albedo_guardado": albedo,
         })
+        _intentar_restaurar_multisuperficie(_tmy_r)
+        _mostrar_resultado_restauracion_multisuperficie()
         st.info(
             f"📂 **Recurso solar restaurado desde caché local** — "
             f"POA: **{_poa_anual_r:,.0f} kWh/m²/año** · "
@@ -758,6 +788,8 @@ if _descarga_btn:
     st.session_state["_solar_tilt_guardado"]   = tilt
     st.session_state["_solar_az_guardado"]     = azimuth
     st.session_state["_solar_albedo_guardado"] = albedo
+    _intentar_restaurar_multisuperficie(tmy)
+    _mostrar_resultado_restauracion_multisuperficie()
 
     st.success(
         f"✅ Recurso solar calculado para **{ciudad}**  |  "
