@@ -915,6 +915,16 @@ with tab_solar:
             mapear_fachadas_csv, fs_mensual_por_superficie,
             color_tipo, color_poa_normalizado, color_fs,
         )
+        from calculos.sitedesigner_marsh import cargar_escena_sitedesigner, verificar_ubicacion
+        from calculos.sombras_3d import calcular_fs_horario_por_superficie
+        from calculos.adaptador_multisuperficie import aplicar_proyecto_a_session_state
+        from calculos.inversores_multisuperficie import validar_inversores_y_asignaciones
+        from calculos.vinculador_sombra_multisuperficie import (
+            aplicar_sombra_a_superficies,
+            construir_y_recalcular_proyecto_fisico,
+            preservar_o_invalidar_campos_fisicos,
+            resumen_estado_fisico_superficies,
+        )
         _b5c_ok = True
     except Exception as _e5c:
         st.error(f"❌ Error cargando módulo multi-superficie: {_e5c}")
@@ -1053,7 +1063,14 @@ with tab_solar:
                     if _c_del.button("🗑️", key=f"sdel_{_uid}", help="Eliminar"):
                         _idx_eliminar = _i
 
-                    _sups_actualizado.append({
+                    # Auditoría 2026-09-21, ronda de recuperación: este bucle
+                    # reconstruye cada superficie desde cero en cada rerun --
+                    # sin preservar_o_invalidar_campos_fisicos, un cambio de
+                    # tilt/azimuth conservaría en silencio un p_shade/
+                    # firma_sombra que ya no corresponde a la nueva
+                    # orientación (la fusión ingenua {**_sup, **editado} no
+                    # invalida nada, solo preserva ciegamente).
+                    _sup_editada = preservar_o_invalidar_campos_fisicos(_sup, {
                         "uid":         _uid,
                         "nombre":      _nom_e,
                         "tipo":        _tipo_e,
@@ -1063,10 +1080,189 @@ with tab_solar:
                         "activa":      _act_e,
                         "montaje_fachada": _montaje_e,
                     })
+                    _sups_actualizado.append(_sup_editada)
 
             if _idx_eliminar is not None:
                 _sups_actualizado.pop(_idx_eliminar)
             st.session_state["superficies_bipv"] = _sups_actualizado
+
+            st.divider()
+            st.markdown("##### 🌳 Sombra 3D por superficie")
+            _archivo_sd = st.file_uploader(
+                "Escena Site Designer (.json)", type=["json"],
+                key="multisup_site_designer_json",
+                help="Exporta desde Site Designer con File → Save Model File.",
+            )
+            if _archivo_sd is not None:
+                try:
+                    _malla_sd, _meta_sd = cargar_escena_sitedesigner(_archivo_sd.getvalue())
+                    st.session_state["multisup_malla_sombra"] = _malla_sd
+                    st.session_state["multisup_malla_meta"] = _meta_sd
+                    for _aviso in verificar_ubicacion(_meta_sd, float(lat), float(lon)):
+                        st.warning(_aviso)
+                    st.success(
+                        f"Malla Site Designer cargada: {_meta_sd['n_bloques']} bloque(s), "
+                        f"{_meta_sd['dim_m']['x']} × {_meta_sd['dim_m']['y']} × {_meta_sd['dim_m']['z']} m."
+                    )
+                except Exception as _error_sd:
+                    st.session_state.pop("multisup_malla_sombra", None)
+                    st.error(f"No se pudo cargar Site Designer: {_error_sd}")
+
+            _puntos_sombra = dict(st.session_state.get("multisup_puntos_por_superficie", {}))
+            _geometrias_sombra = {}
+            for _sup_idx, _sup_sombra in enumerate(_sups_actualizado):
+                if not _sup_sombra.get("activa", True):
+                    continue
+                _nombre_sombra = _sup_sombra["nombre"]
+                _geometrias_sombra[_nombre_sombra] = {
+                    "tilt_deg": float(_sup_sombra["tilt_deg"]),
+                    "azimuth_deg": float(_sup_sombra["azimuth_deg"]),
+                }
+                _texto_sombra = st.text_area(
+                    f"Puntos 3D — {_nombre_sombra} (x,y,z en metros)",
+                    value="\n".join(
+                        f"{p['x']},{p['y']},{p['z']}"
+                        for p in _puntos_sombra.get(_nombre_sombra, [])
+                    ),
+                    key=f"multisup_puntos_{_sup_sombra.get('uid', _sup_idx)}",
+                    placeholder="8,0,2\n8,0,3.5\n8,0,5",
+                )
+                _puntos = []
+                for _linea in _texto_sombra.strip().splitlines():
+                    try:
+                        _xyz = [float(v.strip()) for v in _linea.replace(';', ',').split(',')]
+                        if len(_xyz) == 3:
+                            _puntos.append({"nombre": f"{_nombre_sombra}-P{len(_puntos)+1}", "fachada": _nombre_sombra, "x": _xyz[0], "y": _xyz[1], "z": _xyz[2]})
+                    except ValueError:
+                        pass
+                _puntos_sombra[_nombre_sombra] = _puntos
+            st.session_state["multisup_puntos_por_superficie"] = _puntos_sombra
+            _tmy_sombra = st.session_state.get("tmy_df")
+            _sombra_lista = bool(st.session_state.get("multisup_malla_sombra")) and _tmy_sombra is not None and all(
+                _puntos_sombra.get(s["nombre"]) for s in _sups_actualizado if s.get("activa", True)
+            )
+            if st.button("🌳 Calcular sombra de todas las superficies", key="btn_calcular_sombra_multisup", disabled=not _sombra_lista):
+                _resultados_sombra = calcular_fs_horario_por_superficie(
+                    st.session_state["multisup_malla_sombra"], _puntos_sombra,
+                    float(lat), float(lon), _tmy_sombra, _geometrias_sombra,
+                    malla_horizonte=str(st.session_state.get("multisup_malla_meta", {}).get("fuente", "site_designer")),
+                )
+                st.session_state["superficies_bipv"] = aplicar_sombra_a_superficies(_sups_actualizado, _resultados_sombra)
+                st.success("Sombra calculada por superficie; revisa el estado antes de adoptar resultados.")
+            if not _sombra_lista:
+                st.info("Completa la malla, el TMY y al menos un punto por superficie activa.")
+
+            # ════════════════════════════════════════════════════════════════
+            # Inversores por superficie (recuperado, ronda 2026-09-21): el
+            # tipo NUNCA se declara a mano -- se deriva siempre de cuántas
+            # superficies tiene asignadas cada inversor (1=dedicado, 2+=
+            # compartido), igual que exige transicion_multisuperficie.
+            # ════════════════════════════════════════════════════════════════
+            st.divider()
+            st.markdown("##### 🔌 Inversores por superficie")
+            st.caption(
+                "Asigna cada superficie activa a un inversor. El tipo se "
+                "deriva automáticamente y no se puede declarar manualmente."
+            )
+            _inversores_ui = [dict(_inv) for _inv in st.session_state.get("multisup_inversores", [])]
+            _ci_add, _ = st.columns([1, 3])
+            if _ci_add.button("➕ Agregar inversor", key="btn_add_multisup_inversor"):
+                _ids_ui = {str(_inv.get("inversor_id")) for _inv in _inversores_ui if _inv.get("inversor_id")}
+                _num_ui = 1
+                while f"INV-{_num_ui}" in _ids_ui:
+                    _num_ui += 1
+                _inversores_ui.append({
+                    "inversor_id": f"INV-{_num_ui}", "tipo": "",
+                    "eta_inversor": None, "P_ac_nom_W": None, "ficha": {},
+                })
+                st.session_state["multisup_inversores"] = _inversores_ui
+                st.rerun()
+
+            _inversores_editados = []
+            _borrar_indices = []
+            for _inv_idx, _inv in enumerate(_inversores_ui):
+                _inv_id_actual = str(_inv.get("inversor_id") or "")
+                with st.expander(f"🔌 {_inv_id_actual or 'Inversor sin ID'}", expanded=True):
+                    _ic1, _ic2, _ic3, _ic4 = st.columns([2, 1, 1, 1])
+                    _inv_id_editado = _ic1.text_input(
+                        "ID", value=_inv_id_actual, key=f"ms_inv_id_{_inv_idx}",
+                    ).strip()
+                    _eta_texto = _ic2.text_input(
+                        "Eficiencia (0-1)",
+                        value=("" if _inv.get("eta_inversor") is None else str(_inv.get("eta_inversor"))),
+                        key=f"ms_inv_eta_{_inv_idx}",
+                    ).strip()
+                    _pot_texto = _ic3.text_input(
+                        "Potencia AC (W)",
+                        value=("" if _inv.get("P_ac_nom_W") is None else str(_inv.get("P_ac_nom_W"))),
+                        key=f"ms_inv_pac_{_inv_idx}",
+                    ).strip()
+                    if _ic4.button("🗑️", key=f"ms_inv_del_{_inv_idx}", help="Eliminar este inversor"):
+                        _borrar_indices.append(_inv_idx)
+                    try:
+                        _eta_editado = float(_eta_texto) if _eta_texto else None
+                    except ValueError:
+                        _eta_editado = _eta_texto
+                    try:
+                        _pot_editado = float(_pot_texto) if _pot_texto else None
+                    except ValueError:
+                        _pot_editado = _pot_texto
+                    _inversores_editados.append({
+                        **_inv, "inversor_id": _inv_id_editado,
+                        "eta_inversor": _eta_editado, "P_ac_nom_W": _pot_editado,
+                    })
+                    # Regla dura: el tipo NUNCA se edita a mano en la UI.
+                    st.caption("Tipo: se deriva después de asignar superficies.")
+            if _borrar_indices:
+                _inversores_editados = [
+                    _inv for _idx, _inv in enumerate(_inversores_editados)
+                    if _idx not in _borrar_indices
+                ]
+
+            _ids_editados = [str(_inv.get("inversor_id") or "") for _inv in _inversores_editados]
+            _opciones_inv = [""] + [_i for _i in _ids_editados if _i]
+            for _sup_idx, _sup_ui in enumerate(_sups_actualizado):
+                if not _sup_ui.get("activa", True):
+                    continue
+                _sc1, _sc2, _sc3 = st.columns([2, 1, 1])
+                _sc1.caption(f"{_sup_ui['nombre']} ({_sup_ui['tipo']})")
+                _inv_actual = str(_sup_ui.get("inversor_id") or "")
+                _inv_index = _opciones_inv.index(_inv_actual) if _inv_actual in _opciones_inv else 0
+                _inv_asignado = _sc2.selectbox(
+                    "Inversor", _opciones_inv, index=_inv_index,
+                    key=f"ms_sup_inv_{_sup_ui.get('uid', _sup_idx)}",
+                )
+                _serie_texto = _sc3.text_input(
+                    "N serie",
+                    value=("" if _sup_ui.get("n_serie") is None else str(_sup_ui.get("n_serie"))),
+                    key=f"ms_sup_ns_{_sup_ui.get('uid', _sup_idx)}",
+                ).strip()
+                _par_texto = st.text_input(
+                    f"N paralelo — {_sup_ui['nombre']}",
+                    value=("" if _sup_ui.get("n_paralelo") is None else str(_sup_ui.get("n_paralelo"))),
+                    key=f"ms_sup_np_{_sup_ui.get('uid', _sup_idx)}",
+                ).strip()
+                try:
+                    _sups_actualizado[_sup_idx]["n_serie"] = int(_serie_texto) if _serie_texto else None
+                except ValueError:
+                    _sups_actualizado[_sup_idx]["n_serie"] = _serie_texto
+                try:
+                    _sups_actualizado[_sup_idx]["n_paralelo"] = int(_par_texto) if _par_texto else None
+                except ValueError:
+                    _sups_actualizado[_sup_idx]["n_paralelo"] = _par_texto
+                _sups_actualizado[_sup_idx]["inversor_id"] = _inv_asignado or None
+
+            st.session_state["multisup_inversores"] = _inversores_editados
+            st.session_state["superficies_bipv"] = _sups_actualizado
+            _validacion_ui = validar_inversores_y_asignaciones(_sups_actualizado, _inversores_editados)
+            if _validacion_ui["ok"]:
+                st.success(
+                    "✅ Asignaciones válidas: " + ", ".join(
+                        f"{_inv_id} ({_tipo})" for _inv_id, _tipo in _validacion_ui["tipos_derivados"].items()
+                    )
+                )
+            elif _inversores_editados or any(_s.get("activa", True) for _s in _sups_actualizado):
+                st.warning("⚠️ Configuración eléctrica incompleta: " + " ".join(_validacion_ui["errores"]))
 
             # Calcular POA para todas
             st.divider()
@@ -1214,6 +1410,95 @@ with tab_solar:
                     st.session_state["multisup_desglose"]        = _res_int["desglose"]
                     st.session_state["multisup_activo"]          = True
                     st.rerun()
+
+                # ── Modo físico opt-in (recuperado, ronda 2026-09-21) ──────
+                # No altera el flujo simplificado ni escribe multisup_* hasta
+                # que el usuario adopta el candidato explícitamente.
+                _usar_fisico = st.checkbox(
+                    "🧪 Preparar comparación con modelo físico SDM + bypass",
+                    value=bool(st.session_state.get("multisup_usar_fisico", False)),
+                    key="multisup_usar_fisico",
+                    help=(
+                        "El modelo físico exige datos por superficie (strings, "
+                        "inversor, p_shade y firma de sombra). Si faltan, "
+                        "bloquea explícitamente sin inventar valores."
+                    ),
+                )
+
+                if _usar_fisico:
+                    _resumen_fisico = resumen_estado_fisico_superficies(
+                        st.session_state.get("superficies_bipv", [])
+                    )
+                    if _resumen_fisico:
+                        _listas = [r for r in _resumen_fisico if r["lista"]]
+                        _faltantes = [r for r in _resumen_fisico if not r["lista"]]
+                        if _faltantes:
+                            st.warning(
+                                f"⚠️ {len(_listas)}/{len(_resumen_fisico)} superficies "
+                                "activas listas para el modo físico. Faltan datos en:\n\n"
+                                + "\n".join(
+                                    f"- **{r['nombre']}**: falta `{'`, `'.join(r['campos_faltantes'])}`"
+                                    for r in _faltantes
+                                )
+                            )
+                        else:
+                            st.success(
+                                f"✅ {len(_listas)}/{len(_resumen_fisico)} superficies "
+                                "activas listas para el modo físico."
+                            )
+
+                    _btn_comparar_fisico = st.button(
+                        "🧪 Calcular comparación física (sin adoptar)",
+                        key="btn_comparar_multisup_fisico",
+                    )
+                    if _btn_comparar_fisico:
+                        # Una sola función hace TODA la validación -- TMY
+                        # real, sombra por superficie, inversores/
+                        # asignaciones, POA, forma de p_shade, vigencia
+                        # geométrica -- antes de guardar el candidato. Si
+                        # falla: no se guarda candidato, no se conserva uno
+                        # anterior, y ninguna clave multisup_* se toca.
+                        try:
+                            _proyecto_fisico = construir_y_recalcular_proyecto_fisico(
+                                st.session_state, _tmy_sup, lat=float(lat), lon=float(lon), alt_m=float(alt_m),
+                            )
+                            st.session_state["multisup_proyecto_fisico_candidato"] = _proyecto_fisico
+                            st.success("✅ Comparación física calculada. El resultado aún no fue adoptado.")
+                        except (KeyError, TypeError, ValueError) as _fisico_error:
+                            st.session_state.pop("multisup_proyecto_fisico_candidato", None)
+                            st.error(f"❌ No se puede calcular el modo físico: {_fisico_error}")
+
+                    _fisico_candidato = st.session_state.get("multisup_proyecto_fisico_candidato")
+                    if _fisico_candidato:
+                        _e_fisico = _fisico_candidato["agregados"]["E_ac_total_kWh"]
+                        _e_simple = st.session_state.get("E_ac_anual_kWh_multisup")
+                        if _e_simple:
+                            _dif_fisico = (_e_fisico - float(_e_simple)) / float(_e_simple) * 100.0
+                            st.info(
+                                f"Comparación: simplificado **{float(_e_simple):,.1f} kWh/año** · "
+                                f"físico **{_e_fisico:,.1f} kWh/año** · "
+                                f"diferencia **{_dif_fisico:+.1f}%**"
+                            )
+                        if st.button("✅ Adoptar cálculo físico", key="btn_adoptar_multisup_fisico", type="primary"):
+                            # NUNCA se confía en que el candidato guardado
+                            # (de un rerun anterior) siga siendo válido -- se
+                            # recalcula y revalida TODO de cero con el
+                            # session_state actual, y solo se publica si esa
+                            # revalidación pasa.
+                            try:
+                                _proyecto_a_adoptar = construir_y_recalcular_proyecto_fisico(
+                                    st.session_state, _tmy_sup, lat=float(lat), lon=float(lon), alt_m=float(alt_m),
+                                )
+                            except (KeyError, TypeError, ValueError) as _adopcion_error:
+                                st.session_state.pop("multisup_proyecto_fisico_candidato", None)
+                                st.error(
+                                    "❌ El candidato ya no es válido (los datos cambiaron "
+                                    f"desde que se calculó la comparación): {_adopcion_error}"
+                                )
+                            else:
+                                aplicar_proyecto_a_session_state(_proyecto_a_adoptar, st.session_state)
+                                st.success("✅ Resultado físico adoptado en las claves multi-superficie.")
+                                st.rerun()
 
 
         # ════════════════════════════════════════════════════════════════════

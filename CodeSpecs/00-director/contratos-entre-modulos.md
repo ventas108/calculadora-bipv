@@ -195,6 +195,23 @@ Invariantes:
 	no tienen todavía una firma común de entradas. Una Spec debe invalidarlos al cambiar
 	sus insumos y al recalcular, antes de afirmar que una tabla guardada sigue siendo la
 	comparación actual.
+- **Multi-superficie sin UI de captura de sombra/inversor por superficie:**
+  el backend puro (`calculos.sombras_3d.calcular_fs_horario_por_superficie`,
+  `calculos/vinculador_sombra_multisuperficie.py`,
+  `calculos/inversores_multisuperficie.py`) está implementado, **corregido
+  tras una auditoría del 2026-09-21 (firma TMY real, bloqueo real de sombra
+  incompleta, validación de inversores conectada, invalidación geométrica
+  completa, revalidación en la adopción — ver `registro-de-decisiones.md` y
+  `references/correccion-auditoria-multisuperficie.md`)** y probado
+  (116 pruebas focales, regresión completa sin fallos nuevos), pero
+  `pages/9_🗺️_Vista_3D.py` todavía no tiene widgets para que el usuario
+  capture puntos de análisis/malla por superficie ni para asignar inversor
+  dedicado/compartido por superficie (mockup pendiente de aprobación, ver
+  `05-perdidas-y-temperatura/transicion-multisuperficie/diseno.md`, punto
+  6). Sin esa UI, ninguna superficie real del modo físico llega a estar
+  completa — el toggle `multisup_usar_fisico` ya existe, y tanto "calcular
+  comparación" como "adoptar" bloquean con mensaje explícito (nombrando
+  superficie, estado y acción requerida) en cualquier proyecto real.
 
 ### 09-despliegue
 _(pendiente — ver [../09-despliegue/diseno.md](../09-despliegue/diseno.md))_

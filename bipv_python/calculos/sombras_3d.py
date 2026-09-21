@@ -37,8 +37,27 @@ except Exception:  # pragma: no cover
 
 import pvlib
 
+from calculos.produccion_vigencia import fingerprint_mapping, huella_horaria
+
 ALTURA_SOLAR_MIN_DEG = 1.0   # bajo esto el sol "no cuenta" (horizonte/ruido)
 OFFSET_RAYO_M = 0.05         # separar el origen del rayo de la superficie propia
+VERSION_ALGORITMO_FS_POR_SUPERFICIE = "sombras_3d.ray_casting_por_superficie.v1"
+_HORAS_ANIO = 8760
+
+# ── Estados explícitos de sombra por superficie (restaurado, auditoría
+# 2026-09-21, ronda de recuperación tras el borrado accidental) ─────────────
+# calcular_fs_horario_por_superficie() escribe el valor real (string) en
+# resultados[nombre]["estado_sombra"]; estas constantes son la fuente única
+# del nombre de cada estado y del subconjunto aceptable sin aprobación
+# adicional -- calculos.vinculador_sombra_multisuperficie y
+# calculos.adaptador_multisuperficie las usan en vez de repetir las cadenas
+# literales por separado.
+ESTADO_CALCULADO_COMPLETO = "calculado_completo"
+ESTADO_SOMBRA_CERO_CALCULADA = "sombra_cero_calculada"
+ESTADO_CALCULO_INCOMPLETO = "calculo_incompleto"
+ESTADO_ERROR_GEOMETRICO = "error_geometrico"
+ESTADO_RESOLUCION_INSUFICIENTE = "resolucion_insuficiente"
+ESTADOS_SOMBRA_ACEPTABLES = frozenset({ESTADO_CALCULADO_COMPLETO, ESTADO_SOMBRA_CERO_CALCULADA})
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -415,6 +434,105 @@ def calcular_fs_horario(
             "first_hit_distance_m": np.round(distancias, 6),
         }))
     return pd.concat(filas, ignore_index=True)
+
+
+def calcular_fs_horario_por_superficie(
+    malla,
+    puntos_por_superficie: dict[str, list[dict]],
+    lat: float,
+    lon: float,
+    tmy: pd.DataFrame,
+    geometria_por_superficie: dict[str, dict],
+    malla_horizonte: str,
+    transparencia: float = 0.0,
+    n_modulos_serie_por_superficie: dict[str, int] | None = None,
+) -> dict[str, dict]:
+    """Calcula FS geometrico horario y firma por superficie.
+
+    El TMY real es obligatorio para que la firma pueda ser validada por el
+    mismo contrato que usa produccion. Las horas con sol que no aparezcan en
+    el ray-casting se marcan como incompletas; no se convierten en sombra cero.
+    """
+    if not isinstance(tmy, pd.DataFrame) or "T2m" not in tmy.columns:
+        raise ValueError("tmy debe ser un DataFrame con columna T2m.")
+    idx = pd.DatetimeIndex(tmy.index)
+    if len(idx) != _HORAS_ANIO:
+        raise ValueError(f"tmy debe tener exactamente {_HORAS_ANIO} horas.")
+    if not malla_horizonte:
+        raise ValueError("malla_horizonte debe identificar la malla usada.")
+    sol = posiciones_solares(lat, lon, idx)
+    horas_sol = pd.DatetimeIndex(sol.index[sol["elevacion"] > ALTURA_SOLAR_MIN_DEG]).tz_convert("UTC")
+    n_modulos_serie_por_superficie = n_modulos_serie_por_superficie or {}
+    tmy_fp = huella_horaria(idx, tmy["T2m"].to_numpy(dtype=float))
+    resultados = {}
+    for nombre, puntos in puntos_por_superficie.items():
+        if not puntos:
+            raise ValueError(f"La superficie '{nombre}' no tiene puntos de analisis.")
+        geometria = geometria_por_superficie.get(nombre)
+        if not isinstance(geometria, dict):
+            raise ValueError(f"Falta geometria para la superficie '{nombre}'.")
+        # Auditoría 2026-09-21, ronda de recuperación: esta llamada a
+        # validar_puntos() (y el estado "error_geometrico" que produce) se
+        # había perdido en la reconstrucción posterior al borrado
+        # accidental -- sin ella, un punto de análisis dentro del obstáculo
+        # o pegado a la malla nunca se detectaba.
+        avisos_geometricos = validar_puntos(malla, puntos)
+        df = calcular_fs_horario(malla, puntos, lat, lon, indice_tmy=idx, transparencia=transparencia)
+        serie = pd.Series(0.0, index=idx, dtype=float)
+        calculadas = pd.DatetimeIndex([], tz="UTC")
+        if not df.empty:
+            horas = pd.to_datetime(df["timestamp_utc"], utc=True)
+            valores = pd.Series(df["FS_geometrico"].to_numpy(float), index=horas).groupby(level=0).mean()
+            comunes = valores.index.intersection(idx.tz_convert("UTC"))
+            serie.loc[comunes.tz_convert(idx.tz)] = valores.loc[comunes].to_numpy()
+            calculadas = comunes
+        no_calculadas = len(horas_sol.difference(calculadas))
+        puntos_insuficientes = nombre in n_modulos_serie_por_superficie and len(puntos) < int(n_modulos_serie_por_superficie[nombre])
+        advertencias = [f"error_geometrico: {a}" for a in avisos_geometricos]
+        estado = "sombra_cero_calculada" if calculadas.size and np.allclose(serie.loc[calculadas.tz_convert(idx.tz)], 0) else "calculado_completo"
+        if no_calculadas:
+            estado = "calculo_incompleto"
+            advertencias.append(f"{no_calculadas} horas con sol no fueron calculadas.")
+        if puntos_insuficientes:
+            estado = "resolucion_insuficiente"
+            advertencias.append("Hay menos puntos de analisis que modulos en serie.")
+        if avisos_geometricos:
+            estado = "error_geometrico"
+        firma = {
+            "geometria": dict(geometria),
+            "puntos_analisis": [dict(p) for p in puntos],
+            "malla_horizonte": str(malla_horizonte),
+            "tmy_fingerprint": tmy_fp,
+            "fuente": "sombras_3d",
+            "tilt_deg": geometria.get("tilt_deg"),
+            "azimuth_deg": geometria.get("azimuth_deg"),
+            "transparencia": float(transparencia),
+            "version_algoritmo": VERSION_ALGORITMO_FS_POR_SUPERFICIE,
+            "proveedor": "sombras_3d",
+            "resolucion_espacial": f"{len(puntos)}_puntos",
+            "resolucion_temporal": "horaria_8760",
+            "zona_horaria": str(idx.tz),
+        }
+        resultados[nombre] = {
+            "p_shade": serie.to_numpy(float),
+            "firma_sombra": firma,
+            "cobertura": {
+                "horas_totales": _HORAS_ANIO,
+                "horas_sin_sol": _HORAS_ANIO - len(horas_sol),
+                "horas_con_sol_calculadas": len(calculadas),
+                "horas_con_sol_no_calculadas": no_calculadas,
+                "estado": estado,
+            },
+            "estado_sombra": estado,
+            "advertencias": advertencias,
+            "calidad_confianza": (
+                "baja" if (puntos_insuficientes or avisos_geometricos)
+                else ("media" if no_calculadas else "alta")
+            ),
+            "huella": fingerprint_mapping(firma),
+            "df": df,
+        }
+    return resultados
 
 
 # ══════════════════════════════════════════════════════════════════════════════
