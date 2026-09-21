@@ -26,8 +26,8 @@
 - [x] Guardar proyecto produce payload canónico y escritura atómica por usuario.
 - [x] Cargar proyecto valida antes de publicar cualquier estado y difiere la restauración física hasta disponer de TMY.
 - [ ] Dos superficies con sombra, POA e inversores válidos restauran completas en prueba manual real.
-- [ ] Se conserva el comportamiento opt-in del modo físico.
-- [ ] Comparación global sigue siendo exploratoria y su adopción continúa bloqueada en `multisup_activo=True`.
+- [x] Se conserva el comportamiento opt-in del modo físico.
+- [x] Comparación global sigue siendo exploratoria y su adopción continúa bloqueada en `multisup_activo=True`.
 
 ## Validación operativa manual
 

@@ -52,6 +52,17 @@ adoptar orientación ──────────────> recalcula POA s
 adoptar inversor ─────────────────> conserva Motor Óptico; invalida 04 -> 06 -> 07
 ```
 
+Persistencia física multi-superficie:
+
+```text
+02-recurso-solar (TMY vigente) ──┐
+03-dimensionamiento (eléctrica) ─┼─> payload firmado / restauración todo-o-nada
+05-perdidas-y-temperatura ───────┘                    │
+                                                     ├─> 06-analisis-financiero
+                                                     ├─> 07-informes
+                                                     └─> 08-interfaz
+```
+
 - Los comparadores consumen el motor físico vigente; no mantienen una segunda
   implementación de energía, PR, POA o compatibilidad.
 - El Asistente general consume documentación y estado resumido. Los Analistas locales
@@ -59,7 +70,7 @@ adoptar inversor ─────────────────> conserva M
   ni puede adoptar alternativas.
 - Estas dependencias pertenecen a Streamlit. React solo las incorpora mediante una
   Spec propia que defina contrato, implementación y validación de integración.
-- Las desviaciones activas de orientación multi-superficie y vigencia de tablas están
-      registradas en
-  [contratos-entre-modulos.md](contratos-entre-modulos.md). Toda Spec que toque esos
-  flujos debe tratarlas como riesgos de integración, no como comportamiento resuelto.
+- La adopción global de orientación está bloqueada cuando `multisup_activo=True`;
+      la orientación multi-superficie pertenece a Vista 3D, superficie por superficie.
+- La persistencia física no sustituye el modelo simplificado: es opt-in y su
+      restauración exige firmas coincidentes antes de alimentar los consumidores.

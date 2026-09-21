@@ -14,8 +14,8 @@
 - [x] Conectar Cargar proyecto con validación estructural y restauración diferida hasta disponer de TMY.
 - [ ] Rechazar explícitamente payload incompleto, alterado, legacy o de versión no soportada.
 - [x] Añadir pruebas unitarias de payload, firmas, serialización y rollback; la batería focal actual es de 26 pruebas.
-- [ ] Añadir pruebas de consumidores: Finanzas, CO₂, Presupuesto, Baterías y Reporte no consumen estado invalidado.
-- [ ] Verificar que el modelo simplificado no cambia cuando `multisup_activo` es falso.
-- [ ] Actualizar contratos, mapa de dependencias, registro de decisiones y base del Asistente.
-- [ ] Ejecutar revisión solo lectura de Copilot y revisión de Claude según su Spec.
-- [ ] Crear rama, validar, publicar, fusionar a `main` y desplegar con hashes alineados.
+- [x] Añadir contrato estático de consumidores: Finanzas, CO₂, Baterías, Mismatch, Reporte, Diagrama Unifilar y Comparador de Inversores respetan `multisup_activo` y fallback.
+- [x] Verificar que el modelo simplificado no cambia cuando `multisup_activo` es falso mediante regresión existente.
+- [x] Actualizar contratos, mapa de dependencias, registro de decisiones y base del Asistente.
+- [x] Ejecutar revisión solo lectura de Copilot y revisión de Claude según su Spec.
+- [ ] Crear rama, validar, publicar, fusionar a `main` y desplegar esta unidad.

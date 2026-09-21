@@ -69,6 +69,27 @@ Regla de consumo:
 	`poa_sin_termico_df`; el término térmico se calcula una única vez dentro del
 	SDM. Recalcular la cascada invalida resultados dependientes de su POA.
 
+#### Persistencia física multi-superficie
+
+Entrada:
+- `session_state` con superficies, geometría, asignaciones eléctricas, TMY y
+	snapshot físico adoptado.
+
+Salida:
+- Payload canónico firmado con `inputs`, `results`, `validity` y
+	`provider_metadata`, persistido atómicamente por usuario.
+
+Reglas de consumo:
+- Cargar valida schema, firma global, TMY, geometría, sombra, POA y configuración
+	eléctrica antes de publicar estado físico.
+- La restauración es todo-o-nada; un fallo no publica `multisup_*`, el snapshot
+	físico ni resultados downstream.
+- Finanzas, CO₂, Baterías, Mismatch, Reporte, Diagrama Unifilar y Comparador de
+	Inversores solo consumen multi-superficie cuando `multisup_activo=True`; si no,
+	conservan el fallback simplificado/bypass/base.
+- Cambiar de proyecto invalida el estado físico anterior y cualquier payload
+	pendiente de restauración.
+
 ### 06-analisis-financiero
 
 Entrada:
