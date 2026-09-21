@@ -162,6 +162,24 @@ def test_adopcion_invalida_derivados_de_poa():
     assert "for k in KEYS_DERIVADOS_POA if k in st.session_state" in src
 
 
+def test_adopcion_global_bloqueada_en_multisuperficie():
+    src = _leer(_PAGINA)
+    idx_guard = src.index('st.session_state.get("multisup_activo", False)')
+    idx_boton_adopcion = src.index('st.button("✅ Adoptar esta orientación"')
+    assert idx_guard < idx_boton_adopcion
+    assert "Este proyecto tiene varias superficies." in src
+    assert "desde Vista 3D, superficie por superficie." in src
+
+
+def test_adopcion_simple_sigue_disponible_y_comparacion_no_se_bloquea():
+    src = _leer(_PAGINA)
+    idx_comparar = src.index('st.button("▶️ Comparar orientaciones"')
+    idx_llamada = src.index("comparar_orientacion(_cfg_actual")
+    idx_guard = src.index('st.session_state.get("multisup_activo", False)')
+    assert idx_comparar < idx_llamada < idx_guard
+    assert 'st.button("✅ Adoptar esta orientación"' in src
+
+
 def test_page_links_apuntan_a_archivos_reales():
     src = _leer(_PAGINA)
     rutas = re.findall(r'st\.page_link\(\s*"(pages/[^"]+\.py)"', src)

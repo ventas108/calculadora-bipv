@@ -277,63 +277,70 @@ if df_or is not None and not df_or.empty:
 
     st.divider()
     st.subheader("✅ Adoptar una orientación")
-    st.caption(
-        "Recalcula la POA del sitio (mismo TMY, nueva geometría) y actualiza tilt/azimuth del "
-        "proyecto -- equivale a volver a 📐 Recurso Solar y cambiar el slider manualmente, pero "
-        "sin perder el resultado del barrido. Invalida producción/financiero/CO₂: hay que "
-        "volver a correr esas páginas con la orientación nueva."
-    )
-    _opciones = [
-        f"tilt={r['Tilt (°)']:.0f}°, azimuth={r['Azimuth (°)']:.0f}° "
-        f"({r['E_ac (kWh/año)']:,.0f} kWh/año)"
-        for _, r in df_or.iterrows()
-    ]
-    _idx_elegido = st.selectbox("Combinación a adoptar", range(len(_opciones)), format_func=lambda i: _opciones[i])
-    if st.button("✅ Adoptar esta orientación", type="primary"):
-        _fila = df_or.iloc[_idx_elegido]
-        _tilt_adopt = float(_fila["Tilt (°)"])
-        _az_adopt = float(_fila["Azimuth (°)"])
-        _albedo_actual = float(st.session_state.get("albedo_suelo", 0.20))
-        lat, lon, alt_m = _coords_proyecto()
-        tmy = st.session_state.get("tmy_df")
-        _bifacial_cfg = st.session_state.get("bifacial_cfg") if st.session_state.get("bifacial_activo") else None
+    if st.session_state.get("multisup_activo", False):
+        st.warning(
+            "Este proyecto tiene varias superficies. La orientación debe modificarse "
+            "desde Vista 3D, superficie por superficie.",
+            icon="🔒",
+        )
+    else:
+        st.caption(
+            "Recalcula la POA del sitio (mismo TMY, nueva geometría) y actualiza tilt/azimuth del "
+            "proyecto -- equivale a volver a 📐 Recurso Solar y cambiar el slider manualmente, pero "
+            "sin perder el resultado del barrido. Invalida producción/financiero/CO₂: hay que "
+            "volver a correr esas páginas con la orientación nueva."
+        )
+        _opciones = [
+            f"tilt={r['Tilt (°)']:.0f}°, azimuth={r['Azimuth (°)']:.0f}° "
+            f"({r['E_ac (kWh/año)']:,.0f} kWh/año)"
+            for _, r in df_or.iterrows()
+        ]
+        _idx_elegido = st.selectbox("Combinación a adoptar", range(len(_opciones)), format_func=lambda i: _opciones[i])
+        if st.button("✅ Adoptar esta orientación", type="primary"):
+            _fila = df_or.iloc[_idx_elegido]
+            _tilt_adopt = float(_fila["Tilt (°)"])
+            _az_adopt = float(_fila["Azimuth (°)"])
+            _albedo_actual = float(st.session_state.get("albedo_suelo", 0.20))
+            lat, lon, alt_m = _coords_proyecto()
+            tmy = st.session_state.get("tmy_df")
+            _bifacial_cfg = st.session_state.get("bifacial_cfg") if st.session_state.get("bifacial_activo") else None
 
-        # Recalcula la POA localmente para la nueva geometría -- mismo TMY del
-        # sitio, misma lógica que el branch "_drift_geom" de
-        # pages/2_☀️_Recurso_Solar.py cuando detecta que tilt/azimuth cambiaron.
-        # Sin este recálculo, poa_df quedaría desfasado del nuevo tilt_fachada/
-        # azimuth_fachada -- justo el tipo de inconsistencia silenciosa que
-        # calculos/invalidacion.py existe para evitar.
-        poa_nueva = calcular_poa(
-            tmy, lat, lon, alt_m, _tilt_adopt, _az_adopt,
-            albedo=_albedo_actual, bifacial=_bifacial_cfg,
-        )
-        _orientacion_label_adopt = next(
-            (lbl for lbl, az in ORIENTACIONES.items() if abs(az - _az_adopt) < 0.5),
-            f"Azimuth {_az_adopt:.0f}°",
-        )
-        st.session_state.update({
-            "tilt_fachada": _tilt_adopt,
-            "tilt_default": _tilt_adopt,
-            "azimuth_fachada": _az_adopt,
-            "orientacion_label": _orientacion_label_adopt,
-            "poa_df": poa_nueva,
-            "poa_anual_kWh_m2": round(poa_nueva["poa_global"].sum() / 1000.0, 1),
-            # Guardas de drift (#64/#172) -- si no se actualizan aquí, la próxima
-            # visita a 📐 Recurso Solar detectaría un "drift" falso (o, peor,
-            # ninguno, si el slider vuelve al tilt_default viejo) contra la
-            # geometría que acabamos de adoptar.
-            "_solar_tilt_guardado": _tilt_adopt,
-            "_solar_az_guardado": _az_adopt,
-            "_solar_albedo_guardado": _albedo_actual,
-        })
-        _limpiadas = [k for k in KEYS_DERIVADOS_POA if k in st.session_state]
-        for k in _limpiadas:
-            st.session_state.pop(k, None)
-        st.success(
-            f"Adoptado: **tilt={_tilt_adopt:.0f}°, azimuth={_az_adopt:.0f}°**. POA recalculada. "
-            f"Se invalidaron {len(_limpiadas)} resultados derivados: vuelve a correr "
-            "📊 Producción y 💰 Financiero con la orientación nueva."
-        )
+            # Recalcula la POA localmente para la nueva geometría -- mismo TMY del
+            # sitio, misma lógica que el branch "_drift_geom" de
+            # pages/2_☀️_Recurso_Solar.py cuando detecta que tilt/azimuth cambiaron.
+            # Sin este recálculo, poa_df quedaría desfasado del nuevo tilt_fachada/
+            # azimuth_fachada -- justo el tipo de inconsistencia silenciosa que
+            # calculos/invalidacion.py existe para evitar.
+            poa_nueva = calcular_poa(
+                tmy, lat, lon, alt_m, _tilt_adopt, _az_adopt,
+                albedo=_albedo_actual, bifacial=_bifacial_cfg,
+            )
+            _orientacion_label_adopt = next(
+                (lbl for lbl, az in ORIENTACIONES.items() if abs(az - _az_adopt) < 0.5),
+                f"Azimuth {_az_adopt:.0f}°",
+            )
+            st.session_state.update({
+                "tilt_fachada": _tilt_adopt,
+                "tilt_default": _tilt_adopt,
+                "azimuth_fachada": _az_adopt,
+                "orientacion_label": _orientacion_label_adopt,
+                "poa_df": poa_nueva,
+                "poa_anual_kWh_m2": round(poa_nueva["poa_global"].sum() / 1000.0, 1),
+                # Guardas de drift (#64/#172) -- si no se actualizan aquí, la próxima
+                # visita a 📐 Recurso Solar detectaría un "drift" falso (o, peor,
+                # ninguno, si el slider vuelve al tilt_default viejo) contra la
+                # geometría que acabamos de adoptar.
+                "_solar_tilt_guardado": _tilt_adopt,
+                "_solar_az_guardado": _az_adopt,
+                "_solar_albedo_guardado": _albedo_actual,
+            })
+            _limpiadas = [k for k in KEYS_DERIVADOS_POA if k in st.session_state]
+            for k in _limpiadas:
+                st.session_state.pop(k, None)
+            st.success(
+                f"Adoptado: **tilt={_tilt_adopt:.0f}°, azimuth={_az_adopt:.0f}°**. POA recalculada. "
+                f"Se invalidaron {len(_limpiadas)} resultados derivados: vuelve a correr "
+                "📊 Producción y 💰 Financiero con la orientación nueva."
+            )
 elif df_or is not None:
     st.error("El barrido no produjo ninguna fila — revisa la malla configurada arriba.")
