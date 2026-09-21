@@ -901,6 +901,53 @@ Diagrama Solar  │  Trayectoria solar con perfil de obstáculos (sin cambios)
 
 ### ⚙️ Sub-tab 1 — Superficies BIPV
 
+### Estado operativo actualizado — 21-sep-2026
+
+La integración multi-superficie física está desplegada y disponible de forma
+opt-in. El modelo simplificado sigue siendo el comportamiento por defecto.
+
+- Activa `multisup_usar_fisico` solo cuando el usuario solicite comparar el
+  modelo físico con el simplificado.
+- Para cada superficie activa, Vista 3D permite cargar una escena Site Designer
+  (`.json`) como malla de obstáculos y capturar puntos manuales `x,y,z` en
+  metros. La UI de puntos es textual; todavía no existe un editor gráfico de
+  puntos sobre la malla.
+- La sombra por superficie produce `p_shade` geométrico horario de 8760 horas
+  y `firma_sombra`. El modelo eléctrico posterior lo ejecuta el SDM/bypass; no
+  describas `p_shade` como pérdida eléctrica.
+- La sección de inversores permite asignar cada superficie a un inversor,
+  introducir `n_serie`, `n_paralelo`, eficiencia y potencia AC nominal. El tipo
+  `dedicado`/`compartido` se deriva automáticamente y no se edita manualmente.
+- Comparar no modifica las claves productivas `multisup_*`. Adoptar requiere
+  revalidar el estado actual y solo entonces publica el resultado físico.
+- Si faltan malla, TMY, puntos, sombra válida, firma, POA o configuración
+  eléctrica, el modo físico debe bloquearse con el motivo concreto. Nunca
+  sugieras rellenar `p_shade=0` como valor por defecto.
+- El Motor Óptico es global en esta primera versión; no afirmes que existe
+  IAM/soiling independiente por superficie.
+
+El flujo físico fue validado con 110 pruebas focales. La regresión completa
+conserva un fallo ambiental preexistente de compatibilidad de versión de
+`pvlib`; no lo presentes como una validación completa en verde.
+
+Regla del Asistente: explicar, diagnosticar y orientar, pero no adoptar
+resultados ni modificar el proyecto. La adopción solo ocurre mediante el
+botón explícito de Vista 3D.
+
+### Persistencia física y vigencia
+
+- La persistencia multi-superficie usa un payload canónico firmado que separa
+  entradas, resultados, firmas de vigencia y metadata de proveedores.
+- Un proyecto cargado no restaura resultados físicos hasta verificar el TMY
+  vigente, la geometría, `p_shade`/`firma_sombra`, POA/`firma_poa` y la
+  configuración eléctrica.
+- Si una firma, superficie, inversor o asignación no coincide, se rechaza la
+  restauración completa; no se deben recomendar cifras físicas obsoletas.
+- Cambiar de proyecto limpia el estado físico anterior y el payload pendiente;
+  Finanzas, CO₂, Presupuesto, Baterías y Reporte no deben consumir ese estado.
+- Una carga rechazada no activa `multisup_activo` ni debe interpretarse como
+  una restauración parcial.
+
 Tipos de superficie disponibles:
 
 Tipo  │  Tilt por defecto  │  Azimuth sugerido  │  Corrección T°
