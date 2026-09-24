@@ -1,10 +1,31 @@
 # Manual de uso — Página 9 🗺️ Vista 3D y Multi-Superficie
 
-Versión: 24-sep-2026 (rev. 3) · Código de referencia: rama `claude/mejoras-bipv`
-(incluye la corrección de sombra con el sol detrás del módulo, algoritmo v2, la
-corrección del mapa de calor POA, la vigencia de la POA por superficie, la
-publicación única de la energía multi-superficie, la validación de puntos 3D,
-el estado de sombra por superficie y el panel del proyecto en bypass y MPPT).
+Versión: 24-sep-2026 (rev. 4) · Código de referencia: `main` `72326f2f`
+(desplegado el 24-sep-2026).
+
+---
+
+## 0. Novedades de esta versión (24-sep-2026)
+
+| Cambio | Qué ves ahora | Antes |
+|---|---|---|
+| **Vigencia de la POA** | Si cambias la geometría, el montaje, el albedo, el bifacial, el TMY o la ubicación, la superficie sale en **⚠️ Estas superficies no tienen POA vigente…** y no se usa hasta recalcular | Se seguía usando la POA de la geometría anterior sin aviso |
+| **Publicación única de la energía** | Los tres botones publican juntos total, desglose, área y POA con su **origen**; reemplazar otro origen pide **confirmación** | «Ganaba el último botón» y el bypass cambiaba solo el total |
+| **Puntos 3D** | Acepta `x,y,z` y `x;y;z` (coma decimal); una línea mal escrita sale en rojo y bloquea el cálculo; aviso de punto dentro del volumen antes de calcular | Las líneas mal escritas se perdían en silencio |
+| **Estado de la sombra** | Tabla **Estado de la sombra por superficie** con 🟢/🔴/⚪, motivo y qué hacer | No se veía; además el resultado de «🌳 Calcular sombra» **se perdía** al calcular |
+| **Panel y strings del proyecto** | Bypass y MPPT arrancan con **Panel del proyecto (…)** y el N serie × N paralelo de cada superficie | Arrancaban con *ASP-ST1-T40* y 8 módulos en serie |
+| **Mapa de calor POA** | Funciona con POA por superficie | Se caía con «The truth value of a DataFrame is ambiguous» |
+| **Sombra v2** | Las horas con el sol detrás del módulo no cuentan como sombra | Se contaba sombra total en esas horas |
+
+🚩 **Después de esta actualización, en tus proyectos:**
+
+1. Presiona **⚡ Calcular POA para todas las superficies**.
+2. Presiona **🌳 Calcular sombra de todas las superficies** (antes no quedaba
+   guardada).
+3. Si usabas el bypass por superficie, vuelve a calcularlo: ahora usa el
+   panel y los strings del proyecto.
+4. Vuelve a publicar la energía con el botón que elijas: si el banner dice
+   **origen desconocido**, es energía de la versión anterior.
 
 ---
 
@@ -151,6 +172,10 @@ Debajo hay **3 pestañas principales**:
    - N serie o N paralelo inválidos;
    - un inversor sin ninguna superficie asignada.
 
+> ℹ️ El **N serie** y el **N paralelo** de cada superficie se escriben **solo
+> aquí**: los usan también el bypass por superficie, el MPPT combinado y el
+> modo físico.
+
 ### Paso 4 · Calcular la POA de todas las superficies
 
 - Presiona **⚡ Calcular POA para todas las superficies** (requiere TMY).
@@ -207,7 +232,10 @@ el **origen**:
    cambia nada todavía.
 4. Si la comparación te convence, presiona **✅ Adoptar cálculo físico**. La app
    **revalida todo de nuevo**; si algo cambió desde la comparación, rechaza la
-   adopción y te dice por qué.
+   adopción y te dice por qué. Si ya hay energía publicada de otro origen,
+   primero pregunta *¿Reemplazarla por…?*; al confirmar vuelve a revalidar.
+   El banner queda con origen **físico** y muestra el recorte en buses de
+   inversor.
 5. Nunca completes datos faltantes con valores inventados (por ejemplo,
    `p_shade = 0` "para que pase"): el bloqueo existe para impedir resultados
    falsos.
@@ -222,10 +250,15 @@ el **origen**:
   la POA.
 - Controles: Mes, Vista (Perspectiva / Fachada / Planta / Lateral), Opacidad,
   Cuadrícula de paneles y Etiquetas.
+- Solo usa POA **vigentes**. Una superficie sin POA vigente aparece en el
+  aviso ⚠️ y se colorea con una estimación desde la irradiancia global (no con
+  su POA anterior); en la tabla del mes figura con 0.
 
 ## 6. Sub-pestaña 📊 Producción por Superficie
 
-Requiere la POA del paso 4.
+Requiere la POA del paso 4. Solo usa POA **vigentes**: las superficies sin
+POA vigente aparecen en el aviso ⚠️ y se omiten de las gráficas; el bypass no
+calcula hasta que todas las superficies activas tengan POA vigente.
 
 1. **Producción mensual** en barras apiladas por superficie.
 2. **Recurso solar anual** por orientación.
@@ -252,7 +285,9 @@ Requiere la POA del paso 4.
 6. **🔀 Strings de distinta orientación en un mismo MPPT:** es **informativa**
    y no cambia la energía oficial. Usa el mismo panel y los mismos strings por
    defecto que el bypass. Asigna superficies a MPPTs y presiona
-   **🔀 Simular curva IV combinada por MPPT**. Semáforo:
+   **🔀 Simular curva IV combinada por MPPT**. El resultado indica el **panel
+   usado** (y si es distinto al del proyecto) y los strings de cada superficie
+   con su origen. Semáforo:
    - 🟢 menos de 0,5 %: compartir el MPPT es aceptable;
    - 🟠 entre 0,5 % y 2 %: evalúa si el ahorro del inversor lo compensa;
    - 🔴 más de 2 %: conviene un MPPT por orientación.
@@ -263,8 +298,9 @@ Requiere la POA del paso 4.
    🔀 Mismatch.
 2. **Horas productivas vs sombreadas** (24 h × 12 meses) por superficie. Cada
    hora se clasifica como productiva, sombreada (por el horizonte), **sin vista
-   de la fachada** (sol detrás del plano, AOI ≥ 90°) o nocturna. Con POA por
-   superficie calculada, el mapa usa la POA de esa superficie.
+   de la fachada** (sol detrás del plano, AOI ≥ 90°) o nocturna. Si la
+   superficie tiene POA **vigente**, el mapa usa su POA; si no, usa la POA
+   general de ☀️ Recurso Solar.
    *(Corregido el 24-sep-2026: antes esta sección se caía con "The truth value
    of a DataFrame is ambiguous".)*
 3. **Métricas de sombras:** compara el % de horas sombreadas (trayectoria
@@ -282,7 +318,24 @@ Requiere la POA del paso 4.
 
 ---
 
-## 8. Lista de verificación antes de ir a Financiero
+## 8. Guardar y cargar un proyecto con varias superficies
+
+- El estado multi-superficie (superficies, inversores, energía publicada y su
+  origen) se guarda con el proyecto **solo si hay energía publicada** (banner
+  ✅ activo). Publica antes de guardar si quieres conservar las superficies.
+- El **proyecto físico** solo se guarda si el origen vigente es **físico**.
+- Al cargar el proyecto, el estado multi-superficie se restaura cuando pasas
+  por **☀️ Recurso Solar** con el TMY: verás *📂 Estado multi-superficie
+  restaurado…* o, si el TMY o las firmas no coinciden, *…rechazado* con el
+  motivo.
+- La **POA por superficie no se guarda**: al abrir el proyecto aparece como
+  «POA sin calcular»; presiona **⚡ Calcular POA**.
+- Los **puntos 3D** se conservan y siguen ligados a su superficie.
+- Proyectos guardados antes del 24-sep-2026: si traían proyecto físico se
+  restauran con origen **físico**; los demás muestran **origen desconocido**
+  hasta que vuelvas a publicar.
+
+## 9. Lista de verificación antes de ir a Financiero
 
 - [ ] Recurso Solar ✅ y TMY vigente.
 - [ ] Todas las superficies reales creadas, con tilt, azimut y área correctos,
@@ -292,11 +345,14 @@ Requiere la POA del paso 4.
 - [ ] Si usas sombra 3D: escena del sitio correcto, puntos fuera del volumen
       (20–50 cm) y todas las superficies en 🟢 en *Estado de la sombra por
       superficie*.
-- [ ] Inversores: ✅ Asignaciones válidas.
+- [ ] Inversores: ✅ Asignaciones válidas, con N serie y N paralelo en cada
+      superficie.
+- [ ] Bypass y MPPT con **Panel del proyecto (…)** y strings «configurado en
+      la superficie» (o una diferencia que elegiste a propósito).
 - [ ] El banner ✅ Modo multi-superficie activo muestra el **origen** que
       elegiste (simplificado, bypass con CSV o físico) y la E_ac que esperas.
 
-## 9. Mensajes frecuentes y qué hacer
+## 10. Mensajes frecuentes y qué hacer
 
 | Mensaje | Causa | Solución |
 |---|---|---|
@@ -316,3 +372,11 @@ Requiere la POA del paso 4.
 | ⚠️ Estas superficies no tienen POA vigente… | Cambió la geometría, el montaje, el albedo, el bifacial, el TMY o la ubicación, o el cálculo falló | Presiona ⚡ Calcular POA para todas las superficies |
 | ⚠️ Financiero, Baterías y CO₂ ya usan energía … ¿Reemplazarla por…? | Hay energía publicada de otro origen | ✅ Sí, reemplazar o ✖ Cancelar |
 | ❌ Bypass no publicado; falló en: … | Una superficie no pudo simular el bypass | Corrige la causa y vuelve a calcular |
+| ❌ No se publicó / No se calculó: hay superficies activas sin POA vigente | Falta recalcular la POA | Presiona ⚡ Calcular POA para todas las superficies |
+| ❌ No se calculó: elige el panel y corrige los strings indicados arriba | Sin panel utilizable o strings sin N serie | Elige un panel y completa N serie/N paralelo en el paso 3 |
+| ❌ La superficie … no tiene N serie válido y tampoco hay N serie en 📐 Dimensionamiento | No hay de dónde tomar el N serie | Escribe N serie y N paralelo de esa superficie en el paso 3 |
+| ⚠️ '…': strings por estimación | La superficie no tiene N serie o N paralelo propios | Complétalos en el paso 3 para usar los reales |
+| ⚠️ Esta energía se publicó con una versión anterior… (origen desconocido) | Energía de antes del 24-sep-2026 | Vuelve a publicarla antes de guardar |
+| ⚠️ Se descartaron los puntos de «…»: esa superficie ya no existe | Puntos de una superficie eliminada | Ninguna acción; escribe los puntos de las superficies actuales |
+| Para calcular la sombra: … | Falta escena, TMY, corregir líneas o puntos | Haz lo que indica el aviso |
+| 📂 Estado multi-superficie rechazado… | El TMY o las firmas del proyecto guardado no coinciden | Recalcula POA, sombra y vuelve a publicar |

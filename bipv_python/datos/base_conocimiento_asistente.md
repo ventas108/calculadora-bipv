@@ -953,7 +953,7 @@ Regla del Asistente: explicar, diagnosticar y orientar, pero no adoptar
 resultados ni modificar el proyecto. La adopción solo ocurre mediante el
 botón explícito de Vista 3D.
 
-### Persistencia física y vigencia
+### Guardar y cargar un proyecto multi-superficie: persistencia y vigencia  ACTUALIZADO (24-sep-2026)
 
 - La persistencia multi-superficie usa un payload canónico firmado que separa
   entradas, resultados, firmas de vigencia y metadata de proveedores.
@@ -966,6 +966,15 @@ botón explícito de Vista 3D.
   Finanzas, CO₂, Presupuesto, Baterías y Reporte no deben consumir ese estado.
 - Una carga rechazada no activa `multisup_activo` ni debe interpretarse como
   una restauración parcial.
+- Qué se guarda (24-sep-2026): el estado multi-superficie viaja con el
+  proyecto solo si hay energía publicada (banner ✅ activo), con su origen; el
+  proyecto físico solo si el origen es físico. La POA por superficie NO se
+  guarda: tras cargar aparece «POA sin calcular» y hay que pulsar «⚡ Calcular
+  POA». Los puntos 3D se conservan ligados a su superficie. La restauración
+  ocurre al pasar por ☀️ Recurso Solar con el TMY («📂 Estado multi-superficie
+  restaurado…» o «…rechazado» con el motivo). Proyectos anteriores: con
+  proyecto físico → origen físico; sin él → origen desconocido hasta volver a
+  publicar.
 
 ### Procedimiento seguro para usar la APP
 
@@ -1013,7 +1022,7 @@ Pasos:
 
 ### POA vigente por superficie: cuándo hay que recalcularla  NUEVO (24-sep-2026)
 
-Cada POA queda firmada con la geometría (tipo, tilt, azimuth, área, montaje), el albedo, el bifacial, el TMY y la ubicación. Si algo de eso cambia, esa superficie deja de tener POA vigente: la página muestra «⚠️ Estas superficies no tienen POA vigente…» con el motivo (cambió la geometría/montaje/albedo/bifacial, cambió el TMY o la ubicación, POA sin calcular o el cálculo falló con su causa), la omite en resumen, vista 3D, producción, bypass y mapa de calor, y deshabilita «🔗 Usar sistema multi-superficie en Financiero» hasta recalcular. Renombrar una superficie NO invalida su POA. Solución: volver a pulsar «⚡ Calcular POA para todas las superficies».
+Cada POA queda firmada con la geometría (tipo, tilt, azimuth, área, montaje), el albedo, el bifacial, el TMY y la ubicación. Si algo de eso cambia, esa superficie deja de tener POA vigente: la página muestra «⚠️ Estas superficies no tienen POA vigente…» con el motivo (cambió la geometría/montaje/albedo/bifacial, cambió el TMY o la ubicación, POA sin calcular o el cálculo falló con su causa), la omite en resumen, vista 3D, producción, bypass y mapa de calor, y deshabilita «🔗 Usar sistema multi-superficie en Financiero» hasta recalcular. Renombrar una superficie NO invalida su POA. Solución: volver a pulsar «⚡ Calcular POA para todas las superficies». Al abrir un proyecto guardado la POA aparece como «POA sin calcular» porque no se guarda con el proyecto: recalcúlala igual.
 
 ### Sombra 3D por superficie (Site Designer)  ACTUALIZADO (24-sep-2026)
 

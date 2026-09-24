@@ -234,3 +234,12 @@ def test_buscar_puntos_site_designer_distancia_minima_y_sombra_v2():
     )
     texto = seccion["texto"]
     assert "10 cm" in texto and "v2" in texto
+
+
+def test_buscar_guardar_proyecto_multisuperficie():
+    seccion = _seccion_recuperada(
+        "como guardo un proyecto multi superficie",
+        "guardar y cargar un proyecto multi-superficie",
+    )
+    texto = seccion["texto"]
+    assert "energía publicada" in texto and "POA por superficie NO se" in texto
