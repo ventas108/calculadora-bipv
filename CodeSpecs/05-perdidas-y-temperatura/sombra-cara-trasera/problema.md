@@ -1,6 +1,6 @@
 # Spec — Sombra falsa con el sol detrás del plano del módulo
 
-**Estado:** en implementación
+**Estado:** validación
 
 ## Alcance de la fase
 

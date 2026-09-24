@@ -1,6 +1,6 @@
 # Tareas — Sombra falsa con el sol detrás del plano del módulo
 
-**Estado:** en implementación
+**Estado:** validación
 
 Orden obligatorio: primero las pruebas (deben fallar con `main` `9398948e`),
 luego el código, luego la validación completa.
