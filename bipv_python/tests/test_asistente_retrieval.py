@@ -192,3 +192,33 @@ def test_buscar_auditoria_integral_recupera_anexo_72_con_comparadores():
     assert "P_ac_sin_recorte_kW" not in texto  # la guía usa lenguaje operativo
     assert "multi-superficie" in texto
     assert "firma común de entradas" in texto
+
+
+# ── Vista 3D / Multi-Superficie (actualización 24-sep-2026) ─────────────────
+
+
+def test_buscar_energia_multisuperficie_advierte_que_gana_el_ultimo_boton():
+    seccion = _seccion_recuperada(
+        "que energia llega al financiero si calculo bypass por superficie despues de adoptar el calculo fisico",
+        "tres botones gana el ultimo",
+    )
+    texto = seccion["texto"]
+    assert "E_ac_anual_kWh_multisup" in texto
+    assert "Adoptar cálculo físico" in texto and "Calcular bypass por superficie" in texto
+
+
+def test_buscar_donde_estan_las_superficies_multiples_en_vista_3d():
+    seccion = _seccion_recuperada(
+        "donde estan las superficies multiples en la pagina vista 3d no las encuentro",
+        "estructura de la pagina 9",
+    )
+    assert "Diagrama Solar" in seccion["texto"]
+
+
+def test_buscar_puntos_site_designer_distancia_minima_y_sombra_v2():
+    seccion = _seccion_recuperada(
+        "donde pongo los puntos 3d de site designer para la sombra por superficie",
+        "sombra 3d por superficie",
+    )
+    texto = seccion["texto"]
+    assert "10 cm" in texto and "v2" in texto

@@ -887,17 +887,35 @@ El MPPT combinado multi-superficie (mezcla módulo → string → grupo) tambié
 
 Cuándo usarla: Solo si el proyecto tiene múltiples superficies con distintas orientaciones. Para una sola superficie (techo plano, fachada única), Página 9 no es necesaria.
 
-### Sub-tabs de la Página 9
+### Estructura de la Página 9 — dónde está cada cosa  ACTUALIZADO (24-sep-2026)
 
-Sub-tab  │  Función
+Arriba: «🏗️ Geometría del edificio» (ancho, profundidad, pisos, altura). Son parámetros solo visuales: NO afectan producción ni finanzas.
 
-⚙️ Superficies BIPV  │  Crear y configurar cada superficie (tilt, azimuth, área, tipo)
+Pestañas principales:
 
-🗺️ Vista 3D  │  Visualización 3D del edificio con mapa de POA o FS por mes
+Pestaña  │  Contenido
 
-Producción por Superficie  │  Barras apiladas, recurso solar, tabla resumen, bypass por superficie
+🗺️ Mapa del Sitio  │  Mapa 3D geolocalizado del edificio, fachada activa y orientación
 
-Diagrama Solar  │  Trayectoria solar con perfil de obstáculos (sin cambios)
+🏗️ Modelo 3D con Paneles  │  Modelo de la fachada principal con paneles, rayo solar por mes y POA mensual (en Granja fotovoltaica muestra la granja agrivoltaica)
+
+🌞 Diagrama Solar  │  AQUÍ está todo el sistema Multi-Superficie, en 4 sub-pestañas
+
+Sub-pestañas dentro de 🌞 Diagrama Solar:
+
+Sub-pestaña  │  Función
+
+⚙️ Superficies BIPV  │  Crear superficies, sombra 3D Site Designer, inversores por superficie, POA, integración al Financiero y modo físico
+
+🎨 Vista 3D Multi-Superficie  │  Visualización 3D coloreada por POA mensual o por FS del CSV
+
+📊 Producción por Superficie  │  Barras apiladas, recurso por orientación, resumen, FS del CSV, bypass por superficie y MPPT compartido
+
+🌞 Trayectoria Solar  │  Trayectoria solar, horas productivas vs sombreadas, métricas de sombra y AOI con recomendación de orientación
+
+Confusión frecuente del usuario: buscar las superficies múltiples en las dos primeras pestañas. Indícale que están en la pestaña «🌞 Diagrama Solar».
+
+Manual completo de la página: docs/MANUAL_VISTA_3D.md.
 
 ### ⚙️ Sub-tab 1 — Superficies BIPV
 
@@ -970,26 +988,65 @@ botón explícito de Vista 3D.
 8. Si una firma falla, no copiar cifras manualmente ni continuar con números
   obsoletos: recalcular el módulo que produjo el dato.
 
-Tipos de superficie disponibles:
+### Superficies BIPV: tipos, rangos y pasos  ACTUALIZADO (24-sep-2026)
 
-Tipo  │  Tilt por defecto  │  Azimuth sugerido  │  Corrección T°
+Se agregan con 4 botones rápidos: «🏢 Fachada», «🏠 Techo», «🌿 Pérgola», «🏪 Marquesina». La primera vez aparece una «Fachada principal» con el azimuth y el área del proyecto.
 
-Fachada BIPV  │  90°  │  0° / 90° / 180° / 270°  │  Confinada (k=1.3)
+Tipo  │  Tilt por defecto  │  Rango permitido de tilt
 
-Techo plano  │  10°  │  0°  │  Ventilada (k=1.0)
+🏢 Fachada  │  90°  │  70–90°
 
-Techo inclinado  │  30°  │  180° (sur)  │  Ventilada (k=1.0)
+🏠 Techo  │  10°  │  0–45°
 
-Pérgola BIPV  │  15°  │  180° (sur)  │  Semi-ventilada (k=1.1)
+🌿 Pérgola  │  5°  │  0–20°
 
-Marquesina  │  20°  │  180° (sur)  │  Semi-ventilada (k=1.1)
+🏪 Marquesina  │  20°  │  5–45°
+
+Azimuth: 0 = Norte · 90 = Este · 180 = Sur · 270 = Oeste.
 
 Pasos:
 
-- Pulsar "➕ Agregar superficie" para cada plano activo del edificio
-- Configurar nombre, tipo, área, tilt y azimuth para cada superficie
-- Pulsar " Calcular POA para todas las superficies"
-- La app calcula el perfil TMY para cada orientación
+- Agregar cada superficie con su botón y ajustar Nombre, Tipo, Tilt, Azimuth, Área y «Activa».
+- Desmarcar «Activa» excluye una superficie sin borrarla; 🗑️ la elimina.
+- Superficies con tilt ≥ 80° muestran «🔄 Montaje de la fachada» (Heredar / Adosada / Ventilada).
+- Pulsar «⚡ Calcular POA para todas las superficies» (requiere el TMY de ☀️ Recurso Solar).
+
+⚠️ Precaución: si el usuario cambia tilt, azimuth, área, tipo o montaje de una superficie DESPUÉS de calcular la POA, debe volver a pulsar «⚡ Calcular POA para todas las superficies». La POA por superficie ya calculada NO se borra sola y quedaría la de la geometría anterior.
+
+### Sombra 3D por superficie (Site Designer)  ACTUALIZADO (24-sep-2026)
+
+- Cargar la escena con «Escena Site Designer (.json)» (en Site Designer: File → Save Model File). Si aparece «La ubicación del archivo … NO coincide», es la escena de otro sitio.
+- Escribir los puntos 3D de cada superficie activa, uno por línea «x,y,z» en metros. Ejes: X = Este, Y = Norte verdadero, Z = altura.
+- Colocar los puntos sobre la superficie de módulos, 20–50 cm por delante del muro o cubierta, nunca dentro del volumen. Un punto dentro de un sólido o a menos de 10 cm de la malla deja la superficie en error geométrico y su sombra se descarta.
+- Una línea mal escrita (2 números o letras) se descarta en silencio: el usuario debe verificar que el número de líneas coincida con los puntos que quería.
+- «🌳 Calcular sombra de todas las superficies» solo se habilita con malla, TMY y al menos un punto por superficie activa.
+- La página NO muestra todavía el estado de sombra por superficie. Para comprobarlo: marcar «🧪 Preparar comparación con modelo físico»; si una superficie aparece con «falta p_shade» o «falta firma_sombra», su sombra se descartó.
+
+Algoritmo de sombra v2 (24-sep-2026): las horas en que el sol está DETRÁS del plano del módulo ya no cuentan como sombra (en esas horas no hay haz directo que sombrear; antes el rayo chocaba con el propio edificio y se contaba sombra total). Las sombras guardadas con el algoritmo anterior (v1) no se usan en el modo físico: aparecen como «falta p_shade» y hay que recalcularlas.
+
+### Inversores por superficie y modo físico  ACTUALIZADO (24-sep-2026)
+
+- «➕ Agregar inversor» crea INV-1, INV-2…; completar Eficiencia (0–1, por ejemplo 0.97) y Potencia AC (W).
+- Cada superficie activa: elegir Inversor y escribir N serie y N paralelo (enteros). El tipo dedicado/compartido se deriva solo.
+- Debe verse «✅ Asignaciones válidas». «⚠️ Configuración eléctrica incompleta» lista la causa: ID vacío o repetido, eficiencia fuera de (0, 1], superficie sin inversor, N serie/paralelo inválidos o inversor sin superficies.
+- Modo físico: marcar «🧪 Preparar comparación con modelo físico SDM + bypass» → «🧪 Calcular comparación física (sin adoptar)» → «✅ Adoptar cálculo físico». Cada superficie activa necesita n_serie, n_paralelo, inversor_id, p_shade y firma_sombra. Adoptar revalida todo; si algo cambió, rechaza con «El candidato ya no es válido».
+
+### Qué energía llega a Financiero: tres botones, gana el último  NUEVO (24-sep-2026)
+
+Tres botones escriben la MISMA clave E_ac_anual_kWh_multisup que leen Financiero, Baterías y CO₂. Gana el último que el usuario pulse:
+
+Botón  │  Dónde  │  Energía que publica
+
+«🔗 Usar sistema multi-superficie en Financiero»  │  ⚙️ Superficies BIPV  │  Simplificado: POA × área × η × PR
+
+«⚡ Calcular bypass por superficie»  │  📊 Producción por Superficie › 5  │  Simplificado corregido por bypass con el CSV de 🔀 Mismatch
+
+«✅ Adoptar cálculo físico»  │  ⚙️ Superficies BIPV › modo físico  │  Modelo físico SDM + bypass con la sombra 3D por superficie
+
+⚠️ Precaución: si el usuario adoptó el cálculo físico y después pulsa «Calcular bypass por superficie» (o «Usar sistema multi-superficie»), la cifra física queda reemplazada. Recomiéndale elegir un solo camino y que su botón sea el último antes de ir a Financiero, y comparar la E_ac del banner «✅ Modo multi-superficie activo» con la que espera. «✖ Desactivar modo multi-superficie» vuelve a la energía de superficie única.
+
+Otras precauciones: en el bypass por superficie el panel por defecto es «ASP-ST1-T40» (no necesariamente el del proyecto; hay que elegir el correcto) y su N_series es independiente del «N serie» de inversores.
+
 ### Sub-tab 3 — Producción y Bypass Multi-Superficie
 
 Secciones 1–4 (producción base)
@@ -1036,9 +1093,9 @@ Semáforo de decisión: 🟢 pérdida < 0.5% = compartir MPPT es aceptable · �
 
 ✅ Regla: si cada superficie tiene su propio MPPT, la pérdida es 0 y no necesitas esta simulación; ejecútala solo cuando el inversor tiene menos MPPTs que orientaciones.
 
-### Botón "Integrar al Financiero"
+### Botón «🔗 Usar sistema multi-superficie en Financiero»
 
-Después de calcular la POA (o el bypass), el botón " Integrar al Financiero" escribe las claves exclusivas del sistema multi-superficie en la sesión:
+Después de calcular la POA, el botón «🔗 Usar sistema multi-superficie en Financiero» (antes llamado «Integrar al Financiero») escribe las claves exclusivas del sistema multi-superficie en la sesión:
 
 Clave  │  Contenido  │  Nunca sobreescribe
 
@@ -1062,6 +1119,16 @@ Cuando multisup_activo = True, Financiero, Baterías y CO₂ usan la E_ac multi-
   3. E_ac_anual_kWh           ← simulación estándar base
 
 Un banner en cada página indica qué modo está activo.
+
+### Trayectoria Solar y mapa de calor de horas  ACTUALIZADO (24-sep-2026)
+
+Sub-pestaña «🌞 Trayectoria Solar»: 1) trayectoria del sol (azimuth vs elevación) con el perfil de horizonte de 🔀 Mismatch; 2) horas productivas vs sombreadas (24 h × 12 meses) por superficie; 3) métricas de sombra; 4) AOI mensual con recomendación de orientación.
+
+- El mapa de calor clasifica cada hora como productiva, sombreada por el horizonte, «sin vista de la fachada» (sol detrás del plano, AOI ≥ 90°) o nocturna. Con POA por superficie calculada usa la POA de esa superficie.
+- Corregido 24-sep-2026: el mapa de calor se caía con «ValueError: The truth value of a DataFrame is ambiguous» cuando ya existía POA por superficie. Si un usuario reporta ese error, la app en producción debe actualizarse a main.
+- Esta sub-pestaña usa el horizonte de 🔀 Mismatch, no la escena de Site Designer: son dos fuentes de sombra distintas y es normal que no coincidan.
+- Métricas: una diferencia menor de 2 pp entre % de horas sombreadas (trayectoria) y % de energía perdida (Mismatch) es normal; miden cosas distintas.
+- Orientación: «🧭 mejor incidencia» es solo geométrica; la recomendación que vale es «⚡ máxima energía real con TMY».
 
 ────────────────────────────────────────────────────────────
 
