@@ -47,6 +47,12 @@
   origen `bypass_csv`. El banner muestra el origen, la pérdida de bus en
   origen físico y un aviso para origen desconocido.
 
+Ajuste posterior por uso en producción (24-sep-2026): la sección del bypass
+muestra el origen vigente en su mensaje «✅ Activo en Financiero» y trae su
+propio «✖ Desactivar modo multi-superficie» (misma
+`retirar_energia_multisuperficie`), porque el banner del origen está en otra
+sub-pestaña y el usuario no lo encontraba desde el bypass.
+
 Desviaciones del diseño, con motivo:
 
 - Origen desconocido: la página pide volver a publicar antes de guardar,

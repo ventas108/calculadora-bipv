@@ -2301,12 +2301,26 @@ with tab_solar:
                                     f"{_e_ms_f:,.0f} kWh/año",
                                 )
                                 _bc2b.success(
-                                    "✅ Activo en Financiero · Baterías · CO₂"
+                                    "✅ Activo en Financiero · Baterías · CO₂ — origen: "
+                                    f"**{ETIQUETA_ORIGEN[_origen_bp]}**"
                                 )
+                                # Mismo «✖ Desactivar» del banner de ⚙️ Superficies
+                                # BIPV, aquí para no tener que cambiar de pestaña.
+                                if _bc2b.button(
+                                    "✖ Desactivar modo multi-superficie",
+                                    key="btn_desactivar_multisup_bypass",
+                                    help="Retira la energía multi-superficie: Financiero, Baterías "
+                                         "y CO₂ vuelven a la energía de superficie única.",
+                                ):
+                                    retirar_energia_multisuperficie(st.session_state)
+                                    st.session_state.pop("_multisup_publicacion_pendiente", None)
+                                    st.rerun()
                             elif _origen_bp:
                                 st.info(
                                     "ℹ️ Resultado calculado, **no publicado**: Financiero usa "
-                                    f"energía de origen {ETIQUETA_ORIGEN[_origen_bp]}."
+                                    f"energía de origen **{ETIQUETA_ORIGEN[_origen_bp]}**. El banner "
+                                    "del origen y «✖ Desactivar» están en ⚙️ Superficies BIPV › "
+                                    "🔗 Integrar al análisis financiero."
                                 )
                             else:
                                 st.info("ℹ️ Resultado calculado, **no publicado** en Financiero.")

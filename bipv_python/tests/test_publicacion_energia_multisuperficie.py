@@ -252,3 +252,17 @@ def test_pagina_usa_publicacion_central_en_los_tres_origenes():
     assert "retirar_energia_multisuperficie(st.session_state)" in src
     assert "_multisup_publicacion_pendiente" in src
     assert "ETIQUETA_ORIGEN" in src
+
+
+def test_bypass_muestra_origen_y_permite_desactivar_en_su_seccion():
+    """El usuario no veía el banner del origen (está en ⚙️ Superficies BIPV)
+    desde la sección del bypass: ahí mismo se muestra el origen vigente y un
+    «✖ Desactivar» que usa la misma retirada central."""
+    src = _PAGINA.read_text(encoding="utf-8")
+    inicio = src.index('key="btn_bypass_multisup"')
+    fin = src.index("# ── 🔀 6. Strings de distinta orientación", inicio)
+    bloque = src[inicio:fin]
+    assert 'key="btn_desactivar_multisup_bypass"' in bloque
+    assert "retirar_energia_multisuperficie(st.session_state)" in bloque
+    assert "ETIQUETA_ORIGEN[_origen_bp]" in bloque
+    assert "Activo en Financiero" in bloque and "origen" in bloque
