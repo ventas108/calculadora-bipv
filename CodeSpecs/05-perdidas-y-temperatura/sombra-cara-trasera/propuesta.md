@@ -1,6 +1,6 @@
 # Propuesta — Sombra falsa con el sol detrás del plano del módulo
 
-**Estado:** diseño
+**Estado:** en implementación
 
 ## Objetivo
 

@@ -64,6 +64,10 @@ def _run(request: dict) -> dict:
             "x": point["x_m"],
             "y": point["y_m"],
             "z": point["z_m"],
+            # Orientación opcional (Spec 05/sombra-cara-trasera): con ella el
+            # motor descarta horas con el sol detrás del plano del módulo.
+            "tilt_deg": point.get("tilt_deg"),
+            "azimuth_deg": point.get("azimuth_deg"),
         }
         for point in request["points"]
     ]

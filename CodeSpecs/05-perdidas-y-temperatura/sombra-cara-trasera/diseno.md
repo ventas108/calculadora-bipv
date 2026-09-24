@@ -1,6 +1,6 @@
 # Diseño — Sombra falsa con el sol detrás del plano del módulo
 
-**Estado:** diseño
+**Estado:** en implementación
 
 ## Entradas
 
@@ -45,7 +45,7 @@ ya usa `calcular_svf_difuso`, `vector_al_sol(90 − tilt, azimut)`.
 ## Tipos de datos
 
 - `tilt_deg`, `azimuth_deg`: `float | None`; finitos; `tilt_deg` en [0, 180],
-  `azimuth_deg` en [0, 360).
+  `azimuth_deg` en [0, 360] (360 equivale a 0, igual que el control de la página 5a).
 - Criterio por hora: `np.dot(dir_sol, normal) <= EPS_PLANO`, con
   `EPS_PLANO = 1e-9` (sol rasante sobre el plano cuenta como detrás, sin haz).
 - `sol_detras_plano`: columna `boolean` de pandas (admite `pd.NA`).

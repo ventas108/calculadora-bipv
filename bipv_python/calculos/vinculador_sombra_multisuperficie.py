@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from calculos.adaptador_multisuperficie import _CLAVES_SUPERFICIE_REQUERIDAS
 from calculos.produccion_vigencia import huella_horaria
-from calculos.sombras_3d import ESTADOS_SOMBRA_ACEPTABLES
+from calculos.sombras_3d import ESTADOS_SOMBRA_ACEPTABLES, VERSION_ALGORITMO_FS_POR_SUPERFICIE
 from calculos.transicion_multisuperficie import recalcular_agregados_proyecto, recalcular_etapa_inversor_bus, recalcular_fisica_superficie
 from calculos.adaptador_multisuperficie import construir_proyecto_desde_session_state
 
@@ -101,6 +101,38 @@ def invalidar_sombra_por_cambio_tmy(superficies_bipv: list[dict], tmy: pd.DataFr
     return salida
 
 
+def invalidar_sombra_por_version_algoritmo(superficies_bipv: list[dict]) -> list[dict]:
+    """Retira p_shade/firma_sombra de toda superficie cuya sombra calculó
+    ``sombras_3d`` con una versión de algoritmo distinta de la vigente.
+
+    Spec 05/sombra-cara-trasera: las sombras v1 contaban como sombra total
+    las horas con el sol detrás del plano del módulo; restaurarlas desde la
+    persistencia metería esa pérdida falsa en Producción. Solo aplica a
+    firmas de ``sombras_3d`` (fuente/proveedor): sombras de otras fuentes no
+    dependen de este algoritmo y se conservan.
+    """
+    salida = []
+    for sup in superficies_bipv:
+        firma = sup.get("firma_sombra")
+        de_sombras_3d = isinstance(firma, Mapping) and "sombras_3d" in (
+            firma.get("fuente"), firma.get("proveedor"),
+        )
+        if de_sombras_3d and firma.get("version_algoritmo") != VERSION_ALGORITMO_FS_POR_SUPERFICIE:
+            nueva = dict(sup)
+            for campo in _CAMPOS_SOMBRA:
+                nueva.pop(campo, None)
+            nueva["sombra_bloqueo_motivo"] = (
+                f"La superficie '{sup.get('nombre')}' tenía sombra calculada con "
+                f"un algoritmo anterior ({firma.get('version_algoritmo') or 'sin versión'}) "
+                "que contaba horas con el sol detrás del módulo -- recalcula la "
+                "sombra antes de usar el modo físico."
+            )
+            salida.append(nueva)
+        else:
+            salida.append(dict(sup))
+    return salida
+
+
 def construir_y_recalcular_proyecto_fisico(session_state: Mapping[str, Any], tmy: pd.DataFrame, lat: float, lon: float, alt_m: float) -> dict:
     if not isinstance(tmy, pd.DataFrame) or "T2m" not in tmy.columns:
         raise ValueError(
@@ -113,6 +145,7 @@ def construir_y_recalcular_proyecto_fisico(session_state: Mapping[str, Any], tmy
     superficies_frescas = invalidar_sombra_por_cambio_tmy(
         list(session_state.get("superficies_bipv") or []), tmy,
     )
+    superficies_frescas = invalidar_sombra_por_version_algoritmo(superficies_frescas)
     session_state_fresco = dict(session_state)
     session_state_fresco["superficies_bipv"] = superficies_frescas
 

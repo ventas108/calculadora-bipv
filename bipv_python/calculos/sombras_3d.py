@@ -41,7 +41,13 @@ from calculos.produccion_vigencia import fingerprint_mapping, huella_horaria
 
 ALTURA_SOLAR_MIN_DEG = 1.0   # bajo esto el sol "no cuenta" (horizonte/ruido)
 OFFSET_RAYO_M = 0.05         # separar el origen del rayo de la superficie propia
-VERSION_ALGORITMO_FS_POR_SUPERFICIE = "sombras_3d.ray_casting_por_superficie.v1"
+# v2 (Spec 05/sombra-cara-trasera, 2026-09-24): con el sol detrás del plano
+# del módulo el FS es 0. Las sombras v1 persistidas contaban esas horas como
+# sombra total y se retiran en vinculador_sombra_multisuperficie.
+VERSION_ALGORITMO_FS_POR_SUPERFICIE = "sombras_3d.ray_casting_por_superficie.v2"
+# sol · normal <= EPS_PLANO => sol detrás del plano (rasante incluido: sin haz)
+EPS_PLANO = 1e-9
+AVISO_ORIENTACION_DESCONOCIDA = "orientacion_desconocida"
 _HORAS_ANIO = 8760
 
 # ── Estados explícitos de sombra por superficie (restaurado, auditoría
@@ -353,6 +359,44 @@ def vector_al_sol(elevacion_deg, acimut_deg) -> np.ndarray:
     ], axis=-1)
 
 
+def normal_modulo(tilt_deg, azimuth_deg, contexto: str = "módulo") -> np.ndarray | None:
+    """
+    Normal unitaria del módulo (X=Este, Y=Norte, Z=arriba), o None si no se
+    conoce la orientación (ambos valores None).
+
+    Misma expresión que calcular_svf_difuso(): la normal de un panel con
+    inclinación β y azimut γ apunta con "elevación" 90°−β y acimut γ.
+    tilt: 0=horizontal, 90=vertical (0–180). azimuth: convención pvlib
+    (0=N, 90=E, 180=S, 270=O; 0–360). Nunca se asume una orientación: un
+    valor faltante, no numérico o fuera de rango lanza ValueError.
+    """
+    if tilt_deg is None and azimuth_deg is None:
+        return None
+    if tilt_deg is None or azimuth_deg is None:
+        raise ValueError(
+            f"{contexto}: la orientación requiere tilt_deg y azimuth_deg juntos "
+            f"(tilt_deg={tilt_deg!r}, azimuth_deg={azimuth_deg!r})."
+        )
+    valores = []
+    for nombre, valor in (("tilt_deg", tilt_deg), ("azimuth_deg", azimuth_deg)):
+        if isinstance(valor, (bool, str)):
+            raise ValueError(f"{contexto}: {nombre} no es numérico: {valor!r}.")
+        try:
+            numero = float(valor)
+        except (TypeError, ValueError):
+            raise ValueError(f"{contexto}: {nombre} no es numérico: {valor!r}.") from None
+        if not np.isfinite(numero):
+            raise ValueError(f"{contexto}: {nombre} no es finito: {valor!r}.")
+        valores.append(numero)
+    tilt, azimut = valores
+    if not 0.0 <= tilt <= 180.0:
+        raise ValueError(f"{contexto}: tilt_deg fuera de rango [0, 180]: {tilt!r}.")
+    if not 0.0 <= azimut <= 360.0:
+        raise ValueError(f"{contexto}: azimuth_deg fuera de rango [0, 360]: {azimut!r}.")
+    normal = vector_al_sol(90.0 - tilt, azimut)
+    return normal / np.linalg.norm(normal)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 3. Ray-casting horario
 # ══════════════════════════════════════════════════════════════════════════════
@@ -364,20 +408,47 @@ def calcular_fs_horario(
     indice_tmy: pd.DatetimeIndex | None = None,
     transparencia: float = 0.0,
     altura_min_deg: float = ALTURA_SOLAR_MIN_DEG,
+    *,
+    tilt_deg: float | None = None,
+    azimuth_deg: float | None = None,
 ) -> pd.DataFrame:
     """
-    puntos: lista de {"nombre": str, "fachada": str, "x": m, "y": m, "z": m}.
+    puntos: lista de {"nombre": str, "fachada": str, "x": m, "y": m, "z": m}
+      y, opcionalmente, "tilt_deg"/"azimuth_deg" del módulo en ese punto.
     transparencia: 0.0 = obstáculo sólido (edificio); 0.3–0.6 típico de árboles
       (fracción de luz que SÍ pasa cuando el rayo choca). FS = 1 - transparencia.
+    tilt_deg / azimuth_deg: orientación del módulo (convención pvlib) para
+      los puntos que no traen la suya. La del punto tiene prioridad.
+
+    Con orientación conocida, las horas con el sol detrás del plano del
+    módulo (sol · normal <= EPS_PLANO) salen con FS = 0 y
+    sol_detras_plano = True: ahí el haz directo ya es cero por el ángulo de
+    incidencia y un rayo hacia el sol solo chocaría con el propio edificio o
+    con algo situado detrás (Spec 05/sombra-cara-trasera). Sin orientación
+    se conserva el comportamiento anterior, sol_detras_plano queda nulo y
+    df.attrs["advertencias"] lo reporta como AVISO_ORIENTACION_DESCONOCIDA.
 
     Retorna DataFrame largo con columnas:
       Mes, Dia, Hora, Altura Solar (deg), Acimut Solar (deg),
-      FS_geometrico, FS, Fachada, Fila, Punto y pesos espaciales opcionales.
+      FS_geometrico, FS, Fachada, Fila, Punto, sol_detras_plano y pesos
+      espaciales opcionales.
     Una fila por punto × hora con sol. Horas sin sol no se exportan
     (FS irrelevante: no hay irradiancia directa que recortar).
     """
     if not puntos:
         raise ValueError("Define al menos un punto de análisis")
+
+    normales = []
+    for pt in puntos:
+        nombre_pt = pt.get("nombre") or "P1"
+        if pt.get("tilt_deg") is not None or pt.get("azimuth_deg") is not None:
+            normales.append(normal_modulo(pt.get("tilt_deg"), pt.get("azimuth_deg"),
+                                          f"Punto «{nombre_pt}»"))
+        else:
+            normales.append(normal_modulo(tilt_deg, azimuth_deg, f"Punto «{nombre_pt}»"))
+    sin_orientacion = [
+        pt.get("nombre") or "P1" for pt, n in zip(puntos, normales) if n is None
+    ]
 
     sol = posiciones_solares(lat, lon, indice_tmy)
     con_sol = sol[sol["elevacion"] > altura_min_deg]
@@ -390,12 +461,29 @@ def calcular_fs_horario(
     fs_choque = float(np.clip(1.0 - transparencia, 0.0, 1.0))
 
     filas = []
-    for pt in puntos:
+    for pt, normal in zip(puntos, normales):
         origen = np.array([float(pt["x"]), float(pt["y"]), float(pt["z"])])
-        origenes = np.repeat(origen[None, :], n_h, axis=0) + dirs * OFFSET_RAYO_M
-        hits, tri_primero, distancias = _primeras_intersecciones(
-            malla, origenes, dirs
-        )
+        if normal is None:
+            detras = None
+            delante = np.ones(n_h, dtype=bool)
+        else:
+            detras = (dirs @ normal) <= EPS_PLANO
+            delante = ~detras
+        # Solo se lanzan rayos con el sol delante del plano; el resultado de
+        # cada rayo no depende de los demás, así que esas horas quedan
+        # idénticas a las de un cálculo sin orientación.
+        hits = np.zeros(n_h, dtype=bool)
+        tri_primero = np.full(n_h, -1, dtype=np.int64)
+        distancias = np.full(n_h, np.nan, dtype=float)
+        if delante.any():
+            dirs_delante = dirs[delante]
+            origenes = (
+                np.repeat(origen[None, :], len(dirs_delante), axis=0)
+                + dirs_delante * OFFSET_RAYO_M
+            )
+            hits[delante], tri_primero[delante], distancias[delante] = (
+                _primeras_intersecciones(malla, origenes, dirs_delante)
+            )
         fs_geo = np.where(hits, fs_choque, 0.0)
         ids_caras, nombres_caras = _metadata_caras(malla)
         obstacle_ids = [
@@ -432,8 +520,21 @@ def calcular_fs_horario(
             "obstacle_id": obstacle_ids,
             "obstacle_name": obstacle_names,
             "first_hit_distance_m": np.round(distancias, 6),
+            "sol_detras_plano": (
+                pd.array([pd.NA] * n_h, dtype="boolean")
+                if detras is None else pd.array(detras, dtype="boolean")
+            ),
         }))
-    return pd.concat(filas, ignore_index=True)
+    resultado = pd.concat(filas, ignore_index=True)
+    resultado.attrs["advertencias"] = (
+        [
+            f"{AVISO_ORIENTACION_DESCONOCIDA}: sin tilt_deg/azimuth_deg para "
+            f"{', '.join(sin_orientacion)}; las horas con el sol detrás del plano "
+            "del módulo pueden contarse como sombra."
+        ]
+        if sin_orientacion else []
+    )
+    return resultado
 
 
 def calcular_fs_horario_por_superficie(
@@ -477,7 +578,26 @@ def calcular_fs_horario_por_superficie(
         # accidental -- sin ella, un punto de análisis dentro del obstáculo
         # o pegado a la malla nunca se detectaba.
         avisos_geometricos = validar_puntos(malla, puntos)
-        df = calcular_fs_horario(malla, puntos, lat, lon, indice_tmy=idx, transparencia=transparencia)
+        # Spec 05/sombra-cara-trasera: la orientación de la superficie viaja
+        # en cada punto (copias; la firma conserva los puntos originales) para
+        # que el ray-casting descarte las horas con el sol detrás del plano.
+        # Sin orientación no hay sombra aceptable para el modo físico.
+        tilt_sup, az_sup = geometria.get("tilt_deg"), geometria.get("azimuth_deg")
+        if tilt_sup is None or az_sup is None:
+            avisos_geometricos = list(avisos_geometricos) + [
+                f"La superficie '{nombre}' no tiene orientación completa "
+                "(tilt_deg y azimuth_deg); sin ella la sombra cuenta horas con "
+                "el sol detrás del módulo."
+            ]
+            puntos_calculo = puntos
+        else:
+            normal_modulo(tilt_sup, az_sup, f"Superficie '{nombre}'")
+            puntos_calculo = [
+                p if p.get("tilt_deg") is not None or p.get("azimuth_deg") is not None
+                else {**p, "tilt_deg": tilt_sup, "azimuth_deg": az_sup}
+                for p in puntos
+            ]
+        df = calcular_fs_horario(malla, puntos_calculo, lat, lon, indice_tmy=idx, transparencia=transparencia)
         serie = pd.Series(0.0, index=idx, dtype=float)
         calculadas = pd.DatetimeIndex([], tz="UTC")
         if not df.empty:

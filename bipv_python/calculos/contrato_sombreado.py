@@ -85,6 +85,19 @@ def validar_solicitud(request: dict[str, Any]) -> None:
         for coordinate in ("x_m", "y_m", "z_m"):
             if not _finite(point.get(coordinate)):
                 raise ValueError(f"{point_id}.{coordinate} no es numérico")
+        # Orientación opcional del módulo (Spec 05/sombra-cara-trasera):
+        # ambas o ninguna, numéricas y en rango (convención pvlib).
+        tilt, azimuth = point.get("tilt_deg"), point.get("azimuth_deg")
+        if tilt is not None or azimuth is not None:
+            if tilt is None or azimuth is None:
+                raise ValueError(f"{point_id}: tilt_deg y azimuth_deg deben venir juntos")
+            for key, value, maximum in (("tilt_deg", tilt, 180.0), ("azimuth_deg", azimuth, 360.0)):
+                if (
+                    isinstance(value, (bool, str))
+                    or not _finite(value)
+                    or not 0.0 <= float(value) <= maximum
+                ):
+                    raise ValueError(f"{point_id}.{key} inválido (numérico, 0–{maximum:g})")
 
     triangles = request.get("triangles", [])
     if not isinstance(triangles, list):
