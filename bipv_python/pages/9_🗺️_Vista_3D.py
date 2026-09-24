@@ -2453,10 +2453,11 @@ with tab_solar:
                 _detras  = _es_dia & (~_sombr) & (_spw["aoi"] >= 90.0)
                 _prod_hm = _es_dia & (~_sombr) & (~_detras)
 
-                _poa_hm_df = (
-                    st.session_state.get("poa_superficies", {}).get(_sup_hm.get("nombre", ""))
-                    or _poa_s
-                )
+                # `is None`, no `or`: con POA por superficie calculado el valor
+                # es un DataFrame y `or` evalúa su verdad (ValueError en pandas).
+                _poa_hm_df = st.session_state.get("poa_superficies", {}).get(_sup_hm.get("nombre", ""))
+                if _poa_hm_df is None:
+                    _poa_hm_df = _poa_s
                 if _poa_hm_df is not None and len(_poa_hm_df) == len(_spw):
                     _spw["poa_eff"] = _poa_hm_df["poa_global"].values * _prod_hm.astype(float)
                 else:
