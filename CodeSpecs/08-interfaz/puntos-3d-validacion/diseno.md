@@ -1,6 +1,6 @@
 # Diseño — Validación visible de los puntos 3D por superficie
 
-**Estado:** diseño
+**Estado:** validación
 
 ## Entradas
 

@@ -1,6 +1,6 @@
 # Spec — Validación visible de los puntos 3D por superficie
 
-**Estado:** diseño
+**Estado:** validación
 
 ## Alcance de la fase
 

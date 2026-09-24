@@ -7,11 +7,28 @@ import numpy as np
 import pandas as pd
 from calculos.adaptador_multisuperficie import _CLAVES_SUPERFICIE_REQUERIDAS
 from calculos.produccion_vigencia import huella_horaria
-from calculos.sombras_3d import ESTADOS_SOMBRA_ACEPTABLES, VERSION_ALGORITMO_FS_POR_SUPERFICIE
+from calculos.sombras_3d import (
+    ESTADO_CALCULADO_COMPLETO,
+    ESTADO_CALCULO_INCOMPLETO,
+    ESTADO_ERROR_GEOMETRICO,
+    ESTADO_SOMBRA_CERO_CALCULADA,
+    ESTADOS_SOMBRA_ACEPTABLES,
+    VERSION_ALGORITMO_FS_POR_SUPERFICIE,
+)
 from calculos.transicion_multisuperficie import recalcular_agregados_proyecto, recalcular_etapa_inversor_bus, recalcular_fisica_superficie
 from calculos.adaptador_multisuperficie import construir_proyecto_desde_session_state
 
 _CAMPOS_SOMBRA = ("p_shade", "firma_sombra", "cobertura_sombra", "advertencias_sombra", "calidad_confianza_sombra", "estado_sombra")
+# Spec 08-interfaz/estado-sombra-superficie: en un estado no aceptable solo se
+# retira la sombra horaria; el estado, las advertencias y la calidad quedan
+# para explicar el motivo en la página.
+_CAMPOS_SOMBRA_HORARIA = ("p_shade", "firma_sombra", "cobertura_sombra")
+_MOTIVOS_SOMBRA = ("sombra_invalidada_motivo", "sombra_bloqueo_motivo")
+_ETIQUETA_CAMPO = {
+    "tilt_deg": "tilt", "azimuth_deg": "azimuth", "area_m2": "área",
+    "n_serie": "N serie", "puntos_analisis": "puntos de análisis",
+    "malla_horizonte": "malla de sombra", "transparencia": "transparencia",
+}
 
 def aplicar_sombra_a_superficies(superficies_bipv: list[dict], resultados_sombra: Mapping[str, Mapping[str, Any]]) -> list[dict]:
     nombres = {s.get("nombre") for s in superficies_bipv}
@@ -25,10 +42,13 @@ def aplicar_sombra_a_superficies(superficies_bipv: list[dict], resultados_sombra
         if datos is not None:
             estado = datos.get("estado_sombra", datos.get("estado", "calculado_completo"))
             nueva["estado_sombra"] = estado
+            for campo in _MOTIVOS_SOMBRA:
+                nueva.pop(campo, None)
             if estado not in ESTADOS_SOMBRA_ACEPTABLES:
-                for campo in _CAMPOS_SOMBRA:
+                for campo in _CAMPOS_SOMBRA_HORARIA:
                     nueva.pop(campo, None)
-                nueva["estado_sombra"] = estado
+                nueva["advertencias_sombra"] = list(datos.get("advertencias", []))
+                nueva["calidad_confianza_sombra"] = datos.get("calidad_confianza", "baja")
             else:
                 nueva["p_shade"] = np.asarray(datos["p_shade"], dtype=float)
                 nueva["firma_sombra"] = dict(datos["firma_sombra"])
@@ -47,14 +67,19 @@ def preservar_o_invalidar_campos_fisicos(anterior: Mapping[str, Any] | None, edi
         if campo not in nueva and campo in anterior:
             nueva[campo] = anterior[campo]
     entradas = ("tilt_deg", "azimuth_deg", "area_m2", "n_serie", "puntos_analisis", "malla_horizonte", "transparencia")
-    cambio = any(anterior.get(c) != nueva.get(c) for c in entradas)
-    if not cambio:
-        for campo in _CAMPOS_SOMBRA:
+    cambiados = [c for c in entradas if anterior.get(c) != nueva.get(c)]
+    if not cambiados:
+        for campo in _CAMPOS_SOMBRA + ("sombra_invalidada_motivo",):
             if campo in anterior and campo not in nueva:
                 nueva[campo] = copy.deepcopy(anterior[campo])
     else:
         for campo in _CAMPOS_SOMBRA:
             nueva.pop(campo, None)
+        # Spec 08-interfaz/estado-sombra-superficie: el motivo queda visible.
+        if any(c in anterior for c in _CAMPOS_SOMBRA) or "sombra_invalidada_motivo" in anterior:
+            nueva["sombra_invalidada_motivo"] = "cambió " + ", ".join(
+                _ETIQUETA_CAMPO.get(c, c) for c in cambiados
+            )
     # Spec 05/vigencia-poa-superficie: la firma de la POA sigue a la
     # superficie mientras no cambie su geometría ni su montaje.
     geometria_poa = ("tipo", "tilt_deg", "azimuth_deg", "area_m2", "montaje_fachada")
@@ -163,3 +188,113 @@ def construir_y_recalcular_proyecto_fisico(session_state: Mapping[str, Any], tmy
         proyecto = recalcular_etapa_inversor_bus(proyecto, inv_id)
     proyecto["agregados"] = recalcular_agregados_proyecto(proyecto)
     return proyecto
+
+
+# ── Diagnóstico de sombra por superficie (Spec 08-interfaz/estado-sombra-superficie)
+ESTADO_SIN_CALCULAR = "sin_calcular"
+ESTADO_INVALIDADA_TMY = "invalidada_tmy"
+ESTADO_INVALIDADA_VERSION = "invalidada_version"
+ESTADO_INVALIDADA_GEOMETRIA = "invalidada_geometria"
+ESTADOS_DIAGNOSTICO_SOMBRA = (
+    ESTADO_CALCULADO_COMPLETO, ESTADO_SOMBRA_CERO_CALCULADA,
+    ESTADO_CALCULO_INCOMPLETO, ESTADO_ERROR_GEOMETRICO, ESTADO_SIN_CALCULAR,
+    ESTADO_INVALIDADA_TMY, ESTADO_INVALIDADA_VERSION, ESTADO_INVALIDADA_GEOMETRIA,
+)
+_RECALCULAR = "pulsa «🌳 Calcular sombra de todas las superficies»"
+_ACCION_SOMBRA = {
+    ESTADO_CALCULADO_COMPLETO: "Lista para el modo físico.",
+    ESTADO_SOMBRA_CERO_CALCULADA: "Lista para el modo físico (sin sombra en las horas con sol).",
+    ESTADO_CALCULO_INCOMPLETO: f"Revisa la malla y los puntos y {_RECALCULAR}.",
+    ESTADO_ERROR_GEOMETRICO: (
+        "Corrige los puntos indicados (20–50 cm por delante de la superficie, "
+        f"fuera del volumen) y {_RECALCULAR}."
+    ),
+    ESTADO_SIN_CALCULAR: f"Escribe sus puntos 3D y {_RECALCULAR}.",
+    ESTADO_INVALIDADA_TMY: f"Recalcula: {_RECALCULAR} con el TMY actual.",
+    ESTADO_INVALIDADA_VERSION: f"Recalcula con el algoritmo vigente: {_RECALCULAR}.",
+    ESTADO_INVALIDADA_GEOMETRIA: f"Recalcula con la geometría nueva: {_RECALCULAR}.",
+}
+
+
+def _problema_sombra_horaria(sup: Mapping[str, Any]) -> str | None:
+    """Mismas reglas de sombra que ``construir_proyecto_desde_session_state``."""
+    if sup.get("p_shade") is None or sup.get("firma_sombra") is None:
+        return "no tiene sombra horaria calculada"
+    try:
+        sombra = np.asarray(sup["p_shade"], dtype=float)
+    except (TypeError, ValueError):
+        return "la sombra horaria guardada no es numérica"
+    if sombra.shape != (8760,) or not np.isfinite(sombra).all() or ((sombra < 0) | (sombra > 1)).any():
+        return "la sombra horaria guardada no tiene 8760 valores entre 0 y 1"
+    return None
+
+
+def diagnostico_sombra_superficies(superficies_bipv: list[dict], tmy: pd.DataFrame | None) -> list[dict]:
+    """Estado de la sombra de cada superficie activa, de solo lectura.
+
+    Aplica las mismas invalidaciones que ``construir_y_recalcular_proyecto_fisico``
+    (TMY, versión del algoritmo) y las mismas validaciones de sombra que el
+    modo físico, sin considerar la configuración eléctrica. ``utilizable`` es
+    True si y solo si el modo físico aceptaría la sombra de la superficie.
+    """
+    activas = [copy.deepcopy(s) for s in superficies_bipv if s.get("activa", True)]
+    if isinstance(tmy, pd.DataFrame) and "T2m" in tmy.columns:
+        tras_tmy = invalidar_sombra_por_cambio_tmy(activas, tmy)
+    else:
+        tras_tmy = []
+        for sup in activas:
+            nueva = dict(sup)
+            if nueva.get("p_shade") is not None or nueva.get("firma_sombra") is not None:
+                for campo in _CAMPOS_SOMBRA:
+                    nueva.pop(campo, None)
+                nueva["sombra_bloqueo_motivo"] = "No hay TMY vigente para verificar la sombra."
+            tras_tmy.append(nueva)
+    tras_version = invalidar_sombra_por_version_algoritmo(tras_tmy)
+
+    salida = []
+    for original, sup_tmy, sup in zip(activas, tras_tmy, tras_version):
+        cobertura = original.get("cobertura_sombra") or {}
+        firma = original.get("firma_sombra") if isinstance(original.get("firma_sombra"), Mapping) else {}
+        diag = {
+            "nombre": original.get("nombre"),
+            "horas_con_sol_calculadas": cobertura.get("horas_con_sol_calculadas"),
+            "calidad": original.get("calidad_confianza_sombra"),
+            "n_puntos": len(firma.get("puntos_analisis") or []) or None,
+        }
+        advertencias = [str(a).removeprefix("error_geometrico: ") for a in original.get("advertencias_sombra") or []]
+        if "sombra_bloqueo_motivo" in sup_tmy and "sombra_bloqueo_motivo" not in original:
+            estado, motivo = ESTADO_INVALIDADA_TMY, (
+                "La sombra se calculó con otro TMY o ubicación."
+                if isinstance(tmy, pd.DataFrame) else "No hay TMY vigente para verificar la sombra."
+            )
+        elif "sombra_bloqueo_motivo" in sup and "sombra_bloqueo_motivo" not in sup_tmy:
+            estado = ESTADO_INVALIDADA_VERSION
+            motivo = (
+                f"La sombra se calculó con un algoritmo anterior "
+                f"({firma.get('version_algoritmo') or 'sin versión'}) que contaba horas "
+                "con el sol detrás del módulo."
+            )
+        else:
+            estado_motor = sup.get("estado_sombra") or cobertura.get("estado")
+            problema = _problema_sombra_horaria(sup)
+            if estado_motor and estado_motor not in ESTADOS_SOMBRA_ACEPTABLES:
+                estado = estado_motor
+                motivo = "; ".join(advertencias) or f"El cálculo terminó en estado «{estado_motor}»."
+            elif problema is None:
+                estado = estado_motor or ESTADO_CALCULADO_COMPLETO
+                motivo = "Sombra calculada con el TMY y el algoritmo vigentes."
+            elif sup.get("p_shade") is None and sup.get("firma_sombra") is None:
+                if original.get("sombra_invalidada_motivo"):
+                    estado = ESTADO_INVALIDADA_GEOMETRIA
+                    motivo = f"Se retiró la sombra porque {original['sombra_invalidada_motivo']}."
+                else:
+                    estado, motivo = ESTADO_SIN_CALCULAR, "Todavía no se calculó la sombra."
+            else:
+                estado, motivo = ESTADO_CALCULO_INCOMPLETO, f"La superficie {problema}."
+        utilizable = estado in ESTADOS_SOMBRA_ACEPTABLES and _problema_sombra_horaria(sup) is None
+        accion = _ACCION_SOMBRA.get(estado, f"Revisa las advertencias y {_RECALCULAR}.")
+        if estado == ESTADO_INVALIDADA_TMY and not isinstance(tmy, pd.DataFrame):
+            accion = f"Calcula ☀️ Recurso Solar y luego {_RECALCULAR}."
+        salida.append({**diag, "estado": estado, "utilizable": utilizable,
+                       "motivo": motivo, "accion": accion})
+    return salida

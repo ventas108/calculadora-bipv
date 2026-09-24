@@ -1018,13 +1018,16 @@ Cada POA queda firmada con la geometría (tipo, tilt, azimuth, área, montaje), 
 ### Sombra 3D por superficie (Site Designer)  ACTUALIZADO (24-sep-2026)
 
 - Cargar la escena con «Escena Site Designer (.json)» (en Site Designer: File → Save Model File). Si aparece «La ubicación del archivo … NO coincide», es la escena de otro sitio.
-- Escribir los puntos 3D de cada superficie activa, uno por línea «x,y,z» en metros. Ejes: X = Este, Y = Norte verdadero, Z = altura.
+- Escribir los puntos 3D de cada superficie activa, uno por línea en metros: «8.5,0,2» (coma entre valores, punto decimal) o «8,5;0;2» (punto y coma entre valores, coma decimal). Ejes: X = Este, Y = Norte verdadero, Z = altura. Los puntos quedan ligados a la superficie aunque se renombre.
 - Colocar los puntos sobre la superficie de módulos, 20–50 cm por delante del muro o cubierta, nunca dentro del volumen. Un punto dentro de un sólido o a menos de 10 cm de la malla deja la superficie en error geométrico y su sombra se descarta.
-- Una línea mal escrita (2 números o letras) se descarta en silencio: el usuario debe verificar que el número de líneas coincida con los puntos que quería.
-- «🌳 Calcular sombra de todas las superficies» solo se habilita con malla, TMY y al menos un punto por superficie activa.
-- La página NO muestra todavía el estado de sombra por superficie. Para comprobarlo: marcar «🧪 Preparar comparación con modelo físico»; si una superficie aparece con «falta p_shade» o «falta firma_sombra», su sombra se descartó.
+- Una línea mal escrita (por ejemplo «8,5,0,2», «8,0» o «8,a,2») aparece en rojo con su número de línea y el motivo, y bloquea el cálculo hasta corregirla; nunca se descarta en silencio.
+- Con la escena cargada, la página avisa ANTES de calcular si un punto está dentro del volumen o a menos de 10 cm de la malla.
+- «🌳 Calcular sombra de todas las superficies» solo se habilita con malla, TMY, sin líneas con error y al menos un punto por superficie activa; si no, un aviso dice qué falta.
+- La tabla «Estado de la sombra por superficie» (siempre visible) muestra por superficie: 🟢 utilizable, 🔴 no utilizable o ⚪ sin calcular; el estado (calculado_completo, sombra_cero_calculada, calculo_incompleto, error_geometrico, sin_calcular, invalidada_tmy, invalidada_version, invalidada_geometria), las horas con sol calculadas, la calidad, los puntos, el motivo y qué hacer. Aplica las mismas reglas que el modo físico: una superficie 🟢 no fallará por sombra en el modo físico.
+- Cambiar tilt, azimuth o área retira la sombra de esa superficie y la tabla dice «Se retiró la sombra porque cambió …».
+- Corregido 24-sep-2026: antes, el resultado de «🌳 Calcular sombra» se perdía en el mismo rerun (la sección de inversores volvía a guardar las superficies sin sombra), por eso el modo físico decía «falta p_shade» aunque se hubiera calculado.
 
-Algoritmo de sombra v2 (24-sep-2026): las horas en que el sol está DETRÁS del plano del módulo ya no cuentan como sombra (en esas horas no hay haz directo que sombrear; antes el rayo chocaba con el propio edificio y se contaba sombra total). Las sombras guardadas con el algoritmo anterior (v1) no se usan en el modo físico: aparecen como «falta p_shade» y hay que recalcularlas.
+Algoritmo de sombra v2 (24-sep-2026): las horas en que el sol está DETRÁS del plano del módulo ya no cuentan como sombra (en esas horas no hay haz directo que sombrear; antes el rayo chocaba con el propio edificio y se contaba sombra total). Las sombras guardadas con el algoritmo anterior (v1) no se usan en el modo físico: la tabla las muestra como «invalidada_version» y hay que recalcularlas.
 
 ### Inversores por superficie y modo físico  ACTUALIZADO (24-sep-2026)
 
@@ -1051,7 +1054,7 @@ Botón  │  Dónde  │  Origen publicado
 - Publicar un origen no físico o «✖ Desactivar modo multi-superficie» retiran el proyecto físico: un proyecto guardado nunca mezcla el proyecto físico con energía de otro origen.
 - Una sesión anterior sin origen aparece como «origen desconocido»: pedir al usuario que vuelva a publicar antes de guardar.
 
-Otras precauciones: en el bypass por superficie el panel por defecto es «ASP-ST1-T40» (no necesariamente el del proyecto; hay que elegir el correcto) y su N_series es independiente del «N serie» de inversores.
+Panel y strings (24-sep-2026): el bypass y el MPPT por superficie usan por defecto «Panel del proyecto (…)» de 📐 Dimensionamiento (aunque no esté en el catálogo, siempre que tenga ficha SDM completa) y el N serie × N paralelo de cada superficie. Si una superficie no los tiene, usa el N serie de Dimensionamiento y estima el paralelo por área, con aviso. Elegir otro panel queda marcado en los resultados.
 
 ### Sub-tab 3 — Producción y Bypass Multi-Superficie
 
@@ -1065,8 +1068,8 @@ Sección 5 — Bypass diodes por superficie (#46)
 
 Ejecuta el modelo de bypass individualmente para cada superficie usando su propio perfil POA y su propio perfil FS del CSV:
 
-- Seleccionar el panel fotovoltaico y N_series (compartido para todas las superficies)
-- El N_parallel de cada superficie se calcula automáticamente: N_parallel = área_m² / área_panel / N_series
+- Panel: por defecto el del proyecto; si no hay panel del proyecto o no tiene ficha SDM completa, hay que elegir uno del catálogo (el botón queda deshabilitado hasta elegirlo).
+- Strings: cada superficie usa su N serie y N paralelo de ⚙️ Superficies BIPV; si faltan, N serie de Dimensionamiento y paralelo = módulos que caben por área ÷ N serie (estimación, con aviso). La tabla de resultados muestra «Panel usado», «Panel del proyecto», «N serie × paralelo» y «Origen strings».
 - Pulsar " Calcular bypass por superficie"
 Resultado — tabla por superficie:
 
@@ -1088,8 +1091,8 @@ Sección 6 — Strings de distinta orientación en un mismo MPPT  NUEVO
 
 Cuando dos superficies con orientaciones distintas (p. ej. fachada Este y fachada Oeste) se conectan en paralelo a la MISMA entrada MPPT del inversor, éste impone un solo voltaje de operación para todas. La app resuelve hora a hora la curva IV combinada (suma de las corrientes de los strings) y la compara contra el caso ideal de un MPPT por orientación, para cuantificar cuánta energía se pierde por compartir el MPPT.
 
-- Panel fotovoltaico: solo aparecen paneles con ficha SDM completa (Motor IV).
-- Módulos en serie por string: igual para todas las superficies; los strings en paralelo se calculan por área.
+- Panel fotovoltaico: por defecto el panel del proyecto; solo se ofrecen paneles con ficha SDM completa (Motor IV).
+- Strings: los de cada superficie (N serie × N paralelo de ⚙️ Superficies BIPV); si faltan, N serie de Dimensionamiento y paralelo por área, con aviso. El resultado muestra el panel usado y el origen de los strings.
 - Nº de MPPTs del inversor: se toma automáticamente de la ficha del inversor del Dimensionamiento si existe.
 - Asignación superficie → MPPT: dos o más superficies en el mismo MPPT = strings en paralelo compartiendo voltaje.
 - Resultados: E_dc ideal vs E_dc con MPPT compartido, pérdida por mismatch total y por MPPT, y gráfica de la curva IV combinada de la peor hora del año.
@@ -2863,15 +2866,13 @@ de Página 6 automáticamente.
 
 P: ¿Cómo calcula el N_parallel para cada superficie en el bypass por superficie?
 
-R: La app divide el número estimado de módulos de cada superficie
+R: Desde el 24-sep-2026 usa el N serie y el N paralelo configurados en cada
 
-(N_panels = área_m² / área_panel) por el N_series configurado:
+superficie (⚙️ Superficies BIPV). Solo si faltan los estima: N serie de
 
-N_parallel = max(1, round(N_panels / N_series)). El N_series es el mismo
+Dimensionamiento y N_parallel = max(1, round((área_m² / área_panel) / N_series)),
 
-para todas las superficies (se asume un único tipo de string); el N_parallel
-
-varía proporcionalmente al área de cada superficie.
+con aviso de que es una estimación. La tabla muestra el origen de los strings.
 
 P: Tengo datos de PR de 3 años. ¿Por qué la degradación calculada es negativa (mejora)?
 

@@ -1,6 +1,6 @@
 # Spec — Estado de sombra visible por superficie
 
-**Estado:** diseño
+**Estado:** validación
 
 ## Alcance de la fase
 

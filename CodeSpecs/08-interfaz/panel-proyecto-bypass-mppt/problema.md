@@ -1,6 +1,6 @@
 # Spec — Panel y strings del proyecto en bypass y MPPT por superficie
 
-**Estado:** diseño
+**Estado:** validación
 
 ## Alcance de la fase
 

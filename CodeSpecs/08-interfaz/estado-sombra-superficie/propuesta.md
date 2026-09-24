@@ -1,6 +1,6 @@
 # Propuesta — Estado de sombra visible por superficie
 
-**Estado:** diseño
+**Estado:** validación
 
 ## Objetivo
 
