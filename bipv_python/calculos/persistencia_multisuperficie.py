@@ -331,6 +331,7 @@ def restaurar_multisuperficie(
         claves_resultado_permitidas = {
             "E_ac_anual_kWh_multisup", "area_total_multisup",
             "multisup_desglose", "poa_df_multisup",
+            "multisup_origen", "multisup_perdida_bus_kWh",
         }
         resultados_permitidos = {
             str(clave): (
@@ -350,6 +351,13 @@ def restaurar_multisuperficie(
         if "proyecto_fisico" in resultados:
             candidato["_multisup_proyecto_fisico"] = _restaurar_canonico(
                 resultados["proyecto_fisico"]
+            )
+            # Proyectos guardados antes de multisup_origen: un proyecto
+            # físico en el payload solo pudo venir de «Adoptar cálculo físico».
+            candidato["multisup_origen"] = "fisico"
+        elif candidato.get("multisup_origen") == "fisico":
+            return ResultadoValidacion(
+                False, ("El payload declara origen 'fisico' sin proyecto físico.",)
             )
     except (KeyError, TypeError, ValueError, PayloadMultisuperficieError) as exc:
         return ResultadoValidacion(False, (f"No se pudo preparar restauracion: {exc}",))

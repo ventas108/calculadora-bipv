@@ -155,6 +155,235 @@ def calcular_poa_todas(
     return resultado
 
 
+# ── Vigencia de la POA por superficie (Spec 05/vigencia-poa-superficie) ──────
+# La página ya no usa calcular_poa_todas (que convierte cualquier fallo en un
+# DataFrame vacío sin causa): usa calcular_poa_superficies_firmadas, que
+# indexa por uid, firma cada POA y reporta los errores. Los consumidores leen
+# solo POA vigentes a través de poas_vigentes().
+
+MOTIVO_POA_SIN_CALCULAR = "sin_calcular"
+MOTIVO_POA_GEOMETRIA = "geometria_cambiada"
+MOTIVO_POA_TMY = "tmy_cambiado"
+MOTIVO_POA_ERROR = "error_calculo"
+
+TEXTO_MOTIVO_POA = {
+    MOTIVO_POA_SIN_CALCULAR: "POA sin calcular",
+    MOTIVO_POA_GEOMETRIA: "cambió la geometría, el montaje, el albedo o el bifacial",
+    MOTIVO_POA_TMY: "cambió el TMY o la ubicación del proyecto",
+    MOTIVO_POA_ERROR: "el cálculo de la POA falló",
+}
+
+_COLUMNAS_TMY_POA = ("T2m", "G_h", "Gb_n", "Gd_h")
+
+
+def config_bifacial_superficie(
+    superficie: dict,
+    bifacial_cfg: dict | None,
+    usar_bifacial: bool,
+) -> dict | None:
+    """Configuración bifacial efectiva de UNA superficie (antes en la página).
+
+    tilt < 80° ⇒ factor de vista trasero 1.0; fachadas (tilt ≥ 80°) según su
+    montaje: Adosada ⇒ factor 0 y albedo trasero 0.05; Ventilada ⇒ 1.0;
+    Heredar ⇒ el factor de ``bifacial_cfg``. Sin bifacial activo ⇒ None.
+    """
+    if not usar_bifacial or not bifacial_cfg:
+        return None
+    cfg = dict(bifacial_cfg)
+    if float(superficie.get("tilt_deg", 0)) < 80:
+        cfg["factor_vista_trasera"] = 1.0
+    else:
+        montaje = str(superficie.get("montaje_fachada") or "Heredar de ☀️ Recurso Solar")
+        if montaje.startswith("Adosada"):
+            cfg["factor_vista_trasera"] = 0.0
+            cfg["albedo_trasero"] = 0.05
+        elif montaje.startswith("Ventilada"):
+            cfg["factor_vista_trasera"] = 1.0
+    return cfg
+
+
+def _firma_sitio_poa(tmy_df: pd.DataFrame, lat: float, lon: float, alt_m: float) -> str:
+    from calculos.produccion_vigencia import fingerprint_mapping, huella_horaria
+
+    if not isinstance(tmy_df, pd.DataFrame) or tmy_df.empty:
+        raise ValueError("El TMY no está disponible para firmar la POA.")
+    idx = pd.DatetimeIndex(tmy_df.index)
+    huellas = {
+        col: huella_horaria(idx, tmy_df[col].to_numpy(dtype=float))
+        for col in _COLUMNAS_TMY_POA if col in tmy_df.columns
+    }
+    if not huellas:
+        raise ValueError("El TMY no trae columnas de irradiancia ni T2m para firmar la POA.")
+    return fingerprint_mapping({
+        "lat": round(float(lat), 6), "lon": round(float(lon), 6),
+        "alt_m": round(float(alt_m), 1), "tmy": huellas,
+    })
+
+
+def _firma_geometria_poa(superficie: dict, albedo: float, bifacial_efectivo: dict | None) -> str:
+    from calculos.produccion_vigencia import fingerprint_mapping
+
+    return fingerprint_mapping({
+        "tipo": str(superficie.get("tipo")),
+        "tilt_deg": float(superficie["tilt_deg"]),
+        "azimuth_deg": float(superficie["azimuth_deg"]),
+        "area_m2": float(superficie["area_m2"]),
+        "montaje_fachada": str(superficie.get("montaje_fachada") or ""),
+        "albedo": float(superficie.get("albedo", albedo)),
+        "bifacial": dict(bifacial_efectivo) if bifacial_efectivo else None,
+    })
+
+
+def firma_poa_superficie(
+    superficie: dict,
+    tmy_df: pd.DataFrame,
+    lat: float,
+    lon: float,
+    alt_m: float,
+    albedo: float,
+    bifacial_cfg: dict | None,
+    usar_bifacial: bool,
+) -> dict:
+    """Firma de la POA de una superficie: ``{"sitio", "geometria", "firma"}``.
+
+    ``sitio`` cubre TMY (T2m, G_h, Gb_n, Gd_h) y ubicación; ``geometria`` cubre
+    tipo, tilt, azimuth, área, montaje, albedo y bifacial efectivo. La firma
+    combinada es la que se guarda en ``superficie["firma_poa"]``.
+    """
+    from calculos.produccion_vigencia import fingerprint_mapping
+
+    sitio = _firma_sitio_poa(tmy_df, lat, lon, alt_m)
+    geometria = _firma_geometria_poa(
+        superficie, albedo, config_bifacial_superficie(superficie, bifacial_cfg, usar_bifacial),
+    )
+    return {"sitio": sitio, "geometria": geometria,
+            "firma": fingerprint_mapping({"sitio": sitio, "geometria": geometria})}
+
+
+def calcular_poa_superficies_firmadas(
+    superficies: list[dict],
+    tmy_df: pd.DataFrame,
+    lat: float,
+    lon: float,
+    alt_m: float,
+    albedo: float = 0.20,
+    bifacial_cfg: dict | None = None,
+    usar_bifacial: bool = False,
+) -> tuple[dict, dict]:
+    """POA de cada superficie activa, indexada por ``uid`` y firmada.
+
+    Retorna ``(resultados, errores)``: ``resultados[uid] = {"nombre", "poa",
+    "firma_sitio", "firma_geometria", "firma"}``; ``errores[uid]`` = causa
+    legible del fallo. Un fallo nunca se convierte en una POA vacía.
+    """
+    resultados: dict = {}
+    errores: dict = {}
+    for sup in superficies:
+        if not sup.get("activa", True):
+            continue
+        uid = sup["uid"]
+        try:
+            firma = firma_poa_superficie(
+                sup, tmy_df, lat, lon, alt_m, albedo, bifacial_cfg, usar_bifacial,
+            )
+            bif = config_bifacial_superficie(sup, bifacial_cfg, usar_bifacial)
+            poa = calcular_poa_superficie(
+                tmy_df, lat, lon, alt_m, {**sup, "bifacial": bif} if bif else sup,
+                albedo=albedo, bifacial=None,
+            )
+            if not isinstance(poa, pd.DataFrame) or poa.empty or "poa_global" not in poa.columns:
+                raise ValueError("el cálculo no devolvió una serie 'poa_global'")
+        except Exception as exc:  # se reporta, nunca se oculta
+            errores[uid] = f"{type(exc).__name__}: {exc}"
+            continue
+        resultados[uid] = {
+            "nombre": sup.get("nombre"), "poa": poa,
+            "firma_sitio": firma["sitio"], "firma_geometria": firma["geometria"],
+            "firma": firma["firma"],
+        }
+    return resultados, errores
+
+
+def poas_vigentes(
+    superficies: list[dict],
+    poa_superficies: dict | None,
+    errores: dict | None,
+    tmy_df: pd.DataFrame | None,
+    lat: float,
+    lon: float,
+    alt_m: float,
+    albedo: float,
+    bifacial_cfg: dict | None,
+    usar_bifacial: bool,
+) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
+    """POA vigentes de las superficies activas, por NOMBRE actual.
+
+    Retorna ``(vigentes, motivos)``: ``vigentes[nombre]`` solo contiene POA
+    cuya firma coincide con la geometría, el TMY y la ubicación actuales;
+    ``motivos[nombre]`` explica por qué una superficie activa no tiene POA
+    vigente (constantes ``MOTIVO_POA_*``). Entradas antiguas indexadas por
+    nombre o sin firma cuentan como ``sin_calcular``.
+    """
+    poa_superficies = poa_superficies or {}
+    errores = errores or {}
+    vigentes: dict[str, pd.DataFrame] = {}
+    motivos: dict[str, str] = {}
+    try:
+        sitio_actual = _firma_sitio_poa(tmy_df, lat, lon, alt_m) if tmy_df is not None else None
+    except (TypeError, ValueError):
+        sitio_actual = None
+    for sup in superficies:
+        if not sup.get("activa", True):
+            continue
+        nombre = sup.get("nombre")
+        uid = sup.get("uid")
+        entrada = poa_superficies.get(uid) if uid is not None else None
+        if uid is not None and uid in errores:
+            motivos[nombre] = MOTIVO_POA_ERROR
+            continue
+        if not isinstance(entrada, dict) or "firma" not in entrada:
+            motivos[nombre] = MOTIVO_POA_SIN_CALCULAR
+            continue
+        if sitio_actual is None or entrada.get("firma_sitio") != sitio_actual:
+            motivos[nombre] = MOTIVO_POA_TMY
+            continue
+        geometria_actual = _firma_geometria_poa(
+            sup, albedo, config_bifacial_superficie(sup, bifacial_cfg, usar_bifacial),
+        )
+        if entrada.get("firma_geometria") != geometria_actual:
+            motivos[nombre] = MOTIVO_POA_GEOMETRIA
+            continue
+        vigentes[nombre] = entrada["poa"]
+    return vigentes, motivos
+
+
+def parametros_poa_estado(session_state) -> tuple[float, dict | None, bool]:
+    """``(albedo, bifacial_cfg, usar_bifacial)`` tal como los usa Vista 3D.
+
+    Fuente única para el cálculo y para la vigencia: el bifacial se aplica si
+    ☀️ Recurso Solar lo activó con configuración y el usuario no lo apagó en
+    Vista 3D (casilla ``ms_bifacial_on``, activa por defecto).
+    """
+    cfg = session_state.get("bifacial_cfg") or None
+    usar = (
+        bool(session_state.get("bifacial_activo")) and bool(cfg)
+        and bool(session_state.get("ms_bifacial_on", True))
+    )
+    return float(session_state.get("albedo_suelo", 0.20)), cfg, usar
+
+
+def poas_vigentes_estado(session_state, lat: float, lon: float, alt_m: float):
+    """``poas_vigentes`` con las superficies, POA, errores y TMY de la sesión."""
+    albedo, cfg, usar = parametros_poa_estado(session_state)
+    return poas_vigentes(
+        session_state.get("superficies_bipv") or [],
+        session_state.get("poa_superficies"),
+        session_state.get("poa_superficies_errores"),
+        session_state.get("tmy_df"),
+        lat, lon, alt_m, albedo, cfg, usar,
+    )
+
+
 def poa_mensual_superficie(poa_df: pd.DataFrame) -> list[float]:
     """
     Convierte POA horaria en lista de 12 valores mensuales [kWh/m²/mes].

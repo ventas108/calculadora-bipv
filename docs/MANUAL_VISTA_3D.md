@@ -1,8 +1,10 @@
 # Manual de uso — Página 9 🗺️ Vista 3D y Multi-Superficie
 
-Versión: 24-sep-2026 · Código de referencia: `main` `8f212e64`
-(incluye la corrección de sombra con el sol detrás del módulo, algoritmo v2, y
-la corrección del mapa de calor POA).
+Versión: 24-sep-2026 (rev. 3) · Código de referencia: rama `claude/mejoras-bipv`
+(incluye la corrección de sombra con el sol detrás del módulo, algoritmo v2, la
+corrección del mapa de calor POA, la vigencia de la POA por superficie, la
+publicación única de la energía multi-superficie, la validación de puntos 3D,
+el estado de sombra por superficie y el panel del proyecto en bypass y MPPT).
 
 ---
 
@@ -83,12 +85,12 @@ Debajo hay **3 pestañas principales**:
    - ⚠️ Si aparece *"La ubicación del archivo … NO coincide con la del
      proyecto"*, es la escena de otro sitio: no continúes.
 2. Para **cada superficie activa**, escribe los **puntos 3D** en su recuadro,
-   uno por línea, con el formato `x,y,z` en metros:
+   uno por línea, en metros. Dos formatos válidos:
    ```
-   8,0,2
-   8,0,3.5
-   8,0,5
+   8.5,0,2      ← coma entre valores, punto decimal
+   8,5;0;2      ← punto y coma entre valores, coma decimal
    ```
+   Los puntos quedan ligados a la superficie aunque la renombres.
    - Ejes: **X = Este, Y = Norte (verdadero), Z = altura.**
    - Coloca cada punto **sobre la superficie de módulos, 20–50 cm por delante
      del muro o cubierta**, nunca dentro del volumen del edificio. Un punto
@@ -98,33 +100,40 @@ Debajo hay **3 pestañas principales**:
    - Si la escena tiene un giro de norte (`northOffset`) distinto de 0, las
      coordenadas que ves en Site Designer están giradas: los puntos deben ir en
      ejes reales (Norte verdadero).
-   - ⚠️ Una línea mal escrita (por ejemplo, con 2 números o con letras) **se
-     descarta en silencio**. Revisa que el número de líneas coincida con el de
-     puntos que querías.
+   - Una línea mal escrita (por ejemplo `8,5,0,2`, `8,0` o `8,a,2`) aparece
+     en **rojo** con su número de línea y el motivo, y **bloquea el cálculo**
+     hasta que la corrijas. Nunca se descarta en silencio.
+   - Con la escena cargada, la página avisa **antes de calcular** si un punto
+     está dentro del volumen o a menos de 10 cm de la malla.
 3. Presiona **🌳 Calcular sombra de todas las superficies**. El botón solo se
-   habilita con malla, TMY y al menos un punto en cada superficie activa.
-4. Resultado: cada superficie válida queda con un factor de sombra horario
-   (`p_shade`, 8.760 valores) y su **firma de sombra**. Internamente cada
-   superficie recibe un estado:
+   habilita con malla, TMY, sin líneas con error y al menos un punto en cada
+   superficie activa; si no, un aviso dice qué falta.
+4. Revisa la tabla **Estado de la sombra por superficie** (siempre visible).
+   Usa las mismas reglas que el modo físico: una superficie 🟢 no fallará por
+   sombra en el modo físico.
 
-| Estado interno | Significado | ¿Se conserva la sombra? |
+| Estado | Significado | Semáforo |
 |---|---|---|
-| calculado_completo | Sombra calculada en todas las horas con sol | ✅ |
-| sombra_cero_calculada | Calculada y sin ninguna sombra | ✅ |
-| calculo_incompleto | Faltaron horas con sol por calcular | ❌ se descarta |
-| error_geometrico | Punto dentro o a menos de 10 cm de la malla | ❌ se descarta |
+| calculado_completo | Sombra calculada en todas las horas con sol | 🟢 |
+| sombra_cero_calculada | Calculada y sin ninguna sombra | 🟢 |
+| calculo_incompleto | Faltaron horas con sol por calcular | 🔴 |
+| error_geometrico | Punto dentro o a menos de 10 cm de la malla (dice cuál) | 🔴 |
+| invalidada_tmy | Calculada con otro TMY o ubicación | 🔴 |
+| invalidada_version | Calculada con el algoritmo anterior (v1) | 🔴 |
+| invalidada_geometria | Cambiaste tilt, azimuth o área (dice cuál) | 🔴 |
+| sin_calcular | Todavía no se calculó | ⚪ |
 
-> ⚠️ **La página todavía no muestra ese estado por superficie.** Para
-> comprobar que la sombra quedó bien, marca **🧪 Preparar comparación con
-> modelo físico** (paso 6). Si una superficie aparece con
-> *falta `p_shade`* o *falta `firma_sombra`*, su sombra se descartó: revisa
-> sus puntos (fuera del volumen, a 20–50 cm) y vuelve a calcular la sombra.
+   La columna **Qué hacer** indica la corrección de cada caso.
 
 > ℹ️ **Desde el 24-sep-2026 (algoritmo v2)**, las horas en que el sol está
 > **detrás** del plano del módulo ya no cuentan como sombra: en esas horas no
 > hay haz directo que sombrear. Las sombras guardadas con el algoritmo
-> anterior (v1) no se usan en el modo físico: aparecen como *falta `p_shade`*
-> y hay que recalcularlas con **🌳 Calcular sombra**.
+> anterior (v1) no se usan en el modo físico: la tabla las muestra como
+> *invalidada_version* y hay que recalcularlas con **🌳 Calcular sombra**.
+>
+> *(Corregido el 24-sep-2026: antes el resultado del cálculo de sombra se
+> perdía en el mismo momento de calcular, y el modo físico decía «falta
+> p_shade».)*
 
 ### Paso 3 · Inversores por superficie
 
@@ -151,31 +160,41 @@ Debajo hay **3 pestañas principales**:
 - Verás el **📊 Resumen POA por superficie** y la **⚡ Producción total del
   sistema** (con η del panel y PR del sistema).
 
-> 🚩 **Importante:** si después cambias tilt, azimuth, área, tipo o montaje de
-> una superficie, **vuelve a presionar ⚡ Calcular POA**. La POA ya calculada
-> no se borra sola y quedaría la de la geometría anterior.
+> 🚩 **La POA vigila su vigencia:** cada POA queda firmada con la geometría
+> (tipo, tilt, azimuth, área, montaje), el albedo, el bifacial, el TMY y la
+> ubicación. Si cambias algo de eso, la app muestra **⚠️ Estas superficies no
+> tienen POA vigente…** con el motivo, omite esa superficie en el resumen, la
+> vista 3D, la producción, el bypass y el mapa de calor, y deshabilita
+> **🔗 Usar sistema multi-superficie en Financiero** hasta que vuelvas a
+> presionar **⚡ Calcular POA**. Renombrar una superficie no invalida su POA.
+> Si el cálculo de una superficie falla, el aviso muestra la causa.
 
 ### Paso 5 · Llevar la energía a Financiero, Baterías y CO₂
 
-Hay **tres botones que escriben la misma cifra** de energía
-(`E_ac_anual_kWh_multisup`) que usan Financiero, Baterías y CO₂. **Manda el
-último que presiones:**
+Tres botones publican la energía multi-superficie que usan Financiero,
+Baterías y CO₂. Los tres pasan por **una sola publicación** que escribe juntos
+el total, el desglose por superficie, el área y la POA ponderada, y registra
+el **origen**:
 
-| Botón | Dónde | Qué energía publica |
+| Botón | Dónde | Origen que publica |
 |---|---|---|
-| 🔗 **Usar sistema multi-superficie en Financiero** | ⚙️ Superficies BIPV | Modelo simplificado: POA × área × η × PR |
-| ⚡ **Calcular bypass por superficie** | 📊 Producción por Superficie › 5 | Simplificado corregido por bypass con el CSV de 🔀 Mismatch |
-| ✅ **Adoptar cálculo físico** | ⚙️ Superficies BIPV › modo físico | Modelo físico SDM + bypass con la sombra 3D por superficie |
+| 🔗 **Usar sistema multi-superficie en Financiero** | ⚙️ Superficies BIPV | Simplificado: POA × área × η × PR |
+| ⚡ **Calcular bypass por superficie** | 📊 Producción por Superficie › 5 | Bypass por superficie con el CSV de 🔀 Mismatch |
+| ✅ **Adoptar cálculo físico** | ⚙️ Superficies BIPV › modo físico | Modelo físico SDM + bypass + inversores |
 
-> 🚩 **Regla para no equivocarse:** decide **un solo camino** y que su botón sea
-> **el último** que presionas antes de ir a Financiero. Por ejemplo, si
-> adoptaste el cálculo físico y luego presionas "Calcular bypass por
-> superficie", la cifra física queda reemplazada por la del bypass con CSV.
-> El banner **✅ Modo multi-superficie activo** muestra la E_ac vigente:
-> compárala con el valor que esperas.
-
-- **✖ Desactivar modo multi-superficie** devuelve Financiero, Baterías y CO₂ a
-  la energía de superficie única.
+- El banner **✅ Modo multi-superficie activo** muestra el **origen**, la E_ac
+  y el área. En origen físico muestra también el **recorte en buses de
+  inversor** (suma del desglose por superficie − total de los buses).
+- Si ya hay energía de **otro origen**, el botón no la reemplaza en silencio:
+  pregunta *¿Reemplazarla por…?* con **✅ Sí, reemplazar** o **✖ Cancelar**.
+  Al confirmar, la app vuelve a calcular con los datos actuales (el físico se
+  revalida completo).
+- Si el banner dice **origen desconocido**, la energía viene de una sesión
+  anterior a esta versión: vuelve a publicarla antes de guardar el proyecto.
+- **✖ Desactivar modo multi-superficie** retira toda la publicación y devuelve
+  Financiero, Baterías y CO₂ a la energía de superficie única. Publicar un
+  origen no físico también retira el proyecto físico: un proyecto guardado
+  nunca mezcla el proyecto físico con energía de otro origen.
 
 ### Paso 6 · Modo físico (opcional, recomendado para validar)
 
@@ -216,13 +235,23 @@ Requiere la POA del paso 4.
    superficie.
 5. **⚡ Bypass diodes por superficie:** requiere el CSV de 🔀 Mismatch
    (sección 5).
-   - ⚠️ El selector **Panel fotovoltaico** trae por defecto *ASP-ST1-T40*, que
-     **no es necesariamente el panel de tu proyecto**: elige el correcto.
-   - **N_series** es uno solo para todas las superficies y es independiente
-     del "N serie" del paso 3. Pon el mismo valor.
-   - Al calcular, **reemplaza la energía multi-superficie vigente** (ver paso 5).
+   - **Panel fotovoltaico:** por defecto *Panel del proyecto (…)* de
+     📐 Dimensionamiento, aunque no esté en el catálogo, si tiene ficha SDM
+     completa. Si no hay panel del proyecto o no tiene SDM, elige uno del
+     catálogo (el botón queda deshabilitado hasta elegirlo). Otro panel queda
+     marcado en los resultados.
+   - **Strings:** cada superficie usa su N serie × N paralelo del paso 3. Si
+     faltan, usa el N serie de Dimensionamiento y estima el paralelo por área,
+     con aviso. La tabla muestra *Panel usado*, *N serie × paralelo* y
+     *Origen strings*.
+   - Necesita POA vigente en todas las superficies activas. Si una superficie
+     falla, **no publica nada** y muestra la causa.
+   - Publica con origen *bypass por superficie*; si la energía vigente es de
+     otro origen, pide confirmación (ver paso 5). La tabla dice **✅ Activo en
+     Financiero** solo cuando su origen es el vigente.
 6. **🔀 Strings de distinta orientación en un mismo MPPT:** es **informativa**
-   y no cambia la energía oficial. Asigna superficies a MPPTs y presiona
+   y no cambia la energía oficial. Usa el mismo panel y los mismos strings por
+   defecto que el bypass. Asigna superficies a MPPTs y presiona
    **🔀 Simular curva IV combinada por MPPT**. Semáforo:
    - 🟢 menos de 0,5 %: compartir el MPPT es aceptable;
    - 🟠 entre 0,5 % y 2 %: evalúa si el ahorro del inversor lo compensa;
@@ -259,14 +288,13 @@ Requiere la POA del paso 4.
 - [ ] Todas las superficies reales creadas, con tilt, azimut y área correctos,
       y las que no existen desactivadas.
 - [ ] Montaje "Ventilada" solo donde existe físicamente.
-- [ ] POA recalculada **después** del último cambio de geometría.
+- [ ] Ningún aviso **⚠️ Estas superficies no tienen POA vigente…**.
 - [ ] Si usas sombra 3D: escena del sitio correcto, puntos fuera del volumen
-      (20–50 cm) y, en 🧪 Preparar comparación con modelo físico, ninguna
-      superficie con *falta `p_shade`*.
+      (20–50 cm) y todas las superficies en 🟢 en *Estado de la sombra por
+      superficie*.
 - [ ] Inversores: ✅ Asignaciones válidas.
-- [ ] **Un solo camino de energía** y su botón fue **el último** presionado
-      (simplificado, bypass con CSV o físico adoptado).
-- [ ] El banner ✅ Modo multi-superficie activo muestra la E_ac que esperas.
+- [ ] El banner ✅ Modo multi-superficie activo muestra el **origen** que
+      elegiste (simplificado, bypass con CSV o físico) y la E_ac que esperas.
 
 ## 9. Mensajes frecuentes y qué hacer
 
@@ -277,8 +305,14 @@ Requiere la POA del paso 4.
 | Completa la malla, el TMY y al menos un punto por superficie activa | Falta la escena, el TMY o puntos | Carga el `.json` y escribe puntos en cada superficie activa |
 | La ubicación del archivo … NO coincide | La escena es de otro sitio | Exporta la escena correcta |
 | ⚠️ Configuración eléctrica incompleta | Falta ID, eficiencia, asignación o N serie/paralelo | Corrige lo que indica el mensaje |
-| … no puede entrar al modo físico: falta 'p_shade' (o 'firma_sombra') | Sombra no calculada, descartada por error geométrico, o guardada con el algoritmo v1 | Revisa los puntos (20–50 cm fuera del volumen) y recalcula con 🌳 Calcular sombra |
+| … no puede entrar al modo físico: falta 'p_shade' (o 'firma_sombra') | La superficie no está en 🟢 en *Estado de la sombra por superficie* | Sigue la columna *Qué hacer* y recalcula con 🌳 Calcular sombra |
+| ❌ Líneas con error en … | Un punto 3D mal escrito | Corrige la línea indicada (`x,y,z` o `x;y;z`) |
+| ⚠️ El punto … está DENTRO del modelo / a N cm de la malla | Punto dentro del volumen o pegado a la malla | Muévelo 20–50 cm por delante de la superficie |
+| ⚠️ El panel del proyecto … no tiene ficha SDM completa | El bypass y el MPPT necesitan el SDM | Elige un panel del catálogo o completa la ficha en 📐 Dimensionamiento |
 | … falta 'n_serie' / 'n_paralelo' / 'inversor_id' | Configuración eléctrica de la superficie incompleta | Completa el paso 3 |
 | ❌ No se puede calcular el modo físico: … | Otro dato faltante o inválido | Completa lo indicado; no inventes valores |
 | ❌ El candidato ya no es válido… | Algo cambió después de comparar | Vuelve a calcular la comparación |
 | 🔴 Alarma de validación SDM | El panel no valida contra su ficha | Revisa 📐 Dimensionamiento / Motor IV |
+| ⚠️ Estas superficies no tienen POA vigente… | Cambió la geometría, el montaje, el albedo, el bifacial, el TMY o la ubicación, o el cálculo falló | Presiona ⚡ Calcular POA para todas las superficies |
+| ⚠️ Financiero, Baterías y CO₂ ya usan energía … ¿Reemplazarla por…? | Hay energía publicada de otro origen | ✅ Sí, reemplazar o ✖ Cancelar |
+| ❌ Bypass no publicado; falló en: … | Una superficie no pudo simular el bypass | Corrige la causa y vuelve a calcular |

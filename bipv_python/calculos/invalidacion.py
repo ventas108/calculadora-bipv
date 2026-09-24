@@ -101,6 +101,10 @@ KEYS_DERIVADOS_POA = (
     "impacto_co2_ok", "co2_anual_t", "co2_total_t", "co2_total_prom_t",
     "co2_total_marg_t", "co2_arboles_equiv", "co2_hogares_equiv",
     "co2_km_vehiculo_equiv", "co2_valor_bonos_usd",
+    # Multi-superficie (Página 9) -- origen de la energía publicada y datos
+    # que solo existen con origen físico (Spec 05/publicacion-energia-
+    # multisuperficie). Caducan junto con E_ac_anual_kWh_multisup.
+    "multisup_origen", "multisup_perdida_bus_kWh", "_multisup_proyecto_fisico",
 )
 
 # Cambiar inversor/N_serie no cambia sitio, panel, geometría, IAM, soiling,
@@ -202,6 +206,7 @@ KEYS_BYPASS_MULTISUP_RESULTADO = (
 KEYS_MULTISUP_ESTADO = (
     "E_ac_anual_kWh_multisup", "poa_df_multisup",
     "area_total_multisup", "multisup_desglose", "multisup_activo",
+    "multisup_origen", "multisup_perdida_bus_kWh", "_multisup_proyecto_fisico",
 )
 
 # ── Downstream de Motor Óptico (Página 5b) — TODO lo que depende de SU POA ───
