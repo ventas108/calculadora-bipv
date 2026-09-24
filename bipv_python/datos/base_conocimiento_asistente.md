@@ -1059,7 +1059,7 @@ Botón  │  Dónde  │  Origen publicado
 
 - El banner «✅ Modo multi-superficie activo» muestra el origen vigente, la E_ac y el área. En origen físico muestra además el recorte en buses de inversor (suma del desglose − total de buses).
 - Si ya hay energía de OTRO origen, el botón no la reemplaza en silencio: pregunta «¿Reemplazarla por…?» con «✅ Sí, reemplazar» o «✖ Cancelar». Al confirmar, la app vuelve a calcular con los datos actuales (el físico se revalida completo).
-- El bypass solo publica si todas las superficies activas se calcularon; si una falla, no publica nada. Su tabla muestra «Activo en Financiero» solo si su origen es el vigente.
+- El bypass solo publica si todas las superficies activas se calcularon; si una falla, no publica nada. Bajo su tabla muestra «✅ Activo en Financiero · Baterías · CO₂ — origen: bypass por superficie con CSV de sombreado» y un botón «✖ Desactivar modo multi-superficie» (el mismo del banner) solo si su origen es el vigente; si no, «Resultado calculado, no publicado» con el origen vigente. El banner principal del origen está en ⚙️ Superficies BIPV › 🔗 Integrar al análisis financiero.
 - Publicar un origen no físico o «✖ Desactivar modo multi-superficie» retiran el proyecto físico: un proyecto guardado nunca mezcla el proyecto físico con energía de otro origen.
 - Una sesión anterior sin origen aparece como «origen desconocido»: pedir al usuario que vuelva a publicar antes de guardar.
 

@@ -280,8 +280,12 @@ calcula hasta que todas las superficies activas tengan POA vigente.
    - Necesita POA vigente en todas las superficies activas. Si una superficie
      falla, **no publica nada** y muestra la causa.
    - Publica con origen *bypass por superficie*; si la energía vigente es de
-     otro origen, pide confirmación (ver paso 5). La tabla dice **✅ Activo en
-     Financiero** solo cuando su origen es el vigente.
+     otro origen, pide confirmación (ver paso 5).
+   - Bajo la tabla, cuando su origen es el vigente, dice **✅ Activo en
+     Financiero · Baterías · CO₂ — origen: bypass por superficie con CSV de
+     sombreado** y trae el botón **✖ Desactivar modo multi-superficie**, el
+     mismo del banner de ⚙️ Superficies BIPV. Si la energía vigente es de otro
+     origen, dice *Resultado calculado, no publicado* y el origen vigente.
 6. **🔀 Strings de distinta orientación en un mismo MPPT:** es **informativa**
    y no cambia la energía oficial. Usa el mismo panel y los mismos strings por
    defecto que el bypass. Asigna superficies a MPPTs y presiona
