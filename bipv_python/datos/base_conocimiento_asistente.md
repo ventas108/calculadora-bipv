@@ -1078,7 +1078,7 @@ Sección 5 — Bypass diodes por superficie (#46)
 Ejecuta el modelo de bypass individualmente para cada superficie usando su propio perfil POA y su propio perfil FS del CSV:
 
 - Panel: por defecto el del proyecto; si no hay panel del proyecto o no tiene ficha SDM completa, hay que elegir uno del catálogo (el botón queda deshabilitado hasta elegirlo).
-- Strings: cada superficie usa su N serie y N paralelo de ⚙️ Superficies BIPV; si faltan, N serie de Dimensionamiento y paralelo = módulos que caben por área ÷ N serie (estimación, con aviso). La tabla de resultados muestra «Panel usado», «Panel del proyecto», «N serie × paralelo» y «Origen strings».
+- Strings: cada superficie usa su N serie y N paralelo de ⚙️ Superficies BIPV; si faltan, N serie de Dimensionamiento y paralelo = módulos que caben por área ÷ N serie (estimación, con aviso). La tabla de resultados muestra «Panel usado», «Panel del proyecto», «N serie × paralelo» y «Origen strings». Los strings se escriben siempre como «8 serie × 17 paralelo» (8 módulos en serie por string, 17 strings en paralelo), en la leyenda y en las tablas del bypass y del MPPT.
 - Pulsar " Calcular bypass por superficie"
 Resultado — tabla por superficie:
 
