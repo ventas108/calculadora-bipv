@@ -13,7 +13,7 @@ Entorno: Python 3.12 (igual que CI), `bipv_python/requirements.txt`,
 - [x] Pruebas nuevas en verde: `31 passed`, incluidas las diez comprobaciones
       de coherencia con `construir_proyecto_desde_session_state`.
 - [x] Suite completa, mismo comando que CI (`python -m pytest tests/`):
-      SUITE_COMPLETA.
+      `1588 passed`, 0 fallidas, 17 min 21 s.
 - [x] `physics-guard` local: sin fórmulas ni constantes físicas del SDM
       modificadas.
 - [x] Auditoría SDD (`scripts/sdd-agent.ts`) sin documentos faltantes ni

@@ -12,7 +12,7 @@ Entorno: Python 3.12 (igual que CI), `bipv_python/requirements.txt`,
       contra `3b53a1a0` (`No module named 'calculos.puntos_3d'`).
 - [x] Pruebas nuevas en verde: `25 passed`.
 - [x] Suite completa, mismo comando que CI (`python -m pytest tests/`):
-      SUITE_COMPLETA.
+      `1588 passed`, 0 fallidas, 17 min 21 s.
 - [x] `physics-guard` local: sin fórmulas ni constantes físicas del SDM
       modificadas.
 - [x] Auditoría SDD (`scripts/sdd-agent.ts`) sin documentos faltantes ni
