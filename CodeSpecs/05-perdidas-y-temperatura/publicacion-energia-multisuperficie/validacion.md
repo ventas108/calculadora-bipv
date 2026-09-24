@@ -18,7 +18,7 @@ Entorno: Python 3.12 (igual que CI), `bipv_python/requirements.txt`,
       página de transición, mapa de calor, selección de POA/invalidación,
       Asistente, sombra v2): `159 passed`.
 - [x] Suite completa, mismo comando que CI (`python -m pytest tests/`):
-      SUITE_COMPLETA.
+      `1515 passed`, 0 fallidas, 17 min 08 s.
 - [x] `physics-guard` local: sin fórmulas ni constantes físicas del SDM
       modificadas.
 - [x] Prueba de humo de la página con `streamlit.testing.v1.AppTest`:
