@@ -30,6 +30,7 @@ requerir_login()
 from calculos.sombras_3d import (
     MAX_RAYOS,
     TRIMESH_OK,
+    VERSION_ALGORITMO_FS_POR_SUPERFICIE,
     calcular_fs_horario,
     calcular_svf_difuso,
     cargar_malla,
@@ -264,6 +265,25 @@ if _meta_sd is not None:
     for _aviso_ubi in verificar_ubicacion(_meta_sd, lat, lon):
         st.warning(_aviso_ubi, icon="⚠️")
 
+# Orientación del módulo (Spec 05/sombra-cara-trasera): con ella el
+# ray-casting descarta las horas con el sol detrás del plano del módulo, que
+# antes salían como sombra total (el rayo chocaba con el propio edificio).
+# Si la tabla de puntos trae columnas tilt_deg/azimuth_deg, esas mandan.
+co1, co2 = st.columns(2)
+with co1:
+    tilt_fs = st.number_input(
+        "Inclinación del módulo (°)", min_value=0.0, max_value=90.0,
+        value=float(st.session_state.get("tilt_fachada", 90.0)), step=1.0,
+        key="sk_fs_tilt_input",
+        help="0 = horizontal, 90 = fachada vertical. Por defecto la de ☀️ Recurso Solar.",
+    )
+with co2:
+    azimuth_fs = st.number_input(
+        "Azimut del módulo (°, 0=N 90=E 180=S 270=O)", min_value=0.0, max_value=360.0,
+        value=float(st.session_state.get("azimuth_fachada", 180.0)), step=1.0,
+        key="sk_fs_azimuth_input",
+    )
+
 if _tmy is not None:
     st.info(
         "✅ Se usará el **índice horario del TMY del proyecto** (☀️ Recurso Solar): las horas "
@@ -285,7 +305,8 @@ if archivo is not None:
         archivo.getvalue()
         + repr((escala, rot_norte, transparencia, round(lat, 4), round(lon, 4),
                 len(_tmy) if _tmy is not None else 0,
-                df_pts.to_json())).encode()
+                df_pts.to_json(), tilt_fs, azimuth_fs,
+                VERSION_ALGORITMO_FS_POR_SUPERFICIE)).encode()
     ).hexdigest()
 if st.session_state.get("sk_firma") not in (None, _firma):
     # cambió el modelo o algún parámetro → el cálculo viejo ya no es válido
@@ -321,6 +342,16 @@ def _construir_puntos(df_pts):
                 ),
                 "x": x, "y": y, "z": z,
             })
+            # Orientación por punto opcional: solo si la fila trae ambas y son
+            # numéricas; si no, el punto usa la orientación de arriba.
+            try:
+                tilt_pt = float(fila.get("tilt_deg"))
+                az_pt = float(fila.get("azimuth_deg"))
+            except (ValueError, TypeError):
+                tilt_pt = az_pt = float("nan")
+            if math.isfinite(tilt_pt) and math.isfinite(az_pt):
+                puntos[-1]["tilt_deg"] = tilt_pt
+                puntos[-1]["azimuth_deg"] = az_pt
         except (ValueError, TypeError):
             continue
     return puntos
@@ -345,6 +376,8 @@ if st.button("▶️ Calcular sombras (ray-casting)", type="primary",
                     malla, puntos, lat, lon,
                     indice_tmy=_tmy.index,
                     transparencia=transparencia,
+                    tilt_deg=tilt_fs,
+                    azimuth_deg=azimuth_fs,
                 )
                 st.session_state["sk_df_fs"] = df_fs
                 st.session_state["sk_firma"] = _firma
