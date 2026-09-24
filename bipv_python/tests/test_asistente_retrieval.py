@@ -197,14 +197,26 @@ def test_buscar_auditoria_integral_recupera_anexo_72_con_comparadores():
 # ── Vista 3D / Multi-Superficie (actualización 24-sep-2026) ─────────────────
 
 
-def test_buscar_energia_multisuperficie_advierte_que_gana_el_ultimo_boton():
+def test_buscar_energia_multisuperficie_explica_origen_y_confirmacion():
+    # Spec 05/publicacion-energia-multisuperficie: ya no «gana el último»;
+    # reemplazar otro origen pide confirmación.
     seccion = _seccion_recuperada(
         "que energia llega al financiero si calculo bypass por superficie despues de adoptar el calculo fisico",
-        "tres botones gana el ultimo",
+        "un solo origen con confirmacion",
     )
     texto = seccion["texto"]
-    assert "E_ac_anual_kWh_multisup" in texto
+    assert "E_ac_anual_kWh_multisup" in texto and "multisup_origen" in texto
     assert "Adoptar cálculo físico" in texto and "Calcular bypass por superficie" in texto
+    assert "Sí, reemplazar" in texto
+
+
+def test_buscar_poa_superficie_no_vigente_tras_cambiar_geometria():
+    seccion = _seccion_recuperada(
+        "cambie el tilt de una superficie y ahora dice que no tiene poa vigente",
+        "poa vigente por superficie",
+    )
+    texto = seccion["texto"]
+    assert "no tienen POA vigente" in texto and "Renombrar" in texto
 
 
 def test_buscar_donde_estan_las_superficies_multiples_en_vista_3d():

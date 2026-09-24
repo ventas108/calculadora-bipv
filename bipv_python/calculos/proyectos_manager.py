@@ -47,7 +47,9 @@ _CLAVES_EXCLUIR: set[str] = {
     "superficies_bipv", "multisup_inversores", "multisup_activo",
     "E_ac_anual_kWh_multisup", "area_total_multisup", "multisup_desglose",
     "poa_df_multisup", "_multisup_payload_pendiente",
-    "_multisup_proyecto_fisico",
+    "_multisup_proyecto_fisico", "multisup_origen", "multisup_perdida_bus_kWh",
+    # POA por superficie firmada (DataFrames por uid): se recalcula en Vista 3D.
+    "poa_superficies", "poa_superficies_errores", "poa_superficies_ok",
 }
 
 # Prefijos de claves temporales que se omiten siempre
@@ -234,19 +236,9 @@ def guardar_proyecto_actual(nombre: str | None = None) -> str:
     payload_multisup = None
     if st.session_state.get("multisup_activo", False):
         from calculos.persistencia_multisuperficie import construir_payload_multisuperficie
+        from calculos.publicacion_multisuperficie import resultados_multisuperficie_a_guardar
 
-        resultados_multisup = {
-            clave: st.session_state[clave]
-            for clave in (
-                "E_ac_anual_kWh_multisup", "area_total_multisup",
-                "multisup_desglose", "poa_df_multisup",
-            )
-            if clave in st.session_state
-        }
-        if st.session_state.get("_multisup_proyecto_fisico") is not None:
-            resultados_multisup["proyecto_fisico"] = st.session_state[
-                "_multisup_proyecto_fisico"
-            ]
+        resultados_multisup = resultados_multisuperficie_a_guardar(st.session_state)
         payload_multisup = construir_payload_multisuperficie(
             st.session_state, {"session_state": resultados_multisup}
         )
@@ -357,7 +349,11 @@ def cargar_proyecto(slug: str) -> str:
         "multisup_activo", "superficies_bipv", "multisup_inversores",
         "E_ac_anual_kWh_multisup", "area_total_multisup", "multisup_desglose",
         "poa_df_multisup", "_multisup_payload_pendiente",
-        "_multisup_proyecto_fisico",
+        "_multisup_proyecto_fisico", "multisup_origen", "multisup_perdida_bus_kWh",
+        "_multisup_publicacion_pendiente",
+        # POA por superficie del proyecto ANTERIOR: su firma de sitio la
+        # dejaría no vigente, pero no debe sobrevivir al cambio de proyecto.
+        "poa_superficies", "poa_superficies_errores", "poa_superficies_ok",
         "_multisup_restaurado", "_multisup_restauracion_error",
     }
     for k in _claves_reset:

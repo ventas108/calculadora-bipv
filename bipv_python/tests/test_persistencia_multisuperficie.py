@@ -299,6 +299,10 @@ def test_guardar_y_cargar_difiere_hasta_verificar_tmy(tmp_path, monkeypatch):
         "E_ac_anual_kWh_multisup": 100.0,
         "area_total_multisup": 40.0,
         "multisup_desglose": [{"nombre": "Cubierta"}],
+        # Spec 05/publicacion-energia-multisuperficie: la adopción física
+        # publica siempre su origen; sin él, el proyecto físico no se guarda.
+        "multisup_origen": "fisico",
+        "multisup_perdida_bus_kWh": 0.0,
         "_multisup_proyecto_fisico": {
             "superficies": {
                 "Cubierta": {
@@ -334,6 +338,8 @@ def test_guardar_y_cargar_difiere_hasta_verificar_tmy(tmp_path, monkeypatch):
     assert resultado.ok
     assert session_state["multisup_activo"] is True
     assert "_multisup_proyecto_fisico" in session_state
+    assert session_state["multisup_origen"] == "fisico"
+    assert session_state["multisup_perdida_bus_kWh"] == 0.0
 
 
 def test_cargar_proyecto_sin_multisuperficie_limpia_estado_fisico_previo(
@@ -418,3 +424,48 @@ def test_cargar_proyecto_limpia_payload_pendiente_no_resuelto_del_anterior(
 
     proyectos_manager.cargar_proyecto(slug_b)
     assert "_multisup_payload_pendiente" not in session_state
+
+
+# ── Spec 05/publicacion-energia-multisuperficie: origen de la energía ───────
+def _restaurar_con_resultados(resultados):
+    estado = _estado()
+    payload = construir_payload_multisuperficie(estado, {"session_state": resultados})
+    destino = {}
+    return restaurar_multisuperficie(payload, destino, {"tmy_df": estado["tmy_df"]}), destino
+
+
+def test_restaurar_conserva_el_origen_guardado():
+    resultado, destino = _restaurar_con_resultados(
+        {"E_ac_anual_kWh_multisup": 100.0, "multisup_origen": "bypass_csv"}
+    )
+    assert resultado.ok
+    assert destino["multisup_origen"] == "bypass_csv"
+    assert "_multisup_proyecto_fisico" not in destino
+
+
+def test_restaurar_proyecto_fisico_antiguo_infiere_origen_fisico():
+    resultado, destino = _restaurar_con_resultados(
+        {"E_ac_anual_kWh_multisup": 100.0, "proyecto_fisico": {"superficies": {}}}
+    )
+    assert resultado.ok and destino["multisup_origen"] == "fisico"
+
+
+def test_restaurar_rechaza_origen_fisico_sin_proyecto():
+    resultado, destino = _restaurar_con_resultados(
+        {"E_ac_anual_kWh_multisup": 100.0, "multisup_origen": "fisico"}
+    )
+    assert not resultado.ok and destino == {}
+
+
+def test_restaurar_rechaza_firma_poa_distinta():
+    estado = _estado()
+    payload = construir_payload_multisuperficie(estado, {"session_state": {}})
+    actuales = copy.deepcopy(estado["superficies_bipv"])
+    actuales[0]["firma_poa"] = "poa-otra"
+    destino = {}
+    resultado = restaurar_multisuperficie(
+        payload, destino, {"tmy_df": estado["tmy_df"], "superficies_bipv": actuales}
+    )
+    assert not resultado.ok
+    assert any("firma_poa" in e for e in resultado.errores)
+    assert destino == {}

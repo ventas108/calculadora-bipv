@@ -1,6 +1,6 @@
 # Propuesta — Vigencia de la POA por superficie
 
-**Estado:** diseño
+**Estado:** validación
 
 ## Objetivo
 

@@ -1,6 +1,6 @@
 # Diseño — Vigencia de la POA por superficie
 
-**Estado:** diseño
+**Estado:** validación
 
 ## Entradas
 

@@ -55,6 +55,13 @@ def preservar_o_invalidar_campos_fisicos(anterior: Mapping[str, Any] | None, edi
     else:
         for campo in _CAMPOS_SOMBRA:
             nueva.pop(campo, None)
+    # Spec 05/vigencia-poa-superficie: la firma de la POA sigue a la
+    # superficie mientras no cambie su geometría ni su montaje.
+    geometria_poa = ("tipo", "tilt_deg", "azimuth_deg", "area_m2", "montaje_fachada")
+    if any(anterior.get(c) != nueva.get(c) for c in geometria_poa):
+        nueva.pop("firma_poa", None)
+    elif "firma_poa" in anterior and "firma_poa" not in nueva:
+        nueva["firma_poa"] = anterior["firma_poa"]
     return nueva
 
 

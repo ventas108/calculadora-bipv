@@ -47,7 +47,20 @@ def construir_proyecto_desde_session_state(session_state: Mapping[str, Any]) -> 
     return proyecto_nuevo(inversores, salida)
 
 
-def aplicar_proyecto_a_session_state(proyecto: Mapping[str, Any], session_state: MutableMapping[str, Any]) -> None:
+def aplicar_proyecto_a_session_state(
+    proyecto: Mapping[str, Any],
+    session_state: MutableMapping[str, Any],
+    *,
+    confirmar_reemplazo: bool = True,
+) -> dict:
+    """Publica el proyecto físico con origen ``fisico`` (publicación única).
+
+    Delega en ``publicar_energia_multisuperficie``: valida todo antes de
+    escribir. ``confirmar_reemplazo=False`` deja que la página pida
+    confirmación cuando la energía vigente viene de otro origen.
+    """
+    from calculos.publicacion_multisuperficie import ORIGEN_FISICO, publicar_energia_multisuperficie
+
     agregados = proyecto.get("agregados")
     if not isinstance(agregados, Mapping):
         raise ValueError("El proyecto no tiene agregados calculados.")
@@ -57,12 +70,16 @@ def aplicar_proyecto_a_session_state(proyecto: Mapping[str, Any], session_state:
         if "E_ac_anual_kWh" not in ac or "poa_anual_kWh_m2" not in dc:
             raise ValueError(f"La superficie '{nombre}' no tiene resultados completos.")
         desglose.append({"nombre": nombre, "tipo": sup.get("tipo"), "area_m2": sup.get("area_m2"), "e_ac_kWh": ac["E_ac_anual_kWh"], "poa_kWh_m2": dc["poa_anual_kWh_m2"]})
-    session_state["E_ac_anual_kWh_multisup"] = agregados["E_ac_total_kWh"]
-    session_state["area_total_multisup"] = agregados["area_total_m2"]
-    session_state["multisup_desglose"] = desglose
-    session_state["multisup_activo"] = True
-    session_state["poa_df_multisup"] = _poa_ponderada(proyecto)
-    session_state["_multisup_proyecto_fisico"] = dict(proyecto)
+    return publicar_energia_multisuperficie(
+        session_state,
+        origen=ORIGEN_FISICO,
+        e_ac_total=agregados["E_ac_total_kWh"],
+        desglose=desglose,
+        poa_ponderada=_poa_ponderada(proyecto),
+        area_total=agregados["area_total_m2"],
+        proyecto_fisico=proyecto,
+        confirmar_reemplazo=confirmar_reemplazo,
+    )
 
 
 def _poa_ponderada(proyecto: Mapping[str, Any]) -> pd.DataFrame | None:

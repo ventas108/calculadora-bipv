@@ -1,6 +1,6 @@
 # Diseño — Publicación única de la energía multi-superficie
 
-**Estado:** diseño
+**Estado:** validación
 
 ## Entradas
 

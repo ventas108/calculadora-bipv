@@ -909,7 +909,9 @@ with tab_solar:
         from calculos.multi_superficie import (
             TIPOS_SUPERFICIE, MESES_ES as _MESES_ES,
             superficie_nueva, superficies_por_defecto,
-            calcular_poa_todas,
+            calcular_poa_superficies_firmadas, parametros_poa_estado,
+            poas_vigentes_estado, TEXTO_MOTIVO_POA, MOTIVO_POA_ERROR,
+            MOTIVO_POA_SIN_CALCULAR,
             poa_mensual_superficie, poa_anual_superficie,
             produccion_superficie,
             mapear_fachadas_csv, fs_mensual_por_superficie,
@@ -918,6 +920,10 @@ with tab_solar:
         from calculos.sitedesigner_marsh import cargar_escena_sitedesigner, verificar_ubicacion
         from calculos.sombras_3d import calcular_fs_horario_por_superficie
         from calculos.adaptador_multisuperficie import aplicar_proyecto_a_session_state
+        from calculos.publicacion_multisuperficie import (
+            ETIQUETA_ORIGEN, ORIGEN_DESCONOCIDO, ORIGEN_FISICO, origen_vigente,
+            publicar_energia_multisuperficie, retirar_energia_multisuperficie,
+        )
         from calculos.inversores_multisuperficie import validar_inversores_y_asignaciones
         from calculos.vinculador_sombra_multisuperficie import (
             aplicar_sombra_a_superficies,
@@ -931,6 +937,64 @@ with tab_solar:
         _b5c_ok = False
 
     if _b5c_ok:
+
+        def _avisar_poa_no_vigente(vigentes: dict, motivos: dict) -> None:
+            """Spec 05/vigencia-poa-superficie: dice qué superficie recalcular.
+
+            Si nunca se calculó la POA (todo «sin calcular»), la página ya
+            muestra su propio aviso de «calcula la POA».
+            """
+            if not motivos:
+                return
+            if not vigentes and all(m == MOTIVO_POA_SIN_CALCULAR for m in motivos.values()):
+                return
+            _errores = st.session_state.get("poa_superficies_errores", {})
+            _uid_nombre = {
+                s.get("nombre"): s.get("uid")
+                for s in st.session_state.get("superficies_bipv", [])
+            }
+            _lineas = []
+            for _nombre, _motivo in motivos.items():
+                _detalle = TEXTO_MOTIVO_POA[_motivo]
+                if _motivo == MOTIVO_POA_ERROR:
+                    _detalle += f" ({_errores.get(_uid_nombre.get(_nombre), 'sin detalle')})"
+                _lineas.append(f"- **{_nombre}**: {_detalle}")
+            st.warning(
+                "⚠️ Estas superficies no tienen POA vigente y se omiten aquí. "
+                "Recalcula con **⚡ Calcular POA para todas las superficies** "
+                "en ⚙️ Superficies BIPV:\n\n" + "\n".join(_lineas)
+            )
+
+        def _confirmacion_publicacion(origen: str) -> bool:
+            """Spec 05/publicacion-energia-multisuperficie: si publicar este
+            origen quedó pendiente porque la energía vigente viene de otro,
+            pregunta y retorna True cuando el usuario confirma el reemplazo.
+            Quien llama recalcula y vuelve a publicar con los datos actuales.
+            """
+            _pend = st.session_state.get("_multisup_publicacion_pendiente")
+            if not _pend or _pend.get("origen") != origen:
+                return False
+            st.warning(
+                "⚠️ Financiero, Baterías y CO₂ ya usan energía multi-superficie de "
+                f"origen **{ETIQUETA_ORIGEN[_pend['origen_vigente']]}**. "
+                f"¿Reemplazarla por **{ETIQUETA_ORIGEN[origen]}**?"
+            )
+            _c_si, _c_no = st.columns(2)
+            if _c_no.button("✖ Cancelar", key=f"btn_cancelar_publicacion_{origen}"):
+                st.session_state.pop("_multisup_publicacion_pendiente", None)
+                st.rerun()
+            return _c_si.button(
+                "✅ Sí, reemplazar", key=f"btn_confirmar_publicacion_{origen}", type="primary",
+            )
+
+        def _resolver_publicacion(resultado: dict, origen: str) -> None:
+            """Limpia la confirmación pendiente o la registra para pedirla."""
+            if resultado["publicado"]:
+                st.session_state.pop("_multisup_publicacion_pendiente", None)
+            else:
+                st.session_state["_multisup_publicacion_pendiente"] = {
+                    "origen": origen, "origen_vigente": resultado["origen_vigente"],
+                }
 
         stab_sup, stab_viz, stab_prod, stab_sol = st.tabs([
             "⚙️ Superficies BIPV",
@@ -1293,44 +1357,36 @@ with tab_solar:
 
             if _btn_poa and _tmy_sup is not None:
                 _sups_act = [s for s in _sups_actualizado if s.get("activa", True)]
-                _albedo_ms = float(st.session_state.get("albedo_suelo", 0.20))
-                # #154/#156: factor de vista trasero POR superficie.
-                # tilt < 80° (techos/pérgolas) ⇒ factor 1.0 siempre.
-                # tilt ≥ 80° (fachadas) ⇒ según su selector de montaje:
-                #   Adosada ⇒ factor 0 y albedo trasero mínimo;
-                #   Ventilada ⇒ factor 1;
-                #   Heredar ⇒ lo que se eligió en ☀️ Recurso Solar.
-                _sups_calc = _sups_act
-                if _usar_bif_ms and _bif_cfg_ms:
-                    _sups_calc = []
-                    for _s in _sups_act:
-                        _cfg_s = dict(_bif_cfg_ms)
-                        if float(_s.get("tilt_deg", 0)) < 80:
-                            _cfg_s["factor_vista_trasera"] = 1.0
-                        else:
-                            _mont = _s.get("montaje_fachada", "Heredar de ☀️ Recurso Solar")
-                            if _mont.startswith("Adosada"):
-                                _cfg_s["factor_vista_trasera"] = 0.0
-                                _cfg_s["albedo_trasero"] = 0.05
-                            elif _mont.startswith("Ventilada"):
-                                _cfg_s["factor_vista_trasera"] = 1.0
-                            # "Heredar" ⇒ conserva el factor de bifacial_cfg
-                        _sups_calc.append({**_s, "bifacial": _cfg_s})
+                # #154/#156: factor de vista trasero POR superficie (techos ⇒ 1.0;
+                # fachadas según su montaje) -- config_bifacial_superficie().
+                # Spec 05/vigencia-poa-superficie: cada POA queda indexada por
+                # uid y firmada; un fallo se reporta con su causa.
+                _albedo_ms, _bif_cfg_calc, _usar_bif_calc = parametros_poa_estado(st.session_state)
                 with st.spinner(f"Calculando POA para {len(_sups_act)} superficies..."):
-                    _poa_m = calcular_poa_todas(
-                        _sups_calc, _tmy_sup, lat, lon, alt_m,
+                    _poa_m, _poa_err = calcular_poa_superficies_firmadas(
+                        _sups_act, _tmy_sup, lat, lon, alt_m,
                         albedo=_albedo_ms,
-                        bifacial=_bif_cfg_ms if _usar_bif_ms else None,
+                        bifacial_cfg=_bif_cfg_calc,
+                        usar_bifacial=_usar_bif_calc,
                     )
-                    st.session_state["poa_superficies"]    = _poa_m
-                    st.session_state["poa_superficies_ok"] = True
-                st.success(
-                    f"✅ POA calculada para {len(_poa_m)} superficie(s)"
-                    + (" — incluye ganancia bifacial 🔄." if _usar_bif_ms else ".")
-                )
+                for _s in _sups_actualizado:
+                    if _s.get("uid") in _poa_m:
+                        _s["firma_poa"] = _poa_m[_s["uid"]]["firma"]
+                    else:
+                        _s.pop("firma_poa", None)
+                st.session_state["superficies_bipv"]        = _sups_actualizado
+                st.session_state["poa_superficies"]         = _poa_m
+                st.session_state["poa_superficies_errores"] = _poa_err
+                st.session_state["poa_superficies_ok"]      = bool(_poa_m) and not _poa_err
+                if _poa_m:
+                    st.success(
+                        f"✅ POA calculada para {len(_poa_m)} superficie(s)"
+                        + (" — incluye ganancia bifacial 🔄." if _usar_bif_calc else ".")
+                    )
 
-            # Resumen POA
-            _poa_ss = st.session_state.get("poa_superficies", {})
+            # Resumen POA -- solo POA vigentes (firma = geometría, TMY y sitio actuales)
+            _poa_ss, _motivos_poa = poas_vigentes_estado(st.session_state, lat, lon, alt_m)
+            _avisar_poa_no_vigente(_poa_ss, _motivos_poa)
             if _poa_ss:
                 st.markdown("##### 📊 Resumen POA por superficie")
                 _eta_g = float(st.session_state.get("eta_panel", 0.16))
@@ -1340,7 +1396,9 @@ with tab_solar:
                     if not _s.get("activa", True):
                         continue
                     _pd_s  = _poa_ss.get(_s["nombre"])
-                    _pa_s  = poa_anual_superficie(_pd_s) if _pd_s is not None else 0.0
+                    if _pd_s is None:
+                        continue
+                    _pa_s  = poa_anual_superficie(_pd_s)
                     _pr_s  = produccion_superficie(_pd_s, _s["area_m2"], _eta_g, _pr_g)
                     _mt_s  = TIPOS_SUPERFICIE.get(_s["tipo"], {})
                     _tot_r += _pr_s["e_ac_anual_kWh"]
@@ -1354,11 +1412,16 @@ with tab_solar:
                     })
                 if _rows_r:
                     st.dataframe(_pd.DataFrame(_rows_r), use_container_width=True, hide_index=True)
-                    st.metric("⚡ Producción total del sistema", f"{_tot_r:,.0f} kWh/año")
+                    st.metric(
+                        "⚡ Producción de las superficies con POA vigente"
+                        if _motivos_poa else "⚡ Producción total del sistema",
+                        f"{_tot_r:,.0f} kWh/año",
+                    )
                     st.caption(f"η={_eta_g*100:.0f}% · PR={_pr_g*100:.0f}%")
 
             # ── Integrar al análisis financiero ──────────────────────────────
-            if _poa_ss:
+            _origen_pub = origen_vigente(st.session_state)
+            if _poa_ss or _origen_pub:
                 st.divider()
                 st.markdown("##### 🔗 Integrar al análisis financiero")
                 st.caption(
@@ -1367,29 +1430,46 @@ with tab_solar:
                     "nunca sobreescribe `poa_df` ni `E_ac_anual_kWh` de superficie simple."
                 )
 
-                _multisup_activo = st.session_state.get("multisup_activo", False)
                 _ci1, _ci2 = st.columns([2, 3])
 
                 _btn_integrar = _ci1.button(
                     "🔗 Usar sistema multi-superficie en Financiero",
                     type="primary",
                     key="btn_integrar_multisup",
+                    disabled=bool(_motivos_poa) or not _poa_ss,
+                    help="Requiere POA vigente en TODAS las superficies activas.",
                 )
 
-                if _multisup_activo:
+                if _origen_pub:
                     _ci2.success(
-                        f"✅ Modo multi-superficie **activo** — "
+                        f"✅ Modo multi-superficie **activo** — origen: "
+                        f"**{ETIQUETA_ORIGEN[_origen_pub]}** · "
                         f"E_ac total: **{st.session_state.get('E_ac_anual_kWh_multisup', 0):,.0f} kWh/año** "
                         f"· Área: **{st.session_state.get('area_total_multisup', 0):.1f} m²**"
                     )
+                    if _origen_pub == ORIGEN_FISICO and st.session_state.get("multisup_perdida_bus_kWh"):
+                        _ci2.caption(
+                            "Recorte en buses de inversor: "
+                            f"**{st.session_state['multisup_perdida_bus_kWh']:,.1f} kWh/año** "
+                            "(suma del desglose por superficie − total de los buses)."
+                        )
+                    if _origen_pub == ORIGEN_DESCONOCIDO:
+                        _ci2.warning(
+                            "⚠️ Esta energía se publicó con una versión anterior que no "
+                            "registraba su origen. Vuelve a publicarla antes de guardar el proyecto."
+                        )
                     if _ci2.button("✖ Desactivar modo multi-superficie", key="btn_desactivar_multisup"):
-                        for _k in ("multisup_activo", "poa_df_multisup",
-                                   "E_ac_anual_kWh_multisup", "area_total_multisup",
-                                   "multisup_desglose"):
-                            st.session_state.pop(_k, None)
+                        retirar_energia_multisuperficie(st.session_state)
+                        st.session_state.pop("_multisup_publicacion_pendiente", None)
                         st.rerun()
 
-                if _btn_integrar:
+                _confirmar_simplificado = _confirmacion_publicacion("simplificado")
+                if (_btn_integrar or _confirmar_simplificado) and _motivos_poa:
+                    st.error(
+                        "❌ No se publicó: hay superficies activas sin POA vigente "
+                        f"({', '.join(_motivos_poa)}). Recalcula la POA."
+                    )
+                elif _btn_integrar or _confirmar_simplificado:
                     from calculos.multi_superficie import (
                         agregar_poa_ponderada, e_ac_total_multisup,
                     )
@@ -1403,13 +1483,21 @@ with tab_solar:
                     # E_ac y desglose
                     _res_int = e_ac_total_multisup(_poa_ss, _sups_act_int, _eta_int, _pr_int)
 
-                    # Escribir SOLO claves exclusivas
-                    st.session_state["poa_df_multisup"]         = _poa_comb          # no toca poa_df
-                    st.session_state["E_ac_anual_kWh_multisup"] = _res_int["e_ac_total_kWh"]
-                    st.session_state["area_total_multisup"]      = _res_int["area_total_m2"]
-                    st.session_state["multisup_desglose"]        = _res_int["desglose"]
-                    st.session_state["multisup_activo"]          = True
-                    st.rerun()
+                    # Publicación única: valida y escribe todas las claves juntas
+                    try:
+                        _pub_int = publicar_energia_multisuperficie(
+                            st.session_state, origen="simplificado",
+                            e_ac_total=_res_int["e_ac_total_kWh"],
+                            desglose=_res_int["desglose"],
+                            poa_ponderada=_poa_comb,
+                            area_total=_res_int["area_total_m2"],
+                            confirmar_reemplazo=_confirmar_simplificado,
+                        )
+                    except ValueError as _error_pub:
+                        st.error(f"❌ No se publicó la energía multi-superficie: {_error_pub}")
+                    else:
+                        _resolver_publicacion(_pub_int, "simplificado")
+                        st.rerun()
 
                 # ── Modo físico opt-in (recuperado, ronda 2026-09-21) ──────
                 # No altera el flujo simplificado ni escribe multisup_* hasta
@@ -1479,12 +1567,13 @@ with tab_solar:
                                 f"físico **{_e_fisico:,.1f} kWh/año** · "
                                 f"diferencia **{_dif_fisico:+.1f}%**"
                             )
-                        if st.button("✅ Adoptar cálculo físico", key="btn_adoptar_multisup_fisico", type="primary"):
+                        _confirmar_fisico = _confirmacion_publicacion(ORIGEN_FISICO)
+                        if st.button("✅ Adoptar cálculo físico", key="btn_adoptar_multisup_fisico", type="primary") or _confirmar_fisico:
                             # NUNCA se confía en que el candidato guardado
                             # (de un rerun anterior) siga siendo válido -- se
                             # recalcula y revalida TODO de cero con el
                             # session_state actual, y solo se publica si esa
-                            # revalidación pasa.
+                            # revalidación pasa (también al confirmar).
                             try:
                                 _proyecto_a_adoptar = construir_y_recalcular_proyecto_fisico(
                                     st.session_state, _tmy_sup, lat=float(lat), lon=float(lon), alt_m=float(alt_m),
@@ -1496,9 +1585,16 @@ with tab_solar:
                                     f"desde que se calculó la comparación): {_adopcion_error}"
                                 )
                             else:
-                                aplicar_proyecto_a_session_state(_proyecto_a_adoptar, st.session_state)
-                                st.success("✅ Resultado físico adoptado en las claves multi-superficie.")
-                                st.rerun()
+                                try:
+                                    _pub_fisico = aplicar_proyecto_a_session_state(
+                                        _proyecto_a_adoptar, st.session_state,
+                                        confirmar_reemplazo=_confirmar_fisico,
+                                    )
+                                except ValueError as _error_pub:
+                                    st.error(f"❌ No se publicó el resultado físico: {_error_pub}")
+                                else:
+                                    _resolver_publicacion(_pub_fisico, ORIGEN_FISICO)
+                                    st.rerun()
 
 
         # ════════════════════════════════════════════════════════════════════
@@ -1512,7 +1608,8 @@ with tab_solar:
             )
 
             _sups_viz   = [s for s in st.session_state.get("superficies_bipv", []) if s.get("activa", True)]
-            _poa_viz    = st.session_state.get("poa_superficies", {})
+            _poa_viz, _motivos_viz = poas_vigentes_estado(st.session_state, lat, lon, alt_m)
+            _avisar_poa_no_vigente(_poa_viz, _motivos_viz)
             _df_fs_viz  = st.session_state.get("df_fs_raw")
             _csv_viz_ok = st.session_state.get("csv_fs_ok", False)
 
@@ -1798,7 +1895,8 @@ with tab_solar:
             st.caption("Requiere POA calculada en ⚙️ Superficies BIPV.")
 
             _sups_p  = [s for s in st.session_state.get("superficies_bipv", []) if s.get("activa", True)]
-            _poa_p   = st.session_state.get("poa_superficies", {})
+            _poa_p, _motivos_p = poas_vigentes_estado(st.session_state, lat, lon, alt_m)
+            _avisar_poa_no_vigente(_poa_p, _motivos_p)
             _df_fsp  = st.session_state.get("df_fs_raw")
             _csv_p   = st.session_state.get("csv_fs_ok", False)
             _eta_p   = float(st.session_state.get("eta_panel", 0.16))
@@ -1993,17 +2091,26 @@ with tab_solar:
                         type="primary", key="btn_bypass_multisup",
                     )
 
-                    if _btn_bp_ms:
+                    _confirmar_bp = _confirmacion_publicacion("bypass_csv")
+                    if (_btn_bp_ms or _confirmar_bp) and _motivos_p:
+                        st.error(
+                            "❌ No se calculó: hay superficies activas sin POA vigente "
+                            f"({', '.join(_motivos_p)}). Recalcula la POA."
+                        )
+                    elif _btn_bp_ms or _confirmar_bp:
+                        from calculos.multi_superficie import agregar_poa_ponderada
                         _tmy_ms    = st.session_state.get("tmy_df")
                         _t_amb_ms  = _tmy_ms["T2m"].values
                         _tmy_idx_ms = _tmy_ms.index
                         _mapa_fach = mapear_fachadas_csv(_df_fsp, _sups_p)
                         _bp_rows, _e_bp_total = [], 0.0
+                        _desglose_bp, _errores_bp = [], []
 
                         with st.spinner("Simulando bypass diodes por superficie..."):
                             for _sp_bp in _sups_p:
                                 _poa_sp_bp = _poa_p.get(_sp_bp["nombre"])
                                 if _poa_sp_bp is None or _poa_sp_bp.empty:
+                                    _errores_bp.append(f"{_sp_bp['nombre']}: sin POA vigente")
                                     continue
                                 _g_eff_sp   = _poa_sp_bp["poa_global"].values
                                 _fach_csv_sp = _mapa_fach.get(_sp_bp["nombre"])
@@ -2031,6 +2138,13 @@ with tab_solar:
                                     _f_bp_sp  = 1.0 - (_res_sp_bp["pct_bypass_anual"] / 100.0)
                                     _eac_sp_bp = _prod_sp_bp["e_ac_anual_kWh"] * _f_bp_sp
                                     _e_bp_total += _eac_sp_bp
+                                    _desglose_bp.append({
+                                        "nombre":     _sp_bp["nombre"],
+                                        "tipo":       _sp_bp["tipo"],
+                                        "area_m2":    _sp_bp["area_m2"],
+                                        "e_ac_kWh":   _eac_sp_bp,
+                                        "poa_kWh_m2": _prod_sp_bp["poa_anual_kWh_m2"],
+                                    })
                                     _bp_rows.append({
                                         "Superficie": (
                                             f"{TIPOS_SUPERFICIE.get(_sp_bp['tipo'],{}).get('icon','')} "
@@ -2045,16 +2159,33 @@ with tab_solar:
                                         "E_ac bypass (kWh/año)": f"{_eac_sp_bp:,.0f}",
                                     })
                                 except Exception as _esp_bp:
-                                    st.warning(
-                                        f"⚠️ Error bypass {_sp_bp['nombre']}: {_esp_bp}"
-                                    )
+                                    _errores_bp.append(f"{_sp_bp['nombre']}: {_esp_bp}")
 
-                        # Actualizar clave exclusiva — no toca E_ac_anual_kWh
-                        st.session_state["E_ac_anual_kWh_multisup"]    = round(_e_bp_total, 1)
                         st.session_state["bypass_multisup_resultados"] = _bp_rows
-                        st.session_state["bypass_multisup_ok"]         = True
-                        st.session_state["multisup_activo"]            = True
-                        st.rerun()
+                        st.session_state["bypass_multisup_ok"]         = not _errores_bp
+                        if _errores_bp:
+                            # Publicar sin una superficie dejaría total, área y
+                            # desglose incoherentes: no se publica nada.
+                            st.error(
+                                "❌ Bypass no publicado; falló en: " + "; ".join(_errores_bp)
+                            )
+                        else:
+                            # Publicación única: total, desglose, área y POA
+                            # ponderada del MISMO cálculo (no toca E_ac_anual_kWh).
+                            try:
+                                _pub_bp = publicar_energia_multisuperficie(
+                                    st.session_state, origen="bypass_csv",
+                                    e_ac_total=round(_e_bp_total, 1),
+                                    desglose=_desglose_bp,
+                                    poa_ponderada=agregar_poa_ponderada(_poa_p, _sups_p),
+                                    area_total=sum(float(d["area_m2"]) for d in _desglose_bp),
+                                    confirmar_reemplazo=_confirmar_bp,
+                                )
+                            except ValueError as _error_pub:
+                                st.error(f"❌ No se publicó el bypass por superficie: {_error_pub}")
+                            else:
+                                _resolver_publicacion(_pub_bp, "bypass_csv")
+                                st.rerun()
 
                     if st.session_state.get("bypass_multisup_ok"):
                         _saved_bp = st.session_state.get("bypass_multisup_resultados", [])
@@ -2063,15 +2194,24 @@ with tab_solar:
                                 _pd.DataFrame(_saved_bp),
                                 use_container_width=True, hide_index=True,
                             )
-                            _e_ms_f = st.session_state.get("E_ac_anual_kWh_multisup", 0)
-                            _bc1b, _bc2b = st.columns(2)
-                            _bc1b.metric(
-                                "⚡ E_ac sistema con bypass",
-                                f"{_e_ms_f:,.0f} kWh/año",
-                            )
-                            _bc2b.success(
-                                "✅ Activo en Financiero · Baterías · CO₂"
-                            )
+                            _origen_bp = origen_vigente(st.session_state)
+                            if _origen_bp == "bypass_csv":
+                                _e_ms_f = st.session_state.get("E_ac_anual_kWh_multisup", 0)
+                                _bc1b, _bc2b = st.columns(2)
+                                _bc1b.metric(
+                                    "⚡ E_ac sistema con bypass",
+                                    f"{_e_ms_f:,.0f} kWh/año",
+                                )
+                                _bc2b.success(
+                                    "✅ Activo en Financiero · Baterías · CO₂"
+                                )
+                            elif _origen_bp:
+                                st.info(
+                                    "ℹ️ Resultado calculado, **no publicado**: Financiero usa "
+                                    f"energía de origen {ETIQUETA_ORIGEN[_origen_bp]}."
+                                )
+                            else:
+                                st.info("ℹ️ Resultado calculado, **no publicado** en Financiero.")
 
                 # ── 🔀 6. Strings de distinta orientación en un mismo MPPT (#157) ──
                 st.divider()
@@ -2455,7 +2595,10 @@ with tab_solar:
 
                 # `is None`, no `or`: con POA por superficie calculado el valor
                 # es un DataFrame y `or` evalúa su verdad (ValueError en pandas).
-                _poa_hm_df = st.session_state.get("poa_superficies", {}).get(_sup_hm.get("nombre", ""))
+                # Solo POA vigente de la superficie (Spec 05/vigencia-poa-superficie).
+                _poa_hm_df = poas_vigentes_estado(st.session_state, lat, lon, alt_m)[0].get(
+                    _sup_hm.get("nombre", "")
+                )
                 if _poa_hm_df is None:
                     _poa_hm_df = _poa_s
                 if _poa_hm_df is not None and len(_poa_hm_df) == len(_spw):

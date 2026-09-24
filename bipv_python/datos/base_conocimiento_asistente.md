@@ -1011,7 +1011,9 @@ Pasos:
 - Superficies con tilt ≥ 80° muestran «🔄 Montaje de la fachada» (Heredar / Adosada / Ventilada).
 - Pulsar «⚡ Calcular POA para todas las superficies» (requiere el TMY de ☀️ Recurso Solar).
 
-⚠️ Precaución: si el usuario cambia tilt, azimuth, área, tipo o montaje de una superficie DESPUÉS de calcular la POA, debe volver a pulsar «⚡ Calcular POA para todas las superficies». La POA por superficie ya calculada NO se borra sola y quedaría la de la geometría anterior.
+### POA vigente por superficie: cuándo hay que recalcularla  NUEVO (24-sep-2026)
+
+Cada POA queda firmada con la geometría (tipo, tilt, azimuth, área, montaje), el albedo, el bifacial, el TMY y la ubicación. Si algo de eso cambia, esa superficie deja de tener POA vigente: la página muestra «⚠️ Estas superficies no tienen POA vigente…» con el motivo (cambió la geometría/montaje/albedo/bifacial, cambió el TMY o la ubicación, POA sin calcular o el cálculo falló con su causa), la omite en resumen, vista 3D, producción, bypass y mapa de calor, y deshabilita «🔗 Usar sistema multi-superficie en Financiero» hasta recalcular. Renombrar una superficie NO invalida su POA. Solución: volver a pulsar «⚡ Calcular POA para todas las superficies».
 
 ### Sombra 3D por superficie (Site Designer)  ACTUALIZADO (24-sep-2026)
 
@@ -1031,19 +1033,23 @@ Algoritmo de sombra v2 (24-sep-2026): las horas en que el sol está DETRÁS del 
 - Debe verse «✅ Asignaciones válidas». «⚠️ Configuración eléctrica incompleta» lista la causa: ID vacío o repetido, eficiencia fuera de (0, 1], superficie sin inversor, N serie/paralelo inválidos o inversor sin superficies.
 - Modo físico: marcar «🧪 Preparar comparación con modelo físico SDM + bypass» → «🧪 Calcular comparación física (sin adoptar)» → «✅ Adoptar cálculo físico». Cada superficie activa necesita n_serie, n_paralelo, inversor_id, p_shade y firma_sombra. Adoptar revalida todo; si algo cambió, rechaza con «El candidato ya no es válido».
 
-### Qué energía llega a Financiero: tres botones, gana el último  NUEVO (24-sep-2026)
+### Qué energía llega a Financiero: un solo origen, con confirmación  ACTUALIZADO (24-sep-2026)
 
-Tres botones escriben la MISMA clave E_ac_anual_kWh_multisup que leen Financiero, Baterías y CO₂. Gana el último que el usuario pulse:
+Tres botones publican la energía multi-superficie (E_ac_anual_kWh_multisup, desglose, área y POA ponderada) que leen Financiero, Baterías y CO₂. Los tres pasan por una única publicación que escribe todo junto y registra el origen (multisup_origen):
 
-Botón  │  Dónde  │  Energía que publica
+Botón  │  Dónde  │  Origen publicado
 
-«🔗 Usar sistema multi-superficie en Financiero»  │  ⚙️ Superficies BIPV  │  Simplificado: POA × área × η × PR
+«🔗 Usar sistema multi-superficie en Financiero»  │  ⚙️ Superficies BIPV  │  simplificado: POA × área × η × PR
 
-«⚡ Calcular bypass por superficie»  │  📊 Producción por Superficie › 5  │  Simplificado corregido por bypass con el CSV de 🔀 Mismatch
+«⚡ Calcular bypass por superficie»  │  📊 Producción por Superficie › 5  │  bypass por superficie con el CSV de 🔀 Mismatch
 
-«✅ Adoptar cálculo físico»  │  ⚙️ Superficies BIPV › modo físico  │  Modelo físico SDM + bypass con la sombra 3D por superficie
+«✅ Adoptar cálculo físico»  │  ⚙️ Superficies BIPV › modo físico  │  modelo físico SDM + bypass + inversores
 
-⚠️ Precaución: si el usuario adoptó el cálculo físico y después pulsa «Calcular bypass por superficie» (o «Usar sistema multi-superficie»), la cifra física queda reemplazada. Recomiéndale elegir un solo camino y que su botón sea el último antes de ir a Financiero, y comparar la E_ac del banner «✅ Modo multi-superficie activo» con la que espera. «✖ Desactivar modo multi-superficie» vuelve a la energía de superficie única.
+- El banner «✅ Modo multi-superficie activo» muestra el origen vigente, la E_ac y el área. En origen físico muestra además el recorte en buses de inversor (suma del desglose − total de buses).
+- Si ya hay energía de OTRO origen, el botón no la reemplaza en silencio: pregunta «¿Reemplazarla por…?» con «✅ Sí, reemplazar» o «✖ Cancelar». Al confirmar, la app vuelve a calcular con los datos actuales (el físico se revalida completo).
+- El bypass solo publica si todas las superficies activas se calcularon; si una falla, no publica nada. Su tabla muestra «Activo en Financiero» solo si su origen es el vigente.
+- Publicar un origen no físico o «✖ Desactivar modo multi-superficie» retiran el proyecto físico: un proyecto guardado nunca mezcla el proyecto físico con energía de otro origen.
+- Una sesión anterior sin origen aparece como «origen desconocido»: pedir al usuario que vuelva a publicar antes de guardar.
 
 Otras precauciones: en el bypass por superficie el panel por defecto es «ASP-ST1-T40» (no necesariamente el del proyecto; hay que elegir el correcto) y su N_series es independiente del «N serie» de inversores.
 
@@ -1076,7 +1082,7 @@ Horas bypass/año  │  Horas al año con bypass activo en esa superficie
 
 E_ac bypass (kWh/año)  │  E_ac real corregida por bypass
 
-Clave: E_ac_anual_kWh_multisup se actualiza con la suma de E_ac_bypass de todas las superficies. Esta clave tiene prioridad máxima en Financiero, Baterías y CO₂.
+Publicación (24-sep-2026): el bypass publica con origen «bypass por superficie» el total (suma de E_ac bypass), el desglose, el área y la POA ponderada del MISMO cálculo; si una superficie falla o no tiene POA vigente, no publica nada. Si la energía vigente es de otro origen, pide confirmación antes de reemplazarla. E_ac_anual_kWh_multisup tiene prioridad máxima en Financiero, Baterías y CO₂.
 
 Sección 6 — Strings de distinta orientación en un mismo MPPT  NUEVO
 
@@ -1108,6 +1114,10 @@ area_total_multisup  │  Suma de áreas activas  │  area_fachada_m2
 multisup_desglose  │  Lista con detalle por superficie  │  —
 
 multisup_activo  │  Flag booleano  │  —
+
+multisup_origen  │  simplificado, bypass_csv o fisico  │  —
+
+Requiere POA vigente en todas las superficies activas (si no, el botón queda deshabilitado) y escribe las claves juntas en una sola publicación; si la energía vigente es de otro origen, pide confirmación.
 
 ### Prioridad en las páginas aguas abajo
 

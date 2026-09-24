@@ -1,8 +1,9 @@
 # Manual de uso — Página 9 🗺️ Vista 3D y Multi-Superficie
 
-Versión: 24-sep-2026 · Código de referencia: `main` `8f212e64`
-(incluye la corrección de sombra con el sol detrás del módulo, algoritmo v2, y
-la corrección del mapa de calor POA).
+Versión: 24-sep-2026 (rev. 2) · Código de referencia: rama `claude/mejoras-bipv`
+(incluye la corrección de sombra con el sol detrás del módulo, algoritmo v2, la
+corrección del mapa de calor POA, la vigencia de la POA por superficie y la
+publicación única de la energía multi-superficie).
 
 ---
 
@@ -151,31 +152,41 @@ Debajo hay **3 pestañas principales**:
 - Verás el **📊 Resumen POA por superficie** y la **⚡ Producción total del
   sistema** (con η del panel y PR del sistema).
 
-> 🚩 **Importante:** si después cambias tilt, azimuth, área, tipo o montaje de
-> una superficie, **vuelve a presionar ⚡ Calcular POA**. La POA ya calculada
-> no se borra sola y quedaría la de la geometría anterior.
+> 🚩 **La POA vigila su vigencia:** cada POA queda firmada con la geometría
+> (tipo, tilt, azimuth, área, montaje), el albedo, el bifacial, el TMY y la
+> ubicación. Si cambias algo de eso, la app muestra **⚠️ Estas superficies no
+> tienen POA vigente…** con el motivo, omite esa superficie en el resumen, la
+> vista 3D, la producción, el bypass y el mapa de calor, y deshabilita
+> **🔗 Usar sistema multi-superficie en Financiero** hasta que vuelvas a
+> presionar **⚡ Calcular POA**. Renombrar una superficie no invalida su POA.
+> Si el cálculo de una superficie falla, el aviso muestra la causa.
 
 ### Paso 5 · Llevar la energía a Financiero, Baterías y CO₂
 
-Hay **tres botones que escriben la misma cifra** de energía
-(`E_ac_anual_kWh_multisup`) que usan Financiero, Baterías y CO₂. **Manda el
-último que presiones:**
+Tres botones publican la energía multi-superficie que usan Financiero,
+Baterías y CO₂. Los tres pasan por **una sola publicación** que escribe juntos
+el total, el desglose por superficie, el área y la POA ponderada, y registra
+el **origen**:
 
-| Botón | Dónde | Qué energía publica |
+| Botón | Dónde | Origen que publica |
 |---|---|---|
-| 🔗 **Usar sistema multi-superficie en Financiero** | ⚙️ Superficies BIPV | Modelo simplificado: POA × área × η × PR |
-| ⚡ **Calcular bypass por superficie** | 📊 Producción por Superficie › 5 | Simplificado corregido por bypass con el CSV de 🔀 Mismatch |
-| ✅ **Adoptar cálculo físico** | ⚙️ Superficies BIPV › modo físico | Modelo físico SDM + bypass con la sombra 3D por superficie |
+| 🔗 **Usar sistema multi-superficie en Financiero** | ⚙️ Superficies BIPV | Simplificado: POA × área × η × PR |
+| ⚡ **Calcular bypass por superficie** | 📊 Producción por Superficie › 5 | Bypass por superficie con el CSV de 🔀 Mismatch |
+| ✅ **Adoptar cálculo físico** | ⚙️ Superficies BIPV › modo físico | Modelo físico SDM + bypass + inversores |
 
-> 🚩 **Regla para no equivocarse:** decide **un solo camino** y que su botón sea
-> **el último** que presionas antes de ir a Financiero. Por ejemplo, si
-> adoptaste el cálculo físico y luego presionas "Calcular bypass por
-> superficie", la cifra física queda reemplazada por la del bypass con CSV.
-> El banner **✅ Modo multi-superficie activo** muestra la E_ac vigente:
-> compárala con el valor que esperas.
-
-- **✖ Desactivar modo multi-superficie** devuelve Financiero, Baterías y CO₂ a
-  la energía de superficie única.
+- El banner **✅ Modo multi-superficie activo** muestra el **origen**, la E_ac
+  y el área. En origen físico muestra también el **recorte en buses de
+  inversor** (suma del desglose por superficie − total de los buses).
+- Si ya hay energía de **otro origen**, el botón no la reemplaza en silencio:
+  pregunta *¿Reemplazarla por…?* con **✅ Sí, reemplazar** o **✖ Cancelar**.
+  Al confirmar, la app vuelve a calcular con los datos actuales (el físico se
+  revalida completo).
+- Si el banner dice **origen desconocido**, la energía viene de una sesión
+  anterior a esta versión: vuelve a publicarla antes de guardar el proyecto.
+- **✖ Desactivar modo multi-superficie** retira toda la publicación y devuelve
+  Financiero, Baterías y CO₂ a la energía de superficie única. Publicar un
+  origen no físico también retira el proyecto físico: un proyecto guardado
+  nunca mezcla el proyecto físico con energía de otro origen.
 
 ### Paso 6 · Modo físico (opcional, recomendado para validar)
 
@@ -220,7 +231,11 @@ Requiere la POA del paso 4.
      **no es necesariamente el panel de tu proyecto**: elige el correcto.
    - **N_series** es uno solo para todas las superficies y es independiente
      del "N serie" del paso 3. Pon el mismo valor.
-   - Al calcular, **reemplaza la energía multi-superficie vigente** (ver paso 5).
+   - Necesita POA vigente en todas las superficies activas. Si una superficie
+     falla, **no publica nada** y muestra la causa.
+   - Publica con origen *bypass por superficie*; si la energía vigente es de
+     otro origen, pide confirmación (ver paso 5). La tabla dice **✅ Activo en
+     Financiero** solo cuando su origen es el vigente.
 6. **🔀 Strings de distinta orientación en un mismo MPPT:** es **informativa**
    y no cambia la energía oficial. Asigna superficies a MPPTs y presiona
    **🔀 Simular curva IV combinada por MPPT**. Semáforo:
@@ -259,14 +274,13 @@ Requiere la POA del paso 4.
 - [ ] Todas las superficies reales creadas, con tilt, azimut y área correctos,
       y las que no existen desactivadas.
 - [ ] Montaje "Ventilada" solo donde existe físicamente.
-- [ ] POA recalculada **después** del último cambio de geometría.
+- [ ] Ningún aviso **⚠️ Estas superficies no tienen POA vigente…**.
 - [ ] Si usas sombra 3D: escena del sitio correcto, puntos fuera del volumen
       (20–50 cm) y, en 🧪 Preparar comparación con modelo físico, ninguna
       superficie con *falta `p_shade`*.
 - [ ] Inversores: ✅ Asignaciones válidas.
-- [ ] **Un solo camino de energía** y su botón fue **el último** presionado
-      (simplificado, bypass con CSV o físico adoptado).
-- [ ] El banner ✅ Modo multi-superficie activo muestra la E_ac que esperas.
+- [ ] El banner ✅ Modo multi-superficie activo muestra el **origen** que
+      elegiste (simplificado, bypass con CSV o físico) y la E_ac que esperas.
 
 ## 9. Mensajes frecuentes y qué hacer
 
@@ -282,3 +296,6 @@ Requiere la POA del paso 4.
 | ❌ No se puede calcular el modo físico: … | Otro dato faltante o inválido | Completa lo indicado; no inventes valores |
 | ❌ El candidato ya no es válido… | Algo cambió después de comparar | Vuelve a calcular la comparación |
 | 🔴 Alarma de validación SDM | El panel no valida contra su ficha | Revisa 📐 Dimensionamiento / Motor IV |
+| ⚠️ Estas superficies no tienen POA vigente… | Cambió la geometría, el montaje, el albedo, el bifacial, el TMY o la ubicación, o el cálculo falló | Presiona ⚡ Calcular POA para todas las superficies |
+| ⚠️ Financiero, Baterías y CO₂ ya usan energía … ¿Reemplazarla por…? | Hay energía publicada de otro origen | ✅ Sí, reemplazar o ✖ Cancelar |
+| ❌ Bypass no publicado; falló en: … | Una superficie no pudo simular el bypass | Corrige la causa y vuelve a calcular |

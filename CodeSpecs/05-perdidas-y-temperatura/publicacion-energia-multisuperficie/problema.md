@@ -1,6 +1,6 @@
 # Spec — Publicación única de la energía multi-superficie
 
-**Estado:** diseño
+**Estado:** validación
 
 ## Alcance de la fase
 
