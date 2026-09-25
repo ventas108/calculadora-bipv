@@ -59,3 +59,17 @@ def test_la_seleccion_de_serie_con_is_none_funciona_con_dataframes():
         if elegido is None:
             elegido = poa_general
         assert elegido is esperado
+
+
+def test_mapa_de_calor_indica_de_donde_salen_sus_valores():
+    """Reportado en producción 24-sep-2026: sin POA vigente de la superficie,
+    el mapa usaba en silencio la POA general de ☀️ Recurso Solar (orientación
+    del proyecto) o un valor fijo de 300 W/m², con el título de la superficie."""
+    src = _PAGINA.read_text(encoding="utf-8")
+    inicio = src.index("Solo POA vigente de la superficie")
+    bloque = src[inicio:inicio + 3000]
+    assert "_fuente_hm" in bloque
+    assert "POA vigente de esta superficie" in bloque
+    assert "POA general de ☀️ Recurso Solar" in bloque
+    assert "estimación fija de 300 W/m²" in bloque
+    assert "TEXTO_MOTIVO_POA" in bloque

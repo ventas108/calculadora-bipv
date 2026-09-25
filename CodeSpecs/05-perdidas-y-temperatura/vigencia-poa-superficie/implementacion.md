@@ -36,6 +36,12 @@
   `poa_superficies_errores` y `poa_superficies_ok` no se guardan y se
   reinician al cargar otro proyecto.
 
+Ajuste posterior por la prueba en producción (25-sep-2026): el mapa de calor
+de 🌞 Trayectoria Solar no mostraba el aviso de POA no vigente y coloreaba en
+silencio con la POA general de ☀️ Recurso Solar. Ahora indica siempre la
+fuente de sus valores: POA vigente de la superficie, POA general (aviso con
+el motivo) o estimación fija de 300 W/m² (aviso).
+
 Desviaciones del diseño, con motivo:
 
 - Cada entrada de `poa_superficies` guarda, además de la POA y la firma

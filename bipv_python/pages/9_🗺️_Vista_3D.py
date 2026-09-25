@@ -2764,15 +2764,38 @@ with tab_solar:
                 # `is None`, no `or`: con POA por superficie calculado el valor
                 # es un DataFrame y `or` evalúa su verdad (ValueError en pandas).
                 # Solo POA vigente de la superficie (Spec 05/vigencia-poa-superficie).
-                _poa_hm_df = poas_vigentes_estado(st.session_state, lat, lon, alt_m)[0].get(
-                    _sup_hm.get("nombre", "")
-                )
+                # El mapa siempre dice de dónde salen sus valores (reportado en
+                # producción 24-sep-2026: sin POA vigente usaba otra POA en silencio).
+                _vig_hm, _mot_hm = poas_vigentes_estado(st.session_state, lat, lon, alt_m)
+                _nom_sup_hm = _sup_hm.get("nombre", "")
+                _poa_hm_df = _vig_hm.get(_nom_sup_hm)
+                _fuente_hm = "superficie"
                 if _poa_hm_df is None:
                     _poa_hm_df = _poa_s
+                    _fuente_hm = "general"
                 if _poa_hm_df is not None and len(_poa_hm_df) == len(_spw):
                     _spw["poa_eff"] = _poa_hm_df["poa_global"].values * _prod_hm.astype(float)
                 else:
                     _spw["poa_eff"] = _prod_hm.astype(float) * 300.0
+                    _fuente_hm = "fija"
+                _motivo_hm = TEXTO_MOTIVO_POA.get(_mot_hm.get(_nom_sup_hm), "")
+                if _fuente_hm == "superficie":
+                    st.caption(f"Valores: POA vigente de esta superficie ({_nom_sup_hm}).")
+                elif _fuente_hm == "general":
+                    st.warning(
+                        f"⚠️ **{_nom_sup_hm}** no tiene POA vigente"
+                        + (f" ({_motivo_hm})" if _motivo_hm else "")
+                        + ": los colores usan la POA general de ☀️ Recurso Solar (orientación "
+                        "del proyecto), no la de esta superficie. Las horas productivas sí "
+                        "son las de la superficie. Recalcula con **⚡ Calcular POA** en "
+                        "⚙️ Superficies BIPV."
+                    )
+                else:
+                    st.warning(
+                        "⚠️ Sin POA disponible: los colores son una "
+                        "estimación fija de 300 W/m² en las horas productivas. Calcula ☀️ Recurso Solar y "
+                        "**⚡ Calcular POA** en ⚙️ Superficies BIPV."
+                    )
 
                 _hm_p = (
                     _spw.groupby(["hora","mes"])["poa_eff"].mean()

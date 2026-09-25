@@ -305,9 +305,15 @@ calcula hasta que todas las superficies activas tengan POA vigente.
    🔀 Mismatch.
 2. **Horas productivas vs sombreadas** (24 h × 12 meses) por superficie. Cada
    hora se clasifica como productiva, sombreada (por el horizonte), **sin vista
-   de la fachada** (sol detrás del plano, AOI ≥ 90°) o nocturna. Si la
-   superficie tiene POA **vigente**, el mapa usa su POA; si no, usa la POA
-   general de ☀️ Recurso Solar.
+   de la fachada** (sol detrás del plano, AOI ≥ 90°) o nocturna. Las horas
+   productivas siempre son las de la superficie elegida; los **colores** dicen
+   de dónde salen:
+   - con POA **vigente** de la superficie: nota «Valores: POA vigente de esta
+     superficie»;
+   - sin POA vigente: aviso ⚠️ con el motivo, y los colores usan la POA
+     general de ☀️ Recurso Solar (orientación del proyecto);
+   - sin ninguna POA: aviso ⚠️ de estimación fija de 300 W/m².
+   Recalcula con **⚡ Calcular POA** para ver la POA real de la superficie.
    *(Corregido el 24-sep-2026: antes esta sección se caía con "The truth value
    of a DataFrame is ambiguous".)*
 3. **Métricas de sombras:** compara el % de horas sombreadas (trayectoria
