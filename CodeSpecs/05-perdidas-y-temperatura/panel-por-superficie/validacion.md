@@ -34,6 +34,16 @@ Streamlit 1.36.0; rama `claude/mejoras-bipv` sobre `main` `db7e96a6`.
       6. Un rerun no vuelve a retirar nada; al republicar, el desglose trae
          η 0,0875 y 0,20059. Sin excepciones en ningún paso.
 
+## Auditoría posterior al merge (25-sep-2026)
+
+- [x] Siete pruebas nuevas de los hallazgos H1–H4 (ver `implementacion.md`)
+      en rojo con `main` `975b7a29` (6 fallidas; «renombrar» ya pasaba) y
+      en verde con la corrección: `39 passed` en el archivo de la Spec.
+- [x] Suite completa: `1636 passed`, 0 fallidas, 12 min 7 s.
+- [x] Prueba de humo con `AppTest` repetida: mismos pasos 1–6 y, además,
+      agregar una «Pérgola» con la energía publicada no la retira ni muestra
+      «Cambió el panel…»; sin excepciones.
+
 ## Resultado
 
 Implementación validada en local. Queda para cerrar la Spec como
