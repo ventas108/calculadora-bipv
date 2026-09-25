@@ -53,6 +53,24 @@ Desviaciones del diseño, con motivo:
   ajustaron. Una exigía el selector común de panel, retirado por esta Spec.
   La otra esperaba error sin `area_m2`, y ahora el área sale de largo × ancho.
 
+## Auditoría posterior al merge (25-sep-2026)
+
+Revisión del código ya integrado (#50), antes de la prueba en producción:
+
+| # | Hallazgo | Severidad | Corrección |
+|---|---|---|---|
+| H1 | Agregar, eliminar o desactivar una superficie cambiaba la huella global y mostraba «Cambió el panel de una superficie…», retirando la energía publicada sin que ningún panel cambiara | Media | La huella se guarda por `uid` y solo se comparan las superficies que ya existían |
+| H2 | Si `resolver_panel_calibrado` lanzaba `ValueError` (SDM manual que ya no reproduce la ficha), el editor se caía | Media | `seleccion_panel` convierte el error en `PanelSuperficieError`, que el editor muestra junto al selector |
+| H3 | La comparación simplificado vs físico (`multisup_proyecto_fisico_candidato`) seguía mostrando el valor calculado con el panel anterior; adoptar sí recalculaba | Baja | Se retira junto con los demás resultados al cambiar un panel |
+| H4 | Con una superficie fuera por panel inválido, el resumen decía «Producción total del sistema» | Baja | Dice «de las superficies con POA vigente y panel utilizable» |
+
+Revisado sin hallazgos: adopción del físico (recalcula con el estado
+actual), bypass y MPPT bloqueados si falta SDM o N serie, publicación
+bloqueada si una superficie no tiene η, persistencia de fichas calibradas,
+validación de inversores (no usa el panel), cambio del nombre del panel del
+proyecto (el selector se resincroniza). Queda fuera, ya registrado: PR fijo
+0,78.
+
 ## Archivos modificados
 
 - `bipv_python/calculos/panel_superficie.py` (nuevo)

@@ -1569,8 +1569,8 @@ with tab_solar:
                 if _rows_r:
                     st.dataframe(_pd.DataFrame(_rows_r), use_container_width=True, hide_index=True)
                     st.metric(
-                        "⚡ Producción de las superficies con POA vigente"
-                        if _motivos_poa else "⚡ Producción total del sistema",
+                        "⚡ Producción de las superficies con POA vigente y panel utilizable"
+                        if _motivos_poa or _err_panel_g else "⚡ Producción total del sistema",
                         f"{_tot_r:,.0f} kWh/año",
                     )
                     st.caption(

@@ -360,3 +360,45 @@ def test_pagina_sin_eficiencia_fija_ni_selector_comun_de_panel():
 def test_dimensionamiento_retira_energia_si_cambia_el_panel():
     src = (_PAGINA.parent / "4_📐_Dimensionamiento.py").read_text(encoding="utf-8")
     assert src.index('st.session_state["panel_dict"]        = panel') < src.index("invalidar_por_cambio_panel")
+
+
+# ── Auditoría posterior al merge (25-sep-2026) ───────────────────────────────
+@pytest.mark.parametrize("cambio", ["agregar", "eliminar", "desactivar", "renombrar"])
+def test_cambios_que_no_son_de_panel_no_retiran_nada(cambio):
+    # H1: agregar, eliminar o desactivar una superficie no es «cambió el panel».
+    estado = _estado_publicado()
+    invalidar_por_cambio_panel(estado)
+    sups = estado["superficies_bipv"]
+    if cambio == "agregar":
+        sups.append(_sup("Pérgola", 3))
+    elif cambio == "eliminar":
+        sups.pop()
+    elif cambio == "desactivar":
+        sups[1]["activa"] = False
+    else:
+        sups[1]["nombre"] = "Cubierta"
+    assert invalidar_por_cambio_panel(estado) == []
+    assert estado["multisup_activo"]
+    # Y un cambio real de panel después sí se detecta.
+    sups[0].update(_catalogo(_OTRO))
+    assert "multisup_activo" in invalidar_por_cambio_panel(estado)
+
+
+def test_calibracion_fallida_no_tumba_el_editor():
+    # H2: resolver_panel_calibrado lanza ValueError con un SDM manual inválido.
+    def calibrar_falla(_ficha):
+        raise ValueError("El SDM manual guardado ya no reproduce la ficha dentro del 6%.")
+
+    with pytest.raises(PanelSuperficieError, match="6%"):
+        seleccion_panel(_OTRO, "Panel del proyecto (X)", MODULOS_BIPV, _sup(), calibrar=calibrar_falla)
+
+
+def test_cambio_de_panel_retira_la_comparacion_fisica():
+    # H3: la comparación del modo físico se calculó con el panel anterior.
+    assert "multisup_proyecto_fisico_candidato" in KEYS_RESULTADOS_PANEL
+
+
+def test_resumen_no_dice_total_del_sistema_si_falta_una_superficie():
+    # H4: con una superficie fuera por su panel, el total no es del sistema.
+    src = _PAGINA.read_text(encoding="utf-8")
+    assert "if _motivos_poa or _err_panel_g else" in src
