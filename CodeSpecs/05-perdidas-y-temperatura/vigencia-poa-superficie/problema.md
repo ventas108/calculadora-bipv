@@ -1,6 +1,6 @@
 # Spec — Vigencia de la POA por superficie
 
-**Estado:** validación
+**Estado:** completado
 
 ## Alcance de la fase
 

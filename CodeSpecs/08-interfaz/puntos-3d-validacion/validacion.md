@@ -1,6 +1,6 @@
 # Validación — Validación visible de los puntos 3D por superficie
 
-**Estado:** validación
+**Estado:** completado
 
 Entorno: Python 3.12 (igual que CI), `bipv_python/requirements.txt`,
 `pytest` 9.1.1, Streamlit 1.36.0; rama `claude/mejoras-bipv` sobre el commit
@@ -31,3 +31,9 @@ Implementación validada en local. Queda para cerrar la Spec como
 `main`, despliegue de Streamlit y una prueba en producción con una escena
 real de Site Designer (línea mal escrita, coma decimal y punto dentro del
 volumen).
+
+## Cierre
+
+Pull Request #45 integrado a `main` con CI en verde y aprobación humana. Desplegado en Streamlit. Prueba en producción (24-sep-2026) con una escena real de Site Designer: la línea mal escrita se reportó con su número y motivo, la coma decimal con `;` se aceptó y el punto dentro del volumen se detectó antes de calcular. Tras el reporte en producción, el cuadro de puntos ya no borra lo escrito (#47).
+
+Resultado final: Spec completada.

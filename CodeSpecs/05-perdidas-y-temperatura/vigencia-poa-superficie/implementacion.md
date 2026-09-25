@@ -1,6 +1,6 @@
 # Implementación — Vigencia de la POA por superficie
 
-**Estado:** validación
+**Estado:** completado
 
 ## Cambios realizados
 
