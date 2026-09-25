@@ -310,6 +310,28 @@ def validar_diseno_electrico(
             bloqueos.append(f"{etiqueta}: paneles distintos en el mismo MPPT ({', '.join(sorted(map(str, paneles_mppt)))}).")
             checks.append(_check("Un solo panel por MPPT", len(paneles_mppt), 1, "paneles",
                                  "referencias de panel en el MPPT", "grupos", "rojo"))
+        # Strings en paralelo en un MPPT trabajan al MISMO voltaje: todos deben
+        # tener el mismo número de módulos en serie (25-sep-2026, antes de A3).
+        largos = {}
+        for g in grupos:
+            if isinstance(g["n_serie"], int) and not isinstance(g["n_serie"], bool) and g["n_serie"] >= 1:
+                largos.setdefault(g["n_serie"], []).append(f"{g['superficie']} · {g['gid']}")
+        if largos:
+            valores = " y ".join(str(n) for n in sorted(largos))
+            if len(largos) > 1:
+                detalle = ", ".join(f"{nombre}: {n} módulos"
+                                    for n in sorted(largos, reverse=True) for nombre in largos[n])
+                bloqueos.append(
+                    f"{etiqueta}: strings de distinto largo en el mismo MPPT ({detalle}). Los "
+                    "strings que comparten un MPPT quedan en paralelo y trabajan al mismo voltaje; "
+                    "con distinto número de módulos cada uno necesita un voltaje diferente, así "
+                    "que el más corto o el más largo produce mucho menos y puede circular "
+                    "corriente de uno al otro. Solución: pon el mismo N serie en todos los grupos "
+                    "de este MPPT, o conéctalos en MPPT distintos."
+                )
+            checks.append(_check("Mismo N serie en el MPPT", valores, "un solo valor", "módulos",
+                                 "todos los strings de un MPPT con el mismo N serie", "grupos",
+                                 "rojo" if len(largos) > 1 else "verde"))
         if len(orient) > 1:
             avisos.append(f"{etiqueta}: orientaciones distintas en el mismo MPPT; la sección 6 cuantifica la pérdida.")
             checks.append(_check("Una orientación por MPPT", len(orient), 1, "orientaciones",

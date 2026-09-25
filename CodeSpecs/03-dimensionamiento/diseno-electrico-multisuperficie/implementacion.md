@@ -105,6 +105,24 @@ Desviaciones del diseño, con motivo:
   grupo» no tenía efecto). `preservar_o_invalidar_campos_fisicos` ahora
   conserva `grupos`; hay una prueba para ello.
 
+### Complemento de A2 antes de A3
+
+- `calculos/diseno_electrico_multisup.py`: comprobación «Mismo N serie en el
+  MPPT» (🔴 si los strings de un MPPT tienen distinto número de módulos). El
+  bloqueo nombra cada grupo con su largo, explica por qué (strings en
+  paralelo al mismo voltaje) y da la solución. Los grupos sin N serie válido
+  no cuentan: ya tienen su propio 🔴. Como todo 🔴, impide adoptar el modo
+  físico.
+- `calculos/campos_editor.py` (nuevo): `sincronizar_campo`, usado por los
+  editores de Vista 3D. La referencia `_ref_<clave>` ahora guarda el valor
+  que queda en el campo (el que la página guarda), no el dato de entrada.
+  Antes, un segundo cambio seguido del mismo campo se revertía; lo detectó la
+  prueba de humo de esta regla y también afectaba al azimuth de las
+  superficies.
+- Página: columna «N serie de los strings» en la tabla de MPPT y entrada
+  «Mismo N serie en el MPPT» en la explicación sencilla.
+- Base de conocimiento del Asistente.
+
 ## Archivos modificados
 
 ### Fase A1

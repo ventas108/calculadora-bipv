@@ -78,6 +78,28 @@ Rama `claude/mejoras-bipv` sobre `main` `5d5b98e0`.
       8. 🗑️ quita G2. Sin excepciones en ningún paso.
 - [ ] Prueba en producción de la fase A2.
 
+### Complemento de A2 antes de A3
+
+Rama `claude/mejoras-bipv` sobre `main` `45362d79`.
+
+- [x] Pruebas nuevas en rojo con `main` `45362d79`: `test_campos_editor.py`
+      no se puede recolectar (`calculos.campos_editor` no existe); en las
+      demás, `7 failed, 101 passed` (regla de largo, página, modo físico y
+      Asistente).
+- [x] Suite completa (`python -m pytest tests/`): `1730 passed`, 0 fallidas,
+      12 min 15 s.
+- [x] `physics-guard` local limpio; auditoría SDD sin faltantes.
+- [x] Prueba de humo con `AppTest` (ASP-ST1-T40, Growatt-MID15KTL3-X; techo
+      con G1 y G2 en MPPT 2):
+      1. G2 con N serie 12 y G1 con 8: tabla de MPPT «N serie de los strings»
+         🔴 «8 y 12 módulos», encabezado 🔴 y el mensaje «strings de distinto
+         largo en el mismo MPPT (Techo · G2: 12 módulos, Techo · G1: 8
+         módulos)… Solución: …».
+      2. G2 de vuelta a 8: sin el 🔴; encabezado 🟡 (solo avisos).
+      3. Cambios seguidos del mismo campo: azimuth 170 → 160 → 150 y N serie
+         12 → 8 → 10 quedan cada uno como se escribió. Antes, el segundo
+         cambio seguido volvía al valor anterior.
+
 ## Resultado
 
 Fase A1 validada en producción. Fase A2 validada en local; su prueba en
