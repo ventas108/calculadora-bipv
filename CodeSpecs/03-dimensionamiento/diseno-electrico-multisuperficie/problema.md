@@ -1,6 +1,6 @@
 # Spec A — Diseño eléctrico multi-superficie: inversores, MPPT y grupos de strings
 
-**Estado:** diseño
+**Estado:** implementación
 
 ## Alcance de la fase
 

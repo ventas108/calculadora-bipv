@@ -1,6 +1,6 @@
 # Diseño — Diseño eléctrico multi-superficie: inversores, MPPT y grupos de strings
 
-**Estado:** diseño
+**Estado:** implementación
 
 ## Entradas
 
