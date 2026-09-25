@@ -1096,11 +1096,8 @@ with tab_solar:
             # solo se resincroniza si el dato cambió fuera del campo (p. ej. al
             # cargar un proyecto).
             def _valor_campo_superficie(clave: str, valor_datos):
-                _ref = f"_ref_{clave}"
-                if clave not in st.session_state or st.session_state.get(_ref) != valor_datos:
-                    st.session_state[clave] = valor_datos
-                st.session_state[_ref] = valor_datos
-                return st.session_state[clave]
+                from calculos.campos_editor import sincronizar_campo
+                return sincronizar_campo(st.session_state, clave, valor_datos)
 
             _MONTAJES = [
                 "Heredar de ☀️ Recurso Solar",
@@ -1687,6 +1684,10 @@ with tab_solar:
                         "Inversor · MPPT": f"{_m['inversor_id']} · {_m['mppt']}",
                         "Grupos": ", ".join(_m["grupos"]),
                         "Paneles": ", ".join(_m["paneles"]),
+                        "N serie de los strings": next((
+                            f"{_ICONO_EST[_c['estado']]} {_c['valor']} módulos"
+                            for _c in _m["checks"] if _c["nombre"] == "Mismo N serie en el MPPT"
+                        ), "—"),
                         "Strings / entradas": _v_check(_m, "Strings ≤ entradas del MPPT"),
                         "Isc / límite": _v_check(_m, "Isc del MPPT ≤ límite del tracker"),
                         "Caja combinadora": "sí" if _m.get("caja_combinadora") else "no",
@@ -1761,6 +1762,10 @@ with tab_solar:
                         "corriente no cabe, no hay solución en ese MPPT (🔴).\n"
                         "- **Un solo panel por MPPT:** paneles distintos tienen tensiones "
                         "distintas; en la misma entrada, el MPPT no puede aprovechar a los dos (🔴).\n"
+                        "- **Mismo N serie en el MPPT:** los strings de un mismo MPPT se conectan "
+                        "en paralelo y trabajan al mismo voltaje, así que todos deben tener el "
+                        "mismo número de módulos. Ejemplo: 8 y 8 está bien; 8 y 12 es 🔴. Si "
+                        "necesitas largos distintos, ponlos en MPPT distintos.\n"
                         "- **Relación DC/AC:** potencia de los paneles ÷ potencia del inversor. "
                         "Entre 1,00 y 1,35 es lo usual. Menos: el inversor está sobrado (funciona, "
                         "pero se paga de más). Más: en las horas de más sol el inversor recorta "

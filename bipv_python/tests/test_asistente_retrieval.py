@@ -295,3 +295,13 @@ def test_buscar_varios_grupos_y_reglas_hacia_financiero():
     texto = seccion["texto"]
     assert "Agregar grupo de strings" in texto and "Energía publicada con" in texto
     assert "no se publica" in texto and "Grupos de strings diferentes" in texto
+
+
+def test_buscar_strings_de_distinto_largo_en_el_mismo_mppt():
+    seccion = _seccion_recuperada(
+        "me sale strings de distinto largo en el mismo mppt que hago",
+        "inversores por superficie",
+    )
+    texto = seccion["texto"]
+    assert "Mismo N serie en el MPPT" in texto and "mismo voltaje" in texto
+    assert "8 y 12 es 🔴" in texto

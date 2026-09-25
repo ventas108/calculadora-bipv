@@ -421,3 +421,54 @@ def test_cambios_de_superficie_no_son_cambio_electrico(cambio):
     else:
         sups[1]["nombre"] = "Cubierta"
     assert invalidar_por_cambio_electrico(estado) == [] and estado["multisup_activo"]
+
+
+# ── Strings de distinto largo en el mismo MPPT (antes de A3, 25-sep-2026) ──
+def _dos_grupos(ns1, ns2, mppt2=1, np1=1, np2=1):
+    sup = _sup(grupos=[_grupo("G1", n_serie=ns1, n_paralelo=np1),
+                       _grupo("G2", mppt=mppt2, n_serie=ns2, n_paralelo=np2)], area=500.0)
+    return _diag([sup], [_inv(ficha=dict(_SG5), P_ac_nom_W=5000.0)], _paneles(Fachada=_ASP))
+
+
+def test_strings_de_distinto_largo_en_el_mismo_mppt_es_rojo():
+    d = _dos_grupos(8, 6)
+    m = d["mppt"][0]
+    c = _checks(m)["Mismo N serie en el MPPT"]
+    assert c["estado"] == "rojo" and c["valor"] == "6 y 8" and c["unidad"] == "módulos"
+    assert m["estado"] == "rojo" and d["estado_global"] == "rojo"
+    bloqueo = next(b for b in d["bloqueos"] if "distinto largo" in b)
+    # Explicación para quien aprende: qué pasa, con qué valores y cómo arreglarlo.
+    assert "«INV-1 · MPPT 1»: strings de distinto largo en el mismo MPPT" in bloqueo
+    assert "Fachada · G1: 8 módulos" in bloqueo and "Fachada · G2: 6 módulos" in bloqueo
+    assert "mismo voltaje" in bloqueo and "mismo N serie" in bloqueo and "MPPT distintos" in bloqueo
+
+
+def test_mismo_largo_en_el_mppt_es_verde():
+    c = _checks(_dos_grupos(8, 8)["mppt"][0])["Mismo N serie en el MPPT"]
+    assert c["estado"] == "verde" and c["valor"] == "8"
+    assert not any("distinto largo" in b for b in _dos_grupos(8, 8)["bloqueos"])
+
+
+def test_distinto_largo_en_mppt_distintos_esta_bien():
+    d = _dos_grupos(8, 6, mppt2=2)
+    assert not any("distinto largo" in b for b in d["bloqueos"])
+    assert all(_checks(m)["Mismo N serie en el MPPT"]["estado"] == "verde" for m in d["mppt"])
+
+
+def test_distinto_largo_entre_superficies_en_el_mismo_mppt():
+    a = _sup("Fachada", uid=1, grupos=[_grupo("G1", n_serie=8, n_paralelo=1)], area=500.0)
+    b = _sup("Techo", uid=2, grupos=[_grupo("G1", n_serie=7, n_paralelo=1)], area=500.0)
+    d = _diag([a, b], [_inv(ficha=dict(_SG5), P_ac_nom_W=5000.0)], _paneles(Fachada=_ASP, Techo=_ASP))
+    bloqueo = next(b for b in d["bloqueos"] if "distinto largo" in b)
+    assert "Fachada · G1: 8 módulos" in bloqueo and "Techo · G1: 7 módulos" in bloqueo
+
+
+def test_n_serie_vacio_no_da_falso_rojo_de_largo():
+    # Un grupo aún sin N serie ya tiene su propio 🔴; no debe sumar el de largo.
+    d = _dos_grupos(8, None)
+    assert not any("distinto largo" in b for b in d["bloqueos"])
+
+
+def test_pagina_explica_el_largo_de_los_strings():
+    src = _PAGINA.read_text(encoding="utf-8")
+    assert "Mismo N serie en el MPPT" in src and "\"N serie de los strings\"" in src

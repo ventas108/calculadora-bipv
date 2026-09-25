@@ -74,6 +74,17 @@ Validación:
 - [x] Prueba de humo con `AppTest`.
 - [ ] Prueba en producción de la fase A2.
 
+### Complemento de A2 antes de A3 (aprobado el 25-sep-2026)
+
+- [x] Regla 🔴 «strings de distinto largo en el mismo MPPT»: todos los strings
+      de un MPPT (de uno o varios grupos o superficies) con el mismo N serie;
+      explicación sencilla con los valores y la solución; columna «N serie de
+      los strings» en la tabla de MPPT; entrada en la explicación sencilla.
+- [x] Corrección: un segundo cambio seguido del mismo campo del editor se
+      revertía (azimuth, N serie y demás campos de Vista 3D).
+- [x] Pruebas en rojo con `main` y en verde; suite completa; humo con
+      `AppTest`; Asistente.
+
 ## Fase A3 — Sección 6 unificada (por hacer, después de A2)
 
 - [ ] Sección 6 con los MPPT de los grupos, sin selectores propios.

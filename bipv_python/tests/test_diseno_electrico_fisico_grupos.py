@@ -286,3 +286,13 @@ def test_editor_conserva_los_grupos_al_reconstruir_la_superficie():
     otra["grupos"][1]["n_serie"] = 9
     nueva2 = preservar_o_invalidar_campos_fisicos(anterior, {**editada, "grupos": otra["grupos"]})
     assert "firma_sombra" not in nueva2 and nueva2["sombra_invalidada_motivo"] == "cambió N serie"
+
+
+def test_fisico_no_publica_con_strings_de_distinto_largo_en_un_mppt(tmy):
+    estado = _estado_dos_grupos(tmy)
+    proy = construir_y_recalcular_proyecto_fisico(estado, tmy, _LAT, _LON, _ALT_M)
+    distinto = copy.deepcopy(estado)
+    distinto["superficies_bipv"][0]["grupos"] = [_grupo("G1", "INV-1", 7, 1), _grupo("G2", "INV-1", 6, 1)]
+    with pytest.raises(ValueError, match="distinto largo"):
+        aplicar_proyecto_a_session_state(proy, distinto)
+    assert "multisup_activo" not in distinto
