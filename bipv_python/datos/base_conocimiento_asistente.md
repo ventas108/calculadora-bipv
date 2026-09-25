@@ -1081,6 +1081,13 @@ Botón  │  Dónde  │  Origen publicado
 
 «✅ Adoptar cálculo físico»  │  ⚙️ Superficies BIPV › modo físico  │  modelo físico SDM + bypass + inversores
 
+- Sistema multi-superficie en Financiero, Baterías y CO₂ (corregido 25-sep-2026, Spec 06/sistema-multisuperficie): la publicación guarda también la potencia instalada (Σ módulos de los grupos × Pmax de su panel), el número de módulos por referencia de panel y el reparto mensual de la energía (según la POA de cada superficie). Con el modo multi-superficie activo:
+  - 💰 Financiero ya NO exige 📊 Producción: toma energía, kWp y módulos de 🗺️ Vista 3D. Antes mostraba «Producción no detectada» y pasaba a modo manual con la energía de 📐 Dimensionamiento, o mezclaba la energía de Vista 3D con los kWp y módulos del sistema de superficie única (CAPEX, TIR y payback de otro sistema). El banner dice «Sistema multi-superficie — … kWh/año · … kWp (… módulos)».
+  - Con paneles distintos por superficie, el CAPEX manual pide un costo por referencia de panel («Costo ASP-ST1-T40 (USD/módulo) · 18 módulos», …), prellenado con el costo del catálogo si lo trae.
+  - Si alguna superficie activa no tiene grupos de strings, o la energía se publicó con una versión anterior, Financiero muestra 🔴 «No se calcula el análisis financiero con el sistema multi-superficie…» con la acción exacta y no calcula.
+  - El 💼 Presupuesto todavía se arma con el sistema de superficie única: Financiero lo deja desvinculado por defecto y avisa 🟡 con ambos números.
+  - 🔋 Baterías hace el balance mensual con el reparto mensual publicado (no hace falta 📊 Producción); el balance horario no está disponible con multi-superficie.
+  - 🌿 CO₂ muestra los kWp y módulos del sistema multi-superficie.
 - El banner «✅ Modo multi-superficie activo» muestra el origen vigente, la E_ac y el área. En origen físico muestra además el recorte en buses de inversor (suma del desglose − total de buses).
 - Si ya hay energía de OTRO origen, el botón no la reemplaza en silencio: pregunta «¿Reemplazarla por…?» con «✅ Sí, reemplazar» o «✖ Cancelar». Al confirmar, la app vuelve a calcular con los datos actuales (el físico se revalida completo).
 - El bypass solo publica si todas las superficies activas se calcularon; si una falla, no publica nada. Bajo su tabla muestra «✅ Activo en Financiero · Baterías · CO₂ — origen: bypass por superficie con CSV de sombreado» y un botón «✖ Desactivar modo multi-superficie» (el mismo del banner) solo si su origen es el vigente; si no, «Resultado calculado, no publicado» con el origen vigente. El banner principal del origen está en ⚙️ Superficies BIPV › 🔗 Integrar al análisis financiero.

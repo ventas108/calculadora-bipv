@@ -933,6 +933,7 @@ with tab_solar:
             preservar_o_invalidar_campos_fisicos,
             resumen_estado_fisico_superficies,
         )
+        from calculos.sistema_multisuperficie import sistema_desde_estado
         from calculos.strings_superficie import (
             ETIQUETA_ORIGEN_STRINGS, etiqueta_panel_proyecto, formato_strings,
             perdida_ponderada_por_modulos, strings_grupos_superficie, strings_superficie,
@@ -1967,6 +1968,8 @@ with tab_solar:
                             confirmar_reemplazo=_confirmar_simplificado,
                             estado_electrico=resumen_estado_electrico(
                                 diagnostico_electrico_estado(st.session_state)),
+                            sistema=sistema_desde_estado(
+                                st.session_state, _res_int["desglose"], _poa_ss),
                         )
                     except ValueError as _error_pub:
                         st.error(f"❌ No se publicó la energía multi-superficie: {_error_pub}")
@@ -2754,6 +2757,8 @@ with tab_solar:
                                     confirmar_reemplazo=_confirmar_bp,
                                     estado_electrico=resumen_estado_electrico(
                                         diagnostico_electrico_estado(st.session_state)),
+                                    sistema=sistema_desde_estado(
+                                        st.session_state, _desglose_bp, _poa_p),
                                 )
                             except ValueError as _error_pub:
                                 st.error(f"❌ No se publicó el bypass por superficie: {_error_pub}")

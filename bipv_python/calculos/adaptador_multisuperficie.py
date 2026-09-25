@@ -120,8 +120,16 @@ def aplicar_proyecto_a_session_state(
                 for f in por_superficie.values()]
     # Regla hacia Financiero (Spec A, fase A2): un diseño eléctrico 🔴 no se
     # publica como energía física.
-    estado_electrico = None
+    estado_electrico = sistema = None
     if session_state.get("superficies_bipv"):
+        # Spec 06-analisis-financiero/sistema-multisuperficie (H-D5): potencia,
+        # módulos y reparto mensual del mismo diseño que se publica.
+        from calculos.sistema_multisuperficie import sistema_desde_estado
+
+        poas = {}
+        for nombre_unidad, sup in proyecto["superficies"].items():
+            poas.setdefault(sup.get("superficie_origen") or nombre_unidad, sup.get("poa_df"))
+        sistema = sistema_desde_estado(session_state, desglose, poas)
         from calculos.diseno_electrico_multisup import (
             diagnostico_electrico_estado, resumen_estado_electrico,
         )
@@ -142,6 +150,7 @@ def aplicar_proyecto_a_session_state(
         proyecto_fisico=proyecto,
         confirmar_reemplazo=confirmar_reemplazo,
         estado_electrico=estado_electrico,
+        sistema=sistema,
     )
 
 

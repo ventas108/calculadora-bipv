@@ -67,6 +67,27 @@ elif _bypass_ok_bat and _e_ac_bypass_bat > 0:
 else:
     e_ac_anual = _e_ac_base_bat
 
+# Spec 06-analisis-financiero/sistema-multisuperficie (H-D5): con energía
+# multi-superficie publicada, el balance usa SU reparto mensual (mismo diseño
+# de 🗺️ Vista 3D), no la producción mensual del sistema de superficie única.
+from calculos.sistema_multisuperficie import df_mensual_multisuperficie, estado_sistema_publicado
+_est_ms_bat = estado_sistema_publicado(st.session_state)
+_ms_bat = bool(_multisup_ok_bat and _e_ac_multisup_bat > 0)
+if _ms_bat and _est_ms_bat["problemas"]:
+    st.error(
+        "🔴 **El balance no puede usar el sistema multi-superficie.** "
+        + " ".join(_est_ms_bat["problemas"])
+    )
+    prod_ok, df_m_prod = False, None
+elif _ms_bat:
+    df_m_prod = df_mensual_multisuperficie(_est_ms_bat["sistema"])
+    prod_ok = True
+    st.success(
+        f"✅ Sistema multi-superficie — **{e_ac_anual:,.0f} kWh/año**, repartidos por mes "
+        "según la POA de cada superficie (🗺️ Vista 3D). El balance mensual usa este sistema; "
+        "no hace falta 📊 Producción."
+    )
+
 if not prod_ok or df_m_prod is None or e_ac_anual <= 0:
     st.warning(
         "⚠️ **Producción no calculada.** "
@@ -1050,10 +1071,18 @@ _btn_label = (
     if _modo_horario else
     "▶️ Calcular balance energético mensual"
 )
+if _ms_bat and _modo_horario:
+    # El balance horario solo existe para 📊 Producción (superficie única):
+    # nunca se mezcla con la energía multi-superficie.
+    _df_horario_prod = None
+    st.warning(
+        "⚠️ Con el sistema multi-superficie activo el balance horario no está disponible: "
+        "usa el balance mensual, que ya reparte la energía de cada superficie por mes."
+    )
 _btn_disabled = (
     (_df_horario_prod is None) if _modo_horario else (df_m_prod is None)
 )
-if _modo_horario and _df_horario_prod is None:
+if _modo_horario and _df_horario_prod is None and not _ms_bat:
     st.warning(
         "⚠️ El balance horario requiere los datos de producción hora a hora. "
         "Complete la Página 6 — Producción Anual y vuelva aquí."

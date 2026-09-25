@@ -69,6 +69,25 @@ _area_multisup = st.session_state.get("area_total_multisup", 0.0)
 _desglose_ms   = st.session_state.get("multisup_desglose", [])
 _n_sups        = len(_desglose_ms)
 
+# Spec 06-analisis-financiero/sistema-multisuperficie (H-D5): con energía
+# multi-superficie publicada, energía, potencia y módulos salen del MISMO
+# diseño de 🗺️ Vista 3D; no se exige 📊 Producción (que simula otro sistema,
+# el de superficie única) ni se mezcla con él.
+from calculos.sistema_multisuperficie import estado_sistema_publicado
+_est_ms = estado_sistema_publicado(st.session_state)
+_ms_activo = bool(_multisup_ok and _e_ac_multisup > 0)
+_sistema_ms = _est_ms["sistema"] if _ms_activo else None
+if _ms_activo and _est_ms["problemas"]:
+    st.error(
+        "🔴 **No se calcula el análisis financiero con el sistema multi-superficie.** "
+        + " ".join(_est_ms["problemas"])
+        + " Así se evita calcular TIR y payback con la energía de un sistema y el costo de otro."
+    )
+    st.stop()
+if _ms_activo:
+    p_stc = float(_sistema_ms["P_dc_stc_kW"])
+    n_pan = int(_sistema_ms["n_modulos"])
+
 if _multisup_ok and _e_ac_multisup > 0:
     e_ac = _e_ac_multisup
 elif _bypass_ok and _e_ac_bypass > 0:
@@ -76,16 +95,18 @@ elif _bypass_ok and _e_ac_bypass > 0:
 else:
     e_ac = _e_ac_base
 
-if prod_ok and e_ac > 0:
-    if _multisup_ok and _e_ac_multisup > 0:
+if (prod_ok or _ms_activo) and e_ac > 0:
+    if _ms_activo:
         st.success(
             f"✅ Sistema multi-superficie — **{e_ac:,.0f} kWh/año** | "
-            f"{_n_sups} superficie(s) · Área total: **{_area_multisup:.1f} m²** | Ciudad: **{ciudad}**"
+            f"{_n_sups} superficie(s) · Área total: **{_area_multisup:.1f} m²** · "
+            f"**{p_stc:.2f} kWp** ({n_pan} módulos) | Ciudad: **{ciudad}**"
         )
         st.info(
-            f"🏗️ **Modo multi-superficie activo:** TIR y Payback calculados con la suma "
-            f"de todas las superficies BIPV definidas en 🗺️ Vista 3D. "
-            f"Producción superficie principal: {_e_ac_base:,.0f} kWh/año."
+            "🏗️ **Modo multi-superficie activo:** la energía, la potencia instalada y el "
+            "número de módulos salen del diseño de 🗺️ Vista 3D (grupos de strings de cada "
+            "superficie), no de 📐 Dimensionamiento ni de 📊 Producción, que simulan el "
+            "sistema de superficie única. TIR, VPN, payback y LCOE se calculan con este sistema."
         )
         from calculos.publicacion_multisuperficie import aviso_estado_electrico as _aviso_ee
         _aviso_ms_ee = _aviso_ee(st.session_state)
@@ -102,6 +123,11 @@ if prod_ok and e_ac > 0:
             ])
             with st.expander("📋 Desglose por superficie"):
                 st.dataframe(_df_des, use_container_width=True, hide_index=True)
+                st.dataframe(_pd_fin.DataFrame([
+                    {"Panel": _pp["panel"], "Módulos": _pp["modulos"],
+                     "Potencia (kWp)": f"{_pp['P_dc_stc_kW']:.2f}"}
+                    for _pp in _sistema_ms["por_panel"]
+                ]), use_container_width=True, hide_index=True)
     elif _bypass_ok and _e_ac_bypass > 0:
         st.success(
             f"✅ Producción con corrección bypass — **{e_ac:,.0f} kWh/año** | "
@@ -299,13 +325,23 @@ if _ppto_capex > 0:
     usar_ppto = st.toggle(
         f"🔗 Usar el CAPEX del 💼 Presupuesto ({_ppto_fuente}) "
         f"— **USD {_ppto_capex:,.0f}** ($ {_ppto_capex*_tc0/1e6:.2f} M COP)",
-        value=True,
+        value=not _ms_activo,
         key="toggle_usar_ppto",
         help=(
             "Cuando está activo, TODOS los cálculos financieros usan el CAPEX del "
             "Presupuesto y se ocultan los controles manuales para evitar cifras "
             "contradictorias. Desactívalo para desvincular y volver al CAPEX manual."
         ),
+    )
+
+if _ppto_capex > 0 and _ms_activo:
+    st.warning(
+        "🟡 El 💼 Presupuesto todavía se arma con el sistema de **superficie única** "
+        f"({int(st.session_state.get('N_paneles_final') or st.session_state.get('N_paneles_dim') or 0)} "
+        "módulos de 📐 Dimensionamiento/📊 Producción), no con el multi-superficie "
+        f"(**{n_pan} módulos, {p_stc:.2f} kWp**). Por eso viene desvinculado: el CAPEX "
+        "paramétrico de abajo usa el sistema multi-superficie. Vincúlalo solo si ajustaste "
+        "el Presupuesto a este sistema."
     )
 
 # La fuente efectiva del CAPEX que usa Financiero en este rerun.
@@ -355,12 +391,33 @@ with col_cx1:
                 "🔓 Presupuesto desvinculado — usando CAPEX **Manual** paramétrico. "
                 "Activa el toggle de arriba para volver a usar el Presupuesto."
             )
-        costo_modulo_usd = st.number_input(
-            "Costo módulos BIPV (USD/módulo)",
-            min_value=10.0, max_value=500.0,
-            value=float(st.session_state.get("costo_modulo_usd") or 65.0), step=5.0,
-            help="Pre-llenado desde catálogo si se seleccionó panel en Dimensionamiento.",
-        )
+        _por_panel_ms = (_sistema_ms or {}).get("por_panel") or []
+        if _ms_activo and len(_por_panel_ms) > 1:
+            # H-D5: con paneles distintos por superficie, un costo por referencia.
+            st.caption("Costo por referencia de panel (cada superficie usa su propio panel):")
+            _capex_mod_ms = 0.0
+            for _i_pp, _pp in enumerate(_por_panel_ms):
+                _c_pp = st.number_input(
+                    f"Costo {_pp['panel']} (USD/módulo) · {_pp['modulos']} módulos",
+                    min_value=10.0, max_value=2000.0,
+                    value=float(_pp.get("costo_usd") or st.session_state.get("costo_modulo_usd") or 65.0),
+                    step=5.0, key=f"fin_costo_panel_ms_{_i_pp}",
+                    help="Pre-llenado con el costo del catálogo de ese panel si lo trae.",
+                )
+                _capex_mod_ms += _c_pp * _pp["modulos"]
+            # Promedio ponderado: n_pan × costo_modulo_usd = Σ módulos × costo de su panel.
+            costo_modulo_usd = _capex_mod_ms / n_pan if n_pan > 0 else 0.0
+            st.caption(f"Costo medio ponderado: **USD {costo_modulo_usd:,.1f}/módulo**")
+        else:
+            costo_modulo_usd = st.number_input(
+                "Costo módulos BIPV (USD/módulo)",
+                min_value=10.0, max_value=500.0,
+                value=float(
+                    (_por_panel_ms[0].get("costo_usd") if len(_por_panel_ms) == 1 else None)
+                    or st.session_state.get("costo_modulo_usd") or 65.0),
+                step=5.0,
+                help="Pre-llenado desde catálogo si se seleccionó panel en Dimensionamiento.",
+            )
 
         # ── Pre-llenar costo inversor desde catálogo ──────────────────────────
         _costo_inv_usd  = float(st.session_state.get("costo_inversor_usd") or 0.0)

@@ -305,3 +305,13 @@ def test_buscar_strings_de_distinto_largo_en_el_mismo_mppt():
     texto = seccion["texto"]
     assert "Mismo N serie en el MPPT" in texto and "mismo voltaje" in texto
     assert "8 y 12 es 🔴" in texto
+
+
+def test_buscar_financiero_no_toma_la_energia_multisuperficie():
+    # Spec 06-analisis-financiero/sistema-multisuperficie (H-D5).
+    seccion = _seccion_recuperada(
+        "financiero dice produccion no detectada y no usa la energia multi superficie de vista 3d",
+        "qué energía llega a financiero",
+    )
+    texto = seccion["texto"]
+    assert "ya NO exige 📊 Producción" in texto and "costo por referencia de panel" in texto

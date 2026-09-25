@@ -42,6 +42,9 @@ CLAVES_ENERGIA = (
     # Spec 03/diseno-electrico-multisuperficie (fase A2): estado del diseño
     # eléctrico con el que se publicó (resumen_estado_electrico).
     "multisup_estado_electrico",
+    # Spec 06-analisis-financiero/sistema-multisuperficie (H-D5): potencia,
+    # módulos por panel y reparto mensual del MISMO diseño publicado.
+    "multisup_sistema",
 )
 CLAVES_SOLO_FISICO = ("_multisup_proyecto_fisico", "multisup_perdida_bus_kWh")
 CLAVES_PUBLICACION = CLAVES_ENERGIA + CLAVES_SOLO_FISICO
@@ -116,6 +119,7 @@ def preparar_publicacion(
     area_total: float,
     proyecto_fisico: Mapping[str, Any] | None = None,
     estado_electrico: Mapping[str, Any] | None = None,
+    sistema: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Valida los invariantes y retorna las claves a publicar, sin escribir."""
     if origen not in ORIGENES:
@@ -142,6 +146,10 @@ def preparar_publicacion(
     }
     if estado_electrico is not None:
         candidato["multisup_estado_electrico"] = dict(estado_electrico)
+    if sistema is not None:
+        from calculos.sistema_multisuperficie import validar_sistema
+
+        candidato["multisup_sistema"] = validar_sistema(sistema, suma_energia)
     if origen == ORIGEN_FISICO:
         if not isinstance(proyecto_fisico, Mapping):
             raise ValueError("El origen 'fisico' exige el proyecto físico calculado.")
@@ -171,6 +179,7 @@ def publicar_energia_multisuperficie(
     proyecto_fisico: Mapping[str, Any] | None = None,
     confirmar_reemplazo: bool = False,
     estado_electrico: Mapping[str, Any] | None = None,
+    sistema: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Publica la energía multi-superficie de forma atómica.
 
@@ -183,11 +192,12 @@ def publicar_energia_multisuperficie(
         origen=origen, e_ac_total=e_ac_total, desglose=desglose,
         poa_ponderada=poa_ponderada, area_total=area_total,
         proyecto_fisico=proyecto_fisico, estado_electrico=estado_electrico,
+        sistema=sistema,
     )
     vigente = origen_vigente(session_state)
     if vigente is not None and vigente != origen and not confirmar_reemplazo:
         return {"publicado": False, "requiere_confirmacion": True, "origen_vigente": vigente}
-    for clave in CLAVES_SOLO_FISICO + ("multisup_estado_electrico",):
+    for clave in CLAVES_SOLO_FISICO + ("multisup_estado_electrico", "multisup_sistema"):
         if clave not in candidato:
             session_state.pop(clave, None)
     session_state.update(candidato)
@@ -214,7 +224,7 @@ def resultados_multisuperficie_a_guardar(session_state: Mapping[str, Any]) -> di
         for clave in (
             "E_ac_anual_kWh_multisup", "area_total_multisup",
             "multisup_desglose", "poa_df_multisup", "multisup_origen",
-            "multisup_estado_electrico",
+            "multisup_estado_electrico", "multisup_sistema",
         )
         if clave in session_state
     }
