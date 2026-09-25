@@ -31,6 +31,8 @@ CLAVE_FIRMA_PANELES = "_multisup_firma_paneles"
 KEYS_RESULTADOS_PANEL = (
     "bypass_multisup_ok", "bypass_multisup_resultados",
     "mppt_comb_resultado", "mppt_comb_asig", "mppt_comb_ok", "mppt_comb_panel",
+    # Comparación simplificado vs físico calculada con los paneles anteriores.
+    "multisup_proyecto_fisico_candidato",
 )
 
 
@@ -137,11 +139,12 @@ def firma_paneles_superficies(
     superficies: list[Mapping[str, Any]],
     panel_dict: Mapping[str, Any] | None,
     panel_nombre_dim: str | None,
-) -> str:
-    return fingerprint_mapping({
+) -> dict[str, str]:
+    """Huella del panel de cada superficie activa, por ``uid``."""
+    return {
         str(s.get("uid", s.get("nombre"))): firma_panel_superficie(s, panel_dict, panel_nombre_dim)
         for s in superficies if s.get("activa", True)
-    })
+    }
 
 
 def eficiencias_superficies(
@@ -184,8 +187,10 @@ def eficiencias_superficies_estado(
 def invalidar_por_cambio_panel(session_state: MutableMapping[str, Any]) -> list[str]:
     """Retira lo calculado con otros paneles si cambió el de alguna superficie.
 
-    Compara la huella actual de los paneles de las superficies activas con la
-    registrada. La primera vez solo la registra. Si cambió, retira la energía
+    Compara, superficie por superficie (``uid``), la huella actual del panel
+    con la registrada. La primera vez solo la registra. Agregar, eliminar,
+    desactivar o renombrar superficies no es un cambio de panel. Si el panel
+    de alguna superficie que ya existía cambió, retira la energía
     publicada y los resultados de bypass, MPPT y modo físico; la POA y la
     sombra no dependen del panel y se conservan. Retorna las claves retiradas.
     """
@@ -197,7 +202,9 @@ def invalidar_por_cambio_panel(session_state: MutableMapping[str, Any]) -> list[
     )
     anterior = session_state.get(CLAVE_FIRMA_PANELES)
     session_state[CLAVE_FIRMA_PANELES] = actual
-    if anterior is None or anterior == actual:
+    if not isinstance(anterior, Mapping):
+        return []
+    if all(anterior[uid] == actual[uid] for uid in anterior.keys() & actual.keys()):
         return []
     retiradas = retirar_energia_multisuperficie(session_state)
     for clave in KEYS_RESULTADOS_PANEL:
@@ -233,7 +240,12 @@ def seleccion_panel(
             raise PanelSuperficieError(f"El panel {opcion} no está en el catálogo.")
         ficha = dict(catalogo[opcion])
         if calibrar is not None:
-            ficha = dict(calibrar(ficha))
+            try:
+                ficha = dict(calibrar(ficha))
+            except (ValueError, TypeError, KeyError) as error:
+                raise PanelSuperficieError(
+                    f"El panel {opcion} no se pudo preparar para el cálculo: {error}"
+                ) from error
     return {"panel_origen": ORIGEN_PANEL_CATALOGO, "panel_nombre": opcion, "panel_ficha": ficha}
 
 
