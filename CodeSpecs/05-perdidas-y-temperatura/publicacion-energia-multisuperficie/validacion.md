@@ -1,6 +1,6 @@
 # Validación — Publicación única de la energía multi-superficie
 
-**Estado:** validación
+**Estado:** completado
 
 Entorno: Python 3.12 (igual que CI), `bipv_python/requirements.txt`,
 `pytest` 9.1.1, Streamlit 1.36.0; rama `claude/mejoras-bipv` sobre `main`
@@ -46,3 +46,9 @@ Implementación validada en local. Queda para cerrar la Spec como
 `main`, despliegue de la app Streamlit y una prueba en producción de los
 tres botones: el banner debe mostrar el origen y el reemplazo de un origen
 distinto debe pedir confirmación.
+
+## Cierre
+
+Pull Requests #45 y #46 integrados a `main` con CI en verde y aprobación humana. Desplegado en Streamlit. Prueba en producción (24-sep-2026): el bypass con CSV pidió confirmación antes de reemplazar el origen vigente, publicó `bypass_csv` y la sección del bypass muestra el origen y el botón «✖ Desactivar modo multi-superficie».
+
+Resultado final: Spec completada.

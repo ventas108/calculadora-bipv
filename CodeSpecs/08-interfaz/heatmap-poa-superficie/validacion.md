@@ -1,6 +1,6 @@
 # Validación — Error del mapa de calor POA con POA por superficie calculado
 
-**Estado:** validación
+**Estado:** completado
 
 ## Checklist de validación del módulo
 
@@ -19,3 +19,9 @@ Corrección local validada. Se cierra como `completado` tras el merge con CI
 en verde, el despliegue en Streamlit (`git pull` + `pm2 restart
 streamlit-bipv`) y la comprobación en producción de que el mapa de calor abre
 con POA por superficie calculado.
+
+## Cierre
+
+Pull Request #43 integrado a `main` con CI en verde y aprobación humana. Desplegado en Streamlit. Prueba en producción: el mapa de calor abre sin error con POA por superficie calculada. Desde el #48 indica además de dónde salen sus valores (verificado en producción el 24-sep-2026).
+
+Resultado final: Spec completada.

@@ -1,6 +1,6 @@
 # Validación — Vigencia de la POA por superficie
 
-**Estado:** validación
+**Estado:** completado
 
 Entorno: Python 3.12 (igual que CI), `bipv_python/requirements.txt`,
 `pytest` 9.1.1, Streamlit 1.36.0; rama `claude/mejoras-bipv` sobre `main`
@@ -39,3 +39,9 @@ Implementación validada en local. Queda para cerrar la Spec como
 `main`, despliegue de la app Streamlit y una prueba en producción: calcular
 la POA, cambiar el tilt de una superficie y ver el aviso y el botón
 deshabilitado; recalcular y ver el aviso desaparecer.
+
+## Cierre
+
+Pull Request #45 integrado a `main` con CI en verde y aprobación humana; el aviso del mapa de calor que faltaba llegó en el #48 (Tests #221 en `main` en verde). Desplegado en Streamlit. Prueba en producción (24-sep-2026): al cambiar el tilt sin recalcular aparece el aviso «no tiene POA vigente (POA sin calcular)» y se deshabilita «Usar sistema multi-superficie»; al recalcular el aviso desaparece. En 🌞 Trayectoria Solar, «Fachada principal» a 85° sin POA calculada muestra el aviso de que los colores usan la POA general de ☀️ Recurso Solar.
+
+Resultado final: Spec completada.

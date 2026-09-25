@@ -1,6 +1,6 @@
 # Tareas — Validación visible de los puntos 3D por superficie
 
-**Estado:** validación
+**Estado:** completado
 
 Orden obligatorio: primero las pruebas (deben fallar con el commit previo
 `3b53a1a0`), luego el código, luego la validación completa.

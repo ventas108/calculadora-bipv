@@ -1,6 +1,6 @@
 # Validación — Estado de sombra visible por superficie
 
-**Estado:** validación
+**Estado:** completado
 
 Entorno: Python 3.12 (igual que CI), `bipv_python/requirements.txt`,
 `pytest` 9.1.1, Streamlit 1.36.0; rama `claude/mejoras-bipv` sobre el commit
@@ -35,3 +35,9 @@ Implementación validada en local. Queda para cerrar la Spec como
 `main`, despliegue de Streamlit y una prueba en producción: calcular la
 sombra de un proyecto real y comprobar que la tabla y «🧪 Preparar
 comparación con modelo físico» coinciden.
+
+## Cierre
+
+Pull Request #45 integrado a `main` con CI en verde y aprobación humana. Desplegado en Streamlit. Prueba en producción (24-sep-2026): tras calcular la sombra, la tabla mostró el estado de cada superficie; al cambiar el azimuth del techo de 180° a 170° la tabla lo marcó `invalidada_geometria` con el motivo, coincidiendo con lo que acepta el modo físico. El editor de superficies que revertía el valor se corrigió en el #47.
+
+Resultado final: Spec completada.

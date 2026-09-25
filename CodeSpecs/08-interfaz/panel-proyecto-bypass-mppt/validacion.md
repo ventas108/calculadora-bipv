@@ -1,6 +1,6 @@
 # Validación — Panel y strings del proyecto en bypass y MPPT por superficie
 
-**Estado:** validación
+**Estado:** completado
 
 Entorno: Python 3.12 (igual que CI), `bipv_python/requirements.txt`,
 `pytest` 9.1.1, Streamlit 1.36.0; rama `claude/mejoras-bipv` sobre el commit
@@ -32,3 +32,9 @@ Implementación validada en local. Queda para cerrar la Spec como
 `main`, despliegue de Streamlit y una prueba en producción con el panel real
 del proyecto: el bypass debe arrancar con él y mostrar los strings de cada
 superficie.
+
+## Cierre
+
+Pull Requests #45 y #47 integrados a `main` con CI en verde y aprobación humana. Desplegado en Streamlit. Prueba en producción (24-sep-2026): el bypass arrancó con el panel del proyecto y los strings de cada superficie; tras el reporte en producción, leyenda y tablas usan el formato único «8 serie × 17 paralelo» (#47).
+
+Resultado final: Spec completada.

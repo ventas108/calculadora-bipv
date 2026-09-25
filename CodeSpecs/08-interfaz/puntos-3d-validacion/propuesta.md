@@ -1,6 +1,6 @@
 # Propuesta — Validación visible de los puntos 3D por superficie
 
-**Estado:** validación
+**Estado:** completado
 
 ## Objetivo
 

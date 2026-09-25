@@ -1,6 +1,6 @@
 # Tareas — Publicación única de la energía multi-superficie
 
-**Estado:** validación
+**Estado:** completado
 
 Orden obligatorio: primero las pruebas (deben fallar con `main` `38a56c81`),
 luego el código, luego la validación completa.

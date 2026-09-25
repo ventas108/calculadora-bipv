@@ -1,6 +1,6 @@
 # Diseño — Estado de sombra visible por superficie
 
-**Estado:** validación
+**Estado:** completado
 
 ## Entradas
 

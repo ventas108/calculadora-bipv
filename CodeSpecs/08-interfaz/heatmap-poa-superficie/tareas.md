@@ -1,6 +1,6 @@
 # Tareas — Error del mapa de calor POA con POA por superficie calculado
 
-**Estado:** validación
+**Estado:** completado
 
 - [x] Prueba `tests/test_vista3d_heatmap_poa_superficie.py`: detecta `or`
       sobre series POA en la página (roja con `e677aba6`: línea 2457) y

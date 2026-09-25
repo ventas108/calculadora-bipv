@@ -1,6 +1,6 @@
 # Propuesta — Error del mapa de calor POA con POA por superficie calculado
 
-**Estado:** validación
+**Estado:** completado
 
 ## Objetivo
 
