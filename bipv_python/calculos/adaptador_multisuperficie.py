@@ -4,6 +4,7 @@ from collections.abc import Mapping, MutableMapping
 from typing import Any
 import numpy as np
 import pandas as pd
+from calculos.panel_superficie import PanelSuperficieError, panel_de_superficie
 from calculos.inversores_multisuperficie import validar_inversores_y_asignaciones, aplicar_tipos_derivados
 from calculos.sombras_3d import ESTADOS_SOMBRA_ACEPTABLES
 from calculos.transicion_multisuperficie import inversor_nuevo, proyecto_nuevo, superficie_nueva
@@ -16,9 +17,10 @@ def construir_proyecto_desde_session_state(session_state: Mapping[str, Any]) -> 
     superficies = [s for s in (session_state.get("superficies_bipv") or []) if s.get("activa", True)]
     if not superficies:
         raise ValueError("No hay superficies BIPV activas para el modo fisico.")
-    panel = session_state.get("panel_dict")
-    if not isinstance(panel, Mapping):
-        raise ValueError("Falta 'panel_dict' global para el modo fisico.")
+    # Spec 05/panel-por-superficie: cada superficie usa su panel; el
+    # panel_dict global solo hace falta para las que siguen al del proyecto.
+    panel_dict = session_state.get("panel_dict")
+    panel_nombre_dim = session_state.get("panel_nombre_dim")
     inversores_ss = session_state.get("multisup_inversores")
     if not isinstance(inversores_ss, list) or not inversores_ss:
         raise ValueError("Falta 'multisup_inversores'.")
@@ -38,6 +40,10 @@ def construir_proyecto_desde_session_state(session_state: Mapping[str, Any]) -> 
         for campo in _CLAVES_SUPERFICIE_REQUERIDAS:
             if entrada.get(campo) is None:
                 raise ValueError(f"La superficie '{nombre}' no puede entrar al modo fisico: falta '{campo}'.")
+        try:
+            panel = panel_de_superficie(entrada, panel_dict, panel_nombre_dim)["panel"]
+        except PanelSuperficieError as error:
+            raise ValueError(f"Modo fisico: {error}") from error
         sombra = np.asarray(entrada["p_shade"], dtype=float)
         if sombra.shape != (_HORAS_ANIO,) or not np.isfinite(sombra).all() or ((sombra < 0) | (sombra > 1)).any():
             raise ValueError(f"La superficie '{nombre}' tiene p_shade invalido; se requieren 8760 valores entre 0 y 1.")

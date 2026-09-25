@@ -6,6 +6,7 @@ Cada superficie tiene su propia tilt, azimuth, área y POA calculada con pvlib.
 """
 
 from __future__ import annotations
+from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 from calculos.solar import calcular_poa
@@ -578,32 +579,49 @@ def agregar_poa_ponderada(
 def e_ac_total_multisup(
     poa_superficies: dict,
     superficies: list[dict],
-    eta_panel: float = 0.16,
+    eta_panel: float | Mapping[str, float] = 0.16,
     pr: float = 0.78,
 ) -> dict:
     """
     Calcula E_ac anual total y por superficie para el sistema multi-superficie.
 
+    ``eta_panel`` puede ser un mapa ``nombre → η`` (Spec
+    ``05/panel-por-superficie``): cada superficie usa la eficiencia de su
+    panel y una superficie activa sin η es un error, no un 16 % implícito.
+
     Retorna:
         e_ac_total_kWh  : float — suma de todas las superficies activas
         area_total_m2   : float — suma de áreas activas
-        desglose        : list[dict] — {nombre, tipo, area_m2, e_ac_kWh, poa_kWh_m2}
+        desglose        : list[dict] — {nombre, tipo, area_m2, e_ac_kWh,
+                          poa_kWh_m2[, eta_panel]}
     """
+    por_superficie = isinstance(eta_panel, Mapping)
     desglose, e_total, area_total = [], 0.0, 0.0
     for sup in superficies:
         if not sup.get("activa", True):
             continue
+        if por_superficie:
+            if sup["nombre"] not in eta_panel:
+                raise ValueError(
+                    f"La superficie '{sup['nombre']}' no tiene la eficiencia de su panel."
+                )
+            eta_sup = float(eta_panel[sup["nombre"]])
+        else:
+            eta_sup = float(eta_panel)
         poa = poa_superficies.get(sup["nombre"])
-        prod = produccion_superficie(poa, sup["area_m2"], eta_panel, pr)
+        prod = produccion_superficie(poa, sup["area_m2"], eta_sup, pr)
         e_total    += prod["e_ac_anual_kWh"]
         area_total += sup["area_m2"]
-        desglose.append({
+        fila = {
             "nombre":       sup["nombre"],
             "tipo":         sup["tipo"],
             "area_m2":      sup["area_m2"],
             "e_ac_kWh":     prod["e_ac_anual_kWh"],
             "poa_kWh_m2":   prod["poa_anual_kWh_m2"],
-        })
+        }
+        if por_superficie:
+            fila["eta_panel"] = round(eta_sup, 5)
+        desglose.append(fila)
     return {
         "e_ac_total_kWh": round(e_total, 1),
         "area_total_m2":  round(area_total, 1),

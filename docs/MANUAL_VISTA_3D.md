@@ -1,7 +1,7 @@
 # Manual de uso — Página 9 🗺️ Vista 3D y Multi-Superficie
 
-Versión: 25-sep-2026 (rev. 5) · Código de referencia: `main` con los PR #45 a
-#48 (desplegados el 24 y 25-sep-2026).
+Versión: 25-sep-2026 (rev. 6) · Código de referencia: `main` con los PR #45 a
+#48 (desplegados el 24 y 25-sep-2026) y la Spec «panel por superficie».
 
 > 💡 **Cómo leer este manual:** los recuadros amarillos **«💡 Explicación»**
 > aclaran dudas reales que surgieron al probar la página en producción. Si algo
@@ -11,15 +11,17 @@ Versión: 25-sep-2026 (rev. 5) · Código de referencia: `main` con los PR #45 a
 
 ---
 
-## 0. Novedades de esta versión (24-sep-2026)
+## 0. Novedades de esta versión (24 y 25-sep-2026)
 
 | Cambio | Qué ves ahora | Antes |
 |---|---|---|
+| **Panel por superficie** (25-sep) | Cada superficie tiene **Panel de esta superficie**: por defecto el del proyecto, o uno del catálogo. Energía, strings, bypass, MPPT y modo físico usan el de cada superficie | Todas las superficies usaban un solo panel |
+| **Eficiencia real del panel** (25-sep) | La energía simplificada usa η = Pmax ÷ área del módulo (ASP-ST1-T40: **8,75 %**) y la tabla muestra *Panel* y *η (%)* | Usaba siempre **16 %**: con ASP-ST1-T40 la energía salía **83 % más alta** |
 | **Vigencia de la POA** | Si cambias la geometría, el montaje, el albedo, el bifacial, el TMY o la ubicación, la superficie sale en **⚠️ Estas superficies no tienen POA vigente…** y no se usa hasta recalcular | Se seguía usando la POA de la geometría anterior sin aviso |
 | **Publicación única de la energía** | Los tres botones publican juntos total, desglose, área y POA con su **origen**; reemplazar otro origen pide **confirmación** | «Ganaba el último botón» y el bypass cambiaba solo el total |
 | **Puntos 3D** | Acepta `x,y,z` y `x;y;z` (coma decimal); una línea mal escrita sale en rojo y bloquea el cálculo; aviso de punto dentro del volumen antes de calcular | Las líneas mal escritas se perdían en silencio |
 | **Estado de la sombra** | Tabla **Estado de la sombra por superficie** con 🟢/🔴/⚪, motivo y qué hacer | No se veía; además el resultado de «🌳 Calcular sombra» **se perdía** al calcular |
-| **Panel y strings del proyecto** | Bypass y MPPT arrancan con **Panel del proyecto (…)** y el N serie × N paralelo de cada superficie | Arrancaban con *ASP-ST1-T40* y 8 módulos en serie |
+| **Panel y strings del proyecto** | Bypass y MPPT usan el panel de cada superficie y su N serie × N paralelo | Arrancaban con *ASP-ST1-T40* y 8 módulos en serie |
 | **Mapa de calor POA** | Funciona con POA por superficie | Se caía con «The truth value of a DataFrame is ambiguous» |
 | **Sombra v2** | Las horas con el sol detrás del módulo no cuentan como sombra | Se contaba sombra total en esas horas |
 | **Formato de strings** | Leyendas y tablas del bypass y del MPPT dicen siempre «8 serie × 17 paralelo» | La leyenda decía «17×8s» y la tabla «8 × 17» |
@@ -34,6 +36,9 @@ Versión: 25-sep-2026 (rev. 5) · Código de referencia: `main` con los PR #45 a
    panel y los strings del proyecto.
 4. Vuelve a publicar la energía con el botón que elijas: si el banner dice
    **origen desconocido**, es energía de la versión anterior.
+5. **Desde el 25-sep-2026, vuelve a publicar toda energía simplificada o de
+   bypass**, aunque el banner muestre un origen: se calculó con η = 16 % y no
+   con la eficiencia de tu panel.
 
 ---
 
@@ -105,6 +110,19 @@ Debajo hay **3 pestañas principales**:
   reflejante detrás; si no, inflas la producción.
 - **Desactivar vs eliminar:** desmarca *Activa* para excluir temporalmente una
   superficie sin perder sus datos; 🗑️ la elimina.
+- **Panel de esta superficie:** por defecto **Panel del proyecto (…)**, el de
+  📐 Dimensionamiento. Si esta superficie lleva otra referencia, elígela del
+  catálogo. Al lado verás Pmax, **η** y el área del módulo.
+
+> 💡 **Explicación — fachada y techo con paneles distintos.** Es común en BIPV:
+> vidrio semitransparente en la fachada y módulo opaco en el techo. Cada
+> superficie usa su panel en todo: energía (POA × área × η × PR), strings,
+> bypass, MPPT y modo físico. Si la superficie usa un panel distinto al del
+> proyecto, escribe su **N serie** en el paso 3: el de Dimensionamiento es
+> para el otro panel. Cambiar el panel **retira la energía publicada** y los
+> resultados de bypass, MPPT y físico («ℹ️ Cambió el panel de una
+> superficie…»); la POA y la sombra siguen vigentes, así que solo tienes que
+> volver a publicar.
 
 ### Paso 2 · Sombra 3D por superficie (opcional, necesaria para el modo físico)
 
@@ -224,8 +242,10 @@ Debajo hay **3 pestañas principales**:
 - Si el proyecto es bifacial, marca o desmarca **🔄 Aplicar modelo bifacial**.
   Techos y pérgolas (tilt < 80°) siempre conservan su ganancia; las fachadas
   siguen su selector de montaje.
-- Verás el **📊 Resumen POA por superficie** y la **⚡ Producción total del
-  sistema** (con η del panel y PR del sistema).
+- Verás el **📊 Resumen POA por superficie**, con el *Panel* y la *η (%)* de
+  cada superficie, y la **⚡ Producción total del sistema** (POA × área × η
+  del panel de cada superficie × PR del sistema). Si un panel no trae
+  potencia o área, esa superficie no entra y la página lo dice.
 
 > 🚩 **La POA vigila su vigencia:** cada POA queda firmada con la geometría
 > (tipo, tilt, azimuth, área, montaje), el albedo, el bifacial, el TMY y la
@@ -245,7 +265,7 @@ el **origen**:
 
 | Botón | Dónde | Origen que publica |
 |---|---|---|
-| 🔗 **Usar sistema multi-superficie en Financiero** | ⚙️ Superficies BIPV | Simplificado: POA × área × η × PR |
+| 🔗 **Usar sistema multi-superficie en Financiero** | ⚙️ Superficies BIPV | Simplificado: POA × área × η del panel de cada superficie × PR |
 | ⚡ **Calcular bypass por superficie** | 📊 Producción por Superficie › 5 | Bypass por superficie con el CSV de 🔀 Mismatch |
 | ✅ **Adoptar cálculo físico** | ⚙️ Superficies BIPV › modo físico | Modelo físico SDM + bypass + inversores |
 
@@ -323,16 +343,15 @@ calcula hasta que todas las superficies activas tengan POA vigente.
    superficie.
 5. **⚡ Bypass diodes por superficie:** requiere el CSV de 🔀 Mismatch
    (sección 5).
-   - **Panel fotovoltaico:** por defecto *Panel del proyecto (…)* de
-     📐 Dimensionamiento, aunque no esté en el catálogo, si tiene ficha SDM
-     completa. Si no hay panel del proyecto o no tiene SDM, elige uno del
-     catálogo (el botón queda deshabilitado hasta elegirlo). Otro panel queda
-     marcado en los resultados.
+   - **Panel:** el de cada superficie (paso 1). Ya no hay un selector de
+     panel en esta sección. El panel necesita ficha SDM completa; si no la
+     tiene, el botón queda deshabilitado y el mensaje nombra la superficie.
    - **Strings:** cada superficie usa su N serie × N paralelo del paso 3. Si
-     faltan, usa el N serie de Dimensionamiento y estima el paralelo por área,
+     faltan, usa el N serie de Dimensionamiento (solo si la superficie usa el
+     panel del proyecto) y estima el paralelo con el área de **su** módulo,
      con aviso. Los strings se muestran siempre como «8 serie × 17
-     paralelo». La tabla muestra *Panel usado*, *N serie × paralelo* y
-     *Origen strings*.
+     paralelo». La tabla muestra *Panel usado*, *Panel del proyecto*,
+     *η (%)*, *N serie × paralelo* y *Origen strings*.
    - Necesita POA vigente en todas las superficies activas. Si una superficie
      falla, **no publica nada** y muestra la causa.
    - Publica con origen *bypass por superficie*; si la energía vigente es de
@@ -343,11 +362,12 @@ calcula hasta que todas las superficies activas tengan POA vigente.
      mismo del banner de ⚙️ Superficies BIPV. Si la energía vigente es de otro
      origen, dice *Resultado calculado, no publicado* y el origen vigente.
 6. **🔀 Strings de distinta orientación en un mismo MPPT:** es **informativa**
-   y no cambia la energía oficial. Usa el mismo panel y los mismos strings por
-   defecto que el bypass. Asigna superficies a MPPTs y presiona
-   **🔀 Simular curva IV combinada por MPPT**. El resultado indica el **panel
-   usado** (y si es distinto al del proyecto) y los strings de cada superficie
-   con su origen. Semáforo:
+   y no cambia la energía oficial. Usa el panel y los strings de cada
+   superficie, como el bypass. Si dos superficies con paneles distintos
+   comparten MPPT, la curva combinada incluye también la diferencia de voltaje
+   entre paneles. Asigna superficies a MPPTs y presiona
+   **🔀 Simular curva IV combinada por MPPT**. El resultado indica el **panel**
+   y los strings de cada superficie con su origen. Semáforo:
    - 🟢 menos de 0,5 %: compartir el MPPT es aceptable;
    - 🟠 entre 0,5 % y 2 %: evalúa si el ahorro del inversor lo compensa;
    - 🔴 más de 2 %: conviene un MPPT por orientación.
@@ -418,6 +438,10 @@ calcula hasta que todas las superficies activas tengan POA vigente.
 - La **POA por superficie no se guarda**: al abrir el proyecto aparece como
   «POA sin calcular»; presiona **⚡ Calcular POA**.
 - Los **puntos 3D** se conservan y siguen ligados a su superficie.
+- El **panel de cada superficie** se guarda con su ficha. Los proyectos
+  guardados antes del 25-sep-2026 cargan con **Panel del proyecto (…)** en
+  todas las superficies. Si al cargar el panel de una superficie no coincide
+  con el guardado, el estado se rechaza con «Panel diferente en superficie…».
 - Proyectos guardados antes del 24-sep-2026: si traían proyecto físico se
   restauran con origen **físico**; los demás muestran **origen desconocido**
   hasta que vuelvas a publicar.
@@ -453,8 +477,8 @@ no estén guardados en un proyecto.
       superficie*.
 - [ ] Inversores: ✅ Asignaciones válidas, con N serie y N paralelo en cada
       superficie.
-- [ ] Bypass y MPPT con **Panel del proyecto (…)** y strings «configurado en
-      la superficie» (o una diferencia que elegiste a propósito).
+- [ ] Cada superficie con el **panel que de verdad lleva** (columna *Panel* y
+      *η (%)* del resumen) y strings «configurado en la superficie».
 - [ ] El banner ✅ Modo multi-superficie activo muestra el **origen** que
       elegiste (simplificado, bypass con CSV o físico) y la E_ac que esperas.
 
@@ -470,7 +494,10 @@ no estén guardados en un proyecto.
 | … no puede entrar al modo físico: falta 'p_shade' (o 'firma_sombra') | La superficie no está en 🟢 en *Estado de la sombra por superficie* | Sigue la columna *Qué hacer* y recalcula con 🌳 Calcular sombra |
 | ❌ Líneas con error en … | Un punto 3D mal escrito | Corrige la línea indicada (`x,y,z` o `x;y;z`) |
 | ⚠️ El punto … está DENTRO del modelo / a N cm de la malla | Punto dentro del volumen o pegado a la malla | Muévelo 20–50 cm por delante de la superficie |
-| ⚠️ El panel del proyecto … no tiene ficha SDM completa | El bypass y el MPPT necesitan el SDM | Elige un panel del catálogo o completa la ficha en 📐 Dimensionamiento |
+| ❌ '…': el panel … no tiene ficha SDM completa | El bypass y el MPPT necesitan el SDM | Elige otro panel para esa superficie en el paso 1 o completa la ficha en 📐 Dimensionamiento |
+| ⚠️ El panel … no trae potencia (Pmax) o área del módulo | No se puede calcular su eficiencia | Elige otro panel o completa la ficha; la superficie queda fuera de la energía mientras tanto |
+| ❌ La superficie … usa un panel distinto al del proyecto y no tiene N serie propio | El N serie de Dimensionamiento es para otro panel | Escribe N serie y N paralelo de esa superficie en el paso 3 |
+| ℹ️ Cambió el panel de una superficie: se retiraron la energía publicada… | Cambiaste un panel (aquí o en 📐 Dimensionamiento) | Vuelve a publicar; la POA y la sombra siguen vigentes |
 | … falta 'n_serie' / 'n_paralelo' / 'inversor_id' | Configuración eléctrica de la superficie incompleta | Completa el paso 3 |
 | ❌ No se puede calcular el modo físico: … | Otro dato faltante o inválido | Completa lo indicado; no inventes valores |
 | ❌ El candidato ya no es válido… | Algo cambió después de comparar | Vuelve a calcular la comparación |
@@ -479,7 +506,7 @@ no estén guardados en un proyecto.
 | ⚠️ Financiero, Baterías y CO₂ ya usan energía … ¿Reemplazarla por…? | Hay energía publicada de otro origen | ✅ Sí, reemplazar o ✖ Cancelar |
 | ❌ Bypass no publicado; falló en: … | Una superficie no pudo simular el bypass | Corrige la causa y vuelve a calcular |
 | ❌ No se publicó / No se calculó: hay superficies activas sin POA vigente | Falta recalcular la POA | Presiona ⚡ Calcular POA para todas las superficies |
-| ❌ No se calculó: elige el panel y corrige los strings indicados arriba | Sin panel utilizable o strings sin N serie | Elige un panel y completa N serie/N paralelo en el paso 3 |
+| ❌ No se calculó: corrige el panel o los strings indicados arriba | Un panel sin SDM o strings sin N serie | Cambia el panel en el paso 1 o completa N serie/N paralelo en el paso 3 |
 | ❌ La superficie … no tiene N serie válido y tampoco hay N serie en 📐 Dimensionamiento | No hay de dónde tomar el N serie | Escribe N serie y N paralelo de esa superficie en el paso 3 |
 | ⚠️ '…': strings por estimación | La superficie no tiene N serie o N paralelo propios | Complétalos en el paso 3 para usar los reales |
 | ⚠️ Esta energía se publicó con una versión anterior… (origen desconocido) | Energía de antes del 24-sep-2026 | Vuelve a publicarla antes de guardar |
@@ -515,7 +542,10 @@ actualización. Tarda unos 30 minutos.
 
 > 💡 **Valores de referencia (Bogotá):** fachada sur a 75° ≈ 1.004
 > kWh/m²·año; techo a 10° ≈ 1.675 kWh/m²·año. La fachada recibe bastante menos
-> porque a esta latitud el sol pasa casi por encima.
+> porque a esta latitud el sol pasa casi por encima. Con el panel ASP-ST1-T40
+> (η 8,75 %) y PR 78 %: fachada ≈ **6.667 kWh/año** y techo ≈ **11.123
+> kWh/año**. Antes del 25-sep-2026 la tabla mostraba 12.191 y 20.348 porque
+> usaba η = 16 %.
 
 ### A.3 Prueba 2 · Origen de la energía y confirmación
 Requiere el CSV de sombreado en 🔀 Mismatch › Sección 5.
@@ -566,10 +596,27 @@ Escribe en los recuadros y haz clic fuera:
 
 ### A.6 Prueba 5 · Panel y strings del proyecto
 En **5. Bypass** y **6. MPPT**:
-- El panel por defecto es **«Panel del proyecto (…)»**.
+- La tabla muestra *Panel usado* = el panel del proyecto en las dos
+  superficies.
 - Los strings dicen **«8 serie × 17 paralelo»** en la leyenda y en las tablas.
 - Con 97,3 m² y un módulo de 0,72 m² caben ~135 módulos; con 8 en serie
   salen 17 strings en paralelo.
+
+### A.6b Prueba 7 · Panel por superficie
+1. En **Techo 1 › Panel de esta superficie** elige
+   **SPR-E20-327 (E20-327NE-WHT-D)** → al lado: Pmax 327,1 W · η **20,06 %**
+   · módulo 1,63 m².
+2. Si la energía estaba publicada → «ℹ️ Cambió el panel de una superficie: se
+   retiraron la energía publicada…». **No** aparece el aviso de POA no
+   vigente.
+3. Resumen POA: fachada *ASP-ST1-T40* 8,75 % ≈ 6.667 kWh/año; techo
+   *SPR-E20-327* 20,06 % ≈ **25.500 kWh/año**.
+4. **5. Bypass** o **6. MPPT** → «❌ La superficie 'Techo 1' usa un panel
+   distinto al del proyecto y no tiene N serie propio…». Escribe su N serie y
+   N paralelo en 🔌 Inversores por superficie (por ejemplo 59 módulos: 8
+   serie × 7 paralelo) y el error desaparece.
+5. Vuelve el techo a **Panel del proyecto (…)** para dejar el proyecto como
+   estaba.
 
 ### A.7 Prueba 6 · Mapa de calor
 En **🌞 Trayectoria Solar › 2. Horas productivas vs sombreadas**:
