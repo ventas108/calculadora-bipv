@@ -1,7 +1,13 @@
 # Manual de uso — Página 9 🗺️ Vista 3D y Multi-Superficie
 
-Versión: 24-sep-2026 (rev. 4) · Código de referencia: `main` `72326f2f`
-(desplegado el 24-sep-2026).
+Versión: 25-sep-2026 (rev. 5) · Código de referencia: `main` con los PR #45 a
+#48 (desplegados el 24 y 25-sep-2026).
+
+> 💡 **Cómo leer este manual:** los recuadros amarillos **«💡 Explicación»**
+> aclaran dudas reales que surgieron al probar la página en producción. Si algo
+> no se comporta como esperas, busca primero el recuadro de ese paso. El
+> **Anexo A** trae un ejercicio completo, con valores, para verificar la página
+> de principio a fin.
 
 ---
 
@@ -114,6 +120,19 @@ Debajo hay **3 pestañas principales**:
    8,5;0;2      ← punto y coma entre valores, coma decimal
    ```
    Los puntos quedan ligados a la superficie aunque la renombres.
+
+> 💡 **Explicación — el texto gris no son puntos.** Cuando el recuadro está
+> vacío muestra en gris un **ejemplo de formato** («8,0,2 / 8,0,3.5 /
+> 8;0;5,5»). No son puntos reales: por eso la tabla de estado dice
+> «Puntos: 0». Haz clic dentro, escribe tus propios puntos y **haz clic fuera
+> del recuadro (o pulsa Ctrl+Enter)**: Streamlit solo aplica el texto cuando
+> sales del recuadro.
+
+> 💡 **Explicación — por qué «8,5,0,2» es un error.** Con comas, la app lee
+> cuatro números (8 / 5 / 0 / 2) y no puede adivinar cuál es el decimal. Si
+> usas coma decimal, separa los valores con punto y coma: **8,5;0;2**. Si usas
+> punto decimal, separa con comas: **8.5,0,2**. La línea con error se queda
+> escrita y marcada en rojo hasta que la corrijas.
    - Ejes: **X = Este, Y = Norte (verdadero), Z = altura.**
    - Coloca cada punto **sobre la superficie de módulos, 20–50 cm por delante
      del muro o cubierta**, nunca dentro del volumen del edificio. Un punto
@@ -123,11 +142,26 @@ Debajo hay **3 pestañas principales**:
    - Si la escena tiene un giro de norte (`northOffset`) distinto de 0, las
      coordenadas que ves en Site Designer están giradas: los puntos deben ir en
      ejes reales (Norte verdadero).
+
+> 💡 **Explicación — cómo saber dónde está cada obstáculo.** El mensaje verde
+> («Malla Site Designer cargada: 1 bloque(s), 4.56 × 3.69 × 10.0 m») da el
+> **tamaño** de la escena, no su **ubicación**. Para ubicar un bloque abre el
+> `.json` con el Bloc de notas y busca `"Blocks"`: cada bloque trae `"min"` y
+> `"max"` en **milímetros** (divide entre 1000 para pasar a metros). La app
+> además gira la escena el ángulo `"northOffset"` para llevarla a Norte
+> verdadero, así que las coordenadas finales cambian un poco. El **Anexo A**
+> muestra un ejemplo resuelto.
    - Una línea mal escrita (por ejemplo `8,5,0,2`, `8,0` o `8,a,2`) aparece
      en **rojo** con su número de línea y el motivo, y **bloquea el cálculo**
      hasta que la corrijas. Nunca se descarta en silencio.
    - Con la escena cargada, la página avisa **antes de calcular** si un punto
      está dentro del volumen o a menos de 10 cm de la malla.
+
+> 💡 **Explicación — los avisos amarillos no bloquean el botón.** «El punto …
+> está DENTRO del modelo» o «…está a 3 cm de la malla» son advertencias
+> previas: puedes calcular igual, pero esa superficie saldrá en 🔴
+> *error_geometrico* y la tabla dirá qué punto está mal. Las **líneas en rojo**
+> (mal escritas) sí bloquean el botón.
 3. Presiona **🌳 Calcular sombra de todas las superficies**. El botón solo se
    habilita con malla, TMY, sin líneas con error y al menos un punto en cada
    superficie activa; si no, un aviso dice qué falta.
@@ -147,6 +181,12 @@ Debajo hay **3 pestañas principales**:
 | sin_calcular | Todavía no se calculó | ⚪ |
 
    La columna **Qué hacer** indica la corrección de cada caso.
+
+> 💡 **Explicación — «mi superficie desapareció de la tabla».** La tabla (y el
+> recuadro de puntos) solo muestran superficies **activas**. Si una superficie
+> desaparece, abre su recuadro en ⚙️ Superficies BIPV y revisa la casilla
+> **Activa**: está justo debajo de Tilt, Azimuth y Área y es fácil desmarcarla
+> sin querer.
 
 > ℹ️ **Desde el 24-sep-2026 (algoritmo v2)**, las horas en que el sol está
 > **detrás** del plano del módulo ya no cuentan como sombra: en esas horas no
@@ -222,6 +262,19 @@ el **origen**:
   Financiero, Baterías y CO₂ a la energía de superficie única. Publicar un
   origen no físico también retira el proyecto físico: un proyecto guardado
   nunca mezcla el proyecto físico con energía de otro origen.
+
+> 💡 **Explicación — dónde está el banner del origen.** El banner verde
+> «✅ Modo multi-superficie activo — origen: …» está en **⚙️ Superficies BIPV ›
+> 🔗 Integrar al análisis financiero**, a la derecha del botón «Usar sistema
+> multi-superficie en Financiero». La sección del bypass (📊 Producción por
+> Superficie › 5) repite el origen y el botón «✖ Desactivar» para que no
+> tengas que cambiar de sub-pestaña.
+
+> 💡 **Explicación — «no veo el botón Calcular bypass por superficie».** El
+> bypass necesita el **CSV de sombreado** cargado en **🔀 Mismatch › Sección 5**.
+> Sin él, la sección 5 solo muestra el aviso «Carga el CSV de sombreado…». Si
+> el CSV no tiene columna *Fachada*, el bypass usa el promedio del CSV para
+> todas las superficies («— promedio —» en la tabla).
 
 ### Paso 6 · Modo físico (opcional, recomendado para validar)
 
@@ -299,6 +352,13 @@ calcula hasta que todas las superficies activas tengan POA vigente.
    - 🟠 entre 0,5 % y 2 %: evalúa si el ahorro del inversor lo compensa;
    - 🔴 más de 2 %: conviene un MPPT por orientación.
 
+> 💡 **Explicación — cómo leer «8 serie × 17 paralelo».** Significa **8
+> módulos en serie por string** y **17 strings en paralelo** (8 × 17 = 136
+> módulos). Si el origen dice «N serie de Dimensionamiento, paralelo por
+> área», es una **estimación**: la superficie todavía no tiene N serie y N
+> paralelo propios. Escríbelos en ⚙️ Superficies BIPV › Inversores por
+> superficie y el origen cambiará a «configurado en la superficie».
+
 ## 7. Sub-pestaña 🌞 Trayectoria Solar
 
 1. **Trayectoria solar** (azimut vs elevación) con el perfil de horizonte de
@@ -329,6 +389,20 @@ calcula hasta que todas las superficies activas tengan POA vigente.
 > Designer. Son dos fuentes de sombra distintas; que no coincidan no
 > significa un error.
 
+> 💡 **Explicación — «el mapa sale vacío de mayo a julio».** Es correcto en
+> Colombia. A la latitud de Bogotá (4,7° N) el sol pasa **al norte** a mitad de
+> año, así que una fachada mirando al **sur** (azimuth 180°) no lo ve de mayo a
+> julio: esas horas son «sin vista de la fachada». El gráfico de AOI lo
+> confirma con «–» en esos meses. Una fachada norte tendría el patrón opuesto,
+> y un techo casi horizontal produce todo el año.
+
+> 💡 **Explicación — de dónde salen los colores del mapa.** Las **horas**
+> productivas siempre son las de la superficie elegida. Los **colores** solo
+> son su POA real si la superficie tiene POA vigente (nota «Valores: POA
+> vigente de esta superficie»). Si cambiaste el tilt, el azimuth o el área sin
+> recalcular, sale un aviso ⚠️ y los colores usan la POA general del proyecto:
+> pulsa **⚡ Calcular POA** para verla bien.
+
 ---
 
 ## 8. Guardar y cargar un proyecto con varias superficies
@@ -348,7 +422,26 @@ calcula hasta que todas las superficies activas tengan POA vigente.
   restauran con origen **físico**; los demás muestran **origen desconocido**
   hasta que vuelvas a publicar.
 
-## 9. Lista de verificación antes de ir a Financiero
+## 9. Después de actualizar o reiniciar la app
+
+Cada despliegue (`pm2 restart streamlit-bipv`) **reinicia Streamlit** y borra
+lo que tenías abierto en el navegador: superficies, POA, sombra y bypass que
+no estén guardados en un proyecto.
+
+1. Antes de un despliegue, **guarda el proyecto** si estás trabajando en algo.
+2. Después, recarga la página con **Ctrl+F5** e inicia sesión si te lo pide.
+3. **Carga el proyecto** y pasa por **☀️ Recurso Solar** (ahí se restaura el
+   estado multi-superficie).
+4. En Vista 3D pulsa **⚡ Calcular POA**: la POA por superficie no se guarda con
+   el proyecto.
+
+> 💡 **Explicación — los campos del editor.** Desde el 25-sep-2026, Nombre,
+> Tipo, Tilt, Azimuth, Área, Activa y Montaje conservan lo que escribes y el
+> encabezado de la superficie («… · Az 170° · …») se actualiza al instante.
+> Si cambias el tipo a uno con otro rango de tilt (por ejemplo Fachada 90° →
+> Techo), el tilt se ajusta solo al máximo permitido (45°).
+
+## 10. Lista de verificación antes de ir a Financiero
 
 - [ ] Recurso Solar ✅ y TMY vigente.
 - [ ] Todas las superficies reales creadas, con tilt, azimut y área correctos,
@@ -365,7 +458,7 @@ calcula hasta que todas las superficies activas tengan POA vigente.
 - [ ] El banner ✅ Modo multi-superficie activo muestra el **origen** que
       elegiste (simplificado, bypass con CSV o físico) y la E_ac que esperas.
 
-## 10. Mensajes frecuentes y qué hacer
+## 11. Mensajes frecuentes y qué hacer
 
 | Mensaje | Causa | Solución |
 |---|---|---|
@@ -393,3 +486,103 @@ calcula hasta que todas las superficies activas tengan POA vigente.
 | ⚠️ Se descartaron los puntos de «…»: esa superficie ya no existe | Puntos de una superficie eliminada | Ninguna acción; escribe los puntos de las superficies actuales |
 | Para calcular la sombra: … | Falta escena, TMY, corregir líneas o puntos | Haz lo que indica el aviso |
 | 📂 Estado multi-superficie rechazado… | El TMY o las firmas del proyecto guardado no coinciden | Recalcula POA, sombra y vuelve a publicar |
+
+---
+
+## Anexo A. Ejercicio completo de verificación (con valores)
+
+Este ejercicio es el que se usó el 24 y 25-sep-2026 para validar la página en
+producción. Sirve para comprobar que todo funciona después de una
+actualización. Tarda unos 30 minutos.
+
+### A.1 Preparación
+1. Carga un proyecto con **🏠 Proyecto**, **☀️ Recurso Solar** (TMY) y
+   **📐 Dimensionamiento** (panel) calculados.
+2. En **⚙️ Superficies BIPV** deja **2 superficies activas**:
+
+| Superficie | Tipo | Tilt | Azimuth | Área |
+|---|---|---|---|---|
+| Fachada principal | Fachada | 90° | 180° | 97,3 m² |
+| Techo 1 | Techo | 10° | 180° | 97,3 m² |
+
+### A.2 Prueba 1 · POA vigente
+1. Pulsa **⚡ Calcular POA** → «POA calculada para 2 superficie(s)».
+2. Cambia el tilt de la fachada (90 → 75) **sin recalcular** → aviso «⚠️ Estas
+   superficies no tienen POA vigente… Fachada principal: cambió la geometría…»,
+   el resumen muestra solo el techo y «🔗 Usar sistema multi-superficie» queda
+   en gris.
+3. Pulsa **⚡ Calcular POA** → vuelven las 2 superficies y el botón se habilita.
+
+> 💡 **Valores de referencia (Bogotá):** fachada sur a 75° ≈ 1.004
+> kWh/m²·año; techo a 10° ≈ 1.675 kWh/m²·año. La fachada recibe bastante menos
+> porque a esta latitud el sol pasa casi por encima.
+
+### A.3 Prueba 2 · Origen de la energía y confirmación
+Requiere el CSV de sombreado en 🔀 Mismatch › Sección 5.
+1. **🔗 Usar sistema multi-superficie** → banner con origen **simplificado**.
+2. **5. Bypass › ⚡ Calcular bypass por superficie** → pregunta «¿Reemplazarla
+   por bypass por superficie con CSV de sombreado?».
+3. **✖ Cancelar** → «Resultado calculado, no publicado: Financiero usa energía
+   de origen simplificado».
+4. Repite y pulsa **✅ Sí, reemplazar** → «✅ Activo en Financiero… — origen:
+   bypass por superficie con CSV de sombreado» y el botón **✖ Desactivar**.
+5. **✖ Desactivar** → «Resultado calculado, no publicado en Financiero».
+
+### A.4 Prueba 3 · Puntos 3D (con escena de Site Designer)
+Escena de ejemplo: un **árbol** modelado como bloque sólido.
+
+```
+"northOffset": 7
+"Blocks": [ { "min": [900, 200, 0], "max": [5100, 3400, 10000], "isTree": true } ]
+```
+
+| Paso | Cálculo | Resultado |
+|---|---|---|
+| Pasar mm a m | min ÷ 1000, max ÷ 1000 | X 0,9–5,1 m · Y 0,2–3,4 m · Z 0–10 m |
+| Girar 7° al Norte verdadero | lo hace la app | X ≈ 0,9–5,5 m · Y ≈ −0,4–3,3 m · Z 0–10 m |
+
+Escribe en los recuadros y haz clic fuera:
+
+| Recuadro | Texto | Resultado esperado |
+|---|---|---|
+| Fachada principal | `3,6,2` y en otra línea `8,5,0,2` | Línea 2 en rojo; «Calcular sombra» en gris |
+| Fachada principal | cambia la línea 2 por `8,5;0;2` | Sin error; 2 puntos |
+| Techo 1 | `3.2,1.4,5` | ⚠️ «está DENTRO del modelo» |
+| Techo 1 | `3;-0,2;5` | ⚠️ «está a 3 cm de la malla» |
+
+### A.5 Prueba 4 · Estado de la sombra
+1. Reemplaza los puntos por posiciones válidas:
+
+| Recuadro | Puntos | Por qué |
+|---|---|---|
+| Fachada principal | `3,6,2` · `3,6,4` · `3,6,6` | ~2,7 m al norte del árbol, mirando al sur: el árbol le da sombra |
+| Techo 1 | `12,12,3` · `14,12,3` | Lejos del árbol |
+
+2. **🌳 Calcular sombra** → tabla: Fachada 🟢 *calculado_completo* (el árbol la
+   sombrea ~240 h/año) y Techo 🟢 *sombra_cero_calculada*, con 4.407 horas con
+   sol calculadas y calidad alta.
+3. Cambia el azimuth del techo (180 → 170) → Techo 🔴 *invalidada_geometria*
+   «Se retiró la sombra porque cambió azimuth»; la fachada sigue 🟢.
+
+### A.6 Prueba 5 · Panel y strings del proyecto
+En **5. Bypass** y **6. MPPT**:
+- El panel por defecto es **«Panel del proyecto (…)»**.
+- Los strings dicen **«8 serie × 17 paralelo»** en la leyenda y en las tablas.
+- Con 97,3 m² y un módulo de 0,72 m² caben ~135 módulos; con 8 en serie
+  salen 17 strings en paralelo.
+
+### A.7 Prueba 6 · Mapa de calor
+En **🌞 Trayectoria Solar › 2. Horas productivas vs sombreadas**:
+1. **Techo 1** → mapa productivo todo el año (hasta ~800 W/m²) y nota
+   «Valores: POA vigente de esta superficie».
+2. **Fachada principal** → mayo a julio vacíos (sol al norte) y máximos en
+   diciembre y enero.
+3. Cambia el tilt de la fachada sin recalcular → aviso ⚠️ «…no tiene POA
+   vigente…: los colores usan la POA general de ☀️ Recurso Solar».
+
+### A.8 Cierre
+En el servidor:
+```
+pm2 logs streamlit-bipv --err --lines 20 --nostream
+```
+Debe salir **vacío**: ninguna prueba produjo errores.
