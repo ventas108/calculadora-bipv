@@ -921,7 +921,8 @@ with tab_solar:
         from calculos.sombras_3d import calcular_fs_horario_por_superficie
         from calculos.adaptador_multisuperficie import aplicar_proyecto_a_session_state
         from calculos.publicacion_multisuperficie import (
-            ETIQUETA_ORIGEN, ORIGEN_DESCONOCIDO, ORIGEN_FISICO, origen_vigente,
+            ETIQUETA_ORIGEN, ORIGEN_DESCONOCIDO, ORIGEN_FISICO, aviso_estado_electrico,
+            origen_vigente,
             publicar_energia_multisuperficie, retirar_energia_multisuperficie,
         )
         from calculos.inversores_multisuperficie import validar_inversores_y_asignaciones
@@ -934,7 +935,7 @@ with tab_solar:
         )
         from calculos.strings_superficie import (
             ETIQUETA_ORIGEN_STRINGS, etiqueta_panel_proyecto, formato_strings,
-            strings_superficie,
+            perdida_ponderada_por_modulos, strings_grupos_superficie, strings_superficie,
         )
         from calculos.modelo_iv import resolver_panel_calibrado, tiene_sdm_completo
         from calculos.puntos_3d import (
@@ -942,15 +943,22 @@ with tab_solar:
             puntos_por_nombre,
         )
         from calculos.diseno_electrico_multisup import (
-            campos_legacy_desde_grupos, grupos_de_superficie, inversor_normalizado,
-            normalizar_ficha_inversor, rango_n_serie, temperaturas_diseno,
-            validar_diseno_electrico,
+            ICONO_ESTADO, campos_legacy_desde_grupos, diagnostico_electrico_estado,
+            grupos_de_superficie,
+            invalidar_por_cambio_electrico, inversor_normalizado, normalizar_ficha_inversor,
+            paneles_superficies_estado, rango_n_serie, resumen_estado_electrico,
+            superficies_para_energia, temperaturas_diseno, validar_diseno_electrico,
         )
         from calculos.panel_superficie import (
             CAMPOS_PANEL_SUPERFICIE, PanelSuperficieError, eficiencia_panel,
             eficiencias_superficies_estado, invalidar_por_cambio_panel,
             opcion_panel_actual, seleccion_panel,
         )
+        _ETIQUETA_AREA = {
+            "instalada": "instalada (módulos × área del módulo)",
+            "instalada_recortada": "instalada, recortada al área de la superficie",
+            "superficie": "superficie completa (estimación: sin grupos de strings)",
+        }
         _b5c_ok = True
     except Exception as _e5c:
         st.error(f"❌ Error cargando módulo multi-superficie: {_e5c}")
@@ -1519,67 +1527,94 @@ with tab_solar:
                 ]
 
             _temps_de = temperaturas_diseno(st.session_state)
-            _, _paneles_de, _ = eficiencias_superficies_estado(
-                {**st.session_state, "superficies_bipv": _sups_actualizado}
-            )
+            # Para el diseño eléctrico basta la ficha eléctrica del panel.
+            _paneles_de = paneles_superficies_estado(st.session_state, _sups_actualizado)
             _fichas_por_id = {
                 str(_inv.get("inversor_id") or ""): _inv.get("ficha") or {} for _inv in _inversores_editados
             }
             _ids_editados = [str(_inv.get("inversor_id") or "") for _inv in _inversores_editados]
             _opciones_inv = [""] + [_i for _i in _ids_editados if _i]
+            st.caption(
+                "Cada superficie tiene uno o más **grupos de strings** (G1, G2…). Un grupo es un "
+                "conjunto de strings iguales que va a una misma entrada MPPT de un inversor. Usa "
+                "varios grupos cuando una superficie grande necesita varios MPPT o varios inversores."
+            )
+            _cambio_grupos = False
             for _sup_idx, _sup_ui in enumerate(_sups_actualizado):
                 if not _sup_ui.get("activa", True):
                     continue
-                _grupos_ui = grupos_de_superficie(_sup_ui)
                 _uid_ui = _sup_ui.get("uid", _sup_idx)
-                if len(_grupos_ui) > 1:
-                    st.caption(
-                        f"{_sup_ui['nombre']}: {len(_grupos_ui)} grupos de strings "
-                        "(la edición de varios grupos llega en la próxima fase)."
-                    )
-                    continue
-                _g_ui = _grupos_ui[0] if _grupos_ui else {}
-                _valor_campo_superficie(f"ms_sup_inv_{_uid_ui}", str(_g_ui.get("inversor_id") or ""))
-                if st.session_state.get(f"ms_sup_inv_{_uid_ui}") not in _opciones_inv:
-                    st.session_state[f"ms_sup_inv_{_uid_ui}"] = ""
-                _valor_campo_superficie(f"ms_sup_mppt_{_uid_ui}", int(_g_ui.get("mppt") or 1))
-                _valor_campo_superficie(
-                    f"ms_sup_ns_{_uid_ui}", "" if _g_ui.get("n_serie") is None else str(_g_ui.get("n_serie")),
-                )
-                _valor_campo_superficie(
-                    f"ms_sup_np_{_uid_ui}", "" if _g_ui.get("n_paralelo") is None else str(_g_ui.get("n_paralelo")),
-                )
-                _sc1, _sc2, _sc3, _sc4, _sc5 = st.columns([2, 1, 1, 1, 1])
-                _sc1.caption(f"{_sup_ui['nombre']} ({_sup_ui['tipo']}) · G1")
-                _inv_asignado = _sc2.selectbox("Inversor", _opciones_inv, key=f"ms_sup_inv_{_uid_ui}")
-                _mppt_asignado = _sc3.number_input("MPPT", min_value=1, max_value=24, step=1,
-                                                   key=f"ms_sup_mppt_{_uid_ui}")
-                _serie_texto = _sc4.text_input("N serie", key=f"ms_sup_ns_{_uid_ui}").strip()
-                _par_texto = _sc5.text_input("N paralelo", key=f"ms_sup_np_{_uid_ui}").strip()
+                _grupos_ui = grupos_de_superficie(_sup_ui) or [
+                    {"gid": "G1", "topologia": "string", "inversor_id": None, "mppt": 1,
+                     "n_serie": None, "n_paralelo": None}
+                ]
                 _info_panel_ui = _paneles_de.get(_sup_ui["nombre"])
-                _ficha_asig = _fichas_por_id.get(_inv_asignado or "", {})
-                if _info_panel_ui and _inv_asignado:
-                    _rango_ui = rango_n_serie(_info_panel_ui["panel"], _ficha_asig, _temps_de)
-                    _sc1.caption(
-                        f"Rango válido de N serie con {_info_panel_ui['nombre']}: **{_rango_ui[0]}–{_rango_ui[1]}**"
-                        if _rango_ui else
-                        "Rango de N serie: sin ficha completa del inversor, no se puede calcular."
+                st.markdown(f"**{_sup_ui['nombre']}** ({_sup_ui['tipo']})")
+                _grupos_nuevos = []
+                for _g_ui in _grupos_ui:
+                    _gid = str(_g_ui.get("gid") or "G1")
+                    # G1 conserva las claves de la fase A1 (sesiones abiertas).
+                    _suf = f"{_uid_ui}" if _gid == "G1" else f"{_uid_ui}_{_gid}"
+                    _valor_campo_superficie(f"ms_sup_inv_{_suf}", str(_g_ui.get("inversor_id") or ""))
+                    if st.session_state.get(f"ms_sup_inv_{_suf}") not in _opciones_inv:
+                        st.session_state[f"ms_sup_inv_{_suf}"] = ""
+                    _valor_campo_superficie(f"ms_sup_mppt_{_suf}", int(_g_ui.get("mppt") or 1))
+                    _valor_campo_superficie(
+                        f"ms_sup_ns_{_suf}", "" if _g_ui.get("n_serie") is None else str(_g_ui.get("n_serie")),
                     )
-                try:
-                    _ns_ui = int(_serie_texto) if _serie_texto else None
-                except ValueError:
-                    _ns_ui = _serie_texto
-                try:
-                    _np_ui = int(_par_texto) if _par_texto else None
-                except ValueError:
-                    _np_ui = _par_texto
-                _grupo_ui = {
-                    "gid": "G1", "topologia": (_g_ui.get("topologia") or "string"),
-                    "inversor_id": _inv_asignado or None, "mppt": int(_mppt_asignado),
-                    "n_serie": _ns_ui, "n_paralelo": _np_ui,
-                }
-                _sups_actualizado[_sup_idx]["grupos"] = [_grupo_ui]
-                _sups_actualizado[_sup_idx].update(campos_legacy_desde_grupos([_grupo_ui]))
+                    _valor_campo_superficie(
+                        f"ms_sup_np_{_suf}", "" if _g_ui.get("n_paralelo") is None else str(_g_ui.get("n_paralelo")),
+                    )
+                    _sc1, _sc2, _sc3, _sc4, _sc5, _sc6 = st.columns([2, 1, 1, 1, 1, 0.4])
+                    _sc1.caption(f"{_sup_ui['nombre']} · {_gid}")
+                    _inv_asignado = _sc2.selectbox("Inversor", _opciones_inv, key=f"ms_sup_inv_{_suf}")
+                    _mppt_asignado = _sc3.number_input("MPPT", min_value=1, max_value=24, step=1,
+                                                       key=f"ms_sup_mppt_{_suf}")
+                    _serie_texto = _sc4.text_input("N serie", key=f"ms_sup_ns_{_suf}").strip()
+                    _par_texto = _sc5.text_input("N paralelo", key=f"ms_sup_np_{_suf}").strip()
+                    _borrar_g = len(_grupos_ui) > 1 and _sc6.button(
+                        "🗑️", key=f"ms_sup_delg_{_uid_ui}_{_gid}", help=f"Quitar el grupo {_gid}")
+                    _ficha_asig = _fichas_por_id.get(_inv_asignado or "", {})
+                    if _info_panel_ui and _inv_asignado:
+                        _rango_ui = rango_n_serie(_info_panel_ui["panel"], _ficha_asig, _temps_de)
+                        _sc1.caption(
+                            f"Rango válido de N serie con {_info_panel_ui['nombre']}: **{_rango_ui[0]}–{_rango_ui[1]}**"
+                            if _rango_ui else
+                            "Rango de N serie: sin ficha completa del inversor, no se puede calcular."
+                        )
+                    try:
+                        _ns_ui = int(_serie_texto) if _serie_texto else None
+                    except ValueError:
+                        _ns_ui = _serie_texto
+                    try:
+                        _np_ui = int(_par_texto) if _par_texto else None
+                    except ValueError:
+                        _np_ui = _par_texto
+                    if _borrar_g:
+                        _cambio_grupos = True
+                        continue
+                    _grupos_nuevos.append({
+                        "gid": _gid, "topologia": (_g_ui.get("topologia") or "string"),
+                        "inversor_id": _inv_asignado or None, "mppt": int(_mppt_asignado),
+                        "n_serie": _ns_ui, "n_paralelo": _np_ui,
+                    })
+                if st.button("➕ Agregar grupo de strings", key=f"ms_sup_addg_{_uid_ui}",
+                             help="Otro conjunto de strings de esta superficie, en otro MPPT u otro inversor."):
+                    _usados = {g["gid"] for g in _grupos_nuevos}
+                    _n = 2
+                    while f"G{_n}" in _usados:
+                        _n += 1
+                    _grupos_nuevos.append({
+                        "gid": f"G{_n}", "topologia": "string", "inversor_id": None,
+                        "mppt": 1, "n_serie": None, "n_paralelo": None,
+                    })
+                    _cambio_grupos = True
+                _sups_actualizado[_sup_idx]["grupos"] = _grupos_nuevos
+                _sups_actualizado[_sup_idx].update(campos_legacy_desde_grupos(_grupos_nuevos))
+            if _cambio_grupos:
+                st.session_state["multisup_inversores"] = _inversores_editados
+                st.session_state["superficies_bipv"] = _sups_actualizado
+                st.rerun()
 
             st.session_state["multisup_inversores"] = _inversores_editados
             st.session_state["superficies_bipv"] = _sups_actualizado
@@ -1592,8 +1627,16 @@ with tab_solar:
                 )
             elif _inversores_editados or any(_s.get("activa", True) for _s in _sups_actualizado):
                 st.warning("⚠️ Configuración eléctrica incompleta: " + " ".join(_validacion_ui["errores"]))
+            # Fase A2: un cambio del diseño eléctrico retira lo calculado con el
+            # diseño anterior; la POA y la sombra no dependen de él.
+            if invalidar_por_cambio_electrico(st.session_state):
+                st.info(
+                    "ℹ️ Cambió el diseño eléctrico de una superficie (inversor, MPPT o strings): "
+                    "se retiraron la energía publicada en Financiero y los resultados de bypass, "
+                    "MPPT y modo físico. La POA y la sombra siguen vigentes: solo vuelve a publicar."
+                )
 
-            # ── ⚡ Diseño eléctrico: tabla explícita (Spec A, fase A1) ──────
+            # ── ⚡ Diseño eléctrico: tabla explícita (Spec A, fases A1 y A2) ─
             if any(_s.get("activa", True) for _s in _sups_actualizado):
                 _diag_el = validar_diseno_electrico(
                     _sups_actualizado, _inversores_editados, _paneles_de, _temps_de,
@@ -1607,8 +1650,10 @@ with tab_solar:
                     f"(T mín {_temps_de['T_frio']:g} °C · T celda {_temps_de['T_real']:g}/"
                     f"{_temps_de['T_extremo']:g} °C, "
                     f"{'del proyecto' if _temps_de['origen'] == 'proyecto' else 'por defecto'}). "
-                    "Por ahora es informativa: todavía no cambia ninguna energía ni bloquea "
-                    "la publicación en Financiero."
+                    "Qué pasa con cada color al llevar la energía a Financiero: 🟢 se publica "
+                    "normal · 🟡 se publica con el aviso visible · 🔴 el modo físico **no** se "
+                    "publica (hay algo eléctricamente imposible); el simplificado y el bypass sí, "
+                    "pero con «diseño eléctrico con fallas» en el banner."
                 )
                 for _bloq in _diag_el["bloqueos"]:
                     st.error(f"🔴 {_bloq}")
@@ -1644,6 +1689,7 @@ with tab_solar:
                         "Paneles": ", ".join(_m["paneles"]),
                         "Strings / entradas": _v_check(_m, "Strings ≤ entradas del MPPT"),
                         "Isc / límite": _v_check(_m, "Isc del MPPT ≤ límite del tracker"),
+                        "Caja combinadora": "sí" if _m.get("caja_combinadora") else "no",
                         "Estado": _ICONO_EST[_m["estado"]],
                     } for _m in _diag_el["mppt"]]), use_container_width=True, hide_index=True)
                 if _diag_el["inversores"]:
@@ -1655,6 +1701,7 @@ with tab_solar:
                         "MPPT usados / disponibles": f"{_i['mppt_usados']} / {_i['mppt_disponibles'] or '?'}",
                         "P DC STC (kW)": f"{_i['P_dc_stc_kW']:.2f}",
                         "DC/AC": _v_check(_i, "Relación DC/AC"),
+                        "Cajas combinadoras": _i.get("cajas_combinadoras", 0),
                         "Estado": _ICONO_EST[_i["estado"]],
                     } for _i in _diag_el["inversores"]]), use_container_width=True, hide_index=True)
                 st.dataframe(_pd.DataFrame([{
@@ -1685,7 +1732,42 @@ with tab_solar:
                                     "Unidad": _c["unidad"], "Fórmula": _c["formula"],
                                     "Fuente": _c["fuente"], "Estado": _ICONO_EST[_c["estado"]],
                                 })
-                    st.dataframe(_pd.DataFrame(_filas_calc), use_container_width=True, hide_index=True)
+                    st.dataframe(
+                        _pd.DataFrame(_filas_calc), use_container_width=True, hide_index=True,
+                        column_config={
+                            "Comprobación": st.column_config.TextColumn(width="medium"),
+                            "Unidad": st.column_config.TextColumn(width="small"),
+                            "Límite": st.column_config.TextColumn(width="small"),
+                            "Fórmula": st.column_config.TextColumn(width="large"),
+                        },
+                    )
+                with st.expander("📘 ¿Qué significa cada comprobación? (explicación sencilla)"):
+                    st.markdown(
+                        "- **String:** varios módulos conectados en serie, uno tras otro. Sus "
+                        "tensiones se suman: 8 módulos de 40 V dan unos 320 V.\n"
+                        "- **N serie × N paralelo:** módulos por string × strings que se juntan "
+                        "en paralelo. «8 serie × 2 paralelo» son 16 módulos.\n"
+                        "- **Voc en frío ≤ Vdc máximo:** en la mañana más fría del año los módulos "
+                        "dan su tensión más alta. Si el string pasa del máximo del inversor, lo "
+                        "puede dañar: por eso es 🔴.\n"
+                        "- **Vmp dentro del MPPT:** el MPPT es el «buscador del mejor punto» del "
+                        "inversor y solo trabaja entre una tensión mínima y una máxima. Con calor "
+                        "la tensión baja; si queda por debajo del mínimo, el inversor no produce.\n"
+                        "- **Isc del MPPT ≤ límite:** la corriente de todos los strings de un "
+                        "MPPT se suma; el inversor tiene un máximo por entrada.\n"
+                        "- **Strings ≤ entradas y caja combinadora:** las entradas son cuántos "
+                        "cables caben en el inversor. Si hay más strings que entradas pero la "
+                        "corriente cabe, se unen antes con una **caja combinadora** (🟡); si la "
+                        "corriente no cabe, no hay solución en ese MPPT (🔴).\n"
+                        "- **Un solo panel por MPPT:** paneles distintos tienen tensiones "
+                        "distintas; en la misma entrada, el MPPT no puede aprovechar a los dos (🔴).\n"
+                        "- **Relación DC/AC:** potencia de los paneles ÷ potencia del inversor. "
+                        "Entre 1,00 y 1,35 es lo usual. Menos: el inversor está sobrado (funciona, "
+                        "pero se paga de más). Más: en las horas de más sol el inversor recorta "
+                        "(«clipping»). Nunca es 🔴, solo 🟡, porque no es un diseño imposible.\n"
+                        "- **Cobertura:** qué parte del área de la superficie ocupan los módulos. "
+                        "La energía se calcula con el área que de verdad tiene módulos."
+                    )
 
             # Calcular POA para todas
             st.divider()
@@ -1755,9 +1837,14 @@ with tab_solar:
                     st.warning(f"⚠️ {_msg_panel_g} Esta superficie no entra en la energía.")
                 _pr_g  = float(st.session_state.get("pr_sistema", 0.78))
                 _rows_r, _tot_r = [], 0.0
-                for _s in _sups_actualizado:
-                    if not _s.get("activa", True):
-                        continue
+                # Spec 03/diseno-electrico-multisuperficie (fase A2): con grupos
+                # de strings la energía usa el área instalada (módulos × área
+                # del módulo), la misma base del modo físico.
+                _sups_energia_r = superficies_para_energia(
+                    [x for x in _sups_actualizado if x.get("activa", True)],
+                    paneles_superficies_estado(st.session_state),
+                )
+                for _s in _sups_energia_r:
                     _pd_s  = _poa_ss.get(_s["nombre"])
                     if _pd_s is None or _s["nombre"] not in _etas_g:
                         continue
@@ -1769,7 +1856,8 @@ with tab_solar:
                         "Superficie":       f"{_mt_s.get('icon','')} {_s['nombre']}",
                         "Tipo":             _s["tipo"],
                         "Tilt/Az":          f"{_s['tilt_deg']:.0f}°/{_s['azimuth_deg']:.0f}°",
-                        "Área (m²)":        f"{_s['area_m2']:.1f}",
+                        "Área usada (m²)":  f"{_s['area_m2']:.1f}",
+                        "Base del área":    _ETIQUETA_AREA.get(_s.get("area_origen"), "—"),
                         "Panel":            _paneles_g[_s["nombre"]]["nombre"],
                         "η (%)":            f"{_etas_g[_s['nombre']] * 100:.2f}",
                         "POA (kWh/m²/año)": f"{_pa_s:.0f}",
@@ -1817,6 +1905,9 @@ with tab_solar:
                         f"E_ac total: **{st.session_state.get('E_ac_anual_kWh_multisup', 0):,.0f} kWh/año** "
                         f"· Área: **{st.session_state.get('area_total_multisup', 0):.1f} m²**"
                     )
+                    _aviso_pub = aviso_estado_electrico(st.session_state)
+                    if _aviso_pub:
+                        getattr(_ci2, _aviso_pub[0])(_aviso_pub[1])
                     if _origen_pub == ORIGEN_FISICO and st.session_state.get("multisup_perdida_bus_kWh"):
                         _ci2.caption(
                             "Recorte en buses de inversor: "
@@ -1848,7 +1939,10 @@ with tab_solar:
                     from calculos.multi_superficie import (
                         agregar_poa_ponderada, e_ac_total_multisup,
                     )
-                    _sups_act_int = [s for s in _sups_actualizado if s.get("activa", True)]
+                    _sups_act_int = superficies_para_energia(
+                        [s for s in _sups_actualizado if s.get("activa", True)],
+                        paneles_superficies_estado(st.session_state),
+                    )
                     _pr_int  = float(st.session_state.get("pr_sistema", 0.78))
 
                     # POA combinada ponderada (clave exclusiva — no toca poa_df)
@@ -1866,6 +1960,8 @@ with tab_solar:
                             poa_ponderada=_poa_comb,
                             area_total=_res_int["area_total_m2"],
                             confirmar_reemplazo=_confirmar_simplificado,
+                            estado_electrico=resumen_estado_electrico(
+                                diagnostico_electrico_estado(st.session_state)),
                         )
                     except ValueError as _error_pub:
                         st.error(f"❌ No se publicó la energía multi-superficie: {_error_pub}")
@@ -1932,6 +2028,18 @@ with tab_solar:
 
                     _fisico_candidato = st.session_state.get("multisup_proyecto_fisico_candidato")
                     if _fisico_candidato:
+                        # Fase A2: con 🔴 la comparación se puede ver, pero no
+                        # adoptar (aplicar_proyecto_a_session_state lo bloquea).
+                        _resumen_cand = resumen_estado_electrico(
+                            diagnostico_electrico_estado(st.session_state))
+                        if _resumen_cand["estado"] == "rojo":
+                            st.error(
+                                f"{_resumen_cand['texto']} La comparación física es solo de "
+                                "referencia: **no se puede adoptar** hasta corregir el diseño, "
+                                "porque describiría un sistema que no se puede construir."
+                            )
+                        elif _resumen_cand["estado"] == "amarillo":
+                            st.warning(f"Al adoptarla se publicará con {_resumen_cand['texto']}")
                         _e_fisico = _fisico_candidato["agregados"]["E_ac_total_kWh"]
                         _e_simple = st.session_state.get("E_ac_anual_kWh_multisup")
                         if _e_simple:
@@ -2237,6 +2345,10 @@ with tab_solar:
 
                 # Tabla del mes
                 _etas_vm, _, _ = eficiencias_superficies_estado(st.session_state)
+                _area_vm = {
+                    x["nombre"]: x["area_m2"] for x in superficies_para_energia(
+                        _sups_viz, paneles_superficies_estado(st.session_state))
+                }
                 _rows_mv = []
                 for _sv in _sups_viz:
                     _nv = _sv["nombre"]
@@ -2245,7 +2357,7 @@ with tab_solar:
                     _pv_vm  = _pm_vm[_mes_viz-1]
                     _eta_vm = _etas_vm.get(_nv)
                     _e_vm   = (
-                        _pv_vm * _sv["area_m2"] * _eta_vm * float(st.session_state.get("pr_sistema", 0.78))
+                        _pv_vm * _area_vm.get(_nv, _sv["area_m2"]) * _eta_vm * float(st.session_state.get("pr_sistema", 0.78))
                         if _eta_vm is not None else None
                     )
                     _row_mv = {
@@ -2273,7 +2385,10 @@ with tab_solar:
             st.subheader("📊 Producción mensual por superficie")
             st.caption("Requiere POA calculada en ⚙️ Superficies BIPV.")
 
-            _sups_p  = [s for s in st.session_state.get("superficies_bipv", []) if s.get("activa", True)]
+            _sups_p  = superficies_para_energia(
+                [s for s in st.session_state.get("superficies_bipv", []) if s.get("activa", True)],
+                paneles_superficies_estado(st.session_state),
+            )
             _poa_p, _motivos_p = poas_vigentes_estado(st.session_state, lat, lon, alt_m)
             _avisar_poa_no_vigente(_poa_p, _motivos_p)
             _df_fsp  = st.session_state.get("df_fs_raw")
@@ -2363,7 +2478,8 @@ with tab_solar:
                         "Superficie": f"{TIPOS_SUPERFICIE.get(_sp['tipo'],{}).get('icon','')} {_sp['nombre']}",
                         "Tipo": _sp["tipo"],
                         "Tilt/Az": f"{_sp['tilt_deg']:.0f}°/{_sp['azimuth_deg']:.0f}°",
-                        "Área (m²)": f"{_sp['area_m2']:.1f}",
+                        "Área usada (m²)": f"{_sp['area_m2']:.1f}",
+                        "Base del área": _ETIQUETA_AREA.get(_sp.get("area_origen"), "—"),
                         "Panel": _paneles_p[_sp["nombre"]]["nombre"],
                         "η (%)": f"{_etas_p[_sp['nombre']] * 100:.2f}",
                         "POA (kWh/m²/año)": f"{_pa_a:.0f}",
@@ -2472,7 +2588,8 @@ with tab_solar:
                         if _inf_str is None:
                             continue
                         try:
-                            _strings_bp[_sp_str["nombre"]] = strings_superficie(
+                            # Fase A2: un resultado por grupo de strings.
+                            _strings_bp[_sp_str["nombre"]] = strings_grupos_superficie(
                                 _sp_str, st.session_state.get("N_serie"), _inf_str["panel"],
                                 _inf_str["es_proyecto"],
                             )
@@ -2480,7 +2597,8 @@ with tab_solar:
                             _errores_strings_bp.append(str(_error_str))
                     for _error_str in _errores_panel_bp + _errores_strings_bp:
                         st.error(f"❌ {_error_str}")
-                    _avisos_str_bp = [r["aviso"] for r in _strings_bp.values() if r["aviso"]]
+                    _avisos_str_bp = [g["aviso"] for gs in _strings_bp.values() for g in gs
+                                      if g["aviso"]]
                     if _avisos_str_bp:
                         st.warning("⚠️ " + "\n\n".join(_avisos_str_bp))
                     if _strings_bp:
@@ -2488,11 +2606,22 @@ with tab_solar:
                             "Panel y strings por superficie: "
                             + " · ".join(
                                 f"{n}: {_paneles_p[n]['nombre']}, "
-                                f"{formato_strings(r['n_serie'], r['n_paralelo'])} "
-                                f"({ETIQUETA_ORIGEN_STRINGS[r['origen']]})"
-                                for n, r in _strings_bp.items()
+                                + " + ".join(
+                                    (f"{g['gid']} " if len(gs) > 1 else "")
+                                    + formato_strings(g["n_serie"], g["n_paralelo"])
+                                    for g in gs
+                                )
+                                + f" ({ETIQUETA_ORIGEN_STRINGS[gs[0]['origen']]})"
+                                for n, gs in _strings_bp.items()
                             )
                         )
+                        if any(len(gs) > 1 for gs in _strings_bp.values()):
+                            st.caption(
+                                "Superficies con varios grupos: cada grupo se simula con sus "
+                                "propios strings (misma POA y misma sombra) y la pérdida de la "
+                                "superficie es el promedio de las de sus grupos **ponderado por "
+                                "módulos** (un grupo con el doble de módulos pesa el doble)."
+                            )
                     _bloqueo_bp = bool(_errores_panel_bp or _errores_strings_bp)
 
                     _btn_bp_ms = st.button(
@@ -2532,18 +2661,29 @@ with tab_solar:
                                         _df_fs_sp["fachada"] == _fach_csv_sp
                                     ].copy()
                                 _p_shade_sp = _afs(_df_fs_sp, _tmy_idx_ms, modo=_bp_modo)
-                                _str_sp_bp  = _strings_bp[_sp_bp["nombre"]]
+                                _grupos_sp_bp = _strings_bp[_sp_bp["nombre"]]
                                 _inf_sp_bp  = _paneles_p[_sp_bp["nombre"]]
                                 _panel_sp_bp = dict(_inf_sp_bp["panel"])
                                 try:
-                                    _res_sp_bp = _sbh(
-                                        G_eff=_g_eff_sp, T_amb=_t_amb_ms,
-                                        p_shade=_p_shade_sp.values,
-                                        N_series=int(_str_sp_bp["n_serie"]),
-                                        N_parallel=int(_str_sp_bp["n_paralelo"]),
-                                        panel=_panel_sp_bp,
-                                        NOCT=float(_panel_sp_bp.get("NOCT", 45.0)),
-                                    )
+                                    _res_grupos_bp = []
+                                    for _g_bp in _grupos_sp_bp:
+                                        _res_g_bp = _sbh(
+                                            G_eff=_g_eff_sp, T_amb=_t_amb_ms,
+                                            p_shade=_p_shade_sp.values,
+                                            N_series=int(_g_bp["n_serie"]),
+                                            N_parallel=int(_g_bp["n_paralelo"]),
+                                            panel=_panel_sp_bp,
+                                            NOCT=float(_panel_sp_bp.get("NOCT", 45.0)),
+                                        )
+                                        _res_grupos_bp.append({
+                                            **_g_bp, "pct": _res_g_bp["pct_bypass_anual"],
+                                            "horas": _res_g_bp["horas_bypass"],
+                                        })
+                                    _pct_sp_bp = perdida_ponderada_por_modulos(_res_grupos_bp)
+                                    _res_sp_bp = {
+                                        "pct_bypass_anual": _pct_sp_bp,
+                                        "horas_bypass": max(r["horas"] for r in _res_grupos_bp),
+                                    }
                                     _prod_sp_bp = produccion_superficie(
                                         _poa_sp_bp, _sp_bp["area_m2"], _inf_sp_bp["eta"], _pr_p
                                     )
@@ -2569,8 +2709,17 @@ with tab_solar:
                                         "Panel usado":        _inf_sp_bp["nombre"],
                                         "Panel del proyecto": "sí" if _inf_sp_bp["es_proyecto"] else "no (elegido en la superficie)",
                                         "η (%)":              f"{_inf_sp_bp['eta'] * 100:.2f}",
-                                        "N serie × paralelo": formato_strings(_str_sp_bp["n_serie"], _str_sp_bp["n_paralelo"]),
-                                        "Origen strings":     ETIQUETA_ORIGEN_STRINGS[_str_sp_bp["origen"]],
+                                        "N serie × paralelo": " + ".join(
+                                            (f"{r['gid']}: " if len(_res_grupos_bp) > 1 else "")
+                                            + formato_strings(r["n_serie"], r["n_paralelo"])
+                                            for r in _res_grupos_bp
+                                        ),
+                                        "Pérdida por grupo": (
+                                            " · ".join(f"{r['gid']} {r['pct']:.2f}% ({r['modulos']} mód.)"
+                                                       for r in _res_grupos_bp)
+                                            if len(_res_grupos_bp) > 1 else "— un solo grupo —"
+                                        ),
+                                        "Origen strings":     ETIQUETA_ORIGEN_STRINGS[_res_grupos_bp[0]["origen"]],
                                         "E_ac base (kWh/año)": f"{_prod_sp_bp['e_ac_anual_kWh']:,.0f}",
                                         "Pérdida bypass (%)": f"{_res_sp_bp['pct_bypass_anual']:.2f}%",
                                         "Horas bypass/año":   str(_res_sp_bp["horas_bypass"]),
@@ -2598,6 +2747,8 @@ with tab_solar:
                                     poa_ponderada=agregar_poa_ponderada(_poa_p, _sups_p),
                                     area_total=sum(float(d["area_m2"]) for d in _desglose_bp),
                                     confirmar_reemplazo=_confirmar_bp,
+                                    estado_electrico=resumen_estado_electrico(
+                                        diagnostico_electrico_estado(st.session_state)),
                                 )
                             except ValueError as _error_pub:
                                 st.error(f"❌ No se publicó el bypass por superficie: {_error_pub}")
@@ -2667,12 +2818,25 @@ with tab_solar:
                     for _n_mp, _inf_mp in _paneles_p.items()
                     if not tiene_sdm_completo(dict(_inf_mp["panel"]))
                 ]
-                if not _sups_p:
-                    st.info("ℹ️ No hay superficies activas.")
+                # Fase A2: una superficie con varios grupos ya declara su MPPT
+                # en cada grupo (⚡ Diseño eléctrico lo valida); esta sección
+                # los incorporará en la fase A3. Aquí se deja fuera, a la vista.
+                _sups_varios_mp = [s for s in _sups_p if len(grupos_de_superficie(s)) > 1]
+                _sups_mp = [s for s in _sups_p if len(grupos_de_superficie(s)) <= 1]
+                if _sups_varios_mp:
+                    st.info(
+                        "ℹ️ " + ", ".join(f"'{s['nombre']}'" for s in _sups_varios_mp)
+                        + " tiene(n) varios grupos de strings: esta simulación todavía trabaja "
+                        "con un string por superficie y **no la(s) incluye** (se incorporarán en "
+                        "la fase A3). Su MPPT ya se revisa en ⚙️ Superficies BIPV › "
+                        "⚡ Diseño eléctrico, y su energía se calcula completa en las demás secciones."
+                    )
+                if not _sups_mp:
+                    st.info("ℹ️ No hay superficies de un solo grupo para simular aquí.")
                 else:
                     _mc1, _mc3 = st.columns(2)
                     _strings_mp, _errores_strings_mp = {}, []
-                    for _sp_str in _sups_p:
+                    for _sp_str in _sups_mp:
                         _inf_str_m = _paneles_p.get(_sp_str["nombre"])
                         if _inf_str_m is None:
                             continue
@@ -2705,9 +2869,9 @@ with tab_solar:
                     )
 
                     st.markdown("**Asignación superficie → MPPT** (dos superficies en el mismo MPPT = strings en paralelo):")
-                    _asig_cols = st.columns(min(4, max(1, len(_sups_p))))
+                    _asig_cols = st.columns(min(4, max(1, len(_sups_mp))))
                     _asig = {}
-                    for _i_sp, _sp_m in enumerate(_sups_p):
+                    for _i_sp, _sp_m in enumerate(_sups_mp):
                         _mid = _asig_cols[_i_sp % len(_asig_cols)].selectbox(
                             f"{TIPOS_SUPERFICIE.get(_sp_m['tipo'],{}).get('icon','')} {_sp_m['nombre']}",
                             list(range(1, int(_mp_nmppt) + 1)),
@@ -2730,7 +2894,7 @@ with tab_solar:
                         else:
                             _T2m = _tmy_m["T2m"].values.astype(float)
                             _grupos_m = {}
-                            for _sp_m in _sups_p:
+                            for _sp_m in _sups_mp:
                                 _poa_sp_m = _poa_p.get(_sp_m["nombre"])
                                 if _poa_sp_m is None or _poa_sp_m.empty:
                                     continue

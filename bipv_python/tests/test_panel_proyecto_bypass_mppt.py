@@ -128,7 +128,8 @@ def test_selectores_ya_no_fijan_un_panel_del_catalogo():
     # bypass y el MPPT ya no tienen un selector común de panel.
     assert "ms_bp_panel_sel" not in src and "ms_mppt_panel_sel" not in src
     assert 'key=f"spanel_{_uid}"' in src
-    assert src.count("strings_superficie(") >= 2
+    # Fase A2 (Spec 03/diseno-electrico-multisuperficie): el bypass usa los strings por grupo.
+    assert src.count("strings_superficie(") >= 1 and src.count("strings_grupos_superficie(") >= 1
     assert 'key="ms_bp_nseries"' not in src and 'key="ms_mppt_nser"' not in src
 
 

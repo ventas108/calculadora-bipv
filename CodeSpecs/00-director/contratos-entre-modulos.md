@@ -89,8 +89,10 @@ Entrada:
 Salida:
 - Publicación única: `E_ac_anual_kWh_multisup`, `multisup_desglose`,
 	`area_total_multisup`, `poa_df_multisup`, `multisup_activo` y
-	`multisup_origen` (`simplificado`, `bypass_csv` o `fisico`); en origen físico,
-	además `_multisup_proyecto_fisico` y `multisup_perdida_bus_kWh`.
+	`multisup_origen` (`simplificado`, `bypass_csv` o `fisico`) y
+	`multisup_estado_electrico` (`{estado, n_bloqueos, n_avisos, texto}`, fase
+	A2); en origen físico, además `_multisup_proyecto_fisico` y
+	`multisup_perdida_bus_kWh`.
 
 Reglas de consumo:
 - Toda publicación pasa por `publicar_energia_multisuperficie`. Reemplazar un
@@ -98,16 +100,25 @@ Reglas de consumo:
 - Solo se publica con POA vigente en todas las superficies activas.
 - Modelos declarados (regla de `mapa-dependencias.md`): el simplificado es
 	POA × área × η del panel de cada superficie × PR; η = Pmax / (área del módulo
-	× 1000), nunca un valor fijo. El bypass aplica a esa energía la pérdida del
-	modelo de bypass con los strings de cada superficie. El físico es SDM + bypass
-	+ etapa de inversor. Los tres se muestran con su origen.
+	× 1000), nunca un valor fijo. Con grupos de strings el área es la instalada
+	(módulos × área del módulo, sin pasar del área de la superficie); sin grupos,
+	el área de la superficie como estimación (`superficies_para_energia`). El
+	bypass aplica a esa energía la pérdida del modelo de bypass de cada grupo,
+	ponderada por módulos. El físico es SDM + bypass + etapa de inversor, con una
+	unidad por grupo y las temperaturas de diseño del proyecto. Los tres se
+	muestran con su origen.
 - Cambiar el panel de una superficie (o el del proyecto, para las que lo siguen)
 	retira la publicación y los resultados de bypass, MPPT y físico; la POA y la
 	sombra se conservan. Agregar, eliminar, desactivar o renombrar superficies no
 	cuenta como cambio de panel.
-- El diseño eléctrico (fase A1) es informativo. Desde la fase A2: con 🔴 el
-	modo físico no publica; el simplificado y el bypass publican con el estado
-	eléctrico visible.
+- Diseño eléctrico (fase A2): con 🔴 el modo físico no publica
+	(`aplicar_proyecto_a_session_state` lanza `ValueError`); el simplificado y
+	el bypass publican con `multisup_estado_electrico`, y Vista 3D, Financiero,
+	Baterías y CO₂ lo muestran con `aviso_estado_electrico`. Cambiar grupos,
+	inversor o ficha de una superficie existente retira la publicación y los
+	resultados de bypass, MPPT y físico (`invalidar_por_cambio_electrico`).
+- Hasta la fase A3, la sección 6 deja fuera, con aviso, las superficies con
+	varios grupos.
 - La sección «Strings de distinta orientación en un mismo MPPT» es informativa y
 	no cambia la energía publicada.
 

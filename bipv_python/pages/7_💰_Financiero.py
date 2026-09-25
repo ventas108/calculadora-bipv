@@ -87,6 +87,10 @@ if prod_ok and e_ac > 0:
             f"de todas las superficies BIPV definidas en 🗺️ Vista 3D. "
             f"Producción superficie principal: {_e_ac_base:,.0f} kWh/año."
         )
+        from calculos.publicacion_multisuperficie import aviso_estado_electrico as _aviso_ee
+        _aviso_ms_ee = _aviso_ee(st.session_state)
+        if _aviso_ms_ee:
+            getattr(st, _aviso_ms_ee[0])(_aviso_ms_ee[1])
         if _desglose_ms:
             import pandas as _pd_fin
             _df_des = _pd_fin.DataFrame([

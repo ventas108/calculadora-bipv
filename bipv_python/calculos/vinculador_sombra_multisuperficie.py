@@ -59,15 +59,26 @@ def aplicar_sombra_a_superficies(superficies_bipv: list[dict], resultados_sombra
     return salida
 
 
+def _n_serie_grupos(sup: Mapping[str, Any]) -> tuple:
+    grupos = sup.get("grupos")
+    if not isinstance(grupos, list):
+        return ()
+    return tuple(g.get("n_serie") for g in grupos if isinstance(g, Mapping))
+
+
 def preservar_o_invalidar_campos_fisicos(anterior: Mapping[str, Any] | None, editada: Mapping[str, Any]) -> dict:
     nueva = dict(editada)
     if anterior is None:
         return nueva
-    for campo in ("n_serie", "n_paralelo", "inversor_id"):
+    # Fase A2 (Spec 03/diseno-electrico-multisuperficie): los grupos de
+    # strings viajan con la superficie; el editor los reescribe después.
+    for campo in ("n_serie", "n_paralelo", "inversor_id", "grupos"):
         if campo not in nueva and campo in anterior:
-            nueva[campo] = anterior[campo]
+            nueva[campo] = copy.deepcopy(anterior[campo])
     entradas = ("tilt_deg", "azimuth_deg", "area_m2", "n_serie", "puntos_analisis", "malla_horizonte", "transparencia")
     cambiados = [c for c in entradas if anterior.get(c) != nueva.get(c)]
+    if _n_serie_grupos(anterior) != _n_serie_grupos(nueva) and "n_serie" not in cambiados:
+        cambiados.append("n_serie")
     if not cambiados:
         for campo in _CAMPOS_SOMBRA + ("sombra_invalidada_motivo",):
             if campo in anterior and campo not in nueva:
@@ -95,7 +106,17 @@ def resumen_estado_fisico_superficies(superficies_bipv: list[dict]) -> list[dict
     for sup in superficies_bipv:
         if not sup.get("activa", True):
             continue
-        faltantes = [c for c in _CLAVES_SUPERFICIE_REQUERIDAS if sup.get(c) is None]
+        # Fase A2 de la Spec 03/diseno-electrico-multisuperficie: n_serie,
+        # n_paralelo e inversor_id se revisan en cada grupo de strings.
+        from calculos.diseno_electrico_multisup import grupos_de_superficie
+
+        grupos = grupos_de_superficie(sup)
+        faltantes = [c for c in ("p_shade", "firma_sombra") if sup.get(c) is None]
+        if not grupos:
+            faltantes = ["n_serie", "n_paralelo", "inversor_id"] + faltantes
+        for campo in ("n_serie", "n_paralelo", "inversor_id"):
+            if grupos and any(g.get(campo) is None for g in grupos):
+                faltantes.insert(0, campo)
         salida.append({"nombre": sup.get("nombre"), "lista": not faltantes, "campos_faltantes": faltantes})
     return salida
 

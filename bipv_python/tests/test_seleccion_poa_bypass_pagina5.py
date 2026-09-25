@@ -694,6 +694,7 @@ def _session_state_con_resultados_downstream_vigentes() -> dict:
         "multisup_activo": True,
         "multisup_origen": "fisico",
         "multisup_perdida_bus_kWh": 12.0,
+        "multisup_estado_electrico": {"estado": "verde", "n_bloqueos": 0, "n_avisos": 0, "texto": "🟢"},
         "_multisup_proyecto_fisico": {"agregados": {"E_ac_total_kWh": 3000.0}},
         # ── Configuración/datos independientes -- deben sobrevivir intactos
         # (auditoría ronda 5, 17-sep-2026): ninguna depende de la POA del

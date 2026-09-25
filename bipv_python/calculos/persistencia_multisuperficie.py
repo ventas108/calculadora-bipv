@@ -134,6 +134,34 @@ def _tmy_fingerprint(tmy: Any) -> str:
     return huella_horaria(tmy.index, tmy["T2m"].to_numpy(dtype=float))
 
 
+def _validar_grupos(grupos: Any, uid: Any) -> None:
+    """Estructura de los grupos de strings guardados (Spec A, fase A2)."""
+    from calculos.diseno_electrico_multisup import TOPOLOGIAS_CONOCIDAS
+
+    if not isinstance(grupos, list):
+        raise PayloadMultisuperficieError(f"Grupos inválidos en superficie '{uid}': no es una lista.")
+    vistos = set()
+    for grupo in grupos:
+        if not isinstance(grupo, Mapping) or not grupo.get("gid"):
+            raise PayloadMultisuperficieError(f"Grupo sin identificador en superficie '{uid}'.")
+        if grupo["gid"] in vistos:
+            raise PayloadMultisuperficieError(f"Grupo '{grupo['gid']}' repetido en superficie '{uid}'.")
+        vistos.add(grupo["gid"])
+        if grupo.get("topologia", "string") not in TOPOLOGIAS_CONOCIDAS:
+            raise PayloadMultisuperficieError(
+                f"Topología desconocida en superficie '{uid}': {grupo.get('topologia')!r}."
+            )
+
+
+def _inversores_de_superficie(superficie: Mapping[str, Any]) -> list[str]:
+    from calculos.diseno_electrico_multisup import grupos_de_superficie
+
+    grupos = grupos_de_superficie(superficie)
+    if not grupos:
+        return [str(superficie.get("inversor_id"))]
+    return sorted({str(g.get("inversor_id")) for g in grupos})
+
+
 def _superficie_input(superficie: Mapping[str, Any]) -> dict[str, Any]:
     requeridos = (
         "uid", "nombre", "tipo", "area_m2", "tilt_deg", "azimuth_deg",
@@ -152,9 +180,13 @@ def _superficie_input(superficie: Mapping[str, Any]) -> dict[str, Any]:
         # Spec 05/panel-por-superficie: panel de cada superficie. Ausentes en
         # proyectos anteriores, que cargan con el panel del proyecto.
         "panel_origen", "panel_nombre", "panel_ficha",
+        # Spec 03/diseno-electrico-multisuperficie (fase A2): grupos de strings.
+        "grupos",
     ):
         if campo in superficie:
             salida[campo] = superficie[campo]
+    if "grupos" in salida:
+        _validar_grupos(salida["grupos"], salida["uid"])
     origen = salida.get("panel_origen")
     if origen is not None and origen not in ORIGENES_PANEL:
         raise PayloadMultisuperficieError(
@@ -200,7 +232,9 @@ def construir_payload_multisuperficie(
                 "panel": session_state.get("panel_dict"),
                 "inversores": session_state.get("multisup_inversores"),
                 "asignaciones": {
-                    str(s["uid"]): s.get("inversor_id") for s in superficies
+                    str(s["uid"]): (
+                        _inversores_de_superficie(s) if s.get("grupos") else s.get("inversor_id")
+                    ) for s in superficies
                 },
             },
         },
@@ -261,6 +295,8 @@ def _comparar_contexto(payload: Mapping[str, Any], contexto: Mapping[str, Any]) 
             for campo in ("firma_sombra", "firma_poa", "inversor_id", "n_serie", "n_paralelo"):
                 if campo in esperadas[uid] and actuales[uid].get(campo) != esperadas[uid].get(campo):
                     errores.append(f"{campo} diferente en superficie '{uid}'.")
+            if "grupos" in esperadas[uid] and _canonico(actuales[uid].get("grupos")) != _canonico(esperadas[uid]["grupos"]):
+                errores.append(f"Grupos de strings diferentes en superficie '{uid}'.")
             if _panel_canonico(actuales[uid]) != _panel_canonico(esperadas[uid]):
                 errores.append(f"Panel diferente en superficie '{uid}'.")
         # El panel del proyecto solo importa si alguna superficie lo sigue.
@@ -316,12 +352,12 @@ def validar_payload_multisuperficie(
                 for i in (entradas["electrical"].get("inversores") or [])
             }
             for superficie in entradas["surfaces"]:
-                inv_id = str(superficie.get("inversor_id"))
-                if inv_id not in ids_inversores:
-                    errores.append(
-                        f"Inversor '{inv_id}' inexistente para superficie "
-                        f"'{superficie.get('uid')}'."
-                    )
+                for inv_id in _inversores_de_superficie(superficie):
+                    if inv_id not in ids_inversores:
+                        errores.append(
+                            f"Inversor '{inv_id}' inexistente para superficie "
+                            f"'{superficie.get('uid')}'."
+                        )
         except (KeyError, TypeError, PayloadMultisuperficieError) as exc:
             errores.append(f"Payload incompleto: {exc}")
     if not errores and contexto_actual is not None:
@@ -360,7 +396,7 @@ def restaurar_multisuperficie(
         claves_resultado_permitidas = {
             "E_ac_anual_kWh_multisup", "area_total_multisup",
             "multisup_desglose", "poa_df_multisup",
-            "multisup_origen", "multisup_perdida_bus_kWh",
+            "multisup_origen", "multisup_perdida_bus_kWh", "multisup_estado_electrico",
         }
         resultados_permitidos = {
             str(clave): (

@@ -274,3 +274,24 @@ def test_buscar_mppt_con_paneles_distintos_y_limites_de_la_fase_a1():
         "panel por superficie",
     )
     assert "NO al mismo MPPT" in seccion["texto"] and "paneles distintos en el mismo MPPT" in seccion["texto"]
+
+
+def test_buscar_caja_combinadora_y_dc_ac_fase_a2():
+    # Spec 03/diseno-electrico-multisuperficie, fase A2.
+    seccion = _seccion_recuperada(
+        "me sale requiere caja combinadora o conectores en Y en el mppt que significa",
+        "inversores por superficie",
+    )
+    texto = seccion["texto"]
+    assert "caja combinadora" in texto and "fusible" in texto
+    assert "Nunca es 🔴" in texto and "clipping" in texto
+
+
+def test_buscar_varios_grupos_y_reglas_hacia_financiero():
+    seccion = _seccion_recuperada(
+        "como agrego varios grupos de strings a una superficie y si sale rojo se publica en financiero",
+        "inversores por superficie",
+    )
+    texto = seccion["texto"]
+    assert "Agregar grupo de strings" in texto and "Energía publicada con" in texto
+    assert "no se publica" in texto and "Grupos de strings diferentes" in texto

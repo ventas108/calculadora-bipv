@@ -353,7 +353,7 @@ def test_pagina_sin_eficiencia_fija_ni_selector_comun_de_panel():
     assert "invalidar_por_cambio_panel(" in src
     arbol = ast.parse(src)
     llamadas = [n for n in ast.walk(arbol) if isinstance(n, ast.Call)
-                and ast.unparse(n.func) == "strings_superficie"]
+                and ast.unparse(n.func) in ("strings_superficie", "strings_grupos_superficie")]
     assert len(llamadas) >= 2 and all(len(n.args) == 4 for n in llamadas)
 
 
