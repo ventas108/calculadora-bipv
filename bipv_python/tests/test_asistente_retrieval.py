@@ -266,3 +266,11 @@ def test_buscar_validacion_electrica_de_strings_en_vista_3d():
     texto = seccion["texto"]
     assert "Diseño eléctrico" in texto and "Rango válido de N serie" in texto
     assert "Ficha del inversor" in texto and "un solo panel por MPPT" in texto
+
+
+def test_buscar_mppt_con_paneles_distintos_y_limites_de_la_fase_a1():
+    seccion = _seccion_recuperada(
+        "puedo poner la fachada y el techo con paneles distintos en el mismo mppt del inversor",
+        "panel por superficie",
+    )
+    assert "NO al mismo MPPT" in seccion["texto"] and "paneles distintos en el mismo MPPT" in seccion["texto"]

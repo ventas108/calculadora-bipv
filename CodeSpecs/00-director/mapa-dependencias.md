@@ -63,6 +63,21 @@ Persistencia física multi-superficie:
                                                      └─> 08-interfaz
 ```
 
+Energía multi-superficie (Vista 3D, Streamlit):
+
+```text
+02-recurso-solar (TMY) ───────────────> POA firmada por superficie (05)
+03-dimensionamiento (panel, inversor, ─┬─> panel por superficie (05) ──> η del panel
+      temperaturas de diseño)          └─> diseño eléctrico por superficie (03, Spec A)
+05 sombra 3D por superficie ──────────────────────────────┐
+POA + η + diseño eléctrico + sombra ──> simplificado / bypass / físico
+                                         └─> publicación única con origen ──> 06, 07, 08
+
+cambio de panel o del panel del proyecto ──> retira publicación, bypass, MPPT y físico
+                                             (conserva POA y sombra)
+cambio de geometría o montaje ────────────> invalida POA y sombra de esa superficie
+```
+
 - Los comparadores consumen el motor físico vigente; no mantienen una segunda
   implementación de energía, PR, POA o compatibilidad.
 - El Asistente general consume documentación y estado resumido. Los Analistas locales

@@ -37,6 +37,15 @@ Regla de consumo:
 - Los módulos downstream usan exclusivamente
 	`diseno_electrico_confirmado(session_state)`. Un diseño no vigente no puede
 	producir resultados persistibles.
+- Excepción declarada y aprobada (2026-09-25, Spec
+	`03-dimensionamiento/diseno-electrico-multisuperficie`): en multi-superficie,
+	el diseño eléctrico es por superficie y lo valida
+	`calculos/diseno_electrico_multisup.validar_diseno_electrico`. No es un
+	segundo modelo: usa las mismas funciones (`evaluar_compatibilidad_string`,
+	`calcular_voc_string`, `calcular_vmp_string`, `evaluar_relacion_dc_ac`) y las
+	mismas temperaturas de diseño (`T_min_diseno`, `T_cel_realista`,
+	`T_cel_extremo`). El inversor del proyecto de este módulo es la ficha por
+	defecto de cada inversor multi-superficie.
 
 ### 04-produccion-energia
 
@@ -69,11 +78,44 @@ Regla de consumo:
 	`poa_sin_termico_df`; el término térmico se calcula una única vez dentro del
 	SDM. Recalcular la cascada invalida resultados dependientes de su POA.
 
+#### Energía multi-superficie (Vista 3D)
+
+Entrada:
+- Por superficie: geometría, POA firmada (`05/vigencia-poa-superficie`), sombra
+	3D con su estado, panel propio (`05/panel-por-superficie`) y diseño eléctrico
+	(grupos de strings con inversor y MPPT,
+	`03-dimensionamiento/diseno-electrico-multisuperficie`).
+
+Salida:
+- Publicación única: `E_ac_anual_kWh_multisup`, `multisup_desglose`,
+	`area_total_multisup`, `poa_df_multisup`, `multisup_activo` y
+	`multisup_origen` (`simplificado`, `bypass_csv` o `fisico`); en origen físico,
+	además `_multisup_proyecto_fisico` y `multisup_perdida_bus_kWh`.
+
+Reglas de consumo:
+- Toda publicación pasa por `publicar_energia_multisuperficie`. Reemplazar un
+	origen distinto pide confirmación; nunca «gana el último».
+- Solo se publica con POA vigente en todas las superficies activas.
+- Modelos declarados (regla de `mapa-dependencias.md`): el simplificado es
+	POA × área × η del panel de cada superficie × PR; η = Pmax / (área del módulo
+	× 1000), nunca un valor fijo. El bypass aplica a esa energía la pérdida del
+	modelo de bypass con los strings de cada superficie. El físico es SDM + bypass
+	+ etapa de inversor. Los tres se muestran con su origen.
+- Cambiar el panel de una superficie (o el del proyecto, para las que lo siguen)
+	retira la publicación y los resultados de bypass, MPPT y físico; la POA y la
+	sombra se conservan. Agregar, eliminar, desactivar o renombrar superficies no
+	cuenta como cambio de panel.
+- El diseño eléctrico (fase A1) es informativo. Desde la fase A2: con 🔴 el
+	modo físico no publica; el simplificado y el bypass publican con el estado
+	eléctrico visible.
+- La sección «Strings de distinta orientación en un mismo MPPT» es informativa y
+	no cambia la energía publicada.
+
 #### Persistencia física multi-superficie
 
 Entrada:
-- `session_state` con superficies, geometría, asignaciones eléctricas, TMY y
-	snapshot físico adoptado.
+- `session_state` con superficies (geometría, panel propio y asignaciones
+	eléctricas), inversores con su ficha, TMY y snapshot físico adoptado.
 
 Salida:
 - Payload canónico firmado con `inputs`, `results`, `validity` y
@@ -211,10 +253,19 @@ Invariantes:
 - **Vigencia de tablas y análisis IA:** los DataFrames y textos de los tres comparadores
 	todavía no tienen una firma común de entradas. No deben tratarse como resultados
 	persistidos vigentes después de cambiar sus insumos; deben recalcularse.
-- **Validación operativa multi-superficie:** el backend y la UI opt-in están implementados
-	y probados, pero la prueba manual real de dos superficies sigue siendo evidencia
-	pendiente. No se debe declarar validación operativa completa solo por pasar pruebas
-	unitarias.
+- **Validación operativa multi-superficie:** la prueba manual en producción con dos
+	superficies (fachada y techo) se hizo el 24 y 25-sep-2026: POA vigente, origen único
+	con confirmación, puntos 3D, estado de sombra, panel y strings, mapa de calor y panel
+	por superficie. Siguen abiertos:
+	- la corrida real del modo físico con escena completa (Torre 5, Spec
+		`05/sombra-cara-trasera`);
+	- las fases A2 y A3 del diseño eléctrico multi-superficie.
+- **PR fijo en la energía simplificada multi-superficie:** Vista 3D lee
+	`pr_sistema` (que nadie escribe) y usa siempre 0,78; 📊 Producción publica
+	`PR_sistema`. Registrado como H2 en `05/panel-por-superficie`, sin Spec todavía.
+- **Presupuesto sin superficies de Vista 3D:** 💼 Presupuesto cuenta módulos e
+	inversores con `N_paneles_final` de 📐 Dimensionamiento, no con los paneles, grupos
+	e inversores de cada superficie. Registrado como H3, sin Spec todavía.
 - **Integridad externa del archivo:** la firma actual SHA-256 detecta corrupción y
 	cambios sin recalcular, pero no protege contra un actor con acceso de escritura al
 	JSON. HMAC queda fuera de esta versión y requiere una decisión separada.
