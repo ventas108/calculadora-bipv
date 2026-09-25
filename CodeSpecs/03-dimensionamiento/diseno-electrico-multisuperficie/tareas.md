@@ -54,6 +54,9 @@ Validación:
 - [ ] Área instalada en la energía simplificada; bypass por grupo.
 - [ ] Reglas hacia Financiero y `multisup_estado_electrico`.
 - [ ] Invalidación por cambio eléctrico y persistencia de grupos.
+- [ ] Regla de caja combinadora: strings > entradas con corriente que cabe →
+      🟡 con explicación sencilla; columna «Caja combinadora» y conteo por
+      inversor.
 
 ## Fase A3 — Sección 6 unificada (por hacer, después de A2)
 

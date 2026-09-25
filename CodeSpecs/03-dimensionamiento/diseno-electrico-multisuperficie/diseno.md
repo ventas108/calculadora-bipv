@@ -85,7 +85,7 @@ Temperaturas: las del proyecto (`temperaturas_diseno`).
 |---|---|---|---|---|
 | Grupo | Voc en frío ≤ Vdc máx.; Vmp real y extremo dentro de [MPPT mín. activo, MPPT máx.] | `evaluar_compatibilidad_string` con `N_strings_tracker` = strings del MPPT | `compatible = False` | `alerta_margen` o ficha sin datos (`evaluable = False`) |
 | MPPT | Isc × strings × 1,25 ≤ Isc máx. del tracker | ídem | supera | margen < 7,5 % |
-| MPPT | Strings ≤ `n_strings_tracker` | ficha | supera | ficha sin dato |
+| MPPT | Strings ≤ `n_strings_tracker` (entradas físicas del MPPT) | ficha | supera **y** la corriente del MPPT también supera su límite | supera pero la corriente cabe → «requiere caja combinadora o conectores en Y» (fase A2); ficha sin dato |
 | MPPT | Un solo panel por MPPT | grupos | dos paneles distintos | — |
 | MPPT | Una sola orientación por MPPT | grupos | — | orientaciones distintas (la sección 6 cuantifica la pérdida) |
 | Inversor | MPPT usados ≤ `N_mppt`; número de MPPT de cada grupo ≤ `N_mppt` | ficha | supera | ficha sin dato |
@@ -93,6 +93,26 @@ Temperaturas: las del proyecto (`temperaturas_diseno`).
 | Superficie | Módulos × área del módulo ≤ área de la superficie | panel, grupos | > 100 % | < 80 % (área sin módulos) |
 | Proyecto | Temperaturas del proyecto disponibles | `T_min_diseno`… | — | valores por defecto |
 
+- **Caja combinadora (fase A2, aprobada el 25-sep-2026).** El número de
+  entradas de un MPPT (`n_strings_tracker`) es un límite de conexión: cuántos
+  pares de cables caben en el inversor. El límite físico es la corriente. Si
+  los strings superan las entradas pero la corriente total (Σ Isc × strings ×
+  1,25) cabe en el límite del MPPT, los strings pueden unirse antes del
+  inversor con una caja combinadora (o conectores en Y), algo habitual en BIPV
+  de vidrio, cuyos strings llevan poca corriente. El estado es 🟡 y no 🔴, y la
+  app lo explica en lenguaje sencillo:
+
+  > 🟡 «Fachada · G1» (INV-1 · MPPT 1): 17 strings y el MPPT tiene 1 entrada.
+  > Caben por corriente (17,0 A de 18,0 A), así que se pueden unir antes del
+  > inversor con una **caja combinadora** o **conectores en Y**. Inclúyela en
+  > el diseño y en el presupuesto; con más de 2 strings en paralelo, cada
+  > string necesita su fusible.
+
+  Si la corriente no cabe, sigue 🔴 con el texto «ni con caja combinadora
+  caben: X A > límite Y A; reparte los strings en otro MPPT u otro
+  inversor». La tabla de MPPT agrega la columna «Caja combinadora» (sí/no) y
+  «🔎 Cómo se calcula» explica la regla. El número de cajas por inversor se
+  informa para Presupuesto (H3), sin costearlas en esta Spec.
 - Inversor manual o del catálogo sin `Vdc_max`, MPPT o corriente: sus grupos
   quedan 🟡 «no validado», nunca 🟢.
 - Grupo sin inversor, MPPT fuera de rango o N no entero ≥ 1: 🔴.
@@ -175,6 +195,8 @@ multi-superficie.
   - inversor manual sin ficha → grupos 🟡 «no validado»;
   - un proyecto guardado antes carga con un grupo G1 por superficie.
 - **A2:**
+  - 17 strings ASP-ST1-T40 en un MPPT de 1 entrada y 18 A → 🟡 «requiere
+    caja combinadora» (17,0 A cabe); 19 strings → 🔴 (19,0 A > 18 A);
   - una superficie con dos grupos en dos inversores da la misma E_ac física
     que dos superficies equivalentes de hoy;
   - con 🔴 el modo físico no publica;
