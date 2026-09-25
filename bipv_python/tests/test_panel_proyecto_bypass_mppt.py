@@ -125,3 +125,16 @@ def test_selectores_ya_no_fijan_un_panel_del_catalogo():
     assert src.count("opciones_panel_superficie(") >= 2
     assert src.count("strings_superficie(") >= 2
     assert 'key="ms_bp_nseries"' not in src and 'key="ms_mppt_nser"' not in src
+
+
+# ── Formato único de strings (reportado en producción 24-sep-2026) ──────────
+def test_formato_strings_explicito():
+    from calculos.strings_superficie import formato_strings
+    assert formato_strings(8, 17) == "8 serie × 17 paralelo"
+
+
+def test_pagina_usa_un_solo_formato_de_strings():
+    src = _PAGINA.read_text(encoding="utf-8")
+    assert src.count("formato_strings(") >= 4  # dos leyendas, tabla del bypass, tabla del MPPT
+    assert "×{r['n_serie']}s" not in src and "×{d['n_serie']}s" not in src
+    assert "{_str_sp_bp['n_serie']} × {_str_sp_bp['n_paralelo']}" not in src

@@ -933,8 +933,8 @@ with tab_solar:
             resumen_estado_fisico_superficies,
         )
         from calculos.strings_superficie import (
-            ETIQUETA_ORIGEN_STRINGS, es_panel_del_proyecto, opciones_panel_superficie,
-            strings_superficie,
+            ETIQUETA_ORIGEN_STRINGS, es_panel_del_proyecto, formato_strings,
+            opciones_panel_superficie, strings_superficie,
         )
         from calculos.puntos_3d import (
             migrar_puntos_por_uid, parsear_puntos_3d, previsualizar_puntos,
@@ -1069,63 +1069,83 @@ with tab_solar:
             _sups_actualizado = []
             _idx_eliminar     = None
 
+            # Los campos del editor NO reciben value=/index=: en Streamlit la
+            # identidad del widget incluye ese valor inicial, y como aquí sale
+            # del dato guardado (que cambia justo al editar), el campo se
+            # recreaba en el rerun siguiente: el azimuth «tardaba» o volvía al
+            # valor anterior. El estado se inicializa una vez desde los datos y
+            # solo se resincroniza si el dato cambió fuera del campo (p. ej. al
+            # cargar un proyecto).
+            def _valor_campo_superficie(clave: str, valor_datos):
+                _ref = f"_ref_{clave}"
+                if clave not in st.session_state or st.session_state.get(_ref) != valor_datos:
+                    st.session_state[clave] = valor_datos
+                st.session_state[_ref] = valor_datos
+                return st.session_state[clave]
+
+            _MONTAJES = [
+                "Heredar de ☀️ Recurso Solar",
+                "Adosada al muro (sellada)",
+                "Ventilada con superficie reflejante",
+            ]
             for _i, _sup in enumerate(_sups_list):
                 _uid = _sup["uid"]
-                _meta_t = TIPOS_SUPERFICIE.get(_sup["tipo"], TIPOS_SUPERFICIE["Fachada"])
+                _nom_v  = _valor_campo_superficie(f"snom_{_uid}", str(_sup["nombre"]))
+                _tipo_v = _valor_campo_superficie(
+                    f"stipo_{_uid}", _sup["tipo"] if _sup["tipo"] in TIPOS_SUPERFICIE else "Fachada",
+                )
+                _tilt_v = _valor_campo_superficie(f"stilt_{_uid}", float(_sup["tilt_deg"]))
+                _az_v   = _valor_campo_superficie(f"saz_{_uid}", float(_sup["azimuth_deg"]))
+                _area_v = _valor_campo_superficie(f"sarea_{_uid}", float(_sup["area_m2"]))
+                _valor_campo_superficie(f"sact_{_uid}", bool(_sup.get("activa", True)))
+                _mont_guardado = _sup.get("montaje_fachada", _MONTAJES[0])
+                _valor_campo_superficie(
+                    f"smont_{_uid}", _mont_guardado if _mont_guardado in _MONTAJES else _MONTAJES[0],
+                )
+                # El tilt debe caber en el rango del tipo elegido (cambia con el tipo).
+                _meta_e = TIPOS_SUPERFICIE[_tipo_v]
+                _tilt_rango = float(max(_meta_e["tilt_min"], min(_meta_e["tilt_max"], _tilt_v)))
+                if _tilt_rango != _tilt_v:
+                    st.session_state[f"stilt_{_uid}"] = _tilt_v = _tilt_rango
+                # Encabezado con los valores actuales de los campos, no los del
+                # rerun anterior.
                 with st.expander(
-                    f"{_meta_t['icon']} **{_sup['nombre']}** — {_sup['tipo']} · "
-                    f"Tilt {_sup['tilt_deg']:.0f}° · Az {_sup['azimuth_deg']:.0f}° · "
-                    f"{_sup['area_m2']:.1f} m²",
+                    f"{_meta_e['icon']} **{_nom_v}** — {_tipo_v} · "
+                    f"Tilt {_tilt_v:.0f}° · Az {_az_v:.0f}° · {_area_v:.1f} m²",
                     expanded=(len(_sups_list) == 1),
                 ):
                     _c1, _c2, _c3, _c4, _c5 = st.columns([2, 1, 1, 1, 1])
                     _c_del = st.columns([6, 1])[1]
 
-                    _nom_e  = _c1.text_input("Nombre",  value=_sup["nombre"],  key=f"snom_{_uid}")
+                    _nom_e  = _c1.text_input("Nombre", key=f"snom_{_uid}")
                     _tipo_e = _c2.selectbox(
-                        "Tipo", list(TIPOS_SUPERFICIE.keys()),
-                        index=list(TIPOS_SUPERFICIE.keys()).index(
-                            _sup["tipo"] if _sup["tipo"] in TIPOS_SUPERFICIE else "Fachada"
-                        ),
-                        key=f"stipo_{_uid}",
+                        "Tipo", list(TIPOS_SUPERFICIE.keys()), key=f"stipo_{_uid}",
                     )
                     _meta_e = TIPOS_SUPERFICIE[_tipo_e]
                     _tilt_e = _c3.number_input(
                         "Tilt (°)",
                         min_value=float(_meta_e["tilt_min"]),
                         max_value=float(_meta_e["tilt_max"]),
-                        value=float(max(_meta_e["tilt_min"],
-                                        min(_meta_e["tilt_max"], _sup["tilt_deg"]))),
                         step=5.0, key=f"stilt_{_uid}",
                         help=_meta_e["descripcion"],
                     )
                     _az_e   = _c4.number_input(
                         "Azimuth (°)", 0.0, 360.0,
-                        value=float(_sup["azimuth_deg"]),
                         step=5.0, key=f"saz_{_uid}",
                         help="0=Norte · 90=Este · 180=Sur · 270=Oeste",
                     )
                     _area_e = _c5.number_input(
                         "Área (m²)", 1.0, 5000.0,
-                        value=float(_sup["area_m2"]),
                         step=1.0, key=f"sarea_{_uid}",
                     )
-                    _act_e  = _c1.checkbox(
-                        "Activa", value=bool(_sup.get("activa", True)), key=f"sact_{_uid}"
-                    )
+                    _act_e  = _c1.checkbox("Activa", key=f"sact_{_uid}")
 
                     # #156: montaje bifacial por fachada (solo superficies verticales)
-                    _MONTAJES = [
-                        "Heredar de ☀️ Recurso Solar",
-                        "Adosada al muro (sellada)",
-                        "Ventilada con superficie reflejante",
-                    ]
-                    _montaje_e = _sup.get("montaje_fachada", _MONTAJES[0])
+                    _montaje_e = _mont_guardado
                     if float(_tilt_e) >= 80:
                         _montaje_e = st.selectbox(
                             "🔄 Montaje de la fachada (modelo bifacial)",
                             _MONTAJES,
-                            index=_MONTAJES.index(_montaje_e) if _montaje_e in _MONTAJES else 0,
                             key=f"smont_{_uid}",
                             help="Adosada: la cara trasera no recibe luz — la ganancia bifacial "
                                  "se anula para ESTA fachada. Ventilada: hay cámara de aire con "
@@ -2173,7 +2193,7 @@ with tab_solar:
                     st.caption(
                         "Strings por superficie: "
                         + " · ".join(
-                            f"{n}: {r['n_paralelo']}×{r['n_serie']}s ({ETIQUETA_ORIGEN_STRINGS[r['origen']]})"
+                            f"{n}: {formato_strings(r['n_serie'], r['n_paralelo'])} ({ETIQUETA_ORIGEN_STRINGS[r['origen']]})"
                             for n, r in _strings_bp.items()
                         )
                         if _strings_bp else "Strings por superficie: elige un panel."
@@ -2249,7 +2269,7 @@ with tab_solar:
                                         "Fachada CSV":        _fach_csv_sp or "— promedio —",
                                         "Panel usado":        _bp_panel_sel,
                                         "Panel del proyecto": "sí" if _bp_panel_proyecto else "⚠️ no",
-                                        "N serie × paralelo": f"{_str_sp_bp['n_serie']} × {_str_sp_bp['n_paralelo']}",
+                                        "N serie × paralelo": formato_strings(_str_sp_bp["n_serie"], _str_sp_bp["n_paralelo"]),
                                         "Origen strings":     ETIQUETA_ORIGEN_STRINGS[_str_sp_bp["origen"]],
                                         "E_ac base (kWh/año)": f"{_prod_sp_bp['e_ac_anual_kWh']:,.0f}",
                                         "Pérdida bypass (%)": f"{_res_sp_bp['pct_bypass_anual']:.2f}%",
@@ -2451,7 +2471,7 @@ with tab_solar:
                                 f"Panel usado: **{_panel_m_usado.get('panel')}**"
                                 + ("" if _panel_m_usado.get("del_proyecto") else " — ⚠️ distinto al del proyecto")
                                 + " · Strings: " + " · ".join(
-                                    f"{n}: {r['n_paralelo']}×{r['n_serie']}s ({ETIQUETA_ORIGEN_STRINGS[r['origen']]})"
+                                    f"{n}: {formato_strings(r['n_serie'], r['n_paralelo'])} ({ETIQUETA_ORIGEN_STRINGS[r['origen']]})"
                                     for n, r in _panel_m_usado.get("strings", {}).items()
                                 )
                             )
@@ -2469,7 +2489,7 @@ with tab_solar:
                             _rows_m.append({
                                 "MPPT": f"MPPT {_mid_r}",
                                 "Superficies": ", ".join(_asig_g.get(_mid_r, _asig_g.get(str(_mid_r), []))) or "—",
-                                "Strings": " + ".join(f"{d['n_paralelo']}×{d['n_serie']}s" for d in _r_m["desglose"]),
+                                "Strings": " + ".join(formato_strings(d["n_serie"], d["n_paralelo"]) for d in _r_m["desglose"]),
                                 "E_dc ideal (kWh)": f"{_r_m['e_dc_indep_kWh']:,.0f}",
                                 "E_dc combinada (kWh)": f"{_r_m['e_dc_comb_kWh']:,.0f}",
                                 "Pérdida": f"{_r_m['perdida_pct']:.2f}%",

@@ -16,6 +16,8 @@ Versión: 24-sep-2026 (rev. 4) · Código de referencia: `main` `72326f2f`
 | **Panel y strings del proyecto** | Bypass y MPPT arrancan con **Panel del proyecto (…)** y el N serie × N paralelo de cada superficie | Arrancaban con *ASP-ST1-T40* y 8 módulos en serie |
 | **Mapa de calor POA** | Funciona con POA por superficie | Se caía con «The truth value of a DataFrame is ambiguous» |
 | **Sombra v2** | Las horas con el sol detrás del módulo no cuentan como sombra | Se contaba sombra total en esas horas |
+| **Formato de strings** | Leyendas y tablas del bypass y del MPPT dicen siempre «8 serie × 17 paralelo» | La leyenda decía «17×8s» y la tabla «8 × 17» |
+| **Editor de superficies** | Tilt, azimuth, área, nombre, tipo, montaje y «Activa» conservan el valor escrito y el encabezado de la superficie se actualiza al instante | El campo se recreaba al editar: el valor tardaba en aparecer o volvía al anterior, y el encabezado mostraba el valor previo |
 
 🚩 **Después de esta actualización, en tus proyectos:**
 
@@ -275,7 +277,8 @@ calcula hasta que todas las superficies activas tengan POA vigente.
      marcado en los resultados.
    - **Strings:** cada superficie usa su N serie × N paralelo del paso 3. Si
      faltan, usa el N serie de Dimensionamiento y estima el paralelo por área,
-     con aviso. La tabla muestra *Panel usado*, *N serie × paralelo* y
+     con aviso. Los strings se muestran siempre como «8 serie × 17
+     paralelo». La tabla muestra *Panel usado*, *N serie × paralelo* y
      *Origen strings*.
    - Necesita POA vigente en todas las superficies activas. Si una superficie
      falla, **no publica nada** y muestra la causa.

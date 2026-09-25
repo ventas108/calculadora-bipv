@@ -23,6 +23,14 @@ ETIQUETA_ORIGEN_STRINGS = {
 }
 
 
+def formato_strings(n_serie: int, n_paralelo: int) -> str:
+    """Formato único para mostrar strings: «8 serie × 17 paralelo».
+
+    Evita que una leyenda diga «17×8s» y la tabla «8 × 17» para el mismo dato.
+    """
+    return f"{int(n_serie)} serie × {int(n_paralelo)} paralelo"
+
+
 def etiqueta_panel_proyecto(panel_nombre: str | None) -> str:
     return f"{PREFIJO_PANEL_PROYECTO} ({panel_nombre or 'sin nombre'})"
 
