@@ -76,6 +76,10 @@ eléctrico, y al cambiar de proyecto.
 5. Baterías: el balance mensual suma la energía multi-superficie.
 6. CO₂ muestra 6,37 kWp y 34 módulos.
 7. Guardar y cargar conserva `multisup_sistema`.
+8. Si un cambio de panel o de diseño eléctrico retira la energía publicada, el
+   motivo y las superficies quedan visibles en «🔗 Integrar al análisis
+   financiero» hasta volver a publicar (`_multisup_retiro_motivo`,
+   `aviso_energia_retirada`); desactivar a mano no deja el aviso.
 
 ## Pruebas requeridas
 

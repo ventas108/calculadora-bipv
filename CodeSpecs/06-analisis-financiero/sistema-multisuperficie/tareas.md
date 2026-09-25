@@ -13,4 +13,6 @@
       Presupuesto con aviso H3.
 - [x] Asistente, contratos del director y registro de decisiones.
 - [x] Suite completa, `physics-guard`, auditoría SDD y prueba de humo.
-- [ ] Prueba en producción (repetir D5).
+- [x] Aviso fijo de energía retirada en «🔗 Integrar al análisis financiero»
+      hasta volver a publicar (pedido en la prueba D6).
+- [ ] Prueba en producción (repetir D5 y D6).

@@ -28,6 +28,13 @@
   horario deshabilitado con aviso; 🔴 si el sistema no se puede usar.
 - 🌿 CO₂: kWp y módulos del sistema publicado.
 - 💼 Presupuesto: aviso 🟡 de que se arma con el sistema de superficie única.
+- Aviso fijo de energía retirada (pedido en la prueba D6):
+  `registrar_motivo_retiro` y `aviso_energia_retirada` en
+  `publicacion_multisuperficie.py`. `invalidar_por_cambio_electrico` e
+  `invalidar_por_cambio_panel` registran el motivo y las superficies que
+  cambiaron solo si había energía publicada; publicar, retirar a mano y
+  cambiar de proyecto lo borran. Vista 3D lo muestra en «🔗 Integrar al
+  análisis financiero».
 - Base de conocimiento del Asistente, contratos del director y registro de
   decisiones.
 

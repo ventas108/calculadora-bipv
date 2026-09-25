@@ -360,7 +360,7 @@ def cargar_proyecto(slug: str) -> str:
         "poa_superficies", "poa_superficies_errores", "poa_superficies_ok",
         "_multisup_restaurado", "_multisup_restauracion_error",
         # Huella de los paneles por superficie del proyecto ANTERIOR.
-        "_multisup_firma_paneles", "_multisup_firma_electrica",
+        "_multisup_firma_paneles", "_multisup_firma_electrica", "_multisup_retiro_motivo",
     }
     for k in _claves_reset:
         st.session_state.pop(k, None)

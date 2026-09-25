@@ -15,7 +15,7 @@ sobre `main` `d20d8807`.
 - [x] Pruebas nuevas en verde: `test_sistema_multisuperficie.py` 17 pruebas;
       Asistente 24.
 - [x] Suite completa (`python -m pytest tests/`): `1750 passed`, 0 fallidas,
-      13 min 10 s.
+      13 min 10 s; con el aviso fijo, `1755 passed`, 13 min 42 s.
 - [x] `physics-guard` local limpio; auditoría SDD sin faltantes.
 - [x] Prueba de humo con `AppTest` (escenario D5: fachada ASP-ST1-T40 6 × 3,
       techo SPR-E20-327 con G1 y G2 de 8 × 1; TMY sintético; **sin** 📊
@@ -33,7 +33,12 @@ sobre `main` `d20d8807`.
       4. 🌿 CO₂: «Sistema: 6.37 kWp (34 módulos)».
       5. Sistema incompleto (techo sin grupos): 🔴 «No se calcula el análisis
          financiero… Sin grupos de strings en «Techo 1»…» y ninguna métrica.
-- [ ] Prueba en producción: repetir D5 de la fase A2.
+- [x] Aviso fijo (prueba de humo con `AppTest`, después de publicar):
+      cambiar Fachada G1 a N paralelo 2 muestra en «🔗 Integrar al análisis
+      financiero» «ℹ️ La energía publicada en Financiero se retiró porque
+      cambió el diseño eléctrico de «Fachada principal»…»; sigue en el rerun
+      siguiente y desaparece al volver a publicar.
+- [ ] Prueba en producción: repetir D5 y D6 de la fase A2.
 
 ## Resultado
 

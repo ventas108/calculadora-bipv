@@ -194,7 +194,9 @@ def invalidar_por_cambio_panel(session_state: MutableMapping[str, Any]) -> list[
     publicada y los resultados de bypass, MPPT y modo físico; la POA y la
     sombra no dependen del panel y se conservan. Retorna las claves retiradas.
     """
-    from calculos.publicacion_multisuperficie import retirar_energia_multisuperficie
+    from calculos.publicacion_multisuperficie import (
+        registrar_motivo_retiro, retirar_energia_multisuperficie,
+    )
 
     actual = firma_paneles_superficies(
         list(session_state.get("superficies_bipv") or []),
@@ -204,9 +206,11 @@ def invalidar_por_cambio_panel(session_state: MutableMapping[str, Any]) -> list[
     session_state[CLAVE_FIRMA_PANELES] = actual
     if not isinstance(anterior, Mapping):
         return []
-    if all(anterior[uid] == actual[uid] for uid in anterior.keys() & actual.keys()):
+    cambiados = {uid for uid in anterior.keys() & actual.keys() if anterior[uid] != actual[uid]}
+    if not cambiados:
         return []
     retiradas = retirar_energia_multisuperficie(session_state)
+    registrar_motivo_retiro(session_state, retiradas, "cambió el panel", cambiados)
     for clave in KEYS_RESULTADOS_PANEL:
         if clave in session_state:
             session_state.pop(clave, None)

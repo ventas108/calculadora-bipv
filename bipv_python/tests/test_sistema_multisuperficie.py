@@ -194,3 +194,82 @@ def test_co2_y_presupuesto_no_mezclan_sistemas():
 def test_vista_3d_publica_el_sistema_en_simplificado_y_bypass():
     src = _src("9_🗺️_Vista_3D.py")
     assert src.count("sistema=sistema_desde_estado(") == 2
+
+
+# ── Aviso fijo de energía retirada (hasta volver a publicar) ────────────────
+from calculos.publicacion_multisuperficie import aviso_energia_retirada
+
+
+def _estado_con_diseno():
+    sups, _, desglose, poas = _escenario_d5()
+    ss = {"superficies_bipv": sups, "panel_dict": _ASP, "panel_nombre_dim": "ASP-ST1-T40",
+          "multisup_inversores": [{"inversor_id": "INV-1", "eta_inversor": 0.97, "P_ac_nom_W": 5000.0}]}
+    sups[1].update(panel_origen="catalogo", panel_nombre="SPR-E20-327 (E20-327NE-WHT-D)", panel_ficha=_SPR)
+    return ss, desglose, poas
+
+
+def _publicar_estado(ss, desglose, poas):
+    publicar_energia_multisuperficie(
+        ss, origen="simplificado", e_ac_total=7552.0, desglose=desglose,
+        poa_ponderada=_poa(0.8), area_total=12.96 + 26.091,
+        sistema=sistema_desde_estado(ss, desglose, poas))
+
+
+def test_cambio_electrico_deja_aviso_fijo_con_la_superficie_hasta_publicar():
+    from calculos.diseno_electrico_multisup import invalidar_por_cambio_electrico
+
+    ss, desglose, poas = _estado_con_diseno()
+    invalidar_por_cambio_electrico(ss)                 # registra la huella
+    _publicar_estado(ss, desglose, poas)
+    assert aviso_energia_retirada(ss) is None
+    ss["superficies_bipv"][0]["grupos"][0]["n_paralelo"] = 2
+    assert invalidar_por_cambio_electrico(ss)
+    aviso = aviso_energia_retirada(ss)
+    assert "cambió el diseño eléctrico" in aviso and "«Fachada principal»" in aviso
+    assert "Vuelve a publicarla" in aviso
+    # Sigue visible en los reruns siguientes (no es un mensaje de un instante)…
+    invalidar_por_cambio_electrico(ss)
+    assert aviso_energia_retirada(ss) == aviso
+    # …y desaparece al volver a publicar.
+    _publicar_estado(ss, desglose, poas)
+    assert aviso_energia_retirada(ss) is None
+
+
+def test_cambio_de_panel_deja_aviso_fijo():
+    from calculos.panel_superficie import invalidar_por_cambio_panel
+
+    ss, desglose, poas = _estado_con_diseno()
+    invalidar_por_cambio_panel(ss)
+    _publicar_estado(ss, desglose, poas)
+    ss["superficies_bipv"][1]["panel_nombre"] = "otro"
+    invalidar_por_cambio_panel(ss)
+    aviso = aviso_energia_retirada(ss)
+    assert "cambió el panel" in aviso and "«Techo 1»" in aviso
+
+
+def test_sin_energia_publicada_no_hay_aviso_de_retiro():
+    from calculos.diseno_electrico_multisup import invalidar_por_cambio_electrico
+
+    ss, _, _ = _estado_con_diseno()
+    invalidar_por_cambio_electrico(ss)
+    ss["superficies_bipv"][0]["grupos"][0]["n_paralelo"] = 2
+    invalidar_por_cambio_electrico(ss)
+    assert aviso_energia_retirada(ss) is None
+
+
+def test_desactivar_a_mano_no_deja_aviso_de_retiro():
+    from calculos.publicacion_multisuperficie import retirar_energia_multisuperficie
+
+    ss, desglose, poas = _estado_con_diseno()
+    _publicar_estado(ss, desglose, poas)
+    ss["_multisup_retiro_motivo"] = {"texto": "x"}
+    retirar_energia_multisuperficie(ss)
+    assert aviso_energia_retirada(ss) is None
+
+
+def test_vista_3d_muestra_el_aviso_fijo_en_integrar():
+    src = _src("9_🗺️_Vista_3D.py")
+    i = src.index("# ── Integrar al análisis financiero")
+    seccion = src[i:i + 3000]
+    assert "_aviso_retiro = aviso_energia_retirada(st.session_state)" in seccion
+    assert "_ci2.info(_aviso_retiro)" in seccion
