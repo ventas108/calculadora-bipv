@@ -107,6 +107,12 @@ def strings_superficie(
     se usa de respaldo y la superficie debe traer su propio N serie.
     """
     nombre = superficie.get("nombre", "?")
+    grupos = superficie.get("grupos")
+    if isinstance(grupos, list) and len(grupos) > 1:
+        raise ValueError(
+            f"La superficie '{nombre}' tiene {len(grupos)} grupos de strings: este cálculo "
+            "trabaja con un solo string por superficie. Usa strings_grupos_superficie."
+        )
     n_serie = _entero_positivo(superficie.get("n_serie"))
     n_paralelo = _entero_positivo(superficie.get("n_paralelo"))
     if n_serie and n_paralelo:
@@ -144,3 +150,57 @@ def strings_superficie(
             "configura N serie y N paralelo en ⚙️ Superficies BIPV para usar los reales."
         ),
     }
+
+
+def strings_grupos_superficie(
+    superficie: Mapping[str, Any],
+    n_serie_dimensionamiento: Any,
+    panel: Mapping[str, Any],
+    panel_es_del_proyecto: bool = True,
+) -> list[dict[str, Any]]:
+    """Strings de cada grupo de la superficie (Spec
+    ``03/diseno-electrico-multisuperficie``, fase A2).
+
+    ``[{"gid", "n_serie", "n_paralelo", "modulos", "origen", "aviso"}]``.
+    Con un grupo o ninguno equivale a :func:`strings_superficie` (``gid``
+    ``G1``). Con varios, cada grupo debe traer N serie y N paralelo enteros
+    ≥ 1: no se estima nada, porque repartir el área entre grupos sería
+    inventar el diseño; si falta alguno se lanza ``ValueError`` nombrando el
+    grupo.
+    """
+    grupos = superficie.get("grupos")
+    if not (isinstance(grupos, list) and len(grupos) > 1):
+        uno = dict(superficie)
+        if isinstance(grupos, list) and len(grupos) == 1:
+            uno.update(n_serie=grupos[0].get("n_serie"), n_paralelo=grupos[0].get("n_paralelo"))
+        uno.pop("grupos", None)
+        r = strings_superficie(uno, n_serie_dimensionamiento, panel, panel_es_del_proyecto)
+        gid = grupos[0].get("gid", "G1") if isinstance(grupos, list) and grupos else "G1"
+        return [{"gid": gid, **r, "modulos": r["n_serie"] * r["n_paralelo"]}]
+    nombre = superficie.get("nombre", "?")
+    salida = []
+    for i, g in enumerate(grupos, start=1):
+        gid = g.get("gid") or f"G{i}"
+        n_s, n_p = _entero_positivo(g.get("n_serie")), _entero_positivo(g.get("n_paralelo"))
+        if not (n_s and n_p):
+            raise ValueError(
+                f"La superficie '{nombre}' ({gid}) no tiene N serie y N paralelo válidos. "
+                "Con varios grupos cada uno necesita los suyos: configúralos en "
+                "⚙️ Superficies BIPV › 🔌 Inversores por superficie."
+            )
+        salida.append({"gid": gid, "n_serie": n_s, "n_paralelo": n_p, "modulos": n_s * n_p,
+                       "origen": ORIGEN_SUPERFICIE, "aviso": None})
+    return salida
+
+
+def perdida_ponderada_por_modulos(resultados: list[Mapping[str, Any]]) -> float:
+    """Pérdida (%) de la superficie a partir de la de cada grupo, ponderada
+    por sus módulos: ``Σ pct_g × módulos_g / Σ módulos_g``.
+
+    Todos los grupos de una superficie ven la misma POA y la misma sombra, así
+    que la energía de cada uno es proporcional a sus módulos.
+    """
+    total = sum(int(r["modulos"]) for r in resultados)
+    if total <= 0:
+        raise ValueError("Sin módulos para ponderar la pérdida de la superficie.")
+    return sum(float(r["pct"]) * int(r["modulos"]) for r in resultados) / total

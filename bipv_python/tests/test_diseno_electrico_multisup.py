@@ -192,8 +192,11 @@ def test_corriente_del_mppt_suma_los_strings():
 
 
 def test_strings_por_entrada_del_mppt():
+    # Fase A2: más strings que entradas pero la corriente cabe (5 × 0,8 × 1,25
+    # = 5 A de 20 A) → 🟡 caja combinadora, no 🔴.
     d = _diag([_sup(grupos=[_grupo(n_serie=6, n_paralelo=5)])], [_inv()], _paneles(Fachada=_ASP))
-    assert _checks(d["mppt"][0])["Strings ≤ entradas del MPPT"]["estado"] == "rojo"
+    assert _checks(d["mppt"][0])["Strings ≤ entradas del MPPT"]["estado"] == "amarillo"
+    assert d["mppt"][0]["caja_combinadora"]
 
 
 def test_dos_paneles_en_el_mismo_mppt_es_rojo():
@@ -270,3 +273,151 @@ def test_pagina_muestra_la_tabla_de_diseno_electrico():
     assert 'key=f"ms_sup_mppt_{' in src and 'key=f"ms_inv_ficha_{' in src
     arbol = ast.parse(src)
     assert any(isinstance(n, ast.Call) and ast.unparse(n.func) == "rango_n_serie" for n in ast.walk(arbol))
+
+
+
+# ── Fase A2 ──────────────────────────────────────────────────────────────────
+_SG5 = {"Vdc_max": 1100.0, "Vmppt_min": 160.0, "Vmppt_activo_min": 160.0, "Vmppt_max": 1000.0,
+        "Isc_max_tracker": 18.0, "N_mppt": 2, "n_strings_tracker": 1, "P_ac_nom_W": 5000.0}
+
+
+@pytest.mark.parametrize("n_par, estado, caja", [(1, "verde", False), (17, "amarillo", True), (19, "rojo", False)])
+def test_criterio_a2_caja_combinadora(n_par, estado, caja):
+    # SG5.0RT (1 entrada, 18 A) con strings ASP-ST1-T40 de 0,8 A × 1,25 = 1,0 A.
+    sup = _sup(grupos=[_grupo(n_serie=8, n_paralelo=n_par)], area=500.0)
+    d = _diag([sup], [_inv(ficha=dict(_SG5), P_ac_nom_W=5000.0)], _paneles(Fachada=_ASP))
+    m = d["mppt"][0]
+    assert _checks(m)["Strings ≤ entradas del MPPT"]["estado"] == estado
+    assert m["caja_combinadora"] is caja
+    assert d["inversores"][0]["cajas_combinadoras"] == (1 if caja else 0)
+    if estado == "amarillo":
+        assert any("caja combinadora" in a and "17.0 A de 18.0 A" in a for a in d["avisos"])
+    if estado == "rojo":
+        assert any("ni con caja combinadora" in b and "19.0 A > límite 18.0 A" in b for b in d["bloqueos"])
+
+
+@pytest.mark.parametrize("n_serie, n_par, fragmento", [
+    (8, 1, "más grande que los paneles"),      # 0,50 kW / 5 kW
+])
+def test_dc_ac_nunca_es_rojo_y_se_explica(n_serie, n_par, fragmento):
+    d = _diag([_sup(grupos=[_grupo(n_serie=n_serie, n_paralelo=n_par)])],
+              [_inv(ficha=dict(_SG5), P_ac_nom_W=5000.0)], _paneles(Fachada=_ASP))
+    inv = d["inversores"][0]
+    assert _checks(inv)["Relación DC/AC"]["estado"] == "amarillo"
+    assert inv["estado"] != "rojo"
+    assert any(fragmento in a and "1,00 y 1,35" in a for a in d["avisos"])
+
+
+def test_dc_ac_alto_explica_el_recorte():
+    # 16 × 2 SPR = 10,47 kW en un inversor de 5 kW → DC/AC 2,09.
+    sup = _sup(grupos=[_grupo(n_serie=16, n_paralelo=2)], tilt=10.0)
+    d = _diag([sup], [_inv(ficha={**_SG5, "n_strings_tracker": 2, "Isc_max_tracker": 20.0},
+                           P_ac_nom_W=5000.0)], _paneles(Fachada=_SPR))
+    assert _checks(d["inversores"][0])["Relación DC/AC"]["estado"] == "amarillo"
+    assert any("clipping" in a for a in d["avisos"])
+
+
+def test_inversor_sin_grupos_no_evalua_dc_ac():
+    d = _diag([_sup(grupos=[_grupo(n_serie=8, n_paralelo=1)])],
+              [_inv(ficha=dict(_SG5)), _inv("INV-2", ficha=dict(_SG5))], _paneles(Fachada=_ASP))
+    inv2 = next(i for i in d["inversores"] if i["inversor_id"] == "INV-2")
+    assert "Relación DC/AC" not in _checks(inv2) and inv2["estado"] == "amarillo"
+
+
+def test_cada_color_de_la_tabla_tiene_su_mensaje():
+    # Caso de la prueba en producción: paneles distintos en un MPPT, strings
+    # de más, Vmp bajo, DC/AC bajo y un inversor sin grupos.
+    sups = [_sup("Fachada principal", 1, [_grupo(n_serie=1, n_paralelo=1)]),
+            _sup("Techo 1", 2, [_grupo(n_serie=2, n_paralelo=1)], tilt=10.0)]
+    d = _diag(sups, [_inv(ficha=dict(_SG5)), _inv("INV-2", ficha=dict(_SG5))],
+              _paneles(**{"Fachada principal": _ASP, "Techo 1": _SPR}))
+    etiquetas = {
+        "grupo": lambda x: f"«{x['superficie']} · {x['gid']}»",
+        "mppt": lambda x: f"«{x['inversor_id']} · MPPT {x['mppt']}»",
+        "inversores": lambda x: f"«{x['inversor_id']}»",
+        "superficies": lambda x: f"«{x['superficie']}»",
+    }
+    for clave, etq in (("grupos", etiquetas["grupo"]), ("mppt", etiquetas["mppt"]),
+                       ("inversores", etiquetas["inversores"]), ("superficies", etiquetas["superficies"])):
+        for item in d[clave]:
+            for c in item["checks"]:
+                if c["estado"] == "rojo":
+                    assert any(b.startswith(etq(item)) for b in d["bloqueos"]), (clave, c)
+                if c["estado"] == "amarillo":
+                    assert any(a.startswith(etq(item)) for a in d["avisos"]), (clave, c)
+
+
+def test_resumen_del_estado():
+    from calculos.diseno_electrico_multisup import resumen_estado_electrico
+    d = _diag([_sup(grupos=[_grupo(n_serie=20, n_paralelo=1)])], [_inv()], _paneles(Fachada=_SPR))
+    r = resumen_estado_electrico(d)
+    assert r["estado"] == "rojo" and r["n_bloqueos"] >= 1 and r["texto"].startswith("🔴")
+
+
+# ── Área instalada ───────────────────────────────────────────────────────────
+def test_area_de_energia_con_y_sin_grupos():
+    from calculos.diseno_electrico_multisup import area_energia_superficie, superficies_para_energia
+    con = area_energia_superficie(_sup(grupos=[_grupo(n_serie=8, n_paralelo=16)]), _ASP)
+    assert con["origen"] == "instalada" and con["area_m2"] == pytest.approx(128 * 0.72)
+    sin = area_energia_superficie({"uid": 1, "nombre": "F", "area_m2": 50.0}, _ASP)
+    assert sin["origen"] == "superficie" and sin["area_m2"] == 50.0
+    recortada = area_energia_superficie(_sup(grupos=[_grupo(n_serie=8, n_paralelo=20)]), _ASP)
+    assert recortada["origen"] == "instalada_recortada" and recortada["area_m2"] == 97.3
+    sups = [_sup(grupos=[_grupo(n_serie=8, n_paralelo=2), _grupo("G2", n_serie=8, n_paralelo=1, mppt=2)])]
+    copia = superficies_para_energia(sups, _paneles(Fachada=_ASP))[0]
+    assert copia["area_m2"] == pytest.approx(24 * 0.72) and copia["area_superficie_m2"] == 97.3
+    assert sups[0]["area_m2"] == 97.3  # no muta
+
+
+# ── Invalidación por cambio eléctrico ────────────────────────────────────────
+def _estado_publicado():
+    from calculos.panel_superficie import KEYS_RESULTADOS_PANEL
+    estado = {
+        "superficies_bipv": [_sup("Fachada", 1, [_grupo(n_serie=8, n_paralelo=2)], ),
+                             _sup("Techo", 2, [_grupo(n_serie=12, n_paralelo=1, mppt=2)])],
+        "multisup_inversores": [_inv()],
+        "E_ac_anual_kWh_multisup": 1.0, "multisup_activo": True, "multisup_origen": "simplificado",
+        "poa_superficies": {1: "poa"},
+    }
+    estado["superficies_bipv"][0]["firma_poa"] = "poa-1"
+    for clave in KEYS_RESULTADOS_PANEL:
+        estado[clave] = "x"
+    return estado
+
+
+@pytest.mark.parametrize("cambio", ["n_serie", "mppt", "grupo_nuevo", "eta", "ficha"])
+def test_cambio_electrico_retira_energia_y_conserva_poa(cambio):
+    from calculos.diseno_electrico_multisup import invalidar_por_cambio_electrico
+    estado = _estado_publicado()
+    assert invalidar_por_cambio_electrico(estado) == []
+    if cambio == "n_serie":
+        estado["superficies_bipv"][0]["grupos"][0]["n_serie"] = 7
+    elif cambio == "mppt":
+        estado["superficies_bipv"][1]["grupos"][0]["mppt"] = 1
+    elif cambio == "grupo_nuevo":
+        estado["superficies_bipv"][0]["grupos"].append(_grupo("G2", n_serie=8, n_paralelo=1, mppt=2))
+    elif cambio == "eta":
+        estado["multisup_inversores"][0]["eta_inversor"] = 0.96
+    else:
+        estado["multisup_inversores"][0]["ficha"] = {**_FICHA, "Vdc_max": 1100.0}
+    retiradas = invalidar_por_cambio_electrico(estado)
+    assert "multisup_activo" in retiradas and "multisup_activo" not in estado
+    assert estado["poa_superficies"] == {1: "poa"}
+    assert estado["superficies_bipv"][0]["firma_poa"] == "poa-1"
+
+
+@pytest.mark.parametrize("cambio", ["agregar", "eliminar", "desactivar", "renombrar"])
+def test_cambios_de_superficie_no_son_cambio_electrico(cambio):
+    from calculos.diseno_electrico_multisup import invalidar_por_cambio_electrico
+    estado = _estado_publicado()
+    invalidar_por_cambio_electrico(estado)
+    sups = estado["superficies_bipv"]
+    if cambio == "agregar":
+        sups.append(_sup("Pérgola", 3, [_grupo(n_serie=8, n_paralelo=1)]))
+    elif cambio == "eliminar":
+        sups.pop()
+    elif cambio == "desactivar":
+        sups[1]["activa"] = False
+    else:
+        sups[1]["nombre"] = "Cubierta"
+    assert invalidar_por_cambio_electrico(estado) == [] and estado["multisup_activo"]

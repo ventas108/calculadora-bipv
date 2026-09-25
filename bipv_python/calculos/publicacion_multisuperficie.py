@@ -39,6 +39,9 @@ ETIQUETA_ORIGEN = {
 CLAVES_ENERGIA = (
     "E_ac_anual_kWh_multisup", "multisup_desglose", "poa_df_multisup",
     "area_total_multisup", "multisup_activo", "multisup_origen",
+    # Spec 03/diseno-electrico-multisuperficie (fase A2): estado del diseño
+    # eléctrico con el que se publicó (resumen_estado_electrico).
+    "multisup_estado_electrico",
 )
 CLAVES_SOLO_FISICO = ("_multisup_proyecto_fisico", "multisup_perdida_bus_kWh")
 CLAVES_PUBLICACION = CLAVES_ENERGIA + CLAVES_SOLO_FISICO
@@ -112,6 +115,7 @@ def preparar_publicacion(
     poa_ponderada: pd.DataFrame,
     area_total: float,
     proyecto_fisico: Mapping[str, Any] | None = None,
+    estado_electrico: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Valida los invariantes y retorna las claves a publicar, sin escribir."""
     if origen not in ORIGENES:
@@ -136,6 +140,8 @@ def preparar_publicacion(
         "multisup_activo": True,
         "multisup_origen": origen,
     }
+    if estado_electrico is not None:
+        candidato["multisup_estado_electrico"] = dict(estado_electrico)
     if origen == ORIGEN_FISICO:
         if not isinstance(proyecto_fisico, Mapping):
             raise ValueError("El origen 'fisico' exige el proyecto físico calculado.")
@@ -164,6 +170,7 @@ def publicar_energia_multisuperficie(
     area_total: float,
     proyecto_fisico: Mapping[str, Any] | None = None,
     confirmar_reemplazo: bool = False,
+    estado_electrico: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Publica la energía multi-superficie de forma atómica.
 
@@ -175,12 +182,12 @@ def publicar_energia_multisuperficie(
     candidato = preparar_publicacion(
         origen=origen, e_ac_total=e_ac_total, desglose=desglose,
         poa_ponderada=poa_ponderada, area_total=area_total,
-        proyecto_fisico=proyecto_fisico,
+        proyecto_fisico=proyecto_fisico, estado_electrico=estado_electrico,
     )
     vigente = origen_vigente(session_state)
     if vigente is not None and vigente != origen and not confirmar_reemplazo:
         return {"publicado": False, "requiere_confirmacion": True, "origen_vigente": vigente}
-    for clave in CLAVES_SOLO_FISICO:
+    for clave in CLAVES_SOLO_FISICO + ("multisup_estado_electrico",):
         if clave not in candidato:
             session_state.pop(clave, None)
     session_state.update(candidato)
@@ -207,6 +214,7 @@ def resultados_multisuperficie_a_guardar(session_state: Mapping[str, Any]) -> di
         for clave in (
             "E_ac_anual_kWh_multisup", "area_total_multisup",
             "multisup_desglose", "poa_df_multisup", "multisup_origen",
+            "multisup_estado_electrico",
         )
         if clave in session_state
     }
@@ -218,3 +226,20 @@ def resultados_multisuperficie_a_guardar(session_state: Mapping[str, Any]) -> di
         if "multisup_perdida_bus_kWh" in session_state:
             resultados["multisup_perdida_bus_kWh"] = session_state["multisup_perdida_bus_kWh"]
     return resultados
+
+
+def aviso_estado_electrico(session_state: Mapping[str, Any]) -> tuple[str, str] | None:
+    """``(nivel, texto)`` del diseño eléctrico con que se publicó la energía.
+
+    ``nivel`` es ``"error"`` (🔴), ``"warning"`` (🟡) o ``"caption"`` (🟢)
+    para que Vista 3D, Financiero, Baterías y CO₂ lo muestren igual.
+    ``None`` si no hay publicación activa o no registró el estado (p. ej.
+    una sesión anterior a la fase A2).
+    """
+    if not session_state.get("multisup_activo"):
+        return None
+    estado = session_state.get("multisup_estado_electrico")
+    if not isinstance(estado, Mapping) or not estado.get("texto"):
+        return None
+    nivel = {"rojo": "error", "amarillo": "warning"}.get(estado.get("estado"), "caption")
+    return nivel, f"Energía publicada con {estado['texto']}"

@@ -95,6 +95,10 @@ if e_ac > 0:
         f"Sistema: **{p_stc:.2f} kWp** ({n_pan} módulos) | Ciudad: **{ciudad}**"
         + _sufijo
     )
+    from calculos.publicacion_multisuperficie import aviso_estado_electrico as _aviso_ee
+    _aviso_ms_ee = _aviso_ee(st.session_state)
+    if _aviso_ms_ee:
+        getattr(st, _aviso_ms_ee[0])(_aviso_ms_ee[1])
 else:
     st.warning(
         "⚠️ Ejecuta 📊 Producción primero para obtener E_ac. "

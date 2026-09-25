@@ -105,6 +105,7 @@ KEYS_DERIVADOS_POA = (
     # que solo existen con origen físico (Spec 05/publicacion-energia-
     # multisuperficie). Caducan junto con E_ac_anual_kWh_multisup.
     "multisup_origen", "multisup_perdida_bus_kWh", "_multisup_proyecto_fisico",
+    "multisup_estado_electrico",
 )
 
 # Cambiar inversor/N_serie no cambia sitio, panel, geometría, IAM, soiling,
@@ -207,6 +208,7 @@ KEYS_MULTISUP_ESTADO = (
     "E_ac_anual_kWh_multisup", "poa_df_multisup",
     "area_total_multisup", "multisup_desglose", "multisup_activo",
     "multisup_origen", "multisup_perdida_bus_kWh", "_multisup_proyecto_fisico",
+    "multisup_estado_electrico",
 )
 
 # ── Downstream de Motor Óptico (Página 5b) — TODO lo que depende de SU POA ───

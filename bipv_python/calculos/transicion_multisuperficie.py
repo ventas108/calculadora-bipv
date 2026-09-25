@@ -406,9 +406,14 @@ def recalcular_etapa_inversor_bus(proyecto: Mapping[str, Any], inversor_id: str)
         share = np.nan_to_num(P_dc_por_superficie[nombre] / P_dc_bus_seguro, nan=0.0)
         P_ac_superficie_kW = P_ac_kW * share
 
+        # Spec 03/diseno-electrico-multisuperficie (fase A2): con las
+        # temperaturas de diseño del proyecto si el proyecto las trae.
+        temps = proy.get("temperaturas_diseno") or {}
         compat = evaluar_compatibilidad_string(
             panel=panel, inversor=inversor_cfg.get("inversor", {}),
             N_serie=int(sup["n_serie"]),
+            **({"T_frio": float(temps["T_frio"]), "T_real": float(temps["T_real"]),
+                "T_extremo": float(temps["T_extremo"])} if temps else {}),
         )
         P_dc_stc_kW = float(panel.get("Pmax_stc", 0.0)) * int(sup["n_serie"]) * int(sup["n_paralelo"]) / 1000.0
         relacion_dc_ac = evaluar_relacion_dc_ac(P_dc_stc_kW, P_ac_nom_W)

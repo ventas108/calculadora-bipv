@@ -78,6 +78,10 @@ if not prod_ok or df_m_prod is None or e_ac_anual <= 0:
         "requiere los resultados de producción."
     )
 
+from calculos.publicacion_multisuperficie import aviso_estado_electrico as _aviso_ee
+_aviso_ms_ee = _aviso_ee(st.session_state)
+if _aviso_ms_ee:
+    getattr(st, _aviso_ms_ee[0])(_aviso_ms_ee[1])
 # Banner bypass (#37)
 if prod_ok and _bypass_ok_bat and _e_ac_bypass_bat > 0:
     st.info(

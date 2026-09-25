@@ -29,6 +29,9 @@ def construir_proyecto_desde_session_state(session_state: Mapping[str, Any]) -> 
         raise ValueError("Configuracion multi-superficie invalida: " + "; ".join(validacion["errores"]))
     inversores_ss = aplicar_tipos_derivados(inversores_ss, validacion["tipos_derivados"])
     inversores = [inversor_nuevo(str(i["inversor_id"]), i["tipo"], float(i["eta_inversor"]), i.get("P_ac_nom_W"), dict(i.get("ficha") or i.get("inversor") or {})) for i in inversores_ss]
+    from calculos.diseno_electrico_multisup import grupos_de_superficie, temperaturas_diseno
+    from calculos.panel_superficie import area_modulo
+
     salida = []
     for entrada in superficies:
         nombre = str(entrada.get("nombre", "")).strip()
@@ -37,9 +40,16 @@ def construir_proyecto_desde_session_state(session_state: Mapping[str, Any]) -> 
         estado = entrada.get("estado_sombra") or entrada.get("cobertura_sombra", {}).get("estado")
         if estado and estado not in ESTADOS_SOMBRA_ACEPTABLES:
             raise ValueError(f"La superficie '{nombre}' tiene sombra en estado '{estado}'. Recalcula antes de continuar.")
-        for campo in _CLAVES_SUPERFICIE_REQUERIDAS:
+        grupos = grupos_de_superficie(entrada)
+        if not grupos:
+            raise ValueError(f"La superficie '{nombre}' no puede entrar al modo fisico: falta 'inversor_id'.")
+        for campo in ("p_shade", "firma_sombra"):
             if entrada.get(campo) is None:
                 raise ValueError(f"La superficie '{nombre}' no puede entrar al modo fisico: falta '{campo}'.")
+        for grupo in grupos:
+            for campo in ("n_serie", "n_paralelo", "inversor_id"):
+                if grupo.get(campo) is None:
+                    raise ValueError(f"La superficie '{nombre}' no puede entrar al modo fisico: falta '{campo}'.")
         try:
             panel = panel_de_superficie(entrada, panel_dict, panel_nombre_dim)["panel"]
         except PanelSuperficieError as error:
@@ -47,10 +57,32 @@ def construir_proyecto_desde_session_state(session_state: Mapping[str, Any]) -> 
         sombra = np.asarray(entrada["p_shade"], dtype=float)
         if sombra.shape != (_HORAS_ANIO,) or not np.isfinite(sombra).all() or ((sombra < 0) | (sombra > 1)).any():
             raise ValueError(f"La superficie '{nombre}' tiene p_shade invalido; se requieren 8760 valores entre 0 y 1.")
-        sup = superficie_nueva(nombre, str(entrada.get("tipo", "Fachada")), float(entrada.get("tilt_deg", 90)), float(entrada.get("azimuth_deg", 180)), float(entrada.get("area_m2", 0)), dict(panel), int(entrada["n_serie"]), int(entrada["n_paralelo"]), str(entrada["inversor_id"]), sombra, float(entrada.get("albedo", 0.2)), entrada.get("bifacial"), float(entrada.get("k_bipv", 1.0)))
-        sup["_firma_sombra"] = dict(entrada["firma_sombra"])
-        salida.append(sup)
-    return proyecto_nuevo(inversores, salida)
+        # Spec 03/diseno-electrico-multisuperficie (fase A2): una unidad física
+        # por grupo de strings, con la geometría, POA, sombra y panel de su
+        # superficie. Área de cada unidad = módulos × área del módulo, sin
+        # pasar (en total) del área de la superficie.
+        area_sup = float(entrada.get("area_m2", 0))
+        a_mod = area_modulo(panel)
+        modulos = [int(g["n_serie"]) * int(g["n_paralelo"]) for g in grupos]
+        if a_mod:
+            areas = [m * a_mod for m in modulos]
+            if sum(areas) > area_sup > 0:
+                areas = [a * area_sup / sum(areas) for a in areas]
+        else:
+            areas = [area_sup * m / max(sum(modulos), 1) for m in modulos]
+        varios = len(grupos) > 1
+        for grupo, area_u in zip(grupos, areas):
+            gid = str(grupo.get("gid", "G1"))
+            nombre_u = f"{nombre} · {gid}" if varios else nombre
+            sup = superficie_nueva(nombre_u, str(entrada.get("tipo", "Fachada")), float(entrada.get("tilt_deg", 90)), float(entrada.get("azimuth_deg", 180)), float(area_u), dict(panel), int(grupo["n_serie"]), int(grupo["n_paralelo"]), str(grupo["inversor_id"]), sombra, float(entrada.get("albedo", 0.2)), entrada.get("bifacial"), float(entrada.get("k_bipv", 1.0)))
+            sup["_firma_sombra"] = dict(entrada["firma_sombra"])
+            sup["superficie_origen"] = nombre
+            sup["gid"] = gid
+            sup["mppt"] = grupo.get("mppt")
+            salida.append(sup)
+    proyecto = proyecto_nuevo(inversores, salida)
+    proyecto["temperaturas_diseno"] = temperaturas_diseno(session_state)
+    return proyecto
 
 
 def aplicar_proyecto_a_session_state(
@@ -70,12 +102,36 @@ def aplicar_proyecto_a_session_state(
     agregados = proyecto.get("agregados")
     if not isinstance(agregados, Mapping):
         raise ValueError("El proyecto no tiene agregados calculados.")
-    desglose = []
+    # Fase A2: el desglose publicado es por superficie; los grupos de una
+    # misma superficie se suman (energía y área) y comparten su POA.
+    por_superficie: dict[str, dict] = {}
     for nombre, sup in proyecto["superficies"].items():
         dc, ac = sup.get("resultados_dc") or {}, sup.get("resultados_ac") or {}
         if "E_ac_anual_kWh" not in ac or "poa_anual_kWh_m2" not in dc:
             raise ValueError(f"La superficie '{nombre}' no tiene resultados completos.")
-        desglose.append({"nombre": nombre, "tipo": sup.get("tipo"), "area_m2": sup.get("area_m2"), "e_ac_kWh": ac["E_ac_anual_kWh"], "poa_kWh_m2": dc["poa_anual_kWh_m2"]})
+        origen = sup.get("superficie_origen") or nombre
+        fila = por_superficie.setdefault(origen, {
+            "nombre": origen, "tipo": sup.get("tipo"), "area_m2": 0.0, "e_ac_kWh": 0.0,
+            "poa_kWh_m2": dc["poa_anual_kWh_m2"],
+        })
+        fila["area_m2"] += float(sup.get("area_m2") or 0.0)
+        fila["e_ac_kWh"] += float(ac["E_ac_anual_kWh"])
+    desglose = [{**f, "area_m2": round(f["area_m2"], 3), "e_ac_kWh": round(f["e_ac_kWh"], 1)}
+                for f in por_superficie.values()]
+    # Regla hacia Financiero (Spec A, fase A2): un diseño eléctrico 🔴 no se
+    # publica como energía física.
+    estado_electrico = None
+    if session_state.get("superficies_bipv"):
+        from calculos.diseno_electrico_multisup import (
+            diagnostico_electrico_estado, resumen_estado_electrico,
+        )
+        diagnostico = diagnostico_electrico_estado(session_state)
+        estado_electrico = resumen_estado_electrico(diagnostico)
+        if diagnostico["estado_global"] == "rojo":
+            raise ValueError(
+                "El diseño eléctrico tiene fallas (🔴), así que el modo físico no se publica: "
+                + " ".join(diagnostico["bloqueos"])
+            )
     return publicar_energia_multisuperficie(
         session_state,
         origen=ORIGEN_FISICO,
@@ -85,6 +141,7 @@ def aplicar_proyecto_a_session_state(
         area_total=agregados["area_total_m2"],
         proyecto_fisico=proyecto,
         confirmar_reemplazo=confirmar_reemplazo,
+        estado_electrico=estado_electrico,
     )
 
 

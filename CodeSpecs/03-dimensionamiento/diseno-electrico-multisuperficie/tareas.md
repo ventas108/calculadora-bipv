@@ -45,15 +45,34 @@ Validación:
 - [x] Pruebas nuevas en rojo con `main` y en verde con el cambio.
 - [x] Suites relacionadas y suite completa en verde.
 - [x] Prueba de humo con `AppTest`.
-- [ ] Prueba en producción de la fase A1.
+- [x] Prueba en producción de la fase A1.
 
-## Fase A2 — Cálculos (por hacer, después de A1)
+## Fase A2 — Cálculos
 
-- [ ] Varios grupos por superficie en el editor.
-- [ ] Modo físico por grupos con temperaturas del proyecto.
-- [ ] Área instalada en la energía simplificada; bypass por grupo.
-- [ ] Reglas hacia Financiero y `multisup_estado_electrico`.
-- [ ] Invalidación por cambio eléctrico y persistencia de grupos.
+- [x] Varios grupos por superficie en el editor («➕ Agregar grupo de
+      strings», 🗑️ por grupo).
+- [x] Modo físico por grupos con temperaturas del proyecto.
+- [x] Área instalada en la energía simplificada; bypass por grupo.
+- [x] Reglas hacia Financiero y `multisup_estado_electrico`.
+- [x] Invalidación por cambio eléctrico y persistencia de grupos.
+- [x] Regla de caja combinadora: strings > entradas con corriente que cabe →
+      🟡 con explicación sencilla; columna «Caja combinadora» y conteo por
+      inversor.
+- [x] Relación DC/AC nunca 🔴, siempre 🟡 fuera de 1,00–1,35 con explicación
+      para quien empieza; no se evalúa en inversores sin grupos. Colores de la
+      tabla y de los mensajes siempre iguales.
+- [x] Explicación sencilla de cada comprobación y columnas sin truncar.
+- [x] Estado eléctrico visible en Vista 3D, Financiero, Baterías y CO₂.
+- [x] Sección 6: aviso explícito para superficies con varios grupos (se
+      incorporan en A3).
+- [x] Base de conocimiento del Asistente y documentos del director.
+
+Validación:
+
+- [x] Pruebas nuevas en rojo con `main` y en verde con el cambio.
+- [x] Suites relacionadas y suite completa en verde.
+- [x] Prueba de humo con `AppTest`.
+- [ ] Prueba en producción de la fase A2.
 
 ## Fase A3 — Sección 6 unificada (por hacer, después de A2)
 

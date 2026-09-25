@@ -183,9 +183,23 @@ def test_retirar_borra_todas_las_claves_de_la_publicacion():
     estado = {"bypass_multisup_resultados": [1]}
     aplicar_proyecto_a_session_state(_proyecto(), estado)
     retiradas = retirar_energia_multisuperficie(estado)
-    assert set(retiradas) == set(CLAVES_PUBLICACION)
+    # multisup_estado_electrico es opcional (Spec 03/diseno-electrico-multisuperficie):
+    # sin superficies en la sesión no hay diagnóstico que publicar.
+    assert set(retiradas) == set(CLAVES_PUBLICACION) - {"multisup_estado_electrico"}
     assert estado == {"bypass_multisup_resultados": [1]}
     assert retirar_energia_multisuperficie(estado) == []
+
+
+def test_estado_electrico_se_publica_y_se_retira_con_la_energia():
+    estado = {}
+    resumen = {"estado": "amarillo", "n_bloqueos": 0, "n_avisos": 2, "texto": "🟡 …"}
+    publicar_energia_multisuperficie(estado, origen="simplificado", estado_electrico=resumen, **_datos())
+    assert estado["multisup_estado_electrico"] == resumen
+    # Una publicación posterior sin estado no conserva el anterior.
+    publicar_energia_multisuperficie(estado, origen="simplificado", **_datos())
+    assert "multisup_estado_electrico" not in estado
+    publicar_energia_multisuperficie(estado, origen="simplificado", estado_electrico=resumen, **_datos())
+    assert "multisup_estado_electrico" in retirar_energia_multisuperficie(estado)
 
 
 # ── Estado: invalidación y guardado ──────────────────────────────────────────

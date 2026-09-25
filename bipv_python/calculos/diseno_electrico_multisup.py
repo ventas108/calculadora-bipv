@@ -314,16 +314,42 @@ def validar_diseno_electrico(
             avisos.append(f"{etiqueta}: orientaciones distintas en el mismo MPPT; la sección 6 cuantifica la pérdida.")
             checks.append(_check("Una orientación por MPPT", len(orient), 1, "orientaciones",
                                  "tilt/azimuth distintos en el MPPT", "grupos", "amarillo"))
-        n_ent = ficha.get("n_strings_tracker")
-        checks.append(_check(
-            "Strings ≤ entradas del MPPT", strings, n_ent, "strings",
-            "Σ N paralelo de los grupos del MPPT ≤ entradas por MPPT", fuente,
-            ("rojo" if strings > n_ent else "verde") if n_ent else "amarillo"))
-        if n_ent and strings > n_ent:
-            bloqueos.append(f"{etiqueta}: {strings} strings y el MPPT admite {n_ent}.")
         isc_total = sum(float(g["_panel"]["Isc_stc"]) * (g["n_paralelo"] or 0) * FS_ISC
                         for g in grupos if g["_panel"])
         isc_max = _positivo(ficha.get("Isc_max_tracker") or ficha.get("I_max_tracker"))
+        # Entradas del MPPT: límite de CONEXIÓN (cuántos pares de cables caben
+        # en el inversor). El límite FÍSICO es la corriente: si cabe, los
+        # strings se unen antes del inversor con una caja combinadora
+        # (fase A2, aprobada el 25-sep-2026).
+        n_ent = ficha.get("n_strings_tracker")
+        caja = False
+        if not n_ent:
+            est_s = "amarillo"
+            avisos.append(f"{etiqueta}: la ficha no dice cuántos strings admite cada MPPT; "
+                          "revisa la hoja de datos del inversor.")
+        elif strings <= n_ent:
+            est_s = "verde"
+        elif isc_max and isc_total <= isc_max:
+            est_s, caja = "amarillo", True
+            avisos.append(
+                f"{etiqueta}: {strings} strings y el MPPT tiene {n_ent} entrada(s). Caben por "
+                f"corriente ({isc_total:.1f} A de {isc_max:.1f} A), así que se pueden unir antes "
+                "del inversor con una caja combinadora o conectores en Y. Inclúyela en el diseño "
+                "y en el presupuesto; con más de 2 strings en paralelo, normalmente cada string "
+                "lleva su fusible."
+            )
+        else:
+            est_s = "rojo"
+            detalle = (f"{isc_total:.1f} A > límite {isc_max:.1f} A" if isc_max
+                       else "la ficha no trae la corriente máxima del MPPT")
+            bloqueos.append(
+                f"{etiqueta}: {strings} strings y el MPPT tiene {n_ent} entrada(s); ni con caja "
+                f"combinadora caben ({detalle}). Reparte los strings en otro MPPT u otro inversor."
+            )
+        checks.append(_check(
+            "Strings ≤ entradas del MPPT", strings, n_ent, "strings",
+            "Σ N paralelo de los grupos del MPPT ≤ entradas por MPPT (si no, caja combinadora "
+            "cuando la corriente cabe)", fuente, est_s))
         if isc_max:
             est_i = "rojo" if isc_total > isc_max else ("amarillo" if isc_total > isc_max * 0.925 else "verde")
         else:
@@ -333,6 +359,12 @@ def validar_diseno_electrico(
             f"Σ Isc × N paralelo × {FS_ISC}", fuente, est_i))
         if est_i == "rojo":
             bloqueos.append(f"{etiqueta}: Isc {isc_total:.1f} A > límite {isc_max:.1f} A.")
+        elif est_i == "amarillo" and isc_max:
+            avisos.append(f"{etiqueta}: la corriente ({isc_total:.1f} A) queda a menos de 7,5 % "
+                          f"del límite del MPPT ({isc_max:.1f} A).")
+        elif est_i == "amarillo":
+            avisos.append(f"{etiqueta}: la ficha no trae la corriente máxima del MPPT; no se "
+                          "puede verificar la corriente.")
 
         # Compatibilidad del string de cada grupo con este MPPT
         for g in grupos:
@@ -377,7 +409,7 @@ def validar_diseno_electrico(
             "inversor_id": inv_id, "mppt": mppt,
             "grupos": [f"{g['superficie']} · {g['gid']}" for g in grupos],
             "paneles": sorted(map(str, paneles_mppt)), "orientaciones": sorted(orient),
-            "strings": strings, "isc_total": round(isc_total, 4), "checks": checks,
+            "strings": strings, "caja_combinadora": caja, "isc_total": round(isc_total, 4), "checks": checks,
             "estado": estado_m,
         })
 
@@ -408,25 +440,49 @@ def validar_diseno_electrico(
                 bloqueos.append(f"{etiqueta}: usa el MPPT {', '.join(map(str, fuera or mppts))} y tiene {n_mppt}.")
         else:
             est_m = "amarillo"
+            if grupos_inv:
+                avisos.append(f"{etiqueta}: la ficha no dice cuántos MPPT tiene; no se puede "
+                              "verificar la asignación.")
         checks.append(_check("MPPT usados ≤ MPPT del inversor", len(mppts), n_mppt, "MPPT",
                              "MPPT distintos asignados", fuente, est_m))
         p_dc_kw = sum(
             float(g["_panel"].get("Pmax_stc", 0.0)) * (g["n_serie"] or 0) * (g["n_paralelo"] or 0)
             for g in grupos_inv if g["_panel"]) / 1000.0
         p_ac = _positivo(inv.get("P_ac_nom_W")) or ficha.get("P_ac_nom_W")
-        rel = evaluar_relacion_dc_ac(p_dc_kw, p_ac)
-        if rel.get("evaluable"):
-            est_r = {"🔴": "rojo", "🟠": "amarillo"}.get(rel.get("nivel"), "verde")
-            checks.append(_check("Relación DC/AC", round(rel["ratio"], 3), "1,10–1,35 (orientativo)", "",
+        rel = evaluar_relacion_dc_ac(p_dc_kw, p_ac) if grupos_inv else {"evaluable": False}
+        # La relación DC/AC mide si el inversor está bien aprovechado; nunca
+        # es un diseño imposible, así que como mucho es 🟡 (fase A2). Sin
+        # grupos no hay nada que comparar.
+        if grupos_inv and rel.get("evaluable"):
+            ratio = rel["ratio"]
+            est_r = "verde" if rel.get("estado") == "optimo" else "amarillo"
+            checks.append(_check("Relación DC/AC", round(ratio, 3), "1,00–1,35 (orientativo)", "",
                                  "Σ Pmax × módulos del inversor ÷ P AC nominal", fuente, est_r))
-            if est_r != "verde":
-                avisos.append(f"{etiqueta}: relación DC/AC {rel['ratio']:.2f} ({rel.get('estado')}).")
-        else:
+            if ratio < 1.0:
+                avisos.append(
+                    f"{etiqueta}: el inversor es más grande que los paneles conectados "
+                    f"(DC/AC {ratio:.2f}: {p_dc_kw:.2f} kW de paneles para {p_ac / 1000:.1f} kW de "
+                    "inversor). Funciona bien, pero se desaprovecha parte del inversor y cuesta más "
+                    "de lo necesario. Lo usual es entre 1,00 y 1,35: agrega módulos o elige un "
+                    "inversor más pequeño."
+                )
+            elif est_r == "amarillo":
+                avisos.append(
+                    f"{etiqueta}: hay más potencia de paneles que de inversor (DC/AC {ratio:.2f}). "
+                    "En las horas de más sol el inversor limita su salida (recorte o «clipping») "
+                    "y se pierde algo de energía; el modo físico calcula cuánto. Hasta 1,35 suele "
+                    "ser una buena decisión económica; más arriba conviene revisarlo."
+                )
+        elif grupos_inv:
             checks.append(_check("Relación DC/AC", None, None, "", "sin P AC nominal", fuente, "amarillo"))
+            avisos.append(f"{etiqueta}: sin potencia AC nominal no se puede calcular la relación DC/AC.")
         salida_invs.append({
             "inversor_id": inv_id, "origen_ficha": inv.get("origen_ficha"),
             "nombre": inv.get("nombre"), "mppt_usados": len(mppts),
             "mppt_disponibles": n_mppt, "P_dc_stc_kW": round(p_dc_kw, 3),
+            "cajas_combinadoras": sum(
+                1 for m in salida_mppt if m["inversor_id"] == inv_id and m["caja_combinadora"]
+            ),
             "relacion_dc_ac": rel, "checks": checks,
             "estado": _peor(*(c["estado"] for c in checks)),
         })
@@ -434,6 +490,7 @@ def validar_diseno_electrico(
     for g in salida_grupos:
         g.pop("_orientacion", None)
         g.pop("_panel", None)
+    _asegurar_mensajes(salida_grupos, salida_mppt, salida_invs, salida_sups, bloqueos, avisos)
     estados = ([g["estado"] for g in salida_grupos] + [m["estado"] for m in salida_mppt]
                + [i["estado"] for i in salida_invs] + [s["estado"] for s in salida_sups]
                + (["amarillo"] if temps.get("origen") != "proyecto" else []))
@@ -443,3 +500,179 @@ def validar_diseno_electrico(
         "bloqueos": list(dict.fromkeys(bloqueos)), "avisos": list(dict.fromkeys(avisos)),
         "temperaturas": dict(temps),
     }
+
+
+# ── Coherencia entre tabla y mensajes ────────────────────────────────────────
+def _etiquetas(nivel: str, item: Mapping[str, Any]) -> str:
+    if nivel == "grupo":
+        return f"«{item['superficie']} · {item['gid']}»"
+    if nivel == "mppt":
+        return f"«{item['inversor_id']} · MPPT {item['mppt']}»"
+    if nivel == "inversor":
+        return f"«{item['inversor_id']}»"
+    return f"«{item['superficie']}»"
+
+
+def _asegurar_mensajes(grupos, mppt, invs, sups, bloqueos: list, avisos: list) -> None:
+    """Cada 🔴 de la tabla tiene su mensaje rojo y cada 🟡 su mensaje amarillo
+    (fase A2: antes una relación DC/AC salía 🔴 en la tabla y 🟡 en la lista)."""
+    for nivel, items in (("grupo", grupos), ("mppt", mppt), ("inversor", invs), ("superficie", sups)):
+        for item in items:
+            etiqueta = _etiquetas(nivel, item)
+            for c in item["checks"]:
+                if c["estado"] == "rojo" and not any(b.startswith(etiqueta) for b in bloqueos):
+                    bloqueos.append(f"{etiqueta}: {c['nombre']} ({c['formula']}).")
+                elif c["estado"] == "amarillo" and not any(a.startswith(etiqueta) for a in avisos):
+                    avisos.append(f"{etiqueta}: {c['nombre']} — {c['formula']}.")
+
+
+# ── Resumen, estado de sesión y área instalada ───────────────────────────────
+ICONO_ESTADO = {"verde": "🟢", "amarillo": "🟡", "rojo": "🔴"}
+
+
+def resumen_estado_electrico(diagnostico: Mapping[str, Any]) -> dict:
+    """``{"estado", "n_bloqueos", "n_avisos", "texto"}`` para el banner y la
+    publicación (``multisup_estado_electrico``)."""
+    estado = diagnostico["estado_global"]
+    n_b, n_a = len(diagnostico["bloqueos"]), len(diagnostico["avisos"])
+    if estado == "rojo":
+        texto = (f"🔴 diseño eléctrico con fallas ({n_b}): hay strings, MPPT o inversores "
+                 "eléctricamente imposibles; revísalos en ⚡ Diseño eléctrico.")
+    elif estado == "amarillo":
+        texto = (f"🟡 diseño eléctrico no verificado del todo ({n_a} aviso(s)): funciona, pero "
+                 "revisa los avisos en ⚡ Diseño eléctrico.")
+    else:
+        texto = "🟢 diseño eléctrico verificado."
+    return {"estado": estado, "n_bloqueos": n_b, "n_avisos": n_a, "texto": texto}
+
+
+def paneles_superficies_estado(session_state: Mapping[str, Any],
+                               superficies: list[Mapping[str, Any]] | None = None) -> dict:
+    """``{nombre: {"panel", "nombre"}}`` de cada superficie activa con panel.
+
+    Para el diseño eléctrico basta la ficha eléctrica del panel; no hace falta
+    que traiga área (eso solo lo exige la eficiencia de la energía
+    simplificada)."""
+    from calculos.panel_superficie import PanelSuperficieError, panel_de_superficie
+
+    salida = {}
+    for sup in (superficies if superficies is not None
+                else list(session_state.get("superficies_bipv") or [])):
+        if not sup.get("activa", True):
+            continue
+        try:
+            datos = panel_de_superficie(sup, session_state.get("panel_dict"),
+                                        session_state.get("panel_nombre_dim"))
+        except PanelSuperficieError:
+            continue
+        salida[sup["nombre"]] = {"panel": datos["panel"], "nombre": datos["nombre"]}
+    return salida
+
+
+def diagnostico_electrico_estado(session_state: Mapping[str, Any]) -> dict:
+    """``validar_diseno_electrico`` con el estado de la sesión."""
+    paneles = paneles_superficies_estado(session_state)
+    return validar_diseno_electrico(
+        list(session_state.get("superficies_bipv") or []),
+        list(session_state.get("multisup_inversores") or []),
+        paneles, temperaturas_diseno(session_state),
+    )
+
+
+def modulos_de_superficie(superficie: Mapping[str, Any]) -> int:
+    """Σ N serie × N paralelo de los grupos válidos de la superficie."""
+    total = 0
+    for g in grupos_de_superficie(superficie):
+        n_s, n_p = _entero_positivo(g.get("n_serie")), _entero_positivo(g.get("n_paralelo"))
+        if n_s and n_p:
+            total += n_s * n_p
+    return total
+
+
+def area_energia_superficie(superficie: Mapping[str, Any],
+                            panel: Mapping[str, Any] | None) -> dict:
+    """Área con la que se calcula la energía simplificada de la superficie.
+
+    Con grupos de strings: área instalada = módulos × área del módulo (sin
+    pasar del área de la superficie), la misma base del modo físico. Sin
+    grupos: el área de la superficie, marcada como estimación.
+    """
+    area_sup = _positivo(superficie.get("area_m2")) or 0.0
+    modulos = modulos_de_superficie(superficie)
+    area_mod = None
+    if panel:
+        from calculos.panel_superficie import area_modulo
+        area_mod = area_modulo(panel)
+    if modulos and area_mod:
+        instalada = modulos * area_mod
+        return {"area_m2": round(min(instalada, area_sup), 4), "area_superficie_m2": area_sup,
+                "area_instalada_m2": round(instalada, 4), "modulos": modulos,
+                "origen": "instalada" if instalada <= area_sup + 1e-9 else "instalada_recortada"}
+    return {"area_m2": area_sup, "area_superficie_m2": area_sup, "area_instalada_m2": None,
+            "modulos": modulos, "origen": "superficie"}
+
+
+def superficies_para_energia(superficies: list[Mapping[str, Any]],
+                             paneles: Mapping[str, Mapping[str, Any]]) -> list[dict]:
+    """Copias de las superficies con ``area_m2`` = área de energía y los campos
+    ``area_superficie_m2`` y ``area_origen``. No muta la entrada."""
+    salida = []
+    for sup in superficies:
+        info = paneles.get(sup.get("nombre"))
+        area = area_energia_superficie(sup, info["panel"] if info else None)
+        salida.append({**dict(sup), "area_m2": area["area_m2"],
+                       "area_superficie_m2": area["area_superficie_m2"],
+                       "area_origen": area["origen"], "modulos": area["modulos"]})
+    return salida
+
+
+# ── Invalidación por cambio del diseño eléctrico ─────────────────────────────
+CLAVE_FIRMA_ELECTRICA = "_multisup_firma_electrica"
+_CAMPOS_INVERSOR_FIRMA = ("clase", "origen_ficha", "nombre", "ficha", "eta_inversor", "P_ac_nom_W")
+
+
+def firma_diseno_electrico(superficies: list[Mapping[str, Any]],
+                           inversores: list[Mapping[str, Any]]) -> dict[str, str]:
+    """Huella por ``uid`` de los grupos de cada superficie activa y de los
+    inversores que usan."""
+    from calculos.produccion_vigencia import fingerprint_mapping
+
+    invs = {str(i.get("inversor_id")): i for i in inversores}
+    salida = {}
+    for sup in superficies:
+        if not sup.get("activa", True):
+            continue
+        grupos = grupos_de_superficie(sup)
+        usados = sorted({str(g.get("inversor_id")) for g in grupos if g.get("inversor_id")})
+        salida[str(sup.get("uid", sup.get("nombre")))] = fingerprint_mapping({
+            "grupos": grupos,
+            "inversores": {i: {k: invs.get(i, {}).get(k) for k in _CAMPOS_INVERSOR_FIRMA}
+                           for i in usados},
+        })
+    return salida
+
+
+def invalidar_por_cambio_electrico(session_state) -> list[str]:
+    """Retira la energía publicada y los resultados de bypass, MPPT y físico si
+    cambió el diseño eléctrico de alguna superficie que ya existía. Agregar,
+    quitar, desactivar o renombrar superficies no cuenta. La POA y la sombra
+    no dependen del diseño eléctrico y se conservan."""
+    from calculos.panel_superficie import KEYS_RESULTADOS_PANEL
+    from calculos.publicacion_multisuperficie import retirar_energia_multisuperficie
+
+    actual = firma_diseno_electrico(
+        list(session_state.get("superficies_bipv") or []),
+        list(session_state.get("multisup_inversores") or []),
+    )
+    anterior = session_state.get(CLAVE_FIRMA_ELECTRICA)
+    session_state[CLAVE_FIRMA_ELECTRICA] = actual
+    if not isinstance(anterior, Mapping):
+        return []
+    if all(anterior[uid] == actual[uid] for uid in anterior.keys() & actual.keys()):
+        return []
+    retiradas = retirar_energia_multisuperficie(session_state)
+    for clave in KEYS_RESULTADOS_PANEL:
+        if clave in session_state:
+            session_state.pop(clave, None)
+            retiradas.append(clave)
+    return retiradas
