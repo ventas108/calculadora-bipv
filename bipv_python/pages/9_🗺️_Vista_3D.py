@@ -941,6 +941,11 @@ with tab_solar:
             migrar_puntos_por_uid, parsear_puntos_3d, previsualizar_puntos,
             puntos_por_nombre,
         )
+        from calculos.diseno_electrico_multisup import (
+            campos_legacy_desde_grupos, grupos_de_superficie, inversor_normalizado,
+            normalizar_ficha_inversor, rango_n_serie, temperaturas_diseno,
+            validar_diseno_electrico,
+        )
         from calculos.panel_superficie import (
             CAMPOS_PANEL_SUPERFICIE, PanelSuperficieError, eficiencia_panel,
             eficiencias_superficies_estado, invalidar_por_cambio_panel,
@@ -1378,51 +1383,131 @@ with tab_solar:
                 "Asigna cada superficie activa a un inversor. El tipo se "
                 "deriva automáticamente y no se puede declarar manualmente."
             )
-            _inversores_ui = [dict(_inv) for _inv in st.session_state.get("multisup_inversores", [])]
+            # Spec 03/diseno-electrico-multisuperficie (fase A1): inversor con
+            # ficha (proyecto, catálogo o manual), grupo de strings con MPPT y
+            # tabla de diseño eléctrico validada con las temperaturas del
+            # proyecto. Como en el editor de superficies, los campos no reciben
+            # value=/index=: el estado se inicializa una vez desde los datos.
+            _inversores_ui = [
+                inversor_normalizado(_inv) for _inv in st.session_state.get("multisup_inversores", [])
+            ]
+            _inv_dim = st.session_state.get("inversor_dict_dim")
+            _inv_dim_nombre = st.session_state.get("inversor_nombre_dim") or "sin nombre"
+            _etq_inv_proy = f"Inversor del proyecto ({_inv_dim_nombre})" if _inv_dim else None
+            _ETQ_INV_MANUAL = "✍️ Manual (sin ficha: no se valida)"
+            try:
+                from datos.catalogo_inversores_excel import cargar_catalogo_inversores as _cat_inv_fn
+                _catalogo_inv_ms = dict(_cat_inv_fn() or {})
+            except Exception:
+                _catalogo_inv_ms = {}
+            if not _catalogo_inv_ms:
+                from datos.catalogo_inversores import INVERSORES as _INV_INT
+                _catalogo_inv_ms = dict(_INV_INT)
+            _opciones_ficha_inv = (
+                ([_etq_inv_proy] if _etq_inv_proy else []) + sorted(_catalogo_inv_ms) + [_ETQ_INV_MANUAL]
+            )
+
             _ci_add, _ = st.columns([1, 3])
             if _ci_add.button("➕ Agregar inversor", key="btn_add_multisup_inversor"):
                 _ids_ui = {str(_inv.get("inversor_id")) for _inv in _inversores_ui if _inv.get("inversor_id")}
                 _num_ui = 1
                 while f"INV-{_num_ui}" in _ids_ui:
                     _num_ui += 1
-                _inversores_ui.append({
-                    "inversor_id": f"INV-{_num_ui}", "tipo": "",
-                    "eta_inversor": None, "P_ac_nom_W": None, "ficha": {},
-                })
+                _nuevo_inv = {
+                    "inversor_id": f"INV-{_num_ui}", "tipo": "", "clase": "string",
+                    "origen_ficha": "manual", "nombre": "", "ficha": {},
+                    "eta_inversor": None, "P_ac_nom_W": None,
+                }
+                if _inv_dim:
+                    _ficha_dim = normalizar_ficha_inversor(_inv_dim)
+                    _nuevo_inv.update(origen_ficha="proyecto", nombre=_inv_dim_nombre,
+                                      ficha=_ficha_dim, P_ac_nom_W=_ficha_dim.get("P_ac_nom_W"))
+                _inversores_ui.append(_nuevo_inv)
                 st.session_state["multisup_inversores"] = _inversores_ui
                 st.rerun()
+
+            def _opcion_ficha_guardada(_inv_g):
+                if _inv_g.get("origen_ficha") == "proyecto" and _etq_inv_proy:
+                    return _etq_inv_proy
+                if _inv_g.get("origen_ficha") == "catalogo" and _inv_g.get("nombre"):
+                    return str(_inv_g["nombre"])
+                return _ETQ_INV_MANUAL
 
             _inversores_editados = []
             _borrar_indices = []
             for _inv_idx, _inv in enumerate(_inversores_ui):
                 _inv_id_actual = str(_inv.get("inversor_id") or "")
+                _opc_guardada = _opcion_ficha_guardada(_inv)
+                if _opc_guardada not in _opciones_ficha_inv:
+                    _opciones_ficha_inv = _opciones_ficha_inv + [_opc_guardada]
+                _valor_campo_superficie(f"ms_inv_id_{_inv_idx}", _inv_id_actual)
+                _valor_campo_superficie(f"ms_inv_ficha_{_inv_idx}", _opc_guardada)
+                _valor_campo_superficie(
+                    f"ms_inv_eta_{_inv_idx}",
+                    "" if _inv.get("eta_inversor") is None else str(_inv.get("eta_inversor")),
+                )
+                _valor_campo_superficie(
+                    f"ms_inv_pac_{_inv_idx}",
+                    "" if _inv.get("P_ac_nom_W") is None else str(_inv.get("P_ac_nom_W")),
+                )
                 with st.expander(f"🔌 {_inv_id_actual or 'Inversor sin ID'}", expanded=True):
-                    _ic1, _ic2, _ic3, _ic4 = st.columns([2, 1, 1, 1])
-                    _inv_id_editado = _ic1.text_input(
-                        "ID", value=_inv_id_actual, key=f"ms_inv_id_{_inv_idx}",
-                    ).strip()
-                    _eta_texto = _ic2.text_input(
-                        "Eficiencia (0-1)",
-                        value=("" if _inv.get("eta_inversor") is None else str(_inv.get("eta_inversor"))),
-                        key=f"ms_inv_eta_{_inv_idx}",
-                    ).strip()
-                    _pot_texto = _ic3.text_input(
-                        "Potencia AC (W)",
-                        value=("" if _inv.get("P_ac_nom_W") is None else str(_inv.get("P_ac_nom_W"))),
-                        key=f"ms_inv_pac_{_inv_idx}",
+                    _ic1, _ic2, _ic3, _ic4 = st.columns([1, 2, 1, 1])
+                    _inv_id_editado = _ic1.text_input("ID", key=f"ms_inv_id_{_inv_idx}").strip()
+                    _opc_ficha = _ic2.selectbox(
+                        "Ficha del inversor", _opciones_ficha_inv, key=f"ms_inv_ficha_{_inv_idx}",
+                        help="Inversor del proyecto (📐 Dimensionamiento), uno del catálogo o "
+                             "manual. Sin ficha no se pueden validar los strings.",
+                    )
+                    _eta_texto = _ic3.text_input(
+                        "Eficiencia (0-1)", key=f"ms_inv_eta_{_inv_idx}",
+                        help="El catálogo no trae la eficiencia: escríbela siempre.",
                     ).strip()
                     if _ic4.button("🗑️", key=f"ms_inv_del_{_inv_idx}", help="Eliminar este inversor"):
                         _borrar_indices.append(_inv_idx)
+                    if _opc_ficha == _etq_inv_proy:
+                        _ficha_ed = normalizar_ficha_inversor(_inv_dim)
+                        _campos_ficha = {"origen_ficha": "proyecto", "nombre": _inv_dim_nombre}
+                    elif _opc_ficha == _ETQ_INV_MANUAL:
+                        _ficha_ed = {}
+                        _campos_ficha = {"origen_ficha": "manual", "nombre": ""}
+                    elif _inv.get("origen_ficha") == "catalogo" and _inv.get("nombre") == _opc_ficha:
+                        _ficha_ed = normalizar_ficha_inversor(_inv.get("ficha"))
+                        _campos_ficha = {"origen_ficha": "catalogo", "nombre": _opc_ficha}
+                    else:
+                        _ficha_ed = normalizar_ficha_inversor(_catalogo_inv_ms.get(_opc_ficha))
+                        _campos_ficha = {"origen_ficha": "catalogo", "nombre": _opc_ficha}
+                    if _campos_ficha["origen_ficha"] == "manual":
+                        _pot_texto = st.text_input(
+                            "Potencia AC (W)", key=f"ms_inv_pac_{_inv_idx}",
+                        ).strip()
+                        try:
+                            _pot_editado = float(_pot_texto) if _pot_texto else None
+                        except ValueError:
+                            _pot_editado = _pot_texto
+                        st.caption("Sin ficha: los strings de este inversor quedan 🟡 «no validado».")
+                    else:
+                        _pot_editado = _ficha_ed.get("P_ac_nom_W")
+                        st.caption(
+                            "Ficha: Vdc máx. {vdc} V · MPPT {vmin}–{vmax} V · Isc máx./MPPT {isc} A · "
+                            "{nm} MPPT · {ns} strings/MPPT · P AC {pac} W{eta}".format(
+                                vdc=_ficha_ed.get("Vdc_max", "?"),
+                                vmin=_ficha_ed.get("Vmppt_activo_min", "?"),
+                                vmax=_ficha_ed.get("Vmppt_max", "?"),
+                                isc=_ficha_ed.get("Isc_max_tracker") or _ficha_ed.get("I_max_tracker") or "?",
+                                nm=_ficha_ed.get("N_mppt", "?"),
+                                ns=_ficha_ed.get("n_strings_tracker", "?"),
+                                pac=_ficha_ed.get("P_ac_nom_W", "?"),
+                                eta=(f" · η máx. de la ficha {_ficha_ed['eficiencia_max']}"
+                                     if _ficha_ed.get("eficiencia_max") else ""),
+                            )
+                        )
                     try:
                         _eta_editado = float(_eta_texto) if _eta_texto else None
                     except ValueError:
                         _eta_editado = _eta_texto
-                    try:
-                        _pot_editado = float(_pot_texto) if _pot_texto else None
-                    except ValueError:
-                        _pot_editado = _pot_texto
                     _inversores_editados.append({
-                        **_inv, "inversor_id": _inv_id_editado,
+                        **_inv, "inversor_id": _inv_id_editado, "clase": "string",
+                        **_campos_ficha, "ficha": _ficha_ed,
                         "eta_inversor": _eta_editado, "P_ac_nom_W": _pot_editado,
                     })
                     # Regla dura: el tipo NUNCA se edita a mano en la UI.
@@ -1433,38 +1518,68 @@ with tab_solar:
                     if _idx not in _borrar_indices
                 ]
 
+            _temps_de = temperaturas_diseno(st.session_state)
+            _, _paneles_de, _ = eficiencias_superficies_estado(
+                {**st.session_state, "superficies_bipv": _sups_actualizado}
+            )
+            _fichas_por_id = {
+                str(_inv.get("inversor_id") or ""): _inv.get("ficha") or {} for _inv in _inversores_editados
+            }
             _ids_editados = [str(_inv.get("inversor_id") or "") for _inv in _inversores_editados]
             _opciones_inv = [""] + [_i for _i in _ids_editados if _i]
             for _sup_idx, _sup_ui in enumerate(_sups_actualizado):
                 if not _sup_ui.get("activa", True):
                     continue
-                _sc1, _sc2, _sc3 = st.columns([2, 1, 1])
-                _sc1.caption(f"{_sup_ui['nombre']} ({_sup_ui['tipo']})")
-                _inv_actual = str(_sup_ui.get("inversor_id") or "")
-                _inv_index = _opciones_inv.index(_inv_actual) if _inv_actual in _opciones_inv else 0
-                _inv_asignado = _sc2.selectbox(
-                    "Inversor", _opciones_inv, index=_inv_index,
-                    key=f"ms_sup_inv_{_sup_ui.get('uid', _sup_idx)}",
+                _grupos_ui = grupos_de_superficie(_sup_ui)
+                _uid_ui = _sup_ui.get("uid", _sup_idx)
+                if len(_grupos_ui) > 1:
+                    st.caption(
+                        f"{_sup_ui['nombre']}: {len(_grupos_ui)} grupos de strings "
+                        "(la edición de varios grupos llega en la próxima fase)."
+                    )
+                    continue
+                _g_ui = _grupos_ui[0] if _grupos_ui else {}
+                _valor_campo_superficie(f"ms_sup_inv_{_uid_ui}", str(_g_ui.get("inversor_id") or ""))
+                if st.session_state.get(f"ms_sup_inv_{_uid_ui}") not in _opciones_inv:
+                    st.session_state[f"ms_sup_inv_{_uid_ui}"] = ""
+                _valor_campo_superficie(f"ms_sup_mppt_{_uid_ui}", int(_g_ui.get("mppt") or 1))
+                _valor_campo_superficie(
+                    f"ms_sup_ns_{_uid_ui}", "" if _g_ui.get("n_serie") is None else str(_g_ui.get("n_serie")),
                 )
-                _serie_texto = _sc3.text_input(
-                    "N serie",
-                    value=("" if _sup_ui.get("n_serie") is None else str(_sup_ui.get("n_serie"))),
-                    key=f"ms_sup_ns_{_sup_ui.get('uid', _sup_idx)}",
-                ).strip()
-                _par_texto = st.text_input(
-                    f"N paralelo — {_sup_ui['nombre']}",
-                    value=("" if _sup_ui.get("n_paralelo") is None else str(_sup_ui.get("n_paralelo"))),
-                    key=f"ms_sup_np_{_sup_ui.get('uid', _sup_idx)}",
-                ).strip()
+                _valor_campo_superficie(
+                    f"ms_sup_np_{_uid_ui}", "" if _g_ui.get("n_paralelo") is None else str(_g_ui.get("n_paralelo")),
+                )
+                _sc1, _sc2, _sc3, _sc4, _sc5 = st.columns([2, 1, 1, 1, 1])
+                _sc1.caption(f"{_sup_ui['nombre']} ({_sup_ui['tipo']}) · G1")
+                _inv_asignado = _sc2.selectbox("Inversor", _opciones_inv, key=f"ms_sup_inv_{_uid_ui}")
+                _mppt_asignado = _sc3.number_input("MPPT", min_value=1, max_value=24, step=1,
+                                                   key=f"ms_sup_mppt_{_uid_ui}")
+                _serie_texto = _sc4.text_input("N serie", key=f"ms_sup_ns_{_uid_ui}").strip()
+                _par_texto = _sc5.text_input("N paralelo", key=f"ms_sup_np_{_uid_ui}").strip()
+                _info_panel_ui = _paneles_de.get(_sup_ui["nombre"])
+                _ficha_asig = _fichas_por_id.get(_inv_asignado or "", {})
+                if _info_panel_ui and _inv_asignado:
+                    _rango_ui = rango_n_serie(_info_panel_ui["panel"], _ficha_asig, _temps_de)
+                    _sc1.caption(
+                        f"Rango válido de N serie con {_info_panel_ui['nombre']}: **{_rango_ui[0]}–{_rango_ui[1]}**"
+                        if _rango_ui else
+                        "Rango de N serie: sin ficha completa del inversor, no se puede calcular."
+                    )
                 try:
-                    _sups_actualizado[_sup_idx]["n_serie"] = int(_serie_texto) if _serie_texto else None
+                    _ns_ui = int(_serie_texto) if _serie_texto else None
                 except ValueError:
-                    _sups_actualizado[_sup_idx]["n_serie"] = _serie_texto
+                    _ns_ui = _serie_texto
                 try:
-                    _sups_actualizado[_sup_idx]["n_paralelo"] = int(_par_texto) if _par_texto else None
+                    _np_ui = int(_par_texto) if _par_texto else None
                 except ValueError:
-                    _sups_actualizado[_sup_idx]["n_paralelo"] = _par_texto
-                _sups_actualizado[_sup_idx]["inversor_id"] = _inv_asignado or None
+                    _np_ui = _par_texto
+                _grupo_ui = {
+                    "gid": "G1", "topologia": (_g_ui.get("topologia") or "string"),
+                    "inversor_id": _inv_asignado or None, "mppt": int(_mppt_asignado),
+                    "n_serie": _ns_ui, "n_paralelo": _np_ui,
+                }
+                _sups_actualizado[_sup_idx]["grupos"] = [_grupo_ui]
+                _sups_actualizado[_sup_idx].update(campos_legacy_desde_grupos([_grupo_ui]))
 
             st.session_state["multisup_inversores"] = _inversores_editados
             st.session_state["superficies_bipv"] = _sups_actualizado
@@ -1477,6 +1592,100 @@ with tab_solar:
                 )
             elif _inversores_editados or any(_s.get("activa", True) for _s in _sups_actualizado):
                 st.warning("⚠️ Configuración eléctrica incompleta: " + " ".join(_validacion_ui["errores"]))
+
+            # ── ⚡ Diseño eléctrico: tabla explícita (Spec A, fase A1) ──────
+            if any(_s.get("activa", True) for _s in _sups_actualizado):
+                _diag_el = validar_diseno_electrico(
+                    _sups_actualizado, _inversores_editados, _paneles_de, _temps_de,
+                )
+                _ICONO_EST = {"verde": "🟢", "amarillo": "🟡", "rojo": "🔴"}
+                st.markdown(
+                    f"##### ⚡ Diseño eléctrico — {_ICONO_EST[_diag_el['estado_global']]}"
+                )
+                st.caption(
+                    "Validación con las mismas funciones y temperaturas de 📐 Dimensionamiento "
+                    f"(T mín {_temps_de['T_frio']:g} °C · T celda {_temps_de['T_real']:g}/"
+                    f"{_temps_de['T_extremo']:g} °C, "
+                    f"{'del proyecto' if _temps_de['origen'] == 'proyecto' else 'por defecto'}). "
+                    "Por ahora es informativa: todavía no cambia ninguna energía ni bloquea "
+                    "la publicación en Financiero."
+                )
+                for _bloq in _diag_el["bloqueos"]:
+                    st.error(f"🔴 {_bloq}")
+                if _diag_el["avisos"]:
+                    st.warning("🟡 " + "\n\n🟡 ".join(_diag_el["avisos"]))
+
+                def _v_check(_item, _nombre):
+                    for _c in _item["checks"]:
+                        if _c["nombre"] == _nombre:
+                            return f"{_ICONO_EST[_c['estado']]} {_c['valor']} / {_c['limite']} {_c['unidad']}".strip()
+                    return "—"
+
+                st.dataframe(_pd.DataFrame([{
+                    "Superficie · grupo": f"{_g['superficie']} · {_g['gid']}",
+                    "Panel": _g["panel"] or "—",
+                    "Inversor · MPPT": f"{_g['inversor_id'] or '—'} · {_g['mppt'] or '—'}",
+                    "N serie × paralelo": (
+                        formato_strings(_g["n_serie"], _g["n_paralelo"])
+                        if _g["n_serie"] and _g["n_paralelo"] else "—"
+                    ),
+                    "Rango N serie": (
+                        f"{_g['rango_n_serie'][0]}–{_g['rango_n_serie'][1]}" if _g["rango_n_serie"] else "—"
+                    ),
+                    "Voc frío / Vdc máx.": _v_check(_g, "Voc en frío ≤ Vdc máximo"),
+                    "Vmp real / MPPT": _v_check(_g, "Vmp real dentro del MPPT"),
+                    "Vmp extremo / MPPT": _v_check(_g, "Vmp extremo dentro del MPPT"),
+                    "Estado": _ICONO_EST[_g["estado"]],
+                } for _g in _diag_el["grupos"]]), use_container_width=True, hide_index=True)
+                if _diag_el["mppt"]:
+                    st.dataframe(_pd.DataFrame([{
+                        "Inversor · MPPT": f"{_m['inversor_id']} · {_m['mppt']}",
+                        "Grupos": ", ".join(_m["grupos"]),
+                        "Paneles": ", ".join(_m["paneles"]),
+                        "Strings / entradas": _v_check(_m, "Strings ≤ entradas del MPPT"),
+                        "Isc / límite": _v_check(_m, "Isc del MPPT ≤ límite del tracker"),
+                        "Estado": _ICONO_EST[_m["estado"]],
+                    } for _m in _diag_el["mppt"]]), use_container_width=True, hide_index=True)
+                if _diag_el["inversores"]:
+                    st.dataframe(_pd.DataFrame([{
+                        "Inversor": _i["inversor_id"],
+                        "Ficha": {"proyecto": "del proyecto", "catalogo": "catálogo",
+                                  "manual": "manual"}.get(_i["origen_ficha"], "—")
+                                 + (f" ({_i['nombre']})" if _i["nombre"] else ""),
+                        "MPPT usados / disponibles": f"{_i['mppt_usados']} / {_i['mppt_disponibles'] or '?'}",
+                        "P DC STC (kW)": f"{_i['P_dc_stc_kW']:.2f}",
+                        "DC/AC": _v_check(_i, "Relación DC/AC"),
+                        "Estado": _ICONO_EST[_i["estado"]],
+                    } for _i in _diag_el["inversores"]]), use_container_width=True, hide_index=True)
+                st.dataframe(_pd.DataFrame([{
+                    "Superficie": _s["superficie"],
+                    "Módulos": _s["modulos"],
+                    "Área instalada / área (m²)": (
+                        f"{_s['area_instalada_m2']:.1f} / {_s['area_m2']:.1f}"
+                        if _s["area_instalada_m2"] is not None else "—"
+                    ),
+                    "Cobertura": f"{_s['cobertura_pct']:.0f} %" if _s["cobertura_pct"] is not None else "—",
+                    "Estado": _ICONO_EST[_s["estado"]],
+                } for _s in _diag_el["superficies"]]), use_container_width=True, hide_index=True)
+                with st.expander("🔎 Cómo se calcula cada valor"):
+                    _filas_calc = []
+                    for _nivel, _items, _nombre_item in (
+                        ("Grupo", _diag_el["grupos"], lambda _x: f"{_x['superficie']} · {_x['gid']}"),
+                        ("MPPT", _diag_el["mppt"], lambda _x: f"{_x['inversor_id']} · {_x['mppt']}"),
+                        ("Inversor", _diag_el["inversores"], lambda _x: _x["inversor_id"]),
+                        ("Superficie", _diag_el["superficies"], lambda _x: _x["superficie"]),
+                    ):
+                        for _it in _items:
+                            for _c in _it["checks"]:
+                                _filas_calc.append({
+                                    "Nivel": _nivel, "Elemento": _nombre_item(_it),
+                                    "Comprobación": _c["nombre"],
+                                    "Valor": "—" if _c["valor"] is None else str(_c["valor"]),
+                                    "Límite": "—" if _c["limite"] is None else str(_c["limite"]),
+                                    "Unidad": _c["unidad"], "Fórmula": _c["formula"],
+                                    "Fuente": _c["fuente"], "Estado": _ICONO_EST[_c["estado"]],
+                                })
+                    st.dataframe(_pd.DataFrame(_filas_calc), use_container_width=True, hide_index=True)
 
             # Calcular POA para todas
             st.divider()

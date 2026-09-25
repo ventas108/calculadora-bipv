@@ -255,3 +255,14 @@ def test_buscar_panel_distinto_en_techo_y_fachada():
     assert "Panel de esta superficie" in texto and "Pmax" in texto
     assert "16 %" in texto and "6.667" in texto
     assert "N serie" in texto and "retira la energía publicada" in texto
+
+
+def test_buscar_validacion_electrica_de_strings_en_vista_3d():
+    # Spec 03/diseno-electrico-multisuperficie, fase A1.
+    seccion = _seccion_recuperada(
+        "el diseño electrico sale en rojo por voc en frio mayor que vdc maximo en vista 3d",
+        "inversores por superficie",
+    )
+    texto = seccion["texto"]
+    assert "Diseño eléctrico" in texto and "Rango válido de N serie" in texto
+    assert "Ficha del inversor" in texto and "un solo panel por MPPT" in texto
