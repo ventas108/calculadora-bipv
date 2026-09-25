@@ -5,7 +5,9 @@
 Entorno: Python 3.12 (igual que CI), `bipv_python/requirements.txt`,
 Streamlit 1.36.0; rama `claude/mejoras-bipv` sobre `main` `235d65dc`.
 
-## Fase A1
+## Checklist de validación del módulo
+
+### Fase A1
 
 - [x] Pruebas nuevas en rojo con `main` `235d65dc`: no se pueden recolectar
       (`calculos.diseno_electrico_multisup` no existe).

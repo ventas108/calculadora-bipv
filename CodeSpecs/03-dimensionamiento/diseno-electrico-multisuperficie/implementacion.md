@@ -2,7 +2,9 @@
 
 **Estado:** implementación
 
-## Fase A1 — Cambios realizados
+## Cambios realizados
+
+### Fase A1
 
 - Nuevo `calculos/diseno_electrico_multisup.py` (puro, sin Streamlit):
   - `normalizar_ficha_inversor`: contrato único para fichas del Excel
@@ -46,7 +48,9 @@ Desviaciones del diseño, con motivo:
 - **El Asistente se actualiza ya en A1** y no esperó a A3, porque la
   pantalla cambia en esta fase.
 
-## Archivos modificados (fase A1)
+## Archivos modificados
+
+### Fase A1
 
 - `bipv_python/calculos/diseno_electrico_multisup.py` (nuevo)
 - `bipv_python/pages/9_🗺️_Vista_3D.py`
@@ -56,7 +60,9 @@ Desviaciones del diseño, con motivo:
 - `CodeSpecs/03-dimensionamiento/diseno-electrico-multisuperficie/`
 - `CodeSpecs/00-director/registro-de-decisiones.md`
 
-## Impacto en despliegue (fase A1)
+## Impacto en despliegue
+
+### Fase A1
 
 - Solo Streamlit (`pm2 restart streamlit-bipv`).
 - Ninguna energía cambia. Un inversor que el usuario pase a «del proyecto» o
