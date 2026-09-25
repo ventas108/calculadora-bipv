@@ -93,6 +93,7 @@ def strings_superficie(
     superficie: Mapping[str, Any],
     n_serie_dimensionamiento: Any,
     panel: Mapping[str, Any],
+    panel_es_del_proyecto: bool = True,
 ) -> dict[str, Any]:
     """``{"n_serie", "n_paralelo", "origen", "aviso"}`` de una superficie.
 
@@ -100,6 +101,10 @@ def strings_superficie(
     Si falta el N serie se toma el de Dimensionamiento; si falta el paralelo se
     estima por área (módulos que caben ÷ N serie). Una estimación siempre
     trae aviso; sin ningún N serie válido se lanza ``ValueError``.
+
+    El N serie de Dimensionamiento se dimensionó para el panel del proyecto:
+    con ``panel_es_del_proyecto=False`` (Spec ``05/panel-por-superficie``) no
+    se usa de respaldo y la superficie debe traer su propio N serie.
     """
     nombre = superficie.get("nombre", "?")
     n_serie = _entero_positivo(superficie.get("n_serie"))
@@ -109,6 +114,12 @@ def strings_superficie(
                 "origen": ORIGEN_SUPERFICIE, "aviso": None}
     origen = ORIGEN_ESTIMADO_AREA
     if not n_serie:
+        if not panel_es_del_proyecto:
+            raise ValueError(
+                f"La superficie '{nombre}' usa un panel distinto al del proyecto y no tiene "
+                "N serie propio: el de 📐 Dimensionamiento es para otro panel. Configúralo "
+                "en ⚙️ Superficies BIPV › 🔌 Inversores por superficie."
+            )
         n_serie = _entero_positivo(n_serie_dimensionamiento)
         origen = ORIGEN_DIMENSIONAMIENTO
         if not n_serie:
@@ -116,11 +127,9 @@ def strings_superficie(
                 f"La superficie '{nombre}' no tiene N serie válido y tampoco hay N serie "
                 "en 📐 Dimensionamiento: configúralo en ⚙️ Superficies BIPV."
             )
-    area_panel = panel.get("area_m2")
-    try:
-        area_panel = float(area_panel)
-    except (TypeError, ValueError):
-        area_panel = 0.0
+    from calculos.panel_superficie import area_modulo
+
+    area_panel = area_modulo(panel) or 0.0
     if area_panel <= 0:
         raise ValueError(
             f"El panel elegido no trae su área: no se puede estimar el paralelo de "

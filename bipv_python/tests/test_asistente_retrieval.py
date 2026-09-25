@@ -243,3 +243,15 @@ def test_buscar_guardar_proyecto_multisuperficie():
     )
     texto = seccion["texto"]
     assert "energía publicada" in texto and "POA por superficie NO se" in texto
+
+
+def test_buscar_panel_distinto_en_techo_y_fachada():
+    # Spec 05/panel-por-superficie.
+    seccion = _seccion_recuperada(
+        "el techo lleva paneles de otra referencia distinta a la fachada como lo configuro",
+        "panel por superficie",
+    )
+    texto = seccion["texto"]
+    assert "Panel de esta superficie" in texto and "Pmax" in texto
+    assert "16 %" in texto and "6.667" in texto
+    assert "N serie" in texto and "retira la energía publicada" in texto

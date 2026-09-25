@@ -355,6 +355,8 @@ def cargar_proyecto(slug: str) -> str:
         # dejaría no vigente, pero no debe sobrevivir al cambio de proyecto.
         "poa_superficies", "poa_superficies_errores", "poa_superficies_ok",
         "_multisup_restaurado", "_multisup_restauracion_error",
+        # Huella de los paneles por superficie del proyecto ANTERIOR.
+        "_multisup_firma_paneles",
     }
     for k in _claves_reset:
         st.session_state.pop(k, None)

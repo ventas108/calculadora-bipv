@@ -576,6 +576,16 @@ if not _iv_err:  # Voc/Isc/Vmp/Imp presentes; opcionales usan defaults
 # ── Guardar panel en session_state para Motor IV automático (#7) ─────────────
 st.session_state["panel_dict"]        = panel
 st.session_state["panel_nombre_dim"]  = panel_nombre
+# Spec 05/panel-por-superficie: si cambió el panel del proyecto y alguna
+# superficie de 🗺️ Vista 3D lo sigue, se retira la energía multi-superficie
+# publicada con el panel anterior (no esperar a abrir Vista 3D).
+if st.session_state.get("superficies_bipv"):
+    from calculos.panel_superficie import invalidar_por_cambio_panel as _inv_panel_ms
+    if _inv_panel_ms(st.session_state):
+        st.info(
+            "ℹ️ Cambió el panel del proyecto: se retiró la energía multi-superficie "
+            "publicada con el panel anterior. Vuelve a publicarla en 🗺️ Vista 3D."
+        )
 # inversor ya cargado antes de col2
 if inversor.get("costo_usd"):
     st.session_state["costo_inversor_usd"] = inversor["costo_usd"]

@@ -104,9 +104,11 @@ def test_sin_ningun_n_serie_no_inventa_valores():
 
 
 def test_paralelo_por_area_exige_area_del_panel():
+    # Spec 05/panel-por-superficie: sin area_m2 el área sale de largo × ancho;
+    # sin ninguno de los dos no se puede estimar.
+    sin_area = {k: v for k, v in _PANEL.items() if k not in ("area_m2", "largo_mm", "ancho_mm")}
     with pytest.raises(ValueError, match="área"):
-        strings_superficie({"nombre": "Sur", "n_serie": 8, "area_m2": 48.0}, 8,
-                           {k: v for k, v in _PANEL.items() if k != "area_m2"})
+        strings_superficie({"nombre": "Sur", "n_serie": 8, "area_m2": 48.0}, 8, sin_area)
 
 
 def test_origenes_cerrados():
@@ -122,7 +124,10 @@ def test_selectores_ya_no_fijan_un_panel_del_catalogo():
             for kw in nodo.keywords:
                 if kw.arg == "index":
                     assert "ASP-ST1-T40" not in ast.unparse(kw.value)
-    assert src.count("opciones_panel_superficie(") >= 2
+    # Spec 05/panel-por-superficie: el panel se elige en cada superficie; el
+    # bypass y el MPPT ya no tienen un selector común de panel.
+    assert "ms_bp_panel_sel" not in src and "ms_mppt_panel_sel" not in src
+    assert 'key=f"spanel_{_uid}"' in src
     assert src.count("strings_superficie(") >= 2
     assert 'key="ms_bp_nseries"' not in src and 'key="ms_mppt_nser"' not in src
 

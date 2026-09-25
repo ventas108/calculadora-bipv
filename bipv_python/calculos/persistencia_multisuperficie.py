@@ -15,6 +15,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from calculos.panel_superficie import ORIGEN_PANEL_PROYECTO, ORIGENES_PANEL
 from calculos.produccion_vigencia import fingerprint_mapping, huella_horaria
 
 SCHEMA_VERSION = 1
@@ -148,9 +149,17 @@ def _superficie_input(superficie: Mapping[str, Any]) -> dict[str, Any]:
         "n_serie", "n_paralelo", "inversor_id", "p_shade", "firma_sombra",
         "firma_poa", "estado_sombra", "cobertura_sombra", "puntos_analisis",
         "malla_horizonte", "motor_optico_vigente",
+        # Spec 05/panel-por-superficie: panel de cada superficie. Ausentes en
+        # proyectos anteriores, que cargan con el panel del proyecto.
+        "panel_origen", "panel_nombre", "panel_ficha",
     ):
         if campo in superficie:
             salida[campo] = superficie[campo]
+    origen = salida.get("panel_origen")
+    if origen is not None and origen not in ORIGENES_PANEL:
+        raise PayloadMultisuperficieError(
+            f"Origen de panel desconocido en superficie '{salida['uid']}': {origen!r}."
+        )
     return salida
 
 
@@ -215,6 +224,16 @@ def construir_payload_multisuperficie(
     return _canonico(payload)
 
 
+def _panel_canonico(superficie: Mapping[str, Any]) -> Any:
+    origen = superficie.get("panel_origen") or ORIGEN_PANEL_PROYECTO
+    if origen == ORIGEN_PANEL_PROYECTO:
+        return ORIGEN_PANEL_PROYECTO
+    return _canonico({
+        "panel_nombre": superficie.get("panel_nombre"),
+        "panel_ficha": superficie.get("panel_ficha"),
+    })
+
+
 def _comparar_contexto(payload: Mapping[str, Any], contexto: Mapping[str, Any]) -> list[str]:
     errores: list[str] = []
     entradas = payload["inputs"]
@@ -242,9 +261,19 @@ def _comparar_contexto(payload: Mapping[str, Any], contexto: Mapping[str, Any]) 
             for campo in ("firma_sombra", "firma_poa", "inversor_id", "n_serie", "n_paralelo"):
                 if campo in esperadas[uid] and actuales[uid].get(campo) != esperadas[uid].get(campo):
                     errores.append(f"{campo} diferente en superficie '{uid}'.")
+            if _panel_canonico(actuales[uid]) != _panel_canonico(esperadas[uid]):
+                errores.append(f"Panel diferente en superficie '{uid}'.")
+        # El panel del proyecto solo importa si alguna superficie lo sigue.
+        usa_panel_proyecto = any(
+            (s.get("panel_origen") or ORIGEN_PANEL_PROYECTO) == ORIGEN_PANEL_PROYECTO
+            for s in entradas["surfaces"]
+        )
         panel_actual = contexto.get("panel_dict")
         panel_guardado = entradas["electrical"].get("panel")
-        if panel_actual is not None and _canonico(panel_actual) != _canonico(panel_guardado):
+        if (
+            usa_panel_proyecto and panel_actual is not None
+            and _canonico(panel_actual) != _canonico(panel_guardado)
+        ):
             errores.append("Panel diferente al firmado.")
         inversores_actuales = contexto.get("multisup_inversores")
         if inversores_actuales is not None and _canonico(inversores_actuales) != _canonico(entradas["electrical"].get("inversores")):

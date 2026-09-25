@@ -1,6 +1,6 @@
 # Spec — Panel por superficie en Vista 3D multi-superficie
 
-**Estado:** diseño
+**Estado:** validación
 
 ## Alcance de la fase
 

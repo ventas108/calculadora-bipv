@@ -933,12 +933,18 @@ with tab_solar:
             resumen_estado_fisico_superficies,
         )
         from calculos.strings_superficie import (
-            ETIQUETA_ORIGEN_STRINGS, es_panel_del_proyecto, formato_strings,
-            opciones_panel_superficie, strings_superficie,
+            ETIQUETA_ORIGEN_STRINGS, etiqueta_panel_proyecto, formato_strings,
+            strings_superficie,
         )
+        from calculos.modelo_iv import resolver_panel_calibrado, tiene_sdm_completo
         from calculos.puntos_3d import (
             migrar_puntos_por_uid, parsear_puntos_3d, previsualizar_puntos,
             puntos_por_nombre,
+        )
+        from calculos.panel_superficie import (
+            CAMPOS_PANEL_SUPERFICIE, PanelSuperficieError, eficiencia_panel,
+            eficiencias_superficies_estado, invalidar_por_cambio_panel,
+            opcion_panel_actual, seleccion_panel,
         )
         _b5c_ok = True
     except Exception as _e5c:
@@ -1088,6 +1094,18 @@ with tab_solar:
                 "Adosada al muro (sellada)",
                 "Ventilada con superficie reflejante",
             ]
+            # Spec 05/panel-por-superficie: cada superficie elige su panel;
+            # por defecto sigue al panel del proyecto (📐 Dimensionamiento).
+            _etq_panel_proy = etiqueta_panel_proyecto(st.session_state.get("panel_nombre_dim"))
+            try:
+                from datos.catalogo_paneles_excel import cargar_catalogo_excel as _cat_pan_fn
+                _catalogo_panel_ed = dict(_cat_pan_fn() or {})
+            except Exception:
+                _catalogo_panel_ed = {}
+            if not _catalogo_panel_ed:
+                from datos.tecnologias_bipv import MODULOS_BIPV as _MBPV_ED
+                _catalogo_panel_ed = dict(_MBPV_ED)
+            _opciones_panel_ed = [_etq_panel_proy] + sorted(_catalogo_panel_ed)
             for _i, _sup in enumerate(_sups_list):
                 _uid = _sup["uid"]
                 _nom_v  = _valor_campo_superficie(f"snom_{_uid}", str(_sup["nombre"]))
@@ -1102,6 +1120,10 @@ with tab_solar:
                 _valor_campo_superficie(
                     f"smont_{_uid}", _mont_guardado if _mont_guardado in _MONTAJES else _MONTAJES[0],
                 )
+                _opc_panel_guardada = opcion_panel_actual(_sup, _etq_panel_proy)
+                if _opc_panel_guardada not in _opciones_panel_ed:
+                    _opciones_panel_ed = _opciones_panel_ed + [_opc_panel_guardada]
+                _panel_v = _valor_campo_superficie(f"spanel_{_uid}", _opc_panel_guardada)
                 # El tilt debe caber en el rango del tipo elegido (cambia con el tipo).
                 _meta_e = TIPOS_SUPERFICIE[_tipo_v]
                 _tilt_rango = float(max(_meta_e["tilt_min"], min(_meta_e["tilt_max"], _tilt_v)))
@@ -1140,6 +1162,40 @@ with tab_solar:
                     )
                     _act_e  = _c1.checkbox("Activa", key=f"sact_{_uid}")
 
+                    _cp1, _cp2 = st.columns([3, 2])
+                    _panel_e = _cp1.selectbox(
+                        "Panel de esta superficie", _opciones_panel_ed,
+                        key=f"spanel_{_uid}",
+                        help="Por defecto el panel del proyecto (📐 Dimensionamiento). "
+                             "Elige otro si esta superficie lleva una referencia distinta: "
+                             "la energía, los strings, el bypass, el MPPT y el modo físico "
+                             "usarán el de esta superficie.",
+                    )
+                    try:
+                        _campos_panel_e = seleccion_panel(
+                            _panel_e, _etq_panel_proy, _catalogo_panel_ed, _sup,
+                            calibrar=resolver_panel_calibrado,
+                        )
+                    except PanelSuperficieError as _err_sel_panel:
+                        _cp2.error(f"❌ {_err_sel_panel}")
+                        _campos_panel_e = {
+                            c: _sup[c] for c in CAMPOS_PANEL_SUPERFICIE if c in _sup
+                        }
+                    try:
+                        from calculos.panel_superficie import panel_de_superficie as _pds_ed
+                        _pinfo_e = _pds_ed(
+                            _campos_panel_e, st.session_state.get("panel_dict"),
+                            st.session_state.get("panel_nombre_dim"),
+                        )
+                        _area_mod_e = _pinfo_e["panel"].get("area_m2")
+                        _cp2.caption(
+                            f"**{_pinfo_e['nombre']}** · Pmax {float(_pinfo_e['panel'].get('Pmax_stc', 0)):g} W · "
+                            f"η **{eficiencia_panel(_pinfo_e['panel'], _pinfo_e['nombre']) * 100:.2f} %**"
+                            + (f" · módulo {float(_area_mod_e):g} m²" if _area_mod_e else "")
+                        )
+                    except PanelSuperficieError as _err_panel_e:
+                        _cp2.warning(f"⚠️ {_err_panel_e}")
+
                     # #156: montaje bifacial por fachada (solo superficies verticales)
                     _montaje_e = _mont_guardado
                     if float(_tilt_e) >= 80:
@@ -1172,12 +1228,22 @@ with tab_solar:
                         "area_m2":     _area_e,
                         "activa":      _act_e,
                         "montaje_fachada": _montaje_e,
+                        **_campos_panel_e,
                     })
                     _sups_actualizado.append(_sup_editada)
 
             if _idx_eliminar is not None:
                 _sups_actualizado.pop(_idx_eliminar)
             st.session_state["superficies_bipv"] = _sups_actualizado
+            # Un cambio de panel (aquí o en 📐 Dimensionamiento, para las
+            # superficies que siguen al del proyecto) retira lo calculado con
+            # el panel anterior; la POA y la sombra no dependen del panel.
+            if invalidar_por_cambio_panel(st.session_state):
+                st.info(
+                    "ℹ️ Cambió el panel de una superficie: se retiraron la energía "
+                    "publicada en Financiero y los resultados de bypass, MPPT y modo "
+                    "físico. La POA y la sombra siguen vigentes."
+                )
 
             st.divider()
             st.markdown("##### 🌳 Sombra 3D por superficie")
@@ -1473,17 +1539,21 @@ with tab_solar:
             _avisar_poa_no_vigente(_poa_ss, _motivos_poa)
             if _poa_ss:
                 st.markdown("##### 📊 Resumen POA por superficie")
-                _eta_g = float(st.session_state.get("eta_panel", 0.16))
+                # Spec 05/panel-por-superficie: η del panel de cada superficie
+                # (Pmax / área del módulo), nunca un valor fijo.
+                _etas_g, _paneles_g, _err_panel_g = eficiencias_superficies_estado(st.session_state)
+                for _msg_panel_g in _err_panel_g.values():
+                    st.warning(f"⚠️ {_msg_panel_g} Esta superficie no entra en la energía.")
                 _pr_g  = float(st.session_state.get("pr_sistema", 0.78))
                 _rows_r, _tot_r = [], 0.0
                 for _s in _sups_actualizado:
                     if not _s.get("activa", True):
                         continue
                     _pd_s  = _poa_ss.get(_s["nombre"])
-                    if _pd_s is None:
+                    if _pd_s is None or _s["nombre"] not in _etas_g:
                         continue
                     _pa_s  = poa_anual_superficie(_pd_s)
-                    _pr_s  = produccion_superficie(_pd_s, _s["area_m2"], _eta_g, _pr_g)
+                    _pr_s  = produccion_superficie(_pd_s, _s["area_m2"], _etas_g[_s["nombre"]], _pr_g)
                     _mt_s  = TIPOS_SUPERFICIE.get(_s["tipo"], {})
                     _tot_r += _pr_s["e_ac_anual_kWh"]
                     _rows_r.append({
@@ -1491,6 +1561,8 @@ with tab_solar:
                         "Tipo":             _s["tipo"],
                         "Tilt/Az":          f"{_s['tilt_deg']:.0f}°/{_s['azimuth_deg']:.0f}°",
                         "Área (m²)":        f"{_s['area_m2']:.1f}",
+                        "Panel":            _paneles_g[_s["nombre"]]["nombre"],
+                        "η (%)":            f"{_etas_g[_s['nombre']] * 100:.2f}",
                         "POA (kWh/m²/año)": f"{_pa_s:.0f}",
                         "E_ac (kWh/año)":   f"{_pr_s['e_ac_anual_kWh']:,.0f}",
                     })
@@ -1501,7 +1573,10 @@ with tab_solar:
                         if _motivos_poa else "⚡ Producción total del sistema",
                         f"{_tot_r:,.0f} kWh/año",
                     )
-                    st.caption(f"η={_eta_g*100:.0f}% · PR={_pr_g*100:.0f}%")
+                    st.caption(
+                        f"E_ac = POA × área × η del panel de cada superficie × PR "
+                        f"(PR={_pr_g*100:.0f}%)."
+                    )
 
             # ── Integrar al análisis financiero ──────────────────────────────
             _origen_pub = origen_vigente(st.session_state)
@@ -1515,13 +1590,15 @@ with tab_solar:
                 )
 
                 _ci1, _ci2 = st.columns([2, 3])
+                _etas_int, _, _err_panel_int = eficiencias_superficies_estado(st.session_state)
 
                 _btn_integrar = _ci1.button(
                     "🔗 Usar sistema multi-superficie en Financiero",
                     type="primary",
                     key="btn_integrar_multisup",
-                    disabled=bool(_motivos_poa) or not _poa_ss,
-                    help="Requiere POA vigente en TODAS las superficies activas.",
+                    disabled=bool(_motivos_poa) or not _poa_ss or bool(_err_panel_int),
+                    help="Requiere POA vigente y un panel con potencia y área en TODAS "
+                         "las superficies activas.",
                 )
 
                 if _origen_pub:
@@ -1553,19 +1630,23 @@ with tab_solar:
                         "❌ No se publicó: hay superficies activas sin POA vigente "
                         f"({', '.join(_motivos_poa)}). Recalcula la POA."
                     )
+                elif (_btn_integrar or _confirmar_simplificado) and _err_panel_int:
+                    st.error(
+                        "❌ No se publicó: hay superficies activas sin panel utilizable "
+                        f"({', '.join(_err_panel_int)}). Revisa su panel en Superficies configuradas."
+                    )
                 elif _btn_integrar or _confirmar_simplificado:
                     from calculos.multi_superficie import (
                         agregar_poa_ponderada, e_ac_total_multisup,
                     )
                     _sups_act_int = [s for s in _sups_actualizado if s.get("activa", True)]
-                    _eta_int = float(st.session_state.get("eta_panel", 0.16))
                     _pr_int  = float(st.session_state.get("pr_sistema", 0.78))
 
                     # POA combinada ponderada (clave exclusiva — no toca poa_df)
                     _poa_comb = agregar_poa_ponderada(_poa_ss, _sups_act_int)
 
                     # E_ac y desglose
-                    _res_int = e_ac_total_multisup(_poa_ss, _sups_act_int, _eta_int, _pr_int)
+                    _res_int = e_ac_total_multisup(_poa_ss, _sups_act_int, _etas_int, _pr_int)
 
                     # Publicación única: valida y escribe todas las claves juntas
                     try:
@@ -1946,18 +2027,23 @@ with tab_solar:
                     st.info("🟢 Libre (FS<10%) · 🟠 Parcial (10-35%) · 🔴 Bypass (>35%)")
 
                 # Tabla del mes
+                _etas_vm, _, _ = eficiencias_superficies_estado(st.session_state)
                 _rows_mv = []
                 for _sv in _sups_viz:
                     _nv = _sv["nombre"]
                     _pdf_vm = _poa_viz.get(_nv)
                     _pm_vm  = poa_mensual_superficie(_pdf_vm) if _pdf_vm is not None else [0.0]*12
                     _pv_vm  = _pm_vm[_mes_viz-1]
-                    _e_vm   = _pv_vm * _sv["area_m2"] * float(st.session_state.get("eta_panel",0.16)) * float(st.session_state.get("pr_sistema",0.78))
+                    _eta_vm = _etas_vm.get(_nv)
+                    _e_vm   = (
+                        _pv_vm * _sv["area_m2"] * _eta_vm * float(st.session_state.get("pr_sistema", 0.78))
+                        if _eta_vm is not None else None
+                    )
                     _row_mv = {
                         "Superficie": f"{TIPOS_SUPERFICIE.get(_sv['tipo'],{}).get('icon','')} {_nv}",
                         "Tipo": _sv["tipo"],
                         f"POA {_MESES_ES[_mes_viz-1]} (kWh/m²)": f"{_pv_vm:.1f}",
-                        f"E_ac {_MESES_ES[_mes_viz-1]} (kWh)": f"{_e_vm:.1f}",
+                        f"E_ac {_MESES_ES[_mes_viz-1]} (kWh)": f"{_e_vm:.1f}" if _e_vm is not None else "— sin panel —",
                     }
                     if _csv_viz_ok and _df_fs_viz is not None:
                         _mf_vm = mapear_fachadas_csv(_df_fs_viz, _sups_viz)
@@ -1983,8 +2069,11 @@ with tab_solar:
             _avisar_poa_no_vigente(_poa_p, _motivos_p)
             _df_fsp  = st.session_state.get("df_fs_raw")
             _csv_p   = st.session_state.get("csv_fs_ok", False)
-            _eta_p   = float(st.session_state.get("eta_panel", 0.16))
             _pr_p    = float(st.session_state.get("pr_sistema", 0.78))
+            # Spec 05/panel-por-superficie: η y panel de cada superficie.
+            _etas_p, _paneles_p, _err_panel_p = eficiencias_superficies_estado(st.session_state)
+            for _msg_panel_p in _err_panel_p.values():
+                st.warning(f"⚠️ {_msg_panel_p} Esta superficie no entra en la producción.")
 
             if not _poa_p:
                 st.info("ℹ️ Primero calcula la POA en ⚙️ Superficies BIPV.")
@@ -1995,8 +2084,8 @@ with tab_solar:
                 _tot_m = [0.0]*12
                 for _sp in _sups_p:
                     _pdf_p = _poa_p.get(_sp["nombre"])
-                    if _pdf_p is None or _pdf_p.empty: continue
-                    _prod_p = produccion_superficie(_pdf_p, _sp["area_m2"], _eta_p, _pr_p)
+                    if _pdf_p is None or _pdf_p.empty or _sp["nombre"] not in _etas_p: continue
+                    _prod_p = produccion_superficie(_pdf_p, _sp["area_m2"], _etas_p[_sp["nombre"]], _pr_p)
                     for _mi in range(12): _tot_m[_mi] += _prod_p["e_ac_mensual"][_mi]
                     _fig_stk.add_trace(go.Bar(
                         name=f"{TIPOS_SUPERFICIE.get(_sp['tipo'],{}).get('icon','')} {_sp['nombre']}",
@@ -2050,9 +2139,11 @@ with tab_solar:
                 st.markdown("#### 3. Resumen anual del sistema")
                 _rows_a, _tot_ar, _tot_ea = [], 0.0, 0.0
                 for _sp in _sups_p:
+                    if _sp["nombre"] not in _etas_p:
+                        continue
                     _pdf_p = _poa_p.get(_sp["nombre"])
                     _pa_a  = poa_anual_superficie(_pdf_p) if _pdf_p is not None else 0.0
-                    _pr_a  = produccion_superficie(_pdf_p, _sp["area_m2"], _eta_p, _pr_p)
+                    _pr_a  = produccion_superficie(_pdf_p, _sp["area_m2"], _etas_p[_sp["nombre"]], _pr_p)
                     _tot_ar += _sp["area_m2"]; _tot_ea += _pr_a["e_ac_anual_kWh"]
                     _fs_str = "—"
                     if _csv_p and _df_fsp is not None:
@@ -2064,6 +2155,8 @@ with tab_solar:
                         "Tipo": _sp["tipo"],
                         "Tilt/Az": f"{_sp['tilt_deg']:.0f}°/{_sp['azimuth_deg']:.0f}°",
                         "Área (m²)": f"{_sp['area_m2']:.1f}",
+                        "Panel": _paneles_p[_sp["nombre"]]["nombre"],
+                        "η (%)": f"{_etas_p[_sp['nombre']] * 100:.2f}",
                         "POA (kWh/m²/año)": f"{_pa_a:.0f}",
                         "E_ac (kWh/año)": f"{_pr_a['e_ac_anual_kWh']:,.0f}",
                         "% total": "—", "FS medio": _fs_str,
@@ -2150,59 +2243,53 @@ with tab_solar:
                     from calculos.mismatch_bypass import simular_bypass_horario as _sbh
                     from calculos.mismatch_bypass import alinear_fs_con_tmy as _afs
 
-                    from datos.tecnologias_bipv import MODULOS_BIPV as _MBPV
-                    # Spec 08-interfaz/panel-proyecto-bypass-mppt: por defecto el
-                    # panel del proyecto y los strings de cada superficie.
-                    _panel_nombre_proy = st.session_state.get("panel_nombre_dim")
-                    _opc_bp, _aviso_bp = opciones_panel_superficie(
-                        st.session_state.get("panel_dict"), _panel_nombre_proy, _MBPV,
-                    )
-                    if _aviso_bp:
-                        st.warning(f"⚠️ {_aviso_bp}")
-                    _bpc1, _bpc3 = st.columns(2)
-                    _bp_panel_sel = _bpc1.selectbox(
-                        "Panel fotovoltaico",
-                        list(_opc_bp),
-                        index=None if _aviso_bp else 0,
-                        placeholder="Elige un panel del catálogo",
-                        key="ms_bp_panel_sel",
-                    )
-                    _bp_panel_data = _opc_bp.get(_bp_panel_sel)
-                    _bp_panel_proyecto = es_panel_del_proyecto(_bp_panel_sel, _panel_nombre_proy)
-                    if _bp_panel_sel and not _bp_panel_proyecto:
-                        _bpc1.caption("⚠️ Panel distinto al del proyecto: queda marcado en los resultados.")
-                    _bp_modo = _bpc3.radio(
+                    # Spec 05/panel-por-superficie: cada superficie usa su propio
+                    # panel (⚙️ Superficies BIPV) y sus strings; el bypass
+                    # resuelve el circuito con el SDM de ese panel.
+                    _bp_modo = st.radio(
                         "Modo cobertura", ["mensual", "exacto"],
                         key="ms_bp_modo", horizontal=True,
                         format_func=lambda m: "📅 Mensual" if m == "mensual" else "📌 Exacto",
                     )
+                    _errores_panel_bp = list(_err_panel_p.values()) + [
+                        f"'{_n_bp}': el panel {_inf_bp['nombre']} no tiene ficha SDM completa, "
+                        "que el bypass necesita. Elige otro panel en ⚙️ Superficies BIPV."
+                        for _n_bp, _inf_bp in _paneles_p.items()
+                        if not tiene_sdm_completo(dict(_inf_bp["panel"]))
+                    ]
                     _strings_bp, _errores_strings_bp = {}, []
-                    if _bp_panel_data is not None:
-                        for _sp_str in _sups_p:
-                            try:
-                                _strings_bp[_sp_str["nombre"]] = strings_superficie(
-                                    _sp_str, st.session_state.get("N_serie"), _bp_panel_data,
-                                )
-                            except ValueError as _error_str:
-                                _errores_strings_bp.append(str(_error_str))
-                    for _error_str in _errores_strings_bp:
+                    for _sp_str in _sups_p:
+                        _inf_str = _paneles_p.get(_sp_str["nombre"])
+                        if _inf_str is None:
+                            continue
+                        try:
+                            _strings_bp[_sp_str["nombre"]] = strings_superficie(
+                                _sp_str, st.session_state.get("N_serie"), _inf_str["panel"],
+                                _inf_str["es_proyecto"],
+                            )
+                        except ValueError as _error_str:
+                            _errores_strings_bp.append(str(_error_str))
+                    for _error_str in _errores_panel_bp + _errores_strings_bp:
                         st.error(f"❌ {_error_str}")
                     _avisos_str_bp = [r["aviso"] for r in _strings_bp.values() if r["aviso"]]
                     if _avisos_str_bp:
                         st.warning("⚠️ " + "\n\n".join(_avisos_str_bp))
-                    st.caption(
-                        "Strings por superficie: "
-                        + " · ".join(
-                            f"{n}: {formato_strings(r['n_serie'], r['n_paralelo'])} ({ETIQUETA_ORIGEN_STRINGS[r['origen']]})"
-                            for n, r in _strings_bp.items()
+                    if _strings_bp:
+                        st.caption(
+                            "Panel y strings por superficie: "
+                            + " · ".join(
+                                f"{n}: {_paneles_p[n]['nombre']}, "
+                                f"{formato_strings(r['n_serie'], r['n_paralelo'])} "
+                                f"({ETIQUETA_ORIGEN_STRINGS[r['origen']]})"
+                                for n, r in _strings_bp.items()
+                            )
                         )
-                        if _strings_bp else "Strings por superficie: elige un panel."
-                    )
+                    _bloqueo_bp = bool(_errores_panel_bp or _errores_strings_bp)
 
                     _btn_bp_ms = st.button(
                         "⚡ Calcular bypass por superficie",
                         type="primary", key="btn_bypass_multisup",
-                        disabled=_bp_panel_data is None or bool(_errores_strings_bp),
+                        disabled=_bloqueo_bp,
                     )
 
                     _confirmar_bp = _confirmacion_publicacion("bypass_csv")
@@ -2211,8 +2298,8 @@ with tab_solar:
                             "❌ No se calculó: hay superficies activas sin POA vigente "
                             f"({', '.join(_motivos_p)}). Recalcula la POA."
                         )
-                    elif (_btn_bp_ms or _confirmar_bp) and (_bp_panel_data is None or _errores_strings_bp):
-                        st.error("❌ No se calculó: elige el panel y corrige los strings indicados arriba.")
+                    elif (_btn_bp_ms or _confirmar_bp) and _bloqueo_bp:
+                        st.error("❌ No se calculó: corrige el panel o los strings indicados arriba.")
                     elif _btn_bp_ms or _confirmar_bp:
                         from calculos.multi_superficie import agregar_poa_ponderada
                         _tmy_ms    = st.session_state.get("tmy_df")
@@ -2237,17 +2324,19 @@ with tab_solar:
                                     ].copy()
                                 _p_shade_sp = _afs(_df_fs_sp, _tmy_idx_ms, modo=_bp_modo)
                                 _str_sp_bp  = _strings_bp[_sp_bp["nombre"]]
+                                _inf_sp_bp  = _paneles_p[_sp_bp["nombre"]]
+                                _panel_sp_bp = dict(_inf_sp_bp["panel"])
                                 try:
                                     _res_sp_bp = _sbh(
                                         G_eff=_g_eff_sp, T_amb=_t_amb_ms,
                                         p_shade=_p_shade_sp.values,
                                         N_series=int(_str_sp_bp["n_serie"]),
                                         N_parallel=int(_str_sp_bp["n_paralelo"]),
-                                        panel=_bp_panel_data,
-                                        NOCT=float(_bp_panel_data.get("NOCT", 45.0)),
+                                        panel=_panel_sp_bp,
+                                        NOCT=float(_panel_sp_bp.get("NOCT", 45.0)),
                                     )
                                     _prod_sp_bp = produccion_superficie(
-                                        _poa_sp_bp, _sp_bp["area_m2"], _eta_p, _pr_p
+                                        _poa_sp_bp, _sp_bp["area_m2"], _inf_sp_bp["eta"], _pr_p
                                     )
                                     _f_bp_sp  = 1.0 - (_res_sp_bp["pct_bypass_anual"] / 100.0)
                                     _eac_sp_bp = _prod_sp_bp["e_ac_anual_kWh"] * _f_bp_sp
@@ -2258,6 +2347,7 @@ with tab_solar:
                                         "area_m2":    _sp_bp["area_m2"],
                                         "e_ac_kWh":   _eac_sp_bp,
                                         "poa_kWh_m2": _prod_sp_bp["poa_anual_kWh_m2"],
+                                        "eta_panel":  round(_inf_sp_bp["eta"], 5),
                                     })
                                     _bp_rows.append({
                                         "Superficie": (
@@ -2267,8 +2357,9 @@ with tab_solar:
                                         "Tipo":               _sp_bp["tipo"],
                                         "Área (m²)":          f"{_sp_bp['area_m2']:.1f}",
                                         "Fachada CSV":        _fach_csv_sp or "— promedio —",
-                                        "Panel usado":        _bp_panel_sel,
-                                        "Panel del proyecto": "sí" if _bp_panel_proyecto else "⚠️ no",
+                                        "Panel usado":        _inf_sp_bp["nombre"],
+                                        "Panel del proyecto": "sí" if _inf_sp_bp["es_proyecto"] else "no (elegido en la superficie)",
+                                        "η (%)":              f"{_inf_sp_bp['eta'] * 100:.2f}",
                                         "N serie × paralelo": formato_strings(_str_sp_bp["n_serie"], _str_sp_bp["n_paralelo"]),
                                         "Origen strings":     ETIQUETA_ORIGEN_STRINGS[_str_sp_bp["origen"]],
                                         "E_ac base (kWh/año)": f"{_prod_sp_bp['e_ac_anual_kWh']:,.0f}",
@@ -2357,44 +2448,46 @@ with tab_solar:
                 )
 
                 from calculos.mppt_combinado import simular_mppts_proyecto as _smp
-                from datos.tecnologias_bipv import MODULOS_BIPV as _MBPV_M
 
-                # Spec 08-interfaz/panel-proyecto-bypass-mppt: panel del proyecto
-                # por defecto (con SDM completo) y strings de cada superficie.
-                _panel_nombre_mp = st.session_state.get("panel_nombre_dim")
-                _opc_mp, _aviso_mp = opciones_panel_superficie(
-                    st.session_state.get("panel_dict"), _panel_nombre_mp, _MBPV_M,
-                )
-                if not _opc_mp:
-                    st.info("ℹ️ Ningún panel disponible tiene ficha SDM completa para el Motor IV.")
+                # Spec 05/panel-por-superficie: cada superficie con su panel
+                # (⚙️ Superficies BIPV) y sus strings; el MPPT resuelve las
+                # curvas IV con el SDM de cada panel.
+                _errores_panel_mp = list(_err_panel_p.values()) + [
+                    f"'{_n_mp}': el panel {_inf_mp['nombre']} no tiene ficha SDM completa, "
+                    "que el Motor IV necesita. Elige otro panel en ⚙️ Superficies BIPV."
+                    for _n_mp, _inf_mp in _paneles_p.items()
+                    if not tiene_sdm_completo(dict(_inf_mp["panel"]))
+                ]
+                if not _sups_p:
+                    st.info("ℹ️ No hay superficies activas.")
                 else:
-                    if _aviso_mp:
-                        st.warning(f"⚠️ {_aviso_mp}")
                     _mc1, _mc3 = st.columns(2)
-                    _mp_panel_sel = _mc1.selectbox(
-                        "Panel fotovoltaico", list(_opc_mp),
-                        index=None if _aviso_mp else 0,
-                        placeholder="Elige un panel del catálogo",
-                        key="ms_mppt_panel_sel",
-                    )
-                    _mp_panel = _opc_mp.get(_mp_panel_sel)
-                    _mp_panel_proyecto = es_panel_del_proyecto(_mp_panel_sel, _panel_nombre_mp)
-                    if _mp_panel_sel and not _mp_panel_proyecto:
-                        _mc1.caption("⚠️ Panel distinto al del proyecto: queda marcado en los resultados.")
                     _strings_mp, _errores_strings_mp = {}, []
-                    if _mp_panel is not None:
-                        for _sp_str in _sups_p:
-                            try:
-                                _strings_mp[_sp_str["nombre"]] = strings_superficie(
-                                    _sp_str, st.session_state.get("N_serie"), _mp_panel,
-                                )
-                            except ValueError as _error_str:
-                                _errores_strings_mp.append(str(_error_str))
-                    for _error_str in _errores_strings_mp:
+                    for _sp_str in _sups_p:
+                        _inf_str_m = _paneles_p.get(_sp_str["nombre"])
+                        if _inf_str_m is None:
+                            continue
+                        try:
+                            _strings_mp[_sp_str["nombre"]] = strings_superficie(
+                                _sp_str, st.session_state.get("N_serie"), _inf_str_m["panel"],
+                                _inf_str_m["es_proyecto"],
+                            )
+                        except ValueError as _error_str:
+                            _errores_strings_mp.append(str(_error_str))
+                    for _error_str in _errores_panel_mp + _errores_strings_mp:
                         st.error(f"❌ {_error_str}")
                     _avisos_str_mp = [r["aviso"] for r in _strings_mp.values() if r["aviso"]]
                     if _avisos_str_mp:
                         st.warning("⚠️ " + "\n\n".join(_avisos_str_mp))
+                    _bloqueo_mp = bool(_errores_panel_mp or _errores_strings_mp)
+                    _paneles_distintos_mp = {
+                        _paneles_p[n]["nombre"] for n in _strings_mp
+                    }
+                    if len(_paneles_distintos_mp) > 1:
+                        _mc1.caption(
+                            "ℹ️ Hay superficies con paneles distintos: si comparten MPPT, la "
+                            "curva IV combinada incluye también la diferencia de voltaje entre paneles."
+                        )
                     _mp_nmppt = _mc3.number_input(
                         "Nº de MPPTs del inversor", 1, 12,
                         int((st.session_state.get("inversor_dict_dim") or {}).get("N_mppt") or 2),
@@ -2421,13 +2514,12 @@ with tab_solar:
 
                     if st.button("🔀 Simular curva IV combinada por MPPT",
                                  type="primary", key="btn_mppt_comb",
-                                 disabled=_mp_panel is None or bool(_errores_strings_mp)):
+                                 disabled=_bloqueo_mp):
                         _tmy_m = st.session_state.get("tmy_df")
                         if _tmy_m is None:
                             st.error("❌ No hay TMY cargado — calcula el Recurso Solar primero.")
                         else:
                             _T2m = _tmy_m["T2m"].values.astype(float)
-                            _noct_m = float(_mp_panel.get("NOCT", 45.0))
                             _grupos_m = {}
                             for _sp_m in _sups_p:
                                 _poa_sp_m = _poa_p.get(_sp_m["nombre"])
@@ -2437,11 +2529,13 @@ with tab_solar:
                                 _n_lim = min(len(_g_m), len(_T2m))
                                 _g_m, _t_amb_m = _g_m[:_n_lim], _T2m[:_n_lim]
                                 _str_m = _strings_mp[_sp_m["nombre"]]
+                                _panel_m = dict(_paneles_p[_sp_m["nombre"]]["panel"])
+                                _noct_m = float(_panel_m.get("NOCT", 45.0))
                                 _grupos_m[_sp_m["nombre"]] = {
                                     "nombre":     _sp_m["nombre"],
                                     "G":          _g_m,
                                     "T_cel":      _t_amb_m + (_noct_m - 20.0) / 800.0 * _g_m,
-                                    "panel":      _mp_panel,
+                                    "panel":      _panel_m,
                                     "n_serie":    int(_str_m["n_serie"]),
                                     "n_paralelo": int(_str_m["n_paralelo"]),
                                 }
@@ -2452,7 +2546,11 @@ with tab_solar:
                                     st.session_state["mppt_comb_asig"]      = {k: list(v) for k, v in _asig.items()}
                                     st.session_state["mppt_comb_ok"]        = True
                                     st.session_state["mppt_comb_panel"]     = {
-                                        "panel": _mp_panel_sel, "del_proyecto": _mp_panel_proyecto,
+                                        "paneles": {
+                                            n: {"panel": _paneles_p[n]["nombre"],
+                                                "del_proyecto": _paneles_p[n]["es_proyecto"]}
+                                            for n in _strings_mp
+                                        },
                                         "strings": {
                                             n: {k: r[k] for k in ("n_serie", "n_paralelo", "origen")}
                                             for n, r in _strings_mp.items()
@@ -2467,11 +2565,14 @@ with tab_solar:
                         _asig_g = st.session_state.get("mppt_comb_asig", {})
                         _panel_m_usado = st.session_state.get("mppt_comb_panel") or {}
                         if _panel_m_usado:
+                            _pan_m_usados = _panel_m_usado.get("paneles", {})
                             st.caption(
-                                f"Panel usado: **{_panel_m_usado.get('panel')}**"
-                                + ("" if _panel_m_usado.get("del_proyecto") else " — ⚠️ distinto al del proyecto")
-                                + " · Strings: " + " · ".join(
-                                    f"{n}: {formato_strings(r['n_serie'], r['n_paralelo'])} ({ETIQUETA_ORIGEN_STRINGS[r['origen']]})"
+                                "Panel y strings usados: " + " · ".join(
+                                    f"{n}: {_pan_m_usados.get(n, {}).get('panel', '?')}"
+                                    + ("" if _pan_m_usados.get(n, {}).get("del_proyecto", True)
+                                       else " (elegido en la superficie)")
+                                    + f", {formato_strings(r['n_serie'], r['n_paralelo'])} "
+                                    f"({ETIQUETA_ORIGEN_STRINGS[r['origen']]})"
                                     for n, r in _panel_m_usado.get("strings", {}).items()
                                 )
                             )

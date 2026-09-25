@@ -1018,11 +1018,24 @@ Pasos:
 - Agregar cada superficie con su botón y ajustar Nombre, Tipo, Tilt, Azimuth, Área y «Activa».
 - Desmarcar «Activa» excluye una superficie sin borrarla; 🗑️ la elimina.
 - Superficies con tilt ≥ 80° muestran «🔄 Montaje de la fachada» (Heredar / Adosada / Ventilada).
+- «Panel de esta superficie»: por defecto «Panel del proyecto (…)», el de 📐 Dimensionamiento; se puede elegir otro del catálogo si la superficie lleva otra referencia (ver «Panel por superficie»).
 - Pulsar «⚡ Calcular POA para todas las superficies» (requiere el TMY de ☀️ Recurso Solar).
 
 ### POA vigente por superficie: cuándo hay que recalcularla  NUEVO (24-sep-2026)
 
 Cada POA queda firmada con la geometría (tipo, tilt, azimuth, área, montaje), el albedo, el bifacial, el TMY y la ubicación. Si algo de eso cambia, esa superficie deja de tener POA vigente: la página muestra «⚠️ Estas superficies no tienen POA vigente…» con el motivo (cambió la geometría/montaje/albedo/bifacial, cambió el TMY o la ubicación, POA sin calcular o el cálculo falló con su causa), la omite en resumen, vista 3D, producción y bypass; en el mapa de calor de 🌞 Trayectoria Solar muestra un aviso y colorea con la POA general de ☀️ Recurso Solar (orientación del proyecto), o con una estimación fija de 300 W/m² si no hay ninguna POA; y deshabilita «🔗 Usar sistema multi-superficie en Financiero» hasta recalcular. Renombrar una superficie NO invalida su POA. Solución: volver a pulsar «⚡ Calcular POA para todas las superficies». Al abrir un proyecto guardado la POA aparece como «POA sin calcular» porque no se guarda con el proyecto: recalcúlala igual.
+
+### Panel por superficie: fachada y techo con paneles distintos  NUEVO (25-sep-2026)
+
+Cada superficie tiene su selector «Panel de esta superficie» en ⚙️ Superficies BIPV › Superficies configuradas. Por defecto es «Panel del proyecto (nombre)», que sigue al panel de 📐 Dimensionamiento; si la superficie lleva otra referencia (por ejemplo vidrio BIPV semitransparente en fachada y módulo opaco en el techo) se elige del catálogo. Junto al selector se ven Pmax, la eficiencia η y el área del módulo.
+
+- Eficiencia: η = Pmax ÷ (área del módulo × 1000 W/m²). Ejemplo: ASP-ST1-T40 = 63 W ÷ 0,72 m² = 8,75 %. La energía simplificada de cada superficie es POA × área × η de su panel × PR.
+- Corregido 25-sep-2026: antes la energía simplificada de Vista 3D (resumen, «🔗 Usar sistema multi-superficie en Financiero», Producción por superficie y bypass) usaba siempre η = 16 %, sin importar el panel. Con ASP-ST1-T40 una fachada de 97,3 m² con POA 1004 kWh/m² daba 12.191 kWh/año y la correcta es 6.667. Las energías publicadas antes de esta fecha deben volver a publicarse.
+- Si un panel no trae potencia o área, la superficie no entra en la energía y la app lo dice; nunca se usa un valor fijo.
+- Bypass, MPPT y modo físico usan el panel de cada superficie (ya no hay un selector común de panel en las secciones 5 y 6). Si el panel no tiene ficha SDM completa, el bypass y el MPPT se bloquean con el nombre de la superficie.
+- Strings: el paralelo estimado usa el área del módulo de esa superficie. Si la superficie tiene un panel distinto al del proyecto, necesita su propio N serie en 🔌 Inversores por superficie: el N serie de Dimensionamiento es para el otro panel y no se usa.
+- Cambiar el panel de una superficie (o el panel del proyecto, para las superficies que lo siguen) retira la energía publicada en Financiero y los resultados de bypass, MPPT y modo físico, con el aviso «Cambió el panel de una superficie…». La POA y la sombra siguen vigentes: solo hay que volver a publicar.
+- Guardar el proyecto conserva el panel de cada superficie; los proyectos guardados antes cargan con el panel del proyecto.
 
 ### Sombra 3D por superficie (Site Designer)  ACTUALIZADO (24-sep-2026)
 
@@ -1077,8 +1090,8 @@ Sección 5 — Bypass diodes por superficie (#46)
 
 Ejecuta el modelo de bypass individualmente para cada superficie usando su propio perfil POA y su propio perfil FS del CSV:
 
-- Panel: por defecto el del proyecto; si no hay panel del proyecto o no tiene ficha SDM completa, hay que elegir uno del catálogo (el botón queda deshabilitado hasta elegirlo).
-- Strings: cada superficie usa su N serie y N paralelo de ⚙️ Superficies BIPV; si faltan, N serie de Dimensionamiento y paralelo = módulos que caben por área ÷ N serie (estimación, con aviso). La tabla de resultados muestra «Panel usado», «Panel del proyecto», «N serie × paralelo» y «Origen strings». Los strings se escriben siempre como «8 serie × 17 paralelo» (8 módulos en serie por string, 17 strings en paralelo), en la leyenda y en las tablas del bypass y del MPPT.
+- Panel: el de cada superficie (⚙️ Superficies BIPV › «Panel de esta superficie»); necesita ficha SDM completa, si no, el botón queda deshabilitado y se indica la superficie.
+- Strings: cada superficie usa su N serie y N paralelo de ⚙️ Superficies BIPV; si faltan, N serie de Dimensionamiento (solo si la superficie usa el panel del proyecto) y paralelo = módulos que caben por área ÷ N serie (estimación, con aviso). La tabla de resultados muestra «Panel usado», «Panel del proyecto», «η (%)», «N serie × paralelo» y «Origen strings». Los strings se escriben siempre como «8 serie × 17 paralelo» (8 módulos en serie por string, 17 strings en paralelo), en la leyenda y en las tablas del bypass y del MPPT.
 - Pulsar " Calcular bypass por superficie"
 Resultado — tabla por superficie:
 
@@ -1100,8 +1113,8 @@ Sección 6 — Strings de distinta orientación en un mismo MPPT  NUEVO
 
 Cuando dos superficies con orientaciones distintas (p. ej. fachada Este y fachada Oeste) se conectan en paralelo a la MISMA entrada MPPT del inversor, éste impone un solo voltaje de operación para todas. La app resuelve hora a hora la curva IV combinada (suma de las corrientes de los strings) y la compara contra el caso ideal de un MPPT por orientación, para cuantificar cuánta energía se pierde por compartir el MPPT.
 
-- Panel fotovoltaico: por defecto el panel del proyecto; solo se ofrecen paneles con ficha SDM completa (Motor IV).
-- Strings: los de cada superficie (N serie × N paralelo de ⚙️ Superficies BIPV); si faltan, N serie de Dimensionamiento y paralelo por área, con aviso. El resultado muestra el panel usado y el origen de los strings.
+- Panel fotovoltaico: el de cada superficie (⚙️ Superficies BIPV); debe tener ficha SDM completa (Motor IV). Si dos superficies con paneles distintos comparten MPPT, la curva combinada incluye también la diferencia de voltaje entre paneles.
+- Strings: los de cada superficie (N serie × N paralelo de ⚙️ Superficies BIPV); si faltan, N serie de Dimensionamiento (solo con el panel del proyecto) y paralelo por área, con aviso. El resultado muestra el panel y el origen de los strings de cada superficie.
 - Nº de MPPTs del inversor: se toma automáticamente de la ficha del inversor del Dimensionamiento si existe.
 - Asignación superficie → MPPT: dos o más superficies en el mismo MPPT = strings en paralelo compartiendo voltaje.
 - Resultados: E_dc ideal vs E_dc con MPPT compartido, pérdida por mismatch total y por MPPT, y gráfica de la curva IV combinada de la peor hora del año.
@@ -1129,7 +1142,7 @@ multisup_activo  │  Flag booleano  │  —
 
 multisup_origen  │  simplificado, bypass_csv o fisico  │  —
 
-Requiere POA vigente en todas las superficies activas (si no, el botón queda deshabilitado) y escribe las claves juntas en una sola publicación; si la energía vigente es de otro origen, pide confirmación.
+La energía de cada superficie es POA × área × η de su panel × PR (ver «Panel por superficie»). Requiere POA vigente y un panel con potencia y área en todas las superficies activas (si no, el botón queda deshabilitado) y escribe las claves juntas en una sola publicación; si la energía vigente es de otro origen, pide confirmación.
 
 ### Prioridad en las páginas aguas abajo
 
