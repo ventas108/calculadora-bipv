@@ -174,7 +174,7 @@ def test_financiero_usa_el_sistema_publicado_sin_exigir_produccion():
     assert 'p_stc = float(_sistema_ms["P_dc_stc_kW"])' in src
     assert 'n_pan = int(_sistema_ms["n_modulos"])' in src
     # 🔴 y se detiene si el sistema está incompleto o la publicación es anterior.
-    assert "st.stop()" in src[src.index("_est_ms[\"problemas\"]"):src.index("_ms_activo:\n    p_stc")]
+    assert "st.stop()" in src[src.index("if _problemas_fin:"):src.index("_ms_activo:\n    p_stc")]
     # Costo por referencia de panel y Presupuesto desvinculado por defecto.
     assert 'key=f"fin_costo_panel_ms_{_i_pp}"' in src and "value=not _ms_activo" in src
 
@@ -273,3 +273,48 @@ def test_vista_3d_muestra_el_aviso_fijo_en_integrar():
     seccion = src[i:i + 3000]
     assert "_aviso_retiro = aviso_energia_retirada(st.session_state)" in seccion
     assert "_ci2.info(_aviso_retiro)" in seccion
+
+
+# ── H-D6: aviso de energía retirada en Financiero, Baterías y CO₂ ───────────
+from calculos.publicacion_multisuperficie import aviso_retiro_para_consumidores
+
+
+def test_aviso_retiro_para_consumidores_explica_que_los_valores_no_son_de_vista_3d():
+    ss = {"_multisup_retiro_motivo": {"motivo": "cambió el diseño eléctrico",
+                                      "superficies": ["Fachada principal"]}}
+    aviso = aviso_retiro_para_consumidores(ss)
+    assert "«Fachada principal»" in aviso and "cambió el diseño eléctrico" in aviso
+    assert "NO son de tu diseño" in aviso and "🔗 Integrar al análisis financiero" in aviso
+    ss["multisup_activo"] = True           # ya se volvió a publicar
+    assert aviso_retiro_para_consumidores(ss) is None
+    assert aviso_retiro_para_consumidores({}) is None
+
+
+@pytest.mark.parametrize("pagina", [
+    "7_💰_Financiero.py", "11_🔋_Baterias_y_Balance.py", "12_🌿_Impacto_CO2.py",
+])
+def test_consumidores_muestran_el_aviso_de_retiro(pagina):
+    assert "aviso_retiro_para_consumidores(st.session_state)" in _src(pagina)
+
+
+# ── Regla 🔴: Financiero no calcula con un diseño eléctrico imposible ───────
+def test_estado_rojo_bloquea_el_analisis_financiero():
+    from calculos.sistema_multisuperficie import problemas_financieros
+
+    sistema = resumen_sistema_multisuperficie(*_escenario_d5())
+    ss = {"multisup_activo": True, "multisup_sistema": sistema,
+          "multisup_estado_electrico": {"estado": "rojo", "n_bloqueos": 1, "n_avisos": 0,
+                                        "texto": "🔴 diseño eléctrico con fallas (1)"}}
+    problemas = problemas_financieros(ss)
+    assert problemas and "no se puede construir" in problemas[0]
+    assert "⚡ Diseño eléctrico" in problemas[0] and "vuelve a publicar" in problemas[0]
+    ss["multisup_estado_electrico"]["estado"] = "amarillo"
+    assert problemas_financieros(ss) == []
+    # Sin estado registrado (publicación anterior) no se inventa un bloqueo.
+    ss.pop("multisup_estado_electrico")
+    assert problemas_financieros(ss) == []
+
+
+def test_financiero_usa_problemas_financieros_y_se_detiene():
+    src = _src("7_💰_Financiero.py")
+    assert "problemas_financieros(st.session_state)" in src

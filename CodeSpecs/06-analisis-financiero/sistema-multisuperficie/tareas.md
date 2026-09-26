@@ -16,4 +16,6 @@
 - [x] Aviso fijo de energía retirada en «🔗 Integrar al análisis financiero»
       hasta volver a publicar (pedido en la prueba D6).
 - [x] Corrección: guardar el proyecto sin sombra 3D (hallada en D8).
-- [ ] Prueba en producción (repetir D5, D6 y D8).
+- [x] H-D6: aviso de energía retirada en Financiero, Baterías y CO₂.
+- [x] Regla 🔴: Financiero no calcula con el diseño eléctrico en rojo.
+- [ ] Prueba en producción (repetir D6, D7 y D8).

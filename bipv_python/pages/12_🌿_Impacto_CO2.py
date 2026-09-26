@@ -81,6 +81,10 @@ else:
 
 p_stc   = st.session_state.get("P_stc_kW_sistema", 0.0)
 n_pan   = st.session_state.get("N_paneles_final", 0)
+from calculos.publicacion_multisuperficie import aviso_retiro_para_consumidores
+_aviso_retiro_co2 = aviso_retiro_para_consumidores(st.session_state)
+if _aviso_retiro_co2:
+    st.warning(_aviso_retiro_co2)
 # Spec 06-analisis-financiero/sistema-multisuperficie (H-D5): kWp y módulos
 # del mismo diseño multi-superficie que la energía, nunca los de superficie única.
 if _multisup_ok and _e_ac_multisup > 0:

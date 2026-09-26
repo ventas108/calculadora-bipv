@@ -315,3 +315,12 @@ def test_buscar_financiero_no_toma_la_energia_multisuperficie():
     )
     texto = seccion["texto"]
     assert "ya NO exige 📊 Producción" in texto and "costo por referencia de panel" in texto
+
+
+def test_buscar_por_que_financiero_no_calcula_con_diseno_rojo():
+    seccion = _seccion_recuperada(
+        "por que financiero no calcula el tir si el diseño electrico esta en rojo",
+        "inversores por superficie",
+    )
+    texto = seccion["texto"]
+    assert "Financiero NO calcula TIR" in texto and "NO son de tu diseño de Vista 3D" in texto
