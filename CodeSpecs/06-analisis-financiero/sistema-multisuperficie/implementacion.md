@@ -67,6 +67,11 @@ Desviaciones del diseño, con motivo:
   superficie (la energía anual sí es la del modelo); se declara en
   `reparto_mensual: "poa_superficie"`.
 
+- **Costo por panel desde el catálogo vigente** (26-sep-2026):
+  `costo_actual_panel` (📋 Catálogo Paneles → catálogo interno → copia
+  publicada) y `calculos/campos_editor.sincronizar_con_fuente`; en
+  Financiero el campo ya no recibe `value=` y su clave es el nombre del panel.
+
 ## Archivos modificados
 
 - `bipv_python/calculos/sistema_multisuperficie.py` (nuevo)

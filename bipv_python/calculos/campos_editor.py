@@ -28,3 +28,22 @@ def sincronizar_campo(estado: MutableMapping[str, Any], clave: str, valor_datos:
         estado[clave] = valor_datos
     estado[ref] = estado[clave]
     return estado[clave]
+
+
+def sincronizar_con_fuente(estado: MutableMapping[str, Any], clave: str,
+                           valor_fuente: Any, respaldo: Any) -> Any:
+    """Valor de un campo que sigue a una fuente externa (p. ej. el catálogo)
+    sin pisar lo que escribió el usuario.
+
+    El campo toma ``valor_fuente`` la primera vez y cada vez que la fuente
+    CAMBIA; mientras no cambie, se respeta lo que el usuario escribió. Sin
+    valor en la fuente se usa ``respaldo``. A diferencia de
+    ``sincronizar_campo``, aquí el campo no se guarda de vuelta en la fuente
+    (💰 Financiero no escribe el catálogo), 26-sep-2026.
+    """
+    ref = f"_fuente_{clave}"
+    if clave not in estado or (ref in estado and estado[ref] != valor_fuente
+                               and valor_fuente is not None):
+        estado[clave] = valor_fuente if valor_fuente is not None else respaldo
+    estado[ref] = valor_fuente
+    return estado[clave]

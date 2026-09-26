@@ -403,15 +403,32 @@ with col_cx1:
         if _ms_activo and len(_por_panel_ms) > 1:
             # H-D5: con paneles distintos por superficie, un costo por referencia.
             st.caption("Costo por referencia de panel (cada superficie usa su propio panel):")
+            # Precio vigente del catálogo (📋 Catálogo Paneles), no la copia
+            # guardada al publicar; el campo lo sigue cuando el catálogo cambia
+            # y respeta lo que escribas mientras no cambie (26-sep-2026).
+            from calculos.campos_editor import sincronizar_con_fuente
+            from calculos.sistema_multisuperficie import costo_actual_panel
+            from datos.catalogo_paneles_excel import cargar_catalogo_paneles
+            from datos.tecnologias_bipv import MODULOS_BIPV
+            try:
+                _cat_pan_fin = cargar_catalogo_paneles() or {}
+            except Exception:
+                _cat_pan_fin = {}
+            _respaldo_costo = float(st.session_state.get("costo_modulo_usd") or 65.0)
             _capex_mod_ms = 0.0
-            for _i_pp, _pp in enumerate(_por_panel_ms):
+            for _pp in _por_panel_ms:
+                _costo_cat = costo_actual_panel(_pp, _cat_pan_fin, MODULOS_BIPV)
+                _clave_pp = f"fin_costo_panel_ms_{_pp['panel']}"
+                sincronizar_con_fuente(st.session_state, _clave_pp, _costo_cat, _respaldo_costo)
                 _c_pp = st.number_input(
                     f"Costo {_pp['panel']} (USD/módulo) · {_pp['modulos']} módulos",
-                    min_value=10.0, max_value=2000.0,
-                    value=float(_pp.get("costo_usd") or st.session_state.get("costo_modulo_usd") or 65.0),
-                    step=5.0, key=f"fin_costo_panel_ms_{_i_pp}",
-                    help="Pre-llenado con el costo del catálogo de ese panel si lo trae.",
+                    min_value=10.0, max_value=2000.0, step=5.0, key=_clave_pp,
+                    help="Toma el precio de 📋 Catálogo Paneles y se actualiza cuando lo cambias "
+                         "allí. Puedes escribir otro precio para este proyecto.",
                 )
+                if _costo_cat is None:
+                    st.caption("Sin precio en 📋 Catálogo Paneles: se usa el costo general; "
+                               "escribe el precio real.")
                 _capex_mod_ms += _c_pp * _pp["modulos"]
             # Promedio ponderado: n_pan × costo_modulo_usd = Σ módulos × costo de su panel.
             costo_modulo_usd = _capex_mod_ms / n_pan if n_pan > 0 else 0.0

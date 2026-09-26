@@ -85,6 +85,11 @@ eléctrico, y al cambiar de proyecto.
 10. Si la energía se retiró por un cambio, Financiero, Baterías y CO₂ muestran
    el aviso y que sus valores no son del diseño de Vista 3D
    (`aviso_retiro_para_consumidores`).
+11. El costo de cada panel en Financiero toma el precio vigente de
+   📋 Catálogo Paneles (`costo_actual_panel`); si el catálogo cambia, el campo
+   se actualiza, y si el usuario escribe otro precio se respeta mientras el
+   catálogo no cambie (`sincronizar_con_fuente`). La clave del campo es el
+   nombre del panel, no su posición.
 
 ## Pruebas requeridas
 

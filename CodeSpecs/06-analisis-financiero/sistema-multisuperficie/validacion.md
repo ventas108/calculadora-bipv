@@ -50,7 +50,12 @@ sobre `main` `d20d8807`.
       retirada, Financiero, Baterías y CO₂ muestran «ℹ️ La energía
       multi-superficie de 🗺️ Vista 3D se retiró porque cambió el diseño
       eléctrico de «Fachada principal»…».
-- [ ] Prueba en producción: D6, D7 y D8 con estas correcciones.
+- [x] Prueba en producción: D6, D7 y D8 aprobadas (26-sep-2026).
+- [x] Criterio 11: `test_costo_panel_financiero.py` en rojo con `main` `370d5214`
+      (no se puede recolectar) y en verde con el cambio. AppTest de Financiero:
+      en `main` el SPR-E20-327 muestra 140 con 150 en el catálogo; con el cambio
+      150; el usuario escribe 155 y se conserva al recargar; el catálogo pasa a
+      160 y el campo muestra 160.
 
 ## Resultado
 

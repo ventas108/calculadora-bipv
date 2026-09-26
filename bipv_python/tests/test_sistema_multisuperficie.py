@@ -176,7 +176,8 @@ def test_financiero_usa_el_sistema_publicado_sin_exigir_produccion():
     # 🔴 y se detiene si el sistema está incompleto o la publicación es anterior.
     assert "st.stop()" in src[src.index("if _problemas_fin:"):src.index("_ms_activo:\n    p_stc")]
     # Costo por referencia de panel y Presupuesto desvinculado por defecto.
-    assert 'key=f"fin_costo_panel_ms_{_i_pp}"' in src and "value=not _ms_activo" in src
+    # Clave por nombre de panel (26-sep-2026): la posición no identifica al panel.
+    assert "fin_costo_panel_ms_{_pp['panel']}" in src and "value=not _ms_activo" in src
 
 
 def test_baterias_usa_el_reparto_mensual_publicado():
