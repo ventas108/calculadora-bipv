@@ -18,4 +18,6 @@
 - [x] Corrección: guardar el proyecto sin sombra 3D (hallada en D8).
 - [x] H-D6: aviso de energía retirada en Financiero, Baterías y CO₂.
 - [x] Regla 🔴: Financiero no calcula con el diseño eléctrico en rojo.
-- [ ] Prueba en producción (repetir D6, D7 y D8).
+- [x] Prueba en producción (D6, D7 y D8 repetidas y aprobadas el 26-sep-2026).
+- [x] Costo por inversor (Vista 3D) y de baterías desde el catálogo vigente; Presupuesto igual.
+- [x] Costo por panel desde el catálogo vigente (hallado preparando un proyecto real: USD 150 en el catálogo y 140 en Financiero).

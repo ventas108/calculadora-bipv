@@ -199,3 +199,22 @@ def problemas_financieros(session_state: Mapping[str, Any]) -> list[str]:
             "⚡ Diseño eléctrico, corrígelos y vuelve a publicar la energía."
         )
     return problemas
+
+
+def costo_actual_panel(item: Mapping[str, Any], catalogo_excel: Mapping[str, Any],
+                       catalogo_interno: Mapping[str, Any]) -> float | None:
+    """Costo USD/módulo vigente de un panel de ``multisup_sistema.por_panel``.
+
+    Primero el catálogo editable (📋 Catálogo Paneles), luego el interno y por
+    último la copia guardada al publicar. Antes Financiero solo usaba esa
+    copia, así que un precio puesto después en el catálogo no llegaba
+    (26-sep-2026).
+    """
+    nombre = item.get("panel")
+    for catalogo in (catalogo_excel, catalogo_interno):
+        ficha = (catalogo or {}).get(nombre)
+        if ficha is not None:
+            costo = _costo(ficha)
+            if costo is not None:
+                return costo
+    return _costo(item)
