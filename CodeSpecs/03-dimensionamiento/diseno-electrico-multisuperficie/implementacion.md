@@ -123,6 +123,15 @@ Desviaciones del diseño, con motivo:
   «Mismo N serie en el MPPT» en la explicación sencilla.
 - Base de conocimiento del Asistente.
 
+### Corrección tras la prueba D9 en producción (26-sep-2026)
+
+- `validar_diseno_electrico`: la compatibilidad del string de cada grupo usa solo los strings
+  de ese grupo (`n_paralelo`) para la corriente. La corriente del MPPT completo, con paneles
+  distintos, ya la suma «Isc del MPPT ≤ límite del tracker». Antes se multiplicaba el Isc del
+  panel del grupo por todos los strings del MPPT: con Fachada ASP 8×3 y Techo SPR 12×1 en el
+  MPPT 1 salía un 🔴 falso «Isc de strings 32,30 A > 18 A», mientras la tabla del MPPT
+  mostraba 11,07 A 🟢.
+
 ## Archivos modificados
 
 ### Fase A1

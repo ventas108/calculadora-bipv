@@ -472,3 +472,30 @@ def test_n_serie_vacio_no_da_falso_rojo_de_largo():
 def test_pagina_explica_el_largo_de_los_strings():
     src = _PAGINA.read_text(encoding="utf-8")
     assert "Mismo N serie en el MPPT" in src and "\"N serie de los strings\"" in src
+
+
+# ── D9 en producción (26-sep-2026): corriente con paneles distintos en un MPPT ──
+def test_corriente_del_grupo_no_multiplica_su_isc_por_los_strings_de_otros_paneles():
+    # MPPT 1 con Fachada G1 (ASP, 8×3) y Techo G2 (SPR, 12×1). La corriente
+    # real del MPPT es 3 × Isc ASP + 1 × Isc SPR (×1,25) ≈ 11,1 A < 18 A. Antes,
+    # el chequeo del grupo SPR usaba Isc SPR × 4 strings = 32,3 A y daba un 🔴
+    # falso que contradecía la tabla del MPPT (11,07 A 🟢).
+    a = _sup("Fachada principal", uid=1, grupos=[_grupo("G1", n_serie=8, n_paralelo=3)], area=97.3)
+    b = _sup("Techo 1", uid=2, grupos=[_grupo("G2", n_serie=12, n_paralelo=1)], area=97.3, tilt=10.0)
+    d = _diag([a, b], [_inv(ficha=dict(_SG5), P_ac_nom_W=5000.0)],
+              _paneles(**{"Fachada principal": _ASP, "Techo 1": _SPR}))
+    m = d["mppt"][0]
+    isc_mppt = 1.25 * (3 * float(_ASP["Isc_stc"]) + float(_SPR["Isc_stc"]))
+    assert m["isc_total"] == pytest.approx(isc_mppt, abs=0.01) and isc_mppt < 18.0
+    assert not any("Isc de strings" in x for x in d["bloqueos"])
+    techo = next(g for g in d["grupos"] if g["superficie"] == "Techo 1")
+    assert all(c["estado"] == "verde" for c in techo["checks"])
+    # Los 🔴 reales de este caso siguen: paneles distintos y strings de distinto largo.
+    assert any("paneles distintos" in x for x in d["bloqueos"])
+    assert any("distinto largo" in x for x in d["bloqueos"])
+
+
+def test_grupo_que_solo_no_cabe_en_corriente_sigue_en_rojo():
+    d = _dos_grupos(8, 8, np1=30)
+    assert d["mppt"][0]["estado"] == "rojo"
+    assert any("Isc" in x for x in d["bloqueos"])

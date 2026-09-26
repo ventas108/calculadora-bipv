@@ -388,14 +388,18 @@ def validar_diseno_electrico(
             avisos.append(f"{etiqueta}: la ficha no trae la corriente máxima del MPPT; no se "
                           "puede verificar la corriente.")
 
-        # Compatibilidad del string de cada grupo con este MPPT
+        # Compatibilidad del string de cada grupo con este MPPT. La corriente
+        # usa solo los strings del grupo: la del MPPT completo (paneles
+        # distintos incluidos) ya la suma el chequeo de arriba. Multiplicar el
+        # Isc de este panel por TODOS los strings del MPPT daba un 🔴 falso
+        # (D9, 26-sep-2026: 32,3 A frente a 11,07 A reales).
         for g in grupos:
             if g["_panel"] is None or g["n_serie"] is None:
                 continue
             compat = evaluar_compatibilidad_string(
                 panel=g["_panel"], inversor=ficha, N_serie=g["n_serie"],
                 T_frio=float(temps["T_frio"]), T_real=float(temps["T_real"]),
-                T_extremo=float(temps["T_extremo"]), N_strings_tracker=max(1, strings),
+                T_extremo=float(temps["T_extremo"]), N_strings_tracker=max(1, g["n_paralelo"] or 1),
                 FS_isc=FS_ISC,
             )
             if not compat.get("evaluable"):
