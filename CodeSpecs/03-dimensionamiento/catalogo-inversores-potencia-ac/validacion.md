@@ -25,10 +25,13 @@ sobre `main` `9801ef3f`.
       aviso «105 de 111» y filtro (AppTest).
 - [x] Criterio 7: mensaje en Vista 3D, Dimensionamiento y Producción.
 - [x] `physics-guard` local limpio.
-- [ ] Suite completa.
-- [ ] Prueba en producción: corregir el Growatt desde la tabla y ver INV-2 con
-      DC/AC 1,134 🟢 y 2/2 strings.
+- [x] Suite completa (`python -m pytest tests/`): `1794 passed`, 0 fallidas, 17 min 22 s.
+- [x] Auditoría SDD sin documentos ni secciones faltantes.
+
+Pendiente tras el despliegue: corregir el Growatt desde la tabla en producción y
+ver INV-2 con DC/AC 1,134 🟢 y 2/2 strings.
 
 ## Resultado
 
-Pendiente de la suite completa y de la prueba en producción.
+Aprobado para revisión: pruebas nuevas de rojo a verde, suite completa en verde,
+`physics-guard` limpio y prueba de humo con AppTest de las dos páginas.
