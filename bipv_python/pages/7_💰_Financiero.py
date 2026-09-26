@@ -211,12 +211,49 @@ tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))
 # TRM disponible desde el inicio (se actualiza en Sección 2)
 tipo_cambio = float(st.session_state.get("tipo_cambio", 3400.0))
 
+# ── Precio vigente del inversor (26-sep-2026) ──────────────────────────────
+# Antes: copia tomada al abrir 📐 Dimensionamiento y, sin potencia AC, la
+# potencia FV máxima como si lo fuera.
+from calculos.costos_catalogo import (
+    costo_actual_inversor, nombre_catalogo_inversor, potencia_ac_kw_inversor,
+)
+
+
+def _catalogo_inversores_fin() -> dict:
+    from datos.catalogo_inversores import INVERSORES
+    try:
+        from datos.catalogo_inversores_excel import cargar_catalogo_inversores
+        return {**INVERSORES, **dict(cargar_catalogo_inversores() or {})}
+    except Exception:
+        return dict(INVERSORES)
+
+
+_cat_inv_fin    = _catalogo_inversores_fin()
+_inv_nombre_dim = st.session_state.get("inversor_nombre_dim")
+_inversor_dim   = st.session_state.get("inversor_dict_dim", {}) or {}
+_costo_inv_usd  = (
+    costo_actual_inversor({"origen_ficha": "proyecto"}, _cat_inv_fin, _inv_nombre_dim)
+    or float(st.session_state.get("costo_inversor_usd") or 0.0)
+)
+_p_ac_nom_kW    = potencia_ac_kw_inversor(_inversor_dim)
+
 # ── Balance energético con batería (Página 11) ─────────────────────────────
 _balance_metricas = st.session_state.get("balance_metricas", {}) or {}
 _bateria_dim      = st.session_state.get("bateria_dim", {}) or {}
 _e_autoconsumo    = float(_balance_metricas.get("E_autoconsumo_anual_kWh", 0.0))
 _e_exportacion    = float(_balance_metricas.get("E_exportacion_anual_kWh", 0.0))
-_capex_bat_usd    = float(_bateria_dim.get("costo_total_usd", 0.0))
+# Precio vigente de 🔋 Catálogo de baterías, no el de cuando se dimensionó
+# (26-sep-2026: un precio cambiado después no llegaba, sin aviso).
+from calculos.costos_catalogo import capex_baterias_vigente
+_costo_bat_cat = None
+if _bateria_dim and st.session_state.get("bateria_nombre"):
+    try:
+        from datos.catalogo_baterias_excel import obtener_bateria
+        _costo_bat_cat = (obtener_bateria(st.session_state["bateria_nombre"]) or {}).get("costo_usd")
+    except Exception:
+        _costo_bat_cat = None
+_capex_bat_vig    = capex_baterias_vigente(_bateria_dim, _costo_bat_cat)
+_capex_bat_usd    = _capex_bat_vig["costo_total_usd"]
 _balance_activo   = _e_autoconsumo > 0
 
 # Energía usada en el análisis financiero: autoconsumo total (solar directo +
@@ -379,12 +416,6 @@ with col_cx1:
         )
         # Valores de referencia (no editables aquí) para el desglose informativo.
         costo_modulo_usd      = float(st.session_state.get("costo_modulo_usd") or 65.0)
-        _costo_inv_usd        = float(st.session_state.get("costo_inversor_usd") or 0.0)
-        _inversor_dim         = st.session_state.get("inversor_dict_dim", {})
-        _p_ac_nom_kW          = (
-            _inversor_dim.get("P_ac_nom_kW")
-            or ((_inversor_dim.get("P_ac_nom_W") or _inversor_dim.get("P_dc_max_W") or 0) / 1000)
-        )
         if _costo_inv_usd > 0 and _p_ac_nom_kW and _p_ac_nom_kW > 0:
             costo_inversor_usd_kw = max(50.0, min(400.0, round(_costo_inv_usd / _p_ac_nom_kW, 1)))
         else:
@@ -444,13 +475,8 @@ with col_cx1:
                 help="Pre-llenado desde catálogo si se seleccionó panel en Dimensionamiento.",
             )
 
-        # ── Pre-llenar costo inversor desde catálogo ──────────────────────────
-        _costo_inv_usd  = float(st.session_state.get("costo_inversor_usd") or 0.0)
-        _inversor_dim   = st.session_state.get("inversor_dict_dim", {})
-        _p_ac_nom_kW    = (
-            _inversor_dim.get("P_ac_nom_kW")
-            or ((_inversor_dim.get("P_ac_nom_W") or _inversor_dim.get("P_dc_max_W") or 0) / 1000)
-        )
+        # ── Costo de los inversores ───────────────────────────────────────────
+        _invs_ms_fin = list(st.session_state.get("multisup_inversores") or []) if _ms_activo else []
         if _costo_inv_usd > 0 and _p_ac_nom_kW and _p_ac_nom_kW > 0:
             _default_inv_kw = round(_costo_inv_usd / _p_ac_nom_kW, 1)
             _default_inv_kw = max(50.0, min(400.0, _default_inv_kw))
@@ -468,17 +494,53 @@ with col_cx1:
                 "Selecciona un inversor en Dimensionamiento para pre-llenar automáticamente."
             )
 
-        costo_inversor_usd_kw = st.number_input(
-            "Costo inversor (USD/kWp)",
-            min_value=50.0, max_value=400.0,
-            value=_default_inv_kw, step=10.0,
-            help=_help_inv,
-        )
-        if _costo_inv_usd > 0 and _p_ac_nom_kW and _p_ac_nom_kW > 0:
-            st.caption(
-                f"💡 Valor pre-llenado desde catálogo · "
-                f"USD {_costo_inv_usd:,.0f} / unidad · {_p_ac_nom_kW:.2f} kW AC"
+        if _invs_ms_fin:
+            # Multi-superficie: un precio por inversor REAL del diseño de
+            # 🗺️ Vista 3D (antes USD/kWp × kWp con el inversor de
+            # Dimensionamiento, fuera cual fuera el diseño). 26-sep-2026.
+            from calculos.campos_editor import sincronizar_con_fuente
+            st.caption("Costo por inversor del diseño de 🗺️ Vista 3D:")
+            _capex_inv_ms = 0.0
+            for _inv_f in _invs_ms_fin:
+                _id_f = str(_inv_f.get("inversor_id") or "?")
+                _nombre_f = nombre_catalogo_inversor(_inv_f, _inv_nombre_dim) or "sin ficha"
+                _costo_cat_f = costo_actual_inversor(_inv_f, _cat_inv_fin, _inv_nombre_dim)
+                _pac_f = (potencia_ac_kw_inversor(_inv_f)
+                          or potencia_ac_kw_inversor(_inv_f.get("ficha") or {}))
+                _clave_f = f"fin_costo_inv_ms_{_id_f}"
+                sincronizar_con_fuente(st.session_state, _clave_f, _costo_cat_f,
+                                       round(120.0 * _pac_f, 0) if _pac_f else 0.0)
+                _c_inv_f = st.number_input(
+                    f"Costo {_id_f} · {_nombre_f} (USD/unidad)",
+                    min_value=0.0, max_value=500000.0, step=50.0, key=_clave_f,
+                    help="Toma el precio de 🔌 Catálogo Inversores PDF y se actualiza cuando "
+                         "lo cambias allí. Puedes escribir otro precio para este proyecto.",
+                )
+                if _costo_cat_f is None:
+                    st.caption(
+                        "Sin precio en 🔌 Catálogo Inversores PDF: "
+                        + ("estimado USD 120 por kW AC; " if _pac_f else "")
+                        + "escribe el precio real."
+                    )
+                _capex_inv_ms += _c_inv_f
+            costo_inversor_usd_kw = _capex_inv_ms / p_stc if p_stc > 0 else 0.0
+            st.caption(f"Total inversores: **USD {_capex_inv_ms:,.0f}** "
+                       f"({costo_inversor_usd_kw:,.1f} USD/kWp de paneles)")
+        else:
+            costo_inversor_usd_kw = st.number_input(
+                "Costo inversor (USD/kWp)",
+                min_value=50.0, max_value=400.0,
+                value=_default_inv_kw, step=10.0,
+                help=_help_inv,
             )
+            if _costo_inv_usd > 0 and _p_ac_nom_kW and _p_ac_nom_kW > 0:
+                st.caption(
+                    f"💡 Valor pre-llenado desde catálogo · "
+                    f"USD {_costo_inv_usd:,.0f} / unidad · {_p_ac_nom_kW:.2f} kW AC"
+                )
+            elif _inversor_dim and not _p_ac_nom_kW:
+                st.caption("El inversor no tiene potencia AC nominal en el catálogo: no se puede "
+                           "pasar su precio a USD/kWp. Complétala en 🔌 Catálogo Inversores PDF.")
         costo_estructura_usd_kw = st.number_input(
             "Estructura, cableado, protecciones (USD/kWp)",
             min_value=50.0, max_value=500.0,
@@ -622,6 +684,14 @@ with col_cx2:
 
 # ── Sumar CAPEX de baterías dimensionadas en Página 11 ───────────────────────
 _capex_solar_usd = capex_total          # guardar para la comparativa con/sin batería
+if _capex_bat_vig["cambio"]:
+    st.info(
+        f"🔋 El precio de la batería cambió en el catálogo desde que la dimensionaste "
+        f"(USD {_capex_bat_vig['costo_unitario_anterior']:,.0f} → "
+        f"USD {_capex_bat_vig['costo_unitario_usd']:,.0f} por unidad). El CAPEX usa el "
+        f"precio vigente: {_capex_bat_vig['N_baterias']} × USD "
+        f"{_capex_bat_vig['costo_unitario_usd']:,.0f}."
+    )
 if _capex_bat_usd > 0:
     capex_total += _capex_bat_usd
     st.info(

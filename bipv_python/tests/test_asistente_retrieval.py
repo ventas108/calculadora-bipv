@@ -349,3 +349,11 @@ def test_buscar_precio_del_panel_en_financiero_no_se_actualiza():
         "potencia AC nominal",
     )
     assert "Costo USD" in seccion["texto"] and "Financiero lo muestra" in seccion["texto"]
+
+
+def test_buscar_costo_de_inversores_multisuperficie_en_financiero():
+    seccion = _seccion_recuperada(
+        "como calcula financiero el costo de los inversores del diseño de vista 3d",
+        "potencia AC nominal",
+    )
+    assert "un precio por cada inversor del diseño" in seccion["texto"]

@@ -90,6 +90,15 @@ eléctrico, y al cambiar de proyecto.
    se actualiza, y si el usuario escribe otro precio se respeta mientras el
    catálogo no cambie (`sincronizar_con_fuente`). La clave del campo es el
    nombre del panel, no su posición.
+12. En modo multi-superficie, el CAPEX de inversores es la suma del precio de
+   cada inversor del diseño de Vista 3D (`multisup_inversores`), tomado del
+   catálogo vigente (`costo_actual_inversor`) con la misma regla que los
+   paneles; sin precio, estimado USD 120/kW AC con aviso. En superficie única,
+   el precio vigente del inversor de Dimensionamiento; la potencia AC nunca se
+   sustituye por la potencia FV máxima (`potencia_ac_kw_inversor`).
+13. El CAPEX de baterías usa el precio vigente del catálogo (N × precio) y avisa
+   si cambió desde el dimensionamiento (`capex_baterias_vigente`); igual en
+   💼 Presupuesto.
 
 ## Pruebas requeridas
 

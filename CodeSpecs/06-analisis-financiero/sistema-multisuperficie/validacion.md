@@ -56,6 +56,11 @@ sobre `main` `d20d8807`.
       en `main` el SPR-E20-327 muestra 140 con 150 en el catálogo; con el cambio
       150; el usuario escribe 155 y se conserva al recargar; el catálogo pasa a
       160 y el campo muestra 160.
+- [x] Criterios 12 y 13: `test_costos_catalogo_financiero.py` en rojo con `main`
+      (no se puede recolectar) y en verde. AppTest de Financiero: el inversor del
+      diseño muestra USD 1.850 del catálogo y pasa a 2.000 al cambiarlo; el CAPEX
+      de inversores es 2.000 (antes USD 120/kWp × kWp); la batería dimensionada a
+      USD 1.000 con el catálogo en 1.200 avisa el cambio y suma 2 × 1.200 = 2.400.
 
 ## Resultado
 

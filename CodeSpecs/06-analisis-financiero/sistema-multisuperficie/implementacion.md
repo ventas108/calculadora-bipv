@@ -72,6 +72,15 @@ Desviaciones del diseño, con motivo:
   publicada) y `calculos/campos_editor.sincronizar_con_fuente`; en
   Financiero el campo ya no recibe `value=` y su clave es el nombre del panel.
 
+- **Inversores y baterías con precio vigente** (26-sep-2026): nuevo
+  `calculos/costos_catalogo.py` (`costo_actual_inversor`,
+  `nombre_catalogo_inversor`, `potencia_ac_kw_inversor`,
+  `capex_baterias_vigente`). Financiero: un campo por inversor del diseño
+  (`fin_costo_inv_ms_<ID>`) cuya suma es el CAPEX de inversores; superficie
+  única con precio vigente y sin el respaldo de la potencia FV máxima;
+  baterías con precio vigente y aviso. 💼 Presupuesto: inversor y baterías
+  con precio vigente.
+
 ## Archivos modificados
 
 - `bipv_python/calculos/sistema_multisuperficie.py` (nuevo)

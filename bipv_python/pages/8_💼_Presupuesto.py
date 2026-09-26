@@ -77,6 +77,17 @@ n_pan   = int(st.session_state.get("N_paneles_final", 0))
 p_stc   = float(st.session_state.get("P_stc_kW_sistema", 0.0))
 c_pan   = float(st.session_state.get("costo_modulo_usd", 0.0))
 c_inv   = float(st.session_state.get("costo_inversor_usd", 0.0))
+# Precio vigente del catálogo para el inversor de 📐 Dimensionamiento, no la
+# copia tomada al abrir esa página (26-sep-2026).
+try:
+    from calculos.costos_catalogo import costo_actual_inversor as _costo_inv_vig
+    from datos.catalogo_inversores import INVERSORES as _INV_INT_PPTO
+    from datos.catalogo_inversores_excel import cargar_catalogo_inversores as _cat_inv_ppto
+    c_inv = _costo_inv_vig({"origen_ficha": "proyecto"},
+                           {**_INV_INT_PPTO, **dict(_cat_inv_ppto() or {})},
+                           st.session_state.get("inversor_nombre_dim")) or c_inv
+except Exception:
+    pass
 # Área útil de paneles (agrivoltaica: factor de ocupación < 100%);
 # si no existe, cae al área bruta histórica.
 area_m2 = float(st.session_state.get("area_util_m2")
@@ -1061,6 +1072,20 @@ with t5:
 
     _bat = st.session_state.get("bateria_dim")
     _bat_nom = st.session_state.get("bateria_nombre", "Batería")
+    if _bat:
+        # Precio vigente del catálogo, no el de cuando se dimensionó (26-sep-2026).
+        from calculos.costos_catalogo import capex_baterias_vigente
+        try:
+            from datos.catalogo_baterias_excel import obtener_bateria
+            _costo_bat_cat = (obtener_bateria(_bat_nom) or {}).get("costo_usd")
+        except Exception:
+            _costo_bat_cat = None
+        _bat_vig = capex_baterias_vigente(_bat, _costo_bat_cat)
+        _bat = {**_bat, "costo_unitario_usd": _bat_vig["costo_unitario_usd"]}
+        if _bat_vig["cambio"]:
+            st.caption(f"🔋 Precio de la batería actualizado desde el catálogo: USD "
+                       f"{_bat_vig['costo_unitario_anterior']:,.0f} → "
+                       f"{_bat_vig['costo_unitario_usd']:,.0f} por unidad.")
     if _bat and _bat.get("N_baterias") and _bat.get("costo_unitario_usd"):
         cat_rows.append([f"Baterías — {_bat_nom}", "BAT-CAT",
             float(_bat["N_baterias"]), "un", float(_bat.get("costo_unitario_usd") or 0)])
