@@ -148,6 +148,12 @@ El estado se guarda con la publicación (`multisup_estado_electrico`) y se
 muestra en Financiero, Baterías y CO₂ donde ya aparece el banner
 multi-superficie.
 
+Cambio aprobado el 25-sep-2026 (Spec `06-analisis-financiero/sistema-multisuperficie`):
+con 🔴 el simplificado y el bypass siguen publicando (la energía se ve en
+Baterías y CO₂ con el aviso rojo), pero 💰 Financiero **no calcula** TIR, VPN,
+payback ni LCOE: explica que el sistema no se puede construir y pide corregir
+el diseño y volver a publicar.
+
 ## Errores posibles
 
 - Superficie activa sin grupos ni campos antiguos: 🔴 «sin diseño eléctrico».

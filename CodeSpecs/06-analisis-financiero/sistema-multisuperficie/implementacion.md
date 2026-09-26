@@ -48,6 +48,15 @@
   la restauración no convierte un `p_shade` ausente. Es un vacío anterior a
   esta Spec (persistencia firmada), no una regresión.
 
+- Aprobado tras las pruebas D6 y D7 (pensado para quien está aprendiendo):
+  - `aviso_retiro_para_consumidores` (publicación): Financiero, Baterías y
+    CO₂ dicen que la energía multi-superficie se retiró, por qué y en qué
+    superficie, y que sus valores ya no son del diseño de Vista 3D.
+  - `problemas_financieros` (sistema): además de sistema incompleto y
+    publicación anterior, un diseño eléctrico 🔴 detiene Financiero con una
+    explicación sencilla. Baterías y CO₂ siguen mostrando la energía con el
+    aviso rojo.
+
 Desviaciones del diseño, con motivo:
 
 - **Las páginas se prueban por el código fuente**, como el resto de pruebas de

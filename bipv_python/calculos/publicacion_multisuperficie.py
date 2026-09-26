@@ -292,3 +292,24 @@ def aviso_estado_electrico(session_state: Mapping[str, Any]) -> tuple[str, str] 
         return None
     nivel = {"rojo": "error", "amarillo": "warning"}.get(estado.get("estado"), "caption")
     return nivel, f"Energía publicada con {estado['texto']}"
+
+
+def aviso_retiro_para_consumidores(session_state: Mapping[str, Any]) -> str | None:
+    """Aviso para 💰 Financiero, 🔋 Baterías y 🌿 CO₂ cuando la energía
+    multi-superficie se retiró por un cambio (H-D6, 25-sep-2026).
+
+    Sin él, quien está aprendiendo ve valores de superficie única sin saber
+    que su diseño de 🗺️ Vista 3D ya no se está usando.
+    """
+    datos = session_state.get(CLAVE_MOTIVO_RETIRO)
+    if session_state.get("multisup_activo") or not isinstance(datos, Mapping):
+        return None
+    donde = ", ".join(f"«{n}»" for n in datos.get("superficies") or [])
+    return (
+        "ℹ️ **La energía multi-superficie de 🗺️ Vista 3D se retiró** porque "
+        f"{datos.get('motivo', 'cambió el diseño')}" + (f" de {donde}" if donde else "")
+        + ". Los valores de esta página **NO son de tu diseño de Vista 3D**: vienen del "
+        "sistema de superficie única (📐 Dimensionamiento) o se escriben a mano. Para "
+        "usar tu diseño, vuelve a publicarlo en 🗺️ Vista 3D › ⚙️ Superficies BIPV › "
+        "🔗 Integrar al análisis financiero."
+    )

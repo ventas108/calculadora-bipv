@@ -80,6 +80,11 @@ eléctrico, y al cambiar de proyecto.
    motivo y las superficies quedan visibles en «🔗 Integrar al análisis
    financiero» hasta volver a publicar (`_multisup_retiro_motivo`,
    `aviso_energia_retirada`); desactivar a mano no deja el aviso.
+9. Con `multisup_estado_electrico` 🔴, Financiero no calcula
+   (`problemas_financieros`) y explica que el sistema no se puede construir.
+10. Si la energía se retiró por un cambio, Financiero, Baterías y CO₂ muestran
+   el aviso y que sus valores no son del diseño de Vista 3D
+   (`aviso_retiro_para_consumidores`).
 
 ## Pruebas requeridas
 

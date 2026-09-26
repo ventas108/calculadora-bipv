@@ -44,7 +44,13 @@ sobre `main` `d20d8807`.
       escribe el archivo y `restaurar_multisuperficie` lo carga con los
       grupos G1/G2 y `multisup_sistema` (34 módulos).
 - [x] Prueba en producción: D5 y D6 aprobados (25-sep-2026).
-- [ ] Prueba en producción: D8 con la corrección.
+- [x] H-D6 y regla 🔴 (humo con `AppTest`): con el estado publicado en 🔴,
+      Financiero muestra «🔴 No se calcula el análisis financiero… describe un
+      sistema que no se puede construir…» y ninguna métrica; con la energía
+      retirada, Financiero, Baterías y CO₂ muestran «ℹ️ La energía
+      multi-superficie de 🗺️ Vista 3D se retiró porque cambió el diseño
+      eléctrico de «Fachada principal»…».
+- [ ] Prueba en producción: D6, D7 y D8 con estas correcciones.
 
 ## Resultado
 

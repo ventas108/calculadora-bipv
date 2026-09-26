@@ -115,7 +115,8 @@ Reglas de consumo:
 - Diseño eléctrico (fase A2): con 🔴 el modo físico no publica
 	(`aplicar_proyecto_a_session_state` lanza `ValueError`); el simplificado y
 	el bypass publican con `multisup_estado_electrico`, y Vista 3D, Financiero,
-	Baterías y CO₂ lo muestran con `aviso_estado_electrico`. Cambiar grupos,
+	Baterías y CO₂ lo muestran con `aviso_estado_electrico`. Con 🔴,
+	Financiero no calcula (`problemas_financieros`). Cambiar grupos,
 	inversor o ficha de una superficie existente retira la publicación y los
 	resultados de bypass, MPPT y físico (`invalidar_por_cambio_electrico`).
 - Hasta la fase A3, la sección 6 deja fuera, con aviso, las superficies con
@@ -124,8 +125,9 @@ Reglas de consumo:
 	con `multisup_activo` no exigen `produccion_ok` y toman energía, kWp, módulos
 	y reparto mensual solo de la publicación (`estado_sistema_publicado`); nunca
 	los mezclan con `P_stc_kW_sistema`/`N_paneles_final` de superficie única.
-	Sistema incompleto o publicación sin `multisup_sistema` ⇒ 🔴 y Financiero no
-	calcula.
+	Sistema incompleto, publicación sin `multisup_sistema` o diseño eléctrico 🔴
+	⇒ 🔴 y Financiero no calcula. Si la energía se retiró por un cambio,
+	Financiero, Baterías y CO₂ lo dicen (`aviso_retiro_para_consumidores`).
 - La sección «Strings de distinta orientación en un mismo MPPT» es informativa y
 	no cambia la energía publicada.
 

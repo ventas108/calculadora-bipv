@@ -73,15 +73,23 @@ _n_sups        = len(_desglose_ms)
 # multi-superficie publicada, energía, potencia y módulos salen del MISMO
 # diseño de 🗺️ Vista 3D; no se exige 📊 Producción (que simula otro sistema,
 # el de superficie única) ni se mezcla con él.
-from calculos.sistema_multisuperficie import estado_sistema_publicado
+from calculos.publicacion_multisuperficie import aviso_retiro_para_consumidores
+from calculos.sistema_multisuperficie import estado_sistema_publicado, problemas_financieros
 _est_ms = estado_sistema_publicado(st.session_state)
 _ms_activo = bool(_multisup_ok and _e_ac_multisup > 0)
 _sistema_ms = _est_ms["sistema"] if _ms_activo else None
-if _ms_activo and _est_ms["problemas"]:
+# H-D6: si la energía multi-superficie se retiró, decirlo antes de mostrar
+# valores de superficie única que no son del diseño de Vista 3D.
+_aviso_retiro_fin = aviso_retiro_para_consumidores(st.session_state)
+if _aviso_retiro_fin:
+    st.warning(_aviso_retiro_fin)
+# Sistema incompleto, publicación anterior o diseño eléctrico 🔴: no se
+# calcula (un TIR de un sistema imposible o mezclado no es real).
+_problemas_fin = problemas_financieros(st.session_state) if _ms_activo else []
+if _problemas_fin:
     st.error(
         "🔴 **No se calcula el análisis financiero con el sistema multi-superficie.** "
-        + " ".join(_est_ms["problemas"])
-        + " Así se evita calcular TIR y payback con la energía de un sistema y el costo de otro."
+        + " ".join(_problemas_fin)
     )
     st.stop()
 if _ms_activo:

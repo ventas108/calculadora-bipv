@@ -175,3 +175,27 @@ def df_mensual_multisuperficie(sistema: Mapping[str, Any]) -> pd.DataFrame:
 
     return pd.DataFrame({"Mes": list(MESES_ES)[:12],
                          "E_ac (kWh)": [float(v) for v in sistema["mensual_kWh"]]})
+
+
+def problemas_financieros(session_state: Mapping[str, Any]) -> list[str]:
+    """Motivos para NO calcular TIR, VPN, payback ni LCOE con el sistema
+    multi-superficie publicado (25-sep-2026).
+
+    Además de los de ``estado_sistema_publicado``, un diseño eléctrico 🔴
+    describe un sistema que no se puede construir (por ejemplo, un voltaje
+    que daña el inversor): su TIR no es real. Sin estado registrado
+    (publicación anterior a la fase A2) no se inventa un bloqueo.
+    """
+    problemas = list(estado_sistema_publicado(session_state)["problemas"])
+    if not session_state.get("multisup_activo"):
+        return problemas
+    estado = session_state.get("multisup_estado_electrico")
+    if isinstance(estado, Mapping) and estado.get("estado") == "rojo":
+        problemas.append(
+            f"El diseño eléctrico publicado tiene fallas 🔴 ({int(estado.get('n_bloqueos') or 0)}): "
+            "describe un sistema que no se puede construir tal como está (por ejemplo, un "
+            "voltaje que dañaría el inversor), así que su TIR, VPN y payback no serían "
+            "reales. Revisa los mensajes 🔴 en 🗺️ Vista 3D › ⚙️ Superficies BIPV › "
+            "⚡ Diseño eléctrico, corrígelos y vuelve a publicar la energía."
+        )
+    return problemas
