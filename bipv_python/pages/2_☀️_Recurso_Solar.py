@@ -531,9 +531,11 @@ if not st.session_state.get("recurso_solar_ok"):
             "_solar_az_guardado":     azimuth,
             "_solar_albedo_guardado": albedo,
         })
+        # La recarga de abajo descarta todo lo que se escriba aquí (D8,
+        # 26-sep-2026): los mensajes se dejan en session_state y los muestra
+        # la rama «resultado previo» en la ejecución siguiente.
         _intentar_restaurar_multisuperficie(_tmy_r)
-        _mostrar_resultado_restauracion_multisuperficie()
-        st.info(
+        st.session_state["_solar_cache_msg"] = (
             f"📂 **Recurso solar restaurado desde caché local** — "
             f"POA: **{_poa_anual_r:,.0f} kWh/m²/año** · "
             f"GHI: **{_ghi_anual_r:,.0f} kWh/m²/año** · "
@@ -805,6 +807,12 @@ elif st.session_state.get("recurso_solar_ok") and st.session_state.get("tmy_ciud
     ghi_prev  = st.session_state.get("ghi_anual_kWh_m2", 0)
     tilt_prev = st.session_state.get("tilt_fachada", tipo_cfg["tilt_def"])
     az_prev   = st.session_state.get("orientacion_label", "—")
+
+    # Mensajes dejados por el auto-restore antes de recargar la página.
+    _cache_msg = st.session_state.pop("_solar_cache_msg", None)
+    if _cache_msg:
+        st.info(_cache_msg)
+    _mostrar_resultado_restauracion_multisuperficie()
 
     st.success(
         f"✅ TMY cargado para **{ciudad}**  |  "

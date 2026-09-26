@@ -27,6 +27,7 @@
 - [x] Cargar proyecto valida antes de publicar cualquier estado y difiere la restauración física hasta disponer de TMY.
 - [ ] Dos superficies con sombra, POA e inversores válidos restauran completas en prueba manual real.
 - [x] Se conserva el comportamiento opt-in del modo físico.
+- [x] El aviso «📂 Estado multi-superficie restaurado con TMY y firmas verificadas» se ve al abrir ☀️ Recurso Solar tras cargar un proyecto con TMY en caché. Antes lo borraba la recarga automática de la página (prueba D8 en producción, 26-sep-2026). Cubierto por `test_recurso_solar_mensaje_restauracion.py` y una prueba de humo con AppTest.
 - [x] Comparación global sigue siendo exploratoria y su adopción continúa bloqueada en `multisup_activo=True`.
 
 ## Validación operativa manual

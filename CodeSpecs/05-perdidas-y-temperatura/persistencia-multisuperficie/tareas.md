@@ -17,5 +17,6 @@
 - [x] Añadir contrato estático de consumidores: Finanzas, CO₂, Baterías, Mismatch, Reporte, Diagrama Unifilar y Comparador de Inversores respetan `multisup_activo` y fallback.
 - [x] Verificar que el modelo simplificado no cambia cuando `multisup_activo` es falso mediante regresión existente.
 - [x] Actualizar contratos, mapa de dependencias, registro de decisiones y base del Asistente.
+- [x] Mostrar el resultado de la restauración después de la recarga automática de ☀️ Recurso Solar (auto-restore desde caché): los mensajes se guardan en `session_state` y los muestra la rama «resultado previo» (D8, 26-sep-2026).
 - [x] Ejecutar revisión solo lectura de Copilot y revisión de Claude según su Spec.
 - [ ] Crear rama, validar, publicar, fusionar a `main` y desplegar esta unidad.
