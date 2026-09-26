@@ -38,7 +38,13 @@ sobre `main` `d20d8807`.
       financiero» «ℹ️ La energía publicada en Financiero se retiró porque
       cambió el diseño eléctrico de «Fachada principal»…»; sigue en el rerun
       siguiente y desaparece al volver a publicar.
-- [ ] Prueba en producción: repetir D5 y D6 de la fase A2.
+- [x] Guardar sin sombra 3D (hallado en D8): la prueba nueva reproduce el
+      error de producción en rojo y pasa con la corrección; humo con
+      `AppTest`: 🏠 Proyecto › 💾 Guardar con el escenario D5 sin sombra
+      escribe el archivo y `restaurar_multisuperficie` lo carga con los
+      grupos G1/G2 y `multisup_sistema` (34 módulos).
+- [x] Prueba en producción: D5 y D6 aprobados (25-sep-2026).
+- [ ] Prueba en producción: D8 con la corrección.
 
 ## Resultado
 

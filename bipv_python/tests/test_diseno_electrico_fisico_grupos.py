@@ -328,3 +328,41 @@ def test_fisico_publica_el_sistema_con_sus_grupos(tmy):
     assert sistema["n_modulos"] == 21 and sistema["completo"]
     assert sum(sistema["mensual_kWh"]) == pytest.approx(
         sum(f["e_ac_kWh"] for f in estado["multisup_desglose"]), abs=0.5)
+
+
+# ── Guardar sin sombra 3D (hallado en la prueba D8, 25-sep-2026) ────────────
+def _estado_simplificado_sin_sombra(tmy):
+    estado = _estado_guardable(tmy)
+    for sup in estado["superficies_bipv"]:
+        for campo in ("p_shade", "firma_sombra", "estado_sombra", "cobertura_sombra"):
+            sup.pop(campo, None)
+    estado["multisup_origen"] = "simplificado"
+    return estado
+
+
+def test_guardar_y_cargar_modo_simplificado_sin_sombra_3d(tmy):
+    # El simplificado y el bypass con CSV no necesitan la sombra 3D: el
+    # proyecto se debe poder guardar igual (antes: «faltan: p_shade, firma_sombra»).
+    from calculos.persistencia_multisuperficie import (
+        construir_payload_multisuperficie, restaurar_multisuperficie,
+    )
+    from calculos.publicacion_multisuperficie import resultados_multisuperficie_a_guardar
+
+    estado = _estado_simplificado_sin_sombra(tmy)
+    payload = construir_payload_multisuperficie(
+        estado, {"session_state": resultados_multisuperficie_a_guardar(estado)})
+    destino = {}
+    assert restaurar_multisuperficie(payload, destino).ok
+    sup = destino["superficies_bipv"][0]
+    assert "p_shade" not in sup and [g["gid"] for g in sup["grupos"]] == ["G1", "G2"]
+
+
+def test_guardar_modo_fisico_sin_sombra_se_rechaza(tmy):
+    from calculos.persistencia_multisuperficie import (
+        PayloadMultisuperficieError, construir_payload_multisuperficie,
+    )
+
+    estado = _estado_simplificado_sin_sombra(tmy)
+    with pytest.raises(PayloadMultisuperficieError, match="modo físico necesita la sombra"):
+        construir_payload_multisuperficie(
+            estado, {"session_state": {"multisup_origen": "fisico"}, })
