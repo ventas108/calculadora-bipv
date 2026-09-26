@@ -680,7 +680,9 @@ def invalidar_por_cambio_electrico(session_state) -> list[str]:
     quitar, desactivar o renombrar superficies no cuenta. La POA y la sombra
     no dependen del diseño eléctrico y se conservan."""
     from calculos.panel_superficie import KEYS_RESULTADOS_PANEL
-    from calculos.publicacion_multisuperficie import retirar_energia_multisuperficie
+    from calculos.publicacion_multisuperficie import (
+        registrar_motivo_retiro, retirar_energia_multisuperficie,
+    )
 
     actual = firma_diseno_electrico(
         list(session_state.get("superficies_bipv") or []),
@@ -690,9 +692,11 @@ def invalidar_por_cambio_electrico(session_state) -> list[str]:
     session_state[CLAVE_FIRMA_ELECTRICA] = actual
     if not isinstance(anterior, Mapping):
         return []
-    if all(anterior[uid] == actual[uid] for uid in anterior.keys() & actual.keys()):
+    cambiados = {uid for uid in anterior.keys() & actual.keys() if anterior[uid] != actual[uid]}
+    if not cambiados:
         return []
     retiradas = retirar_energia_multisuperficie(session_state)
+    registrar_motivo_retiro(session_state, retiradas, "cambió el diseño eléctrico", cambiados)
     for clave in KEYS_RESULTADOS_PANEL:
         if clave in session_state:
             session_state.pop(clave, None)

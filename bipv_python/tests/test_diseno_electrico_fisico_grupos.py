@@ -296,3 +296,35 @@ def test_fisico_no_publica_con_strings_de_distinto_largo_en_un_mppt(tmy):
     with pytest.raises(ValueError, match="distinto largo"):
         aplicar_proyecto_a_session_state(proy, distinto)
     assert "multisup_activo" not in distinto
+
+
+def test_criterio_7_guardar_y_cargar_conserva_el_sistema(tmy):
+    # Spec 06-analisis-financiero/sistema-multisuperficie (H-D5).
+    from calculos.persistencia_multisuperficie import (
+        construir_payload_multisuperficie, restaurar_multisuperficie,
+    )
+    from calculos.publicacion_multisuperficie import resultados_multisuperficie_a_guardar
+
+    estado = _estado_guardable(tmy)
+    sistema = {"P_dc_stc_kW": 6.368, "n_modulos": 34, "completo": True,
+               "superficies_sin_grupos": [], "reparto_mensual": "poa_superficie",
+               "por_panel": [{"panel": "X", "modulos": 34, "P_dc_stc_kW": 6.368, "costo_usd": None}],
+               "mensual_kWh": [629.3] * 12}
+    estado.update({"multisup_sistema": sistema, "multisup_origen": "simplificado"})
+    payload = construir_payload_multisuperficie(
+        estado, {"session_state": resultados_multisuperficie_a_guardar(estado)})
+    destino = {}
+    assert restaurar_multisuperficie(payload, destino).ok
+    assert destino["multisup_sistema"]["n_modulos"] == 34
+    assert destino["multisup_sistema"]["mensual_kWh"] == [629.3] * 12
+
+
+def test_fisico_publica_el_sistema_con_sus_grupos(tmy):
+    # H-D5: el origen físico también publica potencia, módulos y reparto mensual.
+    estado = _estado_dos_grupos(tmy)
+    proy = construir_y_recalcular_proyecto_fisico(estado, tmy, _LAT, _LON, _ALT_M)
+    aplicar_proyecto_a_session_state(proy, estado)
+    sistema = estado["multisup_sistema"]
+    assert sistema["n_modulos"] == 21 and sistema["completo"]
+    assert sum(sistema["mensual_kWh"]) == pytest.approx(
+        sum(f["e_ac_kWh"] for f in estado["multisup_desglose"]), abs=0.5)

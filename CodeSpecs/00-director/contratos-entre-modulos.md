@@ -91,7 +91,8 @@ Salida:
 	`area_total_multisup`, `poa_df_multisup`, `multisup_activo` y
 	`multisup_origen` (`simplificado`, `bypass_csv` o `fisico`) y
 	`multisup_estado_electrico` (`{estado, n_bloqueos, n_avisos, texto}`, fase
-	A2); en origen físico, además `_multisup_proyecto_fisico` y
+	A2) y `multisup_sistema` (potencia, módulos por panel, reparto mensual y
+	`completo`; Spec `06-analisis-financiero/sistema-multisuperficie`); en origen físico, además `_multisup_proyecto_fisico` y
 	`multisup_perdida_bus_kWh`.
 
 Reglas de consumo:
@@ -119,6 +120,12 @@ Reglas de consumo:
 	resultados de bypass, MPPT y físico (`invalidar_por_cambio_electrico`).
 - Hasta la fase A3, la sección 6 deja fuera, con aviso, las superficies con
 	varios grupos.
+- Financiero, Baterías y CO₂ (Spec `06-analisis-financiero/sistema-multisuperficie`):
+	con `multisup_activo` no exigen `produccion_ok` y toman energía, kWp, módulos
+	y reparto mensual solo de la publicación (`estado_sistema_publicado`); nunca
+	los mezclan con `P_stc_kW_sistema`/`N_paneles_final` de superficie única.
+	Sistema incompleto o publicación sin `multisup_sistema` ⇒ 🔴 y Financiero no
+	calcula.
 - La sección «Strings de distinta orientación en un mismo MPPT» es informativa y
 	no cambia la energía publicada.
 

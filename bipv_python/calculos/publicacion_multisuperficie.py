@@ -42,9 +42,18 @@ CLAVES_ENERGIA = (
     # Spec 03/diseno-electrico-multisuperficie (fase A2): estado del diseño
     # eléctrico con el que se publicó (resumen_estado_electrico).
     "multisup_estado_electrico",
+    # Spec 06-analisis-financiero/sistema-multisuperficie (H-D5): potencia,
+    # módulos por panel y reparto mensual del MISMO diseño publicado.
+    "multisup_sistema",
 )
 CLAVES_SOLO_FISICO = ("_multisup_proyecto_fisico", "multisup_perdida_bus_kWh")
 CLAVES_PUBLICACION = CLAVES_ENERGIA + CLAVES_SOLO_FISICO
+
+# Motivo por el que se retiró la energía publicada (cambio de panel o de
+# diseño eléctrico). Queda visible en «🔗 Integrar al análisis financiero»
+# hasta volver a publicar (25-sep-2026): un mensaje de un solo rerun se
+# pierde fácilmente.
+CLAVE_MOTIVO_RETIRO = "_multisup_retiro_motivo"
 
 TOLERANCIA_ENERGIA_KWH = 0.1
 TOLERANCIA_AREA_M2 = 0.1
@@ -116,6 +125,7 @@ def preparar_publicacion(
     area_total: float,
     proyecto_fisico: Mapping[str, Any] | None = None,
     estado_electrico: Mapping[str, Any] | None = None,
+    sistema: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Valida los invariantes y retorna las claves a publicar, sin escribir."""
     if origen not in ORIGENES:
@@ -142,6 +152,10 @@ def preparar_publicacion(
     }
     if estado_electrico is not None:
         candidato["multisup_estado_electrico"] = dict(estado_electrico)
+    if sistema is not None:
+        from calculos.sistema_multisuperficie import validar_sistema
+
+        candidato["multisup_sistema"] = validar_sistema(sistema, suma_energia)
     if origen == ORIGEN_FISICO:
         if not isinstance(proyecto_fisico, Mapping):
             raise ValueError("El origen 'fisico' exige el proyecto físico calculado.")
@@ -171,6 +185,7 @@ def publicar_energia_multisuperficie(
     proyecto_fisico: Mapping[str, Any] | None = None,
     confirmar_reemplazo: bool = False,
     estado_electrico: Mapping[str, Any] | None = None,
+    sistema: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Publica la energía multi-superficie de forma atómica.
 
@@ -183,14 +198,16 @@ def publicar_energia_multisuperficie(
         origen=origen, e_ac_total=e_ac_total, desglose=desglose,
         poa_ponderada=poa_ponderada, area_total=area_total,
         proyecto_fisico=proyecto_fisico, estado_electrico=estado_electrico,
+        sistema=sistema,
     )
     vigente = origen_vigente(session_state)
     if vigente is not None and vigente != origen and not confirmar_reemplazo:
         return {"publicado": False, "requiere_confirmacion": True, "origen_vigente": vigente}
-    for clave in CLAVES_SOLO_FISICO + ("multisup_estado_electrico",):
+    for clave in CLAVES_SOLO_FISICO + ("multisup_estado_electrico", "multisup_sistema"):
         if clave not in candidato:
             session_state.pop(clave, None)
     session_state.update(candidato)
+    session_state.pop(CLAVE_MOTIVO_RETIRO, None)
     return {"publicado": True, "requiere_confirmacion": False, "origen_vigente": origen}
 
 
@@ -199,7 +216,39 @@ def retirar_energia_multisuperficie(session_state: MutableMapping[str, Any]) -> 
     retiradas = [c for c in CLAVES_PUBLICACION if c in session_state]
     for clave in retiradas:
         session_state.pop(clave, None)
+    session_state.pop(CLAVE_MOTIVO_RETIRO, None)
     return retiradas
+
+
+def registrar_motivo_retiro(
+    session_state: MutableMapping[str, Any],
+    retiradas: list[str],
+    motivo: str,
+    uids_cambiados: set[str],
+) -> None:
+    """Deja el aviso fijo si se retiró energía publicada. ``motivo`` es
+    «cambió el diseño eléctrico» o «cambió el panel»."""
+    if "E_ac_anual_kWh_multisup" not in retiradas:
+        return
+    nombres = [
+        str(s.get("nombre")) for s in (session_state.get("superficies_bipv") or [])
+        if str(s.get("uid", s.get("nombre"))) in uids_cambiados
+    ]
+    session_state[CLAVE_MOTIVO_RETIRO] = {"motivo": motivo, "superficies": nombres}
+
+
+def aviso_energia_retirada(session_state: Mapping[str, Any]) -> str | None:
+    """Texto del aviso fijo, o ``None`` si hay energía publicada o no se retiró."""
+    datos = session_state.get(CLAVE_MOTIVO_RETIRO)
+    if session_state.get("multisup_activo") or not isinstance(datos, Mapping):
+        return None
+    donde = ", ".join(f"«{n}»" for n in datos.get("superficies") or [])
+    return (
+        f"ℹ️ La energía publicada en Financiero se retiró porque {datos.get('motivo', 'cambió el diseño')}"
+        + (f" de {donde}" if donde else "")
+        + ". Financiero, Baterías y CO₂ ya no la usan. Vuelve a publicarla con el diseño actual "
+        "(«🔗 Usar sistema multi-superficie en Financiero», el bypass o el modo físico)."
+    )
 
 
 def resultados_multisuperficie_a_guardar(session_state: Mapping[str, Any]) -> dict[str, Any]:
@@ -214,7 +263,7 @@ def resultados_multisuperficie_a_guardar(session_state: Mapping[str, Any]) -> di
         for clave in (
             "E_ac_anual_kWh_multisup", "area_total_multisup",
             "multisup_desglose", "poa_df_multisup", "multisup_origen",
-            "multisup_estado_electrico",
+            "multisup_estado_electrico", "multisup_sistema",
         )
         if clave in session_state
     }

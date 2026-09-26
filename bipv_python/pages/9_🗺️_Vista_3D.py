@@ -921,8 +921,8 @@ with tab_solar:
         from calculos.sombras_3d import calcular_fs_horario_por_superficie
         from calculos.adaptador_multisuperficie import aplicar_proyecto_a_session_state
         from calculos.publicacion_multisuperficie import (
-            ETIQUETA_ORIGEN, ORIGEN_DESCONOCIDO, ORIGEN_FISICO, aviso_estado_electrico,
-            origen_vigente,
+            ETIQUETA_ORIGEN, ORIGEN_DESCONOCIDO, ORIGEN_FISICO, aviso_energia_retirada,
+            aviso_estado_electrico, origen_vigente,
             publicar_energia_multisuperficie, retirar_energia_multisuperficie,
         )
         from calculos.inversores_multisuperficie import validar_inversores_y_asignaciones
@@ -933,6 +933,7 @@ with tab_solar:
             preservar_o_invalidar_campos_fisicos,
             resumen_estado_fisico_superficies,
         )
+        from calculos.sistema_multisuperficie import sistema_desde_estado
         from calculos.strings_superficie import (
             ETIQUETA_ORIGEN_STRINGS, etiqueta_panel_proyecto, formato_strings,
             perdida_ponderada_por_modulos, strings_grupos_superficie, strings_superficie,
@@ -1882,7 +1883,8 @@ with tab_solar:
 
             # ── Integrar al análisis financiero ──────────────────────────────
             _origen_pub = origen_vigente(st.session_state)
-            if _poa_ss or _origen_pub:
+            _aviso_retiro = aviso_energia_retirada(st.session_state)
+            if _poa_ss or _origen_pub or _aviso_retiro:
                 st.divider()
                 st.markdown("##### 🔗 Integrar al análisis financiero")
                 st.caption(
@@ -1893,6 +1895,9 @@ with tab_solar:
 
                 _ci1, _ci2 = st.columns([2, 3])
                 _etas_int, _, _err_panel_int = eficiencias_superficies_estado(st.session_state)
+                # Aviso fijo hasta volver a publicar (el de 🔌 Inversores dura un rerun).
+                if _aviso_retiro:
+                    _ci2.info(_aviso_retiro)
 
                 _btn_integrar = _ci1.button(
                     "🔗 Usar sistema multi-superficie en Financiero",
@@ -1967,6 +1972,8 @@ with tab_solar:
                             confirmar_reemplazo=_confirmar_simplificado,
                             estado_electrico=resumen_estado_electrico(
                                 diagnostico_electrico_estado(st.session_state)),
+                            sistema=sistema_desde_estado(
+                                st.session_state, _res_int["desglose"], _poa_ss),
                         )
                     except ValueError as _error_pub:
                         st.error(f"❌ No se publicó la energía multi-superficie: {_error_pub}")
@@ -2754,6 +2761,8 @@ with tab_solar:
                                     confirmar_reemplazo=_confirmar_bp,
                                     estado_electrico=resumen_estado_electrico(
                                         diagnostico_electrico_estado(st.session_state)),
+                                    sistema=sistema_desde_estado(
+                                        st.session_state, _desglose_bp, _poa_p),
                                 )
                             except ValueError as _error_pub:
                                 st.error(f"❌ No se publicó el bypass por superficie: {_error_pub}")

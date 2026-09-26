@@ -81,6 +81,17 @@ else:
 
 p_stc   = st.session_state.get("P_stc_kW_sistema", 0.0)
 n_pan   = st.session_state.get("N_paneles_final", 0)
+# Spec 06-analisis-financiero/sistema-multisuperficie (H-D5): kWp y módulos
+# del mismo diseño multi-superficie que la energía, nunca los de superficie única.
+if _multisup_ok and _e_ac_multisup > 0:
+    from calculos.sistema_multisuperficie import estado_sistema_publicado
+    _est_ms_co2 = estado_sistema_publicado(st.session_state)
+    if _est_ms_co2["problemas"]:
+        st.error("🔴 " + " ".join(_est_ms_co2["problemas"]))
+        p_stc, n_pan = 0.0, 0
+    else:
+        p_stc = float(_est_ms_co2["sistema"]["P_dc_stc_kW"])
+        n_pan = int(_est_ms_co2["sistema"]["n_modulos"])
 ciudad  = st.session_state.get("tmy_ciudad", "—")
 n_anos  = 25     # vida útil estándar BIPV — IEC 61730
 

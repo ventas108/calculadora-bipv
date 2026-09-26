@@ -49,6 +49,7 @@ _CLAVES_EXCLUIR: set[str] = {
     "poa_df_multisup", "_multisup_payload_pendiente",
     "_multisup_proyecto_fisico", "multisup_origen", "multisup_perdida_bus_kWh",
     "multisup_estado_electrico",
+    "multisup_sistema",
     # POA por superficie firmada (DataFrames por uid): se recalcula en Vista 3D.
     "poa_superficies", "poa_superficies_errores", "poa_superficies_ok",
 }
@@ -352,13 +353,14 @@ def cargar_proyecto(slug: str) -> str:
         "poa_df_multisup", "_multisup_payload_pendiente",
         "_multisup_proyecto_fisico", "multisup_origen", "multisup_perdida_bus_kWh",
         "multisup_estado_electrico",
+        "multisup_sistema",
         "_multisup_publicacion_pendiente",
         # POA por superficie del proyecto ANTERIOR: su firma de sitio la
         # dejaría no vigente, pero no debe sobrevivir al cambio de proyecto.
         "poa_superficies", "poa_superficies_errores", "poa_superficies_ok",
         "_multisup_restaurado", "_multisup_restauracion_error",
         # Huella de los paneles por superficie del proyecto ANTERIOR.
-        "_multisup_firma_paneles", "_multisup_firma_electrica",
+        "_multisup_firma_paneles", "_multisup_firma_electrica", "_multisup_retiro_motivo",
     }
     for k in _claves_reset:
         st.session_state.pop(k, None)

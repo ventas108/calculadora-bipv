@@ -397,6 +397,7 @@ def restaurar_multisuperficie(
             "E_ac_anual_kWh_multisup", "area_total_multisup",
             "multisup_desglose", "poa_df_multisup",
             "multisup_origen", "multisup_perdida_bus_kWh", "multisup_estado_electrico",
+            "multisup_sistema",
         }
         resultados_permitidos = {
             str(clave): (

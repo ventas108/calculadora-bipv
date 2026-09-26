@@ -82,6 +82,20 @@ c_inv   = float(st.session_state.get("costo_inversor_usd", 0.0))
 area_m2 = float(st.session_state.get("area_util_m2")
                 or st.session_state.get("area_fachada_m2", 0.0))
 
+# Spec 06-analisis-financiero/sistema-multisuperficie: el Presupuesto todavía
+# se arma con el sistema de superficie única (hallazgo H3, Spec propia).
+if st.session_state.get("multisup_activo"):
+    _sis_ms_pp = st.session_state.get("multisup_sistema") or {}
+    st.warning(
+        "🟡 **Hay un sistema multi-superficie publicado en 🗺️ Vista 3D"
+        + (f" ({_sis_ms_pp['n_modulos']} módulos, {_sis_ms_pp['P_dc_stc_kW']:.2f} kWp)"
+           if _sis_ms_pp.get("completo") else "")
+        + ", pero este Presupuesto se arma con el sistema de superficie única** de "
+        "📐 Dimensionamiento/📊 Producción. 💰 Financiero usa por defecto el CAPEX "
+        "paramétrico del sistema multi-superficie; vincula este Presupuesto allá solo si lo "
+        "ajustaste a mano a ese sistema (paneles, inversor y cajas combinadoras)."
+    )
+
 if n_pan > 0:
     st.info(
         f"📐 Dimensionamiento: **{n_pan} módulos** · **{p_stc:.2f} kWp** · "

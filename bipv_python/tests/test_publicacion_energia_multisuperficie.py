@@ -183,9 +183,10 @@ def test_retirar_borra_todas_las_claves_de_la_publicacion():
     estado = {"bypass_multisup_resultados": [1]}
     aplicar_proyecto_a_session_state(_proyecto(), estado)
     retiradas = retirar_energia_multisuperficie(estado)
-    # multisup_estado_electrico es opcional (Spec 03/diseno-electrico-multisuperficie):
-    # sin superficies en la sesión no hay diagnóstico que publicar.
-    assert set(retiradas) == set(CLAVES_PUBLICACION) - {"multisup_estado_electrico"}
+    # multisup_estado_electrico (Spec 03/diseno-electrico-multisuperficie) y
+    # multisup_sistema (Spec 06/sistema-multisuperficie) son opcionales: sin
+    # superficies en la sesión no hay diagnóstico ni sistema que publicar.
+    assert set(retiradas) == set(CLAVES_PUBLICACION) - {"multisup_estado_electrico", "multisup_sistema"}
     assert estado == {"bypass_multisup_resultados": [1]}
     assert retirar_energia_multisuperficie(estado) == []
 
