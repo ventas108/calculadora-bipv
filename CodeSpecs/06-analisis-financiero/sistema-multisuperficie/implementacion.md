@@ -38,6 +38,16 @@
 - Base de conocimiento del Asistente, contratos del director y registro de
   decisiones.
 
+- Corrección hallada en la prueba D8 (criterio 7): con el modo
+  multi-superficie activo el proyecto no se podía guardar si las superficies
+  no tenían sombra 3D («Error al guardar: Superficie incompleta; faltan:
+  p_shade, firma_sombra»). La persistencia firmada exigía la sombra aunque el
+  simplificado y el bypass con CSV no la usan. Ahora `p_shade`,
+  `firma_sombra` y los campos eléctricos antiguos son opcionales; solo el
+  origen físico exige la sombra («El modo físico necesita la sombra 3D…»), y
+  la restauración no convierte un `p_shade` ausente. Es un vacío anterior a
+  esta Spec (persistencia firmada), no una regresión.
+
 Desviaciones del diseño, con motivo:
 
 - **Las páginas se prueban por el código fuente**, como el resto de pruebas de

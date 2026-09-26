@@ -15,4 +15,5 @@
 - [x] Suite completa, `physics-guard`, auditoría SDD y prueba de humo.
 - [x] Aviso fijo de energía retirada en «🔗 Integrar al análisis financiero»
       hasta volver a publicar (pedido en la prueba D6).
-- [ ] Prueba en producción (repetir D5 y D6).
+- [x] Corrección: guardar el proyecto sin sombra 3D (hallada en D8).
+- [ ] Prueba en producción (repetir D5, D6 y D8).

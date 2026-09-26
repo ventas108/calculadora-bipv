@@ -163,10 +163,11 @@ def _inversores_de_superficie(superficie: Mapping[str, Any]) -> list[str]:
 
 
 def _superficie_input(superficie: Mapping[str, Any]) -> dict[str, Any]:
-    requeridos = (
-        "uid", "nombre", "tipo", "area_m2", "tilt_deg", "azimuth_deg",
-        "n_serie", "n_paralelo", "inversor_id", "p_shade", "firma_sombra",
-    )
+    # La sombra 3D (p_shade, firma_sombra) y los campos eléctricos antiguos
+    # son opcionales: el simplificado y el bypass con CSV no los necesitan
+    # (hallado en la prueba D8, 25-sep-2026: el proyecto no se podía guardar).
+    # El modo físico sí exige la sombra: lo revisa construir_payload.
+    requeridos = ("uid", "nombre", "tipo", "area_m2", "tilt_deg", "azimuth_deg")
     faltantes = [campo for campo in requeridos if campo not in superficie]
     if faltantes:
         raise PayloadMultisuperficieError(
@@ -210,6 +211,17 @@ def construir_payload_multisuperficie(
     ]
     if not superficies:
         raise PayloadMultisuperficieError("No hay superficies activas para persistir.")
+    resultados_ss = resultados.get("session_state") if isinstance(resultados, Mapping) else None
+    es_fisico = isinstance(resultados_ss, Mapping) and (
+        resultados_ss.get("multisup_origen") == "fisico" or "proyecto_fisico" in resultados_ss
+    )
+    sin_sombra = [s["nombre"] for s in superficies
+                  if "p_shade" not in s or "firma_sombra" not in s]
+    if es_fisico and sin_sombra:
+        raise PayloadMultisuperficieError(
+            "El modo físico necesita la sombra 3D de cada superficie; falta en: "
+            + ", ".join(sin_sombra) + "."
+        )
     tmy = session_state.get("tmy_df")
     tmy_fingerprint = _tmy_fingerprint(tmy)
     payload: dict[str, Any] = {
@@ -385,7 +397,8 @@ def restaurar_multisuperficie(
         for superficie in entradas["surfaces"]:
             restaurada = _restaurar_canonico(superficie)
             restaurada["activa"] = True
-            restaurada["p_shade"] = np.asarray(restaurada["p_shade"], dtype=float)
+            if "p_shade" in restaurada:
+                restaurada["p_shade"] = np.asarray(restaurada["p_shade"], dtype=float)
             superficies.append(restaurada)
         inversores = _restaurar_canonico(entradas["electrical"]["inversores"])
         resultados = payload["results"].get("session_state", {})
