@@ -358,7 +358,7 @@ def cargar_proyecto(slug: str) -> str:
         # POA por superficie del proyecto ANTERIOR: su firma de sitio la
         # dejaría no vigente, pero no debe sobrevivir al cambio de proyecto.
         "poa_superficies", "poa_superficies_errores", "poa_superficies_ok",
-        "_multisup_restaurado", "_multisup_restauracion_error",
+        "_multisup_restaurado", "_multisup_restauracion_error", "_solar_cache_msg",
         # Huella de los paneles por superficie del proyecto ANTERIOR.
         "_multisup_firma_paneles", "_multisup_firma_electrica", "_multisup_retiro_motivo",
     }
