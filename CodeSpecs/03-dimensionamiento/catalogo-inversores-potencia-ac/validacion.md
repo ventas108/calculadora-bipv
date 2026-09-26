@@ -28,7 +28,7 @@ sobre `main` `9801ef3f`.
 - [x] Suite completa (`python -m pytest tests/`): `1794 passed`, 0 fallidas, 17 min 22 s.
 - [x] Auditoría SDD sin documentos ni secciones faltantes.
 
-Pendiente tras el despliegue: corregir el Growatt desde la tabla en producción y
+Después del despliegue, en producción: corregir el Growatt desde la tabla en producción y
 ver INV-2 con DC/AC 1,134 🟢 y 2/2 strings.
 
 ## Resultado
