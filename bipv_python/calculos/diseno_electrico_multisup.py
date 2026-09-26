@@ -20,6 +20,7 @@ import math
 from collections.abc import Mapping
 from typing import Any
 
+from calculos.potencia_ac_inversor import MENSAJE_SIN_POTENCIA_AC
 from calculos.dimensionamiento import (
     calcular_vmp_string,
     calcular_voc_string,
@@ -501,7 +502,7 @@ def validar_diseno_electrico(
                 )
         elif grupos_inv:
             checks.append(_check("Relación DC/AC", None, None, "", "sin P AC nominal", fuente, "amarillo"))
-            avisos.append(f"{etiqueta}: sin potencia AC nominal no se puede calcular la relación DC/AC.")
+            avisos.append(f"{etiqueta}: {MENSAJE_SIN_POTENCIA_AC}")
         salida_invs.append({
             "inversor_id": inv_id, "origen_ficha": inv.get("origen_ficha"),
             "nombre": inv.get("nombre"), "mppt_usados": len(mppts),

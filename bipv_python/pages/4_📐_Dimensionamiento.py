@@ -1206,6 +1206,9 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
                 st.warning(f"{_dcac_granja['nivel']} {_dcac_g_texto}")
             else:
                 st.success(f"{_dcac_granja['nivel']} {_dcac_g_texto}")
+        else:
+            from calculos.potencia_ac_inversor import MENSAJE_SIN_POTENCIA_AC
+            st.info(f"🟡 {MENSAJE_SIN_POTENCIA_AC}")
 
         # ── Escalado a la granja completa ─────────────────────────────────────
         if dim["area_ocupada_m2"] > 0:

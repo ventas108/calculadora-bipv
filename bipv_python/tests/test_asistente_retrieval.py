@@ -324,3 +324,20 @@ def test_buscar_por_que_financiero_no_calcula_con_diseno_rojo():
     )
     texto = seccion["texto"]
     assert "Financiero NO calcula TIR" in texto and "NO son de tu diseño de Vista 3D" in texto
+
+
+def test_buscar_potencia_ac_del_inversor_en_el_catalogo():
+    seccion = _seccion_recuperada(
+        "como completo la potencia ac nominal del inversor en el catalogo si la relacion dc/ac no se calcula",
+        "potencia AC nominal",
+    )
+    texto = seccion["texto"]
+    assert "P AC nominal (kW)" in texto and "Rated AC output power" in texto
+
+
+def test_buscar_ficha_growatt_mid15ktl3x():
+    seccion = _seccion_recuperada(
+        "cuantos strings por mppt tiene el growatt mid15ktl3-x y su rango mppt",
+        "potencia AC nominal",
+    )
+    assert "2 strings por MPPT" in seccion["texto"] and "200–1.000 V" in seccion["texto"]
