@@ -23,6 +23,9 @@ from datos.catalogo_inversores_excel import (
     eliminar_inversor_excel,
 )
 from calculos.validador_inversor import validar_inversor, icono_estado
+from calculos.potencia_ac_inversor import (
+    error_potencia_ac, inversores_sin_potencia_ac,
+)
 from calculos.seleccion_modelo_inversor import (
     PLACEHOLDER_MODELO,
     debe_bloquear_guardado,
@@ -45,7 +48,13 @@ tab1, tab2 = st.tabs(["➕ Agregar desde PDF", "✏️ Editar / Eliminar"])
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 1 — Agregar desde PDF
 # ══════════════════════════════════════════════════════════════════════════════
-with tab1:
+def _pestana_agregar_desde_pdf() -> None:
+    """Pestaña ➕ Agregar desde PDF.
+
+    Sale con ``return`` y nunca con ``st.stop()``: ``st.stop()`` detiene TODA
+    la página, así que sin un PDF subido la pestaña ✏️ Editar / Eliminar
+    quedaba en blanco (26-sep-2026, corrigiendo el catálogo del Growatt).
+    """
 
     # ── Disponibilidad de dependencias ────────────────────────────────────────
     if not pdf_disponible():
@@ -53,7 +62,7 @@ with tab1:
             "❌ **pdfplumber no está instalado.** "
             "Contacta al administrador para ejecutar `pip install pdfplumber`."
         )
-        st.stop()
+        return
 
     if ocr_disponible():
         st.info(
@@ -80,7 +89,7 @@ with tab1:
 
     if not uploaded:
         st.info("⬆️ Sube un PDF para comenzar la extracción automática.")
-        st.stop()
+        return
 
     pdf_bytes = uploaded.read()
 
@@ -107,7 +116,7 @@ with tab1:
 
     if "error" in res:
         st.error(f"❌ Error al procesar el PDF: {res['error']}")
-        st.stop()
+        return
 
     # ── Banner estado ─────────────────────────────────────────────────────────
     if res.get("es_escaneado") and res.get("uso_ocr"):
@@ -446,6 +455,14 @@ with tab1:
             value=float(res.get("P_dc_max_W") or 0.0),
             help="Si la ficha reporta en kWp, el extractor ya convirtió ×1000.",
         )
+        P_ac_kw_val = st.number_input(
+            "Potencia AC nominal (kW)",
+            min_value=0.0, max_value=5000.0, step=0.1,
+            value=float(res.get("P_ac_nom_kW") or 0.0),
+            help="Dato «Rated AC output power» / «Potencia nominal CA» de la ficha. "
+                 "Obligatorio (salvo cargador off-grid puro): con él se calcula la "
+                 "relación DC/AC. No es la «Potencia FV máxima», que es otro dato.",
+        )
 
         # ── Batería (solo si híbrido) ─────────────────────────────────────────
         if es_hibrido_val:
@@ -502,6 +519,8 @@ with tab1:
             st.error("❌ El campo **Modelo** es obligatorio.")
         elif Vdc_max_val <= 0:
             st.error("❌ La **Tensión DC Máxima** debe ser mayor que 0.")
+        elif _err_p_ac := error_potencia_ac(arch_val, P_ac_kw_val):
+            st.error(f"❌ {_err_p_ac}")
         elif not (_val_fin := validar_inversor({
             "Vdc_max": Vdc_max_val, "Vmppt_min": Vmppt_min_val,
             "Vmppt_max": Vmppt_max_val, "V_mppt_activo": V_mppt_activo_val,
@@ -539,6 +558,7 @@ with tab1:
                 "Corriente Maxima Tracker (A)":       I_max_val or None,
                 "Corriente Cortocircuito Max Tracker (A)": Isc_max_val or None,
                 "Potencia FV Max Recomendada (W)":    P_dc_val or None,
+                "Potencia AC nominal (kW)":           P_ac_kw_val or None,
                 "Inversor Híbrido (Si/No)":           "Si" if es_hibrido_val else "No",
                 "Voltaje Batería Min (V)":            bat_min_val or None,
                 "Voltaje Batería Max (V)":            bat_max_val or None,
@@ -613,7 +633,7 @@ with tab1:
                 )
                 st.dataframe(_pd.DataFrame(_cambios), use_container_width=True,
                              hide_index=True)
-                st.stop()
+                return
             st.session_state.pop("_inv_confirm_overwrite", None)
 
             try:
@@ -643,6 +663,10 @@ with tab1:
         st.text(res.get("texto_crudo", "(vacío)"))
 
 
+with tab1:
+    _pestana_agregar_desde_pdf()
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 2 — Editar / Eliminar
 # ══════════════════════════════════════════════════════════════════════════════
@@ -662,6 +686,18 @@ with tab2:
 
     _busqueda = st.text_input("Buscar por nombre / modelo", key="edit_inv_busqueda")
 
+    _sin_p_ac = set(inversores_sin_potencia_ac(_cat))
+    if _sin_p_ac:
+        st.warning(
+            f"⚠️ **{len(_sin_p_ac)} de {len(_cat)} inversores no tienen la potencia AC nominal** "
+            "de su ficha: con ellos no se calcula la relación DC/AC. Complétala en la columna "
+            "«P AC nominal (kW)» con el dato «Rated AC output power» de cada ficha."
+        )
+    _solo_sin_p_ac = st.checkbox(
+        "Mostrar solo los inversores sin potencia AC", key="edit_inv_solo_sin_pac",
+        disabled=not _sin_p_ac,
+    )
+
     # Aplicar filtros
     _items = list(_cat.values())
     if _f_marca != "(todas)":
@@ -669,37 +705,28 @@ with tab2:
     if _busqueda.strip():
         _q = _busqueda.strip().lower()
         _items = [x for x in _items if _q in x["nombre"].lower()]
+    if _solo_sin_p_ac:
+        _items = [x for x in _items if x["nombre"] in _sin_p_ac]
 
     if not _items:
         st.warning("No hay inversores que coincidan con el filtro.")
     else:
         # ── Tabla editable ────────────────────────────────────────────────────
-        _COLS_EDIT = {
-            "nombre":            "Modelo",
-            "Vdc_max":           "Vdc máx (V)",
-            "Vmppt_min":         "MPPT mín (V)",
-            "Vmppt_max":         "MPPT máx (V)",
-            "V_mppt_activo":     "MPPT activo mín (V)",
-            "V_arranque":        "V arranque (V)",
-            "n_trackers":        "N Trackers",
-            "n_strings_tracker": "Strings/Tracker",
-            "I_max_tracker":     "I máx tracker (A)",
-            "Isc_max_tracker":   "Isc máx tracker (A)",
-            "P_dc_max_W":        "P FV máx (W)",
-            "costo_usd":         "Costo (USD)",
-        }
+        from calculos.edicion_catalogo_inversores import (
+            COLUMNAS_EDICION, parches_edicion, tabla_edicion,
+        )
 
-        _df_orig = pd.DataFrame([
-            {col: x.get(k) for k, col in _COLS_EDIT.items()}
-            for x in _items
-        ])
-
+        _df_orig = tabla_edicion(_items)
         _col_config = {
             "Modelo": st.column_config.TextColumn("Modelo", disabled=False),
             **{
-                col: st.column_config.NumberColumn(col, format="%.1f")
-                for col in list(_COLS_EDIT.values())[1:]
+                etiqueta: st.column_config.NumberColumn(etiqueta, format="%.1f")
+                for clave, (etiqueta, _) in COLUMNAS_EDICION.items() if clave != "nombre"
             },
+            "P AC nominal (kW)": st.column_config.NumberColumn(
+                "P AC nominal (kW)", format="%.2f",
+                help="«Rated AC output power» de la ficha. Sin este dato no se calcula la DC/AC.",
+            ),
         }
 
         st.markdown("**Edita directamente en la tabla y presiona _Guardar cambios_:**")
@@ -714,49 +741,20 @@ with tab2:
         if st.button("💾 Guardar cambios", key="btn_guardar_inv"):
             _n_ok_edit = 0
             _errores = []
-            for i, (orig_row, edit_row) in enumerate(
-                zip(_df_orig.itertuples(index=False), _df_edit.itertuples(index=False))
-            ):
-                # Detectar cambios
-                _patch = {}
-                for col in _COLS_EDIT.values():
-                    v_orig = getattr(orig_row, col.replace(" ", "_").replace("(", "").replace(")", "").replace("/", "").replace("á","a").replace("í","i").replace("é","e").replace("ó","o"))
-                    v_edit = getattr(edit_row, col.replace(" ", "_").replace("(", "").replace(")", "").replace("/", "").replace("á","a").replace("í","i").replace("é","e").replace("ó","o"))
-                    if v_orig != v_edit:
-                        # Mapear nombre de columna editable → nombre Excel
-                        _excel_col = {v: k for k, v in _COLS_EDIT.items()}.get(col, col)
-                        _excel_map = {
-                            "nombre":            "Modelo",
-                            "Vdc_max":           "Tension DC Maxima (V)",
-                            "Vmppt_min":         "Rango MPPT Min (V)",
-                            "Vmppt_max":         "Rango MPPT Max (V)",
-                            "V_mppt_activo":     "Tension Minima MPPT Activo (V)",
-                            "V_arranque":        "Tension Arranque (V)",
-                            "n_trackers":        "N Trackers",
-                            "n_strings_tracker": "N Strings/Tracker",
-                            "I_max_tracker":     "Corriente Maxima Tracker (A)",
-                            "Isc_max_tracker":   "Corriente Cortocircuito Max Tracker (A)",
-                            "P_dc_max_W":        "Potencia FV Max Recomendada (W)",
-                            "costo_usd":         "Costo Inversor",
-                        }
-                        excel_key = _excel_map.get(_excel_col, col)
-                        _patch[excel_key] = v_edit
-
-                if _patch:
-                    nombre_orig = getattr(orig_row, "Modelo")
-                    try:
-                        actualizar_inversor_excel(nombre_orig, _patch)
-                        _n_ok_edit += 1
-                    except Exception as e:
-                        _errores.append(f"{nombre_orig}: {e}")
-
-            if _n_ok_edit:
+            for nombre_orig, _patch in parches_edicion(_df_orig, _df_edit):
+                try:
+                    actualizar_inversor_excel(nombre_orig, _patch)
+                    _n_ok_edit += 1
+                except Exception as e:
+                    _errores.append(f"{nombre_orig}: {e}")
+            for err in _errores:
+                st.error(err)
+            if _n_ok_edit and not _errores:
                 st.success(f"✅ {_n_ok_edit} inversor(es) actualizado(s).")
                 st.rerun()
-            elif _errores:
-                for err in _errores:
-                    st.error(err)
-            else:
+            elif _n_ok_edit:
+                st.success(f"✅ {_n_ok_edit} inversor(es) actualizado(s); revisa los errores de arriba.")
+            elif not _errores:
                 st.info("Sin cambios detectados.")
 
         # ── Eliminar ──────────────────────────────────────────────────────────

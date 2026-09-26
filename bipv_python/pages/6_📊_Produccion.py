@@ -425,6 +425,10 @@ if _dcac["evaluable"]:
         st.warning(f"{_dcac['nivel']} {_dcac_texto}")
     else:
         st.success(f"{_dcac['nivel']} {_dcac_texto}")
+elif inversor:
+    from calculos.potencia_ac_inversor import MENSAJE_SIN_POTENCIA_AC
+    st.info(f"🟡 {MENSAJE_SIN_POTENCIA_AC} Mientras tanto, la producción se calcula sin el "
+            "recorte («clipping») del inversor.")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 2 — SIMULACIÓN

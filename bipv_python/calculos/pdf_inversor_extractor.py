@@ -928,7 +928,7 @@ def _extract_multimodel_values(text: str) -> dict:
         'por_modelo': {
             m: {'P_dc_max_W': None, 'n_trackers': None, 'n_strings_tracker': None,
                 'I_max_tracker': None, 'Isc_max_tracker': None,
-                'bat_corriente_carga_max': None}
+                'bat_corriente_carga_max': None, 'P_ac_nom_kW': None}
             for m in model_names
         },
     }
@@ -1019,6 +1019,26 @@ def _extract_multimodel_values(text: str) -> dict:
             for i, model in enumerate(model_names):
                 if i in by_idx:
                     result['por_modelo'][model]['P_dc_max_W'] = by_idx[i]
+        break
+
+    # ── 2b. Potencia AC nominal por columna (26-sep-2026) ───────────────────────
+    # "Rated AC output power 15000W 17000W 20000W 22000W 25000W". Solo se
+    # asigna con exactamente un valor por modelo: la fila siguiente de la
+    # ficha (VA aparentes) no debe colarse, y un modelo sin su dato se deja
+    # vacío antes que adivinarlo (el formulario lo pide).
+    for line in lines:
+        m_lab = _PAT_P_AC_ETIQUETA.search(line)
+        if not m_lab:
+            continue
+        valores_kw = [
+            float(m.group(1).replace(',', '.')) / (1.0 if m.group(2) else 1000.0)
+            for m in re.finditer(r'([0-9]+(?:[.,][0-9]+)?)\s*(k?)W\b', line[m_lab.end():],
+                                 re.IGNORECASE)
+        ]
+        if len(valores_kw) == n:
+            for kw, model in zip(valores_kw, model_names):
+                if 0.5 <= kw <= 5000:
+                    result['por_modelo'][model]['P_ac_nom_kW'] = round(kw, 3)
         break
 
     # ── 3. n_trackers / n_strings por columna ──────────────────────────────────
@@ -1182,6 +1202,35 @@ def _extract_multimodel_values(text: str) -> dict:
                 break
 
     return result
+
+
+
+_PAT_P_AC_ETIQUETA = re.compile(
+    r"(?:Potencia\s+nominal\s+(?:CA|AC)|Rated\s+(?:AC\s+)?[Oo]utput\s+[Pp]ower"
+    r"|Rated\s+[Aa]ctive\s+[Pp]ower|Nominal\s+(?:AC\s+)?[Oo]utput\s+[Pp]ower"
+    r"|AC\s+[Rr]ated\s+[Pp]ower)",
+    re.IGNORECASE,
+)
+_PAT_P_AC_NOM = re.compile(
+    r"(?:Potencia\s+nominal\s+(?:CA|AC)|Potencia\s+activa"
+    r"|Rated\s+(?:AC\s+)?[Oo]utput\s+[Pp]ower|Rated\s+[Aa]ctive\s+[Pp]ower"
+    r"|Nominal\s+(?:AC\s+)?[Oo]utput\s+[Pp]ower|AC\s+[Rr]ated\s+[Pp]ower)"
+    r"[^\n0-9]{0,20}([0-9]+(?:[.,][0-9]+)?)\s*(k?)W\b",
+    re.IGNORECASE,
+)
+
+
+def _extraer_potencia_ac_kw(texto: str) -> float | None:
+    """Potencia AC nominal de la ficha en kW («Rated AC output power»), o None."""
+    m_pac = _PAT_P_AC_NOM.search(texto or "")
+    if not m_pac:
+        return None
+    p_ac = _num(m_pac.group(1))
+    if p_ac is None:
+        return None
+    if m_pac.group(2).lower() == 'k' or p_ac < 1000:
+        p_ac *= 1000
+    return round(p_ac / 1000.0, 3) if 500 <= p_ac <= 5_000_000 else None
 
 
 def extraer_parametros_inversor(pdf_bytes: bytes) -> dict:
@@ -1604,22 +1653,10 @@ def _extraer_campos(texto: str) -> dict:
     # Se estima desde la potencia CA nominal con ratio DC/AC 1.5 (práctica
     # estándar de sobredimensionamiento).
     P_dc_estimado = False
-    if P_dc_max_W is None:
-        m_pac = re.search(
-            r"(?:Potencia\s+nominal\s+(?:CA|AC)|Potencia\s+activa"
-            r"|Rated\s+(?:AC\s+)?[Oo]utput\s+[Pp]ower|Rated\s+[Aa]ctive\s+[Pp]ower"
-            r"|Nominal\s+(?:AC\s+)?[Oo]utput\s+[Pp]ower|AC\s+[Rr]ated\s+[Pp]ower)"
-            r"[^\n0-9]{0,20}([0-9]+(?:[.,][0-9]+)?)\s*(k?)W\b",
-            texto, re.IGNORECASE,
-        )
-        if m_pac:
-            p_ac = _num(m_pac.group(1))
-            if p_ac is not None:
-                if m_pac.group(2).lower() == 'k' or p_ac < 1000:
-                    p_ac *= 1000
-                if 500 <= p_ac <= 5_000_000:
-                    P_dc_max_W = round(p_ac * 1.5)
-                    P_dc_estimado = True
+    P_ac_nom_kW = _extraer_potencia_ac_kw(texto)
+    if P_dc_max_W is None and P_ac_nom_kW is not None:
+        P_dc_max_W = round(P_ac_nom_kW * 1000 * 1.5)
+        P_dc_estimado = True
 
     # ── Batería ───────────────────────────────────────────────────────────────
     # use_sma_fallback=False para evitar que "DC voltage range, min./max." de SMA
@@ -1689,6 +1726,9 @@ def _extraer_campos(texto: str) -> dict:
         "P_dc_max_W":       P_dc_max_W,
         # True si P_dc_max_W fue estimada desde la potencia CA nominal (ratio 1.5)
         "P_dc_estimado":    P_dc_estimado,
+        # Potencia AC nominal de la ficha (kW); None si no aparece. Antes solo
+        # se leía para estimar P_dc_max_W y se descartaba (26-sep-2026).
+        "P_ac_nom_kW":      P_ac_nom_kW,
         "bat_voltaje_min":  bat_voltaje_min,
         "bat_voltaje_max":  bat_voltaje_max,
         # True si la ficha declara que la salida/umbrales dependen del tipo

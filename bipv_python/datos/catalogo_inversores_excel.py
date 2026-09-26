@@ -68,10 +68,12 @@ def _cargar_catalogo_inversores_cached(mtime: float) -> dict:
         costo = _f(r.get("Costo Inversor"))
         _p_ac_nom_kW = _f(r.get("Potencia AC nominal (kW)"))
         _p_dc_max_W  = _f(r.get("Potencia FV Max Recomendada (W)"))
-        # P_ac_nom_W: columna directa > derivada de P_dc con factor 0.96 como fallback
-        _p_ac_nom_W  = (_p_ac_nom_kW * 1000) if _p_ac_nom_kW else (
-            _p_dc_max_W * 0.96 if _p_dc_max_W else None
-        )
+        # P_ac_nom_W: SOLO de la ficha. Antes, sin la columna se estimaba como
+        # 0,96 × P FV máx.: con el Growatt MID15KTL3-X daba 21.600 W en vez de
+        # 15.000 W y una relación DC/AC falsa (26-sep-2026). Sin el dato queda
+        # None y las comprobaciones lo tratan como «no evaluable».
+        from calculos.potencia_ac_inversor import potencia_ac_w
+        _p_ac_nom_W  = potencia_ac_w(_p_ac_nom_kW)
         _marca = str(r.get("Marca", "")).strip()
         clave = f"{modelo} [{_marca}]" if _conteo_modelo.get(modelo, 0) > 1 and _marca else modelo
         inversores[clave] = {

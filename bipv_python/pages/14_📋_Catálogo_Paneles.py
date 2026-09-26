@@ -27,7 +27,13 @@ tab_agregar, tab_editar = st.tabs(["➕ Agregar desde PDF", "✏️ Editar / Eli
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 1 — AGREGAR DESDE PDF (#65 + #129)
 # ══════════════════════════════════════════════════════════════════════════════
-with tab_agregar:
+def _pestana_agregar_desde_pdf() -> None:
+    """Pestaña ➕ Agregar desde PDF.
+
+    Sale con ``return`` y nunca con ``st.stop()``: ``st.stop()`` detiene TODA
+    la página y la pestaña ✏️ Editar / Eliminar quedaba en blanco sin un PDF
+    subido (26-sep-2026; mismo bug que en 🔌 Catálogo Inversores PDF).
+    """
     st.caption(
         "Sube la ficha técnica (datasheet) de un panel FV en PDF. "
         "La app extrae automáticamente los parámetros eléctricos y te permite verificarlos "
@@ -45,7 +51,7 @@ with tab_agregar:
             "pm2 restart streamlit-bipv\n"
             "```"
         )
-        st.stop()
+        return
 
     # ── OCR info banner ───────────────────────────────────────────────────────
     if not ocr_disponible():
@@ -68,7 +74,7 @@ with tab_agregar:
 
     if not uploaded:
         st.info("⬆️ Sube un PDF para comenzar.")
-        st.stop()
+        return
 
     # ── Extraer parámetros ────────────────────────────────────────────────────
     with st.spinner("Analizando PDF…"):
@@ -77,7 +83,7 @@ with tab_agregar:
 
     if "error" in data:
         st.error(data["error"])
-        st.stop()
+        return
 
     # ── Banners de estado del análisis ────────────────────────────────────────
     es_escaneado = data.get("es_escaneado", False)
@@ -323,7 +329,7 @@ with tab_agregar:
                 "🔴 **No se guardó** — corrige estos errores y vuelve a presionar Guardar:\n\n"
                 + "\n".join(f"- {e}" for e in _val_fin["errores"])
             )
-            st.stop()
+            return
         for _a in _val_fin["avisos"]:
             st.warning(f"🟠 {_a}")
 
@@ -398,6 +404,10 @@ with tab_agregar:
         debug_tables = data.get("_debug_tables", "")
         if debug_tables:
             st.text_area("Tablas detectadas por pdfplumber (diagnóstico)", debug_tables, height=300)
+
+
+with tab_agregar:
+    _pestana_agregar_desde_pdf()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
