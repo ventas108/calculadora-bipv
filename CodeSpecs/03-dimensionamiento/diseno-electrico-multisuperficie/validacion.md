@@ -100,6 +100,14 @@ Rama `claude/mejoras-bipv` sobre `main` `45362d79`.
          12 → 8 → 10 quedan cada uno como se escribió. Antes, el segundo
          cambio seguido volvía al valor anterior.
 
+### Corrección tras D9 (26-sep-2026)
+
+- [x] `test_corriente_del_grupo_no_multiplica_su_isc_por_los_strings_de_otros_paneles` falla en
+      `main` `50b59ea6` (🔴 «Isc de strings» falso) y pasa con el cambio; los 🔴 reales del caso
+      (paneles distintos, distinto largo) se mantienen. `test_grupo_que_solo_no_cabe_en_corriente_sigue_en_rojo`
+      confirma que una corriente excesiva sigue en 🔴.
+- [x] `physics-guard` limpio.
+
 ## Resultado
 
 Fase A1 validada en producción. Fase A2 validada en local; su prueba en
