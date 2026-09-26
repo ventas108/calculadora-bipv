@@ -72,11 +72,21 @@ Energía multi-superficie (Vista 3D, Streamlit):
 05 sombra 3D por superficie ──────────────────────────────┐
 POA + η + diseño eléctrico + sombra ──> simplificado / bypass / físico
                                          └─> publicación única con origen ──> 06, 07, 08
+                                             (energía + estado eléctrico + sistema:
+                                              kWp, módulos por panel, reparto mensual)
 
-cambio de panel o del panel del proyecto ──> retira publicación, bypass, MPPT y físico
-                                             (conserva POA y sombra)
-cambio de geometría o montaje ────────────> invalida POA y sombra de esa superficie
+publicación multi-superficie ──> 06 Financiero, Baterías y CO₂ (sin 📊 Producción,
+                                 sin mezclar kWp/módulos de superficie única)
+
+cambio de panel o de diseño eléctrico ──> retira publicación, bypass, MPPT y físico
+                                          (conserva POA y sombra; aviso fijo en
+                                           «Integrar» hasta volver a publicar)
+cambio de geometría o montaje ────────> invalida POA y sombra de esa superficie
 ```
+
+- Con `multisup_activo`, 💰 Financiero, 🔋 Baterías y 🌿 CO₂ dependen solo de la
+  publicación multi-superficie (Spec `06-analisis-financiero/sistema-multisuperficie`),
+  no de 📊 Producción; 💼 Presupuesto sigue en superficie única (H3, Spec propia).
 
 - Los comparadores consumen el motor físico vigente; no mantienen una segunda
   implementación de energía, PR, POA o compatibilidad.
