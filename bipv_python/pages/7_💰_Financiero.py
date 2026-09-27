@@ -273,6 +273,7 @@ frac_exportada = (_e_exportacion / e_financiero) if (_balance_activo and e_finan
 # PANEL PREVIO — Consumo vs Producción estimada
 # ═══════════════════════════════════════════════════════════════════════════════
 _consumo_mes_fin = float(st.session_state.get("consumo_kwh_mes", 0.0))
+from calculos.indicadores_excedentes import aviso_sobredimension
 _tarifa_prev_fin = float(st.session_state.get("tarifa_cop_kwh", 0.0))
 
 if _consumo_mes_fin > 0 and e_ac > 0 and _tarifa_prev_fin > 0:
@@ -320,7 +321,13 @@ if _consumo_mes_fin > 0 and e_ac > 0 and _tarifa_prev_fin > 0:
         delta_color="off",
     )
 
-    if e_ac >= _consumo_anual_fin:
+    if _aviso_sobredim_previo := aviso_sobredimension(e_financiero, _consumo_anual_fin, _balance_activo):
+        st.warning(
+            f"⚠️ La producción es el **{_aviso_sobredim_previo['cobertura_pct']:.0f}% del consumo**: "
+            f"unos **{_aviso_sobredim_previo['excedente_kWh']:,.0f} kWh/año** serían excedentes. "
+            "Calcula 🔋 Baterías y Balance antes del análisis (ver el aviso junto al botón Calcular)."
+        )
+    elif e_ac >= _consumo_anual_fin:
         _exc_kwh = e_ac - _consumo_anual_fin
         st.success(
             f"✅ El sistema **cubre el 100% del consumo** y genera "
@@ -1202,7 +1209,12 @@ st.markdown("---")
 with st.expander("💱 Conversor de cifras USD → COP (TRM del día)", expanded=True):
     st.caption(f"Usando TRM: **{tipo_cambio:,.0f} COP/USD** (sincronizada con 💼 Presupuesto · edita en Sección 2)")
 
-    col_cv1, col_cv2, col_cv3, col_cv4 = st.columns(4)
+    # Las tarjetas suman exactamente el CAPEX bruto: antes faltaban los
+    # imprevistos y no cuadraban (37.575 contra 39.454 USD, 26-sep-2026).
+    from calculos.indicadores_excedentes import desglose_capex
+    _desg_capex = desglose_capex(capex_total, capex_modulos, capex_inversor,
+                                 capex_estructura, capex_instalacion)
+    col_cv1, col_cv2, col_cv3, col_cv4, col_cv4b = st.columns(5)
     col_cv1.metric("CAPEX bruto",
                    f"${capex_total*tipo_cambio/1e6:.2f} M COP",
                    delta=f"USD {capex_total:,.0f}", delta_color="off")
@@ -1215,6 +1227,15 @@ with st.expander("💱 Conversor de cifras USD → COP (TRM del día)", expanded
     col_cv4.metric("Estructura + Instalación",
                    f"${(capex_estructura+capex_instalacion)*tipo_cambio/1e6:.2f} M COP",
                    delta=f"USD {(capex_estructura+capex_instalacion):,.0f}", delta_color="off")
+    col_cv4b.metric(
+        "Otros (Presupuesto)" if usar_ppto else f"Imprevistos ({imprevistos_pct:.0f}%)",
+        f"${_desg_capex['resto']*tipo_cambio/1e6:.2f} M COP",
+        delta=f"USD {_desg_capex['resto']:,.0f}", delta_color="off",
+        help=("Diferencia entre el CAPEX del 💼 Presupuesto vinculado y las partidas paramétricas."
+              if usar_ppto else
+              "Imprevistos y contingencia sobre equipos + instalación. Con esta tarjeta, "
+              "las cinco partidas suman el CAPEX bruto."),
+    )
 
     st.markdown("---")
     col_cv5, col_cv6, col_cv7, col_cv8 = st.columns(4)
@@ -1365,6 +1386,24 @@ if st.session_state.get("financiero_ok"):
             + ", ".join(_fin_cambios)
             + "). Presiona **Calcular** para ver TIR, VPN y payback con los datos actuales."
         )
+
+# Sin balance, toda la energía se valora a la tarifa de compra; con un sistema
+# mucho mayor que el consumo, eso infla TIR y VPN (26-sep-2026).
+_aviso_sobredim = aviso_sobredimension(e_financiero, _consumo_mes_fin * 12, _balance_activo)
+if _aviso_sobredim:
+    st.warning(
+        f"⚠️ **El sistema produce {_aviso_sobredim['energia_kWh']:,.0f} kWh/año y el consumo es "
+        f"{_aviso_sobredim['consumo_kWh']:,.0f} kWh/año ({_aviso_sobredim['cobertura_pct']:.0f}%).** "
+        f"Como no hay balance de 🔋 Baterías y Balance, el análisis valora **toda** la energía a "
+        f"{tarifa_cop:,.0f} COP/kWh, incluidos unos {_aviso_sobredim['excedente_kWh']:,.0f} kWh/año "
+        f"({_aviso_sobredim['frac_excedente'] * 100:.0f}%) que serían excedentes. Con la Res. CREG "
+        "174/2021, los excedentes por encima de lo que se importa se pagan a precio de bolsa (XM), "
+        "mucho menos que la tarifa: **TIR y VPN saldrían demasiado altos.**\n\n"
+        "Para un resultado real: 1) revisa que «Tarifa electricidad» sea la tarifa que paga el "
+        "cliente; 2) calcula 🔋 Baterías y Balance con su consumo mensual; 3) vuelve aquí, escribe "
+        "la «Tarifa de excedentes» y pulsa Calcular. Si el tamaño no es intencional, reduce el "
+        "sistema en 🗺️ Vista 3D."
+    )
 
 btn_fin = st.button(
     "📊 Calcular TIR, VPN, Payback y LCOE", type="primary", use_container_width=True

@@ -73,3 +73,47 @@ def escenario_sin_bateria(metricas_balance: Mapping[str, Any] | None) -> dict | 
         "exportada_kWh": exportada,
         "frac_exportada": exportada / solar,
     }
+
+
+# Sin balance de 🔋 Baterías y Balance, Financiero valora toda la energía a la
+# tarifa de compra. Con un sistema mucho más grande que el consumo eso infla la
+# TIR: en la prueba del 26-sep-2026, 26.669 kWh/año contra 5.738 de consumo
+# salían a 800 COP/kWh (TIR 28,9 %), aunque unos 20.900 kWh serían excedentes
+# pagados a precio de bolsa.
+UMBRAL_SOBREDIMENSION = 1.2
+
+
+def aviso_sobredimension(energia_kWh: float, consumo_anual_kWh: float,
+                         balance_activo: bool,
+                         umbral: float = UMBRAL_SOBREDIMENSION) -> dict | None:
+    """Datos del aviso si la energía supera ``umbral`` × consumo sin balance; si no, ``None``."""
+    energia = _num(energia_kWh)
+    consumo = _num(consumo_anual_kWh)
+    if balance_activo or consumo <= 0 or energia <= consumo * umbral:
+        return None
+    excedente = energia - consumo
+    return {
+        "energia_kWh": energia,
+        "consumo_kWh": consumo,
+        "cobertura_pct": energia / consumo * 100.0,
+        "excedente_kWh": excedente,
+        "frac_excedente": excedente / energia,
+    }
+
+
+def desglose_capex(capex_total: float, modulos: float, inversor: float,
+                   estructura: float, instalacion: float) -> dict:
+    """Partes del CAPEX que suman exactamente ``capex_total``.
+
+    La cuarta tarjeta junta estructura e instalación; lo que falta hasta el total
+    son los imprevistos (CAPEX paramétrico) o la diferencia con el Presupuesto
+    vinculado. Antes no se mostraba y las tarjetas no sumaban el CAPEX bruto.
+    """
+    est_inst = _num(estructura) + _num(instalacion)
+    resto = _num(capex_total) - (_num(modulos) + _num(inversor) + est_inst)
+    return {
+        "modulos": _num(modulos),
+        "inversor": _num(inversor),
+        "estructura_instalacion": est_inst,
+        "resto": resto,
+    }

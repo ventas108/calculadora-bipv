@@ -27,6 +27,15 @@ Nuevo módulo `calculos/indicadores_excedentes.py`:
 - `escenario_sin_bateria`: energía y fracción exportada del mismo sistema sin
   batería, valorada con la misma tarifa de excedentes.
 
+Complemento (26-sep-2026):
+
+- `aviso_sobredimension`: aviso 🟡 si, sin balance, la energía supera 1,2 ×
+  el consumo anual de 🏠 Proyecto; explica por qué TIR y VPN salen altos y
+  los pasos para corregirlo. No bloquea el cálculo.
+- `desglose_capex`: quinta tarjeta «Imprevistos (x %)» (u «Otros
+  (Presupuesto)» con el Presupuesto vinculado) para que las tarjetas sumen el
+  CAPEX bruto.
+
 ## Fuera de alcance
 
 - La tabla de sensibilidad por tarifa (cada fila supone vender toda la

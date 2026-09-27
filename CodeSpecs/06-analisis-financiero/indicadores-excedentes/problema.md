@@ -24,6 +24,15 @@ compra:
    sistema: TIR 18,0 % contra 17,2 %. Además rotula «Energía adicional:
    −826 kWh/año», que son los excedentes y no una pérdida.
 
+3. **Sistema mucho mayor que el consumo sin balance (26-sep-2026).** Con
+   24,07 kWp (26.669 kWh/año) para 5.738 kWh/año de consumo y sin correr
+   🔋 Baterías y Balance, Financiero valoró toda la energía a la tarifa de
+   compra (800 COP/kWh, escrita en ese campo por error) y mostró TIR 28,9 %,
+   aunque unos 20.900 kWh/año serían excedentes pagados a precio de bolsa.
+   No había ningún aviso.
+4. **Las tarjetas del CAPEX no suman el CAPEX bruto.** Faltaban los
+   imprevistos: 23.480 + 3.550 + 10.545 = 37.575 USD contra 39.454.
+
 ## Contexto
 
 - `frac_exportada` y `tarifa_excedentes_cop` salen de 🔋 Baterías y Balance y

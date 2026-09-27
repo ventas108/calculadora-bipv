@@ -16,6 +16,9 @@
 - `hay_bateria` → `bool`.
 - `escenario_sin_bateria` → `{energia_kWh, autoconsumo_kWh, exportada_kWh, frac_exportada}` o `None`.
 
+- `aviso_sobredimension` → `{energia_kWh, consumo_kWh, cobertura_pct, excedente_kWh, frac_excedente}` o `None`.
+- `desglose_capex` → `{modulos, inversor, estructura_instalacion, resto}`, que suman `capex_total`.
+
 ## Tipos de datos
 
 Números `float` en kWh/año y COP; `frac_exportada` entre 0 y 1.
@@ -42,3 +45,7 @@ Números `float` en kWh/año y COP; `frac_exportada` entre 0 y 1.
    del análisis.
 4. «Autoconsumo extra» muestra la energía descargada por la batería (≥ 0),
    no la diferencia con la producción.
+5. Sin balance y con energía > 1,2 × consumo anual, la página muestra el aviso
+   de sobredimensión en «Consumo vs Producción» y antes del botón Calcular.
+   Con balance, sin consumo o con 107 % (diseño del cliente) no hay aviso.
+6. Las cinco tarjetas del CAPEX suman el CAPEX bruto.
