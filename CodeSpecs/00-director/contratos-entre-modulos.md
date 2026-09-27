@@ -160,6 +160,17 @@ Reglas de consumo:
 - Cambiar de proyecto invalida el estado físico anterior y cualquier payload
 	pendiente de restauración.
 
+#### Cadena de pérdidas multi-superficie (27-sep-2026)
+
+- La energía que Vista 3D publica (simplificado, bypass y físico) sale de
+	`calculos/cadena_perdidas_multisup`: `motor_optico.cascada_optica` con la
+	POA de cada superficie (sin transparencia: η ya es de módulo) y
+	`produccion.simular_produccion_anual` (SDM) con esa POA. No es un segundo
+	modelo: son las mismas funciones de 🔆 Motor Óptico y 📊 Producción.
+- La publicación guarda `multisup_cadena_perdidas` (versión y huella de
+	parámetros); Vista 3D, Financiero, Baterías y CO₂ avisan si la energía se
+	publicó con el 0,78 o si los parámetros cambiaron después.
+
 ### 06-analisis-financiero
 
 Entrada:
@@ -316,9 +327,10 @@ Invariantes:
 	- la fase A3 del diseño eléctrico multi-superficie (sección 6 unificada). La
 		fase A2 se probó en producción con los casos D1–D9 (25 y 26-sep-2026); los
 		hallazgos de D8 y D9 se corrigieron en los PR #60 y #61.
-- **PR fijo en la energía simplificada multi-superficie:** Vista 3D lee
-	`pr_sistema` (que nadie escribe) y usa siempre 0,78; 📊 Producción publica
-	`PR_sistema`. Registrado como H2 en `05/panel-por-superficie`, sin Spec todavía.
+- **PR de la energía multi-superficie (resuelto el 27-sep-2026, antes H2):**
+	Vista 3D ya no usa el 0,78: cada superficie pasa por la cadena de pérdidas
+	(Spec `05/cadena-perdidas-multisuperficie`): óptica de 🔆 Motor Óptico por
+	superficie y el motor SDM de 📊 Producción con el `k_bipv` de su montaje.
 - **Presupuesto sin superficies de Vista 3D:** 💼 Presupuesto cuenta módulos e
 	inversores con `N_paneles_final` de 📐 Dimensionamiento, no con los paneles, grupos
 	e inversores de cada superficie. Registrado como H3, sin Spec todavía.

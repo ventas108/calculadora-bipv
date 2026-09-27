@@ -429,3 +429,11 @@ def test_buscar_tarifa_de_excedentes_vuelve_a_la_tarifa_de_compra():
         "potencia AC nominal",
     )
     assert "se conservan al cambiar de página y se guardan con el proyecto" in seccion["texto"]
+
+
+def test_buscar_motor_optico_y_mismatch_en_la_energia_multisuperficie():
+    seccion = _seccion_recuperada(
+        "el motor optico y el mismatch afectan la energia de vista 3d y el financiero o se usa PR 0,78",
+        "potencia AC nominal",
+    )
+    assert "ya no usa un PR fijo de 0,78" in seccion["texto"]

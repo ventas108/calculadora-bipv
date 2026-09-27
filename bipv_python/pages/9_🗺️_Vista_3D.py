@@ -1,6 +1,11 @@
 """Página 9 — Vista 3D del sitio: mapa geolocalizado y modelo volumétrico BIPV."""
 import math
 import streamlit as st
+from calculos.cadena_perdidas_multisup import (
+    CLAVE_PUBLICACION as CLAVE_CADENA_PUB, MONTAJE_AUTOMATICO, OPCIONES_MONTAJE,
+    K_BIPV_POR_TIPO, aviso_cadena_vencida, aviso_origen_parametros, cadena_superficies_estado,
+    parametros_cadena, pr_por_superficie, registro_publicacion, tabla_desglose,
+)
 import plotly.graph_objects as go
 
 from datos.ciudades_colombia import CIUDADES
@@ -1135,6 +1140,11 @@ with tab_solar:
                 if _opc_panel_guardada not in _opciones_panel_ed:
                     _opciones_panel_ed = _opciones_panel_ed + [_opc_panel_guardada]
                 _panel_v = _valor_campo_superficie(f"spanel_{_uid}", _opc_panel_guardada)
+                _kb_guardado = _sup.get("k_bipv_montaje", MONTAJE_AUTOMATICO)
+                _valor_campo_superficie(
+                    f"skbipv_{_uid}",
+                    _kb_guardado if _kb_guardado in OPCIONES_MONTAJE else MONTAJE_AUTOMATICO,
+                )
                 # El tilt debe caber en el rango del tipo elegido (cambia con el tipo).
                 _meta_e = TIPOS_SUPERFICIE[_tipo_v]
                 _tilt_rango = float(max(_meta_e["tilt_min"], min(_meta_e["tilt_max"], _tilt_v)))
@@ -1207,6 +1217,19 @@ with tab_solar:
                     except PanelSuperficieError as _err_panel_e:
                         _cp2.warning(f"⚠️ {_err_panel_e}")
 
+                    # Spec 05/cadena-perdidas-multisuperficie: montaje térmico
+                    # (k_BIPV) de ESTA superficie para la cadena de pérdidas.
+                    _kbipv_e = st.selectbox(
+                        "🌡️ Montaje térmico (calentamiento del panel)",
+                        OPCIONES_MONTAJE,
+                        key=f"skbipv_{_uid}",
+                        format_func=lambda o, _t=_tipo_e: (
+                            f"{o} (k={K_BIPV_POR_TIPO.get(_t, 1.0):g})" if o == MONTAJE_AUTOMATICO else o),
+                        help="Cuánto se calienta el panel según su ventilación: fachada confinada "
+                             "k=1,3; techo sobre soporte ventilado k=1,0. Más calor = menos energía. "
+                             "Entra en el PR de esta superficie.",
+                    )
+
                     # #156: montaje bifacial por fachada (solo superficies verticales)
                     _montaje_e = _mont_guardado
                     if float(_tilt_e) >= 80:
@@ -1239,6 +1262,7 @@ with tab_solar:
                         "area_m2":     _area_e,
                         "activa":      _act_e,
                         "montaje_fachada": _montaje_e,
+                        "k_bipv_montaje": _kbipv_e,
                         **_campos_panel_e,
                     })
                     _sups_actualizado.append(_sup_editada)
@@ -1846,7 +1870,6 @@ with tab_solar:
                 _etas_g, _paneles_g, _err_panel_g = eficiencias_superficies_estado(st.session_state)
                 for _msg_panel_g in _err_panel_g.values():
                     st.warning(f"⚠️ {_msg_panel_g} Esta superficie no entra en la energía.")
-                _pr_g  = float(st.session_state.get("pr_sistema", 0.78))
                 _rows_r, _tot_r = [], 0.0
                 # Spec 03/diseno-electrico-multisuperficie (fase A2): con grupos
                 # de strings la energía usa el área instalada (módulos × área
@@ -1855,12 +1878,21 @@ with tab_solar:
                     [x for x in _sups_actualizado if x.get("activa", True)],
                     paneles_superficies_estado(st.session_state),
                 )
+                # Spec 05/cadena-perdidas-multisuperficie: el PR de cada
+                # superficie sale de su cadena (óptica, temperatura, mismatch,
+                # cables, inversor, sombra de horizonte); antes era 0,78 fijo.
+                _cad_g, _err_cad_g = cadena_superficies_estado(
+                    st.session_state, _sups_energia_r, _poa_ss, _paneles_g)
+                for _n_cad, _msg_cad in _err_cad_g.items():
+                    st.warning(f"⚠️ «{_n_cad}»: {_msg_cad} Esta superficie no entra en la energía.")
+                _pr_map_g = pr_por_superficie(_cad_g)
                 for _s in _sups_energia_r:
                     _pd_s  = _poa_ss.get(_s["nombre"])
-                    if _pd_s is None or _s["nombre"] not in _etas_g:
+                    if _pd_s is None or _s["nombre"] not in _etas_g or _s["nombre"] not in _pr_map_g:
                         continue
                     _pa_s  = poa_anual_superficie(_pd_s)
-                    _pr_s  = produccion_superficie(_pd_s, _s["area_m2"], _etas_g[_s["nombre"]], _pr_g)
+                    _pr_s  = produccion_superficie(_pd_s, _s["area_m2"], _etas_g[_s["nombre"]],
+                                                   _pr_map_g[_s["nombre"]])
                     _mt_s  = TIPOS_SUPERFICIE.get(_s["tipo"], {})
                     _tot_r += _pr_s["e_ac_anual_kWh"]
                     _rows_r.append({
@@ -1872,6 +1904,7 @@ with tab_solar:
                         "Panel":            _paneles_g[_s["nombre"]]["nombre"],
                         "η (%)":            f"{_etas_g[_s['nombre']] * 100:.2f}",
                         "POA (kWh/m²/año)": f"{_pa_s:.0f}",
+                        "PR":               f"{_pr_map_g[_s['nombre']]:.3f}",
                         "E_ac (kWh/año)":   f"{_pr_s['e_ac_anual_kWh']:,.0f}",
                     })
                 if _rows_r:
@@ -1882,9 +1915,22 @@ with tab_solar:
                         f"{_tot_r:,.0f} kWh/año",
                     )
                     st.caption(
-                        f"E_ac = POA × área × η del panel de cada superficie × PR "
-                        f"(PR={_pr_g*100:.0f}%)."
+                        "E_ac = POA × área × η del panel de cada superficie × PR de esa "
+                        "superficie (cadena de pérdidas: óptica, temperatura, mismatch, "
+                        "cables, inversor y sombra de horizonte)."
                     )
+                    _aviso_par_g = aviso_origen_parametros(parametros_cadena(st.session_state))
+                    if _aviso_par_g:
+                        st.info(_aviso_par_g)
+                    with st.expander("🔎 De dónde sale el PR de cada superficie (pérdidas)"):
+                        st.dataframe(_pd.DataFrame(tabla_desglose(_cad_g)),
+                                     use_container_width=True, hide_index=True)
+                        st.caption(
+                            "IAM: pérdida por el ángulo de llegada de la luz al vidrio (mayor en "
+                            "fachadas verticales). Temperatura: NOCT y γ del panel con el montaje "
+                            "de la superficie (k_BIPV). Mismatch, cables y sombra de horizonte: "
+                            "🔀 Mismatch. Inversor: η del inversor de sus grupos."
+                        )
 
             # ── Integrar al análisis financiero ──────────────────────────────
             _origen_pub = origen_vigente(st.session_state)
@@ -1913,6 +1959,9 @@ with tab_solar:
                          "las superficies activas.",
                 )
 
+                _aviso_cad_pub = aviso_cadena_vencida(st.session_state)
+                if _aviso_cad_pub and _origen_pub:
+                    _ci2.warning(_aviso_cad_pub)
                 if _origen_pub:
                     _ci2.success(
                         f"✅ Modo multi-superficie **activo** — origen: "
@@ -1958,16 +2007,23 @@ with tab_solar:
                         [s for s in _sups_actualizado if s.get("activa", True)],
                         paneles_superficies_estado(st.session_state),
                     )
-                    _pr_int  = float(st.session_state.get("pr_sistema", 0.78))
+                    _cad_int, _err_cad_int = cadena_superficies_estado(
+                        st.session_state, _sups_act_int, _poa_ss,
+                        eficiencias_superficies_estado(st.session_state)[1])
+                    _pr_int = pr_por_superficie(_cad_int)
 
                     # POA combinada ponderada (clave exclusiva — no toca poa_df)
                     _poa_comb = agregar_poa_ponderada(_poa_ss, _sups_act_int)
 
                     # E_ac y desglose
-                    _res_int = e_ac_total_multisup(_poa_ss, _sups_act_int, _etas_int, _pr_int)
+                    _res_int = (e_ac_total_multisup(_poa_ss, _sups_act_int, _etas_int, _pr_int)
+                                if not _err_cad_int else None)
 
                     # Publicación única: valida y escribe todas las claves juntas
                     try:
+                        if _err_cad_int:
+                            raise ValueError("falta la cadena de pérdidas de "
+                                             + "; ".join(f"«{n}»: {m}" for n, m in _err_cad_int.items()))
                         _pub_int = publicar_energia_multisuperficie(
                             st.session_state, origen="simplificado",
                             e_ac_total=_res_int["e_ac_total_kWh"],
@@ -1983,6 +2039,8 @@ with tab_solar:
                     except ValueError as _error_pub:
                         st.error(f"❌ No se publicó la energía multi-superficie: {_error_pub}")
                     else:
+                        st.session_state[CLAVE_CADENA_PUB] = registro_publicacion(
+                            st.session_state, _cad_int, _sups_act_int)
                         _resolver_publicacion(_pub_int, "simplificado")
                         st.rerun()
 
@@ -2092,6 +2150,10 @@ with tab_solar:
                                 except ValueError as _error_pub:
                                     st.error(f"❌ No se publicó el resultado físico: {_error_pub}")
                                 else:
+                                    st.session_state[CLAVE_CADENA_PUB] = registro_publicacion(
+                                        st.session_state, {}, [
+                                            x for x in st.session_state.get("superficies_bipv") or []
+                                            if x.get("activa", True)])
                                     _resolver_publicacion(_pub_fisico, ORIGEN_FISICO)
                                     st.rerun()
 
@@ -2361,11 +2423,12 @@ with tab_solar:
                     st.info("🟢 Libre (FS<10%) · 🟠 Parcial (10-35%) · 🔴 Bypass (>35%)")
 
                 # Tabla del mes
-                _etas_vm, _, _ = eficiencias_superficies_estado(st.session_state)
-                _area_vm = {
-                    x["nombre"]: x["area_m2"] for x in superficies_para_energia(
-                        _sups_viz, paneles_superficies_estado(st.session_state))
-                }
+                _etas_vm, _paneles_vm, _ = eficiencias_superficies_estado(st.session_state)
+                _sups_energia_vm = superficies_para_energia(
+                    _sups_viz, paneles_superficies_estado(st.session_state))
+                _area_vm = {x["nombre"]: x["area_m2"] for x in _sups_energia_vm}
+                _pr_map_vm = pr_por_superficie(cadena_superficies_estado(
+                    st.session_state, _sups_energia_vm, _poa_viz, _paneles_vm)[0])
                 _rows_mv = []
                 for _sv in _sups_viz:
                     _nv = _sv["nombre"]
@@ -2374,8 +2437,8 @@ with tab_solar:
                     _pv_vm  = _pm_vm[_mes_viz-1]
                     _eta_vm = _etas_vm.get(_nv)
                     _e_vm   = (
-                        _pv_vm * _area_vm.get(_nv, _sv["area_m2"]) * _eta_vm * float(st.session_state.get("pr_sistema", 0.78))
-                        if _eta_vm is not None else None
+                        _pv_vm * _area_vm.get(_nv, _sv["area_m2"]) * _eta_vm * _pr_map_vm[_nv]
+                        if _eta_vm is not None and _nv in _pr_map_vm else None
                     )
                     _row_mv = {
                         "Superficie": f"{TIPOS_SUPERFICIE.get(_sv['tipo'],{}).get('icon','')} {_nv}",
@@ -2410,9 +2473,15 @@ with tab_solar:
             _avisar_poa_no_vigente(_poa_p, _motivos_p)
             _df_fsp  = st.session_state.get("df_fs_raw")
             _csv_p   = st.session_state.get("csv_fs_ok", False)
-            _pr_p    = float(st.session_state.get("pr_sistema", 0.78))
             # Spec 05/panel-por-superficie: η y panel de cada superficie.
             _etas_p, _paneles_p, _err_panel_p = eficiencias_superficies_estado(st.session_state)
+            # Spec 05/cadena-perdidas-multisuperficie: PR de la cadena de cada
+            # superficie; el bypass ya modela su sombra (sin horizonte).
+            _cad_p, _ = cadena_superficies_estado(st.session_state, _sups_p, _poa_p, _paneles_p)
+            _pr_map_p = pr_por_superficie(_cad_p)
+            _cad_bp, _ = cadena_superficies_estado(st.session_state, _sups_p, _poa_p, _paneles_p,
+                                                   aplicar_horizonte=False)
+            _pr_map_bp = pr_por_superficie(_cad_bp)
             for _msg_panel_p in _err_panel_p.values():
                 st.warning(f"⚠️ {_msg_panel_p} Esta superficie no entra en la producción.")
 
@@ -2425,8 +2494,10 @@ with tab_solar:
                 _tot_m = [0.0]*12
                 for _sp in _sups_p:
                     _pdf_p = _poa_p.get(_sp["nombre"])
-                    if _pdf_p is None or _pdf_p.empty or _sp["nombre"] not in _etas_p: continue
-                    _prod_p = produccion_superficie(_pdf_p, _sp["area_m2"], _etas_p[_sp["nombre"]], _pr_p)
+                    if (_pdf_p is None or _pdf_p.empty or _sp["nombre"] not in _etas_p
+                            or _sp["nombre"] not in _pr_map_p): continue
+                    _prod_p = produccion_superficie(_pdf_p, _sp["area_m2"], _etas_p[_sp["nombre"]],
+                                                    _pr_map_p[_sp["nombre"]])
                     for _mi in range(12): _tot_m[_mi] += _prod_p["e_ac_mensual"][_mi]
                     _fig_stk.add_trace(go.Bar(
                         name=f"{TIPOS_SUPERFICIE.get(_sp['tipo'],{}).get('icon','')} {_sp['nombre']}",
@@ -2480,11 +2551,12 @@ with tab_solar:
                 st.markdown("#### 3. Resumen anual del sistema")
                 _rows_a, _tot_ar, _tot_ea = [], 0.0, 0.0
                 for _sp in _sups_p:
-                    if _sp["nombre"] not in _etas_p:
+                    if _sp["nombre"] not in _etas_p or _sp["nombre"] not in _pr_map_p:
                         continue
                     _pdf_p = _poa_p.get(_sp["nombre"])
                     _pa_a  = poa_anual_superficie(_pdf_p) if _pdf_p is not None else 0.0
-                    _pr_a  = produccion_superficie(_pdf_p, _sp["area_m2"], _etas_p[_sp["nombre"]], _pr_p)
+                    _pr_a  = produccion_superficie(_pdf_p, _sp["area_m2"], _etas_p[_sp["nombre"]],
+                                                   _pr_map_p[_sp["nombre"]])
                     _tot_ar += _sp["area_m2"]; _tot_ea += _pr_a["e_ac_anual_kWh"]
                     _fs_str = "—"
                     if _csv_p and _df_fsp is not None:
@@ -2701,8 +2773,12 @@ with tab_solar:
                                         "pct_bypass_anual": _pct_sp_bp,
                                         "horas_bypass": max(r["horas"] for r in _res_grupos_bp),
                                     }
+                                    if _sp_bp["nombre"] not in _pr_map_bp:
+                                        _errores_bp.append(f"{_sp_bp['nombre']}: sin cadena de pérdidas")
+                                        continue
                                     _prod_sp_bp = produccion_superficie(
-                                        _poa_sp_bp, _sp_bp["area_m2"], _inf_sp_bp["eta"], _pr_p
+                                        _poa_sp_bp, _sp_bp["area_m2"], _inf_sp_bp["eta"],
+                                        _pr_map_bp[_sp_bp["nombre"]],
                                     )
                                     _f_bp_sp  = 1.0 - (_res_sp_bp["pct_bypass_anual"] / 100.0)
                                     _eac_sp_bp = _prod_sp_bp["e_ac_anual_kWh"] * _f_bp_sp
@@ -2772,6 +2848,8 @@ with tab_solar:
                             except ValueError as _error_pub:
                                 st.error(f"❌ No se publicó el bypass por superficie: {_error_pub}")
                             else:
+                                st.session_state[CLAVE_CADENA_PUB] = registro_publicacion(
+                                    st.session_state, _cad_bp, _sups_p)
                                 _resolver_publicacion(_pub_bp, "bypass_csv")
                                 st.rerun()
 

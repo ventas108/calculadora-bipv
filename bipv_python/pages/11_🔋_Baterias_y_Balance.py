@@ -75,6 +75,11 @@ _est_ms_bat = estado_sistema_publicado(st.session_state)
 _ms_bat = bool(_multisup_ok_bat and _e_ac_multisup_bat > 0)
 from calculos.publicacion_multisuperficie import aviso_retiro_para_consumidores
 _aviso_retiro_bat = aviso_retiro_para_consumidores(st.session_state)
+# Spec 05/cadena-perdidas-multisuperficie: energía publicada con el PR fijo
+# 0,78 o con parámetros de pérdidas que ya cambiaron.
+from calculos.cadena_perdidas_multisup import aviso_cadena_vencida as _aviso_cadena
+if _aviso_cadena(st.session_state):
+    st.warning(_aviso_cadena(st.session_state))
 if _aviso_retiro_bat:
     st.warning(_aviso_retiro_bat)
 if _ms_bat and _est_ms_bat["problemas"]:

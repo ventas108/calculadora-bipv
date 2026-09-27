@@ -289,6 +289,18 @@ def recalcular_fisica_superficie(
             f"'{superficie.get('nombre')}' (geometría/TMY inconsistentes)."
         )
     G_eff = _validar_serie_horaria("poa_global", poa_df["poa_global"].to_numpy())
+    # Spec 05/cadena-perdidas-multisuperficie: con parámetros ópticos, el SDM
+    # recibe la POA con IAM + suciedad de ESTA superficie (como Producción con
+    # poa_sin_termico_df); la temperatura la aplica el SDM una sola vez.
+    # Sin ellos (superficies de una versión anterior) se usa la POA bruta.
+    f_optico = 1.0
+    poa_bruta_anual = float(G_eff.sum())
+    if superficie.get("cadena_optica"):
+        from calculos.cadena_perdidas_multisup import poa_optica_fisico
+        _bruta = float(G_eff.sum())
+        G_eff = _validar_serie_horaria("poa_optica", poa_optica_fisico(
+            tmy, poa_df, panel, float(superficie.get("k_bipv", 1.0)), superficie["cadena_optica"]))
+        f_optico = float(G_eff.sum()) / _bruta if _bruta > 0 else 1.0
 
     bypass = simular_bypass_horario(
         G_eff=G_eff,
@@ -312,7 +324,8 @@ def recalcular_fisica_superficie(
         "horas_bypass": bypass["horas_bypass"],
         "horas_sombra": bypass["horas_sombra"],
         "E_dc_anual_kWh": round(float(np.sum(bypass["P_dc_kW"])), 1),
-        "poa_anual_kWh_m2": round(float(G_eff.sum()) / 1000.0, 2),
+        "poa_anual_kWh_m2": round(poa_bruta_anual / 1000.0, 2),
+        "f_optico": round(f_optico, 5),
     }
     # La etapa de inversor queda obsoleta -- se recalcula aparte
     # (recalcular_etapa_inversor_bus), nunca se reutiliza un P_ac de la POA

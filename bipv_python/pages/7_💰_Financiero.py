@@ -82,6 +82,11 @@ _sistema_ms = _est_ms["sistema"] if _ms_activo else None
 # H-D6: si la energía multi-superficie se retiró, decirlo antes de mostrar
 # valores de superficie única que no son del diseño de Vista 3D.
 _aviso_retiro_fin = aviso_retiro_para_consumidores(st.session_state)
+# Spec 05/cadena-perdidas-multisuperficie: energía publicada con el PR fijo
+# 0,78 o con parámetros de pérdidas que ya cambiaron.
+from calculos.cadena_perdidas_multisup import aviso_cadena_vencida as _aviso_cadena
+if _aviso_cadena(st.session_state):
+    st.warning(_aviso_cadena(st.session_state))
 if _aviso_retiro_fin:
     st.warning(_aviso_retiro_fin)
 # Sistema incompleto, publicación anterior o diseño eléctrico 🔴: no se

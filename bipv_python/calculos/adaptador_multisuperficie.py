@@ -31,6 +31,9 @@ def construir_proyecto_desde_session_state(session_state: Mapping[str, Any]) -> 
     inversores = [inversor_nuevo(str(i["inversor_id"]), i["tipo"], float(i["eta_inversor"]), i.get("P_ac_nom_W"), dict(i.get("ficha") or i.get("inversor") or {})) for i in inversores_ss]
     from calculos.diseno_electrico_multisup import grupos_de_superficie, temperaturas_diseno
     from calculos.panel_superficie import area_modulo
+    from calculos.cadena_perdidas_multisup import (
+        cadena_optica_fisico, k_bipv_superficie, parametros_cadena,
+    )
 
     salida = []
     for entrada in superficies:
@@ -74,7 +77,10 @@ def construir_proyecto_desde_session_state(session_state: Mapping[str, Any]) -> 
         for grupo, area_u in zip(grupos, areas):
             gid = str(grupo.get("gid", "G1"))
             nombre_u = f"{nombre} · {gid}" if varios else nombre
-            sup = superficie_nueva(nombre_u, str(entrada.get("tipo", "Fachada")), float(entrada.get("tilt_deg", 90)), float(entrada.get("azimuth_deg", 180)), float(area_u), dict(panel), int(grupo["n_serie"]), int(grupo["n_paralelo"]), str(grupo["inversor_id"]), sombra, float(entrada.get("albedo", 0.2)), entrada.get("bifacial"), float(entrada.get("k_bipv", 1.0)))
+            sup = superficie_nueva(nombre_u, str(entrada.get("tipo", "Fachada")), float(entrada.get("tilt_deg", 90)), float(entrada.get("azimuth_deg", 180)), float(area_u), dict(panel), int(grupo["n_serie"]), int(grupo["n_paralelo"]), str(grupo["inversor_id"]), sombra, float(entrada.get("albedo", 0.2)), entrada.get("bifacial"), float(entrada["k_bipv"]) if "k_bipv" in entrada else k_bipv_superficie(entrada))
+            # Spec 05/cadena-perdidas-multisuperficie: el físico usa la POA con
+            # IAM + suciedad de esta superficie (antes, la POA bruta).
+            sup["cadena_optica"] = cadena_optica_fisico(entrada, panel, parametros_cadena(session_state))
             sup["_firma_sombra"] = dict(entrada["firma_sombra"])
             sup["superficie_origen"] = nombre
             sup["gid"] = gid
