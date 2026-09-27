@@ -76,7 +76,8 @@ Rama `claude/mejoras-bipv` sobre `main` `5d5b98e0`.
       7. Sección 6: aviso «'Techo' tiene(n) varios grupos de strings … no
          la(s) incluye».
       8. 🗑️ quita G2. Sin excepciones en ningún paso.
-- [ ] Prueba en producción de la fase A2.
+- [x] Prueba en producción de la fase A2: casos D1–D9 (25 y 26-sep-2026);
+      hallazgos de D8 y D9 corregidos en los PR #60 y #61.
 
 ### Complemento de A2 antes de A3
 
