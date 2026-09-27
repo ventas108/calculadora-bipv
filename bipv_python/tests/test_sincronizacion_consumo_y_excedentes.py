@@ -71,11 +71,15 @@ def test_frac_exportada_se_calcula_y_se_pasa_a_ambos_escenarios():
 
 def test_tarifa_excedentes_widget_existe_y_tiene_ayuda_sobre_creg_174():
     src = _leer(_PAG_FINANCIERO)
-    assert 'key="tarifa_excedentes_cop_kWh"' in src
+    # Desde 27-sep-2026 el valor vive en «tarifa_excedentes_cop_kWh» (se guarda
+    # con el proyecto) y el campo usa campo_persistente (no se pierde al cambiar
+    # de página).
+    assert '"Tarifa de excedentes exportados (COP/kWh)", "tarifa_excedentes_cop_kWh",' in src
     assert "CREG 174" in src
     # Su default debe ser la tarifa de compra (sin descuento inventado) hasta
     # que el usuario la ajuste -- nunca un porcentaje de descuento supuesto.
-    assert 'value=float(st.session_state.get("tarifa_excedentes_cop_kWh", tarifa_cop))' in src
+    i = src.index('"Tarifa de excedentes exportados (COP/kWh)", "tarifa_excedentes_cop_kWh",')
+    assert src[i:i + 200].split("\n")[1].strip() == "float(tarifa_cop),"
 
 
 def test_tarifa_excedentes_se_pasa_a_ambos_escenarios():

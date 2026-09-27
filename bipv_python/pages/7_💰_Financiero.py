@@ -1,6 +1,7 @@
 
 """Página 7 — Análisis financiero BIPV — Ley 1715 de 2014 (Colombia)."""
 import streamlit as st
+from calculos.campos_persistentes import campo_persistente
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
@@ -548,22 +549,25 @@ with col_cx1:
             elif _inversor_dim and not _p_ac_nom_kW:
                 st.caption("El inversor no tiene potencia AC nominal en el catálogo: no se puede "
                            "pasar su precio a USD/kWp. Complétala en 🔌 Catálogo Inversores PDF.")
-        costo_estructura_usd_kw = st.number_input(
-            "Estructura, cableado, protecciones (USD/kWp)",
-            min_value=50.0, max_value=500.0,
-            value=200.0, step=25.0,
+        # Estos parámetros se conservan al cambiar de página y se guardan con
+        # el proyecto (antes volvían a su valor por defecto, 27-sep-2026).
+        costo_estructura_usd_kw = campo_persistente(
+            st.session_state, st.number_input,
+            "Estructura, cableado, protecciones (USD/kWp)", "fin_costo_estructura_usd_kw", 200.0,
+            min_value=50.0, max_value=500.0, step=25.0,
             help="BIPV de fachada requiere subestructura especializada. Típico: USD 150–300/kWp",
         )
-        costo_instalacion_pct = st.number_input(
+        costo_instalacion_pct = campo_persistente(
+            st.session_state, st.number_input,
             "Ingeniería + instalación + puesta en marcha (%CAPEX equipos)",
-            min_value=5.0, max_value=40.0,
-            value=18.0, step=1.0,
+            "fin_costo_instalacion_pct", 18.0,
+            min_value=5.0, max_value=40.0, step=1.0,
             help="Para Colombia: 15–25% del costo de equipos",
         )
-        imprevistos_pct = st.number_input(
-            "Imprevistos y contingencia (%)",
-            min_value=0.0, max_value=20.0,
-            value=5.0, step=1.0,
+        imprevistos_pct = campo_persistente(
+            st.session_state, st.number_input,
+            "Imprevistos y contingencia (%)", "fin_imprevistos_pct", 5.0,
+            min_value=0.0, max_value=20.0, step=1.0,
         )
 
 with col_cx2:
@@ -733,17 +737,19 @@ with col_t1:
     tarifa_cop = tarifa_widget("fin")
 
 with col_t2:
-    esc_tarifa = st.slider(
-        "Escalación anual tarifa (%)",
-        min_value=0.0, max_value=15.0, value=5.0, step=0.5,
+    esc_tarifa = campo_persistente(
+        st.session_state, st.slider,
+        "Escalación anual tarifa (%)", "fin_esc_tarifa_pct", 5.0,
+        min_value=0.0, max_value=15.0, step=0.5,
         help="Colombia: inflación energética histórica ~5–8%/año. "
              "Escenario base: 5%.",
     )
     # ── #177: el O&M también sube con la inflación. Antes era constante en
     # USD los 25-30 años → subestimaba costos tardíos e inflaba TIR/payback.
-    esc_opex = st.slider(
-        "Escalación anual O&M (%)",
-        min_value=0.0, max_value=10.0, value=3.0, step=0.5,
+    esc_opex = campo_persistente(
+        st.session_state, st.slider,
+        "Escalación anual O&M (%)", "fin_esc_opex_pct", 3.0,
+        min_value=0.0, max_value=10.0, step=0.5,
         help="Inflación esperada del mantenimiento en USD (mano de obra, "
              "repuestos, seguros). Referencia Colombia: 3–5%/año. "
              "Con 0% se reproduce el modelo anterior (O&M constante).",
@@ -1057,9 +1063,10 @@ with col_t3:
                 )
             )
         else:
-            opex_pct = st.slider(
-                "O&M anual (%CAPEX) — paramétrico",
-                min_value=0.5, max_value=3.0, value=1.5, step=0.25,
+            opex_pct = campo_persistente(
+                st.session_state, st.slider,
+                "O&M anual (%CAPEX) — paramétrico", "fin_opex_pct_capex", 1.5,
+                min_value=0.5, max_value=3.0, step=0.25,
                 help="FV Colombia zona tropical: 1.5–2.5%/año. "
                      "Incluye limpieza bimestral, revisión semestral y monitoreo.",
             )
@@ -1138,9 +1145,10 @@ with col_t3:
                 f"≡ **USD {_opex_usd_anual:,.0f}/año** · {opex_pct:.2f}% del CAPEX"
             )
         else:
-            opex_pct = st.slider(
-                "O&M anual (%CAPEX)",
-                min_value=0.5, max_value=3.0, value=1.5, step=0.25,
+            opex_pct = campo_persistente(
+                st.session_state, st.slider,
+                "O&M anual (%CAPEX)", "fin_opex_pct_capex", 1.5,
+                min_value=0.5, max_value=3.0, step=0.25,
                 help="FV Colombia zona tropical: 1.5–2.5%/año. "
                      "Incluye limpieza, revisión y seguros. "
                      "Completa 📅 OPEX Anual en Presupuesto para usar valores reales.",
@@ -1164,14 +1172,16 @@ with col_t3:
             "la TIR y el payback quedan mejores de lo que podrás cumplir. "
             "Sube el O&M o completa la pestaña 📅 OPEX Anual del 💼 Presupuesto."
         )
-    tasa_desc = st.slider(
-        "Tasa de descuento WACC (%)",
-        min_value=5.0, max_value=20.0, value=10.0, step=0.5,
+    tasa_desc = campo_persistente(
+        st.session_state, st.slider,
+        "Tasa de descuento WACC (%)", "fin_tasa_desc_pct", 10.0,
+        min_value=5.0, max_value=20.0, step=0.5,
         help="WACC Colombia: 9–14% para proyectos de energía renovable. Base: 10%.",
     )
-    n_anos = st.slider(
-        "Horizonte de análisis (años)",
-        min_value=10, max_value=30, value=25, step=5,
+    n_anos = campo_persistente(
+        st.session_state, st.slider,
+        "Horizonte de análisis (años)", "fin_n_anos", 25,
+        min_value=10, max_value=30, step=5,
     )
 
 # ── Tarifa de excedentes exportados (Res. CREG 174/2021) ──────────────────────
@@ -1185,10 +1195,13 @@ if frac_exportada > 0:
         f"excedente (calculado en 🔋 Baterías y Balance: "
         f"{_e_exportacion:,.0f} kWh/año de {e_financiero:,.0f} kWh/año totales)."
     )
-    tarifa_excedentes_cop = st.number_input(
-        "Tarifa de excedentes exportados (COP/kWh)",
-        min_value=0.0,
-        value=float(st.session_state.get("tarifa_excedentes_cop_kWh", tarifa_cop)),
+    # Antes se perdía al ir a otra página (p. ej. a 🏠 Proyecto a guardar) y
+    # volvía a la tarifa de compra: 800 → 1.200 (27-sep-2026).
+    tarifa_excedentes_cop = campo_persistente(
+        st.session_state, st.number_input,
+        "Tarifa de excedentes exportados (COP/kWh)", "tarifa_excedentes_cop_kWh",
+        float(tarifa_cop),
+        min_value=0.0, max_value=5000.0,
         step=10.0,
         help=(
             "Precio al que se remunera la energía exportada a la red bajo medición neta "
@@ -1197,7 +1210,6 @@ if frac_exportada > 0:
             "Consulta con tu comercializador el valor real de tu contrato. "
             "Por defecto igual a la tarifa de compra (sin descuento) hasta que lo ajustes."
         ),
-        key="tarifa_excedentes_cop_kWh",
     )
 else:
     tarifa_excedentes_cop = tarifa_cop
@@ -1277,10 +1289,10 @@ st.subheader("📜 3. Beneficios Ley 1715 de 2014")
 col_l1, col_l2 = st.columns([1, 1])
 
 with col_l1:
-    tasa_renta = st.number_input(
-        "Tasa impuesto de renta corporativo (%)",
-        min_value=15.0, max_value=40.0,
-        value=35.0, step=1.0,
+    tasa_renta = campo_persistente(
+        st.session_state, st.number_input,
+        "Tasa impuesto de renta corporativo (%)", "fin_tasa_renta_pct", 35.0,
+        min_value=15.0, max_value=40.0, step=1.0,
         help="Colombia 2024: tasa general corporativa 35% (Ley 2277 de 2022)",
     )
     st.markdown("""
