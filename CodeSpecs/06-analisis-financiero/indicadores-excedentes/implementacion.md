@@ -20,5 +20,7 @@
 - `bipv_python/calculos/indicadores_excedentes.py`
 - `bipv_python/pages/7_💰_Financiero.py`
 - `bipv_python/tests/test_indicadores_excedentes.py`
+- `bipv_python/tests/test_sincronizacion_consumo_y_excedentes.py`
+- `bipv_python/tests/test_asistente_retrieval.py`
 - `bipv_python/datos/conocimiento_bipv.md`
 - `CodeSpecs/00-director/registro-de-decisiones.md`

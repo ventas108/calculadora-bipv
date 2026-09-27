@@ -12,7 +12,7 @@
     aparece «Impacto de la batería»;
   - con batería (300 kWh descargados): la sección aparece y «Autoconsumo
     extra» = 300 kWh/año.
-- [x] Suite completa de `bipv_python`.
+- [x] Suite completa de `bipv_python`: 1818 pruebas; se actualizó `test_sincronizacion_consumo_y_excedentes.py` (la tarifa de excedentes ahora se pasa a 3 escenarios: P50, P90 y sin batería).
 
 ## Resultado
 
