@@ -80,5 +80,7 @@ def test_tarifa_excedentes_widget_existe_y_tiene_ayuda_sobre_creg_174():
 
 def test_tarifa_excedentes_se_pasa_a_ambos_escenarios():
     src = _leer(_PAG_FINANCIERO)
+    # P50, P90 y, desde 27-sep-2026, el escenario «sin batería» de la
+    # comparación con/sin batería (Spec 06/indicadores-excedentes).
     ocurrencias = src.count("tarifa_excedentes_cop_kWh = tarifa_excedentes_cop,")
-    assert ocurrencias == 2
+    assert ocurrencias == 3
