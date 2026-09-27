@@ -47,3 +47,18 @@ def sincronizar_con_fuente(estado: MutableMapping[str, Any], clave: str,
         estado[clave] = valor_fuente if valor_fuente is not None else respaldo
     estado[ref] = valor_fuente
     return estado[clave]
+
+
+def clave_con_opciones(base: str, opciones) -> str:
+    """Clave de un selector que cambia cuando cambian sus opciones.
+
+    Si la lista de opciones de un ``selectbox`` cambia (p. ej. se borra un
+    inversor), Streamlit lo recrea con la opción por defecto aunque la clave
+    tenga un valor válido. Con una clave distinta por lista de opciones, el
+    campo nuevo se inicializa desde los datos (``sincronizar_campo``) y
+    conserva la selección (26-sep-2026).
+    """
+    import zlib
+
+    firma = zlib.crc32("\x1f".join(map(str, opciones)).encode("utf-8"))
+    return f"{base}__{firma:08x}"
