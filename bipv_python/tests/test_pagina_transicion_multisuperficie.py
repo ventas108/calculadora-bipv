@@ -82,7 +82,7 @@ def test_modo_fisico_muestra_estado_por_superficie_antes_de_calcular():
 def test_ui_expone_inversores_y_asignacion_por_superficie():
     src = _fuente()
     assert 'key="btn_add_multisup_inversor"' in src
-    assert 'key=f"ms_sup_inv_' in src
+    assert 'f"ms_sup_inv_{_suf}"' in src  # clave del selector de inversor por grupo
     assert "validar_inversores_y_asignaciones(" in src
     assert 'st.session_state["multisup_inversores"]' in src
 

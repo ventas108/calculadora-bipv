@@ -99,6 +99,10 @@ eléctrico, y al cambiar de proyecto.
 13. El CAPEX de baterías usa el precio vigente del catálogo (N × precio) y avisa
    si cambió desde el dimensionamiento (`capex_baterias_vigente`); igual en
    💼 Presupuesto.
+14. El resultado guardado (TIR, VPN, payback, LCOE) solo se muestra si ningún dato
+   del cálculo cambió desde el último «Calcular» (`vigencia_financiero.datos_cambiados`:
+   CAPEX, energía, tarifas, fracción exportada, TRM, tasas, O&M, años, P90,
+   degradación, beneficios); si cambió, se oculta y se nombra lo que cambió.
 
 ## Pruebas requeridas
 

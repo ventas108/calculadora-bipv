@@ -1334,6 +1334,28 @@ if _last_capex_calc > 0 and abs(_last_capex_calc - capex_total) > 0.5:
         f"Presiona **Calcular** para actualizar TIR, VPN y Payback."
     )
 
+# Todos los datos del cálculo: si alguno cambió desde el último «Calcular»,
+# el resultado guardado es viejo y no se muestra (26-sep-2026: antes solo se
+# comparaba el CAPEX y una nueva tarifa de excedentes dejaba el TIR anterior).
+from calculos.vigencia_financiero import datos_cambiados
+_fin_datos_actuales = {
+    "capex_total": capex_total, "e_financiero": e_financiero, "tarifa_cop": tarifa_cop,
+    "tarifa_excedentes_cop": tarifa_excedentes_cop, "frac_exportada": frac_exportada,
+    "tipo_cambio": tipo_cambio, "tasa_desc": tasa_desc, "esc_tarifa": esc_tarifa,
+    "tasa_deg": tasa_deg, "opex_pct": opex_pct, "esc_opex": esc_opex, "n_anos": n_anos,
+    "factor_p90": factor_p90, "config_degradacion": _config_degradacion, "ben": ben,
+}
+if st.session_state.get("financiero_ok"):
+    _fin_cambios = datos_cambiados(st.session_state.get("_fin_datos_calculo"), _fin_datos_actuales)
+    if _fin_cambios:
+        st.session_state.pop("financiero_ok", None)
+        st.session_state.pop("comp_financiero", None)
+        st.warning(
+            "⚠️ Cambiaron datos del análisis desde el último cálculo ("
+            + ", ".join(_fin_cambios)
+            + "). Presiona **Calcular** para ver TIR, VPN y payback con los datos actuales."
+        )
+
 btn_fin = st.button(
     "📊 Calcular TIR, VPN, Payback y LCOE", type="primary", use_container_width=True
 )
@@ -1386,6 +1408,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
         st.session_state["comp_financiero_p90"] = comp_p90
         st.session_state["financiero_ok"]      = True
         st.session_state["factor_p90_guardado"] = factor_p90
+        st.session_state["_fin_datos_calculo"]  = _fin_datos_actuales
     else:
         comp     = st.session_state.get("comp_financiero", {})
         comp_p90 = st.session_state.get("comp_financiero_p90", {})
