@@ -1557,6 +1557,23 @@ if btn_fin or st.session_state.get("financiero_ok"):
 
     st.dataframe(df_comp.style.apply(_color_comp, axis=1), use_container_width=True, hide_index=True)
 
+    # El LCOE se comparaba con la tarifa del año 1 y parecía que el proyecto no
+    # se pagaba aunque el VPN fuera positivo (27-sep-2026).
+    from calculos.lectura_financiera import valor_nivelado_energia
+    _vne = valor_nivelado_energia(comp["sin"]["flujos"], tasa_desc / 100, tipo_cambio)
+    if _vne:
+        _lcoe_cop = comp["sin"]["metricas"]["lcoe_cop_kWh"]
+        st.caption(
+            f"💡 **Cómo leer el LCOE:** cuesta **{_lcoe_cop:,.0f} COP** producir cada kWh "
+            f"(CAPEX bruto + O&M, descontados al {tasa_desc:.0f}%; por eso es igual con y sin "
+            f"Ley 1715). Cada kWh vale en promedio **{_vne['cop_kWh']:,.0f} COP**: la tarifa de "
+            f"{tarifa_cop:,.0f} COP del año 1 sube {esc_tarifa:.1f}% al año y los excedentes "
+            "se pagan a su tarifa, descontado igual que el LCOE. "
+            + ("✅ El LCOE es menor: el proyecto se paga aun sin Ley 1715."
+               if _lcoe_cop < _vne["cop_kWh"] else
+               "⚠️ El LCOE es mayor: sin Ley 1715 el proyecto no alcanza la tasa de descuento.")
+        )
+
     # ── Métricas clave: 3 columnas P50 / P90 / Delta ──────────────────────────
     c1, c2, c3 = st.columns(3)
     tir_delta = ((m_con['tir_pct'] or 0) - (m_sin['tir_pct'] or 0))
@@ -1598,7 +1615,8 @@ if btn_fin or st.session_state.get("financiero_ok"):
                   delta_color="inverse")
     else:
         c6.metric("LCOE P50", f"{m_con['lcoe_cop_kWh']:.0f} COP/kWh  ·  USD {m_con['lcoe_usd_kWh']:.4f}",
-                  delta=f"Tarifa: {tarifa_cop:.0f} COP/kWh", delta_color="off")
+                  delta=(f"Valor nivelado de la energía: {_vne['cop_kWh']:.0f} COP/kWh" if _vne
+                         else f"Tarifa año 1: {tarifa_cop:.0f} COP/kWh"), delta_color="off")
 
     # ── Delta Con batería vs Sin batería ──────────────────────────────────────
     # Solo con batería: antes también se mostraba sin batería (todo excedente
@@ -1867,15 +1885,12 @@ if btn_fin or st.session_state.get("financiero_ok"):
             except Exception:
                 return None
 
-        _tlo, _thi = 50.0, 600.0
-        for _ in range(22):
-            _tmid = (_tlo + _thi) / 2
-            _mm = _metricas_tarifa(_tmid)
-            if _mm and (_mm.get("vpn_usd") or 0) > 0:
-                _thi = _tmid
-            else:
-                _tlo = _tmid
-        _t_umbral = int(round((_tlo + _thi) / 2))
+        # Antes solo se buscaba entre 50 y 600 COP/kWh: si el umbral real era
+        # mayor, la tabla decía 600 con filas de VPN negativo por encima (27-sep-2026).
+        from calculos.lectura_financiera import umbral_vpn_cero
+        _umbral_f = umbral_vpn_cero(
+            lambda _t: (_metricas_tarifa(_t) or {}).get("vpn_usd"), iteraciones=30)
+        _t_umbral = int(round(_umbral_f)) if _umbral_f is not None else None
 
         _rows_sens = []
         for _nm, _tc in _tarifas_sens:
@@ -1893,17 +1908,18 @@ if btn_fin or st.session_state.get("financiero_ok"):
                     "Estado":                "✅ Bancable" if _vpn_ok else "⚠️ Revisar",
                 })
 
-        _m_umb = _metricas_tarifa(_t_umbral)
-        _rows_sens.append({
-            "Escenario":             f"⛔ Umbral mínimo (VPN ≈ 0)",
-            "COP/kWh":               _t_umbral,
-            "USD/kWh":               round(_t_umbral / tipo_cambio, 4),
-            "Ingreso año 1 (USD)":   int(e_financiero * _t_umbral / tipo_cambio),
-            "Payback":               f"≈{n_anos}a",
-            "TIR":                   f"≈{tasa_desc:.0f}% (WACC)",
-            "VPN a WACC (USD)":      "≈ 0",
-            "Estado":                "⛔ Límite",
-        })
+        if _t_umbral is not None:
+            _rows_sens.append({
+                "Escenario":             f"⛔ Umbral mínimo (VPN ≈ 0)",
+                "COP/kWh":               _t_umbral,
+                "USD/kWh":               round(_t_umbral / tipo_cambio, 4),
+                "Ingreso año 1 (USD)":   int(e_financiero * _t_umbral / tipo_cambio),
+                "Payback":               f"≈{n_anos}a",
+                "TIR":                   f"≈{tasa_desc:.0f}% (WACC)",
+                "VPN a WACC (USD)":      "≈ 0",
+                "Estado":                "⛔ Límite",
+            })
+        _rows_sens.sort(key=lambda _r: -_r["COP/kWh"])
 
         _df_sens = pd.DataFrame(_rows_sens)
 
@@ -1927,11 +1943,13 @@ if btn_fin or st.session_state.get("financiero_ok"):
             hide_index=True,
         )
         st.caption(
-            f"🟢 Verde = escenario activo ({tarifa_cop:.0f} COP/kWh) · "
-            f"🟡 Amarillo = rentable con menor margen · "
-            f"🔴 Rojo = no viable al WACC del {tasa_desc:.0f}% · "
-            f"**Umbral calculado: {_t_umbral} COP/kWh** — "
-            f"por debajo de este precio el VPN se vuelve negativo."
+            "Cada fila supone **toda** la energía a ese precio. "
+            f"✅ = VPN positivo al WACC del {tasa_desc:.0f}% · "
+            f"🟡 ⚠️ = VPN negativo: no alcanza el {tasa_desc:.0f}% · "
+            + (f"🔴 **Umbral calculado: {_t_umbral:,} COP/kWh** — por debajo de este precio "
+               "el VPN se vuelve negativo."
+               if _t_umbral is not None else
+               "🔴 **Sin umbral:** el VPN no llega a cero ni con precios muy altos; revisa CAPEX y energía.")
         )
 
     # ── Tabla flujo de caja completo ─────────────────────────────────────────
@@ -1948,6 +1966,8 @@ if btn_fin or st.session_state.get("financiero_ok"):
         st.dataframe(
             df_fc.style.format({
                 "Producción (kWh)":      "{:,.0f}",
+                "Autoconsumo (kWh)":     "{:,.0f}",
+                "Exportación (kWh)":     "{:,.0f}",
                 "Ingreso energía (USD)":  "{:,.0f}",
                 "O&M (USD)":             "{:,.0f}",
                 "Flujo (USD)":           "{:+,.0f}",
@@ -1968,7 +1988,8 @@ if btn_fin or st.session_state.get("financiero_ok"):
         f"VPN: **USD {m_con['vpn_usd']:,.0f}** ($ {m_con['vpn_usd']*tipo_cambio/1e6:.1f} M COP) | "
         + (f"Payback: **{m_con['payback_simple']:.1f} años** | " if m_con['payback_simple'] else "Payback: **> horizonte** | ")
         + f"LCOE: **{m_con['lcoe_cop_kWh']:.0f} COP/kWh** "
-        f"({'<' if m_con['lcoe_cop_kWh'] < tarifa_cop else '>'} tarifa {tarifa_cop:.0f} COP/kWh)"
+        + (f"({'<' if m_con['lcoe_cop_kWh'] < _vne['cop_kWh'] else '>'} valor nivelado de la "
+           f"energía {_vne['cop_kWh']:.0f} COP/kWh)" if _vne else "")
     )
 
     # Guardar para Reporte

@@ -413,3 +413,11 @@ def test_buscar_tir_muy_alta_con_sistema_sobredimensionado():
         "potencia AC nominal",
     )
     assert "valora **toda** la energía a la tarifa de compra" in seccion["texto"]
+
+
+def test_buscar_lcoe_mayor_que_la_tarifa():
+    seccion = _seccion_recuperada(
+        "por que el LCOE es mayor que la tarifa y el proyecto igual es rentable",
+        "potencia AC nominal",
+    )
+    assert "valor nivelado de la energía" in seccion["texto"]
