@@ -81,6 +81,10 @@ Desviaciones del diseño, con motivo:
   baterías con precio vigente y aviso. 💼 Presupuesto: inversor y baterías
   con precio vigente.
 
+- **Resultado financiero siempre vigente** (26-sep-2026):
+  `calculos/vigencia_financiero.py` compara todos los datos del cálculo con los del
+  último «Calcular» (`_fin_datos_calculo`); antes solo el CAPEX.
+
 ## Archivos modificados
 
 - `bipv_python/calculos/sistema_multisuperficie.py` (nuevo)

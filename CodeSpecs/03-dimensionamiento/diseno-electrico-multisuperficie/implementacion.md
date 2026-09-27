@@ -132,6 +132,14 @@ Desviaciones del diseño, con motivo:
   MPPT 1 salía un 🔴 falso «Isc de strings 32,30 A > 18 A», mientras la tabla del MPPT
   mostraba 11,07 A 🟢.
 
+### Corrección: borrar un inversor no deja los grupos sin inversor (26-sep-2026)
+
+- Al eliminar INV-2, el selector «Inversor» de cada grupo cambiaba de opciones y
+  Streamlit lo recreaba vacío; la página guardaba ese vacío y los grupos de INV-1
+  quedaban «sin inversor asignado» (🔴). La clave del selector incluye ahora la
+  lista de inversores (`campos_editor.clave_con_opciones`), así el campo nuevo se
+  inicializa desde el dato del grupo.
+
 ## Archivos modificados
 
 ### Fase A1

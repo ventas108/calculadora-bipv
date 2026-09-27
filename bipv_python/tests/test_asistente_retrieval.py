@@ -359,6 +359,14 @@ def test_buscar_costo_de_inversores_multisuperficie_en_financiero():
     assert "un precio por cada inversor del diseño" in seccion["texto"]
 
 
+def test_buscar_borre_un_inversor_y_los_grupos_quedaron_sin_inversor():
+    seccion = _seccion_recuperada(
+        "borre un inversor y los grupos quedaron sin inversor asignado en vista 3d",
+        "potencia AC nominal",
+    )
+    assert "conservan su inversor" in seccion["texto"]
+
+
 def test_buscar_ahorro_anio_1_con_tarifa_de_excedentes():
     seccion = _seccion_recuperada(
         "el ahorro energía año 1 de financiero no usa la tarifa de excedentes",

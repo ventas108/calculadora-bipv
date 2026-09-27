@@ -1553,9 +1553,14 @@ with tab_solar:
                     _gid = str(_g_ui.get("gid") or "G1")
                     # G1 conserva las claves de la fase A1 (sesiones abiertas).
                     _suf = f"{_uid_ui}" if _gid == "G1" else f"{_uid_ui}_{_gid}"
-                    _valor_campo_superficie(f"ms_sup_inv_{_suf}", str(_g_ui.get("inversor_id") or ""))
-                    if st.session_state.get(f"ms_sup_inv_{_suf}") not in _opciones_inv:
-                        st.session_state[f"ms_sup_inv_{_suf}"] = ""
+                    # La clave incluye la lista de inversores: si cambia (p. ej. se
+                    # borra INV-2), el selector se recrea desde el dato y no queda
+                    # vacío (26-sep-2026: los grupos de INV-1 perdían su inversor).
+                    from calculos.campos_editor import clave_con_opciones
+                    _clave_inv_g = clave_con_opciones(f"ms_sup_inv_{_suf}", _opciones_inv)
+                    _valor_campo_superficie(_clave_inv_g, str(_g_ui.get("inversor_id") or ""))
+                    if st.session_state.get(_clave_inv_g) not in _opciones_inv:
+                        st.session_state[_clave_inv_g] = ""
                     _valor_campo_superficie(f"ms_sup_mppt_{_suf}", int(_g_ui.get("mppt") or 1))
                     _valor_campo_superficie(
                         f"ms_sup_ns_{_suf}", "" if _g_ui.get("n_serie") is None else str(_g_ui.get("n_serie")),
@@ -1565,7 +1570,7 @@ with tab_solar:
                     )
                     _sc1, _sc2, _sc3, _sc4, _sc5, _sc6 = st.columns([2, 1, 1, 1, 1, 0.4])
                     _sc1.caption(f"{_sup_ui['nombre']} · {_gid}")
-                    _inv_asignado = _sc2.selectbox("Inversor", _opciones_inv, key=f"ms_sup_inv_{_suf}")
+                    _inv_asignado = _sc2.selectbox("Inversor", _opciones_inv, key=_clave_inv_g)
                     _mppt_asignado = _sc3.number_input("MPPT", min_value=1, max_value=24, step=1,
                                                        key=f"ms_sup_mppt_{_suf}")
                     _serie_texto = _sc4.text_input("N serie", key=f"ms_sup_ns_{_suf}").strip()

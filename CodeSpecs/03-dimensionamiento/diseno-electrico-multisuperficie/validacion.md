@@ -108,6 +108,13 @@ Rama `claude/mejoras-bipv` sobre `main` `45362d79`.
       confirma que una corriente excesiva sigue en 🔴.
 - [x] `physics-guard` limpio.
 
+### Borrar un inversor (26-sep-2026)
+
+- [x] `test_selector_inversor_grupo.py` en rojo con `main` `ff3522af` y en verde.
+- [x] AppTest de Vista 3D: con INV-1 e INV-2 y los dos grupos en INV-1, borrar
+      INV-2 en `main` deja los grupos en `None`; con el cambio siguen en INV-1
+      también tras recargar.
+
 ## Resultado
 
 Fase A1 validada en producción. Fase A2 validada en local; su prueba en
