@@ -421,3 +421,11 @@ def test_buscar_lcoe_mayor_que_la_tarifa():
         "potencia AC nominal",
     )
     assert "valor nivelado de la energía" in seccion["texto"]
+
+
+def test_buscar_tarifa_de_excedentes_vuelve_a_la_tarifa_de_compra():
+    seccion = _seccion_recuperada(
+        "la tarifa de excedentes vuelve a 1200 cuando guardo y cargo el proyecto",
+        "potencia AC nominal",
+    )
+    assert "se conservan al cambiar de página y se guardan con el proyecto" in seccion["texto"]

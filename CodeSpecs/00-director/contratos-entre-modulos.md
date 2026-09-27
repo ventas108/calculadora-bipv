@@ -228,6 +228,10 @@ Regla de consumo:
 	`sincronizar_con_fuente`). Un selector cuyas opciones cambian (p. ej. la lista
 	de inversores) usa `clave_con_opciones`, para que el widget se reconstruya desde
 	los datos y no pierda ni cambie el valor de otros elementos (26-sep-2026).
+- Un dato que el usuario escribe y que debe guardarse con el proyecto vive en
+	una clave de datos (sin `_`); el campo usa una clave temporal `_w_<clave>`
+	(`calculos/campos_persistentes.campo_persistente`). Un campo con `key` de
+	widget como único almacén pierde su valor al abrir otra página (27-sep-2026).
 
 ### Contrato transversal — comparadores Streamlit
 
