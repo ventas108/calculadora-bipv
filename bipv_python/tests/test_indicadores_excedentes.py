@@ -99,3 +99,38 @@ def test_pagina_usa_los_indicadores_con_excedentes():
     bloque = bloque[:bloque.index(")\n")]
     assert "frac_exportada" in bloque and "tarifa_excedentes_cop_kWh" in bloque
     assert "_e_autoconsumo - e_ac" not in src
+
+
+# ── Aviso de sobredimensión y tarjeta de imprevistos (26-sep-2026) ───────────
+from calculos.indicadores_excedentes import aviso_sobredimension, desglose_capex
+
+
+def test_aviso_sobredimension_con_el_caso_de_24_kwp():
+    aviso = aviso_sobredimension(26669.0, 478.0 * 12, balance_activo=False)
+    assert aviso is not None
+    assert aviso["cobertura_pct"] == pytest.approx(26669 / 5736 * 100)
+    assert aviso["excedente_kWh"] == pytest.approx(26669 - 5736)
+
+
+def test_sin_aviso_con_el_diseno_del_cliente_ni_con_balance():
+    assert aviso_sobredimension(6155.0, 5736.0, balance_activo=False) is None     # 107 %
+    assert aviso_sobredimension(26669.0, 5736.0, balance_activo=True) is None
+    assert aviso_sobredimension(26669.0, 0.0, balance_activo=False) is None       # sin consumo
+
+
+def test_desglose_capex_suma_el_total_con_imprevistos():
+    # Prueba del 26-sep-2026: las 4 tarjetas sumaban 37.575 y el CAPEX era 39.454.
+    d = desglose_capex(39454.0, 23480.0, 3550.0, 4814.0, 5731.0)
+    assert d["estructura_instalacion"] == pytest.approx(10545.0)
+    assert d["resto"] == pytest.approx(39454 - 37575)
+    assert sum(d.values()) == pytest.approx(39454.0)
+
+
+def test_pagina_muestra_imprevistos_y_aviso_de_sobredimension():
+    src = PAGINA.read_text(encoding="utf-8")
+    assert "desglose_capex(" in src
+    assert "Imprevistos" in src and "_desg_capex['resto']" in src
+    assert "aviso_sobredimension(" in src
+    # El aviso va justo antes del botón de cálculo, donde el usuario lo ve.
+    i_aviso = src.rindex("_aviso_sobredim")
+    assert i_aviso < src.index('"📊 Calcular TIR, VPN, Payback y LCOE"')

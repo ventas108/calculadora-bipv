@@ -405,3 +405,11 @@ def test_buscar_rojo_falso_corriente_del_grupo():
         "potencia AC nominal",
     )
     assert "usa solo sus propios strings" in seccion["texto"]
+
+
+def test_buscar_tir_muy_alta_con_sistema_sobredimensionado():
+    seccion = _seccion_recuperada(
+        "la TIR sale muy alta con un sistema mucho mas grande que el consumo sin balance de baterias",
+        "potencia AC nominal",
+    )
+    assert "valora **toda** la energía a la tarifa de compra" in seccion["texto"]

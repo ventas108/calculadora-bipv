@@ -14,6 +14,11 @@
     extra» = 300 kWh/año.
 - [x] Suite completa de `bipv_python`: 1818 pruebas; se actualizó `test_sincronizacion_consumo_y_excedentes.py` (la tarifa de excedentes ahora se pasa a 3 escenarios: P50, P90 y sin batería).
 
+- [x] Complemento: 4 pruebas nuevas (aviso con el caso de 24 kWp, sin aviso
+  al 107 %, con balance o sin consumo; tarjetas que suman el total; página).
+  Humo con AppTest: consumo 478 kWh/mes sin balance → 2 avisos; 1.200 kWh/mes
+  o con balance → ninguno; las 5 tarjetas suman el CAPEX bruto.
+
 ## Resultado
 
-Criterios 1 a 4 cumplidos. En espera de la revisión del PR.
+Criterios 1 a 6 cumplidos. En espera de la revisión del PR.
