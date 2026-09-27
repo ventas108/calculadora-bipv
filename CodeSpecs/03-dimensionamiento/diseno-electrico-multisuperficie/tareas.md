@@ -72,7 +72,8 @@ Validación:
 - [x] Pruebas nuevas en rojo con `main` y en verde con el cambio.
 - [x] Suites relacionadas y suite completa en verde.
 - [x] Prueba de humo con `AppTest`.
-- [ ] Prueba en producción de la fase A2.
+- [x] Prueba en producción de la fase A2: casos D1–D9 (25 y 26-sep-2026);
+      hallazgos de D8 y D9 corregidos en los PR #60 y #61.
 
 ### Complemento de A2 antes de A3 (aprobado el 25-sep-2026)
 

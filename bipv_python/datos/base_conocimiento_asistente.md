@@ -453,6 +453,8 @@ El usuario pidió validar el proyecto real Teusaquillo (128 módulos SOLTECH ASP
 
 ### Otros 2 bugs de catálogo de inversores encontrados validando Teusaquillo  NUEVO (29-ago-2026)
 
+> ⚠️ **Superado el 26-sep-2026 (ver sección 73):** la app ya no estima la potencia AC como 0,96 × potencia FV máxima. La potencia AC nominal sale solo de la ficha (columna «P AC nominal (kW)» de 🔌 Catálogo Inversores PDF › ✏️); si falta, la relación DC/AC queda «no evaluable». El texto siguiente se conserva como historia.
+
 (1) faltaba la columna **"Potencia AC nominal (kW)"** en TODO `datos/inversores_catalogo.xlsx` — sin ella, los ~106 inversores del catálogo calculaban su potencia CA nominal vía un respaldo `P_dc_max_W × 0,96` en vez del dato real del fabricante (para el Growatt MID15KTL3-X eso daba 21.600W en vez de 15.000W reales); columna agregada (retrocompatible, al final de la hoja) y valor real cargado para este inversor — los otros 105 siguen con el respaldo hasta que se cargue su dato real. (2) La corriente máxima por tracker del Growatt MID15KTL3-X se había derivado mal en un primer intento (de lo que produce el arreglo — 8 strings × 0,80A del módulo — no de lo que soporta el inversor), lo que marcaba el inversor como "no compatible" pese a que esa referencia estándar internacional no reporta ningún problema eléctrico con ese mismo diseño; corregido a 27,5A/33,5A tomando el dato real de la entrada genérica hermana.
 
 ### Sugerencia orientativa de "N total de cadenas" con 2 fuentes en orden de prioridad  NUEVO (29-ago-2026)
@@ -1461,6 +1463,8 @@ Precio real del inversor del catálogo  NUEVO (5-ago-2026)
 
 El precio del inversor seleccionado en el catálogo fluye automáticamente al análisis financiero, en lugar de usar un estimado genérico por kW.
 
+> Actualizado el 26-sep-2026 (sección 73): Financiero y Presupuesto leen el precio **vigente** del catálogo cada vez que se abren. Con el diseño multi-superficie de 🗺️ Vista 3D, el costo de inversores es la suma de un precio por cada inversor del diseño (INV-1, INV-2…).
+
 ⚠️ Para no cometer errores: verifica que la ficha del inversor en el catálogo tenga precio cargado. Si el campo está vacío, revisa el valor que aparece en Financiero antes de generar el presupuesto.
 
 ────────────────────────────────────────────────────────────
@@ -2385,6 +2389,8 @@ Al intentar ingresar el Woodward IDS SOLO 500 al catálogo real con `guardar_inv
 **3 tests dejaron de pasar tras el fix** (esperado: ahora usan el catálogo Excel real de 105 en vez del fallback Python de 7) y se corrigieron para reflejar el comportamiento real en vez de un accidente de entorno: `test_optimization_fase4.py::test_generar_candidatos_con_panel_e_inversor_varia_ambos` y `::test_generar_candidatos_sincroniza_eta_inversor_con_el_inversor_sorteado` (resuelven contra `_catalogo_inversores_real()`, no contra `INVERSORES` a secas), y `test_catalogo_inversores_real.py::test_resolver_sincroniza_eta_inversor_cuando_si_hay_dato_real` (el catálogo Excel real no trae `eficiencia_max` para ninguno de sus 105 modelos — el caso "sí hay dato real" ahora se prueba con un catálogo controlado vía `monkeypatch`, mismo patrón que el resto del archivo, no dependiendo de que el entorno local "accidentalmente" cayera al catálogo chico).
 
 **Inversor ingresado al catálogo real** (`datos/inversores_catalogo.xlsx`, hoja `Catalogo_Inversores`): Woodward IDS SOLO 500, con los valores de la ficha verificados por el usuario (Vdc_max=1200 V, Vmppt_min=500 V, Vmppt_max=1100 V, V_mppt_activo=500 V — de "Voltaje mínimo para Pnom" —, P_dc_max_W=600.000 W). Insertado con `guardar_inversor_excel()` y verificado leyendo de vuelta con `cargar_catalogo_inversores()`. **`Datos completos (Si/No)` = "No" a propósito** — primer registro del catálogo marcado así (los 105 anteriores están completos) — porque V_arranque, N Trackers, N Strings/Tracker, Corriente Máxima/Cortocircuito por Tracker genuinamente no aplican/no se publican para este inversor central sin trackers discretos (ver hallazgo de arriba). La página 📐 Dimensionamiento ya tiene el mecanismo correcto para esto: al cargar un inversor con `datos_completos=False` muestra "🟡 Inversor incompleto — faltan: ..." listando exactamente los campos vacíos, en vez de fingir que está completo.
+
+> ⚠️ **Superado el 26-sep-2026 (ver sección 73):** la app ya no estima la potencia AC como 0,96 × potencia FV máxima. La potencia AC nominal sale solo de la ficha (columna «P AC nominal (kW)» de 🔌 Catálogo Inversores PDF › ✏️); si falta, la relación DC/AC queda «no evaluable». El texto siguiente se conserva como historia.
 
 ⚠️ **Imprecisión conocida, declarada, no resuelta**: el catálogo Excel no tiene columna "Potencia AC nominal (kW)" (otro campo que el loader referencia pero que no existe en el schema real — mismo tipo de gap que `CoefIsc_C` en paneles). Por eso `P_ac_nom_W` para este inversor queda **derivado** por el fallback `P_dc_max_W × 0.96` = 576.000 W, en vez del valor real de la ficha ("Potencia de CA nominal 500 kW" = 500.000 W) — una diferencia de 15%. No hay dónde escribir el dato real en el schema actual sin agregar una columna nueva (fuera de alcance de esta tarea).
 
@@ -4363,7 +4369,54 @@ Complementa la sección 25g. ("El procedimiento correcto por módulos") con una 
 - **Borrar un inversor en 🗺️ Vista 3D:** los grupos asignados a los demás inversores conservan su inversor (antes quedaban vacíos y el diseño salía 🔴 «sin inversor asignado»). Si ya te pasó, vuelve a elegir el inversor en cada grupo y publica otra vez.
 - **TIR, VPN y payback siempre al día en 💰 Financiero:** el resultado se guarda al pulsar «Calcular» y se vuelve a mostrar al entrar, pero si cambió cualquier dato (CAPEX, energía, tarifa, tarifa de excedentes, tasas, O&M, degradación…) se oculta y aparece «⚠️ Cambiaron datos del análisis… Presiona Calcular», nombrando lo que cambió.
 - **Ficha oficial del Growatt MID15KTL3-X** (hoja de datos MID15~25KTL3-X, primera columna): Vdc máx. 1.100 V; rango MPPT 200–1.000 V; arranque 250 V; tensión nominal 580 V; 2 MPPT con 2 strings por MPPT; 27 A por MPPT (máx. de entrada) y 33,8 A de cortocircuito por MPPT; 15.000 W AC nominales (16.600 VA máx.); FV máx. recomendada 22.500 W; eficiencia europea 98,6 % (máx. 98,75 %); altitud hasta 4.000 m. Ojo: en esa ficha las filas «Normal Voltage» y «MPPT voltage range» están intercambiadas (dice «MPPT voltage range 580V»); el rango MPPT real es 200–1.000 V. Esto reemplaza lo dicho antes en este manual («8 strings por tracker», «27,5 A / 33,5 A»): no coincide con la ficha. La fila genérica «MID 15KTL3-X» (19.200 W = 20.000 × 0,96) es un duplicado erróneo y conviene eliminarla.
+- **Aviso «Estado multi-superficie restaurado» en ☀️ Recurso Solar (26-sep-2026, prueba D8):** al abrir Recurso Solar después de cargar un proyecto, la app restaura sola la multi-superficie desde la caché y ahora sí muestra el aviso con lo que restauró (antes se perdía en la recarga automática de la página). Si no ves el aviso y el proyecto tenía superficies, vuelve a cargar el proyecto desde 🏠 Proyecto.
+- **Corriente de cada grupo de strings (26-sep-2026, prueba D9):** en 🗺️ Vista 3D la compatibilidad de un grupo usa solo sus propios strings (Isc del panel × strings en paralelo del grupo). Antes multiplicaba por todos los strings del MPPT, aunque fueran de otra superficie y otro panel, y daba un 🔴 falso (32,3 A con fachada ASP 8×3 y techo SPR 12×1 en el mismo MPPT). La corriente del MPPT completo se sigue revisando en la tabla de MPPT, que suma todos los grupos conectados.
 - **Tarifa de excedentes en los indicadores de 💰 Financiero (27-sep-2026):** «Ahorro energía año 1» ahora es autoconsumo × tarifa de compra + excedentes × tarifa de excedentes, igual que el flujo de caja de TIR y VPN (pasa el cursor sobre la métrica para ver el cálculo). Antes valoraba toda la energía a la tarifa de compra: con 6.155 kWh/año, 826 kWh de excedentes a 800 COP/kWh y tarifa de 1.200 COP/kWh mostraba 7,39 M COP en vez de 7,05 M. La sección «🔋 Impacto de la batería en la rentabilidad» solo aparece si hay batería; compara el mismo sistema solar sin batería (sus excedentes a la tarifa de excedentes) contra el sistema con batería, y «Autoconsumo extra» es la energía que la batería deja de exportar para usarla en casa. Antes aparecía sin batería y daba una TIR «sin batería» mayor (18,0 % contra 17,2 %) porque valoraba los excedentes a la tarifa de compra; la cifra correcta es la TIR del análisis. Con liquidación mensual (CREG 174/2021), los excedentes hasta lo importado se pagan a la tarifa menos comercialización y el resto a precio de bolsa de XM: un promedio ponderado de 600–800 COP/kWh es razonable en Bogotá; prueba varios valores.
+
+## 74. Anexo — Resumen para el usuario: qué cambió del 25 al 27 de septiembre de 2026
+
+Guía corta, página por página, de los cambios de esos días (PR #57 a #65). Sirve para responder «¿qué cambió?», «¿por qué ahora veo otro número?» y «¿qué tengo que volver a hacer?». El detalle técnico está en la sección 73 y en `CodeSpecs/00-director/registro-de-decisiones.md`.
+
+**🗺️ Vista 3D (diseño eléctrico multi-superficie, fase A2)**
+- Cada superficie puede tener varios **grupos de strings**. Cada grupo tiene su inversor, su MPPT, su número de módulos en serie y sus strings en paralelo. La app calcula el área instalada (módulos × área del panel) y explica cuándo hace falta caja combinadora (más strings que entradas del MPPT).
+- **Regla 🔴 nueva:** todos los strings de un mismo MPPT deben tener el mismo número de módulos en serie, aunque vengan de superficies distintas.
+- **Corriente por grupo:** el chequeo de cada grupo usa solo sus strings; la suma del MPPT completo está en la tabla de MPPT. Se acabó el 🔴 falso de 32,3 A.
+- **Borrar un inversor** (por ejemplo INV-2) ya no deja sin inversor a los grupos de los demás inversores. Solo quedan sin inversor los grupos que estaban en el inversor borrado; asígnales otro.
+- **Cambiar el panel, los grupos o el inversor** de una superficie retira la energía publicada. Hay que volver a pulsar «Integrar» para que Financiero, Baterías y CO₂ la usen.
+
+**☀️ Recurso Solar**
+- Al cargar un proyecto guardado, la app restaura la multi-superficie y **muestra el aviso** de lo restaurado.
+
+**🏠 Proyecto (guardar)**
+- Un proyecto multi-superficie **se puede guardar sin sombra 3D** cuando se publicó con el modelo simplificado o con bypass desde CSV. Solo el modelo físico exige la sombra.
+
+**🔌 Catálogo Inversores PDF y 📋 Catálogo Paneles**
+- La pestaña **✏️ Editar / Eliminar** se ve siempre (antes quedaba en blanco si no se subía un PDF) y «💾 Guardar cambios» funciona.
+- **Potencia AC nominal:** solo de la ficha («Rated AC output power»). El formulario la exige. Si un inversor no la tiene, la relación DC/AC sale «no evaluable» y la app dice dónde completarla. Ya no se estima como 96 % de la potencia FV máxima.
+- La fila genérica «MID 15KTL3-X» del catálogo es un duplicado del Growatt MID15KTL3-X. Usa la fila «Growatt MID15KTL3-X» corregida con su ficha, y borra o corrige la genérica.
+
+**💰 Financiero**
+- **Usa el sistema publicado en Vista 3D** (energía, kWp y módulos por panel) sin necesitar 📊 Producción, y no mezcla datos del sistema de superficie única.
+- **Con diseño eléctrico 🔴 no calcula** TIR, VPN, payback ni LCOE, porque ese sistema no se puede construir. Primero corrige el diseño en Vista 3D.
+- **Precios vigentes:** el precio de cada panel, de cada inversor (INV-1, INV-2…) y de la batería sale del catálogo cada vez que abres la página. Un precio que escribas a mano para este proyecto se respeta mientras el catálogo no cambie.
+- **TIR siempre al día:** si cambias cualquier dato del cálculo (tarifa, tarifa de excedentes, TRM, tasa de descuento, CAPEX, degradación…), la página oculta el resultado viejo, dice qué dato cambió y pide pulsar **Calcular** otra vez.
+- **Tarifa de excedentes:** aparece cuando 🔋 Baterías y Balance reporta excedentes. «Ahorro energía año 1» ahora es autoconsumo × tarifa + excedentes × tarifa de excedentes, igual que la TIR. La sección «Impacto de la batería» solo aparece si hay batería.
+
+**💼 Presupuesto**
+- Inversor y batería con el precio vigente del catálogo. Aún arma los módulos con el sistema de 📐 Dimensionamiento (superficie única). Esto está registrado como H3 y tiene aviso 🟡 en modo multi-superficie.
+
+**Qué volver a hacer con un proyecto guardado antes de estas fechas**
+1. Cárgalo en una pestaña nueva y abre ☀️ Recurso Solar. Debe aparecer el aviso de restauración.
+2. En 🗺️ Vista 3D revisa que cada grupo tenga inversor y MPPT, que no haya 🔴 y pulsa «Integrar».
+3. En 🔌 Catálogo Inversores PDF comprueba que tus inversores tengan «P AC nominal (kW)» y precio.
+4. En 🔋 Baterías y Balance calcula el balance. En 💰 Financiero escribe la tarifa de excedentes real y pulsa **Calcular**.
+5. Guarda el proyecto con 💾.
+
+**Sigue abierto (no es un error tuyo)**
+- **Fase A3:** la sección 6 de Vista 3D (MPPT) todavía tiene sus propios selectores. Se unificará con los grupos.
+- **H2:** la energía simplificada multi-superficie usa un PR fijo de 0,78.
+- **H3:** Presupuesto por superficie.
+- La tabla de sensibilidad por tarifa de Financiero supone vender toda la energía a la tarifa de cada fila; es a propósito, para ver el umbral.
 
 Calculadora BIPV — Innovación Química
 

@@ -84,6 +84,18 @@ cambio de panel o de diseño eléctrico ──> retira publicación, bypass, MPP
 cambio de geometría o montaje ────────> invalida POA y sombra de esa superficie
 ```
 
+Catálogos y análisis financiero (Streamlit, 26 y 27-sep-2026):
+
+```text
+📋 Catálogo Paneles ────────┐
+🔌 Catálogo Inversores ─────┼─> precio vigente ──> 06 Financiero y 💼 Presupuesto
+🔋 Catálogo Baterías ───────┘   (se lee al abrir la página; nunca una copia vieja)
+🔌 ficha del inversor (P AC nominal) ──> 03 relación DC/AC (sin dato: «no evaluable»)
+🔋 Baterías y Balance ──> frac_exportada ──┬─> flujo de caja (TIR, VPN, payback)
+Financiero: tarifa de excedentes ─────────┘   └─> ahorro año 1 y escenario sin batería
+cualquier dato del cálculo cambia ──> Financiero retira el resultado guardado
+```
+
 - Con `multisup_activo`, 💰 Financiero, 🔋 Baterías y 🌿 CO₂ dependen solo de la
   publicación multi-superficie (Spec `06-analisis-financiero/sistema-multisuperficie`),
   no de 📊 Producción; 💼 Presupuesto sigue en superficie única (H3, Spec propia).

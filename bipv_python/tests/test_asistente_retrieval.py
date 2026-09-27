@@ -381,3 +381,27 @@ def test_buscar_tir_sin_bateria_mayor_que_con_bateria():
         "potencia AC nominal",
     )
     assert "solo aparece si hay batería" in seccion["texto"]
+
+
+def test_buscar_que_cambio_en_los_ultimos_dias():
+    seccion = _seccion_recuperada(
+        "que cambió en la app del 25 al 27 de septiembre y que tengo que volver a hacer",
+        "Resumen para el usuario",
+    )
+    assert "Qué volver a hacer con un proyecto guardado" in seccion["texto"]
+
+
+def test_buscar_aviso_restauracion_recurso_solar():
+    seccion = _seccion_recuperada(
+        "no veo el aviso estado multi-superficie restaurado en recurso solar",
+        "potencia AC nominal",
+    )
+    assert "sí muestra el aviso" in seccion["texto"]
+
+
+def test_buscar_rojo_falso_corriente_del_grupo():
+    seccion = _seccion_recuperada(
+        "rojo falso de corriente Isc 32,3 A en un grupo de strings del mismo MPPT",
+        "potencia AC nominal",
+    )
+    assert "usa solo sus propios strings" in seccion["texto"]

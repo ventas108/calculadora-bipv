@@ -17,7 +17,7 @@ Se completa durante la Fase 0 (arquitectura y contratos), antes de modificar fó
 | Energía mensual/anual | _(pendiente de confirmar)_ | |
 | Performance Ratio (PR) | _(pendiente de confirmar)_ | |
 | Dimensionamiento eléctrico | _(pendiente de confirmar)_ | |
-| Finanzas | _(pendiente de confirmar)_ | |
+| Finanzas (Streamlit) | Flujo de caja con reparto autoconsumo/excedentes (`frac_exportada`, tarifa de excedentes) y precios vigentes de los catálogos | `bipv_python/calculos/financiero.py`, `calculos/indicadores_excedentes.py`, `calculos/costos_catalogo.py` |
 
 ## Flujo funcional entre módulos
 

@@ -46,6 +46,14 @@ Regla de consumo:
 	mismas temperaturas de diseño (`T_min_diseno`, `T_cel_realista`,
 	`T_cel_extremo`). El inversor del proyecto de este módulo es la ficha por
 	defecto de cada inversor multi-superficie.
+- Corriente por grupo (26-sep-2026): la compatibilidad de cada grupo de strings
+	usa solo sus strings en paralelo (`n_paralelo`); la corriente del MPPT completo
+	la suma su propio chequeo de la tabla de MPPT. Ningún chequeo cuenta strings de
+	otro grupo con el Isc de un panel ajeno.
+- Potencia AC nominal (26-sep-2026, Spec `03-dimensionamiento/catalogo-inversores-potencia-ac`):
+	`P_ac_nom_W` sale solo de la ficha del catálogo (`calculos/potencia_ac_inversor.py`);
+	no se estima con `P_dc_max_W`. Sin el dato, la relación DC/AC es «no evaluable»
+	y la página explica dónde completarlo.
 
 ### 04-produccion-energia
 
@@ -168,6 +176,23 @@ Regla de consumo:
 	panel/inversor/TMY/POA). Restauran únicamente si
 	`firma_desde_payload(payload_persistido) == firma_persistida`; payload
 	ausente (legacy) o alterado nunca restaura.
+- Con `multisup_activo`, la energía, los kWp y los módulos salen de
+	`multisup_sistema` (Spec `06-analisis-financiero/sistema-multisuperficie`);
+	con diseño eléctrico 🔴 no se calculan TIR, VPN, payback ni LCOE.
+- Precios (26-sep-2026): Financiero y Presupuesto leen el precio vigente de los
+	catálogos de paneles, inversores y baterías (`calculos/costos_catalogo.py`,
+	`sistema_multisuperficie.costo_actual_panel`). En multi-superficie el CAPEX de
+	inversores es la suma de un precio por inversor del diseño. Un precio escrito
+	a mano se respeta mientras la fuente no cambie (`campos_editor.sincronizar_con_fuente`).
+- Vigencia del resultado (26-sep-2026): el resultado guardado de Financiero solo
+	se muestra si los datos del cálculo no cambiaron
+	(`calculos/vigencia_financiero.datos_cambiados`); si cambiaron, se retira y se
+	pide calcular de nuevo.
+- Excedentes (27-sep-2026, Spec `06-analisis-financiero/indicadores-excedentes`):
+	la única fuente del reparto autoconsumo/excedentes es `frac_exportada` con
+	`tarifa_excedentes_cop`. El flujo de caja (`calculos/financiero.py`) y los
+	indicadores de la página (`calculos/indicadores_excedentes.py`: ahorro del año 1
+	y escenario sin batería) usan ese mismo reparto.
 
 ### 07-informes
 
@@ -198,6 +223,11 @@ Regla de consumo:
 	el contrato transversal de comparadores: mutan el proyecto y ejecutan la
 	invalidación central correspondiente como una sola operación.
 - Cualquier texto de usuario interpolado en HTML debe quedar escapado.
+- Widgets con clave (Streamlit 1.36): no reciben `value=`; su estado se sincroniza
+	con los datos mediante `calculos/campos_editor.py` (`sincronizar_campo`,
+	`sincronizar_con_fuente`). Un selector cuyas opciones cambian (p. ej. la lista
+	de inversores) usa `clave_con_opciones`, para que el widget se reconstruya desde
+	los datos y no pierda ni cambie el valor de otros elementos (26-sep-2026).
 
 ### Contrato transversal — comparadores Streamlit
 
@@ -279,13 +309,17 @@ Invariantes:
 	por superficie. Siguen abiertos:
 	- la corrida real del modo físico con escena completa (Torre 5, Spec
 		`05/sombra-cara-trasera`);
-	- las fases A2 y A3 del diseño eléctrico multi-superficie.
+	- la fase A3 del diseño eléctrico multi-superficie (sección 6 unificada). La
+		fase A2 se probó en producción con los casos D1–D9 (25 y 26-sep-2026); los
+		hallazgos de D8 y D9 se corrigieron en los PR #60 y #61.
 - **PR fijo en la energía simplificada multi-superficie:** Vista 3D lee
 	`pr_sistema` (que nadie escribe) y usa siempre 0,78; 📊 Producción publica
 	`PR_sistema`. Registrado como H2 en `05/panel-por-superficie`, sin Spec todavía.
 - **Presupuesto sin superficies de Vista 3D:** 💼 Presupuesto cuenta módulos e
 	inversores con `N_paneles_final` de 📐 Dimensionamiento, no con los paneles, grupos
 	e inversores de cada superficie. Registrado como H3, sin Spec todavía.
+	Desde el 26-sep-2026 ya usa el precio vigente del inversor y de la batería, y
+	en modo multi-superficie muestra un aviso 🟡 de la diferencia.
 - **Integridad externa del archivo:** la firma actual SHA-256 detecta corrupción y
 	cambios sin recalcular, pero no protege contra un actor con acceso de escritura al
 	JSON. HMAC queda fuera de esta versión y requiere una decisión separada.
