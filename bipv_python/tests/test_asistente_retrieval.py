@@ -357,3 +357,19 @@ def test_buscar_costo_de_inversores_multisuperficie_en_financiero():
         "potencia AC nominal",
     )
     assert "un precio por cada inversor del diseño" in seccion["texto"]
+
+
+def test_buscar_ahorro_anio_1_con_tarifa_de_excedentes():
+    seccion = _seccion_recuperada(
+        "el ahorro energía año 1 de financiero no usa la tarifa de excedentes",
+        "potencia AC nominal",
+    )
+    assert "autoconsumo × tarifa de compra + excedentes × tarifa de excedentes" in seccion["texto"]
+
+
+def test_buscar_tir_sin_bateria_mayor_que_con_bateria():
+    seccion = _seccion_recuperada(
+        "por que la TIR sin batería sale mayor que con batería si no tengo batería",
+        "potencia AC nominal",
+    )
+    assert "solo aparece si hay batería" in seccion["texto"]

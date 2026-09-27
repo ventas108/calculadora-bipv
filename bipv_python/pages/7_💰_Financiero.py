@@ -1230,9 +1230,19 @@ with st.expander("💱 Conversor de cifras USD → COP (TRM del día)", expanded
     col_cv6.metric("CAPEX neto (con Ley 1715)",
                    f"${ben_lv['capex_neto_usd']*tipo_cambio/1e6:.2f} M COP",
                    delta=f"USD {ben_lv['capex_neto_usd']:,.0f}", delta_color="off")
+    # Autoconsumo a la tarifa de compra y excedentes a la suya, como el flujo
+    # de caja (antes: toda la energía a la tarifa de compra, 27-sep-2026).
+    from calculos.indicadores_excedentes import ahorro_anual_cop
+    _ahorro_a1 = ahorro_anual_cop(e_financiero, frac_exportada, tarifa_cop, tarifa_excedentes_cop)
     col_cv7.metric("Ahorro energía año 1",
-                   f"${e_ac * (tarifa_cop/1e6):.2f} M COP/año",
-                   delta=f"USD {e_ac * tarifa_cop / tipo_cambio:,.0f}/año", delta_color="off")
+                   f"${_ahorro_a1['total_cop']/1e6:.2f} M COP/año",
+                   delta=f"USD {_ahorro_a1['total_cop'] / tipo_cambio:,.0f}/año", delta_color="off",
+                   help=(
+                       f"Autoconsumo {_ahorro_a1['autoconsumo_kWh']:,.0f} kWh × {tarifa_cop:,.0f} COP"
+                       + (f" + excedentes {_ahorro_a1['exportada_kWh']:,.0f} kWh × "
+                          f"{tarifa_excedentes_cop:,.0f} COP" if _ahorro_a1['exportada_kWh'] > 0 else "")
+                       + ". Año 1, sin degradación ni escalación."
+                   ))
     col_cv8.metric("Tarifa referencia",
                    f"{tarifa_cop:,.0f} COP/kWh",
                    delta=f"USD {tarifa_cop/tipo_cambio:.4f}/kWh", delta_color="off")
@@ -1529,8 +1539,14 @@ if btn_fin or st.session_state.get("financiero_ok"):
                   delta=f"Tarifa: {tarifa_cop:.0f} COP/kWh", delta_color="off")
 
     # ── Delta Con batería vs Sin batería ──────────────────────────────────────
-    if _balance_activo and (_capex_bat_usd > 0 or _e_autoconsumo != e_ac):
-        # Escenario de referencia: solo solar, sin batería
+    # Solo con batería: antes también se mostraba sin batería (todo excedente
+    # hacía _e_autoconsumo != e_ac) y la referencia valoraba toda la energía a
+    # la tarifa de compra, así que «sin batería» salía mejor que el mismo
+    # sistema (27-sep-2026).
+    from calculos.indicadores_excedentes import escenario_sin_bateria, hay_bateria
+    _esc_sinbat = escenario_sin_bateria(_balance_metricas) if _balance_activo else None
+    if _esc_sinbat and hay_bateria(_capex_bat_usd, _balance_metricas):
+        # Escenario de referencia: el mismo sistema solar, sin batería
         from calculos.financiero import calcular_beneficios_ley_1715 as _cbl1715, comparativo_ley_1715 as _comp1715
         _ben_sinbat = _cbl1715(
             capex_usd       = _capex_solar_usd,
@@ -1541,7 +1557,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
         )
         _comp_sinbat = _comp1715(
             capex_usd        = _capex_solar_usd,
-            e_ac_kWh_anual   = e_ac,
+            e_ac_kWh_anual   = _esc_sinbat["energia_kWh"],
             tarifa_cop_kWh   = tarifa_cop,
             tipo_cambio      = tipo_cambio,
             tasa_descuento   = tasa_desc / 100,
@@ -1551,17 +1567,22 @@ if btn_fin or st.session_state.get("financiero_ok"):
             n_anos           = n_anos,
             beneficios_1715  = _ben_sinbat,
             tasa_escalacion_opex = esc_opex,
+            frac_exportada   = _esc_sinbat["frac_exportada"],
+            tarifa_excedentes_cop_kWh = tarifa_excedentes_cop,
             config_degradacion = _config_degradacion,
         )
         _m_sinbat = _comp_sinbat["con"]["metricas"]
+        _e_bat_extra = max(_e_autoconsumo - _esc_sinbat["autoconsumo_kWh"], 0.0)
 
         st.divider()
         st.subheader("🔋 Impacto de la batería en la rentabilidad")
         st.caption(
-            "Comparativo entre el sistema **sin batería** (solo solar, E_ac pura) "
-            "y **con batería** (autoconsumo total = solar directo + descarga nocturna). "
+            "Comparativo del mismo sistema solar **sin batería** (autoconsumo directo; "
+            "el resto se exporta a la tarifa de excedentes) y **con batería** (autoconsumo "
+            "directo + descarga de la batería). "
             f"Batería: CAPEX **USD {_capex_bat_usd:,.0f}** · "
-            f"Energía adicional: **{_e_autoconsumo - e_ac:+,.0f} kWh/año**."
+            f"Autoconsumo extra: **{_e_bat_extra:,.0f} kWh/año** que dejan de exportarse "
+            f"a {tarifa_excedentes_cop:,.0f} COP/kWh y se ahorran a {tarifa_cop:,.0f} COP/kWh."
         )
         _cb1, _cb2, _cb3 = st.columns(3)
         _pb_sinbat = _m_sinbat.get("payback_simple")
@@ -1610,7 +1631,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
         )
         _cb6.metric(
             "Autoconsumo extra (batería)",
-            f"{max(_e_autoconsumo - e_ac, 0):,.0f} kWh/año",
+            f"{_e_bat_extra:,.0f} kWh/año",
             delta=f"CAPEX batería: USD {_capex_bat_usd:,.0f}",
             delta_color="off",
         )
