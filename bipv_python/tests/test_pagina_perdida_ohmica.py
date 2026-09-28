@@ -70,7 +70,9 @@ def test_produccion_valida_vigencia_del_calculo_unifilar_antes_de_usarlo():
     # (fraccion_paneles), un cambio posterior lo invalida (auditoría 7-sep-2026).
     src = _leer(_PAG_PRODUCCION)
     idx = src.index("_unif_vigente = bool(")
-    bloque = src[idx:idx + 900]
+    # Hasta la llave que cierra el dict (antes una ventana fija de 900
+    # caracteres, que dependía de la sangría del bloque).
+    bloque = src[idx:src.index("}", idx) + 1]
     assert 'panel_nombre") == panel_nombre' in bloque
     assert 'inversor_nombre") == inversor_nombre' in bloque
     assert 'n_serie") == _n_serie_cfg' in bloque
@@ -88,7 +90,9 @@ def test_unifilar_persiste_el_resultado_en_session_state():
     src = _leer(_PAG_UNIFILAR)
     assert 'st.session_state["perdida_ohmica_unifilar"] = {' in src
     idx = src.index('st.session_state["perdida_ohmica_unifilar"] = {')
-    bloque = src[idx:idx + 900]
+    # Hasta la llave que cierra el dict (antes una ventana fija de 900
+    # caracteres, que dependía de la sangría del bloque).
+    bloque = src[idx:src.index("}", idx) + 1]
     for _clave in ("resistencia_dc_ohm", "resistencia_ac_ohm", "tension_red_V",
                     "panel_nombre", "inversor_nombre", "n_serie", "n_paneles_total"):
         assert f'"{_clave}"' in bloque

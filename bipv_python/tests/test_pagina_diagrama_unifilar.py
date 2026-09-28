@@ -7,6 +7,7 @@ depende de una sesión autenticada para llegar al código que nos interesa).
 """
 import ast
 import os
+import re
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PAG_UNIFILAR = os.path.join(_ROOT, "pages", "20_⚡_Diagrama_Unifilar.py")
@@ -60,7 +61,9 @@ def test_pagina_unifilar_reverifica_compatibilidad_bateria_en_vivo():
     # check_compatibilidad() aquí mismo, contra el inversor actual.
     src = _leer(_PAG_UNIFILAR)
     assert "from calculos.compatibilidad_bateria import check_compatibilidad" in src
-    assert "check_compatibilidad(\n        bateria_dict, inversor_dict, inversor_nombre\n    )" in src
+    # Tolerante a la sangría (28-sep-2026: el bloque quedó dentro del modo de
+    # una superficie cuando se agregó el sistema multi-superficie).
+    assert re.search(r"check_compatibilidad\(\s*bateria_dict, inversor_dict, inversor_nombre\s*\)", src)
     # La leyenda vieja afirmaba la verificación de forma incondicional citando
     # a la página 11 -- ya no debe estar: el resultado ahora depende de la
     # re-verificación en vivo hecha aquí mismo, no de lo que se hizo en 🔋.

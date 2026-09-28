@@ -48,6 +48,7 @@ matriculado exigida por RETIE.
 """
 from __future__ import annotations
 
+import re
 from html import escape
 
 from calculos.dimensionamiento import calcular_voc_string, calcular_vmp_string, corriente_diseno_ac
@@ -341,6 +342,173 @@ def validar_retie(cfg: dict, calc: dict) -> list[dict]:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# 2b. Sistema multi-superficie de 🗺️ Vista 3D (Spec 07/unifilar-retie-
+#     multisuperficie, 28-sep-2026). Antes la ficha validaba el panel y el
+#     inversor de 📐 Dimensionamiento aunque el proyecto tuviera dos paneles
+#     y grupos de strings por MPPT. Las comprobaciones de string, MPPT e
+#     inversor NO se recalculan aquí: salen del diagnóstico de
+#     diseno_electrico_multisup (el mismo de ⚡ Diseño eléctrico).
+# ══════════════════════════════════════════════════════════════════════════════
+NIVEL_POR_ESTADO = {"verde": "OK", "amarillo": "PENDIENTE", "rojo": "ERROR"}
+# Fusible gPV por string: corriente continua de diseño 1,25 × Isc y fusible
+# ≥ 1,25 × esa corriente (NEC 690.8/690.9, referencia). El máximo lo fija el
+# «fusible máximo en serie» de la ficha del módulo.
+FACTOR_FUSIBLE_STRING = 1.25 * 1.25
+
+
+def _txt(valor) -> str:
+    """Número para una tarjeta: sin miles, coma decimal; texto tal cual."""
+    if valor is None:
+        return "sin dato"
+    if isinstance(valor, (int, float)) and not isinstance(valor, bool):
+        if float(valor).is_integer():
+            return f"{valor:g}"
+        return (f"{valor:.2f}" if abs(valor) < 10 else f"{valor:.1f}").replace(".", ",")
+    return str(valor)
+
+
+def _con_unidad(valor, unidad: str) -> str:
+    """Valor con su unidad; un texto sin cifras («un solo valor») va sin unidad."""
+    texto = _txt(valor)
+    return f"{texto}{unidad}" if any(ch.isdigit() for ch in texto) else texto
+
+
+def calcular_retie_multisuperficie(topologia: dict, *, tension_salida_v: float | None,
+                                   factor_continuo: float = 1.25) -> dict:
+    """Mismas claves que ``calcular_retie`` (para las tarjetas de la ficha) más
+    ``por_inversor``: corriente y breaker AC de cada inversor con SU potencia.
+    Sin potencia AC de un inversor, su corriente y el total quedan en None."""
+    por_inv, crudas = [], []
+    for inv in topologia["inversores"]:
+        i_cruda = corriente_diseno_ac(inv["p_ac_kW"], 1, tension_salida_v, factor_continuo=1.0)
+        crudas.append(i_cruda)
+        por_inv.append({
+            "inversor_id": inv["inversor_id"], "nombre": inv["nombre"],
+            "p_ac_kw": inv["p_ac_kW"], "p_dc_kwp": round(inv["p_dc_kWp"], 2),
+            "relacion_dc_ac": round(inv["p_dc_kWp"] / inv["p_ac_kW"], 3) if inv["p_ac_kW"] else None,
+            "strings": sum(r["strings"] for r in inv["ramas"]),
+            "corriente_a": round(i_cruda, 1) if i_cruda is not None else None,
+            "breaker_a": calibre_comercial_superior(i_cruda * factor_continuo) if i_cruda is not None else None,
+        })
+    completo = bool(crudas) and all(c is not None for c in crudas)
+    i_total = sum(crudas) if completo else None
+    # La relación sale de los valores crudos: con los ya redondeados daba otra
+    # cifra (1,045 frente a 1,046), el mismo doble redondeo de calcular_retie.
+    pdc_crudo, pac_crudo = topologia["p_dc_kWp"], topologia["p_ac_kW"]
+    return {
+        "potencia_dc_kwp": round(pdc_crudo, 2) if pdc_crudo else None,
+        "potencia_ac_kw": round(pac_crudo, 2) if pac_crudo else None,
+        "relacion_dc_ac": round(pdc_crudo / pac_crudo, 3) if pdc_crudo and pac_crudo else None,
+        "corriente_inversor_a": None,
+        "corriente_total_a": round(i_total, 1) if i_total is not None else None,
+        "corriente_diseno_total_a": round(i_total * factor_continuo, 1) if i_total is not None else None,
+        "breaker_inversor_a": None,
+        "breaker_general_a": calibre_comercial_superior(i_total * factor_continuo) if i_total is not None else None,
+        "pdc_por_inversor_kwp": [p["p_dc_kwp"] for p in por_inv],
+        "dcac_por_inversor": [p["relacion_dc_ac"] for p in por_inv],
+        "voc_string_stc_v": None, "voc_string_frio_v": None,
+        "vmp_string_stc_v": None, "isc_diseno_string_a": None,
+        "por_inversor": por_inv,
+    }
+
+
+def _etiqueta_diag(nivel: str, item: dict) -> str:
+    if nivel == "grupo":
+        return f"{item['superficie']} · {item['gid']}"
+    if nivel == "mppt":
+        return f"{item['inversor_id']} · MPPT {item['mppt']}"
+    if nivel == "inversor":
+        return str(item["inversor_id"])
+    return str(item["superficie"])
+
+
+def _limpiar_mensaje(texto: str) -> str:
+    """Mensaje de compatibilidad_bateria sin markdown ni emoji, en una línea."""
+    limpio = re.sub(r"[*`]", "", texto)
+    limpio = re.sub(r"^[^\wÁÉÍÓÚáéíóú¿(]+", "", limpio.strip())
+    return " ".join(limpio.replace("- ", "").split())
+
+
+def validar_retie_multisuperficie(topologia: dict, diagnostico: dict, calc: dict, *,
+                                  corriente_cortocircuito_pcc_ka: float | None = None,
+                                  esquema_tierra: str = "",
+                                  bateria_dict: dict | None = None) -> list[dict]:
+    """Validaciones ``{nivel, titulo, detalle}`` del sistema multi-superficie.
+
+    Verde → OK, amarillo → PENDIENTE, rojo → ERROR, igual que ⚡ Diseño
+    eléctrico. Agrega cajas combinadoras (fusibles gPV), batería,
+    optimizadores, temperaturas de diseño, capacidad interruptiva y tierra.
+    """
+    from calculos.compatibilidad_bateria import check_compatibilidad
+
+    icc = corriente_cortocircuito_pcc_ka
+    out: list[dict] = []
+    if topologia.get("sin_asignar"):
+        out.append({"nivel": "ERROR", "titulo": "Grupos sin inversor o MPPT válido",
+                    "detalle": ", ".join(topologia["sin_asignar"]) + ": asígnalos en 🗺️ Vista 3D."})
+    if (diagnostico.get("temperaturas") or {}).get("origen") != "proyecto":
+        out.append({"nivel": "PENDIENTE", "titulo": "Temperaturas de diseño",
+                    "detalle": "Se usan las de por defecto; define las del sitio en 📐 Dimensionamiento."})
+
+    for nivel, clave in (("grupo", "grupos"), ("mppt", "mppt"), ("inversor", "inversores"),
+                         ("superficie", "superficies")):
+        for item in diagnostico.get(clave, []):
+            etiqueta = _etiqueta_diag(nivel, item)
+            for c in item.get("checks", []):
+                unidad = f" {c['unidad']}" if c.get("unidad") else ""
+                if c.get("valor") is None:
+                    detalle = str(c.get("formula") or "")
+                elif c.get("limite") is None:
+                    detalle = f"{_con_unidad(c['valor'], unidad)}; límite sin dato en la ficha."
+                else:
+                    detalle = (f"{_con_unidad(c['valor'], unidad)} · límite "
+                               f"{_con_unidad(c['limite'], unidad)}.")
+                out.append({"nivel": NIVEL_POR_ESTADO.get(c.get("estado"), "PENDIENTE"),
+                            "titulo": f"{c['nombre']} — {etiqueta}", "detalle": detalle})
+
+    for inv in topologia["inversores"]:
+        for rama in inv["ramas"]:
+            if not rama["caja_combinadora"]:
+                continue
+            isc = max((g["isc_stc_A"] or 0.0) for g in rama["grupos"]) or None
+            minimo = (f"fusible gPV por string ≥ {_fmt(isc * FACTOR_FUSIBLE_STRING, 2, ' A')} "
+                      f"(1,25 × 1,25 × Isc {_fmt(isc, 2, ' A')})" if isc else "fusible gPV por string")
+            out.append({"nivel": "PENDIENTE",
+                        "titulo": f"Caja combinadora — {inv['inversor_id']} · MPPT {rama['mppt']}",
+                        "detalle": f"{rama['strings']} strings en paralelo: {minimo} y ≤ fusible máximo "
+                                   "de la ficha del módulo; seccionador y DPS DC."})
+
+    bat = topologia.get("bateria")
+    if bat:
+        inv = next(i for i in topologia["inversores"] if i["inversor_id"] == bat["inversor_id"])
+        estado, mensaje = check_compatibilidad(dict(bateria_dict or {}), inv["ficha"], inv["nombre"])
+        nivel = {"ok": "OK", "warning": "PENDIENTE"}.get(estado, "ERROR")
+        out.append({"nivel": nivel, "titulo": f"Batería — {bat['inversor_id']}",
+                    "detalle": _limpiar_mensaje(mensaje)})
+
+    if topologia.get("optimizadores"):
+        out.append({"nivel": "PENDIENTE", "titulo": "Optimizadores (MLPE)",
+                    "detalle": "La app no valida strings con optimizador: longitud del string, "
+                               "voltaje fijo y compatibilidad con el inversor según el fabricante."})
+
+    if icc is None:
+        out.append({"nivel": "PENDIENTE", "titulo": "Capacidad interruptiva",
+                    "detalle": "Falta la corriente de cortocircuito disponible en el PCC."})
+    else:
+        out.append({"nivel": "PENDIENTE", "titulo": "Capacidad interruptiva",
+                    "detalle": f"Icc PCC={icc:.2f} kA; seleccionar Icu/Ics de interruptores y "
+                               "verificar coordinación."})
+    if esquema_tierra:
+        out.append({"nivel": "PENDIENTE", "titulo": "Sistema de puesta a tierra",
+                    "detalle": f"Esquema declarado: {esquema_tierra}; verificar resistividad, "
+                               "electrodos, calibre PE y continuidad."})
+    else:
+        out.append({"nivel": "PENDIENTE", "titulo": "Sistema de puesta a tierra",
+                    "detalle": "Falta definir esquema de tierra, electrodos, barra PE y calibres."})
+    return out
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # 3. Dibujo (SVG) — a partir de config+cálculos+validaciones, sin saber de
 #    dónde salieron. Motor SVG liviano sin dependencias (mismo criterio que
 #    el script original que aportó el usuario) -- no hace falta schemdraw
@@ -453,24 +621,82 @@ def _dibujar_validaciones(d: _SVG, validaciones: list[dict], x: float, y: float)
         d.rect(bx, by, ancho, alto, fondo, color, 1, 8)
         d.circle(bx + 28, by + 28, 15, color, color, 1)
         d.text(bx + 28, by + 34, simbolo, 13, 700, "#fff", "middle")
-        d.text(bx + 52, by + 27, v["titulo"], 14, 700, color)
-        detalle, corte = v["detalle"], 54
-        if len(detalle) > corte:
-            punto = detalle.rfind(" ", 0, corte)
-            punto = punto if punto > 25 else corte
-            lineas = [detalle[:punto], detalle[punto:].strip()]
+        # «Nombre — dónde» (multi-superficie): el «dónde» va en su propia línea;
+        # en una sola línea no cabía en la tarjeta (se salía por la derecha).
+        titulo, _, donde = v["titulo"].partition(" — ")
+        d.text(bx + 52, by + 27, titulo, 14, 700, color)
+        if donde:
+            d.text(bx + 52, by + 45, donde, 12, 700, COLORES["gris"])
+            d.multiline(bx + 52, by + 64, _partir_detalle(v["detalle"], max_lineas=2), 11, 17, COLORES["texto"])
         else:
-            lineas = [detalle]
-        d.multiline(bx + 52, by + 52, lineas, 11, 17, COLORES["texto"])
+            d.multiline(bx + 52, by + 52, _partir_detalle(v["detalle"]), 11, 17, COLORES["texto"])
 
 
-def generar_ficha_svg(cfg: dict, calc: dict, checks: list[dict]) -> str:
+def _partir_detalle(detalle: str, corte: int = 54, max_lineas: int = 3) -> list[str]:
+    """Detalle en líneas de ~``corte`` caracteres; lo que no cabe en la tarjeta
+    termina en «…» (antes la segunda línea llevaba todo el resto y se salía)."""
+    palabras, lineas, actual = detalle.split(), [], ""
+    for palabra in palabras:
+        if actual and len(actual) + 1 + len(palabra) > corte:
+            lineas.append(actual)
+            actual = palabra
+        else:
+            actual = f"{actual} {palabra}".strip()
+    if actual:
+        lineas.append(actual)
+    if len(lineas) > max_lineas:
+        lineas = lineas[:max_lineas]
+        lineas[-1] = lineas[-1][: corte - 1].rstrip() + "…"
+    return lineas or [""]
+
+
+def _lineas_multisuperficie(topologia: dict, calc: dict, tension_v) -> dict:
+    """Líneas de los bloques y filas de la tabla con cada superficie y cada
+    inversor del sistema multi-superficie (en vez de un solo panel)."""
+    campo = []
+    for sup in topologia["superficies"]:
+        campo.append(f"{sup['nombre']}: {sup['modulos']} mód. · {_fmt(sup['p_dc_kWp'], 2, ' kWp')}")
+        campo.append("  " + " + ".join(str(p) for p in sup["paneles"]))
+    campo.append(f"Pdc = {_fmt(calc['potencia_dc_kwp'], 2, ' kWp')}")
+    if topologia.get("optimizadores"):
+        campo.append("Optimizadores MLPE por módulo")
+    n_cajas = sum(r["caja_combinadora"] for i in topologia["inversores"] for r in i["ramas"])
+    dc = ["Fusibles gPV (+/-)*", "Seccionador DC bajo carga*", "DPS DC Tipo 2*", "Cable solar H1Z2Z2-K*"]
+    dc.append(f"Caja combinadora × {n_cajas}" if n_cajas else "Ucpv >= Voc máxima")
+    dc.append("*Dimensionar con ficha")
+    inversores, filas = [], []
+    for inv, c in zip(topologia["inversores"], calc["por_inversor"]):
+        mppts = ", ".join(str(r["mppt"]) for r in inv["ramas"])
+        inversores.append(f"{inv['inversor_id']} {inv['nombre'] or 'inversor'} (MPPT {mppts})")
+        inversores.append(f"  {_fmt(c['p_dc_kwp'], 2, ' kWp')} → {_fmt(c['p_ac_kw'], 1, ' kW')} · "
+                          f"QF {_fmt(c['breaker_a'], 0, ' A')}*")
+        obs = f"{c['strings']} strings" + (f" · DC/AC {_fmt(c['relacion_dc_ac'], 2)}" if c["relacion_dc_ac"] else "")
+        filas.append([f"{inv['inversor_id']} AC", _fmt(c["p_ac_kw"], 1, " kW"), _fmt(tension_v, 0, " V, 3F"),
+                      _fmt(c["corriente_a"], 1, " A"), f"{_fmt(c['breaker_a'], 0, ' A')}*", "Por calcular", obs])
+    bat = topologia.get("bateria")
+    if bat:
+        inversores.append(f"Batería {bat['nombre'] or ''} → {bat['inversor_id']}")
+        filas.append([f"Batería ({bat['inversor_id']})", "-", "DC", "-", "Por calcular", "Por calcular",
+                      f"{bat['cantidad']} × {_fmt(bat['capacidad_kWh_unidad'], 1, ' kWh')} · "
+                      f"total {_fmt(bat['capacidad_total_kWh'], 1, ' kWh')}"])
+    return {"campo": campo[:8], "dc": dc, "inversores": inversores[:8], "filas": filas,
+            "n_inversores": len(topologia["inversores"])}
+
+
+def generar_ficha_svg(cfg: dict, calc: dict, checks: list[dict], topologia: dict | None = None) -> str:
     """Dibuja la ficha completa (SVG). Universal: el número de bloques del
     inversor y de filas de la tabla se ajustan a `inv['cantidad']`, no a 2
-    fijos como en el script original."""
+    fijos como en el script original. Con ``topologia`` (sistema
+    multi-superficie) el campo FV, los inversores y la tabla de cargas
+    muestran cada superficie y cada inversor con su propia potencia."""
     proy, panel, inv, gen = cfg["proyecto"], cfg["panel"], cfg["inversor"], cfg["generador"]
+    multi = _lineas_multisuperficie(topologia, calc, inv["tension_salida_v"]) if topologia else None
     n_filas_validacion = -(-len(checks) // 4)  # techo de división, sin importar
-    height = max(1420, 700 + n_filas_validacion * 108 + 400)
+    # Alto según lo que se dibuja: tabla (filas por inversor + general + tierra)
+    # y tarjetas. Antes no contaba la tabla y la última fila de tarjetas quedaba
+    # debajo del pie de página (28-sep-2026).
+    n_filas_tabla = (len(multi["filas"]) if multi else inv["cantidad"]) + 2
+    height = max(1420, 695 + 45 * (n_filas_tabla + 1) + 60 + 22 + n_filas_validacion * 108 + 170)
     d = _SVG(height=height)
 
     d.rect(0, 0, d.width, d.height, COLORES["fondo"], COLORES["fondo"], 0, 0)
@@ -485,7 +711,8 @@ def generar_ficha_svg(cfg: dict, calc: dict, checks: list[dict]) -> str:
     ancho_tarjeta = (d.width - 110 - 4 * 20) / 5
     tarjetas = [
         ("Potencia instalada", _fmt(calc["potencia_dc_kwp"], 2, " kWp"), "Generador fotovoltaico", COLORES["azul"]),
-        ("Potencia nominal", _fmt(calc["potencia_ac_kw"], 0, " kW"), f"Salida total de {inv['cantidad']} inversor(es)", COLORES["azul"]),
+        ("Potencia nominal", _fmt(calc["potencia_ac_kw"], 1 if multi else 0, " kW"),
+         f"Salida total de {multi['n_inversores'] if multi else inv['cantidad']} inversor(es)", COLORES["azul"]),
         ("Relación DC/AC", _fmt(calc["relacion_dc_ac"], 2), "Relación global del sistema", COLORES["azul"]),
         ("Corriente nominal", _fmt(calc["corriente_total_a"], 1, " A"), "Salida trifásica", COLORES["azul"]),
         ("Protección preliminar", _fmt(calc["breaker_general_a"], 0, " A"), "Confirmar Icu/Ics y conductor", COLORES["naranja"]),
@@ -505,12 +732,14 @@ def generar_ficha_svg(cfg: dict, calc: dict, checks: list[dict]) -> str:
         f"Voc string frío: {_fmt(calc['voc_string_frio_v'], 1, ' V')}",
         f"Isc diseño: {_fmt(calc['isc_diseno_string_a'], 1, ' A')}",
     ]
+    if multi:
+        lineas_campo = multi["campo"]
     _bloque(d, x, y, 270, alto_flujo, "1. CAMPO FV", lineas_campo)
     x += 270
     d.line(x, y + alto_flujo / 2, x + 55, y + alto_flujo / 2, COLORES["azul"], 5, True)
     x += 55
 
-    _bloque(d, x, y, 240, alto_flujo, "2. PROTECCIÓN DC", [
+    _bloque(d, x, y, 240, alto_flujo, "2. PROTECCIÓN DC", multi["dc"] if multi else [
         "Fusibles gPV (+/-)*", "Seccionador DC bajo carga*", "DPS DC Tipo 2*",
         "Cable solar H1Z2Z2-K*", "Ucpv >= Voc máxima", "*Dimensionar con ficha",
     ], COLORES["naranja_claro"], COLORES["naranja"])
@@ -524,6 +753,8 @@ def generar_ficha_svg(cfg: dict, calc: dict, checks: list[dict]) -> str:
             lineas_inv.append(f"INV-{n+1:02d}: {_fmt(pdc_n, 2, ' kWp')} → {_fmt(inv['potencia_ac_kw_unidad'], 0, ' kW')}")
     lineas_inv.append(f"I por inversor = {_fmt(calc['corriente_inversor_a'], 1, ' A')}")
     lineas_inv.append(f"QF preliminar = {_fmt(calc['breaker_inversor_a'], 0, ' A')}*")
+    if multi:
+        lineas_inv = multi["inversores"]
     ancho_inv = 390
     _bloque(d, x, y, ancho_inv, alto_flujo, "3. INVERSORES", lineas_inv)
     x += ancho_inv
@@ -566,6 +797,8 @@ def generar_ficha_svg(cfg: dict, calc: dict, checks: list[dict]) -> str:
             _fmt(inv["tension_salida_v"], 0, " V, 3F"), _fmt(calc["corriente_inversor_a"], 1, " A"),
             f"{_fmt(calc['breaker_inversor_a'], 0, ' A')}*", "Por calcular", obs,
         ])
+    if multi:
+        filas = multi["filas"]
     filas.append([
         "Alimentador general", _fmt(calc["potencia_ac_kw"], 0, " kW"),
         _fmt(inv["tension_salida_v"], 0, " V, 3F"), _fmt(calc["corriente_total_a"], 1, " A"),

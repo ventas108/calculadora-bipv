@@ -4584,6 +4584,82 @@ La columna y las métricas decían «P90 (−10%)» y el texto de arriba «−9,
 
 En la gráfica «Flujo de caja acumulado», «Payback P50: 6,7 a» y «Payback sin 1715: 10,0 a» se escribían a la misma altura y se tapaban. Ahora las etiquetas se ordenan por año y cada una baja una fila, al lado de su línea punteada.
 
+## 77. RETIE, Diagrama Unifilar y Ficha RETIE con el sistema real de Vista 3D (28-sep-2026)
+
+### RETIE y la app — ¿mi app cumple el RETIE?
+
+**Respuesta corta: no, y ninguna app puede cumplirlo por sí sola.** El RETIE (Reglamento Técnico de Instalaciones Eléctricas del MinEnergía; la versión vigente es la Res. 40117 de 2024 — verifica siempre la versión y su transición) certifica **instalaciones eléctricas y productos**, no software. Lo que hace la app es **apoyar el diseño**: revisa varias cosas que el RETIE exige y prepara documentos de borrador para el ingeniero.
+
+**Qué pide el RETIE para aprobar una instalación solar (resumen):**
+1. Diseño con memorias de cálculo firmado por un **ingeniero electricista con matrícula profesional**.
+2. Productos con **certificado de conformidad** (paneles, inversores, protecciones, cables).
+3. Construcción según el diseño y **declaración de cumplimiento** del constructor.
+4. **Inspección** por un organismo acreditado ante la ONAC, que emite el **dictamen de inspección RETIE**.
+5. Para conectarse a la red: el trámite con el operador de red según la **CREG 174/2021** (no es RETIE, pero va de la mano).
+
+**Qué NO hace la app:** estudio de cortocircuito, coordinación de protecciones, análisis de riesgo por rayos, medición de la puesta a tierra, firma, declaración ni inspección. En BIPV además aplican la **NSR-10** (anclajes, cargas y sismo de la fachada), el vidrio de seguridad y el comportamiento ante el fuego.
+
+**La simulación física (SDM, cadena de pérdidas, PR)** calcula cuánta energía produce el sistema y si es rentable. El RETIE regula la **seguridad**, no la producción: son cosas distintas.
+
+### RETIE y la app — qué revisa la 📋 Ficha RETIE con el sistema multi-superficie
+
+**Qué cambió:** antes la ficha revisaba el panel y el inversor de 📐 Dimensionamiento (un solo panel, un solo tipo de string). En un proyecto con fachada y techo con paneles distintos, **revisaba otro sistema**. Ahora, si el proyecto tiene grupos de strings en 🗺️ Vista 3D, la ficha arranca en «🗺️ Sistema multi-superficie (Vista 3D)» y revisa el sistema real.
+
+**Las comprobaciones son las mismas de ⚡ Diseño eléctrico** (no se recalculan con otra fórmula). Colores: 🟢 verde → **OK**, 🟡 amarillo → **PENDIENTE** (por revisar), 🔴 rojo → **ERROR** (corregir).
+
+**Ejemplo real (cliente de Bogotá, inversor SG5.0RT de 5 kW, 2 MPPT de 1 entrada y 18 A):**
+
+| Comprobación | Fachada (ASP 8 × 14) | Techo (SPR 4 × 1) |
+|---|---|---|
+| Voc en frío ≤ Vdc máximo | 987,6 V < 1100 V ✅ | 273,7 V < 1100 V ✅ |
+| Vmp real dentro del MPPT | 666 V en 160–1000 V ✅ | 212 V en 160–1000 V ✅ |
+| Isc del MPPT ≤ límite | 14,0 A ≤ 18 A ✅ | 8,1 A ≤ 18 A ✅ |
+| Strings ≤ entradas del MPPT | 14 strings, 1 entrada → caja combinadora ⚠️ | 1 de 1 ✅ |
+
+Relación DC/AC del inversor: 8,36 kWp ÷ 5 kW = **1,67** ⚠️ (más de 1,35: el inversor recorta en las horas de más sol). Breaker AC del inversor a 220 V: 5.000 W ÷ (√3 × 220 V) = 13,1 A × 1,25 = 16,4 A → calibre comercial **20 A**.
+
+**Cómo leerlo en pantalla:** arriba las tarjetas (potencia, DC/AC, corriente, protección), luego el flujo de 5 bloques con cada superficie y cada inversor, el cuadro de cargas con una fila por inversor y las tarjetas de validación. El texto completo de cada validación está en «📋 Detalle completo de cada validación».
+
+**Qué hacer:** resolver primero los ERROR (rojo) en 🗺️ Vista 3D › ⚡ Diseño eléctrico; los PENDIENTE son puntos que el ingeniero debe completar o justificar.
+
+### RETIE y la app — caja combinadora y fusibles gPV
+
+**Qué es:** una caja donde se unen varios strings en paralelo antes de llegar a una sola entrada del inversor. Lleva un **fusible gPV por string** (gPV = fusible especial para corriente continua fotovoltaica), un seccionador DC y un DPS (protección contra sobretensiones).
+
+**Por qué:** si un string falla (cortocircuito), los demás strings en paralelo le mandan su corriente al revés; el fusible corta esa corriente antes de que dañe el cable o el panel. Con 1 o 2 strings en paralelo normalmente no hace falta; con 3 o más, sí.
+
+**Fórmula en palabras:** corriente mínima del fusible = 1,25 × 1,25 × Isc del panel (referencia NEC 690.8/690.9), y nunca más que el «fusible máximo en serie» que dice la ficha técnica del módulo.
+
+**Ejemplo real:** la fachada del cliente tiene 14 strings de ASP-ST1-T40 (Isc 0,80 A) en un MPPT de 1 entrada → caja combinadora; fusible ≥ 1,25 × 1,25 × 0,80 = **1,25 A** y ≤ el máximo de la ficha del ASP.
+
+**Cómo leerlo en pantalla:** en ⚡ Diagrama Unifilar aparece el bloque «Caja combinadora · 14 strings → 1 salida · Fusible gPV por string»; en la Ficha RETIE, la tarjeta «Caja combinadora — INV-1 · MPPT 1».
+
+### RETIE y la app — optimizadores (MLPE)
+
+**Qué son:** equipos pequeños que se ponen detrás de cada panel (electrónica a nivel de módulo, MLPE) para que cada panel trabaje en su mejor punto aunque otros tengan sombra.
+
+**Cómo se usan en la app:** en ⚡ Diagrama Unifilar o en 📋 Ficha RETIE marca «Optimizadores MLPE (uno por módulo)»; la opción se guarda con el proyecto y vale para las dos páginas. Se dibujan en cada string y la ficha los marca **PENDIENTE**.
+
+**Por qué PENDIENTE:** con optimizadores el voltaje del string lo fija el optimizador y el largo mínimo/máximo del string lo define el fabricante; la app todavía **no** valida esa combinación (sus comprobaciones suponen strings sin optimizador). Tampoco cambian la energía calculada.
+
+### RETIE y la app — batería en el diagrama unifilar
+
+La batería de 🔋 Baterías y Balance se dibuja conectada a **un** inversor (elige cuál en «Inversor al que se conecta la batería»; se guarda con el proyecto). Necesita un inversor **híbrido** (con puerto de batería). La ficha muestra la compatibilidad con ese inversor: si el catálogo no lo reconoce (por ejemplo el SG5.0RT) queda PENDIENTE para confirmarlo en su ficha técnica; si es un inversor de string (sin puerto de batería) queda ERROR.
+
+### RETIE y la app — cómo leer el ⚡ Diagrama Unifilar del sistema real
+
+Se lee **de arriba hacia abajo**, como viaja la energía:
+1. **Strings** de cada superficie (nombre · grupo, «8 × 14 = 112 mód.» = 8 en serie × 14 strings, y el panel).
+2. **Protección DC** del string o **caja combinadora**.
+3. **Entrada MPPT** del inversor (cada MPPT entra por separado: no se juntan, porque trabajan a voltajes distintos).
+4. **Inversor** (nombre, kW AC, número de MPPT; «Híbrido» si tiene la batería).
+5. **QF** = breaker AC de cada inversor; con varios inversores, un **bus AC** y la **protección general**.
+6. **Medidor bidireccional** y **red (PCC)**.
+
+El número de módulos ya **no se escribe a mano**: sale de los grupos de strings de 🗺️ Vista 3D. Para cambiar el sistema, cambia los grupos allá.
+
+**Dos errores corregidos (28-sep-2026):** la página ⚡ Diagrama Unifilar se caía siempre al dibujar (un parámetro de `st.image` que la versión de Streamlit del servidor no acepta) y las cajas del dibujo salían corridas, separadas de las líneas, también en el diagrama de una superficie.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

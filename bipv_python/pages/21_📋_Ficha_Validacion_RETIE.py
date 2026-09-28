@@ -18,9 +18,13 @@ from calculos.ficha_validacion_retie import (
     generar_ficha_svg,
     exportar_ficha_svg_bytes,
     exportar_ficha_png_bytes,
+    calcular_retie_multisuperficie,
+    validar_retie_multisuperficie,
 )
 from calculos.dimensionamiento import diseno_electrico_confirmado
+from calculos.topologia_electrica import topologia_desde_estado
 from calculos import ledger_auditoria as _ledger
+from utils.sistema_electrico_ui import mostrar_resumen_topologia, opciones_sistema_multisuperficie
 
 
 def _nombre_archivo_seguro(nombre: str) -> str:
@@ -48,33 +52,51 @@ st.warning(
     "inspección ni la firma de un ingeniero electricista matriculado que exige RETIE."
 )
 
-if not st.session_state.get("panel_dict") and not st.session_state.get("inversor_dict_dim"):
-    st.info(
-        "ℹ️ No se detecta panel ni inversor configurados todavía en 📐 Dimensionamiento. "
-        "Puedes seguir de todos modos e ingresar los datos manualmente abajo."
-    )
+# ── Sistema multi-superficie de 🗺️ Vista 3D (Spec 07/unifilar-retie-multisuperficie) ──
+# Antes la ficha validaba siempre el panel y el inversor de 📐 Dimensionamiento,
+# aunque el proyecto tuviera dos paneles y grupos de strings por MPPT: revisaba
+# otro sistema. Con multi-superficie activo se valida el sistema real.
+_ORIGEN_MULTI = "🗺️ Sistema multi-superficie (Vista 3D)"
+_ORIGEN_DIM = "📐 Dimensionamiento (una superficie)"
+usar_multi = False
+_topo_retie = None
+if topologia_desde_estado(st.session_state, incluir_bateria=False) is not None:
+    usar_multi = st.radio(
+        "Sistema a validar", [_ORIGEN_MULTI, _ORIGEN_DIM], index=0, horizontal=True,
+        help="El proyecto tiene el sistema multi-superficie de 🗺️ Vista 3D: se valida con "
+             "sus paneles, grupos de strings e inversores reales.",
+    ) == _ORIGEN_MULTI
+    if usar_multi:
+        _topo_retie = opciones_sistema_multisuperficie()
 
-# ── Vigencia del diseño confirmado (31-ago-2026) ───────────────────────────────
-# Mismo gap real que ⚡ Diagrama Unifilar (página gemela: mismo patrón de
-# "generador universal" auto-llenado y editable) -- "Módulos en serie" y
-# "Número total de módulos" se auto-llenan desde el último diseño CONFIRMADO
-# en Dimensionamiento, sin ninguna alerta si panel/inversor cambiaron desde
-# entonces. Ver `DIAGNOSTICO_ALERTA_VIGENCIA_DISENO.md`.
-_diseno_retie = diseno_electrico_confirmado(st.session_state)
-if _diseno_retie["aviso"]:
-    st.warning(_diseno_retie["aviso"])
+if not usar_multi:
+    if not st.session_state.get("panel_dict") and not st.session_state.get("inversor_dict_dim"):
+        st.info(
+            "ℹ️ No se detecta panel ni inversor configurados todavía en 📐 Dimensionamiento. "
+            "Puedes seguir de todos modos e ingresar los datos manualmente abajo."
+        )
 
-_npg_ref_retie = st.session_state.get("N_paneles_granja_inversor_ref")
-_inv_actual_retie = st.session_state.get("inversor_nombre_dim")
-_npg_valor_retie = st.session_state.get("N_paneles_granja")
-if _npg_ref_retie and _inv_actual_retie and _npg_ref_retie != _inv_actual_retie and _npg_valor_retie:
-    st.warning(
-        f"⚠️ El total de módulos auto-llenado ({_npg_valor_retie}) viene del cálculo de "
-        f"Proyecto completo con **{_npg_ref_retie}**, pero el inversor seleccionado ahora en "
-        f"📐 Dimensionamiento es **{_inv_actual_retie}** — vuelve a correr "
-        "\"▶️ Optimizar N paneles/string\" o \"Prorrateo preliminar\" con el inversor "
-        "actual, o revisa a mano el número de módulos abajo antes de generar la ficha."
-    )
+    # ── Vigencia del diseño confirmado (31-ago-2026) ───────────────────────────────
+    # Mismo gap real que ⚡ Diagrama Unifilar (página gemela: mismo patrón de
+    # "generador universal" auto-llenado y editable) -- "Módulos en serie" y
+    # "Número total de módulos" se auto-llenan desde el último diseño CONFIRMADO
+    # en Dimensionamiento, sin ninguna alerta si panel/inversor cambiaron desde
+    # entonces. Ver `DIAGNOSTICO_ALERTA_VIGENCIA_DISENO.md`.
+    _diseno_retie = diseno_electrico_confirmado(st.session_state)
+    if _diseno_retie["aviso"]:
+        st.warning(_diseno_retie["aviso"])
+
+    _npg_ref_retie = st.session_state.get("N_paneles_granja_inversor_ref")
+    _inv_actual_retie = st.session_state.get("inversor_nombre_dim")
+    _npg_valor_retie = st.session_state.get("N_paneles_granja")
+    if _npg_ref_retie and _inv_actual_retie and _npg_ref_retie != _inv_actual_retie and _npg_valor_retie:
+        st.warning(
+            f"⚠️ El total de módulos auto-llenado ({_npg_valor_retie}) viene del cálculo de "
+            f"Proyecto completo con **{_npg_ref_retie}**, pero el inversor seleccionado ahora en "
+            f"📐 Dimensionamiento es **{_inv_actual_retie}** — vuelve a correr "
+            "\"▶️ Optimizar N paneles/string\" o \"Prorrateo preliminar\" con el inversor "
+            "actual, o revisa a mano el número de módulos abajo antes de generar la ficha."
+        )
 
 col1, col2 = st.columns(2)
 
@@ -93,79 +115,88 @@ with col1:
     with col_d2:
         matricula = st.text_input("Matrícula profesional", value="")
 
-    st.subheader("Módulo FV")
-    panel_dict = st.session_state.get("panel_dict", {}) or {}
-    panel_nombre = st.text_input(
-        "Módulo", value=st.session_state.get("panel_nombre_dim", ""),
-        help="Auto-llenado desde 📐 Dimensionamiento si ya configuraste un panel.",
-    )
-    _n_paneles_detectado = (
-        st.session_state.get("N_paneles_granja") or st.session_state.get("N_paneles") or 0
-    )
-    n_paneles = st.number_input("Número total de módulos", min_value=0, step=1, value=int(_n_paneles_detectado))
-    n_serie = st.number_input(
-        "Módulos en serie por string (N)", min_value=0, step=1,
-        value=int(st.session_state.get("N_serie", 0) or 0),
-    )
-    potencia_w = st.number_input(
-        "Potencia por módulo (Wp)", min_value=0.0, step=5.0,
-        value=float(panel_dict.get("Pmax_stc") or 0),
-    )
-    with st.expander("Ficha técnica del módulo (opcional, para validar Voc frío / ventana MPPT)"):
-        voc_v = st.number_input("Voc STC (V)", min_value=0.0, step=0.1, value=float(panel_dict.get("Voc_stc") or 0))
-        vmp_v = st.number_input("Vmp STC (V)", min_value=0.0, step=0.1, value=float(panel_dict.get("Vmp_stc") or 0))
-        isc_a = st.number_input("Isc STC (A)", min_value=0.0, step=0.1, value=float(panel_dict.get("Isc_stc") or 0))
-        coef_voc_pct_c = st.number_input(
-            "Coeficiente de temperatura de Voc (%/°C, típicamente negativo)",
-            step=0.01, value=float(panel_dict.get("Tk_beta") or 0),
+    if not usar_multi:
+        st.subheader("Módulo FV")
+        panel_dict = st.session_state.get("panel_dict", {}) or {}
+        panel_nombre = st.text_input(
+            "Módulo", value=st.session_state.get("panel_nombre_dim", ""),
+            help="Auto-llenado desde 📐 Dimensionamiento si ya configuraste un panel.",
         )
-        temperatura_minima_diseno_c = st.number_input(
-            "Temperatura mínima de diseño del sitio (°C)", step=1.0, value=0.0,
+        _n_paneles_detectado = (
+            st.session_state.get("N_paneles_granja") or st.session_state.get("N_paneles") or 0
         )
+        n_paneles = st.number_input("Número total de módulos", min_value=0, step=1, value=int(_n_paneles_detectado))
+        n_serie = st.number_input(
+            "Módulos en serie por string (N)", min_value=0, step=1,
+            value=int(st.session_state.get("N_serie", 0) or 0),
+        )
+        potencia_w = st.number_input(
+            "Potencia por módulo (Wp)", min_value=0.0, step=5.0,
+            value=float(panel_dict.get("Pmax_stc") or 0),
+        )
+        with st.expander("Ficha técnica del módulo (opcional, para validar Voc frío / ventana MPPT)"):
+            voc_v = st.number_input("Voc STC (V)", min_value=0.0, step=0.1, value=float(panel_dict.get("Voc_stc") or 0))
+            vmp_v = st.number_input("Vmp STC (V)", min_value=0.0, step=0.1, value=float(panel_dict.get("Vmp_stc") or 0))
+            isc_a = st.number_input("Isc STC (A)", min_value=0.0, step=0.1, value=float(panel_dict.get("Isc_stc") or 0))
+            coef_voc_pct_c = st.number_input(
+                "Coeficiente de temperatura de Voc (%/°C, típicamente negativo)",
+                step=0.01, value=float(panel_dict.get("Tk_beta") or 0),
+            )
+            temperatura_minima_diseno_c = st.number_input(
+                "Temperatura mínima de diseño del sitio (°C)", step=1.0, value=0.0,
+            )
 
 with col2:
-    st.subheader("Inversor(es)")
-    inversor_dict = st.session_state.get("inversor_dict_dim", {}) or {}
-    inversor_nombre = st.text_input(
-        "Modelo de inversor", value=st.session_state.get("inversor_nombre_dim", ""),
-        help="Auto-llenado desde ⚖️ Comparador de Inversores / 📐 Dimensionamiento si ya adoptaste una configuración.",
-    )
-    n_inversores = st.number_input(
-        "Cantidad de unidades", min_value=1, step=1,
-        value=int(st.session_state.get("N_inv_total", 1) or 1),
-    )
-    p_ac_manual_kW = st.number_input(
-        "Potencia AC nominal por unidad (kW)", min_value=0.0, step=1.0,
-        value=float((inversor_dict.get("P_ac_nom_W") or 0) / 1000.0),
-    )
-    tension_salida_v = st.selectbox(
-        "Tensión de salida (V)", options=[220, 380, 400, 440, 13200], index=2,
-    )
-    with st.expander("Ficha técnica del inversor (opcional, para validar Voc frío / ventana MPPT)"):
-        vdc_max_v = st.number_input("Vdc máxima (V)", min_value=0.0, step=1.0, value=float(inversor_dict.get("Vdc_max") or 0))
-        vmppt_min_v = st.number_input(
-            "MPPT mínimo (V)", min_value=0.0, step=1.0,
-            value=float(inversor_dict.get("Vmppt_min") or inversor_dict.get("Vmppt_activo_min") or 0),
+    if usar_multi:
+        st.subheader("Sistema de 🗺️ Vista 3D")
+        mostrar_resumen_topologia(_topo_retie)
+        tension_salida_v = st.selectbox(
+            "Tensión de salida (V)", options=[220, 380, 400, 440, 13200], index=2,
+            help="Tensión de salida de los inversores en el punto de conexión (fórmula trifásica).",
         )
-        vmppt_max_v = st.number_input("MPPT máximo (V)", min_value=0.0, step=1.0, value=float(inversor_dict.get("Vmppt_max") or 0))
+    else:
+        st.subheader("Inversor(es)")
+        inversor_dict = st.session_state.get("inversor_dict_dim", {}) or {}
+        inversor_nombre = st.text_input(
+            "Modelo de inversor", value=st.session_state.get("inversor_nombre_dim", ""),
+            help="Auto-llenado desde ⚖️ Comparador de Inversores / 📐 Dimensionamiento si ya adoptaste una configuración.",
+        )
+        n_inversores = st.number_input(
+            "Cantidad de unidades", min_value=1, step=1,
+            value=int(st.session_state.get("N_inv_total", 1) or 1),
+        )
+        p_ac_manual_kW = st.number_input(
+            "Potencia AC nominal por unidad (kW)", min_value=0.0, step=1.0,
+            value=float((inversor_dict.get("P_ac_nom_W") or 0) / 1000.0),
+        )
+        tension_salida_v = st.selectbox(
+            "Tensión de salida (V)", options=[220, 380, 400, 440, 13200], index=2,
+        )
+        with st.expander("Ficha técnica del inversor (opcional, para validar Voc frío / ventana MPPT)"):
+            vdc_max_v = st.number_input("Vdc máxima (V)", min_value=0.0, step=1.0, value=float(inversor_dict.get("Vdc_max") or 0))
+            vmppt_min_v = st.number_input(
+                "MPPT mínimo (V)", min_value=0.0, step=1.0,
+                value=float(inversor_dict.get("Vmppt_min") or inversor_dict.get("Vmppt_activo_min") or 0),
+            )
+            vmppt_max_v = st.number_input("MPPT máximo (V)", min_value=0.0, step=1.0, value=float(inversor_dict.get("Vmppt_max") or 0))
 
-    st.subheader("Distribución de strings por inversor")
-    st.caption(
-        "Opcional -- si la completas, se calcula el balance DC/AC por inversor "
-        "y la tabla de cargas muestra una fila por inversor con su propio dato."
-    )
-    _n_strings_detectado = int(n_paneles // n_serie) if n_serie else 0
-    _texto_strings = st.text_input(
-        f"Strings por inversor, separados por coma (ej. 9,8) — total detectado: {_n_strings_detectado}",
-        value="",
-    )
-    strings_por_inversor = None
-    if _texto_strings.strip():
-        try:
-            strings_por_inversor = [int(x.strip()) for x in _texto_strings.split(",") if x.strip()]
-        except ValueError:
-            st.warning("⚠️ No se pudo interpretar la distribución de strings -- usa solo números separados por coma.")
-            strings_por_inversor = None
+        st.subheader("Distribución de strings por inversor")
+        st.caption(
+            "Opcional -- si la completas, se calcula el balance DC/AC por inversor "
+            "y la tabla de cargas muestra una fila por inversor con su propio dato."
+        )
+        _n_strings_detectado = int(n_paneles // n_serie) if n_serie else 0
+        _texto_strings = st.text_input(
+            f"Strings por inversor, separados por coma (ej. 9,8) — total detectado: {_n_strings_detectado}",
+            value="",
+        )
+        strings_por_inversor = None
+        if _texto_strings.strip():
+            try:
+                strings_por_inversor = [int(x.strip()) for x in _texto_strings.split(",") if x.strip()]
+            except ValueError:
+                st.warning("⚠️ No se pudo interpretar la distribución de strings -- usa solo números separados por coma.")
+                strings_por_inversor = None
 
     st.subheader("Punto de conexión")
     corriente_cortocircuito_pcc_ka = st.number_input(
@@ -176,29 +207,51 @@ with col2:
 
 st.divider()
 
-config = construir_config_retie(
-    nombre_proyecto=nombre_proyecto, propietario=propietario, direccion=direccion,
-    municipio=municipio, operador_red=operador_red, disenador=disenador, matricula=matricula,
-    panel_nombre=panel_nombre, potencia_w=potencia_w,
-    voc_v=voc_v or None, vmp_v=vmp_v or None, isc_a=isc_a or None,
-    coef_voc_pct_c=coef_voc_pct_c or None,
-    inversor_nombre=inversor_nombre, potencia_ac_kw_unidad=p_ac_manual_kW,
-    n_inversores=int(n_inversores), tension_salida_v=float(tension_salida_v),
-    vdc_max_v=vdc_max_v or None, vmppt_min_v=vmppt_min_v or None, vmppt_max_v=vmppt_max_v or None,
-    n_paneles=int(n_paneles), n_serie=int(n_serie), strings_por_inversor=strings_por_inversor,
-    temperatura_minima_diseno_c=temperatura_minima_diseno_c if temperatura_minima_diseno_c else None,
-    corriente_cortocircuito_pcc_ka=corriente_cortocircuito_pcc_ka or None,
-    esquema_tierra=esquema_tierra,
-)
-calc = calcular_retie(config)
-checks = validar_retie(config, calc)
-svg = generar_ficha_svg(config, calc, checks)
+if usar_multi:
+    config = construir_config_retie(
+        nombre_proyecto=nombre_proyecto, propietario=propietario, direccion=direccion,
+        municipio=municipio, operador_red=operador_red, disenador=disenador, matricula=matricula,
+        tension_salida_v=float(tension_salida_v),
+        n_inversores=len(_topo_retie["inversores"]) or 1,
+        corriente_cortocircuito_pcc_ka=corriente_cortocircuito_pcc_ka or None,
+        esquema_tierra=esquema_tierra,
+    )
+    calc = calcular_retie_multisuperficie(_topo_retie, tension_salida_v=float(tension_salida_v))
+    checks = validar_retie_multisuperficie(
+        _topo_retie, _topo_retie["diagnostico"], calc,
+        corriente_cortocircuito_pcc_ka=corriente_cortocircuito_pcc_ka or None,
+        esquema_tierra=esquema_tierra,
+        bateria_dict=st.session_state.get("bateria_dict") or {},
+    )
+    svg = generar_ficha_svg(config, calc, checks, topologia=_topo_retie)
+else:
+    config = construir_config_retie(
+        nombre_proyecto=nombre_proyecto, propietario=propietario, direccion=direccion,
+        municipio=municipio, operador_red=operador_red, disenador=disenador, matricula=matricula,
+        panel_nombre=panel_nombre, potencia_w=potencia_w,
+        voc_v=voc_v or None, vmp_v=vmp_v or None, isc_a=isc_a or None,
+        coef_voc_pct_c=coef_voc_pct_c or None,
+        inversor_nombre=inversor_nombre, potencia_ac_kw_unidad=p_ac_manual_kW,
+        n_inversores=int(n_inversores), tension_salida_v=float(tension_salida_v),
+        vdc_max_v=vdc_max_v or None, vmppt_min_v=vmppt_min_v or None, vmppt_max_v=vmppt_max_v or None,
+        n_paneles=int(n_paneles), n_serie=int(n_serie), strings_por_inversor=strings_por_inversor,
+        temperatura_minima_diseno_c=temperatura_minima_diseno_c if temperatura_minima_diseno_c else None,
+        corriente_cortocircuito_pcc_ka=corriente_cortocircuito_pcc_ka or None,
+        esquema_tierra=esquema_tierra,
+    )
+    calc = calcular_retie(config)
+    checks = validar_retie(config, calc)
+    svg = generar_ficha_svg(config, calc, checks)
 
 st.subheader(f"{config['proyecto']['nombre_proyecto']}")
 _n_error = sum(1 for c in checks if c["nivel"] == "ERROR")
 _n_pendiente = sum(1 for c in checks if c["nivel"] == "PENDIENTE")
 _n_ok = sum(1 for c in checks if c["nivel"] == "OK")
 st.caption(f"✅ {_n_ok} OK · ⚠️ {_n_pendiente} pendiente(s) · ❌ {_n_error} error(es)")
+with st.expander("📋 Detalle completo de cada validación (el texto de las tarjetas se recorta)"):
+    _icono_nivel = {"OK": "✅", "PENDIENTE": "⚠️", "ERROR": "❌"}
+    for _c in checks:
+        st.markdown(f"{_icono_nivel.get(_c['nivel'], '')} **{_c['titulo']}** — {_c['detalle']}")
 
 st.components.v1.html(svg, height=min(1600, len(svg) // 40 + 900), scrolling=True)
 
@@ -227,6 +280,8 @@ if st.button("🔒 Sellar en el Ledger de Auditoría", type="secondary", use_con
         "proyecto": config["proyecto"], "panel": config["panel"], "inversor": config["inversor"],
         "generador": config["generador"], "diseno": config["diseno"],
     }
+    if usar_multi:
+        _insumos["topologia"] = {k: v for k, v in _topo_retie.items() if k != "diagnostico"}
     _resultados = {
         "potencia_dc_kwp": calc["potencia_dc_kwp"], "potencia_ac_kw": calc["potencia_ac_kw"],
         "n_ok": _n_ok, "n_pendiente": _n_pendiente, "n_error": _n_error,
@@ -240,4 +295,6 @@ if st.button("🔒 Sellar en el Ledger de Auditoría", type="secondary", use_con
         st.warning("⚠️ No se pudo sellar (revisa sesión activa y permisos/espacio).")
 
 with st.expander("📋 Datos y validaciones usados en esta ficha"):
-    st.json({"config": config, "calculos": calc, "validaciones": checks})
+    st.json({"config": config, "calculos": calc, "validaciones": checks,
+             **({"topologia": {k: v for k, v in _topo_retie.items() if k != "diagnostico"}}
+                if usar_multi else {})})
