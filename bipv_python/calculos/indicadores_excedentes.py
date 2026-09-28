@@ -117,3 +117,22 @@ def desglose_capex(capex_total: float, modulos: float, inversor: float,
         "estructura_instalacion": est_inst,
         "resto": resto,
     }
+
+
+def tarifa_excedentes_vigente(estado: Mapping[str, Any], tarifa_cop: float,
+                              frac_exportada: float) -> float:
+    """Tarifa de excedentes guardada en 💰 Financiero, o la de compra si no aplica.
+
+    Es la misma regla del campo «Tarifa de excedentes exportados»: solo existe
+    cuando el balance exporta energía (``frac_exportada > 0``) y, sin valor
+    guardado, vale lo mismo que la tarifa de compra. La tarjeta «Ahorro
+    estimado» (arriba de la página) la necesita antes de que se dibuje el campo.
+    """
+    if _num(frac_exportada) <= 0:
+        return _num(tarifa_cop)
+    guardada = estado.get("tarifa_excedentes_cop_kWh")
+    try:
+        valor = float(guardada)
+    except (TypeError, ValueError):
+        return _num(tarifa_cop)
+    return valor if valor == valor and valor >= 0 else _num(tarifa_cop)

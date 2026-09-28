@@ -457,3 +457,20 @@ import pytest  # noqa: E402
 def test_buscar_guia_cadena_de_perdidas(pregunta, texto):
     seccion = _seccion_recuperada(pregunta, "Aprender la cadena de pérdidas")
     assert texto in seccion["texto"]
+
+
+def test_buscar_ahorro_estimado_distinto_del_ahorro_anio_1():
+    seccion = _seccion_recuperada(
+        "por que el ahorro estimado no coincide con el ahorro energia año 1",
+        "Ahorro estimado y ahorro del año 1",
+    )
+    assert "6,85 M COP/año" in seccion["texto"]
+
+
+def test_buscar_pr_del_sistema_no_es_el_promedio():
+    # Pregunta capciosa real (28-sep-2026): el Asistente respondió «no está cubierto».
+    seccion = _seccion_recuperada(
+        "Si la fachada tiene PR 0,724 y el techo 0,828, ¿el PR de todo el sistema es el promedio, 0,776?",
+        "PR de todo el sistema",
+    )
+    assert "5.944 ÷ 7.895 = 0,753" in seccion["texto"]

@@ -279,14 +279,23 @@ frac_exportada = (_e_exportacion / e_financiero) if (_balance_activo and e_finan
 # PANEL PREVIO — Consumo vs Producción estimada
 # ═══════════════════════════════════════════════════════════════════════════════
 _consumo_mes_fin = float(st.session_state.get("consumo_kwh_mes", 0.0))
-from calculos.indicadores_excedentes import aviso_sobredimension
+from calculos.indicadores_excedentes import (
+    ahorro_anual_cop, aviso_sobredimension, tarifa_excedentes_vigente,
+)
 _tarifa_prev_fin = float(st.session_state.get("tarifa_cop_kwh", 0.0))
 
 if _consumo_mes_fin > 0 and e_ac > 0 and _tarifa_prev_fin > 0:
     _consumo_anual_fin = _consumo_mes_fin * 12
     _cob_real_fin      = min(e_ac / _consumo_anual_fin * 100, 100.0) if _consumo_anual_fin > 0 else 0.0
     _prod_mes_fin      = e_ac / 12
-    _ahorro_mes_fin    = min(_prod_mes_fin, _consumo_mes_fin) * _tarifa_prev_fin
+    # Mismo ahorro que «Ahorro energía año 1» y que el flujo de caja: autoconsumo
+    # a la tarifa de compra y excedentes a la suya. Antes todo el consumo a la
+    # tarifa de compra: 6,89 M contra 6,85 M COP/año (27-sep-2026).
+    _ahorro_prev_fin   = ahorro_anual_cop(
+        e_financiero, frac_exportada, _tarifa_prev_fin,
+        tarifa_excedentes_vigente(st.session_state, _tarifa_prev_fin, frac_exportada),
+    )
+    _ahorro_mes_fin    = _ahorro_prev_fin["total_cop"] / 12
     _deficit_kwh_fin   = max(_consumo_anual_fin - e_ac, 0)
     _cobertura_obj_fin = int(st.session_state.get("cobertura_pct", 0))
 
@@ -325,6 +334,11 @@ if _consumo_mes_fin > 0 and e_ac > 0 and _tarifa_prev_fin > 0:
         f"${_ahorro_mes_fin:,.0f} COP/mes",
         delta=f"${_ahorro_mes_fin * 12 / 1e6:.2f} M COP/año",
         delta_color="off",
+        help=(
+            "Igual a «Ahorro energía año 1»: autoconsumo × tarifa de compra"
+            + (" + excedentes × tarifa de excedentes" if _ahorro_prev_fin["exportada_kWh"] > 0 else "")
+            + ". Año 1, sin degradación ni escalación."
+        ),
     )
 
     if _aviso_sobredim_previo := aviso_sobredimension(e_financiero, _consumo_anual_fin, _balance_activo):
@@ -1554,7 +1568,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
             f"{m_con['lcoe_usd_kWh']:.4f}",
             f"{m_con['lcoe_cop_kWh']:.0f}",
         ],
-        f"Con Ley 1715 · P90 🏦 (−{factor_p90:.0f}%)": _col_p90,
+        f"Con Ley 1715 · P90 🏦 (−{factor_p90:.1f}%)": _col_p90,
     })
 
     def _color_comp(row):
@@ -1602,7 +1616,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
     if m_p90:
         tir_caida = (m_con['tir_pct'] or 0) - (m_p90['tir_pct'] or 0)
         c2.metric(
-            f"TIR P90 con Ley 1715 (−{factor_p90:.0f}%)",
+            f"TIR P90 con Ley 1715 (−{factor_p90:.1f}%)",
             f"{m_p90['tir_pct']:.1f}%" if m_p90['tir_pct'] else "—",
             delta=f"−{tir_caida:.1f}pp vs P50",
             delta_color="inverse",
@@ -1748,7 +1762,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
         fig_fc.add_trace(go.Scatter(
             x=anos,
             y=[f["flujo_acum_usd"] for f in fc_p90],
-            name=f"Con Ley 1715 · P90 (−{factor_p90:.0f}%)",
+            name=f"Con Ley 1715 · P90 (−{factor_p90:.1f}%)",
             line=dict(color="#F57F17", width=1.5, dash="dot"),
             mode="lines",
             fill=None,
@@ -1779,28 +1793,22 @@ if btn_fin or st.session_state.get("financiero_ok"):
     ))
     fig_fc.add_hline(y=0, line_color="gray", line_dash="dot", line_width=1)
 
-    # Payback P50
-    if m_con.get("payback_simple"):
-        fig_fc.add_vline(
-            x=m_con["payback_simple"],
-            line_color="#2E7D32", line_dash="dot",
-            annotation_text=f"Payback P50: {m_con['payback_simple']:.1f} a",
-            annotation_position="top right",
-        )
-    # Payback P90
-    if m_p90 and m_p90.get("payback_simple"):
-        fig_fc.add_vline(
-            x=m_p90["payback_simple"],
-            line_color="#F57F17", line_dash="dot",
-            annotation_text=f"Payback P90: {m_p90['payback_simple']:.1f} a",
-            annotation_position="bottom right",
-        )
-    if m_sin.get("payback_simple"):
-        fig_fc.add_vline(
-            x=m_sin["payback_simple"],
-            line_color="#EF5350", line_dash="dot",
-            annotation_text=f"Payback sin 1715: {m_sin['payback_simple']:.1f} a",
-            annotation_position="top left",
+    # Paybacks: líneas verticales y etiquetas escalonadas para que no se
+    # encimen (antes «Payback P50» y «Payback sin 1715» quedaban una sobre otra).
+    from calculos.lectura_financiera import etiquetas_payback
+    for _etq in etiquetas_payback([
+        (f"Payback P50: {m_con['payback_simple']:.1f} a" if m_con.get("payback_simple") else "",
+         m_con.get("payback_simple"), "#2E7D32"),
+        (f"Payback P90: {m_p90['payback_simple']:.1f} a" if m_p90 and m_p90.get("payback_simple") else "",
+         m_p90.get("payback_simple") if m_p90 else None, "#F57F17"),
+        (f"Payback sin 1715: {m_sin['payback_simple']:.1f} a" if m_sin.get("payback_simple") else "",
+         m_sin.get("payback_simple"), "#EF5350"),
+    ]):
+        fig_fc.add_vline(x=_etq["x"], line_color=_etq["color"], line_dash="dot")
+        fig_fc.add_annotation(
+            x=_etq["x"], y=_etq["y"], xref="x", yref="paper", text=_etq["texto"],
+            showarrow=False, xanchor="left", xshift=4, font=dict(color=_etq["color"], size=11),
+            bgcolor="rgba(255,255,255,0.85)",
         )
 
     fig_fc.update_layout(
@@ -1817,7 +1825,7 @@ if btn_fin or st.session_state.get("financiero_ok"):
         st.caption(
             "🟡 La banda **ámbar** muestra la incertidumbre P50–P90: "
             "el proyecto debería ser rentable incluso en el escenario conservador "
-            f"(producción {factor_p90:.0f}% menor). "
+            f"(producción {factor_p90:.1f}% menor). "
             "Un banco típicamente financia si el VPN P90 ≥ 0."
         )
 

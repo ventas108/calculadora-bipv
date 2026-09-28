@@ -4502,6 +4502,28 @@ Todas las fracciones que sobreviven se multiplican. Ejemplo de la fachada ASP (v
 
 Energía de la fachada ≈ 808 kWh/m² × 80,6 m² × 0,0875 × 0,682 ≈ **3.890 kWh/año** (con el 0,78 fijo eran 4.446). El techo SPR queda con PR ≈ 0,80 porque casi no pierde por ángulo. Total del sistema ≈ 5.600–5.700 kWh/año en vez de 6.155; con el TMY real los números pueden variar un poco.
 
+**Con el clima real (TMY) del proyecto del cliente (27-sep-2026):** fachada PR **0,724** → 4.129 kWh/año; techo PR **0,828** → 1.815 kWh/año; total **5.944 kWh/año**.
+
+### Aprender la cadena de pérdidas — PR de todo el sistema: no es el promedio de las superficies (promedio ponderado)
+
+**Pregunta típica:** «si la fachada tiene PR 0,724 y el techo 0,828, ¿el PR de todo el sistema es el promedio, 0,776?» **No.** El promedio simple da el mismo peso a las dos superficies, pero la fachada produce mucho más que el techo, así que pesa más.
+
+**Fórmula en palabras:** PR del sistema = energía real total ÷ energía «ideal» total (la que habría sin pérdidas). La energía ideal de cada superficie es su energía real ÷ su PR (o sea POA × área × η del panel).
+
+**Ejemplo con los números reales del cliente:**
+
+| Superficie | Energía real | Energía ideal (real ÷ PR) |
+|---|---|---|
+| Fachada (PR 0,724) | 4.129 kWh | 4.129 ÷ 0,724 = 5.703 kWh |
+| Techo (PR 0,828) | 1.815 kWh | 1.815 ÷ 0,828 = 2.192 kWh |
+| **Total** | **5.944 kWh** | **7.895 kWh** |
+
+**PR del sistema = 5.944 ÷ 7.895 = 0,753**, no 0,776. Queda más cerca del PR de la fachada porque la fachada aporta el 72 % de la energía ideal. Es un **promedio ponderado** por la energía ideal de cada superficie, no un promedio simple.
+
+**Cómo leerlo en pantalla:** en 🗺️ Vista 3D › «Resumen POA por superficie» están el PR y la E_ac de cada superficie; divide cada E_ac por su PR, suma, y divide la «Producción total del sistema» por esa suma.
+
+**Qué hacer:** para comparar el sistema con otro proyecto usa el PR ponderado (0,753), nunca el promedio simple; para mejorar el sistema ataca primero la superficie que más pesa (aquí la fachada: ángulo y temperatura).
+
 ### Aprender la cadena de pérdidas — cómo leerlo en la pantalla
 
 En 🗺️ Vista 3D › ⚙️ Superficies BIPV › **Resumen POA por superficie**:
@@ -4537,6 +4559,30 @@ En 🗺️ Vista 3D › ⚙️ Superficies BIPV › **Resumen POA por superficie
 - **NOCT y γ:** temperatura nominal de operación del panel y cuánto pierde por cada grado.
 - **k_BIPV:** cuánto más se calienta un panel integrado que uno ventilado.
 - **SDM:** modelo eléctrico de un diodo; describe la curva corriente-voltaje real del panel.
+
+## 76. Financiero: las dos tarjetas de ahorro ahora dicen lo mismo, rótulo P90 y etiquetas de payback (28-sep-2026)
+
+### Ahorro estimado y ahorro del año 1: por qué antes no coincidían
+
+**Qué pasaba:** en 💰 Financiero había dos tarjetas de ahorro con números distintos. En el proyecto del cliente, «Ahorro estimado» (arriba) decía **6,89 M COP/año** y «Ahorro energía año 1» decía **6,85 M COP/año**.
+
+**Por qué:** la tarjeta de arriba multiplicaba todo el consumo por la tarifa de compra (5.738 kWh × 1.200 COP). Pero el balance hora por hora dice que al mediodía sobra energía y se **exporta** (693 kWh), y esa energía se paga a la **tarifa de excedentes** (800 COP), no a 1.200.
+
+**Fórmula en palabras:** ahorro del año = energía que usa la casa × tarifa de compra + energía que sale a la red × tarifa de excedentes.
+
+**Ejemplo real:** (5.943 − 693) = 5.250 kWh × 1.200 = 6,30 M + 693 kWh × 800 = 0,55 M → **6,85 M COP/año**, es decir unos 571.000 COP/mes.
+
+**Cómo leerlo en pantalla:** «Ahorro estimado» (mensual y anual) ahora es igual a «Ahorro energía año 1». Pasa el cursor por el ícono ⓘ de la tarjeta para ver la cuenta. Es el mismo ahorro que usan la TIR y el VPN.
+
+**Qué hacer:** nada; si cambias la tarifa de excedentes o recalculas 🔋 Baterías y Balance, las dos tarjetas cambian juntas.
+
+### Rótulo P90 con un decimal
+
+La columna y las métricas decían «P90 (−10%)» y el texto de arriba «−9,5 %». Es el mismo factor P90 (la producción conservadora que usan los bancos); solo estaba redondeado distinto. Ahora todos los rótulos dicen **−9,5 %**.
+
+### Etiquetas de payback que se encimaban
+
+En la gráfica «Flujo de caja acumulado», «Payback P50: 6,7 a» y «Payback sin 1715: 10,0 a» se escribían a la misma altura y se tapaban. Ahora las etiquetas se ordenan por año y cada una baja una fila, al lado de su línea punteada.
 
 Calculadora BIPV — Innovación Química
 
