@@ -489,3 +489,11 @@ def test_buscar_pr_del_sistema_no_es_el_promedio():
 def test_buscar_retie_unifilar_multisuperficie(pregunta, titulo, texto):
     seccion = _seccion_recuperada(pregunta, titulo)
     assert texto in seccion["texto"]
+
+
+def test_buscar_mensaje_final_financiero_modulos_por_panel():
+    seccion = _seccion_recuperada(
+        "por que el mensaje final de financiero decia 116 modulos ASP y no mostraba VPN payback LCOE",
+        "Mensaje final de Financiero",
+    )
+    assert "112 ASP-ST1-T40 + 4 SPR-E20-327" in seccion["texto"]

@@ -2004,18 +2004,14 @@ if btn_fin or st.session_state.get("financiero_ok"):
         )
 
     # ── Mensaje final ─────────────────────────────────────────────────────────
-    color_vpn = "✅" if m_con["vpn_positivo"] else "⚠️"
-    st.success(
-        f"{color_vpn} **{ciudad}** — {n_pan} módulos "
-        f"{st.session_state.get('panel_nombre_dim') or st.session_state.get('panel_nombre') or st.session_state.get('panel_modelo') or '—'} | "
-        f"CAPEX neto: **USD {ben['capex_neto_usd']:,.0f}** ($ {ben['capex_neto_usd']*tipo_cambio/1e6:.2f} M COP) | "
-        f"TIR: **{m_con['tir_pct']:.1f}%** | " if m_con['tir_pct'] else "TIR: **N/A** | "
-        f"VPN: **USD {m_con['vpn_usd']:,.0f}** ($ {m_con['vpn_usd']*tipo_cambio/1e6:.1f} M COP) | "
-        + (f"Payback: **{m_con['payback_simple']:.1f} años** | " if m_con['payback_simple'] else "Payback: **> horizonte** | ")
-        + f"LCOE: **{m_con['lcoe_cop_kWh']:.0f} COP/kWh** "
-        + (f"({'<' if m_con['lcoe_cop_kWh'] < _vne['cop_kWh'] else '>'} valor nivelado de la "
-           f"energía {_vne['cop_kWh']:.0f} COP/kWh)" if _vne else "")
-    )
+    from calculos.lectura_financiera import mensaje_resumen_financiero, rotulo_modulos
+    _panel_fin = (st.session_state.get("panel_nombre_dim") or st.session_state.get("panel_nombre")
+                  or st.session_state.get("panel_modelo") or "")
+    st.success(mensaje_resumen_financiero(
+        ciudad, rotulo_modulos(_sistema_ms if _ms_activo else None, n_pan, _panel_fin),
+        ben["capex_neto_usd"], tipo_cambio, m_con, _vne["cop_kWh"] if _vne else None,
+        vpn_positivo=m_con["vpn_positivo"],
+    ))
 
     # Guardar para Reporte
     st.session_state["capex_total_usd"]         = capex_total
