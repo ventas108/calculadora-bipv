@@ -4416,7 +4416,7 @@ Guía corta, página por página, de los cambios de esos días (PR #57 a #65). S
 
 **Qué volver a hacer con un proyecto guardado antes de estas fechas**
 1. Cárgalo en una pestaña nueva y abre ☀️ Recurso Solar. Debe aparecer el aviso de restauración.
-2. En 🗺️ Vista 3D revisa que cada grupo tenga inversor y MPPT, que no haya 🔴 y pulsa «Integrar».
+2. En 🗺️ Vista 3D revisa que cada grupo tenga inversor y MPPT, que no haya 🔴, pulsa «⚡ Calcular POA», mira la columna **PR** y la tabla «🔎 De dónde sale el PR» (sección 75) y pulsa «Usar sistema multi-superficie en Financiero». Si ves «se publicó con la versión anterior (PR fijo 0,78)», este paso es obligatorio.
 3. En 🔌 Catálogo Inversores PDF comprueba que tus inversores tengan «P AC nominal (kW)» y precio.
 4. En 🔋 Baterías y Balance calcula el balance. En 💰 Financiero escribe la tarifa de excedentes real y pulsa **Calcular**.
 5. Guarda el proyecto con 💾.
@@ -4425,6 +4425,118 @@ Guía corta, página por página, de los cambios de esos días (PR #57 a #65). S
 - **Fase A3:** la sección 6 de Vista 3D (MPPT) todavía tiene sus propios selectores. Se unificará con los grupos.
 - **H3:** Presupuesto por superficie.
 - La tabla de sensibilidad por tarifa de Financiero supone vender toda la energía a la tarifa de cada fila; es a propósito, para ver el umbral.
+
+## 75. Guía para aprender — la cadena de pérdidas: cómo calcula la app la energía de un sistema BIPV, paso a paso
+
+Esta guía es para quien está aprendiendo. Explica **qué** hace cada cálculo físico de la app, **por qué** existe y **cómo leerlo** en pantalla, con los números reales del proyecto de Teusaquillo (Bogotá): fachada con 112 módulos ASP-ST1-T40 (película delgada CdTe, vertical, mirando al sur) y techo con 4 módulos SPR-E20-327 (silicio monocristalino, 10° de inclinación).
+
+### Aprender la cadena de pérdidas — la idea en una frase: energía, POA y PR (performance ratio)
+
+Un panel nunca entrega en la vida real lo que dice su ficha. La app parte de la luz que llega a cada superficie y le va restando pérdidas, una detrás de otra, como una cadena. Lo que queda al final es la energía que se lleva a 💰 Financiero.
+
+**Energía (kWh/año) = POA × área instalada × η del panel × PR**
+
+- **POA** (irradiación en el plano): cuánta energía solar cae sobre 1 m² de ESA superficie en un año (kWh/m²/año).
+- **Área instalada**: módulos × área de cada módulo (m²).
+- **η** (eficiencia del panel): qué fracción de la luz convierte en electricidad en condiciones de laboratorio (Pmax ÷ área del módulo). ASP-ST1-T40: 63 W ÷ 0,72 m² = 8,75 %. SPR-E20-327: 327 W ÷ 1,63 m² = 20,06 %.
+- **PR** (Performance Ratio, «índice de rendimiento»): la parte que sobrevive a todas las pérdidas. PR 0,68 quiere decir que llega el 68 % de lo que daría un panel perfecto.
+
+Hasta el 27-sep-2026, 🗺️ Vista 3D usaba **PR = 0,78 para todo**: un número de referencia, igual para una fachada y un techo. Ahora cada superficie calcula su propio PR con la cadena que sigue.
+
+### Aprender la cadena de pérdidas — Paso 0: la luz que llega (POA)
+
+La app calcula, hora por hora durante un año típico (8.760 horas del clima TMY de ☀️ Recurso Solar), cuánta luz cae sobre cada superficie según su inclinación y orientación. En Bogotá (latitud 4,6°) el sol pasa casi por encima de la cabeza: un techo casi horizontal recibe mucha luz y una fachada vertical, poca. En el proyecto: **techo 1.675 kWh/m²/año; fachada 808 kWh/m²/año**, menos de la mitad. Por eso una fachada produce menos por m², aunque sea el lugar natural del BIPV.
+
+### Aprender la cadena de pérdidas — Paso 1: pérdidas ópticas, IAM (ángulo de incidencia) y suciedad (🔆 Motor Óptico)
+
+Antes de llegar a la celda, la luz atraviesa el vidrio y la suciedad.
+
+1. **IAM — pérdida por ángulo de incidencia.** El vidrio refleja más luz cuanto más inclinada llega (como un espejo de agua al atardecer). La app usa la fórmula ASHRAE: fracción que entra = 1 − b₀ × (1/cos θ − 1), donde θ es el ángulo entre el rayo y la perpendicular al panel, y **b₀** depende del vidrio (0,05 vidrio templado estándar; 0,12 vidrio laminado de CdTe). La luz difusa (la del cielo nublado) pierde una fracción fija (factor 0,95).
+   - **Fachada vertical:** el sol alto de Bogotá llega muy inclinado sobre una pared → pierde **≈ 12–18 %**.
+   - **Techo a 10°:** la luz llega casi perpendicular → pierde **≈ 2–4 %**.
+2. **Suciedad (soiling).** Polvo y contaminación tapan parte de la luz. La app usa un porcentaje por mes para Colombia (más en los meses secos: febrero y agosto ≈ 6 %; menos en los lluviosos: noviembre ≈ 1 %). Una superficie vertical se ensucia menos porque la lluvia la lava y el polvo no se asienta (la app multiplica por 0,65 si la inclinación es de 75° o más). Pérdida típica: **≈ 2–4 %**.
+
+Si no corriste 🔆 Motor Óptico, la app usa valores por defecto (b₀ según la tecnología del panel: 0,12 si es CdTe, 0,05 si no; suciedad de Colombia) y lo dice con un aviso azul. Si lo corriste con el mismo panel de la superficie, usa tu vidrio.
+
+### Aprender la cadena de pérdidas — Paso 2: temperatura (k_BIPV, montaje térmico) y poca luz (🔬 Motor IV, modelo SDM de un diodo)
+
+1. **La temperatura.** Un panel caliente produce menos. La app estima la temperatura de la celda así: **T celda = T ambiente + luz × (NOCT − 20) / 800 × k_BIPV**. NOCT es la temperatura que la ficha dice que alcanza el panel en condiciones normales (45 °C para estos dos paneles). Cada grado por encima de 25 °C resta un poco de potencia, según el coeficiente **γ** de la ficha (−0,21 %/°C el ASP de CdTe; −0,38 %/°C el SPR de silicio).
+2. **k_BIPV — cuánto se calienta según su ventilación.** Un panel integrado en la fachada tiene poco aire detrás y se calienta más que uno sobre un soporte ventilado. En cada superficie de Vista 3D hay un campo **«🌡️ Montaje térmico»**:
+
+   | Montaje | k_BIPV | Cuándo |
+   |---|---|---|
+   | Ventilado libre | 1,0 | Panel sobre soporte con aire por detrás (techo por defecto) |
+   | Semi-ventilado | 1,15 | Pérgola, marquesina |
+   | Fachada confinada | 1,3 | Fachada integrada con cámara de aire pequeña (fachada por defecto) |
+   | Sin ventilación | 1,5 | Panel sellado contra el muro |
+
+3. **La poca luz y el SDM.** Con poca luz (mañana, tarde, nublado, o en una fachada vertical) los paneles no rinden en proporción: algunos, como la película delgada CdTe, pierden más. La app no usa una regla lineal: usa el **modelo de un diodo (SDM, «Single Diode Model»)** del panel, el mismo del 🔬 Motor IV y de 📊 Producción. El SDM reconstruye hora a hora la curva corriente-voltaje real del panel con la luz y la temperatura de esa hora. Cuando la app se probó con una fórmula lineal, la fachada de CdTe salía un 11 % más alta que con el SDM: por eso se usa el SDM.
+   - Pérdida típica por temperatura y poca luz: **fachada ≈ 9–13 %; techo ≈ 8–11 %**.
+
+### Aprender la cadena de pérdidas — Paso 3: pérdidas eléctricas (🔀 Mismatch)
+
+- **Mismatch de fabricación ≈ 1 %:** dos paneles «iguales» nunca son idénticos; conectados en serie, el más débil frena a los demás.
+- **Cables ≈ 1,5 % (DC):** la corriente calienta los cables y se pierde un poco en el camino hasta el inversor.
+- **Inversor ≈ 2–3 %:** convertir corriente continua en alterna tiene una eficiencia (η del inversor de cada grupo, por ejemplo 97 %).
+
+Si no corriste 🔀 Mismatch, se usan sus valores por defecto (1 % y 1,5 %) y la app lo avisa.
+
+### Aprender la cadena de pérdidas — Paso 4: sombra
+
+- **Sombra de horizonte** (montañas, edificios lejanos) de 🔀 Mismatch: solo en el cálculo simplificado.
+- **Sombra cercana 3D** (bypass con CSV o modo físico): la calculan esos modos con su propio modelo; no se aplica dos veces.
+
+### Aprender la cadena de pérdidas — cómo se juntan: el PR de cada superficie (fachada y techo)
+
+Todas las fracciones que sobreviven se multiplican. Ejemplo de la fachada ASP (valores de prueba):
+
+| Etapa | Pérdida | Queda |
+|---|---|---|
+| IAM (ángulo) | 16,2 % | × 0,838 |
+| Suciedad | 2,4 % | × 0,976 |
+| Temperatura y poca luz (SDM) | 11,8 % | × 0,882 |
+| Mismatch | 1,0 % | × 0,990 |
+| Cables | 1,5 % | × 0,985 |
+| Inversor | 3,0 % | × 0,970 |
+| **PR** | | **0,682** |
+
+Energía de la fachada ≈ 808 kWh/m² × 80,6 m² × 0,0875 × 0,682 ≈ **3.890 kWh/año** (con el 0,78 fijo eran 4.446). El techo SPR queda con PR ≈ 0,80 porque casi no pierde por ángulo. Total del sistema ≈ 5.600–5.700 kWh/año en vez de 6.155; con el TMY real los números pueden variar un poco.
+
+### Aprender la cadena de pérdidas — cómo leerlo en la pantalla
+
+En 🗺️ Vista 3D › ⚙️ Superficies BIPV › **Resumen POA por superficie**:
+- Columna **PR**: el PR de cada superficie.
+- **«🔎 De dónde sale el PR de cada superficie (pérdidas)»**: la tabla de arriba, superficie por superficie. Si una pérdida parece muy grande, empieza por ahí.
+- Aviso azul **«Cadena de pérdidas: … valores por defecto …»**: no es un error; dice qué motor no has corrido.
+- Aviso amarillo **«se publicó con la versión anterior (PR fijo 0,78)»** o **«Cambiaron los parámetros de pérdidas…»** (también en Financiero, Baterías y CO₂): pulsa otra vez «Usar sistema multi-superficie en Financiero».
+
+### Aprender la cadena de pérdidas — qué motor llega a dónde
+
+| Página | Qué aporta | ¿Cambia la energía de Financiero? |
+|---|---|---|
+| ☀️ Recurso Solar | Clima del año típico (TMY) | Sí, a través de la POA |
+| 🔆 Motor Óptico | IAM (vidrio) y suciedad | Sí (cada superficie con su inclinación) |
+| 🔬 Motor IV | Modelo SDM del panel (se guarda en el catálogo) | Sí (temperatura y poca luz) |
+| 🔀 Mismatch | Fabricación, cables, sombra de horizonte | Sí |
+| 🗺️ Vista 3D | Superficies, montaje térmico, grupos e inversores | Sí: junta todo y publica |
+
+### Aprender la cadena de pérdidas — preguntas frecuentes (PR de fachada más bajo que el techo)
+
+- **¿Por qué bajó mi energía después del cambio?** Porque antes se usaba un PR de referencia (0,78) y ahora se calculan las pérdidas reales de cada superficie. La fachada vertical pierde más por ángulo y por poca luz. El número nuevo es más cercano a lo que el cliente medirá.
+- **¿Por qué la fachada tiene PR más bajo que el techo?** Recibe la luz muy inclinada (más reflejo en el vidrio) y mucha luz débil; además se calienta más por estar integrada (k_BIPV 1,3).
+- **¿Tengo que correr 🔆 Motor Óptico y 🔀 Mismatch?** No es obligatorio: sin ellos se usan valores por defecto razonables y la app lo avisa. Córrelos si conoces el vidrio real, la limpieza del sitio o tienes sombra de horizonte.
+- **¿Qué pasa si cambio el montaje térmico?** Cambia la temperatura de la celda y el PR de esa superficie; la app avisa que vuelvas a publicar.
+- **¿El PR de 📊 Producción y el de Vista 3D son el mismo?** Usan el mismo motor. Producción calcula una sola superficie (📐 Dimensionamiento); Vista 3D, cada superficie con su geometría y su panel.
+
+### Aprender la cadena de pérdidas — glosario rápido
+
+- **POA:** luz que cae sobre el plano del panel (kWh/m²/año).
+- **η (eficiencia):** Pmax ÷ área del módulo.
+- **PR:** energía real ÷ energía de un panel perfecto con la misma luz.
+- **IAM y b₀:** pérdida por el ángulo de la luz en el vidrio; b₀ indica cuánto refleja ese vidrio.
+- **NOCT y γ:** temperatura nominal de operación del panel y cuánto pierde por cada grado.
+- **k_BIPV:** cuánto más se calienta un panel integrado que uno ventilado.
+- **SDM:** modelo eléctrico de un diodo; describe la curva corriente-voltaje real del panel.
 
 Calculadora BIPV — Innovación Química
 

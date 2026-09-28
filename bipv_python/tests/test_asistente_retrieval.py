@@ -437,3 +437,23 @@ def test_buscar_motor_optico_y_mismatch_en_la_energia_multisuperficie():
         "potencia AC nominal",
     )
     assert "ya no usa un PR fijo de 0,78" in seccion["texto"]
+
+
+import pytest  # noqa: E402
+
+
+@pytest.mark.parametrize("pregunta, texto", [
+    ("que es el PR performance ratio y como se calcula la energia de una superficie",
+     "Energía (kWh/año) = POA × área instalada × η del panel × PR"),
+    ("que es el IAM perdida por angulo de incidencia en el vidrio de la fachada",
+     "1 − b₀ × (1/cos θ − 1)"),
+    ("que es k_BIPV montaje termico cuanto se calienta el panel",
+     "Fachada confinada | 1,3"),
+    ("por que la fachada tiene PR mas bajo que el techo",
+     "¿Por qué la fachada tiene PR más bajo que el techo?"),
+    ("que es el modelo SDM de un diodo y por que se usa con poca luz",
+     "modelo de un diodo (SDM"),
+])
+def test_buscar_guia_cadena_de_perdidas(pregunta, texto):
+    seccion = _seccion_recuperada(pregunta, "Aprender la cadena de pérdidas")
+    assert texto in seccion["texto"]
