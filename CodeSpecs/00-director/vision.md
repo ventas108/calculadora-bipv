@@ -29,6 +29,17 @@ Problema -> Propuesta -> Diseño -> Aprobación -> Agente de preparación -> Tar
 8. La arquitectura híbrida comparte contratos aprobados, no implementaciones por
    defecto. Una función presente en Streamlit no se replica automáticamente en React
    ni crea una obligación de paridad sin una Spec vertical aprobada para esa app.
+9. **Claridad para quien aprende** (27-sep-2026). El usuario de la app está
+   aprendiendo los cálculos. Toda Spec que cambie un cálculo físico o un resultado
+   que el usuario ve debe dejar, en la base de conocimiento del Asistente
+   (`bipv_python/datos/base_conocimiento_asistente.md`), en lenguaje sencillo:
+   - **qué** es la magnitud y **por qué** existe (la física, sin jerga o explicándola);
+   - la fórmula en palabras y un **ejemplo con números reales** de un proyecto;
+   - **cómo leerlo en pantalla** (dónde está, qué columna, qué aviso) y **qué hacer**.
+   En la interfaz, un resultado físico se muestra con su desglose (no solo el total),
+   y cada aviso dice la acción concreta. Un valor por defecto nunca se usa en silencio:
+   la página dice cuál es y cómo reemplazarlo. La validación de la Spec incluye una
+   prueba de búsqueda del Asistente para esa explicación.
 
 ## Estados de una Spec
 
