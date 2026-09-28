@@ -70,7 +70,9 @@ Energía multi-superficie (Vista 3D, Streamlit):
 03-dimensionamiento (panel, inversor, ─┬─> panel por superficie (05) ──> η del panel
       temperaturas de diseño)          └─> diseño eléctrico por superficie (03, Spec A)
 05 sombra 3D por superficie ──────────────────────────────┐
-POA + η + diseño eléctrico + sombra ──> simplificado / bypass / físico
+🔆 Motor Óptico (IAM, suciedad) + 🔀 Mismatch (fabricación, cables, horizonte)
+   + 🔬 Motor IV (SDM del panel) ──> cadena de pérdidas por superficie (05)
+POA + η + diseño eléctrico + sombra + cadena ──> simplificado / bypass / físico
                                          └─> publicación única con origen ──> 06, 07, 08
                                              (energía + estado eléctrico + sistema:
                                               kWp, módulos por panel, reparto mensual)

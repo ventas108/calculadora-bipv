@@ -83,6 +83,11 @@ p_stc   = st.session_state.get("P_stc_kW_sistema", 0.0)
 n_pan   = st.session_state.get("N_paneles_final", 0)
 from calculos.publicacion_multisuperficie import aviso_retiro_para_consumidores
 _aviso_retiro_co2 = aviso_retiro_para_consumidores(st.session_state)
+# Spec 05/cadena-perdidas-multisuperficie: energía publicada con el PR fijo
+# 0,78 o con parámetros de pérdidas que ya cambiaron.
+from calculos.cadena_perdidas_multisup import aviso_cadena_vencida as _aviso_cadena
+if _aviso_cadena(st.session_state):
+    st.warning(_aviso_cadena(st.session_state))
 if _aviso_retiro_co2:
     st.warning(_aviso_retiro_co2)
 # Spec 06-analisis-financiero/sistema-multisuperficie (H-D5): kWp y módulos

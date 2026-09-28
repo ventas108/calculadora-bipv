@@ -580,10 +580,13 @@ def e_ac_total_multisup(
     poa_superficies: dict,
     superficies: list[dict],
     eta_panel: float | Mapping[str, float] = 0.16,
-    pr: float = 0.78,
+    pr: float | Mapping[str, float] = 0.78,
 ) -> dict:
     """
     Calcula E_ac anual total y por superficie para el sistema multi-superficie.
+
+    ``pr`` también puede ser un mapa ``nombre → PR`` (Spec
+    ``05/cadena-perdidas-multisuperficie``: PR de la cadena de cada superficie).
 
     ``eta_panel`` puede ser un mapa ``nombre → η`` (Spec
     ``05/panel-por-superficie``): cada superficie usa la eficiencia de su
@@ -608,8 +611,16 @@ def e_ac_total_multisup(
             eta_sup = float(eta_panel[sup["nombre"]])
         else:
             eta_sup = float(eta_panel)
+        if isinstance(pr, Mapping):
+            if sup["nombre"] not in pr:
+                raise ValueError(
+                    f"La superficie '{sup['nombre']}' no tiene el PR de su cadena de pérdidas."
+                )
+            pr_sup = float(pr[sup["nombre"]])
+        else:
+            pr_sup = float(pr)
         poa = poa_superficies.get(sup["nombre"])
-        prod = produccion_superficie(poa, sup["area_m2"], eta_sup, pr)
+        prod = produccion_superficie(poa, sup["area_m2"], eta_sup, pr_sup)
         e_total    += prod["e_ac_anual_kWh"]
         area_total += sup["area_m2"]
         fila = {
@@ -621,6 +632,8 @@ def e_ac_total_multisup(
         }
         if por_superficie:
             fila["eta_panel"] = round(eta_sup, 5)
+        if isinstance(pr, Mapping):
+            fila["pr"] = round(pr_sup, 5)
         desglose.append(fila)
     return {
         "e_ac_total_kWh": round(e_total, 1),
