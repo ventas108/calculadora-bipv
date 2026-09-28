@@ -457,3 +457,11 @@ import pytest  # noqa: E402
 def test_buscar_guia_cadena_de_perdidas(pregunta, texto):
     seccion = _seccion_recuperada(pregunta, "Aprender la cadena de pérdidas")
     assert texto in seccion["texto"]
+
+
+def test_buscar_ahorro_estimado_distinto_del_ahorro_anio_1():
+    seccion = _seccion_recuperada(
+        "por que el ahorro estimado no coincide con el ahorro energia año 1",
+        "Ahorro estimado y ahorro del año 1",
+    )
+    assert "6,85 M COP/año" in seccion["texto"]

@@ -4538,6 +4538,30 @@ En 🗺️ Vista 3D › ⚙️ Superficies BIPV › **Resumen POA por superficie
 - **k_BIPV:** cuánto más se calienta un panel integrado que uno ventilado.
 - **SDM:** modelo eléctrico de un diodo; describe la curva corriente-voltaje real del panel.
 
+## 76. Financiero: las dos tarjetas de ahorro ahora dicen lo mismo, rótulo P90 y etiquetas de payback (28-sep-2026)
+
+### Ahorro estimado y ahorro del año 1: por qué antes no coincidían
+
+**Qué pasaba:** en 💰 Financiero había dos tarjetas de ahorro con números distintos. En el proyecto del cliente, «Ahorro estimado» (arriba) decía **6,89 M COP/año** y «Ahorro energía año 1» decía **6,85 M COP/año**.
+
+**Por qué:** la tarjeta de arriba multiplicaba todo el consumo por la tarifa de compra (5.738 kWh × 1.200 COP). Pero el balance hora por hora dice que al mediodía sobra energía y se **exporta** (693 kWh), y esa energía se paga a la **tarifa de excedentes** (800 COP), no a 1.200.
+
+**Fórmula en palabras:** ahorro del año = energía que usa la casa × tarifa de compra + energía que sale a la red × tarifa de excedentes.
+
+**Ejemplo real:** (5.943 − 693) = 5.250 kWh × 1.200 = 6,30 M + 693 kWh × 800 = 0,55 M → **6,85 M COP/año**, es decir unos 571.000 COP/mes.
+
+**Cómo leerlo en pantalla:** «Ahorro estimado» (mensual y anual) ahora es igual a «Ahorro energía año 1». Pasa el cursor por el ícono ⓘ de la tarjeta para ver la cuenta. Es el mismo ahorro que usan la TIR y el VPN.
+
+**Qué hacer:** nada; si cambias la tarifa de excedentes o recalculas 🔋 Baterías y Balance, las dos tarjetas cambian juntas.
+
+### Rótulo P90 con un decimal
+
+La columna y las métricas decían «P90 (−10%)» y el texto de arriba «−9,5 %». Es el mismo factor P90 (la producción conservadora que usan los bancos); solo estaba redondeado distinto. Ahora todos los rótulos dicen **−9,5 %**.
+
+### Etiquetas de payback que se encimaban
+
+En la gráfica «Flujo de caja acumulado», «Payback P50: 6,7 a» y «Payback sin 1715: 10,0 a» se escribían a la misma altura y se tapaban. Ahora las etiquetas se ordenan por año y cada una baja una fila, al lado de su línea punteada.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

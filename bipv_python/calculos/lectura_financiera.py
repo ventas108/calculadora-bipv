@@ -63,3 +63,24 @@ def valor_nivelado_energia(flujos: Iterable[Mapping[str, Any]], tasa_descuento: 
         return None
     usd = ingreso / produccion
     return {"usd_kWh": usd, "cop_kWh": usd * tipo_cambio}
+
+
+# Separación vertical entre etiquetas (fracción de la altura de la gráfica):
+# una fila de texto a 440 px de alto.
+_PASO_ETIQUETA = 0.08
+
+
+def etiquetas_payback(lineas: Iterable[tuple[str, float | None, str]]) -> list[dict]:
+    """Posición de las etiquetas de payback de la gráfica de flujo acumulado.
+
+    Antes cada etiqueta se ponía junto a su línea vertical («top right», «top
+    left»…) y, con paybacks cercanos (6,7 y 10,0 años en el proyecto cliente),
+    los textos se encimaban. Aquí se ordenan por año y cada una baja una fila,
+    todas a la derecha de su línea: nunca comparten altura.
+
+    ``lineas``: ``(texto, año, color)``; se omiten las que no tienen payback.
+    Devuelve ``{texto, x, y, color}`` con ``y`` en fracción de la gráfica.
+    """
+    validas = sorted(((t, float(x), c) for t, x, c in lineas if x), key=lambda l: l[1])
+    return [{"texto": t, "x": x, "y": 0.98 - i * _PASO_ETIQUETA, "color": c}
+            for i, (t, x, c) in enumerate(validas)]
