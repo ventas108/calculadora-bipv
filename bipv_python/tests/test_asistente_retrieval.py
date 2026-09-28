@@ -474,3 +474,18 @@ def test_buscar_pr_del_sistema_no_es_el_promedio():
         "PR de todo el sistema",
     )
     assert "5.944 ÷ 7.895 = 0,753" in seccion["texto"]
+
+
+@pytest.mark.parametrize("pregunta, titulo, texto", [
+    ("mi APP cumple con el estandar exigido por el RETIE", "RETIE y la app — ¿mi app cumple el RETIE?",
+     "ninguna app puede cumplirlo por sí sola"),
+    ("para que sirve la caja combinadora y el fusible gPV", "caja combinadora y fusibles gPV",
+     "1,25 × 1,25 × 0,80 = **1,25 A**"),
+    ("que son los optimizadores MLPE en el diagrama unifilar", "optimizadores (MLPE)",
+     "no** valida esa combinación"),
+    ("como leer el diagrama unifilar del sistema real multi superficie",
+     "cómo leer el ⚡ Diagrama Unifilar del sistema real", "de arriba hacia abajo"),
+])
+def test_buscar_retie_unifilar_multisuperficie(pregunta, titulo, texto):
+    seccion = _seccion_recuperada(pregunta, titulo)
+    assert texto in seccion["texto"]

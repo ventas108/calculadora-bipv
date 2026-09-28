@@ -219,6 +219,20 @@ Regla de consumo:
 - Informes no restaura resultados persistidos por su cuenta; toda vigencia se
 	garantiza aguas arriba, en `04-produccion-energia` y `06-analisis-financiero`.
 
+#### Diagrama Unifilar y Ficha RETIE con el sistema multi-superficie (28-sep-2026)
+
+- Con `multisup_activo` y grupos de strings, ⚡ Diagrama Unifilar y 📋 Ficha
+	RETIE leen UNA topología de `calculos/topologia_electrica`
+	(`topologia_desde_estado`): inversor → MPPT → grupos, caja combinadora del
+	diagnóstico de `diseno_electrico_multisup`, optimizadores y batería.
+- Las comprobaciones de string, MPPT e inversor de la ficha son las del
+	diagnóstico eléctrico (verde → OK, amarillo → PENDIENTE, rojo → ERROR); no
+	se recalculan con otra fórmula.
+- `sistema_optimizadores` y `bateria_inversor_id` son datos del proyecto
+	compartidos por las dos páginas. Los optimizadores no cambian la energía.
+- Sin multi-superficie las dos páginas conservan el modo de una superficie
+	(📐 Dimensionamiento o datos manuales).
+
 ### 08-interfaz
 
 Entrada:

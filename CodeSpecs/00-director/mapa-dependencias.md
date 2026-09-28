@@ -74,6 +74,8 @@ Energía multi-superficie (Vista 3D, Streamlit):
    + 🔬 Motor IV (SDM del panel) ──> cadena de pérdidas por superficie (05)
 POA + η + diseño eléctrico + sombra + cadena ──> simplificado / bypass / físico
                                          └─> publicación única con origen ──> 06, 07, 08
+diseño eléctrico (grupos, diagnóstico) ──> topología eléctrica ──> 07 Unifilar y Ficha RETIE
+      (+ batería de Baterías y Balance, optimizadores del proyecto)
                                              (energía + estado eléctrico + sistema:
                                               kWp, módulos por panel, reparto mensual)
 

@@ -106,6 +106,7 @@ def construir_config_unifilar(
     detalle_proteccion_ac: list[str] | None = None,
     notas_retie: list[str] | None = None,
     pendientes_retie: list[str] | None = None,
+    topologia: dict | None = None,
 ) -> dict:
     """
     Normaliza los datos de un proyecto a la estructura mínima que necesita
@@ -138,6 +139,10 @@ def construir_config_unifilar(
     notas_retie / pendientes_retie: anotaciones opcionales de contenido
     RETIE (ver docstring del módulo, "Detalle RETIE"). Todas por defecto
     inactivas -- no cambian el diagrama de un proyecto que no las use.
+    topologia: la de calculos.topologia_electrica (sistema multi-superficie de
+    🗺️ Vista 3D). Si trae inversores, el diagrama dibuja ESA topología (ramas
+    por MPPT, cajas combinadoras, optimizadores, varios inversores, batería
+    en su inversor) y se ignoran generador único y superficies manuales.
     detalle_proteccion_dc/ac son listas de ítems de texto libre (ej.
     ["Fusibles gPV por string", "Seccionador DC bajo carga", "DPS DC Tipo
     2"]) que se agregan como líneas extra a la etiqueta de protección
@@ -224,6 +229,7 @@ def construir_config_unifilar(
             "capacidad_total_kWh": cap_total_kWh,
             "proteccion_bat_A": proteccion_bat_A,
         },
+        "topologia": _topologia_config(topologia, tension_red_V),
         "retie": {
             "equipotencialidad": bool(equipotencialidad),
             "detalle_dc": list(detalle_proteccion_dc) if detalle_proteccion_dc else [],
@@ -232,6 +238,27 @@ def construir_config_unifilar(
             "pendientes": list(pendientes_retie) if pendientes_retie else [],
         },
     }
+
+
+def _topologia_config(topologia: dict | None, tension_red_V: float | None) -> dict | None:
+    """Copia de la topología para el dibujo, con el breaker AC de cada
+    inversor y el general calculados igual que en 📋 Ficha RETIE (corriente
+    nominal × 1,25 → calibre comercial). Sin el diagnóstico (no se dibuja)."""
+    if not topologia or not topologia.get("inversores"):
+        return None
+    from calculos.ficha_validacion_retie import calibre_comercial_superior
+
+    topo = {k: v for k, v in topologia.items() if k != "diagnostico"}
+    invs, crudas = [], []
+    for inv in topo["inversores"]:
+        i = corriente_diseno_ac(inv["p_ac_kW"], 1, tension_red_V, factor_continuo=1.0)
+        crudas.append(i)
+        invs.append({**{k: v for k, v in inv.items() if k != "ficha"},
+                     "breaker_ac_A": calibre_comercial_superior(i * 1.25) if i is not None else None})
+    topo["inversores"] = invs
+    total = sum(crudas) if all(c is not None for c in crudas) else None
+    topo["breaker_general_A"] = calibre_comercial_superior(total * 1.25) if total is not None else None
+    return topo
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -656,6 +683,15 @@ def _label_bateria(cfg: dict) -> str:
     return "\n".join(lineas)
 
 
+def _rect(x_centro: float, y_top: float, w: float, h: float) -> elm.Rect:
+    """Rectángulo de ancho ``w`` y alto ``h`` centrado en ``x_centro`` con el
+    borde superior en ``y_top``. Las esquinas son relativas a la posición del
+    elemento, que por defecto es la «posición actual» del dibujo (se mueve
+    tras cada elemento): se ancla en el origen para que sean absolutas."""
+    return elm.Rect(corner1=(x_centro - w / 2, y_top - h),
+                    corner2=(x_centro + w / 2, y_top)).right().at((0, 0))
+
+
 def _caja(d: schemdraw.Drawing, w: float, h: float, x_centro: float, y_top: float,
           label: str, loc: str = "top") -> float:
     """
@@ -671,8 +707,11 @@ def _caja(d: schemdraw.Drawing, w: float, h: float, x_centro: float, y_top: floa
     cuanto hay una rama lateral (batería) -- por eso desde Fase 2 el módulo
     usa coordenadas explícitas en toda la función, no solo en la rama nueva.
     """
+    # Corrección (28-sep-2026): con schemdraw 0.23 Rect no acepta w/h (los
+    # ignoraba en silencio) y dibujaba un cuadrado 1×1 corrido a la derecha
+    # de la esquina, separado de las líneas. Se definen las dos esquinas.
     y_bottom = y_top - h
-    d.add(elm.Rect(w=w, h=h).right().at((x_centro - w / 2, y_bottom)).label(label, loc=loc))
+    d.add(_rect(x_centro, y_top, w, h).label(label, loc=loc))
     return y_bottom
 
 
@@ -745,6 +784,149 @@ def _dibujar_generadores(d: schemdraw.Drawing, config: dict, x_main: float) -> f
     return bus_y
 
 
+# ── Sistema multi-superficie real (Spec 07/unifilar-retie-multisuperficie) ──
+# Geometría con coordenadas explícitas (mismo criterio que _caja/_gap). Cada
+# MPPT entra por separado al inversor: NO se dibuja un bus DC común entre
+# MPPT, porque son entradas independientes (juntarlas en el dibujo diría que
+# strings de distinto voltaje quedan en paralelo).
+_ANCHO_CARACTER = 0.17   # unidades schemdraw por carácter a fontsize=11 (calibrado)
+_ALTO_LINEA = 0.36
+
+
+def _num_es(valor: float | None, decimales: int = 1) -> str:
+    return "—" if valor is None else f"{valor:.{decimales}f}".replace(".", ",")
+
+
+def _lineas_rama(rama: dict, optimizadores: bool) -> list[str]:
+    lineas = []
+    for g in rama["grupos"]:
+        lineas.append(f"{g['superficie']} · {g['gid']}")
+        lineas.append(f"{g['n_serie']} × {g['n_paralelo']} = {g['modulos']} mód.")
+        lineas.append(str(g["panel"] or ""))
+    if optimizadores:
+        lineas.append("+ Optimizador por módulo")
+    return lineas
+
+
+def _ancho_texto(lineas: list[str], minimo: float) -> float:
+    return max(minimo, max((len(l) for l in lineas), default=0) * _ANCHO_CARACTER + 0.6)
+
+
+def _rect_texto(d: schemdraw.Drawing, x_centro: float, y_top: float, w: float, h: float,
+                lineas: list[str]) -> float:
+    """Rect con el texto ADENTRO (centrado). Devuelve y_bottom."""
+    y_bottom = y_top - h
+    d.add(_rect(x_centro, y_top, w, h).label("\n".join(lineas), loc="center"))
+    return y_bottom
+
+
+def _linea(d: schemdraw.Drawing, x: float, y0: float, y1: float) -> float:
+    d.add(elm.Line().at((x, y0)).to((x, y1)))
+    return y1
+
+
+def _dibujar_topologia(config: dict) -> schemdraw.Drawing:
+    """Diagrama del sistema multi-superficie: por inversor, una rama por MPPT
+    (strings → protección DC o caja combinadora → entrada MPPT), el inversor
+    con su breaker AC, bus AC, protección general, medidor y red. La batería
+    cuelga del inversor al que se conecta."""
+    topo = config["topologia"]
+    opt = topo.get("optimizadores")
+    bat = topo.get("bateria")
+    d = schemdraw.Drawing(fontsize=11)
+
+    # 1. Posiciones horizontales: ramas de cada inversor, en orden.
+    columnas, cursor = [], 0.0
+    for inv in topo["inversores"]:
+        ramas = []
+        for rama in inv["ramas"]:
+            lineas = _lineas_rama(rama, opt)
+            w = _ancho_texto(lineas, 3.0)
+            ramas.append({"rama": rama, "lineas": lineas, "w": w, "x": cursor + w / 2})
+            cursor += w + 0.8
+        lineas_inv = [f"{inv['inversor_id']} · {inv['nombre'] or 'Inversor'}",
+                      f"{_num_es(inv['p_ac_kW'])} kW AC · {len(inv['ramas'])} MPPT"]
+        if inv.get("bateria"):
+            lineas_inv.append("Híbrido (puerto de batería)")
+        izq, der = ramas[0]["x"] - ramas[0]["w"] / 2, ramas[-1]["x"] + ramas[-1]["w"] / 2
+        w_inv = max(der - izq, _ancho_texto(lineas_inv, 3.4))
+        x_inv = (izq + der) / 2
+        columnas.append({"inv": inv, "ramas": ramas, "x": x_inv, "w": w_inv, "lineas": lineas_inv})
+        cursor = max(cursor, x_inv + w_inv / 2 + 0.8) + 0.6
+        if inv.get("bateria"):
+            cursor += 3.6
+
+    # 2. Campo FV: todas las ramas con la misma altura para que alineen.
+    h_gen = max(_ALTO_LINEA * len(r["lineas"]) + 0.4 for c in columnas for r in c["ramas"])
+    y_gen = -h_gen
+    h_dc = 1.6
+    for c in columnas:
+        for r in c["ramas"]:
+            rama, x = r["rama"], r["x"]
+            _rect_texto(d, x, 0.0, r["w"], h_gen, r["lineas"])
+            y = _linea(d, x, y_gen, y_gen - 0.4)
+            if rama["caja_combinadora"]:
+                lineas_caja = ["Caja combinadora", f"{rama['strings']} strings → 1 salida",
+                               "Fusible gPV por string"]
+                y = _rect_texto(d, x, y, _ancho_texto(lineas_caja, 3.0), h_dc, lineas_caja)
+            else:
+                y = _linea(d, x, y, y - 0.3)
+                corriente = rama.get("isc_diseno_A")
+                # Una sola línea: con varias, schemdraw centra la etiqueta
+                # encima del fusible (ver _dibujar_detalle_proteccion).
+                etiqueta = "Prot. DC" + (f" · {_num_es(corriente)} A" if corriente else "")
+                d += elm.Fuse().at((x, y)).to((x, y - 1.0)).label(etiqueta, loc="right")
+                y = _linea(d, x, y - 1.0, y - 1.3)
+            y = _linea(d, x, y, y - 0.9)
+            d += elm.Label().label(f"MPPT {rama['mppt']}", halign="left").at((x + 0.15, y + 0.45))
+    y_inv_top = y_gen - 0.4 - h_dc - 0.9
+
+    # 3. Inversores, batería y breaker AC de cada uno.
+    h_inv = _ALTO_LINEA * 3 + 0.5
+    y_ac_bus = y_inv_top - h_inv - 0.5 - 1.1 - 0.6
+    for c in columnas:
+        inv, x = c["inv"], c["x"]
+        y = _rect_texto(d, x, y_inv_top, c["w"], h_inv, c["lineas"])
+        if inv.get("bateria") and bat:
+            y_mid = y_inv_top - h_inv / 2
+            x_bat = x + c["w"] / 2 + 2.0
+            d += elm.Line().at((x + c["w"] / 2, y_mid)).to((x_bat, y_mid))
+            d += elm.Fuse().at((x_bat, y_mid)).to((x_bat, y_mid - 1.0)).label("Prot. Bat.", loc="right")
+            _linea(d, x_bat, y_mid - 1.0, y_mid - 1.3)
+            cap = bat.get("capacidad_total_kWh")
+            _rect_texto(d, x_bat, y_mid - 1.3, _ancho_texto([bat.get("nombre") or "Batería"], 2.8), 1.1, [
+                bat.get("nombre") or "Batería",
+                f"{bat.get('cantidad') or 0} × · {_num_es(cap)} kWh" if cap else "Batería"])
+        y = _linea(d, x, y, y - 0.5)
+        breaker = inv.get("breaker_ac_A")
+        etiqueta = f"QF {inv['inversor_id']}" + (f" ({breaker} A)" if breaker else "")
+        d += elm.Breaker().at((x, y)).to((x, y - 1.1)).label(etiqueta, loc="right")
+        _linea(d, x, y - 1.1, y_ac_bus)
+        d += elm.Dot().at((x, y_ac_bus))
+
+    # 4. Bus AC, protección general, medidor y red.
+    xs = [c["x"] for c in columnas]
+    x_main = sum(xs) / len(xs)
+    if len(xs) > 1:
+        d += elm.Line().at((min(xs), y_ac_bus)).to((max(xs), y_ac_bus))
+    y = _linea(d, x_main, y_ac_bus, y_ac_bus - 0.5)
+    if len(xs) > 1:
+        general = topo.get("breaker_general_A")
+        etiqueta = "Protección general" + (f" ({general} A)" if general else "")
+        d += elm.Breaker().at((x_main, y)).to((x_main, y - 1.1)).label(etiqueta, loc="right")
+        y = _linea(d, x_main, y - 1.1, y - 1.6)
+    medidor = f"Medidor {config.get('medidor') or 'Bidireccional'}"
+    y = _rect_texto(d, x_main, y, _ancho_texto([medidor], 3.0), 1.0, [medidor])
+    y = _linea(d, x_main, y, y - 0.9)
+    d += elm.Dot().at((x_main, y))
+    tension = config.get("tension_red_V")
+    etiqueta_red = (f"Red / Punto de Conexión Común — PCC ({tension:.0f} V)" if tension
+                    else "Red / Punto de Conexión Común — PCC")
+    d += elm.Line().at((x_main, y)).to((x_main, y - 0.6)).label(etiqueta_red, loc="right")
+    d += elm.Ground().at((x_main, y - 0.6))
+    return d
+
+
 def generar_diagrama_unifilar(config: dict) -> schemdraw.Drawing:
     """
     Dibuja el diagrama unifilar a partir de un config de
@@ -754,6 +936,8 @@ def generar_diagrama_unifilar(config: dict) -> schemdraw.Drawing:
     # Nota: el título del proyecto/cliente NO se dibuja dentro del esquema --
     # lo pinta quien use el diagrama (página Streamlit, PDF), igual que el
     # resto de la app separa encabezados de documento del contenido gráfico.
+    if config.get("topologia"):
+        return _dibujar_topologia(config)
     d = schemdraw.Drawing(fontsize=11)
     X_MAIN, X_BAT = 0.0, -2.8
 
