@@ -253,7 +253,10 @@ with st.expander("📋 Detalle completo de cada validación (el texto de las tar
     for _c in checks:
         st.markdown(f"{_icono_nivel.get(_c['nivel'], '')} **{_c['titulo']}** — {_c['detalle']}")
 
-st.components.v1.html(svg, height=min(1600, len(svg) // 40 + 900), scrolling=True)
+# Al ancho de la columna, sin barra horizontal (antes un iframe de 1800 px
+# con desplazamiento, 28-sep-2026). El SVG trae viewBox: escala sin deformarse.
+# Las descargas siguen con el tamaño original.
+st.image(svg, use_column_width=True)
 
 _nombre_archivo = _nombre_archivo_seguro(config["proyecto"]["nombre_proyecto"])
 png_bytes = exportar_ficha_png_bytes(svg)

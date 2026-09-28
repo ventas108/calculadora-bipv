@@ -4660,6 +4660,20 @@ El número de módulos ya **no se escribe a mano**: sale de los grupos de string
 
 **Dos errores corregidos (28-sep-2026):** la página ⚡ Diagrama Unifilar se caía siempre al dibujar (un parámetro de `st.image` que la versión de Streamlit del servidor no acepta) y las cajas del dibujo salían corridas, separadas de las líneas, también en el diagrama de una superficie.
 
+## 78. Financiero: mensaje final completo y Ficha RETIE al ancho de la pantalla (28-sep-2026)
+
+### Mensaje final de Financiero: módulos por panel y todos los indicadores
+
+**Qué pasaba:** el recuadro verde al final de 💰 Financiero decía «116 módulos ASP-ST1-T40» y terminaba en «TIR: 16.8% |». El proyecto del cliente tiene **112 ASP-ST1-T40 + 4 SPR-E20-327**, y faltaban VPN, Payback y LCOE.
+
+**Por qué:** el rótulo tomaba el panel de 📐 Dimensionamiento (uno solo) en vez del sistema de 🗺️ Vista 3D; y un error de programación hacía que, cuando había TIR, se cortara el resto del texto.
+
+**Ahora:** el recuadro dice, por ejemplo, «Bogotá — 112 ASP-ST1-T40 + 4 SPR-E20-327 (E20-327NE-WHT-D) | CAPEX neto … | TIR: 16.8% | VPN … | Payback: 6.7 años | LCOE: 1620 COP/kWh (< valor nivelado de la energía 1732 COP/kWh)». Ningún cálculo cambió: solo el texto.
+
+### Ficha RETIE al ancho de la pantalla
+
+La 📋 Ficha RETIE se ve ahora completa al ancho de la columna, sin barra de desplazamiento horizontal. Las descargas (SVG y PNG) conservan su tamaño original para imprimir.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

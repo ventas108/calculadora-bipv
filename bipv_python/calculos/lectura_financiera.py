@@ -84,3 +84,44 @@ def etiquetas_payback(lineas: Iterable[tuple[str, float | None, str]]) -> list[d
     validas = sorted(((t, float(x), c) for t, x, c in lineas if x), key=lambda l: l[1])
     return [{"texto": t, "x": x, "y": 0.98 - i * _PASO_ETIQUETA, "color": c}
             for i, (t, x, c) in enumerate(validas)]
+
+
+def rotulo_modulos(sistema: Mapping[str, Any] | None, n_modulos: int, panel_nombre: str) -> str:
+    """Módulos del proyecto para el mensaje final de 💰 Financiero.
+
+    Con el sistema multi-superficie publicado (``multisup_sistema``) se nombra
+    cada panel con su cantidad: antes decía «116 módulos ASP-ST1-T40» (el panel
+    de 📐 Dimensionamiento) para 112 ASP-ST1-T40 + 4 SPR-E20-327.
+    """
+    por_panel = [p for p in ((sistema or {}).get("por_panel") or []) if p.get("modulos")]
+    if len(por_panel) > 1:
+        return " + ".join(f"{int(p['modulos'])} {p['panel']}" for p in por_panel)
+    if len(por_panel) == 1:
+        return f"{int(por_panel[0]['modulos'])} módulos {por_panel[0]['panel']}"
+    return f"{int(n_modulos)} módulos {panel_nombre or '—'}"
+
+
+def mensaje_resumen_financiero(ciudad: str, rotulo: str, capex_neto_usd: float, tipo_cambio: float,
+                               metricas: Mapping[str, Any], vne_cop_kWh: float | None, *,
+                               vpn_positivo: bool) -> str:
+    """Mensaje final de 💰 Financiero.
+
+    Antes era una sola expresión `"…" f"TIR…" if tir else "TIR N/A" f"VPN…" + …`:
+    el `if/else` abarcaba todo, así que con TIR el mensaje terminaba en
+    «TIR: 16.8% |» sin VPN, Payback ni LCOE (28-sep-2026). Ahora cada parte se
+    arma por separado.
+    """
+    tir = metricas.get("tir_pct")
+    payback = metricas.get("payback_simple")
+    lcoe = metricas["lcoe_cop_kWh"]
+    partes = [
+        f"{'✅' if vpn_positivo else '⚠️'} **{ciudad}** — {rotulo}",
+        f"CAPEX neto: **USD {capex_neto_usd:,.0f}** ($ {capex_neto_usd * tipo_cambio / 1e6:.2f} M COP)",
+        f"TIR: **{tir:.1f}%**" if tir else "TIR: **N/A**",
+        f"VPN: **USD {metricas['vpn_usd']:,.0f}** ($ {metricas['vpn_usd'] * tipo_cambio / 1e6:.1f} M COP)",
+        f"Payback: **{payback:.1f} años**" if payback else "Payback: **> horizonte**",
+        f"LCOE: **{lcoe:.0f} COP/kWh**" + (
+            f" ({'<' if lcoe < vne_cop_kWh else '>'} valor nivelado de la energía "
+            f"{vne_cop_kWh:.0f} COP/kWh)" if vne_cop_kWh else ""),
+    ]
+    return " | ".join(partes)
