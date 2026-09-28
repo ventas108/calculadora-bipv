@@ -110,7 +110,7 @@ if st.session_state.get("multisup_activo"):
 if n_pan > 0:
     st.info(
         f"📐 Dimensionamiento: **{n_pan} módulos** · **{p_stc:.2f} kWp** · "
-        f"Panel **${c_pan:.0f}/un** · Inversor **${c_inv:.0f}/un**"
+        f"Panel **USD {c_pan:.0f}/un** · Inversor **USD {c_inv:.0f}/un**"
         + (f" · Área de paneles **{area_m2:.1f} m²**" if area_m2 > 0 else "")
     )
 else:

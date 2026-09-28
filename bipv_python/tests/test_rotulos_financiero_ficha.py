@@ -56,3 +56,50 @@ def test_paginas_usan_rotulo_mensaje_y_ficha_al_ancho():
     retie = RETIE.read_text(encoding="utf-8")
     assert "st.image(svg, use_column_width=True)" in retie
     assert "st.components.v1.html(svg" not in retie
+
+
+# ── «$» y fórmulas LaTeX ─────────────────────────────────────────────────────
+# Streamlit toma el texto entre dos «$» como una fórmula: el mensaje final
+# salía «(48.76MCOP)|TIR:∗∗16.8…» en cursiva matemática (28-sep-2026). Lo mismo
+# en el cuadro CAPEX bruto → neto, la tabla de la Ley 1715, la tabla de
+# carbono y el resumen de 💼 Presupuesto. El «$» debe ir escapado («\$»).
+import ast  # noqa: E402
+import re  # noqa: E402
+
+_FUNCIONES_MARKDOWN = {"markdown", "success", "info", "warning", "error", "caption", "write", "toast"}
+_DOLAR_SIN_ESCAPAR = re.compile(r"(?<!\\)\$")
+
+
+def _textos(nodo):
+    if isinstance(nodo, ast.Constant) and isinstance(nodo.value, str):
+        yield nodo.value
+    elif isinstance(nodo, ast.JoinedStr):
+        for v in nodo.values:
+            if isinstance(v, ast.Constant):
+                yield v.value
+    elif isinstance(nodo, ast.BinOp):
+        yield from _textos(nodo.left)
+        yield from _textos(nodo.right)
+    elif isinstance(nodo, ast.IfExp):
+        yield from _textos(nodo.body)
+        yield from _textos(nodo.orelse)
+
+
+def test_mensaje_final_no_tiene_dolar_sin_escapar():
+    texto = mensaje_resumen_financiero("Bogotá", "116 módulos P", 14745.0, 3307.0, M_CON, 1732.0,
+                                       vpn_positivo=True)
+    assert not _DOLAR_SIN_ESCAPAR.search(texto), texto
+    assert "(\\$ 48.76 M COP)" in texto and "(\\$ 35.6 M COP)" in texto
+
+
+def test_ningun_texto_markdown_de_las_paginas_tiene_dos_dolares_sin_escapar():
+    malos = []
+    for pagina in sorted((ROOT / "pages").glob("*.py")):
+        arbol = ast.parse(pagina.read_text(encoding="utf-8"))
+        for nodo in ast.walk(arbol):
+            if (isinstance(nodo, ast.Call) and isinstance(nodo.func, ast.Attribute)
+                    and nodo.func.attr in _FUNCIONES_MARKDOWN and nodo.args):
+                texto = "".join(_textos(nodo.args[0]))
+                if len(_DOLAR_SIN_ESCAPAR.findall(texto)) >= 2:
+                    malos.append(f"{pagina.name}:{nodo.lineno}")
+    assert not malos, malos
