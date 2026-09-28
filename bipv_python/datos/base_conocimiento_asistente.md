@@ -4502,6 +4502,28 @@ Todas las fracciones que sobreviven se multiplican. Ejemplo de la fachada ASP (v
 
 Energía de la fachada ≈ 808 kWh/m² × 80,6 m² × 0,0875 × 0,682 ≈ **3.890 kWh/año** (con el 0,78 fijo eran 4.446). El techo SPR queda con PR ≈ 0,80 porque casi no pierde por ángulo. Total del sistema ≈ 5.600–5.700 kWh/año en vez de 6.155; con el TMY real los números pueden variar un poco.
 
+**Con el clima real (TMY) del proyecto del cliente (27-sep-2026):** fachada PR **0,724** → 4.129 kWh/año; techo PR **0,828** → 1.815 kWh/año; total **5.944 kWh/año**.
+
+### Aprender la cadena de pérdidas — PR de todo el sistema: no es el promedio de las superficies (promedio ponderado)
+
+**Pregunta típica:** «si la fachada tiene PR 0,724 y el techo 0,828, ¿el PR de todo el sistema es el promedio, 0,776?» **No.** El promedio simple da el mismo peso a las dos superficies, pero la fachada produce mucho más que el techo, así que pesa más.
+
+**Fórmula en palabras:** PR del sistema = energía real total ÷ energía «ideal» total (la que habría sin pérdidas). La energía ideal de cada superficie es su energía real ÷ su PR (o sea POA × área × η del panel).
+
+**Ejemplo con los números reales del cliente:**
+
+| Superficie | Energía real | Energía ideal (real ÷ PR) |
+|---|---|---|
+| Fachada (PR 0,724) | 4.129 kWh | 4.129 ÷ 0,724 = 5.703 kWh |
+| Techo (PR 0,828) | 1.815 kWh | 1.815 ÷ 0,828 = 2.192 kWh |
+| **Total** | **5.944 kWh** | **7.895 kWh** |
+
+**PR del sistema = 5.944 ÷ 7.895 = 0,753**, no 0,776. Queda más cerca del PR de la fachada porque la fachada aporta el 72 % de la energía ideal. Es un **promedio ponderado** por la energía ideal de cada superficie, no un promedio simple.
+
+**Cómo leerlo en pantalla:** en 🗺️ Vista 3D › «Resumen POA por superficie» están el PR y la E_ac de cada superficie; divide cada E_ac por su PR, suma, y divide la «Producción total del sistema» por esa suma.
+
+**Qué hacer:** para comparar el sistema con otro proyecto usa el PR ponderado (0,753), nunca el promedio simple; para mejorar el sistema ataca primero la superficie que más pesa (aquí la fachada: ángulo y temperatura).
+
 ### Aprender la cadena de pérdidas — cómo leerlo en la pantalla
 
 En 🗺️ Vista 3D › ⚙️ Superficies BIPV › **Resumen POA por superficie**:
