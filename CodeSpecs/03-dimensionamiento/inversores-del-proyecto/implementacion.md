@@ -17,7 +17,9 @@
   `inversores_fijados_vigentes`; texto «DC/AC y recorte con N inversores
   fijados».
 - `pages/8_💼_Presupuesto.py`: cotiza `N_inv_total` inversores.
-- Manual del Asistente, sección 90; contratos y registro de decisiones.
+- Manual del Asistente, sección 90, con la guía rápida de alarmas (pedido del
+  usuario: que oriente de forma simple qué significa cada color y qué hacer);
+  contratos y registro de decisiones.
 
 ## Archivos modificados
 

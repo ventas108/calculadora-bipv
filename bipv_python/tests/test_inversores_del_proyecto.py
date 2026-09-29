@@ -146,3 +146,13 @@ def test_presupuesto_cotiza_todos_los_inversores():
     src = _fuente("8_*Presupuesto.py")
     assert '"INV-CAT", 1.0,' not in src
     assert "N_inv_total" in src
+
+
+def test_manual_del_asistente_explica_las_alarmas():
+    from pathlib import Path
+    kb = (Path(__file__).resolve().parents[1] / "datos" / "base_conocimiento_asistente.md").read_text(encoding="utf-8")
+    seccion = kb[kb.index("## 90."):]
+    for texto in ("guía rápida de alarmas", "0,75", "1,35", "1,60", "💡", "no es posible",
+                  "fijados en 📐 Dimensionamiento", "volvió a 0"):
+        assert texto in seccion
+    assert "PVsyst" not in seccion

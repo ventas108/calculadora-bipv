@@ -23,6 +23,10 @@
   - 📊 Producción (TMY sintético, bifacial): antes 1 inversor, recorte
     191.980 kWh (35,7 %); ahora 2 inversores, DC/AC 1,11 🟢, recorte
     3.337 kWh; con 2 fijados, «DC/AC y recorte con 2 inversores fijados».
+- [x] Manual del Asistente, sección 90: guía rápida de alarmas (colores de la
+  relación DC/AC con sus límites 0,75 / 1,00 / 1,35 / 1,60, 💡, 🟠 de ajuste,
+  texto de Producción y campo que vuelve a 0), con qué hacer en cada caso;
+  prueba `test_manual_del_asistente_explica_las_alarmas`.
 - [x] Suite completa de `bipv_python`: 2133 pruebas pasan.
 
 ## Resultado
