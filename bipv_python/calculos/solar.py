@@ -1,6 +1,6 @@
 """
 Módulo de recurso solar — TMY desde PVGIS + POA para fachadas BIPV.
-Fuente datos: PVGIS v5.2 (JRC European Commission) — sin API key.
+Fuente datos: PVGIS 5.2 o 5.3 (JRC European Commission) — sin API key.
 """
 import warnings
 
@@ -9,7 +9,76 @@ import pandas as pd
 import numpy as np
 import pvlib
 
-PVGIS_TMY_URL = "https://re.jrc.ec.europa.eu/api/v5_2/tmy"
+# ── Versión de PVGIS (Spec 02-recurso-solar/pvgis-5-3, 29-sep-2026) ─────────
+# PVsyst 8 descarga PVGIS 5.3; la app descargaba siempre 5.2. Los proyectos
+# guardados sin versión se calcularon con 5.2 y la siguen usando (su
+# multi-superficie verifica la huella del TMY); los proyectos nuevos usan 5.3.
+PVGIS_URLS_TMY = {
+    "5.2": "https://re.jrc.ec.europa.eu/api/v5_2/tmy",
+    "5.3": "https://re.jrc.ec.europa.eu/api/v5_3/tmy",
+}
+PVGIS_VERSION_DEFAULT = "5.3"
+PVGIS_VERSION_LEGADA = "5.2"
+CLAVE_VERSION_PVGIS = "pvgis_version"
+PVGIS_TMY_URL = PVGIS_URLS_TMY[PVGIS_VERSION_LEGADA]
+
+_MESES_CORTOS = ("Ene", "Feb", "Mar", "Abr", "May", "Jun",
+                 "Jul", "Ago", "Sep", "Oct", "Nov", "Dic")
+
+
+def url_tmy_pvgis(version: str) -> str:
+    """URL del servicio TMY de la versión pedida; desconocida → ValueError."""
+    try:
+        return PVGIS_URLS_TMY[version]
+    except KeyError:
+        raise ValueError(f"Versión de PVGIS desconocida: {version!r}") from None
+
+
+def version_pvgis_de_estado(estado) -> str:
+    """Versión elegida en la sesión; sin elegir (proyecto nuevo) → 5.3."""
+    v = estado.get(CLAVE_VERSION_PVGIS)
+    return v if v in PVGIS_URLS_TMY else PVGIS_VERSION_DEFAULT
+
+
+def version_pvgis_de_proyecto_guardado(estado_guardado) -> str:
+    """Versión de un proyecto guardado; sin versión (anterior a la opción) → 5.2."""
+    v = estado_guardado.get(CLAVE_VERSION_PVGIS)
+    return v if v in PVGIS_URLS_TMY else PVGIS_VERSION_LEGADA
+
+
+def sufijo_cache_pvgis(version: str) -> str:
+    """Sufijo de los archivos de caché: vacío para 5.2 (nombres de siempre)."""
+    return "" if version == PVGIS_VERSION_LEGADA else "_pvgis" + version.replace(".", "")
+
+
+def _entero(valor):
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        return None
+
+
+def metadatos_pvgis(data: dict, version: str) -> dict:
+    """Base de radiación, periodo y año escogido para cada mes del TMY."""
+    meteo = (data.get("inputs") or {}).get("meteo_data") or {}
+    meses = []
+    for m in (data.get("outputs") or {}).get("months_selected") or []:
+        mes, anio = _entero(m.get("month")), _entero(m.get("year"))
+        if mes and anio and 1 <= mes <= 12:
+            meses.append((mes, anio))
+    return {
+        "version": version,
+        "radiation_db": meteo.get("radiation_db"),
+        "meteo_db": meteo.get("meteo_db"),
+        "year_min": _entero(meteo.get("year_min")),
+        "year_max": _entero(meteo.get("year_max")),
+        "meses": sorted(meses),
+    }
+
+
+def texto_meses_tmy(meta: dict) -> str:
+    """«Ene 2012 · Feb 2018 · …» — el año que PVGIS escogió para cada mes."""
+    return " · ".join(f"{_MESES_CORTOS[m - 1]} {a}" for m, a in meta.get("meses") or [])
 
 # Mapa azimuth etiqueta → grados pvlib (0=Norte, 90=Este, 180=Sur, 270=Oeste)
 ORIENTACIONES = {
@@ -24,9 +93,12 @@ ORIENTACIONES = {
 }
 
 
-def obtener_tmy_pvgis(lat: float, lon: float, timeout: int = 30) -> pd.DataFrame:
+def obtener_tmy_pvgis(lat: float, lon: float, timeout: int = 30,
+                      version: str = PVGIS_VERSION_LEGADA) -> pd.DataFrame:
     """
-    Descarga datos TMY horarios desde PVGIS para lat/lon dados.
+    Descarga datos TMY horarios desde PVGIS (``version`` 5.2 o 5.3) para
+    lat/lon dados. Los metadatos (``metadatos_pvgis``) quedan en
+    ``df.attrs["pvgis"]``.
     Retorna DataFrame con índice DatetimeIndex (año 2001, horario) y columnas:
         G_h    — GHI  W/m²
         Gb_n   — DNI  W/m²
@@ -46,7 +118,7 @@ def obtener_tmy_pvgis(lat: float, lon: float, timeout: int = 30) -> pd.DataFrame
         "lon": round(lon, 4),
         "outputformat": "json",
     }
-    resp = requests.get(PVGIS_TMY_URL, params=params, timeout=timeout)
+    resp = requests.get(url_tmy_pvgis(version), params=params, timeout=timeout)
     resp.raise_for_status()
     data = resp.json()
 
@@ -73,7 +145,9 @@ def obtener_tmy_pvgis(lat: float, lon: float, timeout: int = 30) -> pd.DataFrame
     })
 
     cols = ["G_h", "Gb_n", "Gd_h", "T2m", "WS10m", "SP", "RH"]
-    return df[[c for c in cols if c in df.columns]].astype(float)
+    out = df[[c for c in cols if c in df.columns]].astype(float)
+    out.attrs["pvgis"] = metadatos_pvgis(data, version)
+    return out
 
 
 # ── Auditoría 27-ago-2026 ────────────────────────────────────────────────────

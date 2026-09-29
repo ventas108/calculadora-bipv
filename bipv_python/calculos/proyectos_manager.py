@@ -397,6 +397,12 @@ def cargar_proyecto(slug: str) -> str:
     for k in _claves_reset:
         st.session_state.pop(k, None)
 
+    # Spec 02-recurso-solar/pvgis-5-3: un proyecto guardado sin versión de
+    # PVGIS se calculó con 5.2 y la sigue usando (mismo TMY, misma huella de
+    # su multi-superficie); nunca hereda la versión del proyecto anterior.
+    from calculos.solar import CLAVE_VERSION_PVGIS, version_pvgis_de_proyecto_guardado
+    st.session_state[CLAVE_VERSION_PVGIS] = version_pvgis_de_proyecto_guardado(estado)
+
     # El TMY aun no existe necesariamente en esta página. Se difiere la
     # publicación física hasta que Recurso Solar pueda verificar su huella.
     if payload_multisup is not None:

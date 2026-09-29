@@ -23,7 +23,16 @@ Unidades:
 _(pendiente — ver [../01-datos-proyecto/diseno.md](../01-datos-proyecto/diseno.md))_
 
 ### 02-recurso-solar
-_(pendiente — ver [../02-recurso-solar/diseno.md](../02-recurso-solar/diseno.md))_
+Ver [../02-recurso-solar/diseno.md](../02-recurso-solar/diseno.md). Versión
+de PVGIS (Spec [pvgis-5-3](../02-recurso-solar/pvgis-5-3/diseno.md)):
+
+- `pvgis_version` (`"5.2"` o `"5.3"`) se guarda con el proyecto. Proyecto nuevo
+  → 5.3; proyecto guardado sin la clave → 5.2 (`cargar_proyecto`).
+- `tmy_df` es el TMY de esa versión; `tmy_df.attrs["pvgis"]` trae versión, base
+  de radiación, periodo y año escogido para cada mes (puede faltar si el TMY
+  viene de una caché anterior).
+- Cambiar la versión invalida `tmy_df`, la POA y todos sus derivados, igual
+  que cambiar las coordenadas (`_solar_pvgis_guardada`).
 
 ### 03-dimensionamiento
 
