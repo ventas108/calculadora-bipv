@@ -514,6 +514,21 @@ def validar_diseno_electrico(
             "estado": _peor(*(c["estado"] for c in checks)),
         })
 
+    # Strings que cruzan a otra superficie (Spec 05/string-cruza-superficies):
+    # su 🔴/🟡 va al check del grupo y a la lista, con la misma etiqueta.
+    from calculos.cruce_superficies import validar_cruces
+    _bloq_cr, _av_cr = validar_cruces(list(superficies), paneles)
+    for g in salida_grupos:
+        _etq = _etiquetas("grupo", g)
+        for _estado_cr, _msgs in (("rojo", _bloq_cr), ("amarillo", _av_cr)):
+            for _m in _msgs:
+                if _m.startswith(_etq):
+                    g["checks"].append(_check(
+                        "String que cruza a otra superficie", None, None, "",
+                        _m[len(_etq) + 2:], "🔌 Grupos de strings · 🔀 cruce", _estado_cr))
+                    g["estado"] = _peor(g["estado"], _estado_cr)
+    bloqueos.extend(_bloq_cr)
+    avisos.extend(_av_cr)
     for g in salida_grupos:
         g.pop("_orientacion", None)
         g.pop("_panel", None)
@@ -617,7 +632,8 @@ def modulos_de_superficie(superficie: Mapping[str, Any]) -> int:
 
 
 def area_energia_superficie(superficie: Mapping[str, Any],
-                            panel: Mapping[str, Any] | None) -> dict:
+                            panel: Mapping[str, Any] | None,
+                            modulos: int | None = None) -> dict:
     """Área con la que se calcula la energía simplificada de la superficie.
 
     Con grupos de strings: área instalada = módulos × área del módulo (sin
@@ -625,7 +641,9 @@ def area_energia_superficie(superficie: Mapping[str, Any],
     grupos: el área de la superficie, marcada como estimación.
     """
     area_sup = _positivo(superficie.get("area_m2")) or 0.0
-    modulos = modulos_de_superficie(superficie)
+    # ``modulos``: los físicos de la superficie cuando hay strings que cruzan
+    # (Spec 05/string-cruza-superficies); si no, los de sus grupos.
+    modulos = modulos_de_superficie(superficie) if modulos is None else int(modulos)
     area_mod = None
     if panel:
         from calculos.panel_superficie import area_modulo
@@ -643,10 +661,13 @@ def superficies_para_energia(superficies: list[Mapping[str, Any]],
                              paneles: Mapping[str, Mapping[str, Any]]) -> list[dict]:
     """Copias de las superficies con ``area_m2`` = área de energía y los campos
     ``area_superficie_m2`` y ``area_origen``. No muta la entrada."""
+    from calculos.cruce_superficies import modulos_fisicos_por_superficie
+    fisicos = modulos_fisicos_por_superficie(superficies)
     salida = []
     for sup in superficies:
         info = paneles.get(sup.get("nombre"))
-        area = area_energia_superficie(sup, info["panel"] if info else None)
+        area = area_energia_superficie(sup, info["panel"] if info else None,
+                                       fisicos.get(sup.get("nombre")))
         salida.append({**dict(sup), "area_m2": area["area_m2"],
                        "area_superficie_m2": area["area_superficie_m2"],
                        "area_origen": area["origen"], "modulos": area["modulos"]})

@@ -209,6 +209,11 @@ def firma_cadena(parametros: Mapping[str, Any], superficies: list[Mapping[str, A
             for s in superficies if s.get("activa", True)
         ),
     }
+    # Solo si hay strings que cruzan: las firmas guardadas sin cruces no cambian.
+    from calculos.cruce_superficies import cruces_del_proyecto
+    cruces = cruces_del_proyecto(list(superficies))
+    if cruces:
+        datos["cruces"] = cruces
     return hashlib.sha256(json.dumps(datos, sort_keys=True, default=str).encode("utf-8")).hexdigest()
 
 
@@ -261,6 +266,21 @@ def cadena_superficies_estado(estado: Mapping[str, Any], superficies_energia: li
             resultados[nombre] = cache[clave]
         except (ValueError, KeyError, TypeError) as error:
             errores[nombre] = str(error)
+    # Strings que cruzan a otra superficie (Spec 05/string-cruza-superficies):
+    # la pérdida en serie del string, hora a hora con diodos de bypass, baja
+    # el PR de sus módulos en las dos superficies. Sin cruces no cambia nada.
+    from calculos.cruce_superficies import factores_cruce
+    for nombre, f in factores_cruce(superficies_energia, poas).items():
+        if f.get("error"):
+            errores[nombre] = f["error"]
+            resultados.pop(nombre, None)
+            continue
+        if nombre in resultados:
+            r = dict(resultados[nombre])
+            r["pr"] = float(r["pr"]) * f["f_cruce"]
+            r["f_cruce"] = f["f_cruce"]
+            r["cruce_detalle"] = f["detalle"]
+            resultados[nombre] = r
     return resultados, errores
 
 
@@ -282,6 +302,7 @@ def tabla_desglose(resultados: Mapping[str, Mapping[str, Any]]) -> list[dict]:
             "Cables": f"{(1 - r['f_cables']) * 100:.1f} %",
             "Inversor": f"{(1 - r['eta_inversor']) * 100:.1f} %",
             "Sombra horizonte": f"{(1 - r['f_sombra']) * 100:.1f} %",
+            **({"String que cruza": f"{(1 - r['f_cruce']) * 100:.1f} %"} if "f_cruce" in r else {}),
             "PR": f"{r['pr']:.3f}",
         })
     return filas
