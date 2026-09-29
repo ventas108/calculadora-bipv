@@ -15,6 +15,7 @@ from calculos.produccion_vigencia import (
     firma_desde_payload,
 )
 from calculos.persistencia_resultados import CLAVE_PAYLOAD_FIRMA
+from calculos.formato_produccion import FORMATO_TABLA_MENSUAL
 from calculos.mismatch_bypass import exigir_poa_sin_termico, seleccionar_poa_bypass
 from calculos.mismatch import aplicar_factor_horario, factores_mismatch_produccion
 from calculos.produccion_iv import simular_produccion_iv, panel_apto_para_iv, preparar_para_iv
@@ -1446,10 +1447,8 @@ if btn_sim or st.session_state.get("produccion_ok"):
     with st.expander("📋 Ver tabla de producción mensual completa"):
         st.dataframe(
             df_m.style.format({
-                "E_dc (kWh)":            "{:,.0f}",
-                "E_ac (kWh)":            "{:,.0f}",
-                "Pérdida T° (kWh)":      "{:,.0f}",
-                "Producción (kWh/kWp)":  "{:.1f}",
+                # Solo las columnas presentes (resultados guardados antiguos).
+                c: f for c, f in FORMATO_TABLA_MENSUAL.items() if c in df_m.columns
             }).background_gradient(subset=["E_ac (kWh)"], cmap="Greens"),
             use_container_width=True,
         )

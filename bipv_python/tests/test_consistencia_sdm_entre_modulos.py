@@ -228,3 +228,23 @@ def test_bypass_no_cuenta_de_nuevo_las_horas_de_horizonte():
     assert info["horas_excluidas"] == 2 * 365
     assert con["kwh_bypass_anual"] == sin_horas_h["kwh_bypass_anual"]
     assert con["kwh_bypass_anual"] < viejo["kwh_bypass_anual"]
+
+
+def test_los_dos_motores_reportan_el_mismo_gamma_de_ficha():
+    """Spec 04/presentacion-recorte-gamma (29-sep-2026): los dos motores
+    devuelven el γ de la ficha para la nota del balance; es solo un dato
+    mostrado y debe ser el mismo γ que usa el SDM de la ficha."""
+    import pandas as pd
+
+    from calculos.produccion import simular_produccion_anual
+    from calculos.produccion_iv import simular_produccion_iv
+
+    index = pd.date_range("2001-01-01", periods=8760, freq="h", tz="UTC")
+    sol = (index.hour >= 6) & (index.hour < 18)
+    tmy = pd.DataFrame({"T2m": np.full(8760, 20.0)}, index=index)
+    poa = pd.DataFrame({"poa_global": np.where(sol, 600.0, 0.0)}, index=index)
+    kw = dict(tmy=tmy, poa_base=poa, panel=ASP_ST1_T40, N_paneles=16,
+              eta_inversor=0.975, factor_pr_mismatch=1.0)
+    g_anual = simular_produccion_anual(**kw)["Tk_gamma_pct"]
+    g_iv = simular_produccion_iv(**kw)["Tk_gamma_pct"]
+    assert g_anual == g_iv == pytest.approx(ASP_ST1_T40["Tk_gamma"])
