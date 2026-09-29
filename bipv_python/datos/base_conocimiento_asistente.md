@@ -4851,7 +4851,49 @@ La cascada va de la luz que llega a la que usa la celda, en kWh/m² al año:
 5. **POA efectiva → Producción:** lo que queda. 📊 Producción recibe la POA sin el término térmico y calcula la temperatura una sola vez en su modelo eléctrico, para no contarla dos veces.
 6. **Factor de área activa (1 − τ)** y **POA aprovechable por la celda:** solo cambian si el vidrio es semitransparente.
 
-«Factores promedio (horas con sol)» muestra cada factor como fracción (por ejemplo, Factor IAM promedio 0,97 = pierde 3 %).
+«Factores promedio (ponderados por energía)» muestra cada factor como fracción (por ejemplo, Factor IAM promedio 0,97 = pierde 3 %). Ver la sección 84 para el caso bifacial.
+
+## 84. Panel bifacial: la cara trasera en el Motor Óptico (29-sep-2026)
+
+### Cara trasera en el Motor Óptico — qué pasaba y por qué se corrigió
+
+**Qué es:** un panel bifacial recibe luz por las dos caras. ☀️ Recurso Solar calcula la POA bruta como **cara frontal + bifacialidad × cara trasera** (la trasera es sobre todo luz reflejada por el suelo).
+
+**Qué pasaba antes:** 🔆 Motor Óptico restaba el IAM, la suciedad y la temperatura usando solo la cara frontal, y al final **no volvía a sumar la cara trasera**. Esa luz desaparecía sin figurar como pérdida, y 📊 Producción, que toma su irradiancia del Motor Óptico, perdía la ganancia bifacial.
+
+**Ejemplo real (proyecto agrivoltaico de Apartadó, inclinación 10°, bifacialidad 0,80):**
+- POA bruta 1,861 kWh/m²; pérdidas IAM 55, suciedad 62 y térmica 90.
+- Lo que debía quedar: 1,861 − 55 − 62 − 90 = **1,654** kWh/m².
+- Lo que mostraba la pantalla: 1,497. La diferencia, 1,654 − 1,497 ≈ **157 kWh/m² (8,4 %)**, era justo el aporte de la cara trasera.
+- Por eso la granja habría dado cerca de un 8 % menos energía que la referencia estándar internacional, y el aviso decía «sobreestimación 19,6 %» cuando la real era menor.
+
+### Cara trasera en el Motor Óptico — cómo se calcula ahora (fórmula en palabras)
+
+1. **Cara frontal:** se le resta el IAM (reflexión del vidrio) con la mezcla de luz directa y difusa de cada hora, y después la suciedad.
+2. **Aporte trasero** = POA bruta − cara frontal (ya viene multiplicado por la bifacialidad). Solo se le resta la **IAM difusa**: la luz de atrás llega de todos los ángulos, así que se usa el mismo factor 0,95 de la difusa. **No se ensucia**: la cara de abajo casi no acumula polvo, y la referencia estándar internacional tampoco le aplica suciedad.
+3. Las dos partes se suman y sobre el total se calcula la temperatura.
+
+**Cuenta de ejemplo:** aporte trasero 157 kWh/m² × 0,95 = **149 kWh/m²** llegan a la POA efectiva; la IAM difusa le quita 157 − 149 = 8 kWh/m².
+
+**Regla que siempre se cumple:** POA bruta − pérdida IAM − pérdida por suciedad = POA que va a 📊 Producción. Si no cierra, algo está mal.
+
+Los paneles monofaciales no cambian: su cascada es exactamente la de antes. En 🗺️ Vista 3D, las superficies bifaciales ya no cuentan su aporte trasero como «pérdida IAM».
+
+### Cara trasera en el Motor Óptico — factores promedio ponderados por energía
+
+**Qué cambió:** «📋 3. Factores promedio» ahora es **ponderado por energía**: cada factor = energía que queda después de esa pérdida ÷ energía que llegaba a ella. Así coincide con los porcentajes de la cascada, y los tres multiplicados dan el factor global.
+
+**Por qué:** antes era el promedio simple de todas las horas con sol. En Apartadó daba «Factor IAM promedio 0,8942 (10,6 %)» mientras la pérdida de energía por IAM era 3,0 %: las horas de amanecer y atardecer (mucho ángulo, poca luz) pesaban igual que el mediodía.
+
+**Ejemplo:** pérdida IAM 55 kWh/m² sobre POA bruta 1,861 → factor = 1 − 55 ÷ 1,861 = **0,970** (3,0 %).
+
+### Cara trasera en el Motor Óptico — cómo leerlo en pantalla y qué hacer
+
+- Con panel bifacial, debajo de las métricas aparece «🔆 Panel bifacial» con el aporte trasero antes y después de la IAM difusa.
+- En 📊 Producción, el recuadro «🔆 Aporte de la cara trasera» muestra el aporte real (antes salía en 0 con el Motor Óptico activo).
+- El aviso de la sección 5 nombra el tipo de superficie según la inclinación: fachada (75° o más), superficie inclinada o superficie casi horizontal (granja o cubierta, menos de 20°).
+- **Qué hacer:** después de actualizar la app, vuelve a pulsar «🚀 Calcular cascada óptica» y luego recalcula 📊 Producción. Para comparar con un informe de la referencia estándar internacional, usa el montaje que corresponda a su Uc (sección 83) y pon la suciedad en 0 si el informe no tiene pérdida por suciedad.
+- Todavía no están en la app el sombreado trasero ni el mismatch trasero del informe (en Apartadó, 5 % y 10 %): la app dará algo más de ganancia bifacial que la referencia.
 
 Calculadora BIPV — Innovación Química
 

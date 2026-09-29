@@ -285,7 +285,34 @@ def cascada_optica(
     poa_dif_neta  = poa_dif * f_iam_dif_arr
     perd_iam_dif  = poa_dif - poa_dif_neta
 
-    poa_optica = poa_dir_neta + poa_dif_neta          # POA después de toda reflexión
+    # ── 1c. Bifacial (Spec 05/motor-optico-bifacial, 29-sep-2026) ────────────
+    # En bifacial poa_global = poa_front + bifacialidad × trasera (pvlib
+    # infinite_sheds) y las componentes clásicas describen solo el frente sin
+    # sombreado entre filas. Antes la POA óptica se armaba solo con ellas y el
+    # aporte trasero desaparecía sin figurar como pérdida (Apartadó: −8.4 %).
+    # Ahora: frente = poa_front con el IAM de la proporción directa/difusa de
+    # esa hora; trasera = poa_global − poa_front con solo la IAM difusa (luz
+    # de todos los ángulos) y sin suciedad (la cara de abajo casi no se ensucia).
+    bifacial = {"poa_front", "poa_rear"}.issubset(poa_df.columns)
+    if bifacial:
+        frente_clasico = poa_dir + poa_dif
+        with np.errstate(invalid="ignore", divide="ignore"):
+            f_frente = np.where(frente_clasico > 0.0,
+                                (poa_dir_neta + poa_dif_neta) / np.maximum(frente_clasico, 1e-9),
+                                f_iam_dif_arr)
+        poa_front       = np.maximum(poa_df["poa_front"].fillna(0).values, 0.0)
+        aporte_trasero  = np.maximum(poa_bruta - poa_front, 0.0)
+        frontal_optica  = poa_front * f_frente
+        trasera_optica  = aporte_trasero * f_iam_dif_arr
+        perd_iam_dir    = poa_front * np.where(frente_clasico > 0.0,
+                                               perd_iam_dir / np.maximum(frente_clasico, 1e-9), 0.0)
+        perd_iam_dif    = (poa_front - frontal_optica - perd_iam_dir) + (aporte_trasero - trasera_optica)
+    else:
+        aporte_trasero  = np.zeros_like(poa_bruta)
+        frontal_optica  = poa_dir_neta + poa_dif_neta
+        trasera_optica  = np.zeros_like(poa_bruta)
+
+    poa_optica = frontal_optica + trasera_optica      # POA después de toda reflexión
     perd_iam   = perd_iam_dir + perd_iam_dif          # pérdida total IAM (W/m²)
 
     # ── 2. Soiling estacional Colombia ────────────────────────────────────────
@@ -295,8 +322,8 @@ def cascada_optica(
     k_vert       = float(np.clip(k_soiling_vert, 0.3, 1.0))
     f_soil       = f_soil_base * k_vert
 
-    poa_post_soil = poa_optica * (1.0 - f_soil)
-    perd_soil     = poa_optica * f_soil
+    poa_post_soil = frontal_optica * (1.0 - f_soil) + trasera_optica
+    perd_soil     = frontal_optica * f_soil
 
     # ── 3. Modelo térmico BIPV confinado ──────────────────────────────────────
     T_amb = (tmy_df["T2m"].values
@@ -323,6 +350,8 @@ def cascada_optica(
     result_df = pd.DataFrame({
         "poa_bruta":           poa_bruta,
         "poa_optica":          poa_optica,          # tras IAM dir + dif
+        "poa_frontal_optica":  frontal_optica,      # cara frontal tras IAM
+        "poa_trasera_optica":  trasera_optica,      # aporte trasero tras IAM difusa (0 monofacial)
         "poa_post_soil":       poa_post_soil,
         "poa_post_term":       poa_post_term,
         "poa_efectiva":        poa_efectiva,         # = poa_post_term → va a Producción
@@ -352,11 +381,14 @@ def cascada_optica(
     p_term_a   = float(result_df["perdida_term"].sum()   * escala)
     p_tau_a    = float(result_df["perdida_tau"].sum()    * escala)
 
-    # Factores medios (solo horas con sol)
-    mask_sol = poa_bruta > 10
-    f_iam_mean  = float(f_iam[mask_sol].mean())   if mask_sol.any() else 0.0
-    f_soil_mean = float(f_soil.mean())
-    f_term_mean = float(f_term[mask_sol].mean())  if mask_sol.any() else 1.0
+    # Factores medios PONDERADOS POR ENERGÍA (Spec 05/motor-optico-bifacial):
+    # pérdida ÷ energía de su etapa, así coinciden con los % de la cascada y su
+    # producto es el factor global. El promedio simple por hora daba IAM 10.6 %
+    # con una pérdida de energía de 3.0 % (las horas de ángulo alto y poca
+    # energía pesaban igual que el mediodía).
+    f_iam_mean  = optica_a / bruta_a if bruta_a > 0 else 1.0
+    f_soil_mean = p_soil_a / optica_a if optica_a > 0 else 0.0
+    f_term_mean = post_t_a / post_s_a if post_s_a > 0 else 1.0
 
     # Factor global de degradación (bruta → efectiva neta)
     factor_global = efectiva_a / bruta_a if bruta_a > 0 else 0.0
@@ -385,7 +417,11 @@ def cascada_optica(
         "perdida_tau_kWh_m2_info":     round(p_tau_a, 1),
         "perdida_total_kWh_m2":        round(p_iam_a + p_soil_a + p_term_a, 1),
         "_tau_solo_informacional":     True,
-        # Factores promedio (horas con sol)
+        # Bifacial: aporte trasero antes y después del IAM difusa
+        "bifacial":                    bool(bifacial),
+        "aporte_trasero_kWh_m2":       round(float(aporte_trasero.sum()) * escala, 1),
+        "aporte_trasero_optico_kWh_m2": round(float(trasera_optica.sum()) * escala, 1),
+        # Factores promedio (ponderados por energía)
         "f_iam_prom":                  round(f_iam_mean, 4),
         "f_iam_dif":                   round(float(f_iam_dif), 4),
         "f_soil_prom":                 round(1.0 - f_soil_mean, 4),
@@ -404,3 +440,49 @@ def cascada_optica(
     }
 
     return result_df, summary
+
+
+def poa_publicable(poa_df: pd.DataFrame, result_df: pd.DataFrame, columna: str) -> pd.DataFrame:
+    """Copia de ``poa_df`` con ``poa_global`` = la etapa ``columna`` de la cascada.
+
+    En bifacial también ajusta ``poa_front`` (= global − aporte trasero óptico)
+    para que «global − front» siga siendo el aporte trasero que ve 📊 Producción.
+    """
+    salida = poa_df.copy()
+    salida["poa_global"] = result_df[columna].reindex(salida.index).fillna(0.0)
+    if "poa_front" in salida.columns and "poa_trasera_optica" in result_df.columns:
+        trasera = result_df["poa_trasera_optica"].reindex(salida.index).fillna(0.0)
+        salida["poa_front"] = (salida["poa_global"] - trasera).clip(lower=0.0)
+    return salida
+
+
+TILT_FACHADA_DEG = 75.0
+TILT_CASI_HORIZONTAL_DEG = 20.0
+
+
+def mensaje_impacto_optico(pct_impacto: float, tilt_deg: float) -> tuple[str, str]:
+    """Nivel (``warning``/``info``/``success``) y texto del aviso de impacto.
+
+    El tipo de superficie sale de la inclinación (antes decía «fachada
+    vertical» siempre, también en una granja a 10°).
+    """
+    tilt = float(tilt_deg)
+    if tilt >= TILT_FACHADA_DEG:
+        superficie = "una fachada"
+        causa = " El IAM domina las pérdidas en fachadas con ángulos de incidencia altos."
+    elif tilt >= TILT_CASI_HORIZONTAL_DEG:
+        superficie = "una superficie inclinada"
+        causa = " Revisa la cascada: suciedad y temperatura suelen pesar más que la reflexión del vidrio."
+    else:
+        superficie = "una superficie casi horizontal (granja o cubierta)"
+        causa = " Revisa la cascada: suciedad y temperatura suelen pesar más que la reflexión del vidrio."
+    if pct_impacto > 15:
+        return "warning", (f"⚠️ La sobreestimación es **{pct_impacto:.1f}%** — "
+                           f"significativa para {superficie} ({tilt:.0f}°).{causa}")
+    if pct_impacto > 8:
+        return "info", (f"ℹ️ La sobreestimación es **{pct_impacto:.1f}%** — moderada para "
+                        f"{superficie} ({tilt:.0f}°). El Motor Óptico mejora la precisión "
+                        "del análisis financiero.")
+    return "success", (f"✅ La sobreestimación es **{pct_impacto:.1f}%** — baja para "
+                       f"{superficie} ({tilt:.0f}°). La orientación y el tipo de vidrio "
+                       "son favorables.")
