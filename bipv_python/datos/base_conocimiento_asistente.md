@@ -4933,6 +4933,45 @@ Con panel bifacial y sin Motor Óptico, la suciedad de 🔀 Mismatch solo se apl
 - **📄 Reporte PDF:** «Factor Mismatch aplicado» es ahora el que usó de verdad la corrida de Producción.
 - **Qué hacer:** para comparar con la referencia estándar internacional, deja el horizonte en 0 si el informe no tiene «Horizon» (sombra lejana), y copia calidad, mismatch y cableado en sus controles.
 
+## 86. Mismatch por orientación: varias orientaciones en el mismo string, hora a hora (29-sep-2026)
+
+### Varias orientaciones en el mismo string — qué pasa y por qué importa en BIPV
+
+**Qué es:** en BIPV es común poner en un mismo string módulos de dos fachadas (por ejemplo, una esquina Este y Oeste) o de techo y fachada. En un string en **serie** pasa la misma corriente por todos los módulos, y la corriente de un módulo depende de cuánta luz recibe.
+
+**Qué pasaba antes:** la app comparaba solo los **totales del año** de cada orientación. Este y Oeste reciben casi la misma energía en el año, así que la app daba **0,00 %** de pérdida. Pero en la mañana el Este recibe mucho sol y el Oeste poco, y en la tarde al revés: en cada hora un grupo frena al otro.
+
+### Varias orientaciones en el mismo string — cómo se calcula ahora (fórmula en palabras)
+
+En cada hora:
+1. La corriente de cada grupo es proporcional a la luz que recibe.
+2. El inversor elige la corriente que da más potencia. Si elige la corriente del grupo fuerte, el grupo débil no la alcanza y sus **diodos de bypass** lo sacan del string (aporta 0). Si elige la del débil, todos aportan, pero a la corriente baja.
+3. **Pérdida de la hora = 1 − potencia del string ÷ potencia ideal** (la ideal es si cada módulo diera todo lo suyo).
+
+**Ejemplo de una hora (50 % Este, 50 % Oeste):** Este 800 W/m², Oeste 100 W/m².
+- A la corriente del Este: 800 × 0,5 = **400** (el Oeste queda puenteado).
+- A la corriente del Oeste: 100 × 1,0 = 100.
+- Ideal: 0,5 × 800 + 0,5 × 100 = **450**. El string da 400: pierde 1 − 400 ÷ 450 = **11,1 %** esa hora.
+
+**Resultados en Apartadó (año completo, ponderado por energía):**
+
+| Mezcla en el mismo string | Antes (totales del año) | Ahora (hora a hora) |
+|---|---|---|
+| Fachadas Este/Oeste 50/50 | 0,00 % | **14,9 %** |
+| Fachadas Sur/Este 70/30 | 0,62 % | 15,9 % |
+| Techo 10° Sur / 10° Norte 50/50 | 0,02 % | 5,7 % |
+| Techo 10° Sur / fachada Sur 80/20 | 4,10 % | 7,9 % |
+
+Es un modelo de primer orden (corriente proporcional a la luz, voltaje constante): captura el efecto principal, que la corriente la marca el grupo más débil o sus diodos lo sacan.
+
+### Varias orientaciones en el mismo string — cómo leer la pantalla y qué hacer
+
+- En 🔀 Mismatch, sección «🧭 2. Mismatch por orientación múltiple», la tarjeta «Factor mismatch (hora a hora)» muestra la pérdida nueva; debajo aparece lo que daría el cálculo anterior con los totales del año, como referencia.
+- La POA de cada orientación usa el **albedo y el panel bifacial** del proyecto (☀️ Recurso Solar).
+- Si cambias las orientaciones, las fracciones, el albedo, el panel bifacial o el año típico, se recalcula solo (aviso «🔄»).
+- 📊 Producción aplica esta pérdida **hora a hora**, junto con el horizonte: aparece «🔀 Aplicado hora a hora a la POA desde 🔀 Mismatch: … mismatch de orientación con diodos de bypass».
+- **Qué hacer:** evita mezclar orientaciones distintas en el mismo string; conecta cada orientación a su propio MPPT (o usa optimizadores o microinversores). Con 🗺️ Vista 3D puedes modelar cada superficie con su propia POA y su propio MPPT.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
