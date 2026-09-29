@@ -4703,6 +4703,30 @@ Debajo de la tabla de irradiancia mensual está el recuadro con la versión, la 
 
 **La regla en palabras:** para comparar con un informe de PVsyst 8, elige **PVGIS 5.3** y las mismas coordenadas del informe. Así la radiación de partida es la misma y lo que quede de diferencia es del cálculo (pérdidas, temperatura, inversor). Compara primero los valores **anuales**; y el **PR**, que no depende de cuánto sol hay.
 
+## 80. Dimensionamiento: «Proyecto completo» cuenta strings que caben, no inversores llenos (29-sep-2026)
+
+### Proyecto completo — qué pasaba (caso Apartadó)
+
+**Qué pasaba:** «🏭 Proyecto completo» de 📐 Dimensionamiento armaba un inversor con todos sus MPPT llenos y redondeaba hacia arriba cuántos inversores cabían. En el proyecto agrivoltaico de Apartadó (2,393 m² × 40 % = 957 m² útiles; JA Solar JAM66D46-720/LB, 28 en serie; Growatt MAX 100KTL3 LV con 10 MPPT) un inversor lleno son 280 módulos en 870 m², y la página decía **2 inversores, 560 módulos, 403 kWp en 1,740 m²**: casi el doble de lo que cabe. PVsyst tiene **308 módulos (11 strings), 222 kWp**. La «Cobertura 100 %» escondía el exceso porque tenía tope.
+
+**Por qué importa:** ese total de módulos llega a 📊 Producción, al ⚡ Diagrama Unifilar, a la 📋 Ficha RETIE y a los comparadores. Una potencia inflada un 82 % infla la energía y el financiero.
+
+### Proyecto completo — cómo se calcula ahora (fórmula en palabras)
+
+1. **Strings:** si escribiste «N total de cadenas», se usan esas. Si no, los strings completos que caben: área útil ÷ (módulos en serie × área de un módulo), redondeado **hacia abajo**. Apartadó: 957 ÷ (28 × 3.106) = 11.0 → **11 strings**.
+2. **Inversores:** strings ÷ strings que admite un inversor (MPPT × strings por MPPT), redondeado hacia arriba. Apartadó: 11 ÷ 10 → **2 inversores**.
+3. **Reparto parejo:** 11 strings en 2 inversores → **6 + 5**, igual que PVsyst.
+4. **Módulos y potencia:** 11 × 28 = **308 módulos**; 308 × 720 W = **221.8 kWp**; área 957 m² (cobertura 100 %).
+5. **Relación DC/AC del proyecto:** potencia DC total ÷ potencia AC de todos los inversores: 221.8 ÷ (2 × 100) = **1.11** 🟢, la «Proporción Pnom» de PVsyst. También se muestra el inversor más cargado (6 strings: 121 kWp ÷ 100 = 1.21).
+
+### Proyecto completo — cómo leerlo en pantalla y qué hacer
+
+- Debajo de las tarjetas, la línea 🧮 dice cuántos strings, de dónde salen (declarados o los que caben), cuántos inversores y el reparto.
+- «📊 Un inversor lleno» es solo la **capacidad** de un inversor (todos sus MPPT ocupados); el sistema real es el de «Proyecto completo».
+- Si declaras más cadenas de las que caben, la cobertura pasa de 100 % y sale un aviso 🔴 con los m² que faltan: baja «N total de cadenas» o revisa el área y el factor de ocupación en 🏠 Proyecto.
+- Si no cabe ni un string, el aviso 🔴 dice cuántos m² necesita uno.
+- Para que la relación DC/AC aparezca, el inversor debe tener su potencia AC en 📋 Catálogo Inversores.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
