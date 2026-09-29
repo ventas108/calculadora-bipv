@@ -12,7 +12,8 @@
   los del TMY; editada a mano → se respeta; página nueva solo con los datos
   (salir y volver) → se conserva; otro TMY → se recalcula; las tres en 0 →
   se recalculan.
-- [x] `tests/test_invalidacion_ciudad.py` sigue pasando.
+- [x] `tests/test_invalidacion_ciudad.py` sigue pasando. `tests/test_pagina_dimensionamiento_temperaturas_ciudad.py` revisaba el texto del mecanismo anterior (`setdefault`); ahora revisa lo mismo (defectos de la ciudad activa) con `campo_persistente`.
+- [x] Suite completa: 1972 pasan; la única que falló era esa prueba de texto.
 - [x] Compilación con `-W error::SyntaxWarning`.
 - [x] Suite completa de `bipv_python`.
 

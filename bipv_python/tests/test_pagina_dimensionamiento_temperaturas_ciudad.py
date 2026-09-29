@@ -53,9 +53,13 @@ def test_pagina_dimensionamiento_deriva_los_3_defaults_de_la_ciudad_activa():
     src = _leer(_PAG_DIM)
     assert '_ciudad_activa_dim = st.session_state.get("ciudad", "Bogotá")' in src
     assert '_ciudad_defaults = CIUDADES.get(_ciudad_activa_dim, CIUDADES.get("Bogotá", {}))' in src
-    assert 'st.session_state.setdefault("T_min_diseno", _ciudad_defaults.get("T_min_diseno", 5.0))' in src
-    assert 'st.session_state.setdefault("T_cel_realista", _ciudad_defaults.get("T_cel_realista", 36.35))' in src
-    assert 'st.session_state.setdefault("T_cel_extremo", _ciudad_defaults.get("T_cel_extremo", 41.94))' in src
+    # Spec 03/temperaturas-diseno (29-sep-2026): los valores de la ciudad son
+    # el defecto de campo_persistente (antes, setdefault sobre la clave del
+    # campo, que Streamlit borraba al cambiar de página).
+    assert 'float(_ciudad_defaults.get("T_min_diseno", 5.0))' in src
+    assert 'float(_ciudad_defaults.get("T_cel_realista", 36.35))' in src
+    assert 'float(_ciudad_defaults.get("T_cel_extremo", 41.94))' in src
+    assert src.count("campo_persistente(") >= 3
 
 
 def test_ciudades_colombia_tiene_valores_reales_distintos_por_ciudad():

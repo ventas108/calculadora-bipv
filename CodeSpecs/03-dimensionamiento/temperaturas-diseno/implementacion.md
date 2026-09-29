@@ -22,3 +22,4 @@
 - `bipv_python/tests/test_temperaturas_diseno_estables.py`
 - `bipv_python/datos/base_conocimiento_asistente.md`
 - `CodeSpecs/00-director/registro-de-decisiones.md`
+- `bipv_python/tests/test_pagina_dimensionamiento_temperaturas_ciudad.py`
