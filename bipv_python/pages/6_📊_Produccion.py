@@ -23,6 +23,7 @@ from calculos.modelo_iv import resolver_panel_calibrado
 from calculos.dimensionamiento import (
     evaluar_relacion_dc_ac,
     escalar_p_ac_nom_por_inversores,
+    inversores_fijados_vigentes,
     curva_electrica_temperatura,
     interpretar_curva_electrica,
     diseno_electrico_confirmado,
@@ -434,6 +435,9 @@ _escala_ac_dcac = escalar_p_ac_nom_por_inversores(
     N_strings_tracker=_n_strings_tracker_cfg,
     n_trackers=int((inversor or {}).get("n_trackers") or (inversor or {}).get("N_mppt") or 0),
     P_ac_nom_W_unidad=_p_ac_nom_w_unidad,
+    # Spec 03/inversores-del-proyecto: la cantidad fijada en 📐 Dimensionamiento
+    # (solo si es para este mismo inversor).
+    n_inversores_fijado=inversores_fijados_vigentes(st.session_state, inversor_nombre),
 )
 _n_inversores_dcac = _escala_ac_dcac["n_inversores"]
 _paneles_por_inversor_dcac = _escala_ac_dcac["paneles_por_inversor"]
@@ -447,7 +451,14 @@ _p_ac_nom_w_total = _escala_ac_dcac["p_ac_nom_w_total"]
 # justificación -- son un criterio propio de la app, no el algoritmo interno
 # de PVsyst, anclado al único dato real disponible (0.538 → PVsyst avisa).
 _dcac = evaluar_relacion_dc_ac(P_stc_kW, _p_ac_nom_w_total)
-if _n_inversores_dcac > 1 and _p_ac_nom_w_total:
+if _escala_ac_dcac.get("fuente") == "fijado" and _p_ac_nom_w_total:
+    st.caption(
+        f"ℹ️ DC/AC y recorte con **{_n_inversores_dcac} inversores** fijados en "
+        f"📐 Dimensionamiento — {_p_ac_nom_w_total/1000:.1f} kW CA total."
+        + (" (ajustado: la cantidad escrita no era posible con estos paneles)"
+           if _escala_ac_dcac.get("ajustado") else "")
+    )
+elif _n_inversores_dcac > 1 and _p_ac_nom_w_total:
     st.caption(
         f"ℹ️ DC/AC calculado para **{_n_inversores_dcac} inversores** "
         f"({N_paneles} paneles ÷ {_paneles_por_inversor_dcac} paneles/inversor) — "

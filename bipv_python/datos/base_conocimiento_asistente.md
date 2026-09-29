@@ -5047,6 +5047,63 @@ El Voc y el Vmp del string no cambian: la luz trasera sube la corriente, no el v
 
 La fila «↳ Solo horas calientes» del balance mostraba `Tk_gamma=—%/°C` aunque el panel sí tuviera el dato. Ahora muestra el **coeficiente de potencia γ de la ficha** (por ejemplo **−0,29 %/°C** en el JA Solar JAM66D46-720/LB). Si la ficha no lo trae, queda «—». Es el mismo γ que aparece en «Diagnóstico BIPV» más abajo; el cálculo de temperatura no cambió.
 
+## 90. Cantidad de inversores del proyecto: la eliges tú y todos los módulos la usan (29-sep-2026)
+
+### Cantidad de inversores — qué es y por qué se corrigió
+
+**Qué es:** en 📐 Dimensionamiento, el campo **«Cantidad de inversores del proyecto (0 = la calcula la app)»**. Con **0**, la app usa el **mínimo** de inversores en el que caben todos los strings. Si escribes una cantidad, la app usa **esa**: los strings se reparten parejo entre los inversores.
+
+**Por qué se corrigió (caso real Apartadó, 29-sep-2026):**
+1. 📐 Dimensionamiento calculaba 2 inversores (11 strings ÷ 10 MPPT, **redondeando hacia arriba**), pero 📊 Producción redondeaba **al más cercano**: 308 paneles ÷ 280 por inversor = 1,1 → **1 inversor**. Producción simulaba 221,76 kWp con 100 kW AC (DC/AC 2,2) y recortaba ≈ 49.000 kWh/año; la referencia estándar internacional usa 2 inversores (DC/AC 1,11) y recorta 0,01 %.
+2. Con 2 strings por MPPT a un inversor le caben 20 strings y la app solo podía calcular 1 inversor: no había forma de decirle que el diseño real usa 2.
+
+### Cantidad de inversores — fórmula en palabras y cuenta real
+
+- **Mínimo** = strings ÷ strings que admite un inversor (MPPT × strings por MPPT), **redondeado hacia arriba**. Es igual en 📐 Dimensionamiento y en 📊 Producción.
+- **Máximo** = un string por inversor.
+- **Sugerencia para DC/AC ≤ 1,3** = kWp ÷ (kW AC de un inversor × 1,3), redondeado hacia arriba.
+- Si escribes menos que el mínimo o más que el máximo, se ajusta y la app lo avisa.
+
+**Ejemplo (Apartadó):** 11 strings de 28 × JAM66D46-720/LB = 221,76 kWp; Growatt MAX 100KTL3 LV (10 MPPT, 100 kW AC).
+- Con 1 string por MPPT: mínimo = ⌈11 ÷ 10⌉ = **2**, reparto 6 + 5, DC/AC = 221,76 ÷ 200 = **1,11** 🟢.
+- Con 2 strings por MPPT: mínimo = ⌈11 ÷ 20⌉ = 1 (DC/AC 2,22 🔴). Sugerencia: ⌈221,76 ÷ (100 × 1,3)⌉ = **2** → escribe 2 en el campo.
+- Antes Producción recortaba ≈ 35 % de la energía en una prueba con clima sintético; con 2 inversores el recorte baja a menos de 1 %.
+
+### Cantidad de inversores — cómo leerlo en pantalla y qué hacer
+
+- **📐 Dimensionamiento › 🏭 Proyecto completo:** «mínimo N inversor(es)» o «N inversor(es) fijados por ti», con el reparto de strings y la relación DC/AC. Si la cantidad no es posible, 🟠 dice cuál se usó. Si DC/AC pasa de 1,3, 💡 sugiere cuántos poner.
+- **📊 Producción:** «DC/AC y recorte con N inversores fijados en 📐 Dimensionamiento». El recorte hora a hora usa la potencia AC de **todos** los inversores.
+- **⚡ Diagrama Unifilar y 📋 Ficha RETIE:** «Cantidad de unidades» toma esta cantidad (protección y cable AC).
+- **💼 Presupuesto:** cotiza todos los inversores, no uno solo.
+- **Qué hacer:** si el diseño de la referencia estándar internacional usa N inversores, escribe N. Si cambias de modelo de inversor, el campo vuelve a 0 (la cantidad era para el modelo anterior). Después vuelve a simular 📊 Producción.
+
+### Cantidad de inversores — guía rápida de alarmas (qué significa cada color y qué hacer)
+
+**La idea en una frase:** la **relación DC/AC** es cuántos kW de paneles hay por cada kW que el inversor puede entregar. Relación DC/AC = kWp de paneles ÷ (kW AC de un inversor × cantidad de inversores). Ejemplo Apartadó: 221,76 kWp ÷ (100 kW × 2) = **1,11**.
+
+| Lo que ves | Relación DC/AC | Qué significa en palabras simples | Qué hacer |
+|---|---|---|---|
+| 🔴 «Inversor MUY sobredimensionado» | menor de 0,75 | Compraste mucho inversor para pocos paneles: casi la mitad de su capacidad queda sin usar. | Quita un inversor (baja la «Cantidad de inversores») o elige un modelo más pequeño. |
+| 🟠 «Inversor sobredimensionado» | 0,75 a 0,99 | Sobra inversor. Funciona bien, pero pagas capacidad que no usas. | Si puedes, agrega paneles o usa un inversor más pequeño. |
+| 🟢 «Dentro del rango típico» | 1,00 a 1,35 | Buen equilibrio: el inversor se aprovecha y casi no recorta. | Nada. Es el rango recomendado (en Colombia lo usual es 1,1 a 1,3). |
+| 🟠 «Relación DC/AC alta» | 1,36 a 1,60 | En las horas de más sol el inversor se llena y bota un poco de energía (recorte). | Mira el «✂️ Recorte por inversor» en 📊 Producción. Si pasa de 2–3 % al año, sube la cantidad de inversores. |
+| 🔴 «Relación DC/AC MUY alta» | mayor de 1,60 | El inversor es muy chico para tantos paneles: se pierde mucha energía todos los días de sol. | Sube la «Cantidad de inversores» al número que sugiere 💡 o elige un inversor más grande. |
+
+**Los otros avisos de este campo:**
+
+- **💡 «Para una relación DC/AC ≤ 1,3 hacen falta N inversores»** — la app calculó que con la cantidad actual el inversor queda chico. **Qué hacer:** si tu diseño real usa N inversores, escríbelo en «Cantidad de inversores del proyecto». Si lo dejas como está, 📊 Producción recortará la energía que pase del inversor.
+- **🟠 «La cantidad de inversores que escribiste no es posible … Se usa N»** — escribiste menos inversores de los que caben los strings, o más inversores que strings. La app usó el número posible más cercano. **Qué hacer:** corrige el campo, o cambia los strings por MPPT si quieres otra repartición.
+- **«mínimo N inversor(es)»** — el campo está en 0 y la app usa la menor cantidad en la que caben todos los strings. **«N inversor(es) fijados por ti»** — usa lo que escribiste.
+- **En 📊 Producción, «DC/AC y recorte con N inversores fijados en 📐 Dimensionamiento»** — confirma que la simulación de energía usa tu cantidad. Si no aparece, Producción está usando la cantidad calculada.
+- **El campo volvió a 0 solo** — cambiaste de modelo de inversor; la cantidad era para el modelo anterior. Escríbela de nuevo si hace falta.
+
+**Orden recomendado para el usuario:**
+1. En 📐 Dimensionamiento, elige el panel, el inversor y los strings.
+2. Mira el color de la relación DC/AC en «🏭 Proyecto completo».
+3. Si sale 🟠 o 🔴 por DC/AC alta, sigue el 💡 y escribe la cantidad de inversores.
+4. Vuelve a simular 📊 Producción y revisa que el recorte del inversor quede por debajo de 2–3 % al año.
+5. ⚡ Diagrama Unifilar, 📋 Ficha RETIE y 💼 Presupuesto toman esa misma cantidad.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

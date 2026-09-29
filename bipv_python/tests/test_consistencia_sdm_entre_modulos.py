@@ -248,3 +248,20 @@ def test_los_dos_motores_reportan_el_mismo_gamma_de_ficha():
     g_anual = simular_produccion_anual(**kw)["Tk_gamma_pct"]
     g_iv = simular_produccion_iv(**kw)["Tk_gamma_pct"]
     assert g_anual == g_iv == pytest.approx(ASP_ST1_T40["Tk_gamma"])
+@pytest.mark.parametrize("n_str_tr, fijado", [(1, 0), (2, 0), (2, 2), (1, 3)])
+def test_dimensionamiento_y_produccion_cuentan_igual_los_inversores(n_str_tr, fijado):
+    """Spec 03/inversores-del-proyecto (29-sep-2026), caso Apartadó del informe
+    de la referencia estándar internacional: 308 módulos (11 × 28), Growatt
+    MAX 100KTL3 LV (10 MPPT, 100 kW AC). 📐 Dimensionamiento redondeaba hacia
+    arriba y 📊 Producción al más cercano; ahora los dos dan la misma
+    cantidad, y con 2 fijados la relación DC/AC es la de la referencia (1,11)."""
+    from calculos.dimensionamiento import escalar_p_ac_nom_por_inversores, proyecto_completo
+
+    panel = {"area_m2": 3.107, "Pmax_stc": 720.0}
+    pc = proyecto_completo(panel, 957.0, 28, n_str_tr, 10, N_total_cadenas=11,
+                           P_ac_nom_W=100_000.0, N_inversores_fijado=fijado)
+    prod = escalar_p_ac_nom_por_inversores(pc["N_paneles"], 28, n_str_tr, 10, 100_000.0,
+                                           n_inversores_fijado=fijado)
+    assert prod["n_inversores"] == pc["N_inversores"]
+    if fijado == 2:
+        assert pc["dcac"]["ratio"] == pytest.approx(221.76 / 200.0, abs=0.005)
