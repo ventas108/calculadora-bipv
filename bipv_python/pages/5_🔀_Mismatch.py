@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 
 from calculos.mismatch import (
+    CLAVE_CALIDAD_MODULO,
     calcular_sombreado_horizonte,
     calcular_mismatch_orientacion,
     cascada_perdidas,
@@ -1010,17 +1011,33 @@ else:
 st.markdown("---")
 st.subheader("⚙️ 3. Otras pérdidas del sistema")
 
-col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+col_s0, col_s1, col_s2, col_s3, col_s4 = st.columns(5)
+
+# Calidad del módulo y mismatch por separado, como PVsyst (Spec
+# 05/calidad-y-mismatch, 29-sep-2026). Producción los aplica en cadena:
+# Pmax × (1 − calidad) × (1 − mismatch).
+with col_s0:
+    pct_calidad_modulo = st.slider(
+        "🏷️ Calidad del módulo (%)",
+        min_value=-2.0, max_value=5.0,
+        value=float(st.session_state.get(CLAVE_CALIDAD_MODULO, 0.0)),
+        step=0.1,
+        help="«Module quality loss» de PVsyst: cuánto rinde el módulo real frente a "
+             "su ficha. Negativo = ganancia (tolerancia positiva, p. ej. 0/+5 W). "
+             "0 = no se aplica.",
+    )
+    st.caption("PVsyst: «Module quality loss»")
 
 with col_s1:
     pct_mismatch_fab = st.slider(
-        "🔩 Mismatch de fabricación (%)",
-        min_value=0.0, max_value=3.0,
-        value=st.session_state.get("pct_mismatch_fab", 1.0),
+        "🔩 Mismatch módulos y strings (%)",
+        min_value=0.0, max_value=4.0,
+        value=float(st.session_state.get("pct_mismatch_fab", 1.0)),
         step=0.1,
-        help="Diferencias entre módulos del mismo lote. IEC 61215: 0.5–2%. Típico BIPV: 1.0–1.5%.",
+        help="Módulos y strings que no trabajan en el mismo punto. IEC 61215: 0.5–2%. "
+             "PVsyst: «Mismatch loss, modules and strings».",
     )
-    st.caption("Tolerancias de ±3% en Pmax generan ~1% de pérdida")
+    st.caption("PVsyst: «Mismatch loss, modules and strings»")
 
 with col_s2:
     pct_soiling = st.slider(
@@ -1073,6 +1090,7 @@ st.caption(
 # qué cascada_perdidas() (que arma factor_global_mismatch) deja de recibir
 # estos 3 factores.
 st.session_state["pct_mismatch_fab"] = pct_mismatch_fab
+st.session_state[CLAVE_CALIDAD_MODULO] = pct_calidad_modulo
 st.session_state["pct_soiling"]      = pct_soiling
 st.session_state["pct_cableado"]     = pct_cableado
 st.session_state["pct_cableado_dc"]  = pct_cableado

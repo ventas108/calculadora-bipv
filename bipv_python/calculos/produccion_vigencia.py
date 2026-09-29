@@ -209,6 +209,7 @@ def construir_payload_produccion_run_signature_v1(
     pct_cableado_dc: float | None = None,
     pct_cableado_ac: float | None = None,
     perdida_ohmica_unifilar: dict | None = None,
+    pct_calidad_modulo: float | None = None,
 ) -> dict:
     """
     Payload canónico (PRE-hash) de la corrida BASE de Producción -- el mismo
@@ -235,7 +236,7 @@ def construir_payload_produccion_run_signature_v1(
     tuvo esos DataFrames en sesión (Financiero/Presupuesto) -- ver
     `firma_desde_payload()`.
     """
-    return {
+    payload = {
         "signature_version": 1,
         "panel_fingerprint": fingerprint_mapping(panel),
         "panel_nombre": str(panel_nombre),
@@ -262,6 +263,12 @@ def construir_payload_produccion_run_signature_v1(
         "pct_cableado_ac": _float_o_none(pct_cableado_ac),
         "perdida_ohmica_fingerprint": fingerprint_mapping(perdida_ohmica_unifilar),
     }
+    # Spec 05/calidad-y-mismatch (29-sep-2026): la calidad del módulo solo
+    # entra si se aplica, para que las firmas ya guardadas (sin calidad)
+    # sigan siendo las mismas.
+    if pct_calidad_modulo:
+        payload["pct_calidad_modulo"] = float(pct_calidad_modulo)
+    return payload
 
 
 def firma_desde_payload(payload: dict) -> str:
@@ -310,6 +317,7 @@ def calcular_produccion_run_signature_v1(
     pct_cableado_dc: float | None = None,
     pct_cableado_ac: float | None = None,
     perdida_ohmica_unifilar: dict | None = None,
+    pct_calidad_modulo: float | None = None,
 ) -> str:
     """
     Huella determinista de la corrida BASE de Producción (sin bypass ni
@@ -359,6 +367,7 @@ def calcular_produccion_run_signature_v1(
         pct_cableado_dc=pct_cableado_dc,
         pct_cableado_ac=pct_cableado_ac,
         perdida_ohmica_unifilar=perdida_ohmica_unifilar,
+        pct_calidad_modulo=pct_calidad_modulo,
     )
     return firma_desde_payload(payload)
 

@@ -137,6 +137,7 @@ def simular_produccion_iv(
     pct_cableado_ac: float | None = None,
     N_serie: int | None = None,
     tension_red_V: float | None = None,
+    pct_calidad_modulo: float | None = None,
 ) -> dict:
     """
     Simulación de producción anual hora a hora usando la curva IV real (Motor IV).
@@ -175,7 +176,7 @@ def simular_produccion_iv(
                           produccion.py), así que necesita la MISMA corrección para
                           no divergir del motor base en paneles CdTe.
     pct_mismatch_fab, resistencia_dc_ohm, pct_cableado_dc, resistencia_ac_ohm,
-    pct_cableado_ac, N_serie, tension_red_V : mismo significado y mismo
+    pct_cableado_ac, N_serie, tension_red_V, pct_calidad_modulo : mismo significado y mismo
                           criterio (retrocompatible, None = sin pérdida) que en
                           calculos.produccion.simular_produccion_anual() -- ver
                           el docstring completo ahí (7-sep-2026). Única
@@ -263,6 +264,15 @@ def simular_produccion_iv(
     # se toca (sigue siendo la referencia T=25°C pura para ②a/②b).
     E_dc_antes_binning_ohmico_kWh = float(pmp_mod.sum()) * N_paneles / 1000.0
 
+    pct_calidad_modulo_aplicado = None
+    if pct_calidad_modulo:
+        factor_cal = 1.0 - pct_calidad_modulo / 100.0
+        pmp_mod = pmp_mod * factor_cal
+        if i_mp_mod is not None:
+            i_mp_mod = i_mp_mod * factor_cal  # misma reducción proporcional de corriente
+        pct_calidad_modulo_aplicado = pct_calidad_modulo
+    E_dc_despues_calidad_kWh = float(pmp_mod.sum()) * N_paneles / 1000.0
+
     pct_mismatch_fab_aplicado = None
     if pct_mismatch_fab:
         factor_fab = 1.0 - pct_mismatch_fab / 100.0
@@ -290,7 +300,8 @@ def simular_produccion_iv(
         perdida_ohmica_dc_modo = "manual"
     E_dc_despues_ohmico_dc_kWh = float(pmp_mod.sum()) * N_paneles / 1000.0
 
-    perdida_mismatch_fab_kWh = round(E_dc_antes_binning_ohmico_kWh - E_dc_despues_mismatch_kWh, 0)
+    perdida_calidad_modulo_kWh = round(E_dc_antes_binning_ohmico_kWh - E_dc_despues_calidad_kWh, 0)
+    perdida_mismatch_fab_kWh = round(E_dc_despues_calidad_kWh - E_dc_despues_mismatch_kWh, 0)
     perdida_ohmica_dc_kWh    = round(E_dc_despues_mismatch_kWh - E_dc_despues_ohmico_dc_kWh, 0)
 
     # ── Escalar al sistema ─────────────────────────────────────────────────────
@@ -404,6 +415,8 @@ def simular_produccion_iv(
         "factor_espectral_promedio":  factor_espectral_promedio,
         "E_ac_sin_recorte_kWh":    round(E_ac_sin_recorte_anual, 0),
         "E_dc_antes_binning_ohmico_kWh": round(E_dc_antes_binning_ohmico_kWh, 0),
+        "pct_calidad_modulo_aplicado":   pct_calidad_modulo_aplicado,
+        "perdida_calidad_modulo_kWh":    perdida_calidad_modulo_kWh,
         "pct_mismatch_fab_aplicado":     pct_mismatch_fab_aplicado,
         "perdida_mismatch_fab_kWh":      perdida_mismatch_fab_kWh,
         "perdida_ohmica_dc_kWh":         perdida_ohmica_dc_kWh,

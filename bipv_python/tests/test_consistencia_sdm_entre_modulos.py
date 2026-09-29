@@ -149,3 +149,28 @@ def test_las_5_implementaciones_centralizan_en_trasladar_parametros_gt():
             f"{modulo.__name__} todavía usa el motor De Soto 2006 -- "
             "debería centralizar en trasladar_parametros_gt() (PVsyst v6)."
         )
+
+
+def test_calidad_y_mismatch_iguales_en_los_dos_motores():
+    """Spec 05/calidad-y-mismatch (29-sep-2026): la «Calidad del módulo» y el
+    «Mismatch» se aplican en cadena, Pmax × (1 − calidad) × (1 − mismatch), y
+    los dos motores de Producción deben quitar la misma fracción de la energía
+    DC y reportar lo mismo (caso Apartadó: 3.00 % y 2.10 % de PVsyst)."""
+    import pandas as pd
+
+    from calculos.produccion import simular_produccion_anual
+    from calculos.produccion_iv import simular_produccion_iv
+
+    index = pd.date_range("2001-01-01", periods=8760, freq="h", tz="UTC")
+    sol = (index.hour >= 6) & (index.hour < 18)
+    tmy = pd.DataFrame({"T2m": np.full(8760, 20.0)}, index=index)
+    poa = pd.DataFrame({"poa_global": np.where(sol, 700.0, 0.0)}, index=index)
+    kw = dict(tmy=tmy, poa_base=poa, panel=ASP_ST1_T40, N_paneles=40,
+              eta_inversor=0.975, factor_pr_mismatch=1.0)
+    for motor in (simular_produccion_anual, simular_produccion_iv):
+        base = motor(**kw)
+        r = motor(**kw, pct_calidad_modulo=3.0, pct_mismatch_fab=2.1)
+        fraccion = r["E_dc_anual_kWh"] / base["E_dc_anual_kWh"]
+        assert fraccion == pytest.approx(0.97 * 0.979, rel=1e-3), motor.__name__
+        assert r["pct_calidad_modulo_aplicado"] == 3.0
+        assert r["pct_mismatch_fab_aplicado"] == 2.1

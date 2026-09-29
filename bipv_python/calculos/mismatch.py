@@ -17,6 +17,20 @@ import pvlib
 
 from calculos.solar import calcular_poa
 
+# ── Calidad del módulo y mismatch (Spec 05/calidad-y-mismatch, 29-sep-2026) ──
+# PVsyst separa «Module quality loss» (puede ser negativa: ganancia) y
+# «Mismatch loss, modules and strings». La clave histórica `pct_mismatch_fab`
+# queda para el mismatch; la calidad vive en CLAVE_CALIDAD_MODULO.
+CLAVE_CALIDAD_MODULO = "pct_calidad_modulo"
+
+
+def pct_perdida_modulos(calidad, mismatch) -> float:
+    """Pérdida combinada (%) de calidad y mismatch, aplicadas en cadena:
+    (1 − (1 − c/100)(1 − m/100)) × 100. ``None`` cuenta como 0."""
+    c = float(calidad or 0.0)
+    m = float(mismatch or 0.0)
+    return (1.0 - (1.0 - c / 100.0) * (1.0 - m / 100.0)) * 100.0
+
 
 # ─── 1. Sombreado de horizonte ───────────────────────────────────────────────
 
