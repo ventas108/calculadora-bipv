@@ -138,6 +138,17 @@ with col1:
             voc_v = st.number_input("Voc STC (V)", min_value=0.0, step=0.1, value=float(panel_dict.get("Voc_stc") or 0))
             vmp_v = st.number_input("Vmp STC (V)", min_value=0.0, step=0.1, value=float(panel_dict.get("Vmp_stc") or 0))
             isc_a = st.number_input("Isc STC (A)", min_value=0.0, step=0.1, value=float(panel_dict.get("Isc_stc") or 0))
+            # Spec 07/unifilar-retie-bifacial-cruce: panel bifacial → Isc BNPI
+            # (IEC TS 60904-1-2: 1000 + 135 W/m²) para conductores y fusibles.
+            from calculos.corriente_bifacial import factor_isc_bifacial, phi_proyecto, texto_origen
+            _phi_retie, _origen_retie = phi_proyecto(st.session_state, panel_dict)
+            _factor_bif_retie = factor_isc_bifacial(_phi_retie)
+            if _factor_bif_retie > 1.0:
+                st.caption(
+                    f"🔄 Isc BNPI (bifacial) = {isc_a:.2f} A × {_factor_bif_retie:.3f} = "
+                    f"**{isc_a * _factor_bif_retie:.2f} A** — {texto_origen(_origen_retie, _phi_retie)}. "
+                    "Se usa para conductores y fusibles (IEC 62548-1)."
+                )
             coef_voc_pct_c = st.number_input(
                 "Coeficiente de temperatura de Voc (%/°C, típicamente negativo)",
                 step=0.01, value=float(panel_dict.get("Tk_beta") or 0),
@@ -238,6 +249,7 @@ else:
         temperatura_minima_diseno_c=temperatura_minima_diseno_c if temperatura_minima_diseno_c else None,
         corriente_cortocircuito_pcc_ka=corriente_cortocircuito_pcc_ka or None,
         esquema_tierra=esquema_tierra,
+        factor_bifacial=_factor_bif_retie,
     )
     calc = calcular_retie(config)
     checks = validar_retie(config, calc)

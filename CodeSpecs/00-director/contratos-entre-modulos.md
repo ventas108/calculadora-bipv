@@ -197,6 +197,18 @@ Reglas de consumo:
 	(`perdida_string_bypass`). El simplificado y el bypass la usan; el físico no
 	se prepara con cruces (error explicado). `validar_diseno_electrico` agrega
 	🔴/🟡 al grupo. `firma_cadena` incluye los cruces solo si existen.
+- Corriente DC de diseño con panel bifacial (29-sep-2026, Spec
+	`07-informes/unifilar-retie-bifacial-cruce`): `calculos.corriente_bifacial`
+	(`factor_isc_bifacial(φ) = 1 + 0,135 φ`, BNPI). φ: modelo bifacial activo →
+	bifacialidad × vista trasera de la superficie (`config_bifacial_superficie`);
+	modelo apagado → bifacialidad de la ficha del panel (lado seguro, aviso);
+	monofacial → 0. Lo usan `validar_diseno_electrico(..., bifacial=)` (límite de
+	corriente del MPPT y caja combinadora), `topologia_electrica` (`isc_stc_A` en
+	BNPI, `isc_frontal_A`, `factor_bifacial`, `cruce_texto`, superficies con
+	`modulos_fisicos`), `calcular_perdida_ohmica(..., factor_bifacial=)`
+	(ampacidad; la resistencia no cambia) y `construir_config_retie(...,
+	factor_bifacial=)` (`isc_bnpi_a`, Isc de diseño y fusible gPV). Voc y Vmp no
+	cambian. La energía no usa este factor (la luz trasera ya está en la POA).
 - Cambiar el panel de una superficie (o el del proyecto, para las que lo siguen)
 	retira la publicación y los resultados de bypass, MPPT y físico; la POA y la
 	sombra se conservan. Agregar, eliminar, desactivar o renombrar superficies no

@@ -1280,6 +1280,17 @@ if btn_cascada or st.session_state.get("cascada_ok"):
         "sobre la energía DC y AC. Si ⚡ Diagrama Unifilar tiene el cálculo real del cableado, "
         "Producción usa ese en lugar de estos valores."
     )
+    # Spec 07/unifilar-retie-bifacial-cruce: decir cuándo el cableado manual
+    # NO es el que se aplica (Producción usa el real si está vigente: mismo
+    # panel, inversor, N serie y módulos).
+    _ohm_unif = st.session_state.get("perdida_ohmica_unifilar") or {}
+    if _ohm_unif.get("resistencia_dc_ohm") or _ohm_unif.get("resistencia_ac_ohm"):
+        st.info(
+            "🔌 Hay un cálculo de cableado en ⚡ Diagrama Unifilar (longitud y calibre reales): "
+            "Producción usa el cálculo real de ⚡ Diagrama Unifilar en lugar de los % de cableado "
+            f"de esta tabla, si sigue vigente (panel {_ohm_unif.get('panel_nombre') or '—'}, "
+            f"N serie {_ohm_unif.get('n_serie') or '—'})."
+        )
 
     # ── Tabla detalle ─────────────────────────────────────────────────────────
     with st.expander("📋 Ver tabla detallada de la cascada"):

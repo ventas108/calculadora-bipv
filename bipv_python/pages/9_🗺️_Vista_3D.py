@@ -1700,8 +1700,10 @@ with tab_solar:
 
             # ── ⚡ Diseño eléctrico: tabla explícita (Spec A, fases A1 y A2) ─
             if any(_s.get("activa", True) for _s in _sups_actualizado):
+                from calculos.diseno_electrico_multisup import _bifacial_estado as _bif_de
                 _diag_el = validar_diseno_electrico(
                     _sups_actualizado, _inversores_editados, _paneles_de, _temps_de,
+                    bifacial=_bif_de(st.session_state),
                 )
                 _ICONO_EST = {"verde": "🟢", "amarillo": "🟡", "rojo": "🔴"}
                 st.markdown(

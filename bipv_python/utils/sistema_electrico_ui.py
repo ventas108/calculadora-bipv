@@ -62,6 +62,8 @@ def mostrar_resumen_topologia(topo: dict) -> None:
                     "Panel": g["panel"],
                     "N serie × strings": f"{g['n_serie']} × {g['n_paralelo']}",
                     "Módulos": g["modulos"],
+                    "Isc diseño módulo (A)": (round(g["isc_stc_A"], 2) if g.get("isc_stc_A") else None),
+                    "Cruza a otra superficie": g.get("cruce_texto") or "—",
                     "Caja combinadora": "sí" if rama["caja_combinadora"] else "no",
                 })
     st.caption(

@@ -108,6 +108,7 @@ def construir_config_retie(
     factor_continuo: float = 1.25,
     corriente_cortocircuito_pcc_ka: float | None = None,
     esquema_tierra: str = "",
+    factor_bifacial: float = 1.0,
 ) -> dict:
     """
     Normaliza los datos de un proyecto FV/BIPV a la estructura que
@@ -135,6 +136,8 @@ def construir_config_retie(
             "nombre": panel_nombre, "potencia_w": potencia_w,
             "voc_v": voc_v, "vmp_v": vmp_v, "isc_a": isc_a,
             "coef_voc_pct_c": coef_voc_pct_c,
+            # Spec 07/unifilar-retie-bifacial-cruce: 1 + 0,135 φ (BNPI).
+            "factor_bifacial": float(factor_bifacial or 1.0),
         },
         "inversor": {
             "nombre": inversor_nombre, "potencia_ac_kw_unidad": potencia_ac_kw_unidad,
@@ -223,7 +226,11 @@ def calcular_retie(cfg: dict) -> dict:
         round(calcular_vmp_string(gen["n_serie"], panel["vmp_v"], 0.0, 25.0), 1)
         if panel["vmp_v"] and gen["n_serie"] else None
     )
-    isc_diseno = round(panel["isc_a"] * fc, 1) if panel["isc_a"] else None
+    # Isc de diseño con la cara trasera del panel bifacial (BNPI, IEC TS
+    # 60904-1-2): Isc × (1 + 0,135 φ) × 1,25. Monofacial: factor 1.
+    fb = float(panel.get("factor_bifacial") or 1.0)
+    isc_bnpi = round(panel["isc_a"] * fb, 2) if panel["isc_a"] else None
+    isc_diseno = round(panel["isc_a"] * fb * fc, 1) if panel["isc_a"] else None
 
     voc_string_frio = None
     if (
@@ -246,6 +253,7 @@ def calcular_retie(cfg: dict) -> dict:
         "pdc_por_inversor_kwp": pdc_por_inversor, "dcac_por_inversor": dcac_por_inversor,
         "voc_string_stc_v": voc_string_stc, "voc_string_frio_v": voc_string_frio,
         "vmp_string_stc_v": vmp_string_stc, "isc_diseno_string_a": isc_diseno,
+        "isc_bnpi_a": isc_bnpi, "factor_bifacial": fb,
     }
 
 
@@ -470,9 +478,12 @@ def validar_retie_multisuperficie(topologia: dict, diagnostico: dict, calc: dict
         for rama in inv["ramas"]:
             if not rama["caja_combinadora"]:
                 continue
+            # isc_stc_A de la topología ya viene en BNPI si el panel es bifacial.
             isc = max((g["isc_stc_A"] or 0.0) for g in rama["grupos"]) or None
+            bif = any(float(g.get("factor_bifacial") or 1.0) > 1.0 for g in rama["grupos"])
             minimo = (f"fusible gPV por string ≥ {_fmt(isc * FACTOR_FUSIBLE_STRING, 2, ' A')} "
-                      f"(1,25 × 1,25 × Isc {_fmt(isc, 2, ' A')})" if isc else "fusible gPV por string")
+                      f"(1,25 × 1,25 × Isc{' BNPI (bifacial)' if bif else ''} {_fmt(isc, 2, ' A')})"
+                      if isc else "fusible gPV por string")
             out.append({"nivel": "PENDIENTE",
                         "titulo": f"Caja combinadora — {inv['inversor_id']} · MPPT {rama['mppt']}",
                         "detalle": f"{rama['strings']} strings en paralelo: {minimo} y ≤ fusible máximo "
@@ -655,7 +666,10 @@ def _lineas_multisuperficie(topologia: dict, calc: dict, tension_v) -> dict:
     inversor del sistema multi-superficie (en vez de un solo panel)."""
     campo = []
     for sup in topologia["superficies"]:
-        campo.append(f"{sup['nombre']}: {sup['modulos']} mód. · {_fmt(sup['p_dc_kWp'], 2, ' kWp')}")
+        _mf = sup.get("modulos_fisicos", sup["modulos"])
+        campo.append(f"{sup['nombre']}: {_mf} mód."
+                     + (f" ({sup['modulos']} en sus strings)" if _mf != sup["modulos"] else "")
+                     + f" · {_fmt(sup['p_dc_kWp'], 2, ' kWp')}")
         campo.append("  " + " + ".join(str(p) for p in sup["paneles"]))
     campo.append(f"Pdc = {_fmt(calc['potencia_dc_kwp'], 2, ' kWp')}")
     if topologia.get("optimizadores"):
@@ -730,7 +744,9 @@ def generar_ficha_svg(cfg: dict, calc: dict, checks: list[dict], topologia: dict
         f"Pdc = {_fmt(calc['potencia_dc_kwp'], 2, ' kWp')}",
         f"Voc string STC: {_fmt(calc['voc_string_stc_v'], 1, ' V')}",
         f"Voc string frío: {_fmt(calc['voc_string_frio_v'], 1, ' V')}",
-        f"Isc diseño: {_fmt(calc['isc_diseno_string_a'], 1, ' A')}",
+        f"Isc diseño: {_fmt(calc['isc_diseno_string_a'], 1, ' A')}"
+        + (f" (Isc BNPI {_fmt(calc.get('isc_bnpi_a'), 2, ' A')})"
+           if float(calc.get("factor_bifacial") or 1.0) > 1.0 else ""),
     ]
     if multi:
         lineas_campo = multi["campo"]

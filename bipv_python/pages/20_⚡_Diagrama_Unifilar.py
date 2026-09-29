@@ -387,11 +387,23 @@ if not usar_multi:
 if usar_multi:
     st.caption(
         "ℹ️ Pérdida óhmica del cableado: en el sistema multi-superficie la energía ya usa "
-        "la cadena de pérdidas de cada superficie (cables DC 1,5 % de 🔀 Mismatch). El "
+        "la cadena de pérdidas de cada superficie (cables DC "
+        f"{float(st.session_state.get('pct_cableado_dc', 0.0) or 0.0):.1f} % y AC "
+        f"{float(st.session_state.get('pct_cableado_ac', 0.0) or 0.0):.1f} % de 🔀 Mismatch). El "
         "cálculo por longitud y calibre de esta página es para una sola superficie."
     )
 else:
     st.subheader("🔌 Pérdida óhmica de cableado (opcional, real y auditable — 7-sep-2026)")
+    # Spec 07/unifilar-retie-bifacial-cruce: con panel bifacial la corriente
+    # DC de diseño (ampacidad) usa el Isc en BNPI.
+    from calculos.corriente_bifacial import factor_isc_bifacial, phi_proyecto, texto_origen
+    _phi_unif, _origen_unif = phi_proyecto(st.session_state, panel_dict)
+    _factor_bif_unif = factor_isc_bifacial(_phi_unif)
+    if _factor_bif_unif > 1.0:
+        st.caption(
+            f"🔄 Panel bifacial: la corriente DC de diseño usa el Isc BNPI (× {_factor_bif_unif:.3f}, "
+            f"{texto_origen(_origen_unif, _phi_unif)})."
+        )
     st.caption(
         "Longitud + calibre reales del proyecto -- si los completas, 📊 Producción "
         "calcula la pérdida óhmica DC/AC de verdad (hora a hora, con la corriente "
@@ -457,6 +469,7 @@ else:
             longitud_ac_m=longitud_ac_val or None,
             calibre_ac_mm2=float(calibre_ac_val) if longitud_ac_val else None,
             T_diseno_C=45.0,
+            factor_bifacial=_factor_bif_unif,
         )
         # Persistido para que 📊 Producción lo reutilice -- con verificación de
         # vigencia (mismo panel/inversor/N en serie) antes de aplicarlo, mismo

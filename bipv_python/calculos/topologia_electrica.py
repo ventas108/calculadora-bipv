@@ -57,6 +57,12 @@ def construir_topologia(
 
     invs = {str(i.get("inversor_id")): i for i in inversores if i.get("inversor_id")}
     mppt_diag = {(m["inversor_id"], m["mppt"]): m for m in diagnostico.get("mppt", [])}
+    # Spec 07/unifilar-retie-bifacial-cruce: factor BNPI de cada grupo (del
+    # diagnóstico) y strings que cruzan a otra superficie (Spec 05/string-
+    # cruza-superficies).
+    factor_diag = {(g.get("superficie"), g.get("gid")): float(g.get("factor_bifacial") or 1.0)
+                   for g in diagnostico.get("grupos", [])}
+    por_uid = {str(s.get("uid")): s.get("nombre") for s in superficies}
 
     ramas: dict[tuple[str, int], list[dict]] = {}
     sin_asignar: list[str] = []
@@ -80,10 +86,20 @@ def construir_topologia(
                 continue
             modulos = n_s * n_p
             p_kwp = modulos * pmax / 1000.0 if pmax else None
+            isc_frontal = _num(info["panel"].get("Isc_stc"))
+            factor_bif = factor_diag.get((nombre, g.get("gid", "G?")), 1.0)
+            cruce = g.get("cruce") if isinstance(g.get("cruce"), Mapping) else None
+            cruce_texto = None
+            if cruce and cruce.get("uid") is not None:
+                cruce_texto = (f"{cruce.get('modulos')} de {n_s} módulos en "
+                               f"«{por_uid.get(str(cruce['uid']), '?')}»")
             ramas.setdefault((inv_id, mppt), []).append({
                 "superficie": nombre, "gid": g.get("gid", "G?"), "panel": info.get("nombre"),
                 "n_serie": n_s, "n_paralelo": n_p, "modulos": modulos, "p_dc_kWp": p_kwp,
-                "isc_stc_A": _num(info["panel"].get("Isc_stc")),
+                # Isc de diseño del módulo: en BNPI si es bifacial (conductores y fusibles).
+                "isc_stc_A": isc_frontal * factor_bif if isc_frontal else None,
+                "isc_frontal_A": isc_frontal, "factor_bifacial": factor_bif,
+                "cruce_texto": cruce_texto,
             })
             s = por_superficie.setdefault(nombre, {"nombre": nombre, "tipo": sup.get("tipo") or "",
                                                    "paneles": [], "modulos": 0, "p_dc_kWp": 0.0})
@@ -131,6 +147,13 @@ def construir_topologia(
         for i in salida_invs:
             i["bateria"] = i["inversor_id"] == destino
 
+    # Módulos donde están físicamente (un string que cruza pone parte de sus
+    # módulos en otra superficie); "modulos" sigue siendo el eléctrico.
+    from calculos.cruce_superficies import modulos_fisicos_por_superficie
+    fisicos = modulos_fisicos_por_superficie(list(superficies))
+    for nombre_s, datos_s in por_superficie.items():
+        datos_s["modulos_fisicos"] = fisicos.get(nombre_s, datos_s["modulos"])
+
     p_ac = [i["p_ac_kW"] for i in salida_invs]
     return {
         "inversores": salida_invs,
@@ -177,7 +200,9 @@ def topologia_desde_estado(estado: Mapping[str, Any], *, incluir_bateria: bool =
         return None
     inversores = list(estado.get("multisup_inversores") or [])
     paneles = paneles_superficies_estado(estado, superficies)
-    diagnostico = validar_diseno_electrico(superficies, inversores, paneles, temperaturas_diseno(estado))
+    from calculos.diseno_electrico_multisup import _bifacial_estado
+    diagnostico = validar_diseno_electrico(superficies, inversores, paneles, temperaturas_diseno(estado),
+                                           bifacial=_bifacial_estado(estado))
     topo = construir_topologia(
         superficies, inversores, paneles, diagnostico,
         optimizadores=bool(estado.get(CLAVE_OPTIMIZADORES)),
