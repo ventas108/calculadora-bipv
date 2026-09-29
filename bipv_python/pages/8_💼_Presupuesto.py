@@ -1068,7 +1068,10 @@ with t5:
 
     ci = c_inv if c_inv > 0 else st.number_input(
         "Costo inversor (USD/un)", 0.0, 20000.0, 1850.0, 50.0, key="ci_man")
-    cat_rows.append(["Inversor — catálogo", "INV-CAT", 1.0, "un", ci])
+    # Spec 03/inversores-del-proyecto: todos los inversores del proyecto
+    # (📐 Dimensionamiento), no uno solo.
+    _n_inv_pres = max(int(st.session_state.get("N_inv_total") or 1), 1)
+    cat_rows.append(["Inversor — catálogo", "INV-CAT", float(_n_inv_pres), "un", ci])
 
     _bat = st.session_state.get("bateria_dim")
     _bat_nom = st.session_state.get("bateria_nombre", "Batería")

@@ -715,6 +715,7 @@ def escalar_p_ac_nom_por_inversores(
     N_strings_tracker: int,
     n_trackers: int,
     P_ac_nom_W_unidad: float | None,
+    n_inversores_fijado: int = 0,
 ) -> dict:
     """
     Escala la potencia CA nominal de UN inversor al total de inversores que
@@ -748,10 +749,18 @@ def escalar_p_ac_nom_por_inversores(
                             escalar, igual que el comportamiento histórico
                             sin este dato)
     """
+    # Spec 03/inversores-del-proyecto (29-sep-2026): hacia arriba, igual que
+    # proyecto_completo() de 📐 Dimensionamiento -- round() dejaba 308 paneles
+    # en 1 inversor de 280 (Apartadó) mientras Dimensionamiento decía 2. Y la
+    # cantidad que fije el diseñador manda, dentro de lo posible.
     paneles_por_inversor = int(N_serie or 0) * int(N_strings_tracker or 0) * int(n_trackers or 0)
-    n_inversores = (
-        max(1, round(N_paneles / paneles_por_inversor)) if paneles_por_inversor > 0 else 1
+    minimo = (
+        max(1, math.ceil(N_paneles / paneles_por_inversor - 1e-9))
+        if paneles_por_inversor > 0 else 1
     )
+    strings = N_paneles // int(N_serie) if N_serie else 0
+    r = resolver_inversores(strings, 0, n_inversores_fijado, minimo=minimo)
+    n_inversores = max(r["n"], 1)
     p_ac_nom_w_total = (
         P_ac_nom_W_unidad * n_inversores if P_ac_nom_W_unidad else None
     )
@@ -759,6 +768,9 @@ def escalar_p_ac_nom_por_inversores(
         "n_inversores": n_inversores,
         "paneles_por_inversor": paneles_por_inversor,
         "p_ac_nom_w_total": p_ac_nom_w_total,
+        "fuente": r["fuente"],
+        "ajustado": r["ajustado"],
+        "minimo": minimo,
     }
 
 
@@ -963,10 +975,58 @@ def optimizar_n_serie(panel: dict, inversor: dict,
     return resultados
 
 
+DCAC_OBJETIVO = 1.3
+
+
+def resolver_inversores(strings: int, capacidad: int, fijado: int = 0,
+                        minimo: int | None = None) -> dict:
+    """Inversores del proyecto: los que fije el diseñador o el mínimo por capacidad.
+
+    Spec 03/inversores-del-proyecto (29-sep-2026). Mínimo = ⌈strings ÷
+    capacidad⌉ (strings que admite un inversor) o el ``minimo`` dado; máximo =
+    un string por inversor. Un valor fijado fuera de ese rango se ajusta
+    (``ajustado`` = True). Sin strings no hay inversores.
+    """
+    strings = int(strings or 0)
+    if minimo is None:
+        minimo = math.ceil(strings / int(capacidad)) if strings > 0 and int(capacidad or 0) > 0 else (
+            1 if strings > 0 else 0)
+    maximo = strings if strings > 0 else int(minimo)
+    fijado = int(fijado or 0)
+    if strings <= 0 and minimo <= 0:
+        return {"n": 0, "minimo": 0, "maximo": 0, "fuente": "calculado", "ajustado": False}
+    if fijado > 0:
+        n = min(max(fijado, int(minimo)), max(maximo, int(minimo)))
+        return {"n": n, "minimo": int(minimo), "maximo": maximo,
+                "fuente": "fijado", "ajustado": n != fijado}
+    return {"n": int(minimo), "minimo": int(minimo), "maximo": maximo,
+            "fuente": "calculado", "ajustado": False}
+
+
+def inversores_para_dcac(p_dc_kwp: float, p_ac_w_unidad: float | None, minimo: int,
+                         maximo: int, objetivo: float = DCAC_OBJETIVO) -> int | None:
+    """Menos inversores que dejan la relación DC/AC ≤ ``objetivo`` (1,3)."""
+    if not p_ac_w_unidad or p_ac_w_unidad <= 0 or not p_dc_kwp:
+        return None
+    n = math.ceil(float(p_dc_kwp) * 1000.0 / (float(p_ac_w_unidad) * objetivo) - 1e-9)
+    return int(min(max(n, int(minimo)), max(int(maximo), int(minimo))))
+
+
+def inversores_fijados_vigentes(estado, inversor_nombre: str | None) -> int:
+    """Cantidad fijada en 📐 Dimensionamiento, solo si es para este inversor (0 = automática)."""
+    if not inversor_nombre or estado.get("N_inversores_proyecto_ref") != inversor_nombre:
+        return 0
+    try:
+        return max(int(estado.get("N_inversores_proyecto") or 0), 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def proyecto_completo(panel: dict, area_util_m2: float, N_serie: int,
                       N_strings_tracker: int, N_mppt: int,
                       N_total_cadenas: int = 0,
-                      P_ac_nom_W: float | None = None) -> dict:
+                      P_ac_nom_W: float | None = None,
+                      N_inversores_fijado: int = 0) -> dict:
     """«🏭 Proyecto completo» de 📐 Dimensionamiento contando strings completos.
 
     Spec ``03-dimensionamiento/proyecto-completo`` (29-sep-2026). Antes se
@@ -976,8 +1036,10 @@ def proyecto_completo(panel: dict, area_util_m2: float, N_serie: int,
 
     - Strings: los declarados (``N_total_cadenas`` > 0) o los que caben,
       ⌊área útil ÷ (N_serie × área del módulo)⌋.
-    - Inversores = ⌈strings ÷ (N_mppt × N_strings_tracker)⌉, strings
-      repartidos parejo (11 en 2 → [6, 5]).
+    - Inversores = ⌈strings ÷ (N_mppt × N_strings_tracker)⌉ o los que fije
+      el diseñador (``N_inversores_fijado``, entre ese mínimo y un string por
+      inversor; Spec 03/inversores-del-proyecto), strings repartidos parejo
+      (11 en 2 → [6, 5]).
     - DC/AC del proyecto con la potencia AC de todos los inversores.
     """
     area_mod = float(panel.get("area_m2") or 0)
@@ -991,7 +1053,8 @@ def proyecto_completo(panel: dict, area_util_m2: float, N_serie: int,
     declarado = int(N_total_cadenas or 0) > 0
     strings = int(N_total_cadenas) if declarado else caben
     capacidad = int(N_mppt) * int(N_strings_tracker)
-    n_inv = math.ceil(strings / capacidad) if strings > 0 else 0
+    _inv = resolver_inversores(strings, capacidad, N_inversores_fijado)
+    n_inv = _inv["n"]
     reparto = ([strings // n_inv + (1 if i < strings % n_inv else 0) for i in range(n_inv)]
                if n_inv else [])
 
@@ -1021,6 +1084,11 @@ def proyecto_completo(panel: dict, area_util_m2: float, N_serie: int,
         "faltan_m2": faltan,
         "dcac": dcac,
         "dcac_max_inversor": dcac_max,
+        "fuente_inversores": _inv["fuente"],
+        "inversores_ajustado": _inv["ajustado"],
+        "N_inversores_minimo": _inv["minimo"],
+        "N_inversores_dcac": (inversores_para_dcac(p_dc_kwp, P_ac_nom_W, _inv["minimo"], _inv["maximo"])
+                              if strings > 0 else None),
     }
 
 

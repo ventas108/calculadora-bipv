@@ -371,6 +371,26 @@ with col2:
             f"ℹ️ Ajuste manual — {_origen} sugiere "
             f"**{_res_n_str_tr['sugerido']}** strings/tracker."
         )
+    # Spec 03/inversores-del-proyecto (29-sep-2026): el diseñador puede fijar
+    # cuántos inversores usa el proyecto (Apartadó: 2 × 100 kW para 222 kWp,
+    # como la referencia estándar internacional). 0 = la app calcula el mínimo
+    # por capacidad de strings. Vale solo para este inversor: al cambiarlo
+    # vuelve a 0.
+    if st.session_state.get("N_inversores_proyecto_ref") not in (None, inversor_nombre):
+        st.session_state["N_inversores_proyecto"] = 0
+    st.session_state["N_inversores_proyecto_ref"] = inversor_nombre
+    N_inv_fijado = int(campo_persistente(
+        st.session_state, st.number_input,
+        "Cantidad de inversores del proyecto (0 = la calcula la app)",
+        "N_inversores_proyecto", 0, min_value=0, max_value=500, step=1,
+        help=(
+            "Déjalo en 0 para usar el mínimo que cabe por strings (MPPT × strings "
+            "por MPPT). Escribe la cantidad real si tu diseño reparte los strings "
+            "en más inversores para bajar la relación DC/AC (lo usual en Colombia: "
+            "1,1 a 1,3). Producción, Diagrama Unifilar, Ficha RETIE y Presupuesto "
+            "usan esta cantidad."
+        ),
+    ))
     col_nm1, col_nm2 = st.columns(2)
     with col_nm1:
         # Auto-calcular N_min eléctrico desde MPPT del inversor para evitar que
@@ -938,12 +958,30 @@ def _mostrar_proyecto_completo(pc: dict, area_util: float, f_ocup: float,
         _origen = (f"los que caben en {area_util:,.0f} m² útiles: ⌊{area_util:,.0f} ÷ "
                    f"({N_serie} × área del módulo)⌋")
     if pc["N_inversores"]:
+        _cuantos = (f"**{pc['N_inversores']} inversor(es) fijados por ti**"
+                    if pc.get("fuente_inversores") == "fijado"
+                    else f"mínimo **{pc['N_inversores']} inversor(es)**")
         st.caption(
             f"🧮 **{pc['N_strings_total']} strings** de {N_serie} módulos ({_origen}). "
             f"Un inversor admite {pc['capacidad_strings_inversor']} strings (MPPT × strings "
-            f"por MPPT) → **{pc['N_inversores']} inversor(es)**, reparto "
+            f"por MPPT) → {_cuantos}, reparto "
             f"**{' + '.join(str(x) for x in pc['reparto'])}** strings."
         )
+        if pc.get("inversores_ajustado"):
+            st.warning(
+                f"🟠 La cantidad de inversores que escribiste no es posible: con "
+                f"{pc['N_strings_total']} strings va de {pc['N_inversores_minimo']} "
+                f"(inversores llenos) a {pc['N_strings_total']} (un string por inversor). "
+                f"Se usa **{pc['N_inversores']}**."
+            )
+        _n_dcac = pc.get("N_inversores_dcac")
+        if (_n_dcac and _n_dcac > pc["N_inversores"]
+                and pc.get("fuente_inversores") != "fijado"):
+            st.info(
+                f"💡 Para una relación DC/AC ≤ 1,3 hacen falta **{_n_dcac} inversores**. "
+                "Escríbelo en «Cantidad de inversores del proyecto» si ese es tu diseño; "
+                "con menos, 📊 Producción recorta la potencia que pase del inversor."
+            )
     if not pc["cabe"]:
         if pc["N_strings_total"] == 0:
             st.error(
@@ -1030,6 +1068,7 @@ if _prelim_modelo and _prelim_n:
             panel, _prelim_area, _prelim_n, int(N_str_tr), _prelim_n_mppt,
             N_total_cadenas=int(N_total_cadenas),
             P_ac_nom_W=_prelim_inversor.get("P_ac_nom_W"),
+            N_inversores_fijado=N_inv_fijado if _prelim_modelo == inversor_nombre else 0,
         )
         _mostrar_proyecto_completo(_prelim_pc, _prelim_area, _prelim_f_ocup,
                                    _prelim_n, _prelim_modelo, "####")
@@ -1239,6 +1278,7 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
             panel, area, mejor.N_serie, int(N_str_tr), inversor["N_mppt"],
             N_total_cadenas=int(N_total_cadenas),
             P_ac_nom_W=inversor.get("P_ac_nom_W"),
+            N_inversores_fijado=N_inv_fijado,
         )
         _mostrar_proyecto_completo(_pc, area, _f_ocup, mejor.N_serie, inversor_nombre, "###")
     else:

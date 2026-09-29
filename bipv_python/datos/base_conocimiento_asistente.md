@@ -5047,6 +5047,36 @@ El Voc y el Vmp del string no cambian: la luz trasera sube la corriente, no el v
 
 La fila «↳ Solo horas calientes» del balance mostraba `Tk_gamma=—%/°C` aunque el panel sí tuviera el dato. Ahora muestra el **coeficiente de potencia γ de la ficha** (por ejemplo **−0,29 %/°C** en el JA Solar JAM66D46-720/LB). Si la ficha no lo trae, queda «—». Es el mismo γ que aparece en «Diagnóstico BIPV» más abajo; el cálculo de temperatura no cambió.
 
+## 90. Cantidad de inversores del proyecto: la eliges tú y todos los módulos la usan (29-sep-2026)
+
+### Cantidad de inversores — qué es y por qué se corrigió
+
+**Qué es:** en 📐 Dimensionamiento, el campo **«Cantidad de inversores del proyecto (0 = la calcula la app)»**. Con **0**, la app usa el **mínimo** de inversores en el que caben todos los strings. Si escribes una cantidad, la app usa **esa**: los strings se reparten parejo entre los inversores.
+
+**Por qué se corrigió (caso real Apartadó, 29-sep-2026):**
+1. 📐 Dimensionamiento calculaba 2 inversores (11 strings ÷ 10 MPPT, **redondeando hacia arriba**), pero 📊 Producción redondeaba **al más cercano**: 308 paneles ÷ 280 por inversor = 1,1 → **1 inversor**. Producción simulaba 221,76 kWp con 100 kW AC (DC/AC 2,2) y recortaba ≈ 49.000 kWh/año; la referencia estándar internacional usa 2 inversores (DC/AC 1,11) y recorta 0,01 %.
+2. Con 2 strings por MPPT a un inversor le caben 20 strings y la app solo podía calcular 1 inversor: no había forma de decirle que el diseño real usa 2.
+
+### Cantidad de inversores — fórmula en palabras y cuenta real
+
+- **Mínimo** = strings ÷ strings que admite un inversor (MPPT × strings por MPPT), **redondeado hacia arriba**. Es igual en 📐 Dimensionamiento y en 📊 Producción.
+- **Máximo** = un string por inversor.
+- **Sugerencia para DC/AC ≤ 1,3** = kWp ÷ (kW AC de un inversor × 1,3), redondeado hacia arriba.
+- Si escribes menos que el mínimo o más que el máximo, se ajusta y la app lo avisa.
+
+**Ejemplo (Apartadó):** 11 strings de 28 × JAM66D46-720/LB = 221,76 kWp; Growatt MAX 100KTL3 LV (10 MPPT, 100 kW AC).
+- Con 1 string por MPPT: mínimo = ⌈11 ÷ 10⌉ = **2**, reparto 6 + 5, DC/AC = 221,76 ÷ 200 = **1,11** 🟢.
+- Con 2 strings por MPPT: mínimo = ⌈11 ÷ 20⌉ = 1 (DC/AC 2,22 🔴). Sugerencia: ⌈221,76 ÷ (100 × 1,3)⌉ = **2** → escribe 2 en el campo.
+- Antes Producción recortaba ≈ 35 % de la energía en una prueba con clima sintético; con 2 inversores el recorte baja a menos de 1 %.
+
+### Cantidad de inversores — cómo leerlo en pantalla y qué hacer
+
+- **📐 Dimensionamiento › 🏭 Proyecto completo:** «mínimo N inversor(es)» o «N inversor(es) fijados por ti», con el reparto de strings y la relación DC/AC. Si la cantidad no es posible, 🟠 dice cuál se usó. Si DC/AC pasa de 1,3, 💡 sugiere cuántos poner.
+- **📊 Producción:** «DC/AC y recorte con N inversores fijados en 📐 Dimensionamiento». El recorte hora a hora usa la potencia AC de **todos** los inversores.
+- **⚡ Diagrama Unifilar y 📋 Ficha RETIE:** «Cantidad de unidades» toma esta cantidad (protección y cable AC).
+- **💼 Presupuesto:** cotiza todos los inversores, no uno solo.
+- **Qué hacer:** si el diseño de la referencia estándar internacional usa N inversores, escribe N. Si cambias de modelo de inversor, el campo vuelve a 0 (la cantidad era para el modelo anterior). Después vuelve a simular 📊 Producción.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

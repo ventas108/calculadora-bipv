@@ -70,6 +70,14 @@ Regla de consumo:
 	parejo. Publica `N_inv_total`, `N_paneles_granja`, `P_dc_total_kWp` y
 	`reparto_strings_inversores`; nunca más módulos de los que caben sin
 	cadenas declaradas. La relación DC/AC se evalúa con el sistema real.
+- Cantidad de inversores (29-sep-2026, Spec `03-dimensionamiento/inversores-del-proyecto`):
+	`N_inversores_proyecto` (0 = automática) y `N_inversores_proyecto_ref`
+	(modelo para el que se fijó) son claves de datos. `resolver_inversores`
+	usa la cantidad fijada entre el mínimo ⌈strings ÷ capacidad⌉ y un string
+	por inversor; `N_inv_total` publica la cantidad efectiva. 📊 Producción
+	(`escalar_p_ac_nom_por_inversores`) redondea hacia arriba igual que
+	Dimensionamiento y usa la fijada vía `inversores_fijados_vigentes` (solo
+	si es del mismo modelo). Unifilar, RETIE y Presupuesto toman `N_inv_total`.
 - Temperaturas de diseño (29-sep-2026, Spec `03-dimensionamiento/temperaturas-diseno`):
 	`T_min_diseno`, `T_cel_realista` y `T_cel_extremo` son claves de datos (se
 	guardan con el proyecto); sus campos usan `campo_persistente`. Se recalculan
