@@ -20,5 +20,6 @@
 - `bipv_python/calculos/produccion_iv.py`
 - `bipv_python/pages/6_📊_Produccion.py`
 - `bipv_python/tests/test_produccion_presentacion.py`
+- `bipv_python/tests/test_consistencia_sdm_entre_modulos.py`
 - `bipv_python/datos/base_conocimiento_asistente.md`
 - `CodeSpecs/00-director/registro-de-decisiones.md`

@@ -13,7 +13,9 @@
 - [x] Pruebas existentes de la tabla de balance y de la página de Producción
   (`test_perdidas_desglosadas_pvsyst.py`, `test_produccion_pagina_vigencia.py`)
   siguen verdes.
-- [x] Suite completa de `bipv_python` en curso antes del PR.
+- [x] Prueba de referencia en `test_consistencia_sdm_entre_modulos.py`: los dos
+  motores devuelven el mismo γ de la ficha.
+- [x] Suite completa de `bipv_python`: 2109 pruebas pasan.
 
 ## Resultado
 
