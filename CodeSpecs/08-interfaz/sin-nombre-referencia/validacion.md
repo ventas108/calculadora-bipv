@@ -9,6 +9,7 @@
   notas del catálogo).
 - [x] Revisión a mano de las frases reemplazadas en páginas y cálculos.
 - [x] Pruebas del Asistente actualizadas al texto nuevo.
+- [x] Prueba de referencia en `tests/test_consistencia_sdm_entre_modulos.py`: el Loss Diagram sale igual desde los dos motores, reconcilia hasta E_dc y sus notas no nombran la referencia (`produccion.py` cambió solo textos).
 - [x] Suite completa de `bipv_python`.
 
 ## Resultado

@@ -174,3 +174,30 @@ def test_calidad_y_mismatch_iguales_en_los_dos_motores():
         assert fraccion == pytest.approx(0.97 * 0.979, rel=1e-3), motor.__name__
         assert r["pct_calidad_modulo_aplicado"] == 3.0
         assert r["pct_mismatch_fab_aplicado"] == 2.1
+
+
+def test_loss_diagram_igual_desde_los_dos_motores_y_sin_nombre_de_referencia():
+    """El Loss Diagram de 📊 Producción (`perdidas_desglosadas`) debe tener las
+    mismas filas y reconciliar hasta E_dc con el resultado de cualquiera de los
+    dos motores, y sus notas no nombran el software de referencia (Spec
+    08-interfaz/sin-nombre-referencia, 29-sep-2026)."""
+    import pandas as pd
+
+    from calculos.produccion import perdidas_desglosadas, simular_produccion_anual
+    from calculos.produccion_iv import simular_produccion_iv
+    from calculos.texto_referencia import menciona_referencia
+
+    index = pd.date_range("2001-01-01", periods=8760, freq="h", tz="UTC")
+    sol = (index.hour >= 6) & (index.hour < 18)
+    tmy = pd.DataFrame({"T2m": np.full(8760, 20.0)}, index=index)
+    poa = pd.DataFrame({"poa_global": np.where(sol, 700.0, 0.0)}, index=index)
+    kw = dict(tmy=tmy, poa_base=poa, panel=ASP_ST1_T40, N_paneles=40, eta_inversor=0.975,
+              factor_pr_mismatch=1.0, pct_calidad_modulo=3.0, pct_mismatch_fab=2.1,
+              pct_cableado_dc=1.0)
+    tablas = [perdidas_desglosadas(m(**kw), poa_bruta_kWh_m2=2555.0).to_dict("records")
+              for m in (simular_produccion_anual, simular_produccion_iv)]
+    assert [f["Etapa"] for f in tablas[0]] == [f["Etapa"] for f in tablas[1]]
+    for tabla in tablas:
+        e_dc = next(f["kWh"] for f in tabla if f["Etapa"].startswith("③"))
+        assert next(f["kWh"] for f in tabla if f["Etapa"].startswith("②d")) == e_dc
+        assert not [f["Nota"] for f in tabla if menciona_referencia(f["Nota"])]

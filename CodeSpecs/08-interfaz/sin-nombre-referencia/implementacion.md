@@ -25,3 +25,4 @@
 - `bipv_python/pages/7_💰_Financiero.py`
 - `bipv_python/tests/test_sin_nombre_referencia.py`
 - `CodeSpecs/00-director/registro-de-decisiones.md`
+- `bipv_python/tests/test_consistencia_sdm_entre_modulos.py`
