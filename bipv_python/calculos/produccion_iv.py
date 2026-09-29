@@ -16,6 +16,7 @@ tiene ficha completa para el Motor IV (calculos.modelo_iv.tiene_sdm_completo).
 import numpy as np
 import pandas as pd
 
+from calculos.formato_produccion import gamma_ficha
 from calculos.modelo_iv import (
     tiene_sdm_completo,
     preparar_panel_iv,
@@ -411,6 +412,7 @@ def simular_produccion_iv(
         "perdida_inv_kWh":         round(perdida_inv_kWh, 0),
         "perdida_clipping_kWh":    round(perdida_clipping_kWh, 0),
         "horas_con_clipping":      horas_con_clipping,
+        "Tk_gamma_pct":            gamma_ficha(panel),
         "factor_espectral_aplicado":  factor_espectral_aplicado,
         "factor_espectral_promedio":  factor_espectral_promedio,
         "E_ac_sin_recorte_kWh":    round(E_ac_sin_recorte_anual, 0),

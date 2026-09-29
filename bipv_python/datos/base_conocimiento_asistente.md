@@ -5029,6 +5029,24 @@ El Voc y el Vmp del string no cambian: la luz trasera sube la corriente, no el v
 - **String que cruza dos superficies (sección 87):** la tabla del sistema y el diagrama marcan «↔ cruza: 4 de 10 módulos en «Oeste»»; la ficha RETIE muestra cada superficie con sus **módulos físicos** («12 mód. (20 en sus strings)»). La rama eléctrica y la corriente siguen siendo las del string completo.
 - **Cableado:** si ⚡ Diagrama Unifilar tiene longitud y calibre reales, 📊 Producción usa ese cálculo en lugar de los % de 🔀 Mismatch, y 🔀 Mismatch lo avisa. En multi-superficie el Unifilar muestra los % de cableado DC y AC que de verdad aplica la cadena de pérdidas.
 
+## 89. 📊 Producción: tabla mensual con el recorte del inversor y γ en el balance (29-sep-2026)
+
+### Recorte del inversor en la tabla mensual — qué es y cómo leerlo
+
+**Qué es:** el **recorte (clipping)** es la energía que los paneles podrían entregar pero el inversor no deja pasar, porque en esa hora la potencia DC supera su potencia AC nominal. Se calcula hora a hora y se suma por mes en la columna **«Recorte inversor (kWh)»** de «📋 Ver tabla de producción mensual completa».
+
+**Qué se corrigió:** esa columna salía sin formato (por ejemplo `4927.475563`). Ahora se ve como las demás: **4,927** kWh. Ningún kWh cambió.
+
+**Fórmula en palabras:** recorte de la hora = potencia DC que llega al inversor − potencia AC nominal del inversor (si es positiva; si no, 0). El recorte del mes es la suma de sus horas.
+
+**Ejemplo real (Apartadó, 221,76 kWp):** en enero entran 31,580 kWh DC y el recorte es 4,927 kWh; al inversor le pasan 26,653 kWh y entrega 25,863 kWh (eficiencia ≈ 97 %). Un recorte de ≈ 49,000 kWh/año (≈ 14,5 % de la energía DC) indica que la potencia AC es muy baja para ese campo: con **1** inversor de 100 kW la relación DC/AC es 221,76 ÷ 100 = **2,2**; la referencia estándar internacional usa **2** inversores (200 kW, relación **1,11**) y su recorte es solo 0,01 %.
+
+**Qué hacer:** si el recorte pasa de 2–3 % al año, revisa en 📐 Dimensionamiento la **cantidad y potencia de inversores**. Una relación DC/AC de 1,1 a 1,3 es lo usual en Colombia. Compara siempre con la misma cantidad de inversores que la referencia estándar internacional antes de comparar energía.
+
+### γ en el balance IEC 61724 — qué se corrigió
+
+La fila «↳ Solo horas calientes» del balance mostraba `Tk_gamma=—%/°C` aunque el panel sí tuviera el dato. Ahora muestra el **coeficiente de potencia γ de la ficha** (por ejemplo **−0,29 %/°C** en el JA Solar JAM66D46-720/LB). Si la ficha no lo trae, queda «—». Es el mismo γ que aparece en «Diagnóstico BIPV» más abajo; el cálculo de temperatura no cambió.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

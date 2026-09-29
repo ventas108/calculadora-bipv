@@ -35,6 +35,7 @@ Métricas de salida (IEC 61724):
 import numpy as np
 import pandas as pd
 
+from calculos.formato_produccion import gamma_ficha, texto_gamma
 from calculos.modelo_iv import calcular_pmax_vectorizado
 from calculos.modelo_jrc_huld import clasificar_tecnologia_jrc, potencia_jrc
 from calculos.temperatura import temperatura_celda_noct
@@ -542,6 +543,9 @@ def simular_produccion_anual(
         "perdida_inv_kWh":        round(perdida_inv_kWh, 0),
         "perdida_clipping_kWh":   round(perdida_clipping_kWh, 0),
         "horas_con_clipping":     horas_con_clipping,
+        # γ de la ficha (%/°C), solo para mostrarlo en el balance; None si la
+        # ficha no lo trae.
+        "Tk_gamma_pct":           gamma_ficha(panel),
         "factor_espectral_aplicado":  factor_espectral_aplicado,
         "factor_espectral_promedio":  factor_espectral_promedio,
         "E_ac_sin_recorte_kWh":   round(E_ac_sin_recorte_anual, 0),
@@ -737,7 +741,7 @@ def perdidas_desglosadas(
             "Etapa":     "   ↳ Solo horas calientes  (T_cel > 25°C, sin compensar por frío)",
             "kWh":       round(E_dc_pre_binning, 0),
             "Δ kWh":     round(delta_t, 0),
-            "Nota":      f"Sub-componente de ②  ·  Tk_gamma={res.get('Tk_gamma_pct','—')}%/°C",
+            "Nota":      f"Sub-componente de ②  ·  Tk_gamma={texto_gamma(res.get('Tk_gamma_pct'))}%/°C",
         },
     ]
 
