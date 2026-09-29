@@ -119,6 +119,13 @@ Regla de consumo:
 	Uc/Uv, k_BIPV = α(1 − η)/(Uc + Uv·v) ÷ ((NOCT − 20)/800); la tabla de
 	presets por tipo de montaje del Asistente es solo orientativa (ver sección 83
 	de la base de conocimiento).
+- Cascada bifacial (29-sep-2026, Spec `05-perdidas-y-temperatura/motor-optico-bifacial`):
+	con POA bifacial (`poa_front`, `poa_rear`), `cascada_optica` aplica el IAM a
+	`poa_front` y solo la IAM difusa al aporte trasero (`poa_global − poa_front`),
+	sin suciedad; se cumple POA bruta − IAM − suciedad = `poa_post_soil`. La POA
+	publicada (`motor_optico.poa_publicable`) mantiene `poa_global − poa_front` =
+	aporte trasero óptico. Los factores promedio del resumen son ponderados por
+	energía (su producto es `factor_global`). Monofacial sin cambios.
 
 #### Energía multi-superficie (Vista 3D)
 

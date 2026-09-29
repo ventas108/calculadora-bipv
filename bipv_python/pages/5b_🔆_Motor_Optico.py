@@ -14,6 +14,8 @@ from calculos.motor_optico import (
     K_BIPV_POR_MONTAJE,
     indice_montaje_default,
     SOILING_COLOMBIA,
+    mensaje_impacto_optico,
+    poa_publicable,
 )
 from calculos.invalidacion import invalidar_downstream_motor_optico
 
@@ -55,7 +57,7 @@ mismatch_ok  = st.session_state.get("mismatch_ok", False)
 factor_sombra = st.session_state.get("factor_sombra_anual", None)
 
 st.info(
-    f"📍 **{ciudad}** · Fachada **{orient_lbl} / {tilt}°** · "
+    f"📍 **{ciudad}** · Superficie **{orient_lbl} / {tilt}°** · "
     f"POA bruta: **{poa_anual_bruta:,.0f} kWh/m²/año**"
 )
 
@@ -402,15 +404,15 @@ if run_btn:
             # ── Guardar en session_state ──────────────────────────────────────
             # poa_efectiva_df: POA tras IAM + Soiling + Térmico (cascada completa).
             # Usada para visualización del waterfall, Financiero y resúmenes.
-            poa_ef_df = poa_df.copy()
-            poa_ef_df["poa_global"] = result_df["poa_efectiva"].reindex(poa_ef_df.index).fillna(0.0)
+            # poa_publicable() también ajusta poa_front en bifacial, para que
+            # «global − front» siga siendo el aporte trasero que ve Producción.
+            poa_ef_df = poa_publicable(poa_df, result_df, "poa_efectiva")
 
             # poa_sin_termico_df: POA tras IAM + Soiling ÚNICAMENTE, SIN f_term.
             # Es la irradiancia física real para el SDM de Producción.
             # La corrección térmica la aplica el SDM internamente vía T_cell(k_bipv).
             # Usar poa_efectiva (con f_term) en el SDM daría doble conteo térmico.
-            poa_st_df = poa_df.copy()
-            poa_st_df["poa_global"] = result_df["poa_post_soil"].reindex(poa_st_df.index).fillna(0.0)
+            poa_st_df = poa_publicable(poa_df, result_df, "poa_post_soil")
 
             # Cualquier resultado downstream de la POA ANTERIOR (Producción,
             # bypass monofacial, pérdida óhmica, Financiero, CO₂) deja de
@@ -529,6 +531,14 @@ cm6.metric(
     delta_color="normal",
     help="Irradiancia efectiva tras IAM (dir+dif) + Soiling + Térmico. Es la que usa Producción.",
 )
+if summary.get("bifacial"):
+    st.caption(
+        f"🔆 **Panel bifacial:** la POA bruta incluye el aporte de la cara trasera "
+        f"(**{summary.get('aporte_trasero_kWh_m2', 0):,.0f} kWh/m²/año**, ya multiplicado por la "
+        "bifacialidad). A esa parte solo se le resta la IAM difusa — llega a la POA efectiva como "
+        f"**{summary.get('aporte_trasero_optico_kWh_m2', 0):,.0f} kWh/m²/año** — y no se ensucia "
+        "(la cara de abajo casi no acumula polvo). La suciedad se aplica solo a la cara frontal."
+    )
 
 # ── 2B. Gráfica Waterfall ──────────────────────────────────────────────────────
 st.markdown("#### 2.1. Cascada de pérdidas (kWh/m²/año)")
@@ -649,7 +659,11 @@ st.plotly_chart(fig_stack, use_container_width=True)
 
 # ── 2E. Tabla resumen de factores ─────────────────────────────────────────────
 st.markdown("---")
-st.subheader("📋 3. Factores promedio (horas con sol)")
+st.subheader("📋 3. Factores promedio (ponderados por energía)")
+st.caption(
+    "Cada factor es la energía que queda después de esa pérdida ÷ la energía que llegaba a ella. "
+    "Coinciden con los porcentajes de la cascada y multiplicados dan el factor global."
+)
 
 fcf = st.columns(3)
 with fcf[0]:
@@ -658,7 +672,7 @@ with fcf[0]:
         f"{summary['f_iam_prom']:.4f}",
         f"Pérdida: {(1-summary['f_iam_prom'])*100:.1f}%",
         delta_color="inverse",
-        help="Promedio de f_IAM en horas con irradiancia directa > 10 W/m².",
+        help="1 − pérdida IAM ÷ POA bruta (ponderado por energía, no promedio simple por hora).",
     )
 with fcf[1]:
     st.metric(
@@ -666,7 +680,7 @@ with fcf[1]:
         f"{summary['f_soil_prom']:.4f}",
         f"Pérdida: {(1-summary['f_soil_prom'])*100:.1f}%",
         delta_color="inverse",
-        help="Fracción media de POA retenida tras descontar suciedad.",
+        help="1 − pérdida por suciedad ÷ POA después del IAM (ponderado por energía).",
     )
 with fcf[2]:
     st.metric(
@@ -674,7 +688,8 @@ with fcf[2]:
         f"{summary['f_term_prom']:.4f}",
         f"Pérdida: {(1-summary['f_term_prom'])*100:.1f}%",
         delta_color="inverse",
-        help=f"Degradación media de eficiencia por temperatura de celda con k_BIPV={summary['k_bipv']}.",
+        help=(f"POA después del térmico ÷ POA antes del térmico (k_BIPV={summary['k_bipv']}). "
+              "Informativo: la pérdida por temperatura definitiva la calcula 📊 Producción."),
     )
 
 # ── 2F. Impacto de la transparencia (informativo) ─────────────────────────────
@@ -737,21 +752,10 @@ cmp3.metric(
     delta_color="inverse",
 )
 
-if pct_impacto > 15:
-    st.warning(
-        f"⚠️ La sobreestimación es **{pct_impacto:.1f}%** — significativa para una fachada vertical. "
-        "El IAM domina las pérdidas en fachadas con ángulos de incidencia altos."
-    )
-elif pct_impacto > 8:
-    st.info(
-        f"ℹ️ La sobreestimación es **{pct_impacto:.1f}%** — moderada. "
-        "El Motor Óptico mejora la precisión del análisis financiero."
-    )
-else:
-    st.success(
-        f"✅ La sobreestimación es **{pct_impacto:.1f}%** — baja para este sistema. "
-        "La orientación y tipo de vidrio son favorables."
-    )
+# El tipo de superficie sale de la inclinación (antes decía «fachada vertical»
+# siempre, también en una granja a 10°). Spec 05/motor-optico-bifacial.
+_nivel_imp, _texto_imp = mensaje_impacto_optico(pct_impacto, tilt)
+getattr(st, _nivel_imp)(_texto_imp)
 
 # ── Nota final sobre integración downstream ───────────────────────────────────
 st.markdown("---")
