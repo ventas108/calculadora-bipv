@@ -4996,6 +4996,39 @@ Es un modelo de primer orden (corriente proporcional a la luz, voltaje constante
 - El **modo físico** todavía no modela un string que cruza (necesita la geometría y la sombra 3D de las dos superficies): no se prepara y lo explica. La sección «🔀 6» (strings en paralelo en un mismo MPPT, informativa) deja fuera esas superficies.
 - **Qué hacer:** si puedes, evita que un string cruce la esquina: cada orientación en su propio string y su propio MPPT (o con optimizadores). Declararlo te muestra cuánto cuesta no hacerlo.
 
+## 88. Corriente bifacial (Isc BNPI) en ⚡ Diagrama Unifilar y 📋 Ficha RETIE (29-sep-2026)
+
+### Corriente bifacial — qué es y por qué cambia cables y fusibles
+
+**Qué es:** un panel bifacial también produce corriente con la luz que le llega por detrás. El Isc de la ficha técnica es solo el de la cara frontal (STC, 1000 W/m²). Para dimensionar conductores, fusibles y el límite de corriente del MPPT, la norma IEC 62548-1 pide usar la corriente en la **irradiancia de placa bifacial (BNPI)** de la IEC TS 60904-1-2: **1000 W/m² al frente + 135 W/m² atrás**.
+
+**Por qué se corrigió:** 🔆 Motor Óptico ya suma la luz trasera a la energía, pero el ⚡ Diagrama Unifilar y la 📋 Ficha RETIE seguían usando Isc × 1,25 solo con la cara frontal: cables y fusibles quedaban dimensionados con menos corriente de la que el panel entrega en obra.
+
+### Corriente bifacial — fórmula en palabras y cuenta real
+
+- **Isc BNPI = Isc de la ficha × (1 + bifacialidad × 135 ÷ 1000).**
+- Isc de diseño del string = Isc BNPI × 1,25; fusible gPV por string ≥ 1,25 × 1,25 × Isc BNPI.
+
+**Ejemplo (JA Solar JAM66D46-720/LB, bifacialidad 0,80):**
+- Factor = 1 + 0,80 × 0,135 = **1,108**.
+- Isc BNPI = 18,59 A × 1,108 = **20,60 A** (antes 18,59 A).
+- Isc de diseño = 18,59 × 1,108 × 1,25 = **25,74 A** (antes 23,24 A).
+- Fusible gPV ≥ 1,25 × 1,25 × 18,59 × 1,108 = **32,18 A** (antes 29,05 A).
+
+El Voc y el Vmp del string no cambian: la luz trasera sube la corriente, no el voltaje de diseño.
+
+### Corriente bifacial — de dónde sale la bifacialidad y cómo leerlo
+
+- **Modelo bifacial activo** (☀️ Recurso Solar, y en 🗺️ Vista 3D la casilla «🔄 Aplicar modelo bifacial»): bifacialidad × factor de vista trasera de cada superficie. Una **fachada adosada** al muro no recibe luz atrás: factor 1 (sin cambio).
+- **Modelo apagado pero panel bifacial en el catálogo:** se usa la bifacialidad de la ficha, del **lado seguro** (en obra la cara trasera recibe luz igual), con un aviso. Si el catálogo solo marca «bifacial» (100 %), se usa 1,0 → factor 1,135.
+- **Panel monofacial:** factor 1.
+- **Dónde se ve:** 📋 Ficha RETIE muestra «🔄 Isc BNPI (bifacial) = … A» y en la ficha «Isc diseño … (Isc BNPI …)»; el fusible de cada caja combinadora dice «Isc BNPI (bifacial)». ⚡ Diagrama Unifilar usa esa corriente para el semáforo de ampacidad DC. En 🗺️ Vista 3D › ⚡ Diseño eléctrico, la corriente del MPPT y la caja combinadora también.
+
+### Unifilar y RETIE con lo nuevo de Vista 3D y 🔀 Mismatch
+
+- **String que cruza dos superficies (sección 87):** la tabla del sistema y el diagrama marcan «↔ cruza: 4 de 10 módulos en «Oeste»»; la ficha RETIE muestra cada superficie con sus **módulos físicos** («12 mód. (20 en sus strings)»). La rama eléctrica y la corriente siguen siendo las del string completo.
+- **Cableado:** si ⚡ Diagrama Unifilar tiene longitud y calibre reales, 📊 Producción usa ese cálculo en lugar de los % de 🔀 Mismatch, y 🔀 Mismatch lo avisa. En multi-superficie el Unifilar muestra los % de cableado DC y AC que de verdad aplica la cadena de pérdidas.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

@@ -437,6 +437,7 @@ def calcular_perdida_ohmica(
     longitud_ac_m: float | None = None,
     calibre_ac_mm2: float | None = None,
     T_diseno_C: float = 45.0,
+    factor_bifacial: float = 1.0,
 ) -> dict:
     """
     Calcula la resistencia (Ω) de cada tramo DC declarado (uno por superficie
@@ -493,7 +494,12 @@ def calcular_perdida_ohmica(
     decide cuál usar.
     """
     resistividad = _resistividad_cobre(T_diseno_C)
+    # Spec 07/unifilar-retie-bifacial-cruce: con panel bifacial la corriente
+    # de diseño es la del Isc en BNPI (factor_bifacial = 1 + 0,135 φ). Solo
+    # cambia la ampacidad; la resistencia de cada tramo no depende de esto.
     corriente_dc_diseno_A = corriente_diseno_dc(panel.get("Isc_stc"), N_strings_tracker)
+    if corriente_dc_diseno_A is not None:
+        corriente_dc_diseno_A *= float(factor_bifacial or 1.0)
 
     tramos_in = [t for t in (tramos_dc or []) if t.get("n_paneles")]
     _suma_tramos = sum(int(t["n_paneles"]) for t in tramos_in) or None
@@ -571,6 +577,7 @@ def calcular_perdida_ohmica(
         "resistencia_dc_efectiva_ohm": resistencia_dc_efectiva_ohm,
         "resistencia_ac_ohm": resistencia_ac_ohm,
         "corriente_dc_diseno_A": corriente_dc_diseno_A,
+        "factor_bifacial": float(factor_bifacial or 1.0),
         "corriente_ac_diseno_A": corriente_ac_diseno_A,
         "semaforo_ampacidad_ac": calcular_semaforo_ampacidad(calibre_ac_mm2, corriente_ac_diseno_A, "ntc2050"),
         "resistividad_ohm_mm2_m": round(resistividad, 6),
@@ -802,6 +809,8 @@ def _lineas_rama(rama: dict, optimizadores: bool) -> list[str]:
     for g in rama["grupos"]:
         lineas.append(f"{g['superficie']} · {g['gid']}")
         lineas.append(f"{g['n_serie']} × {g['n_paralelo']} = {g['modulos']} mód.")
+        if g.get("cruce_texto"):
+            lineas.append(f"↔ cruza: {g['cruce_texto']}")
         lineas.append(str(g["panel"] or ""))
     if optimizadores:
         lineas.append("+ Optimizador por módulo")

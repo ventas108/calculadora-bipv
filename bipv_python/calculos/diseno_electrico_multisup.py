@@ -191,12 +191,24 @@ def validar_diseno_electrico(
     inversores: list[Mapping[str, Any]],
     paneles: Mapping[str, Mapping[str, Any]],
     temps: Mapping[str, Any],
+    bifacial: tuple | None = None,
 ) -> dict:
     """Diagnóstico del diseño eléctrico (ver ``diseno.md`` de la Spec).
 
     ``paneles[nombre_superficie]`` es ``{"panel", "nombre"}`` (como
     ``panel_superficie.eficiencias_superficies``). No muta las entradas.
+
+    ``bifacial``: ``(bifacial_cfg, usar_bifacial)`` del proyecto (Spec
+    07/unifilar-retie-bifacial-cruce). La corriente de cada grupo (límite del
+    MPPT, caja combinadora) usa el Isc en BNPI de su superficie; sin el dato,
+    la bifacialidad de la ficha del panel (lado seguro).
     """
+    from calculos.corriente_bifacial import (
+        factor_isc_bifacial, panel_para_corriente, phi_superficie, texto_origen,
+    )
+    _cfg_bif, _usar_bif = bifacial if bifacial else (None, False)
+    _estado_bif = {"bifacial_activo": bool(_usar_bif), "bifacial_cfg": _cfg_bif,
+                   "ms_bifacial_on": True}
     invs = {str(i.get("inversor_id")): inversor_normalizado(i) for i in inversores
             if i.get("inversor_id")}
     bloqueos: list[str] = []
@@ -219,6 +231,13 @@ def validar_diseno_electrico(
         grupos = grupos_de_superficie(sup)
         info_panel = paneles.get(nombre)
         panel = dict(info_panel["panel"]) if info_panel else None
+        _phi_sup, _origen_bif = phi_superficie(sup, _estado_bif, panel) if panel else (0.0, "monofacial")
+        _panel_corriente = panel_para_corriente(panel, _phi_sup) if panel else None
+        if panel and _origen_bif == "panel":
+            avisos.append(
+                f"«{nombre}»: la corriente de diseño usa la {texto_origen(_origen_bif, _phi_sup)} "
+                f"(Isc × {factor_isc_bifacial(_phi_sup):.3f})."
+            )
         checks_sup = []
         if not grupos:
             bloqueos.append(f"«{nombre}»: sin diseño eléctrico (agrega un inversor y sus strings).")
@@ -264,7 +283,9 @@ def validar_diseno_electrico(
                 "panel": info_panel.get("nombre") if info_panel else None,
                 "inversor_id": inv_id or None, "mppt": mppt, "n_serie": n_serie,
                 "n_paralelo": n_par, "rango_n_serie": rango, "checks": checks,
-                "estado": estado, "_orientacion": _orientacion(sup), "_panel": panel,
+                "estado": estado, "_orientacion": _orientacion(sup), "_panel": _panel_corriente,
+                "factor_bifacial": round(factor_isc_bifacial(_phi_sup), 4),
+                "origen_bifacial": _origen_bif,
             }
             salida_grupos.append(registro)
             if inv is not None and mppt:
@@ -618,7 +639,15 @@ def diagnostico_electrico_estado(session_state: Mapping[str, Any]) -> dict:
         list(session_state.get("superficies_bipv") or []),
         list(session_state.get("multisup_inversores") or []),
         paneles, temperaturas_diseno(session_state),
+        bifacial=_bifacial_estado(session_state),
     )
+
+
+def _bifacial_estado(session_state: Mapping[str, Any]) -> tuple:
+    """``(bifacial_cfg, usar)`` igual que la POA de 🗺️ Vista 3D."""
+    from calculos.multi_superficie import parametros_poa_estado
+    _, cfg, usar = parametros_poa_estado(session_state)
+    return cfg, usar
 
 
 def modulos_de_superficie(superficie: Mapping[str, Any]) -> int:
