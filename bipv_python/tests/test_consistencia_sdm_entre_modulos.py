@@ -265,3 +265,17 @@ def test_dimensionamiento_y_produccion_cuentan_igual_los_inversores(n_str_tr, fi
     assert prod["n_inversores"] == pc["N_inversores"]
     if fijado == 2:
         assert pc["dcac"]["ratio"] == pytest.approx(221.76 / 200.0, abs=0.005)
+
+
+@pytest.mark.parametrize("ratio, nivel", [(0.97, "🟠"), (1.00, "🟢"), (1.35, "🟢"), (1.36, "🟠")])
+def test_mensaje_dc_ac_dice_el_rango_que_usa_el_calculo(ratio, nivel):
+    """Spec 05/recorte-inversor-multisuperficie (29-sep-2026): el mensaje decía
+    «rango típico 0.95–1.35» pero el cálculo pone 🟢 desde 1,00; una relación
+    de 0,97 salía 🟠 «por debajo de 0.95–1.35». Texto y límite deben coincidir."""
+    from calculos.dimensionamiento import evaluar_relacion_dc_ac
+
+    r = evaluar_relacion_dc_ac(ratio * 100.0, 100_000.0)
+    assert r["nivel"] == nivel
+    assert "0.95" not in r["mensaje"]
+    if ratio < 1.36:
+        assert "1.00–1.35" in r["mensaje"]

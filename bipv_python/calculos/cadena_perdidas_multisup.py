@@ -164,10 +164,17 @@ def cadena_superficie(poa_df: pd.DataFrame, tmy_df: pd.DataFrame, panel: Mapping
         )
         base = bruta / 1000.0 * n_modulos * float(panel["Pmax_stc"]) / 1000.0
         pr = float(prod["E_ac_anual_kWh"]) / base if base > 0 else 0.0
+        perfil = np.asarray(prod["df_horario"]["P_ac_kW"], dtype=float)
         resto = f_iam * f_soiling * f_mismatch * f_cables * float(eta_inversor) * f_sombra
         f_termico = pr / resto if resto > 0 else 1.0     # temperatura y poca luz (SDM)
     else:
         pr = f_iam * f_soiling * f_termico * f_mismatch * f_cables * float(eta_inversor) * f_sombra
+        perfil = np.asarray(res["poa_post_term"], dtype=float)
+    # Forma horaria de la AC (suma 1): con ella se reparte la energía de la
+    # superficie en las horas para el recorte de cada inversor (Spec
+    # 05/recorte-inversor-multisuperficie).
+    perfil = np.maximum(np.nan_to_num(perfil), 0.0)
+    perfil = perfil / perfil.sum() if perfil.sum() > 0 else perfil
     for nombre, valor in (("f_iam", f_iam), ("f_soiling", f_soiling), ("f_termico", f_termico),
                           ("f_mismatch", f_mismatch), ("f_cables", f_cables), ("f_sombra", f_sombra),
                           ("PR", pr)):
@@ -180,6 +187,7 @@ def cadena_superficie(poa_df: pd.DataFrame, tmy_df: pd.DataFrame, panel: Mapping
         "f_sombra": f_sombra, "pr": pr,
         "poa_bruta_kWh_m2": bruta / 1000.0,
         "poa_sin_termico": res["poa_post_soil"],
+        "perfil_ac": perfil,
     }
 
 
@@ -199,7 +207,8 @@ def eta_inversor_superficie(superficie: Mapping[str, Any], inversores: list[Mapp
     return float(np.mean(list(etas.values()))) if etas else 0.97
 
 
-def firma_cadena(parametros: Mapping[str, Any], superficies: list[Mapping[str, Any]]) -> str:
+def firma_cadena(parametros: Mapping[str, Any], superficies: list[Mapping[str, Any]],
+                 inversores: list[Mapping[str, Any]] | None = None) -> str:
     """Huella de lo que decide la cadena: si cambia, la energía publicada quedó vieja."""
     datos = {
         "version": VERSION_CADENA,
@@ -214,6 +223,18 @@ def firma_cadena(parametros: Mapping[str, Any], superficies: list[Mapping[str, A
     cruces = cruces_del_proyecto(list(superficies))
     if cruces:
         datos["cruces"] = cruces
+    # Solo si algún inversor con potencia AC tiene grupos: su recorte cambia la
+    # energía (Spec 05/recorte-inversor-multisuperficie).
+    from calculos.recorte_inversores_multisup import potencia_ac_inversor
+    pac = {str(i.get("inversor_id")): potencia_ac_inversor(i) for i in inversores or []}
+    grupos = sorted(
+        (str(s.get("nombre")), str(g.get("gid")), str(g.get("inversor_id")),
+         int(g.get("n_serie") or 0), int(g.get("n_paralelo") or 0))
+        for s in superficies if s.get("activa", True) for g in s.get("grupos") or []
+        if pac.get(str(g.get("inversor_id")))
+    )
+    if grupos:
+        datos["recorte"] = {"pac": sorted((k, v) for k, v in pac.items() if v), "grupos": grupos}
     return hashlib.sha256(json.dumps(datos, sort_keys=True, default=str).encode("utf-8")).hexdigest()
 
 
@@ -281,7 +302,28 @@ def cadena_superficies_estado(estado: Mapping[str, Any], superficies_energia: li
             r["f_cruce"] = f["f_cruce"]
             r["cruce_detalle"] = f["detalle"]
             resultados[nombre] = r
+    # Recorte de cada inversor a su potencia AC, hora a hora (Spec
+    # 05/recorte-inversor-multisuperficie): baja el PR de las superficies de
+    # ese inversor. Sin potencia AC o sin recorte no cambia nada.
+    from calculos.recorte_inversores_multisup import factores_recorte
+    recorte = factores_recorte(superficies_energia, resultados, paneles, inversores)
+    for nombre, d in recorte["superficies"].items():
+        if nombre in resultados and d["recorte_kWh"] > 0:
+            r = dict(resultados[nombre])
+            r["pr"] = float(r["pr"]) * d["f_recorte"]
+            r["f_recorte"] = d["f_recorte"]
+            r["recorte_kWh"] = d["recorte_kWh"]
+            r["recorte_inversores"] = recorte["inversores"]
+            resultados[nombre] = r
     return resultados, errores
+
+
+def recorte_por_inversor(resultados: Mapping[str, Mapping[str, Any]]) -> list[dict]:
+    """Resumen por inversor del recorte que ya aplicó la cadena ([] si no hubo)."""
+    for r in resultados.values():
+        if r.get("recorte_inversores"):
+            return list(r["recorte_inversores"])
+    return []
 
 
 def pr_por_superficie(resultados: Mapping[str, Mapping[str, Any]]) -> dict[str, float]:
@@ -303,6 +345,7 @@ def tabla_desglose(resultados: Mapping[str, Mapping[str, Any]]) -> list[dict]:
             "Inversor": f"{(1 - r['eta_inversor']) * 100:.1f} %",
             "Sombra horizonte": f"{(1 - r['f_sombra']) * 100:.1f} %",
             **({"String que cruza": f"{(1 - r['f_cruce']) * 100:.1f} %"} if "f_cruce" in r else {}),
+            **({"Recorte inversor": f"{(1 - r['f_recorte']) * 100:.1f} %"} if "f_recorte" in r else {}),
             "PR": f"{r['pr']:.3f}",
         })
     return filas
@@ -325,7 +368,8 @@ def registro_publicacion(estado: Mapping[str, Any], resultados: Mapping[str, Map
     """Lo que se guarda junto a la energía publicada."""
     return {
         "version": VERSION_CADENA,
-        "firma": firma_cadena(parametros_cadena(estado), superficies),
+        "firma": firma_cadena(parametros_cadena(estado), superficies,
+                              list(estado.get("multisup_inversores") or [])),
         "pr": {n: round(float(r["pr"]), 5) for n, r in resultados.items()},
     }
 
@@ -340,9 +384,10 @@ def aviso_cadena_vencida(estado: Mapping[str, Any]) -> str | None:
                 "0,78, sin 🔆 Motor Óptico ni 🔀 Mismatch). Vuelve a publicarla en 🗺️ Vista 3D "
                 "› Integrar para usar la cadena de pérdidas de cada superficie.")
     superficies = [s for s in estado.get("superficies_bipv") or [] if s.get("activa", True)]
-    if registro.get("firma") != firma_cadena(parametros_cadena(estado), superficies):
-        return ("⚠️ Cambiaron los parámetros de pérdidas (🔆 Motor Óptico, 🔀 Mismatch o el "
-                "montaje de una superficie) después de publicar la energía. Vuelve a publicarla "
+    if registro.get("firma") != firma_cadena(parametros_cadena(estado), superficies,
+                                             list(estado.get("multisup_inversores") or [])):
+        return ("⚠️ Cambiaron los parámetros de pérdidas (🔆 Motor Óptico, 🔀 Mismatch, el "
+                "montaje de una superficie o la potencia AC de un inversor) después de publicar la energía. Vuelve a publicarla "
                 "en 🗺️ Vista 3D › Integrar.")
     return None
 

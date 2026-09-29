@@ -1380,7 +1380,7 @@ Regresión: 3 tests nuevos en `tests/test_simulation_pipeline.py` (recorte real 
 
 Verificando el proyecto real Teusaquillo contra una referencia estándar internacional se confirmó algo importante: con la config real (128 módulos, 8,064 kWp, Growatt MID15KTL3-X 15 kW CA), esa referencia muestra *"La potencia del inversor está muy sobredimensionada"* y el indicador **"Sistema"** queda en 🔴 — el botón **"Ejecutar simulación"** se deshabilita. **No es una advertencia cosmética: esa referencia estándar internacional bloquea la simulación por completo** hasta resolver el sobredimensionamiento. Proporción Pnom real de esa referencia para este caso: 8,064/15 = **0,538**.
 
-**Nueva función** `calculos/dimensionamiento.py::evaluar_relacion_dc_ac(P_dc_stc_kW, P_ac_nom_W)`: clasifica la relación DC/AC en 5 niveles — 🔴 muy sobredimensionado (<0,75) · 🟠 sobredimensionado (<1,0) · 🟢 óptimo (0,95–1,35) · 🟠 alto (≤1,6) · 🔴 muy alto (>1,6), anclada al dato real de esa referencia estándar internacional (0,538 → mismo aviso "muy sobredimensionado", verificado idéntico). Se muestra en **📊 Producción** (antes de simular, junto a la compatibilidad eléctrica) y en **📐 Dimensionamiento** (tras presionar "▶️ Optimizar N paneles/string", a nivel de proyecto completo).
+**Nueva función** `calculos/dimensionamiento.py::evaluar_relacion_dc_ac(P_dc_stc_kW, P_ac_nom_W)`: clasifica la relación DC/AC en 5 niveles — 🔴 muy sobredimensionado (<0,75) · 🟠 sobredimensionado (<1,0) · 🟢 óptimo (1,00–1,35) · 🟠 alto (≤1,6) · 🔴 muy alto (>1,6), anclada al dato real de esa referencia estándar internacional (0,538 → mismo aviso "muy sobredimensionado", verificado idéntico). Se muestra en **📊 Producción** (antes de simular, junto a la compatibilidad eléctrica) y en **📐 Dimensionamiento** (tras presionar "▶️ Optimizar N paneles/string", a nivel de proyecto completo).
 
 **Diferencia deliberada respecto a esa referencia estándar internacional**: la app **avisa pero NO bloquea** la simulación — permite evaluar diseños BIPV con relaciones DC/AC atípicas (habituales en fachadas de baja potencia con inversor reutilizado o sobredimensionado a propósito por el cliente) en vez de rechazarlos de plano como hace esa referencia.
 
@@ -5103,6 +5103,33 @@ La fila «↳ Solo horas calientes» del balance mostraba `Tk_gamma=—%/°C` au
 3. Si sale 🟠 o 🔴 por DC/AC alta, sigue el 💡 y escribe la cantidad de inversores.
 4. Vuelve a simular 📊 Producción y revisa que el recorte del inversor quede por debajo de 2–3 % al año.
 5. ⚡ Diagrama Unifilar, 📋 Ficha RETIE y 💼 Presupuesto toman esa misma cantidad.
+
+## 91. 🗺️ Vista 3D: recorte de cada inversor también en los modos simplificado y bypass (29-sep-2026)
+
+### Recorte por inversor en Vista 3D — qué es y por qué se corrigió
+
+**Qué es:** cuando la potencia de los paneles conectados a un inversor supera su **potencia AC nominal**, en las horas de más sol el inversor no deja pasar el exceso: eso es el **recorte (clipping)**. En 🗺️ Vista 3D tú eliges los inversores y a qué inversor va cada grupo de strings, así que el recorte se calcula **por inversor**, sumando todos sus grupos aunque estén en superficies distintas.
+
+**Por qué se corrigió:** solo el **modo físico** recortaba. Los modos **simplificado** y **bypass** publicaban POA × área × η × PR sin ese límite: con un inversor chico (relación DC/AC alta) la energía salía **más alta** de lo que el inversor puede entregar; ⚡ Diseño eléctrico avisaba en 🟡 pero el número publicado no lo restaba.
+
+### Recorte por inversor — fórmula en palabras y cuenta real
+
+1. AC de cada superficie en cada hora = su energía del año × la forma horaria de su producción (la misma cadena de pérdidas: óptica, temperatura, mismatch, cables, inversor, horizonte, string que cruza).
+2. AC de un grupo = sus módulos en cada superficie × la AC por módulo de esa superficie (un string que cruza aporta desde las dos).
+3. AC del inversor = suma de sus grupos. **Recorte de la hora = AC del inversor − potencia AC nominal** (si es positivo).
+4. El recorte de cada hora se reparte entre las superficies según lo que aportó cada una; baja el PR de cada superficie (columna «Recorte inversor»).
+
+**Ejemplo (prueba de la app):** fachadas Este y Oeste de 13 kWp con un string que cruza la esquina, un solo inversor.
+- Inversor de 15 kW: sin recorte, **14.920 kWh/año**.
+- Inversor de 3 kW (DC/AC ≈ 4,4): recorte **3.596 kWh/año (24,1 %)** en 2.940 horas → se publica **11.324 kWh/año** (14.920 − 3.596). Este y Oeste pierden 23,9 % y 24,3 %.
+
+### Recorte por inversor — cómo leerlo en pantalla y qué hacer
+
+- **🗺️ Vista 3D › Resumen POA por superficie:** tabla **«✂️ Recorte por inversor (hora a hora)»** con potencia AC, AC sin recorte, kWh y % recortados y horas con recorte; en «🔎 De dónde sale el PR», la columna **«Recorte inversor»** por superficie.
+- La energía que se publica al Financiero (simplificado y bypass) ya lo resta. El modo físico sigue con su propio cálculo por bus de inversor.
+- Si cambias la potencia AC de un inversor o la asignación de grupos, la energía publicada queda vencida y la app pide volver a publicarla.
+- **Qué hacer:** si un inversor recorta más de 2–3 % al año, agrega otro inversor en ⚡ Diseño eléctrico y reparte los grupos, o elige un modelo de más potencia. Lo usual es DC/AC entre 1,1 y 1,3.
+- **Límite:** en el modo bypass el recorte se calcula antes de restar la sombra del CSV (horas con sombra producen menos y recortan menos), así que puede quedar un poco por encima del real.
 
 Calculadora BIPV — Innovación Química
 

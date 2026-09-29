@@ -518,7 +518,7 @@ def validar_diseno_electrico(
                 avisos.append(
                     f"{etiqueta}: hay más potencia de paneles que de inversor (DC/AC {ratio:.2f}). "
                     "En las horas de más sol el inversor limita su salida (recorte o «clipping») "
-                    "y se pierde algo de energía; el modo físico calcula cuánto. Hasta 1,35 suele "
+                    "y se pierde algo de energía; la energía de 🗺️ Vista 3D lo resta hora a hora (ver «✂️ Recorte por inversor»). Hasta 1,35 suele "
                     "ser una buena decisión económica; más arriba conviene revisarlo."
                 )
         elif grupos_inv:

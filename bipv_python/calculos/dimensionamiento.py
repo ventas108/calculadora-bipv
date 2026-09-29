@@ -494,12 +494,15 @@ def evaluar_relacion_dc_ac(P_dc_stc_kW: float, P_ac_nom_W: float | None) -> dict
         estado, nivel = "sobredimensionado", "🟠"
         mensaje = (
             f"Inversor sobredimensionado (relación DC/AC = {ratio:.2f}) -- por debajo del "
-            "rango típico de diseño (0.95–1.35). Verifica si es una decisión deliberada "
+            "rango típico de diseño (1.00–1.35). Verifica si es una decisión deliberada "
             "(ej. inversor ya disponible/reutilizado) o si conviene un equipo más pequeño."
         )
+    # El texto dice 1.00–1.35 porque es lo que decide el código (antes decía
+    # 0.95 y una relación de 0,97 salía 🟠 «por debajo de 0.95–1.35»; Spec
+    # 05/recorte-inversor-multisuperficie, 29-sep-2026).
     elif ratio <= 1.35:
         estado, nivel = "optimo", "🟢"
-        mensaje = f"Relación DC/AC = {ratio:.2f} -- dentro del rango típico de diseño (0.95–1.35)."
+        mensaje = f"Relación DC/AC = {ratio:.2f} -- dentro del rango típico de diseño (1.00–1.35)."
     elif ratio <= 1.6:
         estado, nivel = "alto", "🟠"
         mensaje = (
