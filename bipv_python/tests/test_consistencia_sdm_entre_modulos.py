@@ -201,3 +201,30 @@ def test_loss_diagram_igual_desde_los_dos_motores_y_sin_nombre_de_referencia():
         e_dc = next(f["kWh"] for f in tabla if f["Etapa"].startswith("③"))
         assert next(f["kWh"] for f in tabla if f["Etapa"].startswith("②d")) == e_dc
         assert not [f["Nota"] for f in tabla if menciona_referencia(f["Nota"])]
+
+
+def test_bypass_no_cuenta_de_nuevo_las_horas_de_horizonte():
+    """Spec 05/mismatch-horizonte-coherente (29-sep-2026): en las horas con el
+    sol detrás del horizonte Producción ya quitó la luz directa; el bypass
+    (mismo SDM) no debe restar nada más en esas horas y debe dar exactamente
+    lo mismo en las demás. Antes el horizonte entraba como sombra TOTAL."""
+    import pandas as pd
+
+    from calculos.mismatch_bypass import excluir_horas_horizonte, simular_bypass_horario
+
+    index = pd.date_range("2001-01-01", periods=8760, freq="h", tz="UTC")
+    sol = (index.hour >= 6) & (index.hour < 18)
+    g = np.where(sol, 700.0, 0.0)
+    t = np.full(8760, 25.0)
+    fs3d = pd.Series(np.where(sol, 0.3, 0.0), index=index)
+    horizonte = pd.Series((index.hour == 6) | (index.hour == 17), index=index)
+    p_final, info = excluir_horas_horizonte(fs3d, horizonte)
+    kw = dict(G_eff=g, T_amb=t, N_series=8, N_parallel=2, panel=ASP_ST1_T40)
+    con = simular_bypass_horario(p_shade=p_final.to_numpy(), **kw)
+    sin_horas_h = simular_bypass_horario(
+        p_shade=np.where(horizonte.to_numpy(), 0.0, fs3d.to_numpy()), **kw)
+    viejo = simular_bypass_horario(
+        p_shade=np.maximum(fs3d.to_numpy(), horizonte.to_numpy().astype(float)), **kw)
+    assert info["horas_excluidas"] == 2 * 365
+    assert con["kwh_bypass_anual"] == sin_horas_h["kwh_bypass_anual"]
+    assert con["kwh_bypass_anual"] < viejo["kwh_bypass_anual"]
