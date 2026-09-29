@@ -37,6 +37,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from calculos.mismatch import pct_perdida_modulos
 from calculos.motor_optico import K_BIPV_POR_MONTAJE, SOILING_COLOMBIA, cascada_optica
 
 VERSION_CADENA = "cadena_perdidas_v1"
@@ -90,7 +91,11 @@ def parametros_cadena(estado: Mapping[str, Any]) -> dict:
         "soiling_config": dict(soiling) if isinstance(soiling, Mapping) else dict(SOILING_COLOMBIA),
         "k_soiling_vert": _num(estado.get("motor_optico_k_soil_vert"), K_SOILING_VERT_DEFECTO) if motor_ok else K_SOILING_VERT_DEFECTO,
         "mismatch": mismatch_ok,
-        "pct_mismatch_fab": _num(estado.get("pct_mismatch_fab"), PCT_MISMATCH_FAB_DEFECTO),
+        # Calidad del módulo + mismatch combinados (Spec 05/calidad-y-mismatch).
+        "pct_mismatch_fab": pct_perdida_modulos(
+            _num(estado.get("pct_calidad_modulo"), 0.0),
+            _num(estado.get("pct_mismatch_fab"), PCT_MISMATCH_FAB_DEFECTO),
+        ),
         "pct_cable_dc": _num(estado.get("pct_cableado_dc"), PCT_CABLE_DC_DEFECTO),
         "pct_cable_ac": _num(estado.get("pct_cableado_ac"), PCT_CABLE_AC_DEFECTO),
         "f_sombra_horizonte": (1.0 - _num(estado.get("factor_sombra_anual"), 0.0)) if mismatch_ok else 1.0,

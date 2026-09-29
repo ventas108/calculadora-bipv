@@ -29,6 +29,7 @@ import streamlit as st
 st.set_page_config(page_title="Análisis IA — BIPV", page_icon="🤖", layout="wide")
 
 from calculos.auth import requerir_login
+from calculos.mismatch import pct_perdida_modulos
 requerir_login()
 
 from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
@@ -145,7 +146,8 @@ def _candidato_actual() -> CandidatoRegistrado:
         eta_inversor=float(st.session_state.get("eta_inversor", 0.97)),
         k_bipv=float(st.session_state.get("motor_optico_k_bipv", 1.0)),
         inversor=st.session_state.get("inversor_dict_dim"),
-        pct_mismatch_fab=float(st.session_state.get("pct_mismatch_fab", 2.0)),
+        pct_mismatch_fab=pct_perdida_modulos(   # calidad + mismatch (Spec 05/calidad-y-mismatch)
+            st.session_state.get("pct_calidad_modulo"), st.session_state.get("pct_mismatch_fab", 2.0)),
         pct_soiling=float(st.session_state.get("pct_soiling", 2.0)),
         pct_cableado=float(st.session_state.get("pct_cableado", 1.5)),
     )

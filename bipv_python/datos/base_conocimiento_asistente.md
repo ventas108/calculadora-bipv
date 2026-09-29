@@ -4727,6 +4727,54 @@ Debajo de la tabla de irradiancia mensual está el recuadro con la versión, la 
 - Si no cabe ni un string, el aviso 🔴 dice cuántos m² necesita uno.
 - Para que la relación DC/AC aparezca, el inversor debe tener su potencia AC en 📋 Catálogo Inversores.
 
+## 81. Calidad del módulo y mismatch por separado, como PVsyst (29-sep-2026)
+
+### Calidad del módulo y mismatch — qué es cada una
+
+**Qué es:** son dos pérdidas distintas del módulo, que PVsyst muestra en dos filas de su diagrama de pérdidas:
+- **Calidad del módulo** («Module quality loss»): cuánto rinde el módulo real frente a lo que dice su ficha. Si el fabricante entrega módulos con tolerancia positiva (por ejemplo 0/+5 W), puede ser **negativa**, es decir, una ganancia.
+- **Mismatch** («Mismatch loss, modules and strings»): los módulos de un string y los strings de un MPPT no son idénticos; la corriente la marca el más débil y se pierde un poco.
+
+**Por qué se separaron:** antes la app tenía un solo control, «Mismatch de fabricación», de 0 a 3 %. Un informe de PVsyst con las dos pérdidas no se podía copiar.
+
+### Calidad del módulo y mismatch — fórmula en palabras y caso Apartadó
+
+**La fórmula en palabras:** la potencia del módulo se multiplica primero por (1 − calidad) y después por (1 − mismatch). No se suman: se aplican una detrás de la otra.
+
+**Ejemplo real:** en el informe de PVsyst del proyecto agrivoltaico de Apartadó la calidad es 3.00 % y el mismatch 2.10 %. Juntas: 0.97 × 0.979 = 0.950, una pérdida de **5.04 %**. Con el control único, que llegaba a 3 %, la app daba unos 2 % más energía que PVsyst solo por esto.
+
+### Calidad del módulo y mismatch — cómo leerlo en pantalla y qué hacer
+
+- En 🔀 Mismatch, sección «⚙️ 3. Otras pérdidas del sistema», hay dos controles: «🏷️ Calidad del módulo» (−2 a 5 %) y «🔩 Mismatch módulos y strings» (0 a 4 %).
+- En 📊 Producción, el diagrama de pérdidas muestra la fila «②c0 Calidad del módulo» y la fila «②c Mismatch módulos y strings», cada una con sus kWh.
+- **Qué hacer:** para comparar con PVsyst, copia los dos valores de su página «PV Array Characteristics». Si no tienes datos del fabricante, deja la calidad en 0 y el mismatch entre 1 y 2 %.
+- Los proyectos guardados antes de este cambio quedan con calidad 0: su energía no cambia.
+
+## 82. Temperaturas de diseño de Dimensionamiento: de dónde salen y por qué ya no se pierden (29-sep-2026)
+
+### Temperaturas de diseño — de dónde salen (fórmula en palabras)
+
+📐 Dimensionamiento usa tres temperaturas para revisar los voltajes del string:
+- **T_mín de diseño:** la hora más fría del año típico (TMY) de ☀️ Recurso Solar. Con frío el panel da más voltaje, así que decide el Voc máximo contra el límite del inversor.
+- **T_celda caliente realista:** la temperatura del aire que solo se supera el 5 % de las horas (P95), más el calentamiento del panel con 800 W/m²: (NOCT − 20) ÷ 800 × 800.
+- **T_celda caliente extremo:** la hora más caliente del año, más el calentamiento con 1000 W/m²: (NOCT − 20) ÷ 800 × 1000. Decide el voltaje mínimo de trabajo.
+
+**Ejemplo real:** Apartadó con PVGIS 5.3 y el JA Solar JAM66D46-720/LB (NOCT 45 °C): **20.9 / 54.2 / 63.6 °C**. Con 28 módulos en serie el Voc en frío es 1,386 V, 7.6 % por debajo de 1,500 V: sin riesgos.
+
+### Temperaturas de diseño — qué pasaba antes (salían 20 / 55 / 64 o en cero)
+
+El 29-sep-2026, en la comparación con PVsyst de Apartadó, salieron en 0 y luego en **20.0 / 55.0 / 64.0**, los valores fijos de referencia de la ciudad. Con 20.0 °C el Voc sube a 1,389 V, el margen baja a 7.4 % y N = 28 salía en ALERTA («Ningún N válido»). Tres causas, ya corregidas:
+1. Al abrir otra página se borraba el valor de los campos y al volver quedaban los de la ciudad.
+2. «💾 Guardar configuración» de 🏠 Proyecto escribía los valores de la ciudad encima de los del año típico.
+3. Solo se recalculaban al cambiar de ciudad; no al cambiar la versión de PVGIS, las coordenadas o el panel.
+
+### Temperaturas de diseño — cómo leerlo en pantalla y qué hacer
+
+- Debajo de los campos, la línea 🌡️ dice de dónde salen: «desde el TMY de Apartadó (PVGIS 5.3)» o «Sin año típico en esta sesión».
+- Si dice «Sin año típico», abre primero ☀️ Recurso Solar (restaura el año típico en segundos) y vuelve a 📐 Dimensionamiento: se recalculan solas.
+- Puedes escribirlas a mano (por ejemplo, la mínima histórica de una estación del IDEAM): la app las respeta mientras no cambie el año típico ni el panel.
+- Se guardan con el proyecto.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

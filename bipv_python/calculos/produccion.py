@@ -170,6 +170,7 @@ def simular_produccion_anual(
     pct_cableado_ac: float | None = None,
     N_serie: int | None = None,
     tension_red_V: float | None = None,
+    pct_calidad_modulo: float | None = None,
 ) -> dict:
     """
     Simulación de producción anual hora a hora — IEC 61724.
@@ -246,6 +247,12 @@ def simular_produccion_anual(
                           hora a hora -- es tolerancia de fábrica, no un efecto
                           eléctrico dependiente de corriente). None (default) =
                           sin pérdida, retrocompatible.
+    pct_calidad_modulo  : % «Module quality loss» de PVsyst (29-sep-2026, Spec
+                          05/calidad-y-mismatch): potencia real del módulo frente
+                          a la de la ficha; negativo = ganancia. Se aplica sobre
+                          Pmax ANTES de pct_mismatch_fab, que desde entonces es
+                          solo el «Mismatch loss, modules and strings». None o 0
+                          = sin efecto, retrocompatible.
     resistencia_dc_ohm  : resistencia DC efectiva (Ω) de todo el tramo de
                           cableado del array al inversor -- ver calculos.
                           diagrama_unifilar.calcular_perdida_ohmica()
@@ -373,6 +380,12 @@ def simular_produccion_anual(
     # fila ②a/②b del Loss Diagram.
     E_dc_antes_binning_ohmico_kWh = float(pmax_mod.sum()) * N_paneles / 1000.0
 
+    pct_calidad_modulo_aplicado = None
+    if pct_calidad_modulo:
+        pmax_mod = pmax_mod * (1.0 - pct_calidad_modulo / 100.0)
+        pct_calidad_modulo_aplicado = pct_calidad_modulo
+    E_dc_despues_calidad_kWh = float(pmax_mod.sum()) * N_paneles / 1000.0
+
     pct_mismatch_fab_aplicado = None
     if pct_mismatch_fab:
         pmax_mod = pmax_mod * (1.0 - pct_mismatch_fab / 100.0)
@@ -401,7 +414,8 @@ def simular_produccion_anual(
         perdida_ohmica_dc_modo = "manual"
     E_dc_despues_ohmico_dc_kWh = float(pmax_mod.sum()) * N_paneles / 1000.0
 
-    perdida_mismatch_fab_kWh = round(E_dc_antes_binning_ohmico_kWh - E_dc_despues_mismatch_kWh, 0)
+    perdida_calidad_modulo_kWh = round(E_dc_antes_binning_ohmico_kWh - E_dc_despues_calidad_kWh, 0)
+    perdida_mismatch_fab_kWh = round(E_dc_despues_calidad_kWh - E_dc_despues_mismatch_kWh, 0)
     perdida_ohmica_dc_kWh    = round(E_dc_despues_mismatch_kWh - E_dc_despues_ohmico_dc_kWh, 0)
 
     # ── Escalar al sistema ─────────────────────────────────────────────────────
@@ -537,6 +551,8 @@ def simular_produccion_anual(
         # usa perdidas_desglosadas() para las nuevas filas ②c/②d del Loss
         # Diagram -- reconciliación exacta, ningún kWh se pierde ni se inventa.
         "E_dc_antes_binning_ohmico_kWh": round(E_dc_antes_binning_ohmico_kWh, 0),
+        "pct_calidad_modulo_aplicado":   pct_calidad_modulo_aplicado,
+        "perdida_calidad_modulo_kWh":    perdida_calidad_modulo_kWh,
         "pct_mismatch_fab_aplicado":     pct_mismatch_fab_aplicado,
         "perdida_mismatch_fab_kWh":      perdida_mismatch_fab_kWh,
         "perdida_ohmica_dc_kWh":         perdida_ohmica_dc_kWh,
@@ -737,9 +753,30 @@ def perdidas_desglosadas(
     # ninguna fila ②c en absoluto -- ni real ni informativa -- perdiendo el
     # disclaimer de PVsyst por completo. Ningún kWh salía mal (③ seguía
     # reconciliando exacto), pero la tabla dejaba de ser auditable en ese caso.
+    _pct_cal_aplicado = res.get("pct_calidad_modulo_aplicado")
     _pct_fab_aplicado = res.get("pct_mismatch_fab_aplicado")
     _modo_ohmico_dc    = res.get("perdida_ohmica_dc_modo")
     _kwh_prev = round(E_dc_pre_binning, 0)
+
+    # ②c0 Calidad del módulo y ②c Mismatch (Spec 05/calidad-y-mismatch,
+    # 29-sep-2026): dos filas, como el Loss Diagram de PVsyst. La última fila
+    # del bloque se fuerza a E_dc_anual_kWh (sin residuo de redondeo).
+    if _pct_cal_aplicado is not None:
+        _es_ultima_cal = _pct_fab_aplicado is None and _modo_ohmico_dc is None
+        _kwh_cal = (
+            round(res["E_dc_anual_kWh"], 0) if _es_ultima_cal
+            else round(_kwh_prev - res.get("perdida_calidad_modulo_kWh", 0.0), 0)
+        )
+        filas.append({
+            "Etapa": "②c0 Calidad del módulo  (aplicado)",
+            "kWh": _kwh_cal,
+            "Δ kWh": round(_kwh_cal - _kwh_prev, 0),
+            "Nota": (
+                f"{_pct_cal_aplicado}% configurado en 🔀 Mismatch · «Module quality "
+                "loss» de PVsyst (negativo = ganancia por tolerancia positiva)."
+            ),
+        })
+        _kwh_prev = _kwh_cal
 
     if _pct_fab_aplicado is not None:
         _es_ultima_fab = _modo_ohmico_dc is None
@@ -748,17 +785,16 @@ def perdidas_desglosadas(
             else round(_kwh_prev - res.get("perdida_mismatch_fab_kWh", 0.0), 0)
         )
         filas.append({
-            "Etapa": "②c Mismatch fabricación  (aplicado)",
+            "Etapa": "②c Mismatch módulos y strings  (aplicado)",
             "kWh": _kwh_fab,
             "Δ kWh": round(_kwh_fab - _kwh_prev, 0),
             "Nota": (
-                f"{_pct_fab_aplicado}% configurado en 🔀 Mismatch · PVsyst mostró +0,75% "
-                "(ganancia) en 2 papers independientes como valor por defecto sin datos "
-                "reales de binning -- compáralo contra tu propio reporte."
+                f"{_pct_fab_aplicado}% configurado en 🔀 Mismatch · «Mismatch loss, "
+                "modules and strings» de PVsyst."
             ),
         })
         _kwh_prev = _kwh_fab
-    else:
+    elif _pct_cal_aplicado is None:
         filas.append({
             # Informativa, NUNCA aplicada al cálculo -- esta app no tiene datos
             # de binning/clasificación de fábrica del panel, así que no hay

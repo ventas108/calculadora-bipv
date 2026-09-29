@@ -14,6 +14,12 @@ from calculos.dimensionamiento import (
     diseno_electrico_confirmado,
 )
 from calculos.graficos_compatibilidad import figura_compatibilidad_electrica
+from calculos.campos_persistentes import campo_persistente
+from calculos.temperatura import (
+    KEYS_TEMPS_DISENO,
+    temperaturas_a_aplicar,
+    temps_diseno_en_cero,
+)
 from calculos.modelo_iv import (
     preparar_panel_iv, resolver_curva_iv, resolver_panel_calibrado,
     validar_sdm_vs_ficha, explicar_fallo_validacion_sdm,
@@ -165,28 +171,20 @@ if _es_estimado:
         f"cotizar."
     )
 
-# ── Auto-población de temperaturas desde TMY ──────────────────────────────────
-# Se recalcula SOLO cuando cambia el origen de datos climáticos (nueva ciudad/TMY).
-# Una vez aplicado para una ciudad, el usuario puede editar libremente los campos.
-_tmy_df    = st.session_state.get("tmy_df")
-_ciudad_ss = st.session_state.get("tmy_ciudad", "")
-_ciudad_applied = st.session_state.get("_dim_tmy_ciudad_ref", None)
-_temp_auto_info = None
-
-# Guardián: si las tres temperaturas quedaron en 0 (p. ej. un proyecto
-# guardado con ceros las pisó al restaurarse), re-sembrar desde el TMY.
-# Físicamente T_mín, T_realista y T_extremo nunca son 0.0 a la vez.
-_temps_en_cero = all(
-    abs(float(st.session_state.get(_k) or 0.0)) < 1e-9
-    for _k in ("T_min_diseno", "T_cel_realista", "T_cel_extremo")
-) and any(
-    st.session_state.get(_k) is not None
-    for _k in ("T_min_diseno", "T_cel_realista", "T_cel_extremo")
-)
+# ── Temperaturas de diseño desde el TMY (Spec 03/temperaturas-diseno) ───────
+# Se recalculan cuando cambia la firma del TMY o el NOCT del panel (otra
+# ciudad, otras coordenadas, otra versión de PVGIS, otro panel), cuando falta
+# alguna o cuando las tres están en 0. Si no, se respeta lo que el usuario
+# escribió. Antes dependía solo del nombre de la ciudad (29-sep-2026).
+_tmy_df = st.session_state.get("tmy_df")
+_t2m_dim = None
+if _tmy_df is not None:
+    _t2m_dim = _tmy_df["T2m"] if "T2m" in _tmy_df.columns else _tmy_df.iloc[:, 0]
+_noct_dim = float(panel.get("NOCT", 45.0) or 45.0)
 
 # #229 — aviso: el proyecto restaurado traía las temperaturas en cero y se
 # descartaron (JSON legado con el bug de ciudades). Se re-siembran del TMY si
-# existe; si no, de los defaults de la ciudad al volver a Guardar en Proyecto.
+# existe; si no, de los valores de la ciudad.
 if st.session_state.pop("_temps_diseno_saneadas", False):
     st.info(
         "🌡️ El proyecto guardado traía las temperaturas de diseño en 0 °C "
@@ -195,30 +193,12 @@ if st.session_state.pop("_temps_diseno_saneadas", False):
         "verifica los valores antes de dimensionar."
     )
 
-if _tmy_df is not None and _ciudad_ss and (
-    _ciudad_ss != _ciudad_applied or _temps_en_cero
-):
-    try:
-        _noct    = float(panel.get("NOCT", 45.0))
-        _t2m     = _tmy_df["T2m"] if "T2m" in _tmy_df.columns else _tmy_df.iloc[:, 0]
-        _t_min   = round(float(_t2m.min()), 1)
-        _t_p95   = round(float(_t2m.quantile(0.95)), 1)
-        _t_max   = round(float(_t2m.max()), 1)
-        # T_celda = T_amb + (NOCT-20)/800 * G  (fórmula Mod_TemperaturasDiseno VBA)
-        _t_real  = round(_t_p95 + (_noct - 20.0) / 800.0 * 800.0, 1)   # G=800 W/m²
-        _t_extr  = round(_t_max + (_noct - 20.0) / 800.0 * 1000.0, 1)  # G=1000 W/m²
-        # Pre-poblar session_state ANTES de renderizar los widgets
-        st.session_state["T_min_diseno"]       = _t_min
-        st.session_state["T_cel_realista"]     = _t_real
-        st.session_state["T_cel_extremo"]      = _t_extr
-        st.session_state["_dim_tmy_ciudad_ref"] = _ciudad_ss
-        _temp_auto_info = (
-            f"🌡️ Temperaturas actualizadas desde TMY **{_ciudad_ss}** — "
-            f"T_mín: {_t_min}°C · T_celda realista: {_t_real}°C · T_celda extremo: {_t_extr}°C "
-            f"(NOCT {_noct}°C del panel)"
-        )
-    except Exception:
-        pass  # Si falla, usa defaults anteriores sin interrumpir
+try:
+    _temps_nuevas = temperaturas_a_aplicar(st.session_state, _t2m_dim, _noct_dim)
+except (TypeError, ValueError):
+    _temps_nuevas = None
+if _temps_nuevas:
+    st.session_state.update(_temps_nuevas)
 
 with col2:
     # No pasar value= junto con key= cuando session_state ya trae el valor:
@@ -239,17 +219,32 @@ with col2:
     # el bloque de arriba solo recalcula desde el TMY real cuando ya existe.
     # Corregido: el placeholder ahora es el valor real de la ciudad activa
     # (mismo dato que ya usa 🏠 Proyecto), no un número universal inventado.
+    #
+    # 29-sep-2026 (Spec 03/temperaturas-diseno): el dato vive en su clave de
+    # siempre y el campo en «_w_<clave>» (campo_persistente). Con la misma
+    # clave para los dos, Streamlit la borraba al abrir otra página y al
+    # volver quedaban los valores de la ciudad (Apartadó: 20/55/64 en vez de
+    # 20.9/54.2/63.6 del TMY), o en 0.
     _ciudad_activa_dim = st.session_state.get("ciudad", "Bogotá")
     _ciudad_defaults = CIUDADES.get(_ciudad_activa_dim, CIUDADES.get("Bogotá", {}))
-    st.session_state.setdefault("T_min_diseno", _ciudad_defaults.get("T_min_diseno", 5.0))
-    st.session_state.setdefault("T_cel_realista", _ciudad_defaults.get("T_cel_realista", 36.35))
-    st.session_state.setdefault("T_cel_extremo", _ciudad_defaults.get("T_cel_extremo", 41.94))
-    T_frio   = st.number_input("T_mín diseño (°C)", key="T_min_diseno",
-                help="Auto-calculado como mínimo histórico del TMY. Determina Voc_max y riesgo sobre Vdc_max del inversor.")
-    T_real   = st.number_input("T_celda caliente realista (°C)", key="T_cel_realista",
-                help="T_amb P95 + (NOCT-20)/800×800 W/m². Determina Vmp de operación habitual.")
-    T_extr   = st.number_input("T_celda caliente extremo (°C)", key="T_cel_extremo",
-                help="T_amb máxima histórica + (NOCT-20)/800×1000 W/m². Determina Vmp mínimo (peor caso MPPT).")
+    if temps_diseno_en_cero(st.session_state):
+        for _k in KEYS_TEMPS_DISENO:
+            st.session_state.pop(_k, None)
+    T_frio = campo_persistente(
+        st.session_state, st.number_input, "T_mín diseño (°C)", "T_min_diseno",
+        float(_ciudad_defaults.get("T_min_diseno", 5.0)), min_value=-40.0, max_value=45.0,
+        step=0.1, format="%.2f",
+        help="Mínima del año típico (TMY) de ☀️ Recurso Solar. Determina Voc_max y riesgo sobre Vdc_max del inversor.")
+    T_real = campo_persistente(
+        st.session_state, st.number_input, "T_celda caliente realista (°C)", "T_cel_realista",
+        float(_ciudad_defaults.get("T_cel_realista", 36.35)), min_value=-10.0, max_value=110.0,
+        step=0.1, format="%.2f",
+        help="T_amb P95 + (NOCT-20)/800×800 W/m². Determina Vmp de operación habitual.")
+    T_extr = campo_persistente(
+        st.session_state, st.number_input, "T_celda caliente extremo (°C)", "T_cel_extremo",
+        float(_ciudad_defaults.get("T_cel_extremo", 41.94)), min_value=-10.0, max_value=120.0,
+        step=0.1, format="%.2f",
+        help="T_amb máxima histórica + (NOCT-20)/800×1000 W/m². Determina Vmp mínimo (peor caso MPPT).")
     # N_strings/tracker: dos mecanismos posibles, ver docstring de
     # resolver_n_strings_tracker() para la comparación honesta contra la
     # referencia estándar internacional que motivó agregar el mecanismo
@@ -446,13 +441,19 @@ if _motor_ok_dim:
     )
 
 # Caption estable de temperaturas (siempre presente → evita removeChild de React)
-_tmy_applied = st.session_state.get("_dim_tmy_ciudad_ref", "")
-if _tmy_applied:
+if _t2m_dim is not None:
     st.caption(
-        f"🌡️ Temperaturas desde TMY **{_tmy_applied}** — "
+        f"🌡️ Temperaturas desde el TMY de **{st.session_state.get('tmy_ciudad', '—')}** "
+        f"(PVGIS {st.session_state.get('_solar_pvgis_guardada', '—')}) — "
         f"T_mín: {T_frio:.1f}°C · T_cel realista: {T_real:.1f}°C · "
         f"T_cel extremo: {T_extr:.1f}°C  "
-        f"*(NOCT {panel.get('NOCT', 45.0):.0f}°C · editable manualmente)*"
+        f"*(NOCT {_noct_dim:.0f}°C · editable manualmente)*"
+    )
+else:
+    st.caption(
+        f"🌡️ Sin año típico en esta sesión: T_mín {T_frio:.1f}°C · T_cel realista "
+        f"{T_real:.1f}°C · T_cel extremo {T_extr:.1f}°C son los guardados o los de "
+        "referencia de la ciudad. Abre ☀️ Recurso Solar para calcularlas desde el TMY."
     )
 
 # (panel e inversor ya cargados arriba)

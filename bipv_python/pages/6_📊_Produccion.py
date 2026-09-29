@@ -616,6 +616,7 @@ def _payload_y_firma_produccion_config_actual() -> tuple[dict | None, str | None
             factor_mismatch_aplicado=factor_pr,
             factor_espectral=_factor_espectral_serie,
             pct_mismatch_fab=st.session_state.get("pct_mismatch_fab"),
+            pct_calidad_modulo=st.session_state.get("pct_calidad_modulo"),
             pct_cableado_dc=st.session_state.get("pct_cableado_dc"),
             pct_cableado_ac=st.session_state.get("pct_cableado_ac"),
             perdida_ohmica_unifilar=_perd_ohm_unif if _unif_vigente else None,
@@ -646,6 +647,7 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 P_dc_stc_kW       = P_stc_kW,
                 k_bipv            = _k_bipv_sim,
                 pct_mismatch_fab   = st.session_state.get("pct_mismatch_fab"),
+                pct_calidad_modulo = st.session_state.get("pct_calidad_modulo"),
                 resistencia_dc_ohm = _resistencia_dc_ohm,
                 pct_cableado_dc    = st.session_state.get("pct_cableado_dc"),
                 resistencia_ac_ohm = _resistencia_ac_ohm,
@@ -1347,15 +1349,20 @@ if btn_sim or st.session_state.get("produccion_ok"):
             # 7-sep-2026: deja de ser SIEMPRE informativa. Es real y aplicada
             # si el usuario configuró un % en 🔀 Mismatch (sección 3); si no,
             # sigue siendo solo la referencia de PVsyst, sin aplicar nada.
+            if res.get("pct_calidad_modulo_aplicado") is not None:
+                st.caption(
+                    f"ℹ️ Fila ②c0 \"Calidad del módulo\" **sí se aplica** -- "
+                    f"{res['pct_calidad_modulo_aplicado']}% configurado en 🔀 Mismatch "
+                    "(«Module quality loss» de PVsyst; negativo = ganancia)."
+                )
             if res.get("pct_mismatch_fab_aplicado") is not None:
                 st.caption(
-                    f"ℹ️ Fila ②c \"Mismatch fabricación\" **sí se aplica** al cálculo -- "
+                    f"ℹ️ Fila ②c \"Mismatch módulos y strings\" **sí se aplica** al cálculo -- "
                     f"{res['pct_mismatch_fab_aplicado']}% configurado en 🔀 Mismatch "
-                    "(sección 3). PVsyst mostró +0,75% (ganancia) en 2 papers "
-                    "independientes como valor por defecto del software sin datos "
-                    "reales de binning -- compáralo contra tu propio reporte."
+                    "(sección 3) -- «Mismatch loss, modules and strings» de PVsyst."
                 )
-            else:
+            if (res.get("pct_calidad_modulo_aplicado") is None
+                    and res.get("pct_mismatch_fab_aplicado") is None):
                 st.caption(
                     "ℹ️ Fila ②c \"Módulo\" es **solo informativa** — muestra +0,75% porque eso "
                     "fue lo que PVsyst reportó, idéntico, en 2 papers reales independientes "

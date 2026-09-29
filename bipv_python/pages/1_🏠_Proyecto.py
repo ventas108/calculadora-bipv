@@ -7,6 +7,7 @@ from datos.ciudades_colombia import CIUDADES, LISTA_CIUDADES, FECHA_VALIDACION_T
 from calculos.tz_utils import utc_offset_latam, tz_label
 from calculos.tarifa_utils import init_tarifa, set_tarifa_from_ciudad, tarifa_widget
 from calculos.invalidacion import KEYS_RECURSO_SOLAR, KEYS_DERIVADOS_POA
+from calculos.temperatura import CLAVE_FIRMA_TEMPS_TMY
 from calculos.proyectos_manager import (
     listar_proyectos, guardar_proyecto_actual,
     cargar_proyecto, eliminar_proyecto,
@@ -262,6 +263,8 @@ with col1:
             "motor_optico_k_soil_vert",
             "_solar_lat_guardada", "_solar_lon_guardada", "_solar_alt_guardada",
             "_solar_pvgis_guardada",
+            # Temperaturas de diseño: la firma es del TMY de la ciudad anterior.
+            "dim_temps_tmy_firma",
         )
         for _k in _KEYS_LIMPIAR_CIUDAD:
             st.session_state.pop(_k, None)
@@ -738,7 +741,11 @@ if st.button("💾 Guardar configuración", type="primary"):
             c.get("T_cel_realista"),
             c.get("T_cel_extremo"),
         )
-        if any(_t not in (None, 0, 0.0) for _t in _temps_ciudad):
+        # Spec 03/temperaturas-diseno (29-sep-2026): tampoco pisar las que ya
+        # salieron del año típico (hay firma del TMY): con Apartadó dejaba
+        # 20/55/64 de la ciudad en vez de 20.9/54.2/63.6 del TMY de PVGIS 5.3.
+        if (not st.session_state.get(CLAVE_FIRMA_TEMPS_TMY)
+                and any(_t not in (None, 0, 0.0) for _t in _temps_ciudad)):
             st.session_state["T_min_diseno"]   = c["T_min_diseno"]
             st.session_state["T_cel_realista"] = c["T_cel_realista"]
             st.session_state["T_cel_extremo"]  = c["T_cel_extremo"]
