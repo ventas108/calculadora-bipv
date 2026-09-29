@@ -106,6 +106,29 @@ def test_optimizar_n_serie(N, esperado_ok):
     )
 
 
+@pytest.mark.parametrize("n_inversores", [1, 2, 3])
+def test_proyecto_completo_coincide_con_dimensionar_sistema_del_xlsm(n_inversores):
+    """«Proyecto completo» (Spec 03-dimensionamiento/proyecto-completo,
+    29-sep-2026) cuenta strings completos en vez de inversores llenos. Cuando
+    el área útil alcanza justo para k inversores llenos, debe dar lo mismo que
+    k × dimensionar_sistema() con la configuración del XLSM (N=8, 8 strings
+    por tracker): mismos módulos, potencia y área; y nunca más de lo que cabe."""
+    from calculos.dimensionamiento import dimensionar_sistema, proyecto_completo
+    dim = dimensionar_sistema(ASP_ST1_T40, 1.0, 8, 8, GROWATT["N_mppt"])
+    area = n_inversores * dim["area_ocupada_m2"] + 1e-6
+    pc = proyecto_completo(ASP_ST1_T40, area, 8, 8, GROWATT["N_mppt"],
+                           P_ac_nom_W=GROWATT.get("P_ac_nom_W"))
+    assert pc["N_inversores"] == n_inversores
+    assert pc["N_paneles"] == n_inversores * dim["N_paneles"]
+    assert pc["P_dc_kWp"] == pytest.approx(n_inversores * dim["P_dc_stc_kW"], abs=1e-3)
+    assert pc["area_m2"] <= area and pc["cabe"]
+    # Un poco menos de área: ya no cabe el último string (antes se redondeaba
+    # hacia arriba a otro inversor lleno).
+    pc_menos = proyecto_completo(ASP_ST1_T40, area - 1.0, 8, 8, GROWATT["N_mppt"])
+    assert pc_menos["N_paneles"] == n_inversores * dim["N_paneles"] - 8
+    assert pc_menos["area_m2"] <= area - 1.0
+
+
 def test_voc_n8_vs_xlsm():
     """Voc frío con N=8 debe ser 1017.4V ± 2V (hoja Resultado_Dim_String del XLSM)."""
     from calculos.dimensionamiento import calcular_voc_string
