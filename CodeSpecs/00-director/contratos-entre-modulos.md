@@ -186,6 +186,17 @@ Reglas de consumo:
 	ponderada por módulos. El físico es SDM + bypass + etapa de inversor, con una
 	unidad por grupo y las temperaturas de diseño del proyecto. Los tres se
 	muestran con su origen.
+- Strings que cruzan a otra superficie (29-sep-2026, Spec
+	`05-perdidas-y-temperatura/string-cruza-superficies`): un grupo puede
+	declarar `cruce = {uid, modulos}` (k de sus N serie módulos en otra
+	superficie). Los módulos se cuentan donde están
+	(`cruce_superficies.modulos_fisicos_por_superficie`, usado por
+	`superficies_para_energia`); `cadena_superficies_estado` multiplica el PR de
+	cada superficie por `f_cruce` = 1 − Σ L × módulos del string en ella ÷
+	módulos de la superficie, con L la pérdida hora a hora con diodos de bypass
+	(`perdida_string_bypass`). El simplificado y el bypass la usan; el físico no
+	se prepara con cruces (error explicado). `validar_diseno_electrico` agrega
+	🔴/🟡 al grupo. `firma_cadena` incluye los cruces solo si existen.
 - Cambiar el panel de una superficie (o el del proyecto, para las que lo siguen)
 	retira la publicación y los resultados de bypass, MPPT y físico; la POA y la
 	sombra se conservan. Agregar, eliminar, desactivar o renombrar superficies no

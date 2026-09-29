@@ -17,6 +17,18 @@ def construir_proyecto_desde_session_state(session_state: Mapping[str, Any]) -> 
     superficies = [s for s in (session_state.get("superficies_bipv") or []) if s.get("activa", True)]
     if not superficies:
         raise ValueError("No hay superficies BIPV activas para el modo fisico.")
+    # Spec 05/string-cruza-superficies: el modo físico simula cada grupo con la
+    # geometría y la sombra 3D de UNA superficie; un string que cruza a otra
+    # necesitaría las dos. No se prepara (mejor que publicar números
+    # incompletos); el simplificado y el bypass sí restan esa pérdida.
+    from calculos.cruce_superficies import tiene_cruce
+    _con_cruce = [s.get("nombre", "?") for s in superficies if tiene_cruce(s)]
+    if _con_cruce:
+        raise ValueError(
+            "El modo físico todavía no modela strings que cruzan a otra superficie ("
+            + ", ".join(f"«{n}»" for n in _con_cruce)
+            + "). Usa el modo simplificado o el bypass, que sí restan esa pérdida."
+        )
     # Spec 05/panel-por-superficie: cada superficie usa su panel; el
     # panel_dict global solo hace falta para las que siguen al del proyecto.
     panel_dict = session_state.get("panel_dict")

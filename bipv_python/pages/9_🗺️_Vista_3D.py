@@ -1617,6 +1617,40 @@ with tab_solar:
                         _np_ui = int(_par_texto) if _par_texto else None
                     except ValueError:
                         _np_ui = _par_texto
+                    # 🔀 String que cruza a otra superficie (Spec 05/string-
+                    # cruza-superficies): k de los N serie módulos de cada string
+                    # están en otra superficie (p. ej. la esquina Este/Oeste).
+                    _otras_sup = [s for s in _sups_actualizado
+                                  if s.get("activa", True) and s.get("uid", s["nombre"]) != _uid_ui]
+                    _cruce_prev = _g_ui.get("cruce") if isinstance(_g_ui.get("cruce"), dict) else None
+                    _cruce_ui = None
+                    if _otras_sup:
+                        _valor_campo_superficie(f"ms_sup_cruce_{_suf}", bool(_cruce_prev))
+                        _usa_cruce = st.checkbox(
+                            "🔀 Este string cruza a otra superficie",
+                            key=f"ms_sup_cruce_{_suf}",
+                            help="Márcalo si cada string de este grupo tiene parte de sus módulos en "
+                                 "otra superficie (p. ej. una esquina Este/Oeste). En serie, la parte "
+                                 "con menos luz frena al string: se resta esa pérdida hora a hora.",
+                        )
+                        if _usa_cruce:
+                            _nombres_otras = [s["nombre"] for s in _otras_sup]
+                            _uid_por_nombre = {s["nombre"]: s.get("uid", s["nombre"]) for s in _otras_sup}
+                            _dest_prev = next((s["nombre"] for s in _otras_sup
+                                               if _cruce_prev and str(s.get("uid", s["nombre"])) == str(_cruce_prev.get("uid"))),
+                                              _nombres_otras[0])
+                            _valor_campo_superficie(f"ms_sup_cruce_dest_{_suf}", _dest_prev)
+                            _valor_campo_superficie(
+                                f"ms_sup_cruce_k_{_suf}", int((_cruce_prev or {}).get("modulos") or 1))
+                            _cc1, _cc2 = st.columns(2)
+                            _dest_ui = _cc1.selectbox("Cruza a", _nombres_otras, key=f"ms_sup_cruce_dest_{_suf}")
+                            _k_ui = _cc2.number_input(
+                                "Módulos de cada string en esa superficie", min_value=1, step=1,
+                                key=f"ms_sup_cruce_k_{_suf}",
+                                help="Cuántos de los N serie módulos de cada string están en la otra "
+                                     "superficie. Deben quedar módulos en las dos (entre 1 y N serie − 1).",
+                            )
+                            _cruce_ui = {"uid": _uid_por_nombre[_dest_ui], "modulos": int(_k_ui)}
                     if _borrar_g:
                         _cambio_grupos = True
                         continue
@@ -1624,6 +1658,7 @@ with tab_solar:
                         "gid": _gid, "topologia": (_g_ui.get("topologia") or "string"),
                         "inversor_id": _inv_asignado or None, "mppt": int(_mppt_asignado),
                         "n_serie": _ns_ui, "n_paralelo": _np_ui,
+                        **({"cruce": _cruce_ui} if _cruce_ui else {}),
                     })
                 if st.button("➕ Agregar grupo de strings", key=f"ms_sup_addg_{_uid_ui}",
                              help="Otro conjunto de strings de esta superficie, en otro MPPT u otro inversor."):
@@ -2919,7 +2954,20 @@ with tab_solar:
                 # en cada grupo (⚡ Diseño eléctrico lo valida); esta sección
                 # los incorporará en la fase A3. Aquí se deja fuera, a la vista.
                 _sups_varios_mp = [s for s in _sups_p if len(grupos_de_superficie(s)) > 1]
-                _sups_mp = [s for s in _sups_p if len(grupos_de_superficie(s)) <= 1]
+                # Spec 05/string-cruza-superficies: un string que cruza a otra
+                # superficie no es de una sola orientación; queda fuera, a la vista
+                # (su pérdida en serie ya la restan el simplificado y el bypass).
+                from calculos.cruce_superficies import tiene_cruce as _tiene_cruce_mp
+                _sups_cruce_mp = [s for s in _sups_p if _tiene_cruce_mp(s)]
+                _sups_mp = [s for s in _sups_p
+                            if len(grupos_de_superficie(s)) <= 1 and not _tiene_cruce_mp(s)]
+                if _sups_cruce_mp:
+                    st.info(
+                        "ℹ️ " + ", ".join(f"'{s['nombre']}'" for s in _sups_cruce_mp)
+                        + " tiene(n) strings que cruzan a otra superficie: esta simulación no la(s) "
+                        "incluye (tiene_cruce(s)). Su pérdida en serie ya la restan la energía "
+                        "simplificada y el bypass (columna «String que cruza» del desglose)."
+                    )
                 if _sups_varios_mp:
                     st.info(
                         "ℹ️ " + ", ".join(f"'{s['nombre']}'" for s in _sups_varios_mp)

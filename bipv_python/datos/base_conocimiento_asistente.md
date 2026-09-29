@@ -4972,6 +4972,30 @@ Es un modelo de primer orden (corriente proporcional a la luz, voltaje constante
 - 📊 Producción aplica esta pérdida **hora a hora**, junto con el horizonte: aparece «🔀 Aplicado hora a hora a la POA desde 🔀 Mismatch: … mismatch de orientación con diodos de bypass».
 - **Qué hacer:** evita mezclar orientaciones distintas en el mismo string; conecta cada orientación a su propio MPPT (o usa optimizadores o microinversores). Con 🗺️ Vista 3D puedes modelar cada superficie con su propia POA y su propio MPPT.
 
+## 87. Vista 3D: string que cruza dos superficies (esquina Este/Oeste, techo y fachada) (29-sep-2026)
+
+### String que cruza dos superficies — qué es y por qué importa
+
+**Qué es:** en obra es común que un string cruce una esquina: parte de sus módulos en la fachada Este y parte en la Oeste, o pase del techo a la fachada. En 🗺️ Vista 3D cada grupo de strings pertenecía a una sola superficie, así que ese string no se podía declarar: se modelaba como dos strings separados y **no se restaba su pérdida en serie**.
+
+**Por qué pierde:** en serie pasa la misma corriente por todos los módulos. En la mañana el lado Este recibe mucho sol y el Oeste poco (y en la tarde al revés): el lado con menos luz frena al string, o sus diodos de bypass lo sacan. Es el mismo cálculo hora a hora de la sección 86: con 50 % de los módulos en cada fachada Este/Oeste, el string pierde **14,9 %** en Apartadó.
+
+### String que cruza dos superficies — cómo se calcula (fórmula en palabras)
+
+1. **Los módulos se cuentan donde están:** si un grupo de la fachada Este tiene strings de 10 módulos en serie × 2 en paralelo y 4 de cada string están en la Oeste, la Este cuenta 6 × 2 = 12 de esos módulos y la Oeste suma 4 × 2 = 8. El área y la energía de cada superficie salen de sus módulos.
+2. **Pérdida del string (L):** hora a hora, con la luz de cada fachada y las fracciones del string (6/10 y 4/10), con diodos de bypass. Se suma el año ponderando por energía.
+3. **A qué módulos se aplica:** a los del string, en las **dos** superficies (todos trabajan a la corriente del string). **PR de la superficie = PR de su cadena × (1 − L × módulos del string en ella ÷ módulos de la superficie).**
+
+**Ejemplo:** Este con 20 módulos, 10 de ellos del string que cruza, y L = 14,9 %: PR × (1 − 0,149 × 10 ÷ 20) = PR × 0,9255 (−7,45 % para la superficie Este). La Oeste, con 10 de sus 20 módulos en ese string, baja lo mismo.
+
+### String que cruza dos superficies — cómo declararlo y qué hacer
+
+- En 🗺️ Vista 3D › ⚙️ Superficies BIPV › grupos de strings, marca **«🔀 Este string cruza a otra superficie»**, elige a qué superficie cruza y cuántos módulos de cada string quedan allá (entre 1 y N serie − 1).
+- ⚡ Diseño eléctrico lo revisa: 🔴 si la otra superficie no existe, no está activa o es la misma, si los módulos no están entre 1 y N serie − 1, o si las dos superficies usan paneles distintos (un string es de un solo panel). 🟡 con la explicación cuando está bien declarado.
+- En el desglose de la cadena de pérdidas aparece la columna **«String que cruza»** con el % que baja cada superficie. La energía **simplificada** y la del **bypass** ya la restan.
+- El **modo físico** todavía no modela un string que cruza (necesita la geometría y la sombra 3D de las dos superficies): no se prepara y lo explica. La sección «🔀 6» (strings en paralelo en un mismo MPPT, informativa) deja fuera esas superficies.
+- **Qué hacer:** si puedes, evita que un string cruce la esquina: cada orientación en su propio string y su propio MPPT (o con optimizadores). Declararlo te muestra cuánto cuesta no hacerlo.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
