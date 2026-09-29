@@ -208,8 +208,14 @@ def publicar_cascada_mismatch(estado, *, poa_anual: float, pct_soiling: float, m
     """
     sombra = estado.get("res_sombra") or {}
     fs = float(sombra.get("factor_sombra_anual", 0.0) or 0.0) if estado.get("sombra_ok") else 0.0
-    mm_or = float((estado.get("res_mismatch_or") or {}).get("factor_mismatch_pct", 0.0) or 0.0)
+    res_or = estado.get("res_mismatch_or") or {}
+    mm_or = float(res_or.get("factor_mismatch_pct", 0.0) or 0.0)
     soil = float(pct_soiling or 0.0)
+    # Spec 05/mismatch-orientacion-horario: si el mismatch de orientación es
+    # horario, Producción lo aplica hora a hora y el escalar no lo repite. Un
+    # resultado anterior (sin factor_horario) va en el escalar, como antes.
+    or_horario = isinstance(res_or.get("factor_horario"), pd.Series) and mm_or > 0
+    mm_or_escalar = 0.0 if or_horario else mm_or
 
     visible = cascada_perdidas(poa_anual, fs, mm_or, 0.0, 0.0 if motor_ok else soil, 0.0)
     nombres = {
@@ -222,8 +228,9 @@ def publicar_cascada_mismatch(estado, *, poa_anual: float, pct_soiling: float, m
     estado["cascada_mismatch"] = visible
     estado["poa_efectiva_kWh_m2"] = round(visible[-1]["energia"], 1)
     estado["factor_global_mismatch"] = factor_global_perdidas(
-        cascada_perdidas(poa_anual, 0.0, mm_or, 0.0, soil, 0.0))
-    estado["factor_mismatch_sin_soiling"] = calcular_factor_mismatch_sin_soiling(0.0, mm_or)
+        cascada_perdidas(poa_anual, 0.0, mm_or_escalar, 0.0, soil, 0.0))
+    estado["factor_mismatch_sin_soiling"] = calcular_factor_mismatch_sin_soiling(0.0, mm_or_escalar)
+    estado["mismatch_or_horario"] = bool(or_horario)
     estado["factor_sombra_anual"] = fs
     estado["factor_mismatch_or_pct"] = mm_or
     estado["pct_soiling_cascada"] = soil
@@ -270,7 +277,20 @@ def factores_mismatch_produccion(estado, poa: pd.DataFrame, motor_ok: bool) -> d
         else:
             f = f * factor_horizonte_horario(alineada.astype(bool), poa)
 
-    soil = float(estado.get("pct_soiling_cascada", 0.0) or 0.0) / 100.0
+    # Mismatch de orientación hora a hora (Spec 05/mismatch-orientacion-horario)
+    if estado.get("mismatch_or_horario"):
+        f_or = (estado.get("res_mismatch_or") or {}).get("factor_horario")
+        alineado = (f_or.reindex(poa.index) if isinstance(f_or, pd.Series)
+                    and len(f_or) == len(poa.index) else None)
+        if alineado is None or alineado.isna().any():
+            avisos.append(
+                "⚠️ El mismatch de orientación de 🔀 Mismatch se calculó con otras horas: no se "
+                "aplicó. Abre 🔀 Mismatch para recalcularlo con el año típico actual."
+            )
+        else:
+            f = f * alineado.to_numpy(dtype=float)
+
+    soil =float(estado.get("pct_soiling_cascada", 0.0) or 0.0) / 100.0
     if not motor_ok and soil > 0 and "poa_front" in poa.columns and soil < 1:
         # La suciedad actúa sobre la cara frontal que QUEDA después del
         # horizonte (front − luz directa tapada): así el resultado es
@@ -287,12 +307,49 @@ def factores_mismatch_produccion(estado, poa: pd.DataFrame, motor_ok: bool) -> d
 
 # ─── 2. Mismatch por orientación múltiple ───────────────────────────────────
 
+def perdida_string_bypass(poas, fracciones) -> tuple[np.ndarray, np.ndarray]:
+    """Potencia relativa ideal y del string, hora a hora, con diodos de bypass.
+
+    Modelo de primer orden (Spec 05/mismatch-orientacion-horario): la
+    corriente de un módulo es proporcional a su irradiancia y su voltaje es
+    constante. El string trabaja a la corriente que da más potencia: a la
+    corriente de un grupo j aportan los grupos con G ≥ G_j y los demás quedan
+    puenteados por sus diodos:
+
+        string = máx_j  G_j × Σ_{i: G_i ≥ G_j} f_i        ideal = Σ_i f_i × G_i
+
+    Ej.: 800/100 W/m² con 50/50 → string 400, ideal 450 (pierde 11.1 %).
+    """
+    g = np.clip(np.asarray(poas, dtype=float), 0.0, None)
+    if g.ndim == 1:
+        g = g[None, :]
+    f = np.asarray(fracciones, dtype=float)[:, None]
+    ideal = (f * g).sum(axis=0)
+    string = np.zeros(g.shape[1])
+    for j in range(g.shape[0]):
+        corriente = g[j]
+        string = np.maximum(string, corriente * (f * (g >= corriente)).sum(axis=0))
+    return ideal, np.minimum(string, ideal)
+
+
+def firma_orientacion(configuraciones, tmy: pd.DataFrame, albedo, bifacial) -> str:
+    """Huella de los datos del mismatch de orientación: si cambia, se recalcula."""
+    cfgs = sorted(
+        (float(c["azimuth"]), float(c["tilt"]), round(float(c["fraccion"]), 4))
+        for c in (configuraciones or [])
+    )
+    bif = sorted((bifacial or {}).items()) if bifacial else None
+    return f"{cfgs}|{float(albedo or 0):.4f}|{bif}|{len(tmy)}|{float(tmy['G_h'].sum()):.3f}"
+
+
 def calcular_mismatch_orientacion(
     tmy: pd.DataFrame,
     lat: float,
     lon: float,
     alt_m: float,
     configuraciones: list[dict],
+    albedo: float = 0.20,
+    bifacial: dict | None = None,
 ) -> dict:
     """
     Pérdidas de mismatch cuando módulos de distintas orientaciones están
@@ -303,15 +360,21 @@ def calcular_mismatch_orientacion(
         {"azimuth": 90, "tilt": 90, "fraccion": 0.40, "label": "Este"},
     ]
 
-    Modelo (PVsyst aprox. 1er orden):
-        LM = σ²_poa / (2 · μ²_poa)
-    donde σ² es la varianza ponderada de POA anual entre orientaciones.
+    Modelo (Spec 05/mismatch-orientacion-horario, 29-sep-2026): hora a hora
+    con diodos de bypass (``perdida_string_bypass``) y la POA de cada
+    orientación con el albedo y el panel bifacial del proyecto. La pérdida
+    anual es la ponderada por energía. Antes se usaban los totales anuales
+    (σ²/(2μ²)), que dan 0 % para Este/Oeste; queda como referencia en
+    ``factor_mismatch_pct_anual_aprox``.
 
-    Retorna dict con POA por orientación y factor de mismatch.
+    Retorna dict con POA por orientación, factor horario y factor de mismatch.
     """
     poa_res = []
+    series = []
     for cfg in configuraciones:
-        poa      = calcular_poa(tmy, lat, lon, alt_m, cfg["tilt"], cfg["azimuth"])
+        poa      = calcular_poa(tmy, lat, lon, alt_m, cfg["tilt"], cfg["azimuth"],
+                                albedo=albedo, bifacial=bifacial or None)
+        series.append(poa["poa_global"].to_numpy(dtype=float))
         poa_anual = poa["poa_global"].sum() / 1000.0
         poa_res.append({
             "label":   cfg.get("label", f"Az{cfg['azimuth']}°/{cfg['tilt']}°"),
@@ -321,28 +384,42 @@ def calcular_mismatch_orientacion(
             "poa_anual": round(poa_anual, 1),
         })
 
-    fracs    = np.array([p["fraccion"]  for p in poa_res])
-    poa_vals = np.array([p["poa_anual"] for p in poa_res])
-
+    fracs    = np.array([p["fraccion"]  for p in poa_res], dtype=float)
+    poa_vals = np.array([p["poa_anual"] for p in poa_res], dtype=float)
     poa_medio = float(np.sum(fracs * poa_vals))
+    firma = firma_orientacion(configuraciones, tmy, albedo, bifacial)
 
     if len(poa_res) < 2 or poa_medio == 0:
         return dict(
             poas                   = poa_res,
             factor_mismatch_pct    = 0.0,
+            factor_mismatch_pct_anual_aprox = 0.0,
+            factor_horario         = pd.Series(1.0, index=tmy.index),
+            modelo                 = "bypass_horario",
+            firma                  = firma,
             energia_ideal_kWh_m2   = round(poa_medio, 1),
             energia_perdida_kWh_m2 = 0.0,
         )
 
-    variance        = float(np.sum(fracs * (poa_vals - poa_medio) ** 2))
-    mismatch_pct    = (variance / (2 * poa_medio ** 2)) * 100
-    energia_perdida = poa_medio * mismatch_pct / 100.0
+    # Referencia anterior: totales anuales, σ²/(2μ²).
+    variance = float(np.sum(fracs * (poa_vals - poa_medio) ** 2))
+    aprox_pct = (variance / (2 * poa_medio ** 2)) * 100
+
+    ideal, string = perdida_string_bypass(series, fracs / fracs.sum())
+    with np.errstate(invalid="ignore", divide="ignore"):
+        f_h = np.where(ideal > 0, string / np.maximum(ideal, 1e-12), 1.0)
+    mismatch_pct = (1.0 - string.sum() / ideal.sum()) * 100 if ideal.sum() > 0 else 0.0
+    energia_ideal = float(ideal.sum()) / 1000.0
 
     return dict(
         poas                   = poa_res,
         factor_mismatch_pct    = round(mismatch_pct, 2),
-        energia_ideal_kWh_m2   = round(poa_medio, 1),
-        energia_perdida_kWh_m2 = round(energia_perdida, 1),
+        factor_mismatch_pct_anual_aprox = round(aprox_pct, 2),
+        factor_horario         = pd.Series(np.clip(f_h, 0.0, 1.0), index=tmy.index),
+        modelo                 = "bypass_horario",
+        firma                  = firma,
+        energia_ideal_kWh_m2   = round(energia_ideal, 1),
+        energia_perdida_kWh_m2 = round(energia_ideal * mismatch_pct / 100.0, 1),
     )
 
 

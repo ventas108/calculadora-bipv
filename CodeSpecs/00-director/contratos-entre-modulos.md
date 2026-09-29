@@ -146,6 +146,15 @@ Regla de consumo:
 		aplica si la página no se abrió (aplica 0 % y avisa).
 	- Producción guarda `factor_mismatch_aplicado` (el factor escalar de su
 		corrida), que muestra 📄 Reporte PDF.
+	- Mismatch por orientación (29-sep-2026, Spec
+		`05-perdidas-y-temperatura/mismatch-orientacion-horario`):
+		`calcular_mismatch_orientacion` calcula la pérdida hora a hora con diodos de
+		bypass (`perdida_string_bypass`) y la POA de cada orientación con
+		`albedo_suelo` y `bifacial_cfg` del proyecto; publica `factor_horario`,
+		`factor_mismatch_pct` (ponderado por energía) y `firma`. Con resultado
+		horario, `mismatch_or_horario = True`: el escalar no lleva la orientación
+		y `factores_mismatch_produccion` la aplica hora a hora junto con el
+		horizonte. Un resultado sin `factor_horario` va en el escalar, como antes.
 
 #### Energía multi-superficie (Vista 3D)
 

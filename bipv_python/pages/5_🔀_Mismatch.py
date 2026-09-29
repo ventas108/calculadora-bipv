@@ -11,6 +11,7 @@ from calculos.mismatch import (
     calcular_sombreado_horizonte,
     calcular_mismatch_orientacion,
     firma_horizonte,
+    firma_orientacion,
     publicar_cascada_mismatch,
 )
 from calculos.mismatch_bypass import (
@@ -996,24 +997,33 @@ if multi_orient:
         btn_mismatch_or = st.button(
             "🧭 Calcular mismatch de orientación", type="primary", use_container_width=True
         )
-        # Vigencia: si cambiaron las orientaciones, tilts o fracciones desde
-        # el último cálculo, se recalcula solo.
+        # Vigencia (Specs 05/mismatch-horizonte-coherente y 05/mismatch-
+        # orientacion-horario): si cambiaron las orientaciones, tilts,
+        # fracciones, el albedo, el panel bifacial o el año típico desde el
+        # último cálculo, se recalcula solo. La POA de cada orientación usa el
+        # albedo y la configuración bifacial del proyecto (☀️ Recurso Solar).
+        _albedo_or = float(st.session_state.get("albedo_suelo", 0.20))
+        _bifacial_or = (st.session_state.get("bifacial_cfg") or None) if st.session_state.get("bifacial_activo") else None
+        _firma_or = firma_orientacion(configs, tmy, _albedo_or, _bifacial_or)
         _res_or_prev = st.session_state.get("res_mismatch_or") or {}
         _or_viejo = bool(
             st.session_state.get("mismatch_or_ok")
-            and _res_or_prev.get("configs") != configs
+            and _res_or_prev.get("firma") != _firma_or
         )
         if btn_mismatch_or or _or_viejo or st.session_state.get("mismatch_or_ok"):
             if btn_mismatch_or or _or_viejo:
-                with st.spinner("Calculando POA por orientación y factor de mismatch..."):
+                with st.spinner("Calculando POA por orientación y mismatch hora a hora..."):
                     res_mismatch_or = calcular_mismatch_orientacion(
-                        tmy, lat, lon, alt_m, configs
+                        tmy, lat, lon, alt_m, configs,
+                        albedo=float(st.session_state.get("albedo_suelo", 0.20)),
+                        bifacial=_bifacial_or,
                     )
                 res_mismatch_or["configs"] = [dict(c) for c in configs]
                 st.session_state["res_mismatch_or"] = res_mismatch_or
                 st.session_state["mismatch_or_ok"]  = True
                 if _or_viejo and not btn_mismatch_or:
-                    st.caption("🔄 Mismatch de orientación recalculado: cambiaron las orientaciones.")
+                    st.caption("🔄 Mismatch de orientación recalculado: cambiaron las orientaciones, "
+                               "el albedo, el panel bifacial o el año típico.")
             else:
                 res_mismatch_or = _res_or_prev
 
@@ -1023,8 +1033,16 @@ if multi_orient:
                 mc2.metric("Pérdida solar por mismatch", f"{res_mismatch_or['energia_perdida_kWh_m2']:.1f} kWh/m²",
                            delta=f"-{res_mismatch_or['factor_mismatch_pct']:.2f}%",
                            delta_color="inverse")
-                mc3.metric("Factor mismatch",      f"{res_mismatch_or['factor_mismatch_pct']:.2f}%",
-                           help="σ²/(2μ²) — aproximación de 1er orden, referencia estándar internacional")
+                mc3.metric("Factor mismatch (hora a hora)", f"{res_mismatch_or['factor_mismatch_pct']:.2f}%",
+                           help="Pérdida de cada hora con diodos de bypass: la corriente del string la "
+                                "marca el grupo más débil, o sus diodos lo sacan. Ponderada por energía.")
+                if "factor_mismatch_pct_anual_aprox" in res_mismatch_or:
+                    st.caption(
+                        "Con los totales del año (σ²/2μ², el cálculo anterior) daría "
+                        f"{res_mismatch_or['factor_mismatch_pct_anual_aprox']:.2f} %: los totales "
+                        "esconden que cada orientación recibe el sol a distinta hora. "
+                        "📊 Producción aplica la pérdida **hora a hora**."
+                    )
 
                 # Tabla POA por orientación
                 df_poas = pd.DataFrame(res_mismatch_or["poas"])

@@ -221,7 +221,9 @@ def test_cascada_sin_filas_en_cero(sombra):
 def test_pagina5_recalcula_si_cambian_datos():
     src = _src(_PAG5)
     assert "firma_horizonte(puntos_horizonte, poa_base)" in src
-    assert '_res_or_prev.get("configs") != configs' in src
+    # Spec 05/mismatch-orientacion-horario: la vigencia usa la firma completa
+    # (orientaciones + albedo + bifacial + año típico).
+    assert '_res_or_prev.get("firma") != _firma_or' in src
     assert 'st.session_state["mismatch_or_ok"] = False' in src
 
 

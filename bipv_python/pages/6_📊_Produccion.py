@@ -181,12 +181,16 @@ _factor_horario_mm = _factores_mm["factor_horario"]
 if _factor_horario_mm is not None:
     poa_base = aplicar_factor_horario(poa_base, _factor_horario_mm)
     _fs_anual_mm = float(st.session_state.get("factor_sombra_anual") or 0.0)
+    _partes_mm = []
+    if _fs_anual_mm > 0:
+        _partes_mm.append(f"horizonte (solo luz directa, {_fs_anual_mm * 100:.2f} % en el año)")
+    if st.session_state.get("mismatch_or_horario"):
+        _or_pct_mm = float((st.session_state.get("res_mismatch_or") or {}).get("factor_mismatch_pct", 0.0))
+        _partes_mm.append(f"mismatch de orientación con diodos de bypass ({_or_pct_mm:.2f} % en el año)")
+    if not _motor_ok and "poa_front" in poa_base.columns:
+        _partes_mm.append("suciedad solo en la cara frontal (bifacial)")
     st.caption(
-        "🏔️ Horizonte de 🔀 Mismatch aplicado **hora a hora** a la POA "
-        f"(solo luz directa, {_fs_anual_mm * 100:.2f} % en el año)"
-        + (" · suciedad solo en la cara frontal (bifacial)" if (
-            not _motor_ok and "poa_front" in poa_base.columns) else "")
-        + "."
+        "🔀 Aplicado **hora a hora** a la POA desde 🔀 Mismatch: " + " · ".join(_partes_mm) + "."
     )
 for _aviso_mm in _factores_mm["avisos"]:
     st.warning(_aviso_mm)
