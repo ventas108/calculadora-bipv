@@ -4678,6 +4678,31 @@ La 📋 Ficha RETIE se ve ahora completa al ancho de la columna, sin barra de de
 
 Si un recuadro mostraba cifras como «(48.76MCOP)|TIR:∗∗16.8» en letra cursiva y sin espacios, era un error de presentación: la app convierte el texto que queda entre dos signos «$» en una fórmula matemática. Se corrigió en el mensaje final de 💰 Financiero, el cuadro «CAPEX bruto → CAPEX neto», la tabla «Detalle Ley 1715», la tabla de mercado de carbono de 🌿 Impacto CO₂ y el resumen de 💼 Presupuesto. Los números nunca cambiaron: solo cómo se veían.
 
+## 79. PVGIS 5.2 o 5.3: qué base de datos del año típico usa ☀️ Recurso Solar (29-sep-2026)
+
+### PVGIS 5.2 o 5.3 — qué es y por qué se puede elegir
+
+**Qué es:** PVGIS es la base de datos gratuita de la Comisión Europea (JRC) de donde ☀️ Recurso Solar descarga el **año típico** (TMY): 8.760 horas de sol, temperatura y viento de un año «representativo» del sitio. Hay dos versiones en servicio: **5.2** y **5.3**. **PVsyst 8 descarga PVGIS 5.3**; la app descargaba siempre 5.2.
+
+**Por qué importa:** cada versión arma su propio año típico. Para cada mes escoge, entre todos los años de su periodo, el mes más representativo; como las dos versiones tienen bases de radiación y periodos distintos, escogen años distintos. El total del año suele parecerse; el reparto mes a mes no.
+
+**Qué hace la app ahora:** en ☀️ Recurso Solar aparece «🛰️ Versión de PVGIS».
+- **Proyecto nuevo:** 5.3 (la misma de PVsyst 8).
+- **Proyecto guardado antes del 29-sep-2026:** 5.2, con la que se calculó; sus resultados no cambian. La versión se guarda con el proyecto.
+- **Cambiar la versión** borra el recurso solar y todo lo que depende de él (producción, financiero, CO₂), igual que cambiar las coordenadas. Hay que volver a presionar «🌐 Descargar TMY de PVGIS».
+
+### PVGIS 5.2 o 5.3 — cómo leer el recuadro «🛰️ Qué descargó PVGIS»
+
+Debajo de la tabla de irradiancia mensual está el recuadro con la versión, la **base de radiación** (satélite), la **base meteorológica** (temperatura y viento), el **periodo** de donde escoge los meses y el **año escogido para cada mes** («Ene 2012 · Feb 2018 · …»). Si dice que no hay metadatos, el año típico viene de una caché anterior: presiona 🔄 **Limpiar caché** y descarga de nuevo.
+
+**Qué hacer:** si dos estudios del mismo sitio no coinciden mes a mes, mira el año escogido para cada mes en los dos. Si son años distintos, la diferencia mensual es del clima, no del cálculo.
+
+### PVGIS 5.2 o 5.3 — comparar la app con un informe de PVsyst (caso Apartadó)
+
+**Ejemplo real (29-sep-2026):** proyecto agrivoltaico de Apartadó, 7.8830 / −76.6259, calculado en PVsyst 8.1.5. Con PVGIS 5.2 la app obtuvo GHI **1,606** kWh/m² y POA frontal **1,607** kWh/m²; PVsyst, con PVGIS 5.3, **1,683** y **1,716** (−4.6 % y −6.4 %). La verificación cruzada de la app con PVWatts (NSRDB de NREL) dio **1,707** kWh/m² de POA frontal: casi lo mismo que PVsyst. La diferencia venía de la base de datos, no del cálculo.
+
+**La regla en palabras:** para comparar con un informe de PVsyst 8, elige **PVGIS 5.3** y las mismas coordenadas del informe. Así la radiación de partida es la misma y lo que quede de diferencia es del cálculo (pérdidas, temperatura, inversor). Compara primero los valores **anuales**; y el **PR**, que no depende de cuánto sol hay.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

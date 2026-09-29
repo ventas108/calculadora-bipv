@@ -261,6 +261,7 @@ with col1:
             "motor_optico_noct", "motor_optico_coef_temp", "motor_optico_f_iam_dif",
             "motor_optico_k_soil_vert",
             "_solar_lat_guardada", "_solar_lon_guardada", "_solar_alt_guardada",
+            "_solar_pvgis_guardada",
         )
         for _k in _KEYS_LIMPIAR_CIUDAD:
             st.session_state.pop(_k, None)

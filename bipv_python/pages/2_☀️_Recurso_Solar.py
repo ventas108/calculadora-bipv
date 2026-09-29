@@ -5,22 +5,26 @@ import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 
+from calculos.solar import sufijo_cache_pvgis
+
 # ── Caché de disco para TMY+POA — sobrevive reinicios de PM2 ─────────────────
 _SOLAR_CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "datos", "solar_cache")
 
-def _cache_path(lat, lon, tilt, azimuth, alt_m, albedo=0.20):
+def _cache_path(lat, lon, tilt, azimuth, alt_m, albedo=0.20, version="5.2"):
     os.makedirs(_SOLAR_CACHE_DIR, exist_ok=True)
     # El sufijo de albedo solo aparece si difiere del default histórico (0.20),
-    # para no invalidar los cachés existentes en el servidor.
+    # para no invalidar los cachés existentes en el servidor. Igual el de la
+    # versión de PVGIS: vacío para 5.2 (Spec 02-recurso-solar/pvgis-5-3).
     _alb = "" if abs(float(albedo) - 0.20) < 1e-9 else f"_alb{float(albedo):.2f}"
     return os.path.join(
         _SOLAR_CACHE_DIR,
-        f"solar_{lat:.4f}_{lon:.4f}_t{tilt}_a{int(azimuth)}_h{alt_m}{_alb}.pkl",
+        f"solar_{lat:.4f}_{lon:.4f}_t{tilt}_a{int(azimuth)}_h{alt_m}"
+        f"{sufijo_cache_pvgis(version)}{_alb}.pkl",
     )
 
-def _leer_cache(lat, lon, tilt, azimuth, alt_m, albedo=0.20):
+def _leer_cache(lat, lon, tilt, azimuth, alt_m, albedo=0.20, version="5.2"):
     try:
-        p = _cache_path(lat, lon, tilt, azimuth, alt_m, albedo)
+        p = _cache_path(lat, lon, tilt, azimuth, alt_m, albedo, version)
         if os.path.exists(p):
             with open(p, "rb") as f:
                 return pickle.load(f)
@@ -32,13 +36,14 @@ def _leer_cache(lat, lon, tilt, azimuth, alt_m, albedo=0.20):
 # El TMY solo depende de lat/lon; la POA es un cálculo local barato. Antes la
 # clave del pickle incluía la orientación, así que cambiar la inclinación
 # forzaba una nueva descarga de PVGIS aunque el TMY ya estuviera en disco.
-def _tmy_cache_path(lat, lon):
+def _tmy_cache_path(lat, lon, version="5.2"):
     os.makedirs(_SOLAR_CACHE_DIR, exist_ok=True)
-    return os.path.join(_SOLAR_CACHE_DIR, f"tmy_{lat:.4f}_{lon:.4f}.pkl")
+    return os.path.join(_SOLAR_CACHE_DIR,
+                        f"tmy_{lat:.4f}_{lon:.4f}{sufijo_cache_pvgis(version)}.pkl")
 
-def _leer_tmy_cache(lat, lon):
+def _leer_tmy_cache(lat, lon, version="5.2"):
     try:
-        p = _tmy_cache_path(lat, lon)
+        p = _tmy_cache_path(lat, lon, version)
         if os.path.exists(p):
             with open(p, "rb") as f:
                 return pickle.load(f)["tmy"]
@@ -46,7 +51,7 @@ def _leer_tmy_cache(lat, lon):
         pass
     return None
 
-def _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa, albedo=0.20):
+def _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa, albedo=0.20, version="5.2"):
     """Persiste TMY+POA de la variante Y el TMY solo (por coordenadas).
 
     Returns:
@@ -55,12 +60,12 @@ def _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa, albedo=0.20):
     """
     ok = True
     try:
-        with open(_cache_path(lat, lon, tilt, azimuth, alt_m, albedo), "wb") as f:
+        with open(_cache_path(lat, lon, tilt, azimuth, alt_m, albedo, version), "wb") as f:
             pickle.dump({"tmy": tmy, "poa": poa}, f, protocol=4)
     except Exception:
         ok = False
     try:
-        with open(_tmy_cache_path(lat, lon), "wb") as f:
+        with open(_tmy_cache_path(lat, lon, version), "wb") as f:
             pickle.dump({"tmy": tmy}, f, protocol=4)
     except Exception:
         ok = False
@@ -68,6 +73,11 @@ def _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa, albedo=0.20):
 
 from datos.ciudades_colombia import CIUDADES
 from calculos.solar import (
+    CLAVE_VERSION_PVGIS,
+    PVGIS_VERSION_LEGADA,
+    PVGIS_URLS_TMY,
+    texto_meses_tmy,
+    version_pvgis_de_estado,
     obtener_tmy_pvgis,
     calcular_poa,
     resumen_mensual,
@@ -107,6 +117,35 @@ def _mostrar_banner_pvwatts(cmp: dict, fuente: str | None) -> None:
         st.info(msg, icon="🛰️")
 
 
+def _mostrar_metadatos_pvgis(tmy, version: str) -> None:
+    """Recuadro «🛰️ Qué descargó PVGIS» (Spec 02-recurso-solar/pvgis-5-3):
+    base de radiación, periodo y año escogido para cada mes del TMY."""
+    meta = getattr(tmy, "attrs", {}).get("pvgis") if tmy is not None else None
+    with st.expander(f"🛰️ Qué descargó PVGIS {version}", expanded=False):
+        if not meta:
+            st.caption(
+                "Este TMY viene de una caché anterior a esta opción y no trae "
+                "metadatos. Usa 🔄 **Limpiar caché** y vuelve a descargar si los necesitas."
+            )
+            return
+        _periodo = (f"{meta['year_min']}–{meta['year_max']}"
+                    if meta.get("year_min") and meta.get("year_max") else "no informado")
+        st.markdown(
+            f"- **Versión:** PVGIS {meta.get('version') or version}\n"
+            f"- **Base de radiación:** {meta.get('radiation_db') or 'no informada'}"
+            f" · **Base meteorológica:** {meta.get('meteo_db') or 'no informada'}\n"
+            f"- **Periodo de donde escoge los meses:** {_periodo}"
+        )
+        _meses = texto_meses_tmy(meta)
+        if _meses:
+            st.markdown(f"**Año escogido para cada mes:** {_meses}")
+        st.caption(
+            "El año típico junta, para cada mes, el mes más representativo de "
+            "todos los años del periodo. Otra versión de PVGIS escoge otros "
+            "años: el total anual se parece, el reparto mes a mes no."
+        )
+
+
 def _intentar_restaurar_multisuperficie(tmy) -> None:
     """Publica el payload pendiente solo contra el TMY ya cargado."""
     payload = st.session_state.get("_multisup_payload_pendiente")
@@ -143,7 +182,7 @@ from utils.ui import bloquear_traduccion, mostrar_proyecto_activo
 bloquear_traduccion()
 mostrar_proyecto_activo()   # #63 — proyecto activo visible en cada página
 st.title("☀️ Recurso Solar")
-st.caption("Datos TMY (Typical Meteorological Year) desde PVGIS v5.2 — JRC European Commission")
+st.caption("Datos TMY (Typical Meteorological Year) desde PVGIS — JRC European Commission")
 
 # ── Leer ciudad y tipo de instalación desde session_state ────────────────────
 ciudad = st.session_state.get("ciudad", "Bogotá")
@@ -397,6 +436,26 @@ with st.expander("🔄 Simulación bifacial (ganancia de la cara trasera)",
                 icon="🏢",
             )
 
+# ── Versión de PVGIS (Spec 02-recurso-solar/pvgis-5-3, 29-sep-2026) ─────────
+# Proyecto nuevo → 5.3 (la que descarga PVsyst 8). Proyecto guardado sin
+# versión → 5.2 (lo fija proyectos_manager.cargar_proyecto).
+_versiones_pvgis = list(PVGIS_URLS_TMY)
+_etiquetas_pvgis = {
+    "5.3": "PVGIS 5.3 — la que descarga PVsyst 8",
+    "5.2": "PVGIS 5.2 — la de los proyectos anteriores al 29-sep-2026",
+}
+pvgis_version = st.radio(
+    "🛰️ Versión de PVGIS (base de datos del año típico)",
+    _versiones_pvgis[::-1],
+    index=_versiones_pvgis[::-1].index(version_pvgis_de_estado(st.session_state)),
+    format_func=lambda v: _etiquetas_pvgis.get(v, f"PVGIS {v}"),
+    horizontal=True,
+    help="Para comparar con un informe de PVsyst 8 usa 5.3: así la diferencia "
+         "que quede es del cálculo y no del clima. Cambiar la versión borra el "
+         "recurso solar y todo lo que depende de él.",
+)
+st.session_state[CLAVE_VERSION_PVGIS] = pvgis_version
+
 st.markdown("---")
 
 # ── #64 / #172 — Invalidar si cambiaron coordenadas o geometría ──────────────
@@ -419,6 +478,7 @@ _SOLAR_SS_KEYS = (
 _GUARD_KEYS = (
     "_solar_lat_guardada", "_solar_lon_guardada", "_solar_alt_guardada",
     "_solar_tilt_guardado", "_solar_az_guardado", "_solar_albedo_guardado",
+    "_solar_pvgis_guardada",
 )
 
 # Aviso pendiente de un drift detectado en el run anterior (el auto-restore
@@ -439,7 +499,10 @@ if st.session_state.get("recurso_solar_ok") and _s_lat is not None:
         abs(lon - float(_s_lon)) > 0.0001 or
         abs(alt_m - int(_s_alt))  > 10
     )
-    _drift_geom = (not _drift) and _s_tilt is not None and (
+    # Otra versión de PVGIS es otro TMY: se invalida como un cambio de sitio.
+    _s_pvgis = st.session_state.get("_solar_pvgis_guardada", PVGIS_VERSION_LEGADA)
+    _drift_pvgis = (not _drift) and _s_pvgis != pvgis_version
+    _drift_geom = (not _drift) and (not _drift_pvgis) and _s_tilt is not None and (
         abs(tilt - float(_s_tilt))      > 0.5 or
         abs(azimuth - float(_s_az))     > 0.5 or
         abs(albedo - float(_s_alb))     > 0.005
@@ -453,6 +516,15 @@ if st.session_state.get("recurso_solar_ok") and _s_lat is not None:
             f"**{int(_s_alt)} m**  \n"
             f"Coordenadas actuales: **{lat:.5f}°**, **{lon:.5f}°**, **{alt_m} m**  \n"
             "Presiona **🌐 Descargar TMY de PVGIS** para recalcular con las coordenadas actuales."
+        )
+    elif _drift_pvgis:
+        for _k in _SOLAR_SS_KEYS + KEYS_DERIVADOS_POA + _GUARD_KEYS:
+            st.session_state.pop(_k, None)
+        st.warning(
+            f"⚠️ **Recurso solar invalidado** — cambiaste la versión de PVGIS "
+            f"(antes {_s_pvgis}, ahora {pvgis_version}). Otra versión es otro año "
+            "típico: la POA, la producción y el financiero deben recalcularse.  \n"
+            "Presiona **🌐 Descargar TMY de PVGIS** para calcular con la versión elegida."
         )
     elif _drift_geom:
         # #172: conservar tmy_df (el TMY solo depende del sitio); caduca la POA
@@ -478,18 +550,20 @@ if not st.session_state.get("recurso_solar_ok"):
     # -- esa caché no distingue factor SVF en su clave (ver _cache_path) y
     # reutilizarla serviría una POA de otra reducción (o sin reducción)
     # silenciosamente. El TMY sí se sigue cacheando (no depende del SVF).
-    _auto_cached = _leer_cache(lat, lon, tilt, azimuth, alt_m, albedo) if factor_svf >= 0.999 else None
+    _auto_cached = (_leer_cache(lat, lon, tilt, azimuth, alt_m, albedo, pvgis_version)
+                    if factor_svf >= 0.999 else None)
     if _auto_cached is None:
         # ── #61: no hay caché de esta variante, pero puede haber TMY del predio
         # (descargado con otra inclinación/orientación) → recalcular POA local
         # en vez de volver a PVGIS.
-        _tmy_solo = _leer_tmy_cache(lat, lon)
+        _tmy_solo = _leer_tmy_cache(lat, lon, pvgis_version)
         if _tmy_solo is not None:
             with st.spinner("📂 TMY en caché — recalculando POA para esta orientación..."):
                 _poa_var = calcular_poa(_tmy_solo, lat, lon, alt_m, tilt, azimuth,
                                         albedo=albedo, reduccion_diffusa_isotropica=factor_svf)
                 if factor_svf >= 0.999:
-                    _guardar_cache(lat, lon, tilt, azimuth, alt_m, _tmy_solo, _poa_var, albedo)
+                    _guardar_cache(lat, lon, tilt, azimuth, alt_m, _tmy_solo, _poa_var, albedo,
+                                   pvgis_version)
             _auto_cached = {"tmy": _tmy_solo, "poa": _poa_var}
     if _auto_cached is not None:
         _tmy_r = _auto_cached["tmy"]
@@ -530,6 +604,7 @@ if not st.session_state.get("recurso_solar_ok"):
             "_solar_tilt_guardado":   tilt,
             "_solar_az_guardado":     azimuth,
             "_solar_albedo_guardado": albedo,
+            "_solar_pvgis_guardada": pvgis_version,
         })
         # La recarga de abajo descarta todo lo que se escriba aquí (D8,
         # 26-sep-2026): los mensajes se dejan en session_state y los muestra
@@ -537,7 +612,7 @@ if not st.session_state.get("recurso_solar_ok"):
         _intentar_restaurar_multisuperficie(_tmy_r)
         st.session_state["_solar_cache_msg"] = (
             f"📂 **Recurso solar restaurado desde caché local** — "
-            f"POA: **{_poa_anual_r:,.0f} kWh/m²/año** · "
+            f"PVGIS {pvgis_version} · POA: **{_poa_anual_r:,.0f} kWh/m²/año** · "
             f"GHI: **{_ghi_anual_r:,.0f} kWh/m²/año** · "
             f"{icono_tipo} {orientacion_label} / {tilt}°  \n"
             f"*(Sin descarga de PVGIS. Usa 🔄 **Limpiar caché** si necesitas datos frescos.)*"
@@ -546,8 +621,8 @@ if not st.session_state.get("recurso_solar_ok"):
 
 # ── Función cacheada para PVGIS (RAM, 24 h) ──────────────────────────────────
 @st.cache_data(ttl=86400, show_spinner=False)
-def cargar_tmy(lat, lon):
-    return obtener_tmy_pvgis(lat, lon)
+def cargar_tmy(lat, lon, version):
+    return obtener_tmy_pvgis(lat, lon, version=version)
 
 # ── Botones de acción ────────────────────────────────────────────────────────
 _btn_col1, _btn_col2 = st.columns([4, 1])
@@ -565,9 +640,12 @@ if _recalc_btn:
             os.remove(_p)
         # #61: borrar también el TMY por coordenadas — "datos frescos" implica
         # nueva descarga de PVGIS, no reutilizar el TMY viejo del predio.
-        _p_tmy = _tmy_cache_path(lat, lon)
-        if os.path.exists(_p_tmy):
-            os.remove(_p_tmy)
+        # El glob de arriba ya cubre todas las versiones de PVGIS (el sufijo de
+        # versión va antes del de albedo); el TMY solo va por versión.
+        for _ver in PVGIS_URLS_TMY:
+            _p_tmy = _tmy_cache_path(lat, lon, _ver)
+            if os.path.exists(_p_tmy):
+                os.remove(_p_tmy)
     except Exception:
         pass
     st.session_state["recurso_solar_ok"] = False
@@ -584,21 +662,22 @@ if _descarga_btn:
     )
     # Intentar caché de disco antes de ir a PVGIS (no con SVF activo, ver
     # nota junto al bloque de auto-restauración arriba).
-    _disco = _leer_cache(lat, lon, tilt, azimuth, alt_m, albedo) if factor_svf >= 0.999 else None
+    _disco = (_leer_cache(lat, lon, tilt, azimuth, alt_m, albedo, pvgis_version)
+              if factor_svf >= 0.999 else None)
     if _disco is not None:
         tmy = _disco["tmy"]
         poa = _disco["poa"]
         st.info("📂 Datos recuperados de caché local — sin conexión a PVGIS.")
     else:
         # ── #61: TMY del predio en disco (otra orientación) → sin PVGIS ──────
-        tmy = _leer_tmy_cache(lat, lon)
+        tmy = _leer_tmy_cache(lat, lon, pvgis_version)
         if tmy is not None:
             st.info("📂 TMY recuperado de caché local — POA recalculada para esta "
                     "orientación, sin conexión a PVGIS.")
         else:
-            with st.spinner(f"Conectando a PVGIS para {_sitio_label}..."):
+            with st.spinner(f"Conectando a PVGIS {pvgis_version} para {_sitio_label}..."):
                 try:
-                    tmy = cargar_tmy(lat, lon)
+                    tmy = cargar_tmy(lat, lon, pvgis_version)
                 except Exception as e:
                     st.error(f"❌ Error conectando a PVGIS: {e}")
                     st.info("Verifica la conexión a internet del servidor. PVGIS requiere acceso a re.jrc.ec.europa.eu")
@@ -611,7 +690,8 @@ if _descarga_btn:
             # bifacial se recalcula localmente (es barata y depende de la config).
             # Con SVF activo NO se guarda -- ver nota junto al bloque de
             # auto-restauración arriba (la clave del caché no distingue SVF).
-            if factor_svf >= 0.999 and not _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa, albedo):
+            if factor_svf >= 0.999 and not _guardar_cache(lat, lon, tilt, azimuth, alt_m, tmy, poa,
+                                                          albedo, pvgis_version):
                 # #61: antes fallaba en silencio → el usuario repetía la descarga
                 # en cada recarga sin saber por qué.
                 st.warning(
@@ -755,6 +835,7 @@ if _descarga_btn:
             monthly_display["POA (kWh/m²)"] / monthly_display["GHI (kWh/m²)"]
         ).round(3)
         st.dataframe(monthly_display.style.format("{:.1f}"), use_container_width=True)
+    _mostrar_metadatos_pvgis(tmy, pvgis_version)
 
     # ── Guardar en session_state ─────────────────────────────────────────────
     # Detectar zona geográfica desde coordenadas del proyecto (referencia directa para Presupuesto)
@@ -790,12 +871,14 @@ if _descarga_btn:
     st.session_state["_solar_tilt_guardado"]   = tilt
     st.session_state["_solar_az_guardado"]     = azimuth
     st.session_state["_solar_albedo_guardado"] = albedo
+    st.session_state["_solar_pvgis_guardada"] = pvgis_version
     _intentar_restaurar_multisuperficie(tmy)
     _mostrar_resultado_restauracion_multisuperficie()
 
     st.success(
         f"✅ Recurso solar calculado para **{ciudad}**  |  "
         f"{icono_tipo} **{tipo_instalacion}** — {orientacion_label} / {tilt}°  |  "
+        f"PVGIS {pvgis_version}  |  "
         f"POA: **{poa_anual:,.0f} kWh/m²/año**  |  "
         f"GHI: **{ghi_anual:,.0f} kWh/m²/año**\n\n"
         f"Continúa en 📊 Producción para simular la energía generada."
@@ -815,7 +898,7 @@ elif st.session_state.get("recurso_solar_ok") and st.session_state.get("tmy_ciud
     _mostrar_resultado_restauracion_multisuperficie()
 
     st.success(
-        f"✅ TMY cargado para **{ciudad}**  |  "
+        f"✅ TMY de PVGIS {pvgis_version} cargado para **{ciudad}**  |  "
         f"{icono_tipo} **{tipo_instalacion}** — {az_prev} / {tilt_prev}°  |  "
         f"POA: **{poa_prev:,.0f} kWh/m²/año**  |  "
         f"GHI: **{ghi_prev:,.0f} kWh/m²/año**"
@@ -832,6 +915,7 @@ elif st.session_state.get("recurso_solar_ok") and st.session_state.get("tmy_ciud
         and _pvwatts_guardado.get("azimuth_fachada") == st.session_state.get("azimuth_fachada")
     ):
         _mostrar_banner_pvwatts(_pvwatts_guardado["cmp"], _pvwatts_guardado.get("fuente"))
+    _mostrar_metadatos_pvgis(st.session_state.get("tmy_df"), pvgis_version)
     st.info("Cambia la orientación o inclinación y presiona el botón para recalcular.")
 
 else:
@@ -841,7 +925,8 @@ else:
     )
     st.markdown(f"""
     **¿Qué descarga PVGIS?**
-    - **8.760 horas** de datos climáticos típicos (promedio 2005–2020)
+    - **8.760 horas** de un año típico: para cada mes, el más representativo
+      del periodo de la versión elegida (PVGIS **{pvgis_version}**)
     - Variables: GHI, DNI, DHI, temperatura, viento, presión
     - Fuente: satélite CM SAF + estaciones SYNOP
     - Gratis, sin API key, precisión ~±5% para Colombia
