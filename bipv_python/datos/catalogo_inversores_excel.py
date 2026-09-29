@@ -1,4 +1,5 @@
 """Loader Catalogo_Inversores con costos y semáforo de completitud."""
+from calculos.texto_referencia import anonimizar_referencia
 import math as _math
 import os as _os
 
@@ -115,8 +116,8 @@ def _cargar_catalogo_inversores_cached(mtime: float) -> dict:
             "marca":            str(r.get("Marca", "")).strip() or None,
             "arquitectura":     str(r.get("Arquitectura", "")).strip() or None,
             "bat_corriente_carga_max": _f(r.get("Corriente Máxima Carga Batería (A)")),
-            "confianza":        str(r.get("Confianza", "")).strip() or None,
-            "notas":            str(r.get("Notas", "")).strip() or None,
+            "confianza":        anonimizar_referencia(str(r.get("Confianza", "")).strip()) or None,
+            "notas":            anonimizar_referencia(str(r.get("Notas", "")).strip()) or None,
         }
     return inversores
 

@@ -641,7 +641,7 @@ def perdidas_desglosadas(
             "Etapa":     "① E ref  (P_STC × POA bruta)",
             "kWh":       round(ref_dc, 0),
             "Δ kWh":     0,
-            "Nota":      "Baseline a condiciones STC · equivalente a \"Global incident in coll. plane\" de PVsyst",
+            "Nota":      "Baseline a condiciones STC · equivalente a \"Global incident in coll. plane\" de la referencia estándar internacional",
         },
     ]
 
@@ -658,13 +658,13 @@ def perdidas_desglosadas(
             "Etapa":     "①a Pérdida IAM  (ángulo de incidencia)",
             "kWh":       round(ref_post_iam, 0),
             "Δ kWh":     round(-P_stc * _mo["perdida_iam_kWh_m2"], 0),
-            "Nota":      f"ASHRAE b₀ · equivalente a \"IAM factor on global\" de PVsyst · factor medio {_mo.get('f_iam_prom', '—')}",
+            "Nota":      f"ASHRAE b₀ · equivalente a \"IAM factor on global\" de la referencia estándar internacional · factor medio {_mo.get('f_iam_prom', '—')}",
         })
         filas.append({
             "Etapa":     "①b Pérdida soiling  (suciedad)",
             "kWh":       round(ref_post_soil, 0),
             "Δ kWh":     round(-P_stc * _mo["perdida_soil_kWh_m2"], 0),
-            "Nota":      f"Calendario Colombia · equivalente a \"Soiling loss factor\" de PVsyst · factor medio {_mo.get('f_soil_prom', '—')}",
+            "Nota":      f"Calendario Colombia · equivalente a \"Soiling loss factor\" de la referencia estándar internacional · factor medio {_mo.get('f_soil_prom', '—')}",
         })
         # A partir de aquí, la referencia de "② Efecto SDM" es la POA YA
         # corregida por IAM+soiling -- si se siguiera comparando contra la
@@ -700,7 +700,7 @@ def perdidas_desglosadas(
                           else "🔴 Pérdida óptica + temperatura") +
                          (" · ver desglose ②a/②b abajo"
                           if _tiene_split_temp else
-                          " · combina \"irradiance level\" + \"temperature\" de PVsyst (no separables sin una segunda corrida SDM)"
+                          " · combina \"irradiance level\" + \"temperature\" de la referencia estándar internacional (no separables sin una segunda corrida SDM)"
                           if _tiene_cascada_optica else ""),
         },
     ]
@@ -713,7 +713,7 @@ def perdidas_desglosadas(
                 "Etapa":     "②a Pérdida por nivel de irradiancia  (T=25°C fijo)",
                 "kWh":       round(E_dc_a_T25, 0),
                 "Δ kWh":     round(delta_irr, 0),
-                "Nota":      "No linealidad del panel a baja luz, aislada de temperatura · equivalente a \"PV loss due to irradiance level\" de PVsyst",
+                "Nota":      "No linealidad del panel a baja luz, aislada de temperatura · equivalente a \"PV loss due to irradiance level\" de la referencia estándar internacional",
             },
             {
                 "Etapa":     "②b Efecto temperatura  (T real vs. 25°C)",
@@ -722,7 +722,7 @@ def perdidas_desglosadas(
                 "Nota":      ("🟢 Ganancia neta por T_cel < 25°C (clima frío / alta altitud)"
                               if delta_temp_neto >= 0
                               else "🔴 Pérdida neta por temperatura") +
-                             " · equivalente a \"PV loss due to temperature\" de PVsyst",
+                             " · equivalente a \"PV loss due to temperature\" de la referencia estándar internacional",
             },
         ]
 
@@ -773,7 +773,7 @@ def perdidas_desglosadas(
             "Δ kWh": round(_kwh_cal - _kwh_prev, 0),
             "Nota": (
                 f"{_pct_cal_aplicado}% configurado en 🔀 Mismatch · «Module quality "
-                "loss» de PVsyst (negativo = ganancia por tolerancia positiva)."
+                "loss» de la referencia estándar internacional (negativo = ganancia por tolerancia positiva)."
             ),
         })
         _kwh_prev = _kwh_cal
@@ -790,7 +790,7 @@ def perdidas_desglosadas(
             "Δ kWh": round(_kwh_fab - _kwh_prev, 0),
             "Nota": (
                 f"{_pct_fab_aplicado}% configurado en 🔀 Mismatch · «Mismatch loss, "
-                "modules and strings» de PVsyst."
+                "modules and strings» de la referencia estándar internacional."
             ),
         })
         _kwh_prev = _kwh_fab
@@ -811,7 +811,7 @@ def perdidas_desglosadas(
             "Etapa":     "②c Módulo  (informativo — no aplicado por esta app)",
             "kWh":       round(_kwh_prev, 0),
             "Δ kWh":     0,
-            "Nota":      ("PVsyst mostró +0,75% (ganancia) en 2 papers reales independientes -- "
+            "Nota":      ("La referencia estándar internacional mostró +0,75% (ganancia) en 2 papers reales independientes -- "
                           "probable valor por defecto del software sin datos de binning propios. "
                           "Esta app no lo modela ni lo aplica; compáralo contra tu propio reporte."),
         })

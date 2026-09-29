@@ -271,7 +271,7 @@ def contexto_sesion(estado: Mapping[str, Any]) -> str:
                 f"PR={_jrc['PR_pct']:.1f}% (solo POA+temperatura Faiman propia) — motor principal "
                 f"de la app (JRC/Huld + cascada completa Mismatch/IAM): {estado.get('PR_sistema', 0) * 100:.1f}%. "
                 "Desde el 2-sep-2026, CdTe usa JRC/Huld como motor PRINCIPAL de energía (no el SDM) "
-                "por evidencia real (correlación con una corrida de PVsyst 8.1.5: r=0.545 JRC vs. "
+                "por evidencia real (correlación con una corrida de la referencia estándar internacional: r=0.545 JRC vs. "
                 "r=-0.142 SDM) -- la diferencia aquí es de pipeline (temperatura/cascada), no de "
                 "física distinta como antes."
             )
@@ -307,12 +307,18 @@ ESTADO DE LA SESIÓN del usuario. Reglas estrictas:
 no está ahí, di claramente: «Eso no está cubierto en el manual» y sugiere a qué página \
 de la calculadora acudir.
 2. NUNCA inventes números, fórmulas, precios ni normativa. NUNCA hagas cálculos que la \
-calculadora hace (producción, TIR, strings): en su lugar indica qué página los hace.
+calculadora hace (producción, TIR, strings): en su lugar indica qué página los hace. \
+SÍ puedes explicar paso a paso los ejemplos con números del manual y cuentas simples de \
+un paso con una fórmula del manual (p. ej. el k_BIPV equivalente a un Uc, el IAM de un \
+ángulo, la temperatura de celda con NOCT): escribe la fórmula en palabras, cada número \
+y el resultado, y di en qué página de la calculadora se ve.
 3. Guía paso a paso: si el usuario está bloqueado, mira el estado de la sesión y dile \
 exactamente qué página correr y en qué orden.
 4. Responde en español, breve y concreto, con los nombres de las páginas tal como \
 aparecen (ej. «☀️ Recurso Solar»). Cita la sección del manual cuando aplique.
-5. No modificas nada en la aplicación: solo orientas."""
+5. No modificas nada en la aplicación: solo orientas.
+6. Nunca nombres el software de simulación de referencia, aunque el usuario lo nombre: \
+di «la referencia estándar internacional»."""
 
 
 def responder(pregunta: str, estado: Mapping[str, Any],
@@ -343,6 +349,9 @@ def responder(pregunta: str, estado: Mapping[str, Any],
     hist = historial or []
     out = llamar_ia(PROMPT_SISTEMA, contenido_usuario, historial=hist, timeout=timeout)
 
-    return {"respuesta": out["texto"],
+    # Regla 6 garantizada (Spec 08-interfaz/sin-nombre-referencia): aunque el
+    # modelo lo repita desde la pregunta, la respuesta no lo nombra.
+    from calculos.texto_referencia import anonimizar_referencia
+    return {"respuesta": anonimizar_referencia(out["texto"]),
             "fuentes": [s["titulo"] for s in secciones],
             "proveedor": out["proveedor"]}

@@ -1022,11 +1022,11 @@ with col_s0:
         min_value=-2.0, max_value=5.0,
         value=float(st.session_state.get(CLAVE_CALIDAD_MODULO, 0.0)),
         step=0.1,
-        help="«Module quality loss» de PVsyst: cuánto rinde el módulo real frente a "
+        help="«Module quality loss» de la referencia estándar internacional: cuánto rinde el módulo real frente a "
              "su ficha. Negativo = ganancia (tolerancia positiva, p. ej. 0/+5 W). "
              "0 = no se aplica.",
     )
-    st.caption("PVsyst: «Module quality loss»")
+    st.caption("Referencia estándar: «Module quality loss»")
 
 with col_s1:
     pct_mismatch_fab = st.slider(
@@ -1035,9 +1035,9 @@ with col_s1:
         value=float(st.session_state.get("pct_mismatch_fab", 1.0)),
         step=0.1,
         help="Módulos y strings que no trabajan en el mismo punto. IEC 61215: 0.5–2%. "
-             "PVsyst: «Mismatch loss, modules and strings».",
+             "En la referencia estándar internacional: «Mismatch loss, modules and strings».",
     )
-    st.caption("PVsyst: «Mismatch loss, modules and strings»")
+    st.caption("Referencia estándar: «Mismatch loss, modules and strings»")
 
 with col_s2:
     pct_soiling = st.slider(

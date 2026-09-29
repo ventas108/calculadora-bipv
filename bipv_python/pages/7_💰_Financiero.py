@@ -869,7 +869,7 @@ with col_t2:
             "Usar tabla de garantía del fabricante (curva no lineal completa)",
             value=False, key="usar_deg_tabla_fabricante",
             help="Interpola la tabla año-por-año publicada en la ficha del panel "
-                 "elegido — el mismo tipo de curva que PVsyst permite cargar.",
+                 "elegido — el mismo tipo de curva que la referencia estándar internacional permite cargar.",
         )
         if _usar_curva_fab:
             _config_degradacion = {"modo": "tabla_fabricante", "tabla_anio_pct": _deg_tabla}
@@ -881,7 +881,7 @@ with col_t2:
             value=False, key="usar_deg_curva_fabricante",
             help="Curva de 2 tramos de la ficha del panel elegido en 📐 Dimensionamiento "
                  "(caída inicial por LID + tasa lineal) en vez de una tasa fija todo el "
-                 "período — el mismo criterio que PVsyst para garantías reales.",
+                 "período — el mismo criterio que la referencia estándar internacional para garantías reales.",
         )
         if _usar_curva_fab:
             _config_degradacion = {

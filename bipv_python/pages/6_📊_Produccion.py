@@ -1120,7 +1120,7 @@ if btn_sim or st.session_state.get("produccion_ok"):
                     )
                 else:
                     st.markdown(
-                        f"- **Motor principal de la app** (SDM PVsyst v6): PR = **{res['PR']*100:.1f}%**\n"
+                        f"- **Motor principal de la app** (SDM de un diodo, v6 de la referencia estándar internacional): PR = **{res['PR']*100:.1f}%**\n"
                         f"- **Modelo JRC/Huld** (power-rating, calibrado contra mediciones ESTI, "
                         f"independiente del anterior): PR = **{_jrc['PR_pct']:.1f}%**\n"
                         f"- Diferencia: **{_diff_pp:+.1f} puntos porcentuales**"
@@ -1136,7 +1136,7 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 if _es_cdte:
                     st.caption(
                         "ℹ️ Para CdTe, el motor principal de esta app usa JRC/Huld (no el SDM) desde el "
-                        "2-sep-2026 -- comparado contra una corrida real de PVsyst 8.1.5, correlaciona "
+                        "2-sep-2026 -- comparado contra una corrida real de la referencia estándar internacional, correlaciona "
                         "mejor con el patrón mensual real que el SDM (r=0.545 vs. r=-0.142). El SDM sigue "
                         "siendo el único motor en Motor IV, Mismatch/Bypass y MPPT compartido, que necesitan "
                         "la curva I-V completa. Detalle completo: "
@@ -1329,7 +1329,7 @@ if btn_sim or st.session_state.get("produccion_ok"):
     # Tabla desglose — nombres alineados con el Loss Diagram de PVsyst
     # (1-sep-2026, ver DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md) para auditar una
     # corrida manual de PVsyst fila por fila, no solo comparando el PR final.
-    with st.expander("📋 Ver tabla detallada de balance IEC 61724 (estilo PVsyst)"):
+    with st.expander("📋 Ver tabla detallada de balance IEC 61724 (estilo de la referencia estándar internacional)"):
         df_loss = perdidas_desglosadas(res, poa_bruta_anual, _mo_summary)
         if not df_loss.empty:
             st.dataframe(
@@ -1353,22 +1353,22 @@ if btn_sim or st.session_state.get("produccion_ok"):
                 st.caption(
                     f"ℹ️ Fila ②c0 \"Calidad del módulo\" **sí se aplica** -- "
                     f"{res['pct_calidad_modulo_aplicado']}% configurado en 🔀 Mismatch "
-                    "(«Module quality loss» de PVsyst; negativo = ganancia)."
+                    "(«Module quality loss» de la referencia estándar internacional; negativo = ganancia)."
                 )
             if res.get("pct_mismatch_fab_aplicado") is not None:
                 st.caption(
                     f"ℹ️ Fila ②c \"Mismatch módulos y strings\" **sí se aplica** al cálculo -- "
                     f"{res['pct_mismatch_fab_aplicado']}% configurado en 🔀 Mismatch "
-                    "(sección 3) -- «Mismatch loss, modules and strings» de PVsyst."
+                    "(sección 3) -- «Mismatch loss, modules and strings» de la referencia estándar internacional."
                 )
             if (res.get("pct_calidad_modulo_aplicado") is None
                     and res.get("pct_mismatch_fab_aplicado") is None):
                 st.caption(
                     "ℹ️ Fila ②c \"Módulo\" es **solo informativa** — muestra +0,75% porque eso "
-                    "fue lo que PVsyst reportó, idéntico, en 2 papers reales independientes "
+                    "fue lo que la referencia estándar internacional reportó, idéntico, en 2 papers reales independientes "
                     "(probable valor por defecto del software sin datos de binning propios), "
                     "pero **esta app no lo aplica** al cálculo (Δ kWh = 0 a propósito). Compárala "
-                    "contra tu propio reporte de PVsyst — si el tuyo también trae +0,75% ahí, "
+                    "contra tu propio reporte de la referencia estándar internacional — si el tuyo también trae +0,75% ahí, "
                     "confirma que es el default, no algo medido de tu proyecto. Configura un "
                     "% real en 🔀 Mismatch (sección 3) para que se aplique de verdad."
                 )
@@ -1379,13 +1379,13 @@ if btn_sim or st.session_state.get("produccion_ok"):
             if res.get("perdida_ohmica_dc_modo") or res.get("perdida_ohmica_ac_modo"):
                 st.caption(
                     "ℹ️ Filas ②d/④c \"Pérdida óhmica\" (antes *\"Ohmic wiring loss\"* de "
-                    "PVsyst, categoría que esta app NO modelaba antes del 7-sep-2026) ya "
+                    "la referencia estándar internacional, categoría que esta app NO modelaba antes del 7-sep-2026) ya "
                     "se aplican de verdad -- ver la fuente (manual o calculada) en la "
                     "nota de cada fila."
                 )
             else:
                 st.caption(
-                    "ℹ️ Categoría del Loss Diagram de PVsyst *\"Ohmic wiring loss\"* "
+                    "ℹ️ Categoría del Loss Diagram de la referencia estándar internacional *\"Ohmic wiring loss\"* "
                     "todavía sin activar en este proyecto (a propósito, sin inventar un "
                     "número): configura un % en 🔀 Mismatch (sección 3), o longitud + "
                     "calibre reales en ⚡ Diagrama Unifilar (Página 20) para un cálculo "
@@ -1399,7 +1399,7 @@ if btn_sim or st.session_state.get("produccion_ok"):
             else:
                 st.caption(
                     "ℹ️ Corre 🔆 Motor Óptico antes de esta página para que la tabla "
-                    "también desglose IAM y soiling por separado (estilo PVsyst) en "
+                    "también desglose IAM y soiling por separado (estilo de la referencia estándar internacional) en "
                     "vez de un solo \"efecto SDM\" combinado."
                 )
 

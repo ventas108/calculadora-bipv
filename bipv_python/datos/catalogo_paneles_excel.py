@@ -1,4 +1,5 @@
 """Loader Catalogo_Paneles_FV — estructura unificada con costos y parámetros IV."""
+from calculos.texto_referencia import anonimizar_referencia
 import json
 import math
 import re
@@ -111,9 +112,11 @@ def cargar_catalogo_paneles() -> dict:
             "N_s":         _f(r.get("SDM_N_s")) or _f(r.get("Ns (Celdas Serie)")),
             "n_idealidad": _f(r.get("n (Factor Idealidad)")),
             "NsA":         _f(r.get("NsA = n × Ns")),
-            "fuente_NsA":  str(r.get("Fuente NsA", "")).strip(),
-            "confianza":   str(r.get("Confianza", "")).strip(),
-            "notas":       str(r.get("Notas", "")).strip(),
+            # Textos que se muestran: sin el nombre del software de referencia
+            # (Spec 08-interfaz/sin-nombre-referencia; el Excel no se reescribe).
+            "fuente_NsA":  anonimizar_referencia(str(r.get("Fuente NsA", "")).strip()),
+            "confianza":   anonimizar_referencia(str(r.get("Confianza", "")).strip()),
+            "notas":       anonimizar_referencia(str(r.get("Notas", "")).strip()),
             "I_sc_ref": Isc, "V_oc_ref": Voc,
             "I_mp_ref": Imp, "V_mp_ref": Vmp,
             "alpha_sc": None, "beta_oc": _f(r.get("CoefVoc_C")),
@@ -145,8 +148,8 @@ def cargar_catalogo_paneles() -> dict:
             "a_ref": _f(r.get("SDM_a_ref")),
             "mu_gamma": _f(r.get("SDM_mu_gamma")),
             "sdm_origen": str(r.get("SDM_Origen", "") or "").strip(),
-            "sdm_fuente": str(r.get("SDM_Fuente", "") or "").strip(),
-            "sdm_advertencia": str(r.get("SDM_Advertencia", "") or "").strip(),
+            "sdm_fuente": anonimizar_referencia(str(r.get("SDM_Fuente", "") or "").strip()),
+            "sdm_advertencia": anonimizar_referencia(str(r.get("SDM_Advertencia", "") or "").strip()),
         }
     return paneles
 
