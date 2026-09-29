@@ -7,7 +7,7 @@ from calculos.dimensionamiento import (
     mapear_inversores_catalogo,
     optimizar_n_serie,
     dimensionar_sistema,
-    evaluar_relacion_dc_ac,
+    proyecto_completo,
     resolver_n_strings_tracker,
     curva_electrica_temperatura,
     interpretar_curva_electrica,
@@ -915,6 +915,66 @@ if _prelim_modelo and (
     st.session_state.pop("prorrateo_preliminar_n_str_tr", None)
     _prelim_modelo = None
     _prelim_n = None
+def _mostrar_proyecto_completo(pc: dict, area_util: float, f_ocup: float,
+                               N_serie: int, modelo: str, nivel_titulo: str) -> None:
+    """Muestra y publica «🏭 Proyecto completo» (Spec
+    03-dimensionamiento/proyecto-completo): strings completos que caben en el
+    área útil o los declarados, repartidos entre los inversores necesarios."""
+    _tit = "área útil para paneles" if f_ocup < 100.0 else "toda el área"
+    st.markdown(f"{nivel_titulo} 🏭 Proyecto completo ({_tit})")
+    _g1, _g2, _g3, _g4, _g5 = st.columns(5)
+    _g1.metric("Inversores", pc["N_inversores"])
+    _g2.metric("Paneles totales", f"{pc['N_paneles']:,}")
+    _g3.metric("kWp instalados", f"{pc['P_dc_kWp']:,.1f} kWp")
+    _g4.metric("Área cubierta", f"{pc['area_m2']:,.0f} m²")
+    _g5.metric("Cobertura del área útil" if f_ocup < 100.0 else "Cobertura total",
+               f"{pc['cobertura_pct']} %",
+               help=f"Área de los módulos ÷ {area_util:,.0f} m² útiles. Puede pasar "
+                    "de 100 % solo si declaraste más cadenas de las que caben.")
+    if pc["fuente"] == "declarado":
+        _origen = "declarados en «N total de cadenas»"
+    else:
+        _origen = (f"los que caben en {area_util:,.0f} m² útiles: ⌊{area_util:,.0f} ÷ "
+                   f"({N_serie} × área del módulo)⌋")
+    if pc["N_inversores"]:
+        st.caption(
+            f"🧮 **{pc['N_strings_total']} strings** de {N_serie} módulos ({_origen}). "
+            f"Un inversor admite {pc['capacidad_strings_inversor']} strings (MPPT × strings "
+            f"por MPPT) → **{pc['N_inversores']} inversor(es)**, reparto "
+            f"**{' + '.join(str(x) for x in pc['reparto'])}** strings."
+        )
+    if not pc["cabe"]:
+        if pc["N_strings_total"] == 0:
+            st.error(
+                f"🔴 No cabe ni un string de {N_serie} módulos: necesita "
+                f"{pc['faltan_m2'] + area_util:,.0f} m² y el área útil es "
+                f"{area_util:,.0f} m². Revisa el área en 🏠 Proyecto o baja N en serie."
+            )
+        else:
+            st.error(
+                f"🔴 Las {pc['N_strings_total']} cadenas declaradas ocupan "
+                f"{pc['area_m2']:,.0f} m² y el área útil es {area_util:,.0f} m²: "
+                f"faltan **{pc['faltan_m2']:,.0f} m²**. Baja «N total de cadenas» o "
+                "revisa el área y el factor de ocupación en 🏠 Proyecto."
+            )
+    _dc = pc["dcac"]
+    if _dc["evaluable"]:
+        _txt = (f"**Relación DC/AC del proyecto = {_dc['ratio']:.2f}** "
+                f"({pc['P_dc_kWp']:,.1f} kWp ÷ {pc['N_inversores']} inversor(es))"
+                + (f" · inversor más cargado: {pc['dcac_max_inversor']:.2f}"
+                   if pc["dcac_max_inversor"] and pc["N_inversores"] > 1 else "")
+                + f"  \n{_dc['mensaje']}")
+        {"🔴": st.error, "🟠": st.warning}.get(_dc["nivel"], st.success)(f"{_dc['nivel']} {_txt}")
+    elif pc["N_inversores"]:
+        from calculos.potencia_ac_inversor import MENSAJE_SIN_POTENCIA_AC
+        st.info(f"🟡 {MENSAJE_SIN_POTENCIA_AC}")
+    st.session_state["N_inv_total"] = pc["N_inversores"]
+    st.session_state["P_dc_total_kWp"] = round(pc["P_dc_kWp"], 2)
+    st.session_state["N_paneles_granja"] = pc["N_paneles"]
+    st.session_state["N_paneles_granja_inversor_ref"] = modelo
+    st.session_state["reparto_strings_inversores"] = list(pc["reparto"])
+
+
 if _prelim_modelo and _prelim_n:
     _prelim_inversor = obtener_inversor_excel(_prelim_modelo) if _cat_inv else (
         seleccionar_inversor(_prelim_modelo)
@@ -965,36 +1025,13 @@ if _prelim_modelo and _prelim_n:
         _pc3.metric("Área / inversor", f"{_prelim_dim['area_ocupada_m2']} m²")
         _pc4.metric("Cobertura unitaria", f"{_prelim_dim['cobertura_pct']}%")
 
-        if _prelim_dim["area_ocupada_m2"] > 0:
-            _prelim_n_inv = math.ceil(_prelim_area / _prelim_dim["area_ocupada_m2"])
-            _prelim_total_panels = _prelim_n_inv * _prelim_dim["N_paneles"]
-            _prelim_total_kwp = _prelim_n_inv * _prelim_dim["P_dc_stc_kW"]
-            _prelim_total_area = _prelim_n_inv * _prelim_dim["area_ocupada_m2"]
-            _prelim_cobertura = (
-                min(round(_prelim_total_area / _prelim_area * 100, 1), 100.0)
-                if _prelim_area > 0 else 0
-            )
-            _prelim_titulo_area = (
-                "área útil para paneles"
-                if _prelim_f_ocup < 100.0 else "toda el área"
-            )
-            st.markdown(
-                f"#### 🏭 Proyecto completo ({_prelim_titulo_area})"
-            )
-            _pg1, _pg2, _pg3, _pg4, _pg5 = st.columns(5)
-            _pg1.metric("Inversores", _prelim_n_inv)
-            _pg2.metric("Paneles totales", f"{_prelim_total_panels:,}")
-            _pg3.metric("kWp instalados", f"{_prelim_total_kwp:,.1f} kWp")
-            _pg4.metric("Área cubierta", f"{_prelim_total_area:,.0f} m²")
-            _pg5.metric(
-                "Cobertura del área útil"
-                if _prelim_f_ocup < 100.0 else "Cobertura total",
-                f"{_prelim_cobertura} %",
-            )
-            st.session_state["N_inv_total"] = _prelim_n_inv
-            st.session_state["P_dc_total_kWp"] = round(_prelim_total_kwp, 2)
-            st.session_state["N_paneles_granja"] = _prelim_total_panels
-            st.session_state["N_paneles_granja_inversor_ref"] = _prelim_modelo
+        _prelim_pc = proyecto_completo(
+            panel, _prelim_area, _prelim_n, int(N_str_tr), _prelim_n_mppt,
+            N_total_cadenas=int(N_total_cadenas),
+            P_ac_nom_W=_prelim_inversor.get("P_ac_nom_W"),
+        )
+        _mostrar_proyecto_completo(_prelim_pc, _prelim_area, _prelim_f_ocup,
+                                   _prelim_n, _prelim_modelo, "####")
     else:
         st.warning(
             f"El inversor **{_prelim_modelo}** no tiene un número válido de "
@@ -1186,51 +1223,22 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
         dim  = dimensionar_sistema(panel, area, mejor.N_serie,
                                     int(N_str_tr), inversor["N_mppt"])
 
-        st.markdown("### 📊 Por inversor (1 unidad)")
+        st.markdown("### 📊 Un inversor lleno (todos sus MPPT)")
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Paneles / inversor", dim["N_paneles"])
         c2.metric("P_DC / inversor",    f"{dim['P_dc_stc_kW']:.2f} kW")
         c3.metric("Área / inversor",    f"{dim['area_ocupada_m2']} m²")
         c4.metric("Cobertura unitaria", f"{dim['cobertura_pct']}%")
 
-        # Relación DC/AC por inversor -- homóloga al aviso real de PVsyst 8.1.5
-        # ("La potencia del inversor está muy sobredimensionada", "Proporción
-        # Pnom") verificado por el usuario en Teusaquillo (29-ago-2026). Ver
-        # calculos.dimensionamiento.evaluar_relacion_dc_ac() para los umbrales.
-        _dcac_granja = evaluar_relacion_dc_ac(dim["P_dc_stc_kW"], inversor.get("P_ac_nom_W"))
-        if _dcac_granja["evaluable"]:
-            _dcac_g_texto = f"**Relación DC/AC = {_dcac_granja['ratio']:.2f}**  \n{_dcac_granja['mensaje']}"
-            if _dcac_granja["nivel"] == "🔴":
-                st.error(f"{_dcac_granja['nivel']} {_dcac_g_texto}")
-            elif _dcac_granja["nivel"] == "🟠":
-                st.warning(f"{_dcac_granja['nivel']} {_dcac_g_texto}")
-            else:
-                st.success(f"{_dcac_granja['nivel']} {_dcac_g_texto}")
-        else:
-            from calculos.potencia_ac_inversor import MENSAJE_SIN_POTENCIA_AC
-            st.info(f"🟡 {MENSAJE_SIN_POTENCIA_AC}")
-
-        # ── Escalado a la granja completa ─────────────────────────────────────
-        if dim["area_ocupada_m2"] > 0:
-            N_inv        = math.ceil(area / dim["area_ocupada_m2"])
-            total_panels = N_inv * dim["N_paneles"]
-            total_kWp    = N_inv * dim["P_dc_stc_kW"]
-            total_area   = N_inv * dim["area_ocupada_m2"]
-            cobert_total = min(round(total_area / area * 100, 1), 100.0) if area > 0 else 0
-            _tit_area = ("área útil para paneles" if _f_ocup < 100.0 else "toda el área")
-            st.markdown(f"### 🏭 Proyecto completo ({_tit_area})")
-            g1, g2, g3, g4, g5 = st.columns(5)
-            g1.metric("Inversores",       N_inv)
-            g2.metric("Paneles totales",  f"{total_panels:,}")
-            g3.metric("kWp instalados",   f"{total_kWp:,.1f} kWp")
-            g4.metric("Área cubierta",    f"{total_area:,.0f} m²")
-            g5.metric("Cobertura del área útil" if _f_ocup < 100.0 else "Cobertura total",
-                      f"{cobert_total} %",
-                      help=(f"Sobre los {area:,.0f} m² útiles para paneles "
-                            f"({_f_ocup:.0f}% del terreno)") if _f_ocup < 100.0 else None)
-            st.session_state["N_inv_total"]      = N_inv
-            st.session_state["P_dc_total_kWp"]  = round(total_kWp, 2)
-            st.session_state["N_paneles_granja"] = total_panels
-            st.session_state["N_paneles_granja_inversor_ref"] = inversor_nombre
+        # Relación DC/AC -- homóloga al aviso real de PVsyst 8.1.5 ("Proporción
+        # Pnom", Teusaquillo 29-ago-2026). Desde el 29-sep-2026 se evalúa con el
+        # sistema real del Proyecto completo, no con un inversor lleno (Spec
+        # 03-dimensionamiento/proyecto-completo).
+        _pc = proyecto_completo(
+            panel, area, mejor.N_serie, int(N_str_tr), inversor["N_mppt"],
+            N_total_cadenas=int(N_total_cadenas),
+            P_ac_nom_W=inversor.get("P_ac_nom_W"),
+        )
+        _mostrar_proyecto_completo(_pc, area, _f_ocup, mejor.N_serie, inversor_nombre, "###")
     else:
         st.error("❌ Ningún N válido en el rango. Revisar parámetros del inversor o temperaturas.")

@@ -963,6 +963,67 @@ def optimizar_n_serie(panel: dict, inversor: dict,
     return resultados
 
 
+def proyecto_completo(panel: dict, area_util_m2: float, N_serie: int,
+                      N_strings_tracker: int, N_mppt: int,
+                      N_total_cadenas: int = 0,
+                      P_ac_nom_W: float | None = None) -> dict:
+    """«🏭 Proyecto completo» de 📐 Dimensionamiento contando strings completos.
+
+    Spec ``03-dimensionamiento/proyecto-completo`` (29-sep-2026). Antes se
+    redondeaban hacia arriba inversores LLENOS: en Apartadó (957 m² útiles,
+    28 × JAM66D46-720/LB, Growatt MAX 100KTL3 LV de 10 MPPT) daba 2 inversores,
+    560 módulos y 403 kWp en 1,740 m²; PVsyst: 11 strings, 308 módulos, 222 kWp.
+
+    - Strings: los declarados (``N_total_cadenas`` > 0) o los que caben,
+      ⌊área útil ÷ (N_serie × área del módulo)⌋.
+    - Inversores = ⌈strings ÷ (N_mppt × N_strings_tracker)⌉, strings
+      repartidos parejo (11 en 2 → [6, 5]).
+    - DC/AC del proyecto con la potencia AC de todos los inversores.
+    """
+    area_mod = float(panel.get("area_m2") or 0)
+    if area_mod <= 0:
+        raise ValueError("El panel no tiene área (area_m2).")
+    if int(N_mppt) < 1 or int(N_serie) < 1 or int(N_strings_tracker) < 1:
+        raise ValueError("N_mppt, N_serie y N_strings_tracker deben ser ≥ 1.")
+
+    area_string = int(N_serie) * area_mod
+    caben = int(math.floor(max(float(area_util_m2), 0.0) / area_string + 1e-9))
+    declarado = int(N_total_cadenas or 0) > 0
+    strings = int(N_total_cadenas) if declarado else caben
+    capacidad = int(N_mppt) * int(N_strings_tracker)
+    n_inv = math.ceil(strings / capacidad) if strings > 0 else 0
+    reparto = ([strings // n_inv + (1 if i < strings % n_inv else 0) for i in range(n_inv)]
+               if n_inv else [])
+
+    n_paneles = strings * int(N_serie)
+    p_mod_kw = float(panel.get("Pmax_stc") or 0) / 1000.0
+    p_dc_kwp = round(n_paneles * p_mod_kw, 3)
+    area = round(n_paneles * area_mod, 2)
+    area_util = float(area_util_m2)
+    necesaria = area if strings > 0 else area_string
+    faltan = round(max(necesaria - area_util, 0.0), 2) if (strings == 0 or area > area_util) else 0.0
+
+    dcac = evaluar_relacion_dc_ac(p_dc_kwp, (P_ac_nom_W or 0) * n_inv if n_inv else None)
+    dcac_max = (round(reparto[0] * int(N_serie) * p_mod_kw * 1000.0 / P_ac_nom_W, 3)
+                if reparto and P_ac_nom_W else None)
+    return {
+        "fuente": "declarado" if declarado else "area",
+        "strings_que_caben": caben,
+        "N_strings_total": strings,
+        "N_inversores": n_inv,
+        "reparto": reparto,
+        "capacidad_strings_inversor": capacidad,
+        "N_paneles": n_paneles,
+        "P_dc_kWp": p_dc_kwp,
+        "area_m2": area,
+        "cobertura_pct": round(area / area_util * 100, 1) if area_util > 0 else 0.0,
+        "cabe": strings > 0 and faltan == 0,
+        "faltan_m2": faltan,
+        "dcac": dcac,
+        "dcac_max_inversor": dcac_max,
+    }
+
+
 def dimensionar_sistema(panel: dict, area_m2: float, N_serie: int,
                         N_strings_tracker: int, N_mppt: int) -> dict:
     """
