@@ -31,6 +31,11 @@ su PR»).
 - El mensaje de la relación DC/AC dice **1.00–1.35**, el rango que de verdad
   usa el cálculo (pedido del usuario el 29-sep-2026); el manual se corrige
   igual. Los límites no cambian.
+- Con el campo «Cantidad de inversores del proyecto» en 0, un aviso debajo
+  dice cuántos inversores calcula la app y cómo
+  (`texto_inversores_automaticos`: cuenta exacta con «N total de cadenas»; si
+  no, lo último de «🏭 Proyecto completo»). Aprobado por el usuario («si
+  agrega el aviso»). La guía de alarmas de la sección 90 lo explica.
 - Manual del Asistente, sección 91.
 
 ## Alternativas descartadas

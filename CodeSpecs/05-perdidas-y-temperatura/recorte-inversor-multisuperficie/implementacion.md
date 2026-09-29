@@ -15,6 +15,8 @@
   resta el recorte hora a hora.
 - `calculos/dimensionamiento.py`: el mensaje de `evaluar_relacion_dc_ac` dice
   «1.00–1.35» (antes 0.95–1.35); límites sin cambio.
+- `calculos/dimensionamiento.py`: `texto_inversores_automaticos`;
+  `pages/4_📐_Dimensionamiento.py` lo muestra bajo el campo cuando está en 0.
 - `pages/9_🗺️_Vista_3D.py`: tabla «✂️ Recorte por inversor (hora a hora)».
 - Manual del Asistente, sección 91; contratos y registro de decisiones.
 
@@ -27,6 +29,8 @@
 - `bipv_python/tests/test_consistencia_sdm_entre_modulos.py`
 - `bipv_python/tests/test_compatibilidad_string.py`
 - `bipv_python/pages/9_🗺️_Vista_3D.py`
+- `bipv_python/pages/4_📐_Dimensionamiento.py`
+- `bipv_python/tests/test_inversores_del_proyecto.py`
 - `bipv_python/tests/test_recorte_inversor_multisup.py`
 - `bipv_python/datos/base_conocimiento_asistente.md`
 - `CodeSpecs/00-director/contratos-entre-modulos.md`

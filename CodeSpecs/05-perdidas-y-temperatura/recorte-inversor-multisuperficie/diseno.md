@@ -54,3 +54,5 @@
 9. Vista 3D muestra «✂️ Recorte por inversor» y el manual lo explica.
 10. El mensaje DC/AC dice «1.00–1.35» y coincide con los límites: 0,97 → 🟠,
     1,00 y 1,35 → 🟢, 1,36 → 🟠; ya no aparece 0,95.
+11. Con el campo de inversores en 0 aparece «🧮 La app calcula N
+    inversor(es)» con la cuenta; con un número escrito no aparece.

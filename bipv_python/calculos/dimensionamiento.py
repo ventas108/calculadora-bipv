@@ -1025,6 +1025,30 @@ def inversores_fijados_vigentes(estado, inversor_nombre: str | None) -> int:
         return 0
 
 
+def texto_inversores_automaticos(n_total_cadenas: int, n_trackers: int, n_strings_tracker: int,
+                                  publicado: int | None = None) -> str:
+    """Aviso bajo «Cantidad de inversores del proyecto» cuando está en 0 (automática).
+
+    Pedido del usuario (29-sep-2026): con el campo en 0 parecía vacío aunque
+    la app sí calculaba los inversores. Con «N total de cadenas» declarado la
+    cuenta es exacta (la misma de ``proyecto_completo``); sin él se usa lo
+    último que publicó «🏭 Proyecto completo», o se explica cuándo se calcula.
+    """
+    capacidad = int(n_trackers or 0) * int(n_strings_tracker or 0)
+    cola = (" Escribe otro número solo si tu diseño usa una cantidad distinta "
+            "(por ejemplo, para bajar la relación DC/AC).")
+    if int(n_total_cadenas or 0) > 0 and capacidad > 0:
+        n = resolver_inversores(int(n_total_cadenas), capacidad)["n"]
+        return (f"🧮 La app calcula **{n} inversor(es)**: {int(n_total_cadenas)} strings ÷ "
+                f"{capacidad} strings por inversor ({int(n_trackers)} MPPT × {int(n_strings_tracker)} "
+                f"por MPPT), redondeado hacia arriba (ver «🏭 Proyecto completo»)." + cola)
+    if publicado:
+        return (f"🧮 La app calcula **{int(publicado)} inversor(es)** según el último "
+                "«🏭 Proyecto completo»." + cola)
+    return ("🧮 La app calcula la cantidad al presionar «▶️ Optimizar N paneles/string»; "
+            "la verás en «🏭 Proyecto completo»." + cola)
+
+
 def proyecto_completo(panel: dict, area_util_m2: float, N_serie: int,
                       N_strings_tracker: int, N_mppt: int,
                       N_total_cadenas: int = 0,

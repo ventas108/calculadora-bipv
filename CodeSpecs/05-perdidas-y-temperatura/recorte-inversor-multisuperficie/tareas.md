@@ -5,4 +5,5 @@
 - [x] Recorte en `cadena_superficies_estado`, desglose y firma.
 - [x] Tabla «✂️ Recorte por inversor» en Vista 3D y texto DC/AC de ⚡ Diseño eléctrico.
 - [x] Mensaje DC/AC con el rango real (1.00–1.35) y manual corregido.
+- [x] Aviso «🧮 La app calcula N inversor(es)» bajo el campo en 0 y guía del manual.
 - [x] Prueba con la página, manual del Asistente, director, suite completa y PR.

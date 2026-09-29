@@ -23,6 +23,11 @@ Además, el mensaje de la relación DC/AC (`evaluar_relacion_dc_ac`) decía
 una relación de 0,97 salía 🟠 «por debajo del rango típico (0.95–1.35)». El
 manual del Asistente (sección de la relación DC/AC) repetía 0,95.
 
+Por último, en 📐 Dimensionamiento el campo «Cantidad de inversores del
+proyecto» en **0** (automático) parecía vacío: el usuario esperaba ver ahí los
+2 inversores de Apartadó, que la app sí calculaba más abajo en «🏭 Proyecto
+completo».
+
 ## Contexto
 
 Pregunta del usuario el 29-sep-2026, tras encontrar en Apartadó que 📊

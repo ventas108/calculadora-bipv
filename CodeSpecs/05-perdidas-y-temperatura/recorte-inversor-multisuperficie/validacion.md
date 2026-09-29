@@ -20,8 +20,13 @@
 - [x] Mensaje DC/AC: prueba de referencia en
   `test_consistencia_sdm_entre_modulos.py` (0,97 🟠; 1,00 y 1,35 🟢 con
   «1.00–1.35»; 1,36 🟠; sin 0,95). Manual corregido a 1,00–1,35.
+- [x] Aviso bajo el campo de inversores: 3 pruebas nuevas en
+  `test_inversores_del_proyecto.py`; prueba con la página (Apartadó, 11
+  cadenas): en 0 con 1 string por MPPT «La app calcula **2 inversor(es)**:
+  11 strings ÷ 10»; con 2 escritos, sin aviso; en 0 con 2 por MPPT,
+  «**1** inversor(es): 11 ÷ 20».
 - [x] Suite completa de `bipv_python`.
 
 ## Resultado
 
-Criterios 1 a 10 cumplidos. En espera de la revisión del PR.
+Criterios 1 a 11 cumplidos. En espera de la revisión del PR.

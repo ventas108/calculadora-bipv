@@ -156,3 +156,23 @@ def test_manual_del_asistente_explica_las_alarmas():
                   "fijados en 📐 Dimensionamiento", "volvió a 0"):
         assert texto in seccion
     assert "PVsyst" not in seccion
+
+
+# ── Aviso bajo el campo cuando está en 0 (pedido del usuario, 29-sep-2026) ───
+def test_aviso_con_cadenas_declaradas_da_la_cuenta_exacta():
+    from calculos.dimensionamiento import texto_inversores_automaticos
+    t = texto_inversores_automaticos(11, 10, 1)
+    assert "**2 inversor(es)**" in t and "11 strings ÷ 10" in t and "otro número" in t
+    assert "**1 inversor(es)**" in texto_inversores_automaticos(11, 10, 2)
+
+
+def test_aviso_sin_cadenas_usa_lo_publicado_o_explica_cuando():
+    from calculos.dimensionamiento import texto_inversores_automaticos
+    assert "**3 inversor(es)**" in texto_inversores_automaticos(0, 10, 1, publicado=3)
+    assert "Optimizar N paneles/string" in texto_inversores_automaticos(0, 10, 1)
+
+
+def test_dimensionamiento_muestra_el_aviso_en_0():
+    src = _fuente("4_*Dimensionamiento.py")
+    assert "texto_inversores_automaticos(" in src
+    assert "if N_inv_fijado == 0:" in src
