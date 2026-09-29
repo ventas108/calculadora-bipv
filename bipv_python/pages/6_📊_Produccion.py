@@ -16,6 +16,7 @@ from calculos.produccion_vigencia import (
 )
 from calculos.persistencia_resultados import CLAVE_PAYLOAD_FIRMA
 from calculos.mismatch_bypass import exigir_poa_sin_termico, seleccionar_poa_bypass
+from calculos.mismatch import aplicar_factor_horario, factores_mismatch_produccion
 from calculos.produccion_iv import simular_produccion_iv, panel_apto_para_iv, preparar_para_iv
 from calculos.modelo_iv import resolver_panel_calibrado
 from calculos.dimensionamiento import (
@@ -82,16 +83,20 @@ _motor_ok       = st.session_state.get("motor_optico_ok", False)
 _mo_summary     = st.session_state.get("motor_optico_summary", {})
 _mismatch_ok    = st.session_state.get("mismatch_ok", False)
 
-# Factor de pérdidas de la página Mismatch (default 1.0 si no se ejecutó).
-# produccion-codespec Fase 1 ("Soiling único"): con Motor Óptico activo,
-# poa_sin_termico_df YA incluye soiling -- multiplicar además por
-# factor_global_mismatch (que también lo incluye) lo aplicaría dos veces.
-# Con Motor Óptico activo se usa factor_mismatch_sin_soiling (solo sombra de
-# horizonte + mismatch de orientación); sin él, factor_global_mismatch tal
-# como antes (comportamiento histórico sin cambios).
-factor_pr = st.session_state.get(
-    "factor_mismatch_sin_soiling" if _motor_ok else "factor_global_mismatch", 1.0,
+# Factores de la página Mismatch (1.0 si no se ejecutó) -- una sola función
+# decide qué se aplica (Spec 05/mismatch-horizonte-coherente, 29-sep-2026):
+# • factor escalar: factor_mismatch_sin_soiling con Motor Óptico activo (la
+#   suciedad ya viene en poa_sin_termico_df -- "Soiling único") o
+#   factor_global_mismatch sin él. Desde la versión 2 ninguno trae el horizonte.
+# • factor horario: el horizonte (solo luz directa, en sus horas) y, en
+#   bifacial sin Motor Óptico, que la suciedad no toque la cara trasera. Se
+#   aplica a la POA base más abajo, ANTES de la firma y de la simulación.
+# Un estado de una versión anterior se usa como antes (su escalar ya trae el
+# horizonte) y se pide recalcular: nunca se cuenta el horizonte dos veces.
+_factores_mm = factores_mismatch_produccion(
+    st.session_state, st.session_state["poa_df"], bool(_motor_ok),
 )
+factor_pr = _factores_mm["factor_escalar"]
 poa_ef    = st.session_state.get("poa_efectiva_kWh_m2", poa_bruta_anual)
 
 if _motor_ok:
@@ -166,6 +171,32 @@ else:
             f"se usará POA bruta ({poa_bruta_anual:.0f} kWh/m²/año). "
             "Puedes continuar o ejecutar primero el Motor Óptico para mayor precisión."
         )
+
+# ── Horizonte hora a hora (Spec 05/mismatch-horizonte-coherente) ─────────────
+# Se aplica aquí, a la POA base, ANTES de la firma de vigencia (que hashea
+# poa_base["poa_global"]) y de la simulación: el resultado queda atado a este
+# horizonte. En bifacial la pérdida sale de la cara frontal (el aporte
+# trasero no cambia).
+_factor_horario_mm = _factores_mm["factor_horario"]
+if _factor_horario_mm is not None:
+    poa_base = aplicar_factor_horario(poa_base, _factor_horario_mm)
+    _fs_anual_mm = float(st.session_state.get("factor_sombra_anual") or 0.0)
+    st.caption(
+        "🏔️ Horizonte de 🔀 Mismatch aplicado **hora a hora** a la POA "
+        f"(solo luz directa, {_fs_anual_mm * 100:.2f} % en el año)"
+        + (" · suciedad solo en la cara frontal (bifacial)" if (
+            not _motor_ok and "poa_front" in poa_base.columns) else "")
+        + "."
+    )
+for _aviso_mm in _factores_mm["avisos"]:
+    st.warning(_aviso_mm)
+# Valores por defecto: si 🔀 Mismatch nunca se abrió, Producción aplica 0 %
+# de mismatch y cableado (no inventa valores) y lo dice.
+if "pct_mismatch_fab" not in st.session_state:
+    st.info(
+        "ℹ️ 🔀 Mismatch no se ha abierto: se aplica **0 %** de calidad, mismatch y cableado. "
+        "Ábrela para fijar esas pérdidas (propone mismatch 1.0 % y cableado DC 1.5 %)."
+    )
 
 with st.expander("ℹ️ ¿Qué POA se usa en la simulación?", expanded=False):
     st.markdown(f"""
@@ -723,6 +754,10 @@ if btn_sim or st.session_state.get("produccion_ok"):
         res["produccion_run_signature_v1"] = _firma_produccion
 
         st.session_state["res_produccion"]         = res
+        # Factor de 🔀 Mismatch que DE VERDAD usó esta corrida (el 📄 Reporte
+        # PDF lo muestra; antes mostraba factor_global_mismatch aunque con
+        # Motor Óptico se aplicara otro).
+        st.session_state["factor_mismatch_aplicado"] = float(factor_pr)
         st.session_state["res_produccion_base"]    = res_base
         st.session_state["res_produccion_iv"]      = res_iv
         st.session_state["produccion_modo_iv"]     = bool(usar_iv and res_iv is not None)

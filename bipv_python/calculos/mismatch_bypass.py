@@ -1025,3 +1025,42 @@ def combinar_fs_con_horizonte(p_shade, mascara_horizonte):
         "horas_solo_horizonte": int(((fs_h >= 1.0) & (p_shade < 1.0)).sum()),
     }
     return fs_comb, info
+
+
+def excluir_horas_horizonte(p_shade, mascara_horizonte):
+    """
+    FS geométrico 3D para el bypass SIN las horas en que el sol está detrás
+    del horizonte (Spec 05/mismatch-horizonte-coherente, 29-sep-2026).
+
+    En esas horas no hay luz directa que sombrear: 📊 Producción ya la quitó
+    hora a hora con el horizonte. Poner FS = 0 evita contar la misma sombra
+    dos veces (antes: horizonte como sombra total en el bypass y además como
+    factor en Producción) y que el bypass borre la difusa de esas horas.
+
+    Retorna (p_shade_final: pd.Series, info: dict con horas_excluidas y
+    horas_horizonte). Lanza ValueError si las horas no coinciden.
+    """
+    if not isinstance(p_shade, pd.Series) or not isinstance(mascara_horizonte, pd.Series):
+        raise ValueError("excluir_horas_horizonte espera dos pd.Series")
+    if len(mascara_horizonte) != len(p_shade):
+        raise ValueError(
+            f"El horizonte tiene {len(mascara_horizonte)} horas y el FS 3D "
+            f"{len(p_shade)} — recalcula el sombreado de horizonte con el TMY "
+            "actual de la sesión (☀️ Recurso Solar cambió)."
+        )
+    mask = mascara_horizonte
+    if not mask.index.equals(p_shade.index):
+        mask = mascara_horizonte.reindex(p_shade.index)
+        if mask.isna().any():
+            raise ValueError(
+                "Las horas del horizonte no coinciden con las del TMY de la "
+                "sesión — recalcula el sombreado de horizonte."
+            )
+    m = mask.astype(bool).to_numpy()
+    fs = p_shade.to_numpy(dtype=float)
+    salida = pd.Series(np.where(m, 0.0, fs), index=p_shade.index)
+    info = {
+        "horas_horizonte": int(m.sum()),
+        "horas_excluidas": int((m & (fs > 0)).sum()),
+    }
+    return salida, info

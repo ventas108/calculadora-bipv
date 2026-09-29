@@ -42,11 +42,17 @@ def test_mismatch_excluye_mismatch_fab_y_cableado_de_la_cascada_global():
     # reductor de irradiancia en Producción) debe recibir 0.0 para estos 2
     # factores -- si no, Producción los contaría dos veces (una vez aquí,
     # otra vez como parámetro explícito del motor).
-    src = _leer(_PAG_MISMATCH)
-    idx = src.index("cascada = cascada_perdidas(")
-    bloque = src[idx:idx + 400]
-    assert "pct_mismatch_fab       = 0.0" in bloque
-    assert "pct_cableado           = 0.0" in bloque
+    # Spec 05/mismatch-horizonte-coherente: la cascada se arma en
+    # calculos.mismatch.publicar_cascada_mismatch(), que ni siquiera recibe
+    # estos dos porcentajes; se verifica con números: con mismatch de
+    # orientación y suciedad en 0, el factor publicado es exactamente 1.
+    from calculos.mismatch import publicar_cascada_mismatch
+    estado = {"pct_mismatch_fab": 3.0, "pct_cableado": 2.0,
+              "res_mismatch_or": {"factor_mismatch_pct": 0.0}}
+    publicar_cascada_mismatch(estado, poa_anual=1500.0, pct_soiling=0.0, motor_ok=False)
+    assert estado["factor_global_mismatch"] == 1.0
+    assert estado["factor_mismatch_sin_soiling"] == 1.0
+    assert "publicar_cascada_mismatch(" in _leer(_PAG_MISMATCH)
 
 
 # ── Página 6 — Producción ────────────────────────────────────────────────────

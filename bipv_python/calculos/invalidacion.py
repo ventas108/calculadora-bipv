@@ -82,6 +82,9 @@ KEYS_DERIVADOS_POA = (
     # auditoría anterior (E_ac_anual_kWh/PR_sistema/res_produccion* ya
     # estaban arriba).
     "E_dc_anual_kWh", "Y_f_kWh_kWp", "df_mensual_produccion", "verificacion_jrc",
+    # Factor de 🔀 Mismatch que usó esa corrida (Spec 05/mismatch-horizonte-
+    # coherente) -- caduca con ella.
+    "factor_mismatch_aplicado",
     # Diagnóstico real vs. simulado (Página 6, sección "#28"; consumido por
     # 📄 Reporte PDF) -- SOLO el lado DERIVADO de la simulación/POA (E_sim,
     # PR_esperado, PR_conv/corr -- estos dependen de HSP mensual, que sale de

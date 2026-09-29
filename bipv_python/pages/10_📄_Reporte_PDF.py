@@ -929,7 +929,10 @@ def generar_html_reporte() -> str:
         Yr    = res_prod.get("Y_r", 0)
         CF    = res_prod.get("CF_pct", 0)
         eta   = st.session_state.get("eta_inversor", 0.975) * 100
-        mismatch_f = st.session_state.get("factor_global_mismatch", 1.0)
+        # El factor que usó de verdad la corrida de Producción (Spec
+        # 05/mismatch-horizonte-coherente); factor_global_mismatch solo como
+        # respaldo para resultados guardados antes de ese cambio.
+        mismatch_f = st.session_state.get("factor_mismatch_aplicado", st.session_state.get("factor_global_mismatch", 1.0))
         fuente_poa = "Motor Óptico (IAM+Soiling+Térmico)" if motor_optico else "POA bruta"
 
         html += seccion("Producción Anual — Simulación IEC 61724", "📊")

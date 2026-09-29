@@ -35,28 +35,38 @@ def _lineas(ruta: str) -> list[str]:
 # Objetivo 2 — Soiling único: Página 5 publica factor_mismatch_sin_soiling
 # ══════════════════════════════════════════════════════════════════════════
 
+# Spec 05/mismatch-horizonte-coherente (29-sep-2026): la publicación pasó de
+# la página a calculos.mismatch.publicar_cascada_mismatch() (probada con
+# números en tests/test_mismatch_horizonte_coherente.py) y el horizonte ya no
+# va en el factor escalar -- Producción lo aplica hora a hora.
+_MISMATCH_PY = os.path.join(os.path.dirname(_PAGINA_5), "..", "calculos", "mismatch.py")
+
+
+def _publicar_src():
+    src = _leer(_MISMATCH_PY)
+    return src[src.index("def publicar_cascada_mismatch"):src.index("def factores_mismatch_produccion")]
+
+
 def test_pagina5_importa_calcular_factor_mismatch_sin_soiling():
-    src = _leer(_PAGINA_5)
-    assert "calcular_factor_mismatch_sin_soiling" in src
+    assert "publicar_cascada_mismatch(" in _leer(_PAGINA_5)
+    assert "calcular_factor_mismatch_sin_soiling" in _publicar_src()
 
 
 def test_pagina5_publica_factor_mismatch_sin_soiling_junto_a_global():
-    src = _leer(_PAGINA_5)
-    assert 'st.session_state["factor_mismatch_sin_soiling"]' in src
+    src = _publicar_src()
+    assert 'estado["factor_mismatch_sin_soiling"]' in src
     # Debe seguir conservando la clave histórica (compatibilidad).
-    assert 'st.session_state["factor_global_mismatch"]' in src
+    assert 'estado["factor_global_mismatch"]' in src
 
 
 def test_pagina5_factor_sin_soiling_usa_sombra_y_mismatch_orientacion_no_soiling():
-    """La llamada debe pasar factor_sombra_anual y factor_mismatch_or_pct --
-    nunca pct_soiling ni cascada_mismatch -- para que el resultado
-    estructuralmente no pueda incluir soiling."""
-    src = _leer(_PAGINA_5)
-    idx = src.index("calcular_factor_mismatch_sin_soiling(")
-    llamada = src[idx: idx + 200]
-    assert "factor_sombra_anual" in llamada
-    assert "factor_mismatch_or_pct" in llamada
-    assert "pct_soiling" not in llamada
+    """El factor sin soiling solo lleva el mismatch de orientación (el
+    horizonte va hora a hora desde la versión 2) -- nunca la suciedad."""
+    src = _publicar_src()
+    idx = src.index("calcular_factor_mismatch_sin_soiling(") + len("calcular_factor_mismatch_sin_soiling(")
+    argumentos = src[idx: src.index(")", idx)]
+    assert "mm_or" in argumentos
+    assert "soil" not in argumentos
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -108,11 +118,12 @@ def test_pagina5_firma_bypass_usa_los_mismos_argumentos_efectivos():
 
 def test_pagina6_selecciona_factor_mismatch_sin_soiling_cuando_motor_activo():
     src = _leer(_PAGINA_6)
-    idx = src.index("factor_pr = st.session_state.get(")
-    bloque = src[idx: idx + 200]
-    assert "factor_mismatch_sin_soiling" in bloque
-    assert "factor_global_mismatch" in bloque
-    assert "_motor_ok" in bloque
+    idx = src.index("_factores_mm = factores_mismatch_produccion(")
+    assert "_motor_ok" in src[idx: idx + 200]
+    fuente = _leer(_MISMATCH_PY)
+    bloque = fuente[fuente.index("def factores_mismatch_produccion"):]
+    bloque = bloque[: bloque.index('clave = "factor_mismatch_sin_soiling" if motor_ok else "factor_global_mismatch"') + 100]
+    assert "factor_mismatch_sin_soiling" in bloque and "factor_global_mismatch" in bloque
 
 
 # ══════════════════════════════════════════════════════════════════════════
