@@ -4895,6 +4895,44 @@ Los paneles monofaciales no cambian: su cascada es exactamente la de antes. En �
 - **Qué hacer:** después de actualizar la app, vuelve a pulsar «🚀 Calcular cascada óptica» y luego recalcula 📊 Producción. Para comparar con un informe de la referencia estándar internacional, usa el montaje que corresponda a su Uc (sección 83) y pon la suciedad en 0 si el informe no tiene pérdida por suciedad.
 - Todavía no están en la app el sombreado trasero ni el mismatch trasero del informe (en Apartadó, 5 % y 10 %): la app dará algo más de ganancia bifacial que la referencia.
 
+## 85. 🔀 Mismatch: horizonte y cascada de Mismatch coherentes con Producción (29-sep-2026)
+
+### Horizonte y cascada de Mismatch — qué cambió y por qué
+
+**Qué es el horizonte:** montañas, edificios o árboles lejanos que tapan el sol cuando está bajo. Se escribe en 🔀 Mismatch, sección 1, como una tabla de azimut y elevación.
+
+**Qué pasaba antes (auditoría del 29-sep-2026):**
+1. En las horas con el sol detrás del obstáculo se quitaba **toda** la luz, también la difusa del cielo. Con un horizonte de 15° alrededor, la app quitaba 1,85 % de la irradiancia; la luz directa de esas horas era solo **0,93 %**: la pérdida salía al doble.
+2. A 📊 Producción llegaba un **promedio anual**: 3.632 horas sin sombra perdían igual 1,8 % y las horas sombreadas perdían de menos.
+3. Si además calculabas el bypass, el horizonte se restaba **dos veces** (una en Producción y otra en el bypass).
+
+### Horizonte y cascada de Mismatch — cómo se calcula ahora (fórmula en palabras)
+
+- En cada hora con el sol detrás del obstáculo: **factor de la hora = 1 − luz directa ÷ luz total**. Las demás horas tienen factor 1 (no pierden nada).
+- La luz difusa del cielo y el aporte trasero de un panel bifacial **no se tocan**.
+- Producción multiplica la luz de **cada hora** por su factor, antes de calcular la temperatura y la potencia.
+- El horizonte se cuenta **una sola vez**: en las horas de horizonte el bypass no vuelve a contar sombra del modelo 3D (ya no hay luz directa que sombrear).
+
+**Ejemplo de una hora:** luz total 400 W/m², de los que 300 son directa y 100 difusa. Con el sol detrás de una montaña quedan 100 W/m²: factor = 1 − 300 ÷ 400 = **0,25**. Antes quedaban 0 W/m².
+
+**Ejemplo del año (Apartadó, 15° alrededor):** antes 1,85 %; ahora **0,93 %**.
+
+### Horizonte y cascada de Mismatch — suciedad con Motor Óptico
+
+Hay dos lugares con suciedad: 🔀 Mismatch (un solo porcentaje) y 🔆 Motor Óptico (un calendario mes a mes, en promedio 3,75 % en Colombia). Si el Motor Óptico está calculado, **manda el Motor Óptico** y el control de 🔀 Mismatch queda deshabilitado y dice cuánto aplica el Motor Óptico. Para cambiarla: 🔆 Motor Óptico → «Usar factores de soiling personalizados». Así nunca se aplica dos veces ni se cree que está en 0 cuando no lo está.
+
+Con panel bifacial y sin Motor Óptico, la suciedad de 🔀 Mismatch solo se aplica a la **cara frontal**; la trasera casi no se ensucia.
+
+### Horizonte y cascada de Mismatch — cómo leer la pantalla y qué hacer
+
+- **Cascada (sección 4):** solo muestra lo que se resta a la **luz**: horizonte (solo luz directa), mismatch de orientación y suciedad. La tarjeta se llama «Factor sobre la irradiancia» (no es el PR).
+- **Tabla «Pérdidas que 📊 Producción aplica sobre la potencia»:** calidad del módulo, mismatch de módulos y strings, cableado DC y AC. Esas se restan a la potencia, no a la luz; antes aparecían como filas en 0 en la cascada.
+- **Recalcula sola:** si cambias el horizonte, las orientaciones o la POA (otra versión de PVGIS, otra orientación), la página recalcula y lo avisa con «🔄».
+- **En 📊 Producción:** aparece «🏔️ Horizonte de 🔀 Mismatch aplicado hora a hora». Si ves el aviso de «versión anterior», abre 🔀 Mismatch una vez para recalcular.
+- **Si nunca abres 🔀 Mismatch,** Producción aplica 0 % de calidad, mismatch y cableado y lo avisa. Al abrir la página se proponen mismatch 1,0 % y cableado DC 1,5 %.
+- **📄 Reporte PDF:** «Factor Mismatch aplicado» es ahora el que usó de verdad la corrida de Producción.
+- **Qué hacer:** para comparar con la referencia estándar internacional, deja el horizonte en 0 si el informe no tiene «Horizon» (sombra lejana), y copia calidad, mismatch y cableado en sus controles.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

@@ -126,6 +126,26 @@ Regla de consumo:
 	publicada (`motor_optico.poa_publicable`) mantiene `poa_global − poa_front` =
 	aporte trasero óptico. Los factores promedio del resumen son ponderados por
 	energía (su producto es `factor_global`). Monofacial sin cambios.
+- 🔀 Mismatch → 📊 Producción (29-sep-2026, Spec
+	`05-perdidas-y-temperatura/mismatch-horizonte-coherente`, `mismatch_version = 2`):
+	- `factor_global_mismatch` (orientación + suciedad) y
+		`factor_mismatch_sin_soiling` (orientación) ya **no** incluyen el horizonte.
+	- El horizonte entra solo por `calculos.mismatch.factores_mismatch_produccion`:
+		factor hora a hora = 1 − luz directa frontal ÷ POA en las horas bloqueadas,
+		aplicado a la POA base con `aplicar_factor_horario` antes de la firma de
+		vigencia y de la simulación (en bifacial baja `poa_front`, el aporte trasero
+		no cambia). Sin Motor Óptico y en bifacial, la suciedad solo sobre la cara
+		frontal que queda tras el horizonte.
+	- Bypass: FS 3D = 0 en las horas de horizonte (`excluir_horas_horizonte`); cada
+		sombra se resta una sola vez.
+	- Estado sin `mismatch_version` (versión anterior): se usa su escalar tal cual
+		(ya trae el horizonte), sin factor horario, con aviso de recalcular.
+	- Con Motor Óptico activo la suciedad es la del Motor Óptico; el control de
+		🔀 Mismatch queda deshabilitado.
+	- Valores por defecto: `calculos.mismatch.DEFAULTS_MISMATCH`; Producción no los
+		aplica si la página no se abrió (aplica 0 % y avisa).
+	- Producción guarda `factor_mismatch_aplicado` (el factor escalar de su
+		corrida), que muestra 📄 Reporte PDF.
 
 #### Energía multi-superficie (Vista 3D)
 

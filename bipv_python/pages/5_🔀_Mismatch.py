@@ -7,16 +7,16 @@ import numpy as np
 
 from calculos.mismatch import (
     CLAVE_CALIDAD_MODULO,
+    DEFAULTS_MISMATCH,
     calcular_sombreado_horizonte,
     calcular_mismatch_orientacion,
-    cascada_perdidas,
-    factor_global_perdidas,
-    calcular_factor_mismatch_sin_soiling,
+    firma_horizonte,
+    publicar_cascada_mismatch,
 )
 from calculos.mismatch_bypass import (
     cargar_csv_fs,
     alinear_fs_con_tmy,
-    combinar_fs_con_horizonte,
+    excluir_horas_horizonte,
     cobertura_csv,
     resolver_poa_bypass,
     simular_bypass_horario,
@@ -262,14 +262,14 @@ if _definicion_fase4:
         if st.session_state.get("bypass_horizonte_incluido"):
             _ec2.success(
                 "**Situación actual**\n\n"
-                "Definida · horizonte + modelo 3D combinados en el bypass "
-                "(máximo hora a hora)"
+                "Definida · horizonte + modelo 3D reconciliados (cada sombra "
+                "una sola vez)"
             )
         else:
             _ec2.warning(
                 "**Situación actual**\n\n"
                 "Definida · reconciliar horizonte + SketchUp antes de comparar "
-                "(actívalo en la sección del bypass)"
+                "(calcula el horizonte y luego el bypass)"
             )
     else:
         _ec2.success("**Situación actual**\n\nFuente de sombreado definida")
@@ -879,8 +879,17 @@ btn_sombra = st.button(
     "🏙️ Calcular pérdidas por sombreado", type="primary", use_container_width=True
 )
 
-if btn_sombra or st.session_state.get("sombra_ok"):
-    if btn_sombra:
+# Vigencia (Spec 05/mismatch-horizonte-coherente): si cambió el horizonte o
+# la POA desde el último cálculo, se recalcula solo -- antes quedaba vigente
+# el resultado anterior sin aviso.
+_firma_horiz_actual = firma_horizonte(puntos_horizonte, poa_base)
+_res_sombra_prev = st.session_state.get("res_sombra") or {}
+_sombra_vieja = bool(
+    st.session_state.get("sombra_ok")
+    and _res_sombra_prev.get("firma") != _firma_horiz_actual
+)
+if btn_sombra or _sombra_vieja or st.session_state.get("sombra_ok"):
+    if btn_sombra or _sombra_vieja:
         with st.spinner("Calculando sombreado horario sobre TMY completo..."):
             res_sombra = calcular_sombreado_horizonte(
                 lat, lon, alt_m, tmy, poa_base, puntos_horizonte
@@ -888,9 +897,10 @@ if btn_sombra or st.session_state.get("sombra_ok"):
         st.session_state["res_sombra"]  = res_sombra
         st.session_state["sombra_ok"]   = True
         st.session_state["puntos_horiz"] = puntos_horizonte
+        if _sombra_vieja and not btn_sombra:
+            st.caption("🔄 Sombreado recalculado: cambió el horizonte o la POA desde el último cálculo.")
     else:
-        res_sombra       = st.session_state.get("res_sombra", {})
-        puntos_horizonte = st.session_state.get("puntos_horiz", [])
+        res_sombra       = _res_sombra_prev
 
     if res_sombra:
         sc1, sc2, sc3, sc4 = st.columns(4)
@@ -903,6 +913,17 @@ if btn_sombra or st.session_state.get("sombra_ok"):
         sc4.metric("Factor de sombreado",
                    f"{res_sombra['factor_sombra_anual']*100:.1f}%",
                    help="Fracción de la energía POA perdida por sombreado")
+        if res_sombra.get("solo_directa", False):
+            st.caption(
+                "🏔️ Con el sol detrás del obstáculo se quita solo la **luz directa** de la cara "
+                "frontal: la luz difusa del cielo y el aporte trasero siguen llegando. "
+                "📊 Producción aplica esta pérdida **hora a hora** (no como un promedio anual)."
+            )
+        elif res_sombra.get("horas_sombreadas", 0):
+            st.caption(
+                "🏔️ Esta POA no separa la luz directa (POA combinada de varias superficies): "
+                "en las horas bloqueadas se quita toda la POA."
+            )
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 2 — MISMATCH POR ORIENTACIÓN MÚLTIPLE
@@ -975,16 +996,26 @@ if multi_orient:
         btn_mismatch_or = st.button(
             "🧭 Calcular mismatch de orientación", type="primary", use_container_width=True
         )
-        if btn_mismatch_or or st.session_state.get("mismatch_or_ok"):
-            if btn_mismatch_or:
+        # Vigencia: si cambiaron las orientaciones, tilts o fracciones desde
+        # el último cálculo, se recalcula solo.
+        _res_or_prev = st.session_state.get("res_mismatch_or") or {}
+        _or_viejo = bool(
+            st.session_state.get("mismatch_or_ok")
+            and _res_or_prev.get("configs") != configs
+        )
+        if btn_mismatch_or or _or_viejo or st.session_state.get("mismatch_or_ok"):
+            if btn_mismatch_or or _or_viejo:
                 with st.spinner("Calculando POA por orientación y factor de mismatch..."):
                     res_mismatch_or = calcular_mismatch_orientacion(
                         tmy, lat, lon, alt_m, configs
                     )
+                res_mismatch_or["configs"] = [dict(c) for c in configs]
                 st.session_state["res_mismatch_or"] = res_mismatch_or
                 st.session_state["mismatch_or_ok"]  = True
+                if _or_viejo and not btn_mismatch_or:
+                    st.caption("🔄 Mismatch de orientación recalculado: cambiaron las orientaciones.")
             else:
-                res_mismatch_or = st.session_state.get("res_mismatch_or", {})
+                res_mismatch_or = _res_or_prev
 
             if res_mismatch_or:
                 mc1, mc2, mc3 = st.columns(3)
@@ -1004,6 +1035,9 @@ else:
     st.info("Sin mismatch de orientación — todos los módulos están en la misma fachada.")
     res_mismatch_or = {"factor_mismatch_pct": 0.0, "energia_perdida_kWh_m2": 0.0}
     st.session_state["res_mismatch_or"] = res_mismatch_or
+    # Al volver a prender el control no debe reaparecer un resultado de otras
+    # orientaciones (Spec 05/mismatch-horizonte-coherente).
+    st.session_state["mismatch_or_ok"] = False
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SECCIÓN 3 — PÉRDIDAS SIMPLES
@@ -1020,7 +1054,7 @@ with col_s0:
     pct_calidad_modulo = st.slider(
         "🏷️ Calidad del módulo (%)",
         min_value=-2.0, max_value=5.0,
-        value=float(st.session_state.get(CLAVE_CALIDAD_MODULO, 0.0)),
+        value=float(st.session_state.get(CLAVE_CALIDAD_MODULO, DEFAULTS_MISMATCH["pct_calidad_modulo"])),
         step=0.1,
         help="«Module quality loss» de la referencia estándar internacional: cuánto rinde el módulo real frente a "
              "su ficha. Negativo = ganancia (tolerancia positiva, p. ej. 0/+5 W). "
@@ -1032,28 +1066,42 @@ with col_s1:
     pct_mismatch_fab = st.slider(
         "🔩 Mismatch módulos y strings (%)",
         min_value=0.0, max_value=4.0,
-        value=float(st.session_state.get("pct_mismatch_fab", 1.0)),
+        value=float(st.session_state.get("pct_mismatch_fab", DEFAULTS_MISMATCH["pct_mismatch_fab"])),
         step=0.1,
         help="Módulos y strings que no trabajan en el mismo punto. IEC 61215: 0.5–2%. "
              "En la referencia estándar internacional: «Mismatch loss, modules and strings».",
     )
     st.caption("Referencia estándar: «Mismatch loss, modules and strings»")
 
+# Con 🔆 Motor Óptico activo la suciedad la aplica esa página (calendario
+# mensual); este control no se usa y se muestra deshabilitado (Spec
+# 05/mismatch-horizonte-coherente -- antes se ignoraba sin avisar).
+_motor_ok_mm = bool(st.session_state.get("motor_optico_ok"))
 with col_s2:
     pct_soiling = st.slider(
         "🌫️ Suciedad — Soiling (%)",
         min_value=0.0, max_value=6.0,
-        value=st.session_state.get("pct_soiling", 2.0),
+        value=float(st.session_state.get("pct_soiling", DEFAULTS_MISMATCH["pct_soiling"])),
         step=0.5,
+        disabled=_motor_ok_mm,
         help="Polvo y suciedad en el vidrio. Colombia urbana: 1.5–3%. Sin limpieza periódica: hasta 5%.",
     )
-    st.caption("Reducir con limpieza cada 2–3 meses")
+    if _motor_ok_mm:
+        _mo_sum_mm = st.session_state.get("motor_optico_summary") or {}
+        _f_soil_mm = _mo_sum_mm.get("f_soil_prom")
+        st.caption(
+            "🔆 La aplica **Motor Óptico**"
+            + (f" ({(1 - float(_f_soil_mm)) * 100:.1f} % en el año)" if _f_soil_mm is not None else "")
+            + ". Para cambiarla, ve a 🔆 Motor Óptico → «Usar factores de soiling personalizados»."
+        )
+    else:
+        st.caption("Reducir con limpieza cada 2–3 meses")
 
 with col_s3:
     pct_cableado = st.slider(
         "🔌 Cableado DC (%)",
         min_value=0.0, max_value=4.0,
-        value=st.session_state.get("pct_cableado", 1.5),
+        value=float(st.session_state.get("pct_cableado", DEFAULTS_MISMATCH["pct_cableado"])),
         step=0.5,
         help="Pérdidas óhmicas en cables DC. Buena práctica: <1.5%. Instalaciones largas: hasta 3%.",
     )
@@ -1067,7 +1115,7 @@ with col_s4:
     pct_cableado_ac = st.slider(
         "🔌 Cableado AC (%)",
         min_value=0.0, max_value=4.0,
-        value=st.session_state.get("pct_cableado_ac", 0.0),
+        value=float(st.session_state.get("pct_cableado_ac", DEFAULTS_MISMATCH["pct_cableado_ac"])),
         step=0.5,
         help="Pérdidas óhmicas en el tramo inversor→punto de conexión. Antes de "
              "7-sep-2026 esta app no lo modelaba en absoluto.",
@@ -1129,21 +1177,22 @@ if btn_cascada or st.session_state.get("cascada_ok"):
     # quedaban escondidos dentro de "② Efecto SDM" del Loss Diagram sin fila
     # propia. Ahora Producción los aplica DIRECTO como parámetros explícitos
     # del motor (ver calculos.produccion.simular_produccion_anual()) --
-    # dejarlos también aquí los contaría DOS VECES. factor_global_mismatch
-    # sigue cubriendo sombreado de horizonte + mismatch de orientación +
-    # soiling exactamente igual que antes (fuera de alcance de este cambio).
-    cascada = cascada_perdidas(
-        poa_bruta_kWh_m2       = poa_anual,
-        factor_sombra          = factor_sombra_anual,
-        factor_mismatch_orient = factor_mismatch_or_pct,
-        pct_mismatch_fab       = 0.0,
-        pct_soiling            = pct_soiling,
-        pct_cableado           = 0.0,
+    # dejarlos también aquí los contaría DOS VECES.
+    #
+    # Spec 05/mismatch-horizonte-coherente (29-sep-2026): la cascada visible
+    # muestra SOLO lo que se resta a la irradiancia (horizonte, orientación,
+    # suciedad -- esta en 0 si la aplica 🔆 Motor Óptico). Lo que se publica
+    # para Producción (factor_global_mismatch / factor_mismatch_sin_soiling)
+    # ya NO incluye el horizonte: Producción lo aplica hora a hora
+    # (calculos.mismatch.factores_mismatch_produccion).
+    cascada = publicar_cascada_mismatch(
+        st.session_state,
+        poa_anual=poa_anual,
+        pct_soiling=pct_soiling,
+        motor_ok=_motor_ok_mm,
     )
-    fg = factor_global_perdidas(cascada)
-    st.session_state["cascada_mismatch"] = cascada
-    st.session_state["factor_global_mismatch"] = fg
-    st.session_state["cascada_ok"] = True
+    poa_efectiva = cascada[-1]["energia"]
+    fg = poa_efectiva / poa_anual if poa_anual > 0 else 0.0
 
     # ── Waterfall chart ──────────────────────────────────────────────────────
     etapas     = [r["etapa"]   for r in cascada]
@@ -1185,16 +1234,34 @@ if btn_cascada or st.session_state.get("cascada_ok"):
     st.plotly_chart(fig_wf, use_container_width=True)
 
     # ── Métricas finales ──────────────────────────────────────────────────────
-    poa_efectiva = next(r["energia"] for r in cascada if r["etapa"] == "POA efectiva final")
     perdida_total = poa_anual - poa_efectiva
 
     cm1, cm2, cm3, cm4 = st.columns(4)
     cm1.metric("POA bruta",        f"{poa_anual:.0f} kWh/m²")
     cm2.metric("POA efectiva",     f"{poa_efectiva:.0f} kWh/m²")
     cm3.metric("Pérdida acumulada de POA",    f"{perdida_total:.0f} kWh/m²",
-               delta=f"-{perdida_total/poa_anual*100:.1f}%", delta_color="inverse")
-    cm4.metric("Factor global PR",  f"{fg*100:.1f}%",
-                help="Factor de la cascada de POA; no representa por sí solo el PR eléctrico AC.")
+               delta=f"-{perdida_total/poa_anual*100:.1f}%" if poa_anual > 0 else None,
+               delta_color="inverse")
+    cm4.metric("Factor sobre la irradiancia",  f"{fg*100:.1f}%",
+                help="POA efectiva ÷ POA bruta de esta cascada. No es el PR: las pérdidas "
+                     "eléctricas (tabla de abajo), la temperatura y el inversor van aparte en 📊 Producción.")
+
+    # ── Pérdidas eléctricas: las aplica Producción sobre la potencia ─────────
+    st.markdown("**Pérdidas que 📊 Producción aplica sobre la potencia** (no sobre la irradiancia)")
+    st.dataframe(
+        pd.DataFrame([
+            {"Pérdida": "🏷️ Calidad del módulo", "%": pct_calidad_modulo},
+            {"Pérdida": "🔩 Mismatch módulos y strings", "%": pct_mismatch_fab},
+            {"Pérdida": "🔌 Cableado DC", "%": pct_cableado},
+            {"Pérdida": "🔌 Cableado AC", "%": pct_cableado_ac},
+        ]).style.format({"%": "{:.1f} %"}),
+        hide_index=True, use_container_width=True,
+    )
+    st.caption(
+        "Calidad × mismatch se aplican en cadena sobre la potencia del módulo; el cableado, "
+        "sobre la energía DC y AC. Si ⚡ Diagrama Unifilar tiene el cálculo real del cableado, "
+        "Producción usa ese en lugar de estos valores."
+    )
 
     # ── Tabla detalle ─────────────────────────────────────────────────────────
     with st.expander("📋 Ver tabla detallada de la cascada"):
@@ -1212,27 +1279,13 @@ if btn_cascada or st.session_state.get("cascada_ok"):
     st.success(
         f"✅ Cascada calculada para **{ciudad}** | "
         f"POA efectiva: **{poa_efectiva:.0f} kWh/m²/año** | "
-        f"Factor global PR: **{fg*100:.1f}%** | "
+        f"Factor sobre la irradiancia: **{fg*100:.1f}%** | "
         f"Continúa en 📊 Producción para calcular la energía generada."
     )
-
-    # ── Guardar en session_state para Producción ──────────────────────────────
-    st.session_state["poa_efectiva_kWh_m2"]       = round(poa_efectiva, 1)
-    st.session_state["factor_global_mismatch"]    = fg
-    # factor_mismatch_sin_soiling (produccion-codespec Fase 1, "Soiling
-    # único"): SOLO sombra de horizonte + mismatch de orientación, SIN
-    # soiling -- Motor Óptico ya lo incorpora dentro de poa_sin_termico_df.
-    # Producción usa este factor (no factor_global_mismatch, que sí incluye
-    # soiling) cuando Motor Óptico está activo, para no aplicarlo dos veces.
-    # Se recalcula/invalida junto con factor_global_mismatch (misma sección,
-    # mismo botón) -- factor_global_mismatch se conserva sin cambios por
-    # compatibilidad con los demás consumidores (Página 4b/4c/4d, IA, etc.).
-    st.session_state["factor_mismatch_sin_soiling"] = calcular_factor_mismatch_sin_soiling(
-        factor_sombra_anual, factor_mismatch_or_pct,
-    )
-    st.session_state["factor_sombra_anual"]       = factor_sombra_anual
-    st.session_state["factor_mismatch_or_pct"]    = factor_mismatch_or_pct
-    st.session_state["mismatch_ok"]               = True
+    # publicar_cascada_mismatch() ya dejó en sesión lo que usa Producción:
+    # factor_global_mismatch / factor_mismatch_sin_soiling (sin horizonte),
+    # factor_sombra_anual, factor_mismatch_or_pct, pct_soiling_cascada,
+    # mismatch_version = 2 y mismatch_ok.
 
     # ── Clave exclusiva multi-superficie (no sobreescribe poa_efectiva_kWh_m2) ─
     if _multisup_ok and _poa_multisup is not None:
@@ -1594,26 +1647,25 @@ if csv_ok and df_fs_raw is not None:
     # El widget con key="bypass_modo_alineacion" ya mantiene session_state
     # sincronizado; reasignarlo tras instanciar el widget lanza StreamlitAPIException.
 
-    # ── Horizonte: combinar con el FS 3D (#232) ───────────────────────────
+    # ── Horizonte y FS 3D: la misma sombra una sola vez ──────────────────
+    # Spec 05/mismatch-horizonte-coherente (29-sep-2026): 📊 Producción ya
+    # quita hora a hora la luz directa de las horas con el sol detrás del
+    # horizonte. En esas horas no queda luz directa que el modelo 3D pueda
+    # sombrear, así que su FS se pone en 0 (excluir_horas_horizonte). Antes
+    # una casilla metía el horizonte como sombra TOTAL en el bypass: la
+    # misma sombra se restaba dos veces y además se borraba la difusa.
     _horiz_disponible = bool(
         st.session_state.get("sombra_ok")
         and isinstance(st.session_state.get("res_sombra"), dict)
         and st.session_state["res_sombra"].get("horas_sombreadas", 0) > 0
     )
+    incluir_horizonte = _horiz_disponible
     if _horiz_disponible:
-        incluir_horizonte = st.checkbox(
-            "🏔️ Incluir el perfil de horizonte en el bypass (recomendado)",
-            value=True,
-            key="bypass_incluir_horizonte",
-            help=(
-                "Combina hora a hora la sombra del horizonte (montañas/edificios "
-                "lejanos, sección de arriba) con el FS del modelo 3D tomando la "
-                "PEOR de las dos — máximo, nunca suma, para no contar dos veces "
-                "el mismo obstáculo."
-            ),
+        st.caption(
+            "🏔️ El horizonte ya lo aplica 📊 Producción hora a hora: en esas horas el bypass "
+            "no vuelve a contar sombra (el FS 3D se toma como 0). Así cada sombra se resta una sola vez."
         )
     else:
-        incluir_horizonte = False
         if st.session_state.get("puntos_horiz") is None:
             st.caption(
                 "🏔️ Sin perfil de horizonte calculado — solo se usará el FS del "
@@ -1658,11 +1710,11 @@ if csv_ok and df_fs_raw is not None:
                     st.session_state["bypass_modo_usado"] = _modo
                     st.session_state["bypass_modo_agregacion_usado"] = _modo_ag
 
-                    # Combinar con el horizonte (#232): máximo hora a hora
+                    # Horizonte: FS 3D = 0 en sus horas (lo aplica Producción)
                     _info_horiz = None
                     if incluir_horizonte:
                         _mask_h = st.session_state["res_sombra"]["mascara_sombra"]
-                        p_shade, _info_horiz = combinar_fs_con_horizonte(
+                        p_shade, _info_horiz = excluir_horas_horizonte(
                             p_shade, _mask_h
                         )
                     st.session_state["bypass_horizonte_info"] = _info_horiz
@@ -1715,18 +1767,18 @@ if csv_ok and df_fs_raw is not None:
 
         res_bp = st.session_state.get("bypass_result", {})
 
-        # #232: si el checkbox de horizonte cambió después de calcular, el
-        # resultado mostrado ya no corresponde a la selección — avisar.
+        # Si el horizonte apareció o desapareció después de calcular el
+        # bypass, el resultado mostrado ya no corresponde — avisar.
         if res_bp and bool(incluir_horizonte) != bool(
             st.session_state.get("bypass_horizonte_incluido")
         ):
             st.warning(
-                "⚠️ Cambiaste la opción del horizonte después de calcular: el "
+                "⚠️ El horizonte cambió después de calcular el bypass: el "
                 "resultado de abajo se calculó "
                 + (
-                    "SIN el horizonte incluido. "
+                    "sin horizonte. "
                     if incluir_horizonte
-                    else "CON el horizonte incluido. "
+                    else "con otro horizonte. "
                 )
                 + "Pulsa «⚡ Calcular pérdida real por bypass diodes» para "
                 "actualizarlo."
@@ -1891,11 +1943,12 @@ if csv_ok and df_fs_raw is not None:
             if st.session_state.get("bypass_horizonte_incluido"):
                 _ih = st.session_state.get("bypass_horizonte_info") or {}
                 _horiz_txt = (
-                    f" · 🏔️ Horizonte incluido ({_ih.get('horas_horizonte', 0)} h/año, "
-                    f"{_ih.get('horas_solo_horizonte', 0)} h solo por horizonte)"
+                    f" · 🏔️ Horizonte reconciliado ({_ih.get('horas_horizonte', 0)} h/año "
+                    f"las aplica Producción; {_ih.get('horas_excluidas', 0)} h de sombra 3D "
+                    "no se cuentan de nuevo)"
                 )
             elif st.session_state.get("sombra_ok"):
-                _horiz_txt = " · 🏔️ Horizonte NO incluido en este cálculo"
+                _horiz_txt = " · 🏔️ Sin horizonte en este cálculo"
             st.caption(
                 "🧭 Fuente del sombreado: "
                 f"**{_etq_fs(st.session_state.get('fs_fuente'))}**{_horiz_txt}"
