@@ -663,6 +663,8 @@ Ambas herramientas modelan el mismo fenómeno físico con distinto nivel de deta
 
 ⚠️ No es una igualdad numérica exacta (nuestro modelo no depende del viento real, el de la referencia estándar sí) — es un punto de partida físicamente coherente, no un reemplazo del ajuste fino manual en esa herramienta.
 
+⚠️ **Corrección del 29-sep-2026:** esta tabla relaciona *nombres de montaje*, no números. Para igualar un informe concreto con su Uc y Uv hay que calcular k_BIPV con la fórmula de la sección 83 («Motor Óptico — Uc y Uv de PVsyst y su equivalente k_BIPV»). Con un panel de NOCT 45 °C y eficiencia 23,2 %, Uc = 20 equivale a k ≈ 1,1 (no a 1,3) y Uc = 29 a k ≈ 0,76.
+
 Nueva función `calculos/ficha_pvsyst.py::generar_ficha_conversion_pvsyst(panel, tipo_instalacion, k_bipv)`: genera, para cualquier panel del catálogo, una ficha de texto con los parámetros eléctricos STC en el orden que pide el diálogo de la referencia estándar internacional, los coeficientes de temperatura disponibles, y el preset Uc/Uv sugerido según la tabla de arriba. Acepta los dos esquemas de campo reales que coexisten en el repo (catálogo Excel: `marca`/`Imp`, sin coeficiente de Isc; `MODULOS_BIPV`: `fabricante`/`Imp_stc`/`Tk_alfa`) — corregido tras auto-auditoría (ver arriba) que encontró que la primera versión solo leía el esquema Excel. 12 tests nuevos (`tests/test_ficha_pvsyst.py`), 4 de ellos anclados al panel real de Teusaquillo (`ASP-ST1-T40`). Se evaluó y **se pospuso a pedido explícito del usuario** implementar el modelo de Faiman completo con viento real del TMY como modo alternativo — el k_BIPV actual, ya corregido para los 6 tipos, se consideró suficiente por ahora. Detalle completo en `DIAGNOSTICO_MODELO_TERMICO_UC_UV.md` (raíz del repo).
 
 ────────────────────────────────────────────────────────────
@@ -4774,6 +4776,83 @@ El 29-sep-2026, en la comparación con PVsyst de Apartadó, salieron en 0 y lueg
 - Si dice «Sin año típico», abre primero ☀️ Recurso Solar (restaura el año típico en segundos) y vuelve a 📐 Dimensionamiento: se recalculan solas.
 - Puedes escribirlas a mano (por ejemplo, la mínima histórica de una estación del IDEAM): la app las respeta mientras no cambie el año típico ni el panel.
 - Se guardan con el proyecto.
+
+## 83. Motor Óptico — constantes y métricas explicadas con cálculos simples (29-sep-2026)
+
+Guía de 🔆 Motor Óptico para quien está aprendiendo: qué es cada constante, la fórmula en palabras, un cálculo con números y cómo leerla en pantalla. Ejemplo real: el proyecto agrivoltaico de Apartadó (JA Solar JAM66D46-720/LB, 10° al sur, comparado con PVsyst).
+
+### Motor Óptico — b₀: el coeficiente del vidrio (IAM directo, fórmula ASHRAE)
+
+**Qué es:** el vidrio refleja más luz cuanto más inclinado llega el rayo. **b₀** dice cuánto refleja ese vidrio. IAM (Incidence Angle Modifier) es la fracción que sí entra.
+
+**Fórmula en palabras:** fracción que entra = 1 − b₀ × (1 ÷ coseno del ángulo − 1). El ángulo se mide entre el rayo y la perpendicular al panel.
+
+**Cálculo con b₀ = 0,05 (vidrio templado estándar):**
+
+| Ángulo | 1 ÷ cos | Cuenta | IAM | PVsyst «Fresnel, n = 1,526» |
+|---|---|---|---|---|
+| 0° | 1,000 | 1 − 0,05 × 0 | 1,000 | 1,000 |
+| 30° | 1,155 | 1 − 0,05 × 0,155 | 0,992 | 0,998 |
+| 60° | 2,000 | 1 − 0,05 × 1,000 | 0,950 | 0,948 |
+| 70° | 2,924 | 1 − 0,05 × 1,924 | 0,904 | 0,862 |
+| 80° | 5,759 | 1 − 0,05 × 4,759 | 0,762 | 0,636 |
+
+Hasta 60° dan casi lo mismo; en ángulos muy rasantes PVsyst pierde más, pero esas horas traen poca energía. Con b₀ = 0,12 (vidrio laminado de CdTe), a 60° entra 1 − 0,12 × 1 = **0,88**. **En pantalla:** «b₀ ASHRAE seleccionado» y la métrica «Pérdida IAM total». En Apartadó PVsyst reporta −2,35 % por IAM.
+
+### Motor Óptico — IAM difusa (f_iam_dif = 0,95)
+
+**Qué es:** la luz difusa (la del cielo, las nubes) llega de todas las direcciones a la vez, así que no tiene un solo ángulo. Se usa un factor promedio fijo: **0,95** para vidrio plano (norma IEC 61853-3); 0,90–0,93 para vidrio texturado o CdTe laminado.
+
+**Cálculo:** por cada 100 kWh/m² de luz difusa sobre el panel se pierden 100 × (1 − 0,95) = **5 kWh/m²**. En Apartadó la difusa horizontal del año es 704 kWh/m² (PVsyst); del orden de 35 kWh/m² se perderían por este factor.
+
+### Motor Óptico — suciedad (soiling) y auto-limpieza vertical
+
+**Qué es:** polvo y contaminación que tapan el vidrio. La app usa un porcentaje por mes para Colombia: enero 5 %, febrero 6 %, marzo 4 %, abril 2 %, mayo 2 %, junio 4 %, julio 5 %, agosto 6 %, septiembre 4 %, octubre 2 %, noviembre 1 %, diciembre 4 % (promedio **3,75 %**). Una superficie de 75° o más se ensucia menos (la lluvia la lava): se multiplica por el factor de auto-limpieza, **0,65**.
+
+**Cálculo:** febrero en un techo: la luz se multiplica por 1 − 0,06 = **0,94**. Febrero en una fachada vertical: 6 % × 0,65 = 3,9 % → × **0,961**. **Qué hacer:** para comparar con un informe de PVsyst que no trae suciedad, marca «Usar factores de soiling personalizados» y pon 0 en los 12 meses.
+
+### Motor Óptico — transparencia τ (área sin celda)
+
+**Qué es:** en un vidrio BIPV semitransparente, parte del área no tiene celda y deja pasar la luz sin producir. El «Factor de área activa» es 1 − τ.
+
+**Cálculo:** con τ = 20 %, de 1.000 kWh/m² solo 1.000 × 0,80 = **800 kWh/m²** caen sobre celda. Un módulo opaco (como el JA Solar) lleva τ = 0 %.
+
+### Motor Óptico — temperatura de la celda: NOCT, k_BIPV y γ
+
+**Fórmula en palabras:** temperatura de la celda = temperatura del aire + luz × (NOCT − 20) ÷ 800 × k_BIPV. NOCT es la temperatura que alcanza el panel con 800 W/m², 20 °C de aire y 1 m/s de viento (dato de la ficha). k_BIPV dice cuánto peor se ventila que un panel libre (1,0 libre; 1,15 semi-ventilado; 1,3 fachada confinada; 1,5 sellado).
+
+**Cálculo (Apartadó, NOCT 45 °C, k = 1,15, mediodía con 30 °C y 800 W/m²):** 30 + 800 × (45 − 20) ÷ 800 × 1,15 = 30 + 28,75 = **58,75 °C**.
+
+**Cuánto pierde:** γ es cuánto baja la potencia por cada °C sobre 25 °C (ficha: −0,29 %/°C). En esa hora: (58,75 − 25) × 0,29 % = **9,8 %** menos potencia. En el año PVsyst reporta −6,52 % por temperatura: las mañanas y las tardes son más frescas que el mediodía.
+
+### Motor Óptico — Uc y Uv de PVsyst y su equivalente k_BIPV
+
+**Qué es:** PVsyst no usa NOCT; usa un balance de calor: temperatura de la celda = aire + luz × α × (1 − η) ÷ (Uc + Uv × viento).
+- **α** = 0,9: fracción de la luz que el panel absorbe.
+- **η**: eficiencia del módulo (JA Solar 720 W: 23,2 %).
+- **Uc** (W/m²K): cuánto calor pierde el panel por cada grado, sin viento. Más alto = mejor ventilado. Libre (free standing) 29; semi-integrado 20; integrado 15.
+- **Uv**: lo que suma el viento (en el informe de Apartadó, 0).
+
+**Cálculo (Apartadó, Uc = 20, Uv = 0):** grados por cada W/m² = 0,9 × (1 − 0,232) ÷ 20 = **0,0346**. Con 800 W/m²: 0,0346 × 800 = **27,6 °C** sobre el aire.
+
+**En la app:** grados por cada W/m² = (NOCT − 20) ÷ 800 × k = (45 − 20) ÷ 800 × k = **0,03125 × k**.
+- Con k = 1,0: 0,0313 → **10 % menos caliente** que PVsyst (25,0 °C sobre el aire a 800 W/m²).
+- Con k = 1,15: 0,0359 → **4 % más caliente** (28,7 °C).
+- Con k = 1,3: 0,0406 → **17,5 % más caliente** (32,5 °C).
+
+**Por eso k = 1,15 es la opción más cercana al Uc = 20 de ese informe.** La fórmula para cualquier caso: k equivalente = α × (1 − η) ÷ Uc ÷ ((NOCT − 20) ÷ 800). Con NOCT 45 °C y η 23,2 %: Uc 29 → k 0,76; Uc 24,5 → k 0,90; Uc 20 → k 1,11; Uc 15 → k 1,47. La tabla de «presets» por tipo de montaje (sección más arriba) es solo orientativa: para igualar un informe concreto usa esta fórmula.
+
+### Motor Óptico — cómo leer las métricas de la pantalla
+
+La cascada va de la luz que llega a la que usa la celda, en kWh/m² al año:
+1. **POA bruta:** luz sobre el plano del panel, sin correcciones (☀️ Recurso Solar).
+2. **Pérdida IAM total:** lo que refleja el vidrio (directa con b₀ + difusa con f_iam_dif).
+3. **Pérdida soiling:** lo que tapa la suciedad.
+4. **Pérdida térmica:** la potencia que se pierde por calor, expresada como kWh/m² equivalentes.
+5. **POA efectiva → Producción:** lo que queda. 📊 Producción recibe la POA sin el término térmico y calcula la temperatura una sola vez en su modelo eléctrico, para no contarla dos veces.
+6. **Factor de área activa (1 − τ)** y **POA aprovechable por la celda:** solo cambian si el vidrio es semitransparente.
+
+«Factores promedio (horas con sol)» muestra cada factor como fracción (por ejemplo, Factor IAM promedio 0,97 = pierde 3 %).
 
 Calculadora BIPV — Innovación Química
 
