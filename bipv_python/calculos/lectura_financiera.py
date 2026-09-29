@@ -109,16 +109,17 @@ def mensaje_resumen_financiero(ciudad: str, rotulo: str, capex_neto_usd: float, 
     Antes era una sola expresión `"…" f"TIR…" if tir else "TIR N/A" f"VPN…" + …`:
     el `if/else` abarcaba todo, así que con TIR el mensaje terminaba en
     «TIR: 16.8% |» sin VPN, Payback ni LCOE (28-sep-2026). Ahora cada parte se
-    arma por separado.
+    arma por separado. El «$» va escapado (``\\$``): Streamlit toma el texto
+    entre dos «$» como fórmula LaTeX y deformaba el mensaje (28-sep-2026).
     """
     tir = metricas.get("tir_pct")
     payback = metricas.get("payback_simple")
     lcoe = metricas["lcoe_cop_kWh"]
     partes = [
         f"{'✅' if vpn_positivo else '⚠️'} **{ciudad}** — {rotulo}",
-        f"CAPEX neto: **USD {capex_neto_usd:,.0f}** ($ {capex_neto_usd * tipo_cambio / 1e6:.2f} M COP)",
+        f"CAPEX neto: **USD {capex_neto_usd:,.0f}** (\\$ {capex_neto_usd * tipo_cambio / 1e6:.2f} M COP)",
         f"TIR: **{tir:.1f}%**" if tir else "TIR: **N/A**",
-        f"VPN: **USD {metricas['vpn_usd']:,.0f}** ($ {metricas['vpn_usd'] * tipo_cambio / 1e6:.1f} M COP)",
+        f"VPN: **USD {metricas['vpn_usd']:,.0f}** (\\$ {metricas['vpn_usd'] * tipo_cambio / 1e6:.1f} M COP)",
         f"Payback: **{payback:.1f} años**" if payback else "Payback: **> horizonte**",
         f"LCOE: **{lcoe:.0f} COP/kWh**" + (
             f" ({'<' if lcoe < vne_cop_kWh else '>'} valor nivelado de la energía "

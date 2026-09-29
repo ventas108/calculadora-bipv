@@ -1374,9 +1374,9 @@ with col_l2:
                 delta_color="off")
 
     st.info(
-        f"**CAPEX bruto:** USD {capex_total:,.0f}  ($ {capex_total*tipo_cambio/1e6:.2f} M COP) → "
+        f"**CAPEX bruto:** USD {capex_total:,.0f}  (\\$ {capex_total*tipo_cambio/1e6:.2f} M COP) → "
         f"**CAPEX neto (con Ley 1715):** USD {ben['capex_neto_usd']:,.0f}  "
-        f"($ {ben['capex_neto_usd']*tipo_cambio/1e6:.2f} M COP)  "
+        f"(\\$ {ben['capex_neto_usd']*tipo_cambio/1e6:.2f} M COP)  "
         f"— {ben['pct_capex']:.1f}% de reducción efectiva"
     )
 
@@ -1857,17 +1857,17 @@ if btn_fin or st.session_state.get("financiero_ok"):
         _bat_row = (
             f"| **Baterías** (Art. 14) | Dep. acelerada 5 años | CAPEX bat. {_capex_bat_usd:,.0f} USD | "
             f"**{_capex_bat_usd * 0.50 * (tasa_renta/100):,.0f}*** | "
-            f"**$ {_capex_bat_usd * 0.50 * (tasa_renta/100) * tipo_cambio/1e6:.2f} M*** |\n"
+            f"**\\$ {_capex_bat_usd * 0.50 * (tasa_renta/100) * tipo_cambio/1e6:.2f} M*** |\n"
             if _capex_bat_usd > 0 else ""
         )
         st.markdown(f"""
 | Beneficio | Base | Cálculo | USD | COP |
 |---|---|---|---|---|
-| **Art. 11** Deducción renta | 50% × CAPEX × tasa_renta | 0.50 × {capex_total:,.0f} × {tasa_renta/100:.2f} | **{ben['ahorro_renta_usd']:,.0f}** | **$ {ben['ahorro_renta_usd']*tipo_cambio/1e6:.2f} M** |
-| **Art. 12** Exclusión IVA | 19% × CAPEX_equipos | 0.19 × {capex_total*fraccion_equipos:,.0f} | **{ben['ahorro_iva_usd']:,.0f}** | **$ {ben['ahorro_iva_usd']*tipo_cambio/1e6:.2f} M** |
-| **Art. 14** Dep. acelerada | VPN diferencial 5yr vs 10yr | — | **{ben['ahorro_dep_vpn_usd']:,.0f}** | **$ {ben['ahorro_dep_vpn_usd']*tipo_cambio/1e6:.2f} M** |
-{_bat_row}| **Total Ley 1715** | — | — | **{ben['total_usd']:,.0f}** | **$ {ben['total_usd']*tipo_cambio/1e6:.2f} M** |
-| **CAPEX neto** | CAPEX − Ley 1715 | {capex_total:,.0f} − {ben['total_usd']:,.0f} | **{ben['capex_neto_usd']:,.0f}** | **$ {ben['capex_neto_usd']*tipo_cambio/1e6:.2f} M** |
+| **Art. 11** Deducción renta | 50% × CAPEX × tasa_renta | 0.50 × {capex_total:,.0f} × {tasa_renta/100:.2f} | **{ben['ahorro_renta_usd']:,.0f}** | **\\$ {ben['ahorro_renta_usd']*tipo_cambio/1e6:.2f} M** |
+| **Art. 12** Exclusión IVA | 19% × CAPEX_equipos | 0.19 × {capex_total*fraccion_equipos:,.0f} | **{ben['ahorro_iva_usd']:,.0f}** | **\\$ {ben['ahorro_iva_usd']*tipo_cambio/1e6:.2f} M** |
+| **Art. 14** Dep. acelerada | VPN diferencial 5yr vs 10yr | — | **{ben['ahorro_dep_vpn_usd']:,.0f}** | **\\$ {ben['ahorro_dep_vpn_usd']*tipo_cambio/1e6:.2f} M** |
+{_bat_row}| **Total Ley 1715** | — | — | **{ben['total_usd']:,.0f}** | **\\$ {ben['total_usd']*tipo_cambio/1e6:.2f} M** |
+| **CAPEX neto** | CAPEX − Ley 1715 | {capex_total:,.0f} − {ben['total_usd']:,.0f} | **{ben['capex_neto_usd']:,.0f}** | **\\$ {ben['capex_neto_usd']*tipo_cambio/1e6:.2f} M** |
         """)
         st.caption(
             "⚠️ Los beneficios Art. 11 y 14 requieren declaración de renta con utilidades suficientes. "

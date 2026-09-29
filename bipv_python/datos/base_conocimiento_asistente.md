@@ -4674,6 +4674,10 @@ El número de módulos ya **no se escribe a mano**: sale de los grupos de string
 
 La 📋 Ficha RETIE se ve ahora completa al ancho de la columna, sin barra de desplazamiento horizontal. Las descargas (SVG y PNG) conservan su tamaño original para imprimir.
 
+### Mensaje final de Financiero en cursiva matemática (corregido el 28-sep-2026)
+
+Si un recuadro mostraba cifras como «(48.76MCOP)|TIR:∗∗16.8» en letra cursiva y sin espacios, era un error de presentación: la app convierte el texto que queda entre dos signos «$» en una fórmula matemática. Se corrigió en el mensaje final de 💰 Financiero, el cuadro «CAPEX bruto → CAPEX neto», la tabla «Detalle Ley 1715», la tabla de mercado de carbono de 🌿 Impacto CO₂ y el resumen de 💼 Presupuesto. Los números nunca cambiaron: solo cómo se veían.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

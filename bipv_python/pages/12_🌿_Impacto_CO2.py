@@ -558,9 +558,9 @@ with col_mc1:
 | **GHG Protocol / RETC** | 0.126 kg/kWh (SIN promedio) | — (inventario, no transaccional) | **{co2_total_prom_t:,.1f} tCO₂ declaradas** |
 | **Mercado voluntario VCS** | 0.300 kg/kWh (CDM marginal) | USD 8–20/tCO₂ | **USD {co2_total_marg_t*12:,.0f}** (a USD 12/t) |
 | **Mercado voluntario Gold Standard** | 0.300 kg/kWh | USD 15–30/tCO₂ | **USD {co2_total_marg_t*18:,.0f}** (a USD 18/t) |
-| **Impuesto carbono Colombia** | Emisiones directas (*) | COP 25.000/tCO₂ (2024) | **$ {co2_total_prom_t*25_000/1e6:.1f} M COP** ahorro |
+| **Impuesto carbono Colombia** | Emisiones directas (*) | COP 25.000/tCO₂ (2024) | **\\$ {co2_total_prom_t*25_000/1e6:.1f} M COP** ahorro |
 | **NAMA Sector Energía Colombia** | 0.126 kg/kWh | No transaccional | Reporte NDC obligatorio |
-| **Precio usuario (seleccionado)** | {factor_activo:.3f} kg/kWh | **USD {precio_bono_usd:.0f}/tCO₂** | **USD {valor_bonos_usd:,.0f}  ·  $ {valor_bonos_cop/1e6:.2f} M COP** |
+| **Precio usuario (seleccionado)** | {factor_activo:.3f} kg/kWh | **USD {precio_bono_usd:.0f}/tCO₂** | **USD {valor_bonos_usd:,.0f}  ·  \\$ {valor_bonos_cop/1e6:.2f} M COP** |
     """)
     st.caption(
         "(*) El impuesto al carbono de Colombia (Ley 1819/2016, Art. 221) aplica a "
