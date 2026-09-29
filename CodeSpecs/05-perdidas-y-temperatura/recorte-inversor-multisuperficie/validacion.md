@@ -25,7 +25,7 @@
   cadenas): en 0 con 1 string por MPPT «La app calcula **2 inversor(es)**:
   11 strings ÷ 10»; con 2 escritos, sin aviso; en 0 con 2 por MPPT,
   «**1** inversor(es): 11 ÷ 20».
-- [x] Suite completa de `bipv_python`.
+- [x] Suite completa de `bipv_python`: 2151 pruebas pasan.
 
 ## Resultado
 
