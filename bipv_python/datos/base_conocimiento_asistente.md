@@ -663,7 +663,9 @@ Ambas herramientas modelan el mismo fenómeno físico con distinto nivel de deta
 
 ⚠️ No es una igualdad numérica exacta (nuestro modelo no depende del viento real, el de la referencia estándar sí) — es un punto de partida físicamente coherente, no un reemplazo del ajuste fino manual en esa herramienta.
 
-Nueva función `calculos/ficha_pvsyst.py::generar_ficha_conversion_pvsyst(panel, tipo_instalacion, k_bipv)`: genera, para cualquier panel del catálogo, una ficha de texto con los parámetros eléctricos STC en el orden que pide el diálogo de la referencia estándar internacional, los coeficientes de temperatura disponibles, y el preset Uc/Uv sugerido según la tabla de arriba. Acepta los dos esquemas de campo reales que coexisten en el repo (catálogo Excel: `marca`/`Imp`, sin coeficiente de Isc; `MODULOS_BIPV`: `fabricante`/`Imp_stc`/`Tk_alfa`) — corregido tras auto-auditoría (ver arriba) que encontró que la primera versión solo leía el esquema Excel. 12 tests nuevos (`tests/test_ficha_pvsyst.py`), 4 de ellos anclados al panel real de Teusaquillo (`ASP-ST1-T40`). Se evaluó y **se pospuso a pedido explícito del usuario** implementar el modelo de Faiman completo con viento real del TMY como modo alternativo — el k_BIPV actual, ya corregido para los 6 tipos, se consideró suficiente por ahora. Detalle completo en `DIAGNOSTICO_MODELO_TERMICO_UC_UV.md` (raíz del repo).
+⚠️ **Corrección del 29-sep-2026:** esta tabla relaciona *nombres de montaje*, no números. Para igualar un informe concreto con su Uc y Uv hay que calcular k_BIPV con la fórmula de la sección 83 («Motor Óptico — Uc y Uv de la referencia estándar internacional y su equivalente k_BIPV»). Con un panel de NOCT 45 °C y eficiencia 23,2 %, Uc = 20 equivale a k ≈ 1,1 (no a 1,3) y Uc = 29 a k ≈ 0,76.
+
+Nueva función una función interna: genera, para cualquier panel del catálogo, una ficha de texto con los parámetros eléctricos STC en el orden que pide el diálogo de la referencia estándar internacional, los coeficientes de temperatura disponibles, y el preset Uc/Uv sugerido según la tabla de arriba. Acepta los dos esquemas de campo reales que coexisten en el repo (catálogo Excel: `marca`/`Imp`, sin coeficiente de Isc; `MODULOS_BIPV`: `fabricante`/`Imp_stc`/`Tk_alfa`) — corregido tras auto-auditoría (ver arriba) que encontró que la primera versión solo leía el esquema Excel. 12 tests nuevos (un módulo interno), 4 de ellos anclados al panel real de Teusaquillo (`ASP-ST1-T40`). Se evaluó y **se pospuso a pedido explícito del usuario** implementar el modelo de Faiman completo con viento real del TMY como modo alternativo — el k_BIPV actual, ya corregido para los 6 tipos, se consideró suficiente por ahora. Detalle completo en `DIAGNOSTICO_MODELO_TERMICO_UC_UV.md` (raíz del repo).
 
 ────────────────────────────────────────────────────────────
 
@@ -1321,7 +1323,7 @@ Además del modelo hora a hora estándar, la página 6 puede calcular la producc
 
 Si el panel seleccionado es **CdTe** (Soltech, First Solar, HIITIO, EINNOVA/vidrio — cualquier ficha que clasifique como CdTe, no solo un modelo puntual), la simulación aplica automáticamente una corrección por el espectro solar REAL del sitio, además de la temperatura y la irradiancia. No hace falta activar nada: se calcula solo cuando corresponde.
 
-**Por qué existe**: el espectro de la luz solar cambia hora a hora según cuánta atmósfera atraviesa (masa de aire) y cuánta humedad hay en el camino (agua precipitable) — más camino/humedad = espectro corrido hacia el rojo. La corriente que un módulo puede generar depende de qué tan bien su respuesta espectral cubre ESE espectro real, no el espectro estándar de laboratorio (AM1.5G) de la ficha técnica. Para silicio cristalino el efecto es pequeño (~1-2%, casi nadie lo modela); **para CdTe es varias veces mayor (~5-10%)** porque su respuesta espectral es más angosta — por eso PVsyst y la literatura técnica SÍ lo aplican específicamente para esta tecnología. La app usa el modelo **First Solar** (`pvlib.spectrum.spectral_factor_firstsolar`), el mismo enfoque/coeficientes que usa PVsyst para CdTe.
+**Por qué existe**: el espectro de la luz solar cambia hora a hora según cuánta atmósfera atraviesa (masa de aire) y cuánta humedad hay en el camino (agua precipitable) — más camino/humedad = espectro corrido hacia el rojo. La corriente que un módulo puede generar depende de qué tan bien su respuesta espectral cubre ESE espectro real, no el espectro estándar de laboratorio (AM1.5G) de la ficha técnica. Para silicio cristalino el efecto es pequeño (~1-2%, casi nadie lo modela); **para CdTe es varias veces mayor (~5-10%)** porque su respuesta espectral es más angosta — por eso la referencia estándar internacional y la literatura técnica SÍ lo aplican específicamente para esta tecnología. La app usa el modelo **First Solar** (`pvlib.spectrum.spectral_factor_firstsolar`), el mismo enfoque/coeficientes que usa la referencia estándar internacional para CdTe.
 
 **Qué necesita para funcionar**: el TMY del proyecto debe tener la columna de humedad relativa (RH) que PVGIS entrega — los TMY descargados ANTES del 6-sep-2026 no la tienen (quedaban en caché de disco sin ese dato). Si detecta un panel CdTe pero el TMY no tiene RH, la página muestra un aviso ⚠️ pidiendo ir a ☀️ Recurso Solar, presionar "🔄 Limpiar caché" y descargar el TMY de nuevo — un clic, sin perder nada más de la configuración del proyecto.
 
@@ -1333,11 +1335,11 @@ Si el panel seleccionado es **CdTe** (Soltech, First Solar, HIITIO, EINNOVA/vidr
 
 En la tabla desglosada de pérdidas (expander "📋 Ver tabla detallada de balance IEC 61724"), las filas ②c (mismatch de fabricación / calidad de módulo) y ②d/④c (pérdida óhmica DC/AC de cableado) dejaron de ser solo informativas — si están configuradas, se aplican de verdad al cálculo.
 
-**Mismatch de fabricación (②c)**: viene del slider "🔩 Mismatch de fabricación (%)" de 🔀 Mismatch (sección 3) — no hay ningún dato real de tolerancia de fábrica por panel en el catálogo, así que sigue siendo un valor manual honesto, no calculado. Si está en 0% (o no visitaste esa página), la fila queda igual que siempre fue: solo informativa, mostrando el +0,75% de referencia de PVsyst sin aplicarlo.
+**Mismatch de fabricación (②c)**: viene del slider "🔩 Mismatch de fabricación (%)" de 🔀 Mismatch (sección 3) — no hay ningún dato real de tolerancia de fábrica por panel en el catálogo, así que sigue siendo un valor manual honesto, no calculado. Si está en 0% (o no visitaste esa página), la fila queda igual que siempre fue: solo informativa, mostrando el +0,75% de referencia de la referencia estándar internacional sin aplicarlo.
 
 **Pérdida óhmica DC/AC (②d/④c) — 2 modos, nunca los 2 a la vez**:
 - **Manual**: sliders "🔌 Cableado DC (%)" y "🔌 Cableado AC (%)" de 🔀 Mismatch (sección 3) — el de AC es nuevo, antes esa pérdida no tenía ninguna representación en la app.
-- **Calculado (real, más preciso)**: si configuraste longitud + calibre reales del proyecto en ⚡ Diagrama Unifilar (Página 20, un tramo por superficie si el proyecto es multi-superficie, más el tramo AC), la app calcula la resistencia real del cableado y la pérdida se computa **hora a hora**, con la corriente real de cada hora — no un % fijo. Esta es la misma física que usan PVsyst y HelioScope (P = R·I² con la corriente real de cada hora, verificado contra la documentación oficial de ambos el 7-sep-2026) — no es una técnica que supere a esos 2 estándares, es ponerle a esta app el mismo rigor que ya tenían ellos (antes de esta fecha, esta app no tenía este cálculo en absoluto). El modo calculado SUSTITUYE al manual cuando el panel/inversor/N en serie/N total de paneles de Página 20 coinciden con el proyecto vigente — si cambiaste cualquiera de esos 4 datos después de configurar el cableado, la app lo detecta y vuelve al modo manual en vez de aplicar un número desactualizado (el total de paneles se sumó a esta verificación el 7-sep-2026, en la auditoría rigurosa que también corrigió el factor de la resistencia AC — ver sección 13f para el detalle).
+- **Calculado (real, más preciso)**: si configuraste longitud + calibre reales del proyecto en ⚡ Diagrama Unifilar (Página 20, un tramo por superficie si el proyecto es multi-superficie, más el tramo AC), la app calcula la resistencia real del cableado y la pérdida se computa **hora a hora**, con la corriente real de cada hora — no un % fijo. Esta es la misma física que usan la referencia estándar internacional y HelioScope (P = R·I² con la corriente real de cada hora, verificado contra la documentación oficial de ambos el 7-sep-2026) — no es una técnica que supere a esos 2 estándares, es ponerle a esta app el mismo rigor que ya tenían ellos (antes de esta fecha, esta app no tenía este cálculo en absoluto). El modo calculado SUSTITUYE al manual cuando el panel/inversor/N en serie/N total de paneles de Página 20 coinciden con el proyecto vigente — si cambiaste cualquiera de esos 4 datos después de configurar el cableado, la app lo detecta y vuelve al modo manual en vez de aplicar un número desactualizado (el total de paneles se sumó a esta verificación el 7-sep-2026, en la auditoría rigurosa que también corrigió el factor de la resistencia AC — ver sección 13f para el detalle).
 
 **Cómo saber cuál se está usando**: la nota de cada fila en la tabla desglosada dice la fuente ("% manual configurado en 🔀 Mismatch" o "cálculo real del ⚡ Diagrama Unifilar, hora a hora con la corriente real"). Si ninguno de los 2 modos está activo, las filas quedan exactamente como antes de este cambio (②c informativa, sin fila ②d/④c) — nada se activa solo.
 
@@ -1347,10 +1349,10 @@ En la tabla desglosada de pérdidas (expander "📋 Ver tabla detallada de balan
 
 Complemento al manual de usuario "Cableado y Mismatch" — los 6 errores de interpretación/uso más probables, para que el Asistente pueda resolverlos directamente si un usuario pregunta por qué su resultado cambió o parece raro:
 
-1. **Leer "②c Módulo (informativo)" como si fuera una pérdida real aplicada.** El +0,75% que muestra por defecto es la referencia de PVsyst, con Δ kWh = 0 siempre. → Revisa el texto de la fila: "aplicado" = real, "informativo" = solo referencia.
+1. **Leer "②c Módulo (informativo)" como si fuera una pérdida real aplicada.** El +0,75% que muestra por defecto es la referencia de la referencia estándar internacional, con Δ kWh = 0 siempre. → Revisa el texto de la fila: "aplicado" = real, "informativo" = solo referencia.
 2. **Cambiar panel, inversor, N en serie o número de paneles y no volver a ⚡ Página 20.** El cálculo vigente se invalida solo, y la app cae al modo manual (o a 0%) sin una alerta grande. → Ante un cambio de producción inexplicado, revisa primero si alguno de esos 4 datos cambió y si el aviso verde de Página 20 sigue apareciendo.
 3. **Declarar cable para una sola superficie de un proyecto multi-superficie y asumir que cubre todo.** Los paneles sin tramo declarado quedan sin pérdida registrada — el total calculado subestima la pérdida real. → Revisa el aviso amarillo de "declaraste cable para X de Y módulos".
-4. **Esperar un % idéntico a un reporte de PVsyst con la misma resistencia de cable.** La física de fondo es la misma (I²R hora a hora, igual que PVsyst/HelioScope) — pero esta app usa una temperatura de diseño FIJA de 45°C, mientras que PVsyst deja elegirla al usuario; si el proyecto real en PVsyst usó otra temperatura, el % difiere un poco por eso, no por un error de método. → Una diferencia pequeña por esta razón es esperable; para comparar igual, ajusta la temperatura de diseño en PVsyst a 45°C.
+4. **Esperar un % idéntico a un reporte de la referencia estándar internacional con la misma resistencia de cable.** La física de fondo es la misma (I²R hora a hora, igual que la referencia estándar internacional/HelioScope) — pero esta app usa una temperatura de diseño FIJA de 45°C, mientras que la referencia estándar internacional deja elegirla al usuario; si el proyecto real en la referencia estándar internacional usó otra temperatura, el % difiere un poco por eso, no por un error de método. → Una diferencia pequeña por esta razón es esperable; para comparar igual, ajusta la temperatura de diseño en la referencia estándar internacional a 45°C.
 5. **Confundir el semáforo de ampacidad de ⚡ Diagrama Unifilar (7-sep-2026) con una certificación de que el calibre es seguro.** Muestra un ranking de escenarios reales y citables (ficha H1Z2Z2-K para DC, NTC 2050 para AC), pero NUNCA una luz verde única — la ampacidad real depende del método de instalación, el agrupamiento de circuitos y la temperatura ambiente real, datos que esta app no pide hoy. → Ubica el escenario que más se parece a tu instalación real y lee el margen ahí; la validación definitiva sigue siendo responsabilidad del ingeniero eléctrico del proyecto.
 6. **Pensar que el cálculo usa la temperatura real de cada hora.** Usa una temperatura de diseño fija (45°C), no la temperatura de celda horaria — simplificación intencional (mismo criterio que RETIE/NEC), no un dato faltante.
 
@@ -1556,7 +1558,7 @@ Esta subsección documenta, de forma dedicada, las 3 fuentes de degradación anu
 - La curva de garantía y la tasa fija **NO son comparables punto a punto en el año 1**: la tasa fija geométrica no degrada nada en el año 1 (`factor=1.0`), mientras que la curva real SÍ aplica la caída LID completa desde el año 1. Es normal y esperado que el año 1 de energía sea menor con la curva real activada — no es un error del cálculo.
 - El **año 25 tampoco coincide** entre ambos modelos aunque la tasa "parezca" similar: una tasa fija de 0,5%/año geométrica da ≈88,6% en el año 25 (0,995²⁴), mientras que una curva real típica (2% año 1 + 0,55%/año) da ≈84,8% — más conservadora. Esta diferencia es la razón de ser de la feature, no un bug.
 - La curva de garantía del fabricante y la degradación MEDIDA en campo responden preguntas DISTINTAS: "¿qué promete el fabricante?" vs. "¿qué está pasando realmente en mi sistema ya instalado?". Un proyecto en etapa de diseño/venta solo puede usar la primera (o la tasa fija); la segunda solo existe si ya hay 2+ años de datos operativos reales.
-- Fuera de alcance, a propósito: la curva de garantía se define siempre por AÑO CALENDARIO, igual que el estándar de la industria y que PVsyst — no depende de horas de operación reales ni de ciclos térmicos del sitio.
+- Fuera de alcance, a propósito: la curva de garantía se define siempre por AÑO CALENDARIO, igual que el estándar de la industria y que la referencia estándar internacional — no depende de horas de operación reales ni de ciclos térmicos del sitio.
 
 ────────────────────────────────────────────────────────────
 
@@ -2573,7 +2575,7 @@ Nueva sección "🔌 Pérdida óhmica de cableado" al final de la página, despu
 - Con multi-superficie activo: **un tramo DC por cada superficie activa** — cada una puede tener su propia longitud/calibre, porque cada una tiene su propio recorrido físico real hasta el punto de convergencia.
 - Siempre: un tramo AC (inversor → punto de conexión).
 
-**Qué calcula**: la resistencia real (Ω) de cada tramo, con la resistividad del cobre estándar (IEC 60228) corregida por una temperatura de diseño fija de 45°C — mismo criterio que usa RETIE/NEC (evaluar a una condición de diseño fija, no con clima horario). Esa resistencia queda guardada para que 📊 Producción calcule la pérdida real **hora a hora**, con la corriente real de cada hora — la misma física que usan PVsyst y HelioScope (verificado contra su documentación oficial), no una técnica que los supere.
+**Qué calcula**: la resistencia real (Ω) de cada tramo, con la resistividad del cobre estándar (IEC 60228) corregida por una temperatura de diseño fija de 45°C — mismo criterio que usa RETIE/NEC (evaluar a una condición de diseño fija, no con clima horario). Esa resistencia queda guardada para que 📊 Producción calcule la pérdida real **hora a hora**, con la corriente real de cada hora — la misma física que usan la referencia estándar internacional y HelioScope (verificado contra su documentación oficial), no una técnica que los supere.
 
 ⚠️ **Declaración parcial en multi-superficie**: si declaras cable solo para ALGUNAS superficies, la app no le inventa pérdida a las que dejaste sin declarar — esos paneles simplemente no aportan pérdida al cálculo (subestimación deliberada, nunca una sobreestimación). Un aviso amarillo indica cuántos módulos de cuántos totales del proyecto quedaron con cable declarado.
 
@@ -2972,11 +2974,11 @@ R: Sí, conviene corregirlo: cuando un modelo se repite, solo la última fila de
 
 P: ¿Cuántos motores de cálculo usa la app para producción de energía y cuándo corre cada uno?
 
-R: Tres. (1) **Fallback lineal**: cualquier tecnología sin ficha SDM calibrada — solo escala Pmax_stc por irradiancia/temperatura, sin curva I-V. (2) **SDM (modelo de un diodo, PVsyst v6)**: TODAS las tecnologías, y es el ÚNICO motor de 🔬 Motor IV, 🔀 Mismatch/Bypass y 🗺️ Vista 3D/MPPT combinado (estas 3 páginas siempre necesitan la curva I-V completa, algo que JRC/Huld no calcula). (3) **JRC/Huld (empírico, Huld et al. 2011)**: motor PRINCIPAL de energía en 📊 Producción Anual, pero solo para paneles **CdTe** (película delgada) — activado desde el 2-sep-2026. Paneles cristalinos y CIS/CIGS en 📊 Producción siguen usando el SDM como siempre.
+R: Tres. (1) **Fallback lineal**: cualquier tecnología sin ficha SDM calibrada — solo escala Pmax_stc por irradiancia/temperatura, sin curva I-V. (2) **SDM (modelo de un diodo, modelo de un diodo v6 de la referencia estándar internacional)**: TODAS las tecnologías, y es el ÚNICO motor de 🔬 Motor IV, 🔀 Mismatch/Bypass y 🗺️ Vista 3D/MPPT combinado (estas 3 páginas siempre necesitan la curva I-V completa, algo que JRC/Huld no calcula). (3) **JRC/Huld (empírico, Huld et al. 2011)**: motor PRINCIPAL de energía en 📊 Producción Anual, pero solo para paneles **CdTe** (película delgada) — activado desde el 2-sep-2026. Paneles cristalinos y CIS/CIGS en 📊 Producción siguen usando el SDM como siempre.
 
 P: ¿Por qué se cambió a JRC/Huld como motor principal solo para CdTe, y no para todas las tecnologías?
 
-R: Se encontró un defecto estructural real del SDM específico de CdTe: a irradiancia media (~200 W/m²) el SDM predice una "joroba" de eficiencia relativa por encima del 100% que no aparece en corridas reales de PVsyst 8.1.5 ni en el modelo JRC/Huld. Validado contra un caso real (proyecto Teusaquillo, panel ASP-ST1-T40): el PR mensual de JRC/Huld correlaciona con el PR mensual real de PVsyst (r=0.545), mientras el SDM correlaciona negativamente (r=-0.142). Ver `DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md`. Para silicio cristalino y CIS/CIGS no se encontró ese defecto, así que ahí el SDM sigue siendo el motor principal.
+R: Se encontró un defecto estructural real del SDM específico de CdTe: a irradiancia media (~200 W/m²) el SDM predice una "joroba" de eficiencia relativa por encima del 100% que no aparece en corridas reales de la referencia estándar internacional ni en el modelo JRC/Huld. Validado contra un caso real (proyecto Teusaquillo, panel ASP-ST1-T40): el PR mensual de JRC/Huld correlaciona con el PR mensual real de la referencia estándar internacional (r=0.545), mientras el SDM correlaciona negativamente (r=-0.142). Ver `DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md`. Para silicio cristalino y CIS/CIGS no se encontró ese defecto, así que ahí el SDM sigue siendo el motor principal.
 
 P: Corrí un panel CdTe en 🔬 Motor IV y en 📊 Producción y los números de energía no coinciden exactamente. ¿Es un bug?
 
@@ -3302,39 +3304,39 @@ Corregido "hacia arriba": justo después de fijar `inversor_dict_dim`/`inversor_
 
 5 tests nuevos en `tests/test_pagina_dimensionamiento_compat_bateria.py` (patrón AST/substring). Suite completa: **902/902**. Con esto quedan cubiertos los 3 huecos de esta auditoría. Ver `DIAGNOSTICO_STALENESS_BATERIA_DIAGRAMA_UNIFILAR.md`.
 
-## 25p. Anexo — Actualizaciones del 1 de septiembre de 2026 (tabla de balance energético con nombres estilo Loss Diagram de PVsyst)
+## 25p. Anexo — Actualizaciones del 1 de septiembre de 2026 (tabla de balance energético con nombres estilo Loss Diagram de la referencia estándar internacional)
 
-El usuario encontró el paper Kadir et al. 2023 (*J. Phys.: Conf. Ser.* 2550 012005, PVsyst 7.2, 16,20 kWp c-Si en Malasia) mientras armaba una ficha manual para comparar el proyecto real Teusaquillo contra PVsyst — pidió analizarlo y usarlo para construir "nuestro seguimiento de cálculo para comparar con PVsyst". Lo valioso del paper no son sus números (clima/panel distintos) sino la estructura oficial del Loss Diagram de PVsyst: la cascada nombrada GHI→POA→IAM→Soiling→efectiva→STC→irradiancia/temperatura→calidad módulo→mismatch→óhmico→inversor→red.
+El usuario encontró el paper Kadir et al. 2023 (*J. Phys.: Conf. Ser.* 2550 012005, la referencia estándar internacional, 16,20 kWp c-Si en Malasia) mientras armaba una ficha manual para comparar el proyecto real Teusaquillo contra la referencia estándar internacional — pidió analizarlo y usarlo para construir "nuestro seguimiento de cálculo para comparar con la referencia estándar internacional". Lo valioso del paper no son sus números (clima/panel distintos) sino la estructura oficial del Loss Diagram de la referencia estándar internacional: la cascada nombrada GHI→POA→IAM→Soiling→efectiva→STC→irradiancia/temperatura→calidad módulo→mismatch→óhmico→inversor→red.
 
 Antes de tocar nada se verificó (y se descartó) un riesgo real: que Motor Óptico y el SDM contaran la temperatura dos veces. Confirmado que NO — `pages/6_📊_Producción.py` ya usa `poa_sin_termico_df` para alimentar el SDM (con un comentario explícito de una corrección anterior), reservando `poa_efectiva_df` (con el factor térmico) solo para visualización.
 
-**Extendido `calculos/produccion.py::perdidas_desglosadas()`** con un parámetro opcional `motor_optico_summary` (el dict real de `cascada_optica()`): si está disponible, inserta filas "①a Pérdida IAM" y "①b Pérdida soiling" con los nombres y valores reales de PVsyst, y — el detalle que evita un doble conteo — la fila "② Efecto SDM" pasa a compararse contra la POA YA corregida por IAM+soiling, no contra la bruta. Sin el resumen (Motor Óptico no corrió), la tabla sale idéntica a antes. Las 2 categorías de PVsyst que esta app no modela (calidad de módulo, pérdida óhmica de cableado) se declaran explícitamente en un `st.caption()`, nunca se omiten en silencio ni se inventa un número. La separación irradiancia-vs-temperatura de PVsyst (2 líneas) se deja deliberadamente combinada — separarla bien requeriría una segunda corrida SDM completa a T=25°C fijo, una decisión de metodología física, no un refactor.
+**Extendido `calculos/produccion.py::perdidas_desglosadas()`** con un parámetro opcional `motor_optico_summary` (el dict real de `cascada_optica()`): si está disponible, inserta filas "①a Pérdida IAM" y "①b Pérdida soiling" con los nombres y valores reales de la referencia estándar internacional, y — el detalle que evita un doble conteo — la fila "② Efecto SDM" pasa a compararse contra la POA YA corregida por IAM+soiling, no contra la bruta. Sin el resumen (Motor Óptico no corrió), la tabla sale idéntica a antes. Las 2 categorías de la referencia estándar internacional que esta app no modela (calidad de módulo, pérdida óhmica de cableado) se declaran explícitamente en un `st.caption()`, nunca se omiten en silencio ni se inventa un número. La separación irradiancia-vs-temperatura de la referencia estándar internacional (2 líneas) se deja deliberadamente combinada — separarla bien requeriría una segunda corrida SDM completa a T=25°C fijo, una decisión de metodología física, no un refactor.
 
-6 tests de aritmética exacta en `tests/test_perdidas_desglosadas_pvsyst.py` (compatibilidad hacia atrás, filas nuevas correctas, el bug de doble conteo específicamente evitado) + 2 tests de página. Suite completa: **911/911**. Ver `DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md`.
+6 tests de aritmética exacta en un módulo interno (compatibilidad hacia atrás, filas nuevas correctas, el bug de doble conteo específicamente evitado) + 2 tests de página. Suite completa: **911/911**. Ver un documento interno de diagnóstico.
 
-## 25q. Anexo — Actualizaciones del 1 de septiembre de 2026 (irradiancia vs. temperatura, separadas de verdad en la tabla estilo PVsyst)
+## 25q. Anexo — Actualizaciones del 1 de septiembre de 2026 (irradiancia vs. temperatura, separadas de verdad en la tabla estilo de la referencia estándar internacional)
 
-Continuación de la sección 25p (tabla de balance estilo PVsyst): el usuario preguntó qué herramientas hacían falta para separar "irradiance level loss" de "temperature loss" como hace PVsyst (2 líneas, no combinadas). La respuesta real, verificando el código: nada externo — el SDM ya se llamaba una segunda vez internamente (misma G_eff real, T_cel fija en 25°C) para calcular `perdida_temp_kWh`, pero ese resultado intermedio nunca se sumaba como su propio total.
+Continuación de la sección 25p (tabla de balance estilo de la referencia estándar internacional): el usuario preguntó qué herramientas hacían falta para separar "irradiance level loss" de "temperature loss" como hace la referencia estándar internacional (2 líneas, no combinadas). La respuesta real, verificando el código: nada externo — el SDM ya se llamaba una segunda vez internamente (misma G_eff real, T_cel fija en 25°C) para calcular `perdida_temp_kWh`, pero ese resultado intermedio nunca se sumaba como su propio total.
 
 Se agregó la clave `E_dc_a_T25_kWh` al dict de retorno de `calculos/produccion.py::simular_produccion_anual()` Y de `calculos/produccion_iv.py::simular_produccion_iv()` (mismo SDM ya validado, sin fórmula física nueva — solo una segunda corrida con T fija). `perdidas_desglosadas()` la usa para descomponer "② Efecto SDM" en "②a Pérdida por nivel de irradiancia" (T=25°C fijo, aísla la no linealidad a baja luz) y "②b Efecto temperatura" (T real vs. 25°C, con signo). Los dos deltas suman EXACTO el de la fila ②, verificado con aritmética exacta en tests — no es una estimación aparte. Sin la clave (versión anterior, u otro caller), la fila queda combinada como antes.
 
-5 tests nuevos en `tests/test_perdidas_desglosadas_pvsyst.py`, incluido el que garantiza la reconciliación exacta (②a+②b == delta de ②). Suite completa: **917/917**. Ver `DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md`.
+5 tests nuevos en un módulo interno, incluido el que garantiza la reconciliación exacta (②a+②b == delta de ②). Suite completa: **917/917**. Ver un documento interno de diagnóstico.
 
-## 25r. Anexo — Actualizaciones del 1 de septiembre de 2026 (fila informativa "Módulo" ②c en la tabla estilo PVsyst, sin aplicarla al cálculo)
+## 25r. Anexo — Actualizaciones del 1 de septiembre de 2026 (fila informativa "Módulo" ②c en la tabla estilo de la referencia estándar internacional, sin aplicarla al cálculo)
 
-Continuación de las secciones 25p/25q: el usuario encontró un tercer paper real sobre PVsyst (Mohammadi & Gezegin 2022, *IJPTE* — 5 MW on-grid en Afganistán, comparando PVsyst vs. PVGIS vs. HOMER) y pidió analizarlo. Hallazgo concreto: su Loss Diagram muestra "Module quality loss" = +0,75% — el mismo valor EXACTO que ya había aparecido en el paper de Kadir (dos estudios independientes, mismo número), fuerte indicio de que es el valor por defecto de PVsyst cuando no se cargan datos reales de binning del fabricante, no una medición específica de cada proyecto.
+Continuación de las secciones 25p/25q: el usuario encontró un tercer paper real sobre la referencia estándar internacional (Mohammadi & Gezegin 2022, *IJPTE* — 5 MW on-grid en Afganistán, comparando la referencia estándar internacional vs. PVGIS vs. HOMER) y pidió analizarlo. Hallazgo concreto: su Loss Diagram muestra "Module quality loss" = +0,75% — el mismo valor EXACTO que ya había aparecido en el paper de Kadir (dos estudios independientes, mismo número), fuerte indicio de que es el valor por defecto de la referencia estándar internacional cuando no se cargan datos reales de binning del fabricante, no una medición específica de cada proyecto.
 
-Se agregó una fila puramente informativa ("②c Módulo") a `perdidas_desglosadas()` mostrando ese +0,75% como referencia — con `Δ kWh` fijo en 0 y `kWh` igual a la etapa anterior a propósito: esta app no tiene datos de binning reales, así que no aporta ningún número propio ahí (mismo principio de nunca inventar). Sirve para que el usuario compare: si su PVsyst real también trae +0,75%, confirma que es el default; si trae otro valor, indica que sí cargó datos reales de binning.
+Se agregó una fila puramente informativa ("②c Módulo") a `perdidas_desglosadas()` mostrando ese +0,75% como referencia — con `Δ kWh` fijo en 0 y `kWh` igual a la etapa anterior a propósito: esta app no tiene datos de binning reales, así que no aporta ningún número propio ahí (mismo principio de nunca inventar). Sirve para que el usuario compare: si su la referencia estándar internacional real también trae +0,75%, confirma que es el default; si trae otro valor, indica que sí cargó datos reales de binning.
 
-El paper también aportó el tercer PR real independiente en rango típico (84,9%, junto a 80,2% de Kadir y 77,8% de Ruespina et al.) — sigue reforzando que el >100% de Teusaquillo es la anomalía. Y su corrida cruzada PVsyst/PVGIS/HOMER del mismo sistema mostró 2%-10,6% de diferencia entre herramientas válidas — referencia útil de discrepancia "normal" esperable.
+El paper también aportó el tercer PR real independiente en rango típico (84,9%, junto a 80,2% de Kadir y 77,8% de Ruespina et al.) — sigue reforzando que el >100% de Teusaquillo es la anomalía. Y su corrida cruzada la referencia estándar internacional/PVGIS/HOMER del mismo sistema mostró 2%-10,6% de diferencia entre herramientas válidas — referencia útil de discrepancia "normal" esperable.
 
-2 tests nuevos en `tests/test_perdidas_desglosadas_pvsyst.py`. Suite completa: **920/920**. Ver `DIAGNOSTICO_LOSS_DIAGRAM_PVSYST.md`.
+2 tests nuevos en un módulo interno. Suite completa: **920/920**. Ver un documento interno de diagnóstico.
 
 ## 25y. Anexo — Actualizaciones del 2 de septiembre de 2026 (Rsh_exp de CdTe según Sandia PVPMC: investigado, no se activa — empeora la joroba)
 
-Revisando la página oficial de PVPMC (Sandia National Laboratories) sobre el modelo de módulo PVsyst, se encontró una tabla de `Rsh_exp` por defecto por tecnología: CdTe=2.0, µc-Si=3.0, todas las demás=5.5. El catálogo real (`CONSTANTES_TECNOLOGIA["CdTe"]["c_Rsh"]`) usa 5.5, el mismo valor genérico — ya se había detectado esta discrepancia antes (sección 25t: "excepción real CdTe~3") y había quedado sin corregir.
+Revisando la página oficial de PVPMC (Sandia National Laboratories) sobre el modelo de módulo de la referencia estándar internacional, se encontró una tabla de `Rsh_exp` por defecto por tecnología: CdTe=2.0, µc-Si=3.0, todas las demás=5.5. El catálogo real (`CONSTANTES_TECNOLOGIA["CdTe"]["c_Rsh"]`) usa 5.5, el mismo valor genérico — ya se había detectado esta discrepancia antes (sección 25t: "excepción real CdTe~3") y había quedado sin corregir.
 
-**Se probó, con rigor, antes de implementar**: se recalculó la curva de eficiencia relativa del panel real ASP-ST1-T40 (parámetros ya calibrados sin cambios: R_s=25,51Ω, R_sh_ref=1340,6Ω, R_sh_0=18450Ω) variando SOLO `Rsh_exp` entre 5.5 (actual), 3.0 (PVsyst) y 2.0 (Sandia).
+**Se probó, con rigor, antes de implementar**: se recalculó la curva de eficiencia relativa del panel real ASP-ST1-T40 (parámetros ya calibrados sin cambios: R_s=25,51Ω, R_sh_ref=1340,6Ω, R_sh_0=18450Ω) variando SOLO `Rsh_exp` entre 5.5 (actual), 3.0 (la referencia estándar internacional) y 2.0 (Sandia).
 
 **Resultado contraintuitivo**: bajar `Rsh_exp` EMPEORA la joroba de eficiencia >100% que motivó el cambio a JRC/Huld (ver `DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md`), no la mejora — pico de 106,1% (con 5.5) sube a 109,6% (con 3.0) y 111,0% (con 2.0). El FF puntual a G=200W/m² sí mejora ligeramente hacia el real de laboratorio (75,02%→77,09%→77,80%, real Batzner 2001: 76,28%), pero un solo punto y la forma completa de la curva responden en direcciones distintas — no se pueden optimizar ambos con un solo número.
 
@@ -3344,7 +3346,7 @@ Revisando la página oficial de PVPMC (Sandia National Laboratories) sobre el mo
 
 ## 25z. Anexo — Actualizaciones del 3 de septiembre de 2026 (catálogo ampliado con 278 paneles reales de JA Solar, fuente NREL/SAM + paper Sandia 2025)
 
-El catálogo de paneles pasó de 76 a 354 (`datos/paneles_catalogo.xlsx::Catalogo_Paneles_FV`) — 278 módulos reales de JA Solar, cruzando 2 fuentes públicas: `CEC Modules.csv` de NREL/SAM (California Energy Commission, NOCT/dimensiones/coeficientes de temperatura REPORTADOS, no estimados) y el dataset del paper Deville et al. 2025 IEEE J. Photovoltaics (parámetros ya traducidos al modelo PVsyst v6, el mismo que usa el motor SDM de la app). Se descartó antes una fórmula propia para estimar NOCT (`Mod_Estimar_NOCT.bas`, documento fuente autoría IA "Manus AI") por tener datos de validación que no coincidían con datasheets reales verificados.
+El catálogo de paneles pasó de 76 a 354 (`datos/paneles_catalogo.xlsx::Catalogo_Paneles_FV`) — 278 módulos reales de JA Solar, cruzando 2 fuentes públicas: `CEC Modules.csv` de NREL/SAM (California Energy Commission, NOCT/dimensiones/coeficientes de temperatura REPORTADOS, no estimados) y el dataset del paper Deville et al. 2025 IEEE J. Photovoltaics (parámetros ya traducidos al modelo modelo de un diodo v6 de la referencia estándar internacional, el mismo que usa el motor SDM de la app). Se descartó antes una fórmula propia para estimar NOCT (`Mod_Estimar_NOCT.bas`, documento fuente autoría IA "Manus AI") por tener datos de validación que no coincidían con datasheets reales verificados.
 
 **Auditoría real** (reutilizando `validar_sdm_vs_ficha()`, tolerancia 6%): 0/278 fuera de tolerancia real de producción, 64/278 con desviación >2% (revisado contra ficha oficial de JA Solar: buena parte es tolerancia de fabricación real declarada por el fabricante, "0~+5W", no error de traducción), 115/278 sin dimensiones físicas en la fuente (solo área total) — todo documentado explícitamente en la columna Notas de cada fila, nada se completa inventado.
 
@@ -3470,7 +3472,7 @@ Lo que sí estaba desactualizado era este mismo manual (Sección 1): describía 
 
 Primera ampliación masiva de **inversores** (no paneles): 108 → **2.451**, usando `CEC Inverters.csv` de NREL/SAM (modelo eléctrico Sandia oficial, el mismo que usa `pvlib.inverter.sandia()`).
 
-**Diferencia crítica con los imports de paneles**: el modelo Sandia no incluye los datos MECÁNICOS que exige el chequeo de compatibilidad (`N Trackers`, `N Strings/Tracker`, `Corriente Máxima/Cortocircuito por Tracker`) — a diferencia de paneles, no existe una segunda fuente pública que complete justo eso (investigado: NREL/SAM no la publica; la base .OND completa de PVsyst es propietaria y no está disponible en bloque, solo descargable inversor-por-inversor desde dentro del programa). Por eso los 2.343 nuevos quedan con `Datos completos`="No".
+**Diferencia crítica con los imports de paneles**: el modelo Sandia no incluye los datos MECÁNICOS que exige el chequeo de compatibilidad (`N Trackers`, `N Strings/Tracker`, `Corriente Máxima/Cortocircuito por Tracker`) — a diferencia de paneles, no existe una segunda fuente pública que complete justo eso (investigado: NREL/SAM no la publica; la base .OND completa de la referencia estándar internacional es propietaria y no está disponible en bloque, solo descargable inversor-por-inversor desde dentro del programa). Por eso los 2.343 nuevos quedan con `Datos completos`="No".
 
 **Fix estructural real** (no solo para este import): se extendió `optimization/variables.py::variable_inversor()` con el mismo filtro que ya tenía `variable_panel()` — excluye del optimizador de Fase 4 cualquier inversor sin `Vdc_max`/`Vmppt_max`/`Isc_max_tracker` o `I_max_tracker`/`N_mppt` o `n_trackers`. Se agregó `calculos/comparador_inversores.py::inversores_excluidos_por_ficha_incompleta()`. Verificado: 4 de los 108 inversores YA existentes (`POWEST-1KVA-12V`, `POWEST-3KVA-24V`, `LSP 100K`, `Woodward IDS SOLO 500`) también estaban incompletos y expuestos al mismo riesgo — este fix los protege también a ellos, no solo a los nuevos.
 
@@ -3629,13 +3631,13 @@ Otros 3 casos con el mismo patrón (sin daño numérico hoy porque el catálogo 
 
 ────────────────────────────────────────────────────────────
 
-## 62. Anexo — Actualizaciones del 6 de septiembre de 2026 (📊 Producción/Motor IV: corrección espectral CdTe — modelo First Solar, el mismo que usa PVsyst para esta tecnología)
+## 62. Anexo — Actualizaciones del 6 de septiembre de 2026 (📊 Producción/Motor IV: corrección espectral CdTe — modelo First Solar, el mismo que usa la referencia estándar internacional para esta tecnología)
 
-El usuario preguntó, con honestidad, qué le faltaría al motor de producción para estar al nivel de una app estándar (PVsyst). Entre los hallazgos entregados, priorizó explícitamente la **corrección espectral para CdTe** — relevante porque buena parte del catálogo real es CdTe (Soltech, First Solar, HIITIO, EINNOVA/vidrio), y CdTe es más sensible al efecto espectral (~±5-10%) que el silicio cristalino (~±1-2%, casi nunca modelado).
+El usuario preguntó, con honestidad, qué le faltaría al motor de producción para estar al nivel de una app estándar (la referencia estándar internacional). Entre los hallazgos entregados, priorizó explícitamente la **corrección espectral para CdTe** — relevante porque buena parte del catálogo real es CdTe (Soltech, First Solar, HIITIO, EINNOVA/vidrio), y CdTe es más sensible al efecto espectral (~±5-10%) que el silicio cristalino (~±1-2%, casi nunca modelado).
 
 **Qué es**: el espectro solar real varía hora a hora según la masa de aire y el agua precipitable en la atmósfera — más atravesada = espectro corrido al rojo. La corriente de cortocircuito de un módulo depende de qué tan bien su respuesta espectral cubre ESE espectro real, no el AM1.5G estándar de la ficha STC.
 
-**Modelo usado**: First Solar (Pelaez et al. 2019, coeficientes de un First Solar Series 4-2 CdTe real) vía `pvlib.spectrum.spectral_factor_firstsolar(module_type="cdte")` — el MISMO modelo que usa PVsyst para esta tecnología, no una aproximación propia. Verificado que la función y sus coeficientes 'cdte' son IDÉNTICOS entre pvlib==0.11.1 (pin de producción) y 0.15.2 (sandbox), a diferencia del riesgo real encontrado el mismo día con `haydavies()` (sección 59) — aquí no había ese riesgo de nombres de columna.
+**Modelo usado**: First Solar (Pelaez et al. 2019, coeficientes de un First Solar Series 4-2 CdTe real) vía `pvlib.spectrum.spectral_factor_firstsolar(module_type="cdte")` — el MISMO modelo que usa la referencia estándar internacional para esta tecnología, no una aproximación propia. Verificado que la función y sus coeficientes 'cdte' son IDÉNTICOS entre pvlib==0.11.1 (pin de producción) y 0.15.2 (sandbox), a diferencia del riesgo real encontrado el mismo día con `haydavies()` (sección 59) — aquí no había ese riesgo de nombres de columna.
 
 **Descubrimiento necesario para poder calcularlo**: el modelo First Solar necesita agua precipitable (derivada de T2m + humedad relativa) y masa de aire absoluta (derivada de la posición solar + presión). PVGIS SÍ entrega humedad relativa ("RH") en su JSON crudo — verificado con una llamada real a la API — pero `obtener_tmy_pvgis()` la descartaba silenciosamente desde siempre (nunca estaba en la lista de columnas capturadas). Corregido: "RH" ahora se captura (columna nueva, aditiva, no rompe a ningún consumidor existente del TMY).
 
@@ -3673,7 +3675,7 @@ El usuario recordó haber instalado PVWatts como segunda fuente de validación (
 
 ## 64. Anexo — Actualizaciones del 7 de septiembre de 2026 (Mismatch de fabricación + pérdida óhmica de cableado DC/AC: de "no modelado" a un cálculo real, hora a hora, escalado desde ⚡ Diagrama Unifilar)
 
-`perdidas_desglosadas()` declaraba explícitamente que "Module quality loss" y "Ohmic wiring loss" (2 categorías reales del Loss Diagram de PVsyst) no se modelaban, a propósito, sin inventar un número. El usuario preguntó con honestidad si eso dependía del clima de cada región y si era viable calcularlo de verdad por proyecto, escalando desde el Diagrama Unifilar.
+`perdidas_desglosadas()` declaraba explícitamente que "Module quality loss" y "Ohmic wiring loss" (2 categorías reales del Loss Diagram de la referencia estándar internacional) no se modelaban, a propósito, sin inventar un número. El usuario preguntó con honestidad si eso dependía del clima de cada región y si era viable calcularlo de verdad por proyecto, escalando desde el Diagrama Unifilar.
 
 **Auditoría, hallazgo clave**: estas 2 pérdidas NO estaban totalmente ausentes del cálculo — ya se aplicaban, pero mal atribuidas y de forma físicamente imprecisa. 2 sliders manuales en 🔀 Mismatch (`pct_mismatch_fab` = mismatch de fabricación/binning con otro nombre; `pct_cableado` = solo lado DC, el lado AC no tenía ninguna representación) se combinaban con sombreado de horizonte + mismatch de orientación + soiling en un único `factor_global_mismatch`, aplicado en 📊 Producción **multiplicando la irradiancia ANTES del modelo eléctrico** — impreciso (son pérdidas eléctricas post-conversión, no una reducción de irradiancia física) y quedaban escondidos dentro de la fila "② Efecto SDM" del Loss Diagram, sin fila propia.
 
@@ -3682,7 +3684,7 @@ El usuario recordó haber instalado PVWatts como segunda fuente de validación (
 **Diseño e implementación**:
 - **Mismatch fabricación**: se mantiene el slider manual de 🔀 Mismatch (no existe ningún dato real de tolerancia de fábrica en los ~2.600+ paneles del catálogo — inventar una fórmula desde un campo "±3%" habría sido la falsa precisión que esta app evita en todos lados) — pero pasa a aplicarse como parámetro EXPLÍCITO del motor (`pct_mismatch_fab`), no como reductor de irradiancia.
 - **Pérdida óhmica DC/AC — nuevo, real, escalado desde ⚡ Diagrama Unifilar**: `calculos/diagrama_unifilar.py` gana una tercera capa (antes solo tenía capa de datos y capa de dibujo): `calcular_perdida_ohmica()`, una función pura que calcula la resistencia (Ω) de cada tramo de cable a partir de longitud + calibre REALES del proyecto — un tramo por superficie activa (multi-superficie), más el tramo AC inversor→punto de conexión. Resistividad del cobre según IEC 60228 (0,0172 Ω·mm²/m a 20°C), corregida por temperatura con el coeficiente estándar (0,393%/°C). De paso se extrajo un helper compartido (`calculos/dimensionamiento.py::corriente_diseno_dc/ac()`) que cierra una discrepancia de redondeo de 0,1A que ya existía entre `diagrama_unifilar.py` y `ficha_validacion_retie.py` para el mismo proyecto real.
-- **Hora a hora, no un % fijo anual** (corregido 7-sep-2026, ver Anexo 66: al momento de escribir esto se creyó, sin verificar, que PVsyst usaba un % fijo a condiciones STC para las 8760 horas — **esto es incorrecto**, PVsyst ya calcula esto hora a hora desde hace años, igual que HelioScope; no es una técnica que supere a esos 2 estándares, es ponerle a esta app el mismo rigor). La pérdida óhmica es proporcional a la corriente, que varía fuerte con la irradiancia (a 300 W/m² la corriente es ~30% de la de diseño a 1000 W/m²) — por eso vale la pena calcularla hora a hora y no con un % fijo, sea o no lo que hace PVsyst. Como esta app ya corre una simulación horaria completa, se calcula de verdad hora a hora: en el Motor IV (`calculos/produccion_iv.py`), usando la corriente REAL `i_mp` que `pvlib.singlediode`/`bishop88_mpp` ya resuelve internamente (antes se descartaba; nueva función `calculos/modelo_iv.py::calcular_iv_vectorizado()`); en el motor JRC/Huld (`calculos/produccion.py`, primario para CdTe, que no resuelve curva I-V), aproximando la corriente vía `Pmax(t)/Vmp_string(T_celda(t))`, con `T_celda(t)` ya calculada hora a hora — declarado como menos exacto que el camino con `i_mp` real, no oculto.
+- **Hora a hora, no un % fijo anual** (corregido 7-sep-2026, ver Anexo 66: al momento de escribir esto se creyó, sin verificar, que la referencia estándar internacional usaba un % fijo a condiciones STC para las 8760 horas — **esto es incorrecto**, la referencia estándar internacional ya calcula esto hora a hora desde hace años, igual que HelioScope; no es una técnica que supere a esos 2 estándares, es ponerle a esta app el mismo rigor). La pérdida óhmica es proporcional a la corriente, que varía fuerte con la irradiancia (a 300 W/m² la corriente es ~30% de la de diseño a 1000 W/m²) — por eso vale la pena calcularla hora a hora y no con un % fijo, sea o no lo que hace la referencia estándar internacional. Como esta app ya corre una simulación horaria completa, se calcula de verdad hora a hora: en el Motor IV (`calculos/produccion_iv.py`), usando la corriente REAL `i_mp` que `pvlib.singlediode`/`bishop88_mpp` ya resuelve internamente (antes se descartaba; nueva función `calculos/modelo_iv.py::calcular_iv_vectorizado()`); en el motor JRC/Huld (`calculos/produccion.py`, primario para CdTe, que no resuelve curva I-V), aproximando la corriente vía `Pmax(t)/Vmp_string(T_celda(t))`, con `T_celda(t)` ya calculada hora a hora — declarado como menos exacto que el camino con `i_mp` real, no oculto.
 - **Modo manual como respaldo**: si el usuario no configura longitud/calibre en ⚡ Diagrama Unifilar (Página 20), los sliders de 🔀 Mismatch (incluido uno NUEVO para el lado AC, que antes no existía en absoluto, default 0% — nunca inventar un valor distinto de cero para algo que no existía) siguen funcionando como antes, como un % fijo. El modo calculado SUSTITUYE al manual cuando hay datos reales del proyecto vigentes (mismo panel/inversor/N en serie) — nunca se aplican ambos a la vez.
 - **Evitar doble conteo (crítico)**: `pct_mismatch_fab`/`pct_cableado` se excluyen ahora de la llamada a `cascada_perdidas()` que arma `factor_global_mismatch` en 🔀 Mismatch — quedan aplicados SOLO como parámetros explícitos del motor. `factor_global_mismatch` sigue cubriendo sombreado de horizonte + mismatch de orientación + soiling exactamente igual que antes (fuera de alcance de este cambio).
 - **`perdidas_desglosadas()`**: fila "②c Módulo" deja de ser SIEMPRE informativa — si hay un % real configurado, se reemplaza por "②c Mismatch fabricación (aplicado)" con su Δ kWh real; nueva fila "②d Pérdida óhmica DC" y "④c Pérdida óhmica AC" con la fuente (manual o calculada) en la nota. Las filas ②/②a/②b se corrigieron para referenciar `E_dc_antes_binning_ohmico_kWh` (el punto ANTES de estas 2 pérdidas nuevas) en vez de `E_dc_anual_kWh` (que ahora ya viene neto de ellas) — si no, el efecto SDM/temperatura se habría mezclado con la pérdida nueva, exactamente el mismo tipo de bug de atribución que se estaba corrigiendo.
@@ -3699,7 +3701,7 @@ Con la sección 64 ya desplegada y corriendo en producción, el usuario pidió u
 **Hallazgo BLOCKER, confirmado por los 2 frentes de forma independiente**: `calcular_perdida_ohmica()` calculaba la resistencia del tramo AC con el factor "×2" (convención de un circuito DC de 2 hilos, ida y vuelta) en vez de "×3" (trifásico real). La corriente que el motor de producción multiplica contra esa resistencia ya se calcula como `P_ac/(√3·V)` — la corriente DE LÍNEA, misma convención que `corriente_diseno_ac()` usa en todo el resto de la app. Esa corriente fluye por 3 conductores de fase, cada uno con resistencia `ρ·L/S` — la pérdida total real es `3·I²·(ρ·L/S)`, no `2·I²·(ρ·L/S)`. Con el factor original, la pérdida óhmica AC calculada (modo real, Página 20) quedaba **subestimada en ~33%**. Corregido a 3.0, con la derivación completa documentada en el código. Solo afectaba al modo calculado del tramo AC — el slider manual nunca tuvo este problema.
 
 **2 hallazgos MEDIUM adicionales, reales, corregidos**:
-1. La fila "②c" (mismatch de fabricación) del Loss Diagram desaparecía por completo (ni real ni informativa) cuando un proyecto solo activaba pérdida óhmica DC sin tocar el mismatch de fabricación — perdía el disclaimer de PVsyst sin necesidad. Ningún kWh salía mal, pero la tabla dejaba de ser auditable en ese caso puntual. Reestructurado: ②c ahora SIEMPRE aparece (real o informativa), independiente de si ②d también aparece — la última fila del bloque sigue forzándose al valor exacto de `E_dc_anual_kWh` para que la reconciliación nunca se rompa.
+1. La fila "②c" (mismatch de fabricación) del Loss Diagram desaparecía por completo (ni real ni informativa) cuando un proyecto solo activaba pérdida óhmica DC sin tocar el mismatch de fabricación — perdía el disclaimer de la referencia estándar internacional sin necesidad. Ningún kWh salía mal, pero la tabla dejaba de ser auditable en ese caso puntual. Reestructurado: ②c ahora SIEMPRE aparece (real o informativa), independiente de si ②d también aparece — la última fila del bloque sigue forzándose al valor exacto de `E_dc_anual_kWh` para que la reconciliación nunca se rompa.
 2. La verificación de "vigencia" en Producción (antes de reusar el cálculo de Página 20) comparaba panel/inversor/N en serie, pero NO el número total de paneles del proyecto — como la resistencia DC efectiva se calcula con una fracción normalizada contra ese total, un cambio posterior de N_paneles (sin volver a Página 20) dejaba aplicándose una fracción obsoleta que sobreestimaría la corriente de cada tramo. Corregido: se agregó `n_paneles_total` a la verificación de vigencia (ver sección 13f).
 
 **1 hallazgo adicional propio, no reportado por el agente** (encontrado en la re-derivación desde cero): si el usuario declara cable DC para SOLO ALGUNAS superficies de un proyecto multi-superficie, la fracción de corriente de los tramos declarados se normalizaba contra la suma de esos tramos únicamente, no contra el total real de paneles del proyecto — atribuyéndoles más corriente de la real y sobreestimando su pérdida. Corregido: nuevo parámetro `n_paneles_total` explícito en `calcular_perdida_ohmica()`; los paneles sin tramo declarado simplemente no aportan pérdida (subestimación deliberada, nunca sobreestimación — mismo principio de nunca inventar), más un aviso amarillo visible en Página 20 cuando la declaración está incompleta.
@@ -3712,21 +3714,21 @@ Documentado además en un manual de usuario dedicado ("Cableado y Mismatch") —
 
 ────────────────────────────────────────────────────────────
 
-## 66. Anexo — Corrección del manual: "más preciso que PVsyst" era una afirmación sin verificar, y era falsa (7-sep-2026)
+## 66. Anexo — Corrección del manual: "más preciso que la referencia estándar internacional" era una afirmación sin verificar, y era falsa (7-sep-2026)
 
-El usuario preguntó, con honestidad, si el diseño del cálculo de pérdida óhmica (secciones 64/65) era novedoso o ya tenía antecedentes en otras apps del mercado. Antes de responder, se verificó contra la documentación oficial de PVsyst y HelioScope (los 2 motores de simulación que la industria solar considera "bancables") en vez de asumir.
+El usuario preguntó, con honestidad, si el diseño del cálculo de pérdida óhmica (secciones 64/65) era novedoso o ya tenía antecedentes en otras apps del mercado. Antes de responder, se verificó contra la documentación oficial de la referencia estándar internacional y HelioScope (los 2 motores de simulación que la industria solar considera "bancables") en vez de asumir.
 
-**El supuesto quedó desmentido**: tanto la sección 64 como el manual de usuario ("Cableado y Mismatch") y sus 2 formatos (artefacto web y `.docx`) afirmaban que "esto es más preciso que PVsyst, que aplica un % fijo a condiciones de diseño para las 8.760 horas, sobreestimando la pérdida en horas de baja irradiancia". **Esa afirmación es incorrecta** — nunca se verificó contra la fuente antes de escribirla, justo el tipo de cosa que este código evita en todos los demás lados.
+**El supuesto quedó desmentido**: tanto la sección 64 como el manual de usuario ("Cableado y Mismatch") y sus 2 formatos (artefacto web y `.docx`) afirmaban que "esto es más preciso que la referencia estándar internacional, que aplica un % fijo a condiciones de diseño para las 8.760 horas, sobreestimando la pérdida en horas de baja irradiancia". **Esa afirmación es incorrecta** — nunca se verificó contra la fuente antes de escribirla, justo el tipo de cosa que este código evita en todos los demás lados.
 
-**Lo que dice la documentación oficial de PVsyst** (`pvsyst.com/help/.../array-ohmic-wiring-loss.html`): la pérdida óhmica se calcula en cada hora de la simulación como `P_pérdida = R_cable · I(t)²`, con la corriente real simulada de esa hora — el manual del propio PVsyst dice textualmente que, por el comportamiento cuadrático con la corriente, "at half the irradiance (half the current), the wiring loss fraction will be half". Es exactamente la misma física implementada aquí.
+**Lo que dice la documentación oficial de la referencia estándar internacional** (`la referencia estándar internacional.com/help/.../array-ohmic-wiring-loss.html`): la pérdida óhmica se calcula en cada hora de la simulación como `P_pérdida = R_cable · I(t)²`, con la corriente real simulada de esa hora — el manual del propio la referencia estándar internacional dice textualmente que, por el comportamiento cuadrático con la corriente, "at half the irradiance (half the current), the wiring loss fraction will be half". Es exactamente la misma física implementada aquí.
 
-**HelioScope hace lo mismo**: calcula resistencia y corriente de cada conductor cada hora, en vez de aplicar un % plano — verificado por un tercero (DNV GL) coincidiendo con PVsyst dentro de 1% en cada paso del cálculo.
+**HelioScope hace lo mismo**: calcula resistencia y corriente de cada conductor cada hora, en vez de aplicar un % plano — verificado por un tercero (DNV GL) coincidiendo con la referencia estándar internacional dentro de 1% en cada paso del cálculo.
 
-**Veredicto honesto**: el diseño de esta app NO es novedoso para la industria — le da a esta calculadora paridad con lo que PVsyst y HelioScope ya hacían desde hace años. Sí es una mejora real **para esta app específicamente** (antes del 7-sep no tenía este cálculo en absoluto, o un % manual plano). La diferencia legítima que puede seguir existiendo frente a un reporte real de PVsyst no es metodológica — es que esta app usa una temperatura de diseño FIJA (45°C) para la resistividad del cobre, mientras PVsyst deja que el usuario la elija; si las corridas usan la misma temperatura, los números deberían converger, no divergir por el método.
+**Veredicto honesto**: el diseño de esta app NO es novedoso para la industria — le da a esta calculadora paridad con lo que la referencia estándar internacional y HelioScope ya hacían desde hace años. Sí es una mejora real **para esta app específicamente** (antes del 7-sep no tenía este cálculo en absoluto, o un % manual plano). La diferencia legítima que puede seguir existiendo frente a un reporte real de la referencia estándar internacional no es metodológica — es que esta app usa una temperatura de diseño FIJA (45°C) para la resistividad del cobre, mientras la referencia estándar internacional deja que el usuario la elija; si las corridas usan la misma temperatura, los números deberían converger, no divergir por el método.
 
-**Corregido**: la afirmación se reemplazó en las 5 ubicaciones donde vivía (sección 9, sección 13f, Anexo 64, el manual/artefacto, y el `.docx`) por la comparación correcta (paridad con PVsyst/HelioScope, no superioridad), republicados los 3 documentos externos. Ningún cálculo ni número del código cambió — era un error de comunicación/documentación, no un bug de `calcular_perdida_ohmica()` ni de los motores de producción.
+**Corregido**: la afirmación se reemplazó en las 5 ubicaciones donde vivía (sección 9, sección 13f, Anexo 64, el manual/artefacto, y el `.docx`) por la comparación correcta (paridad con la referencia estándar internacional/HelioScope, no superioridad), republicados los 3 documentos externos. Ningún cálculo ni número del código cambió — era un error de comunicación/documentación, no un bug de `calcular_perdida_ohmica()` ni de los motores de producción.
 
-Lección para el Asistente: no repetir una comparación contra una herramienta externa (PVsyst, HelioScope, o cualquier otra) sin haberla verificado contra su documentación oficial primero — mismo principio de "nunca inventar un número" aplicado a afirmaciones sobre terceros, no solo a cifras propias.
+Lección para el Asistente: no repetir una comparación contra una herramienta externa (la referencia estándar internacional, HelioScope, o cualquier otra) sin haberla verificado contra su documentación oficial primero — mismo principio de "nunca inventar un número" aplicado a afirmaciones sobre terceros, no solo a cifras propias.
 
 ────────────────────────────────────────────────────────────
 
@@ -3764,7 +3766,7 @@ El usuario pidió implementar un P50/P90 "auditable y bancarizable, 100% compati
 
 ## 69. Anexo — Actualizaciones del 7 de septiembre de 2026 (degradación no lineal: curva real de garantía del fabricante, vía Plan Mode)
 
-El usuario pidió verificar qué recursos/herramientas hay disponibles para implementar degradación no lineal (curva real de garantía del fabricante, como PVsyst) en vez del %/año plano actual, y entregar un plan — no construirlo directamente. Plan presentado y aprobado vía EnterPlanMode/ExitPlanMode antes de tocar código.
+El usuario pidió verificar qué recursos/herramientas hay disponibles para implementar degradación no lineal (curva real de garantía del fabricante, como la referencia estándar internacional) en vez del %/año plano actual, y entregar un plan — no construirlo directamente. Plan presentado y aprobado vía EnterPlanMode/ExitPlanMode antes de tocar código.
 
 **Investigación previa que definió el diseño**: `calculos/financiero.py::calcular_flujo_caja()` es el ÚNICO punto real de cálculo en toda la app que aplica degradación (`(1 - tasa/100)**(t-1)`, decaimiento geométrico) — los otros ~25 archivos que la mencionan solo reenvían el mismo parámetro, sin duplicar la fórmula. **pvlib 0.11.1 (la versión pineada) no tiene ningún submódulo de degradación** (confirmado enumerando los 24 submódulos reales) — no hay librería que resuelva esto, se implementó con datos + una función propia, sin dependencia nueva. Ni el catálogo de paneles ni el extractor de PDF tenían ningún dato de garantía/degradación antes de este cambio.
 
@@ -3786,16 +3788,15 @@ El usuario pidió verificar qué recursos/herramientas hay disponibles para impl
 
 ## 25x. Anexo — Actualizaciones del 2 de septiembre de 2026 (inversor real INVT MG750TL agregado al catálogo)
 
-El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de
-PVsyst 8.1.5 (el mismo caso de las secciones 25v/25w). Agregado con datos de 2 fuentes reales
+El usuario no encontraba en el catálogo el inversor con el que corrió la última prueba real de la referencia estándar internacional (el mismo caso de las secciones 25v/25w). Agregado con datos de 2 fuentes reales
 cruzadas: la ficha oficial del fabricante (INVT-MG-0.75-6kW datasheet, rev. 2020.07 V1.0) y la
-propia pantalla de PVsyst capturada en la corrida real ("Definición del inversor de red",
+propia pantalla de la referencia estándar internacional capturada en la corrida real ("Definición del inversor de red",
 fabricante "INVT Solar technology", fuente "Manufacturer 2017"). Ambas coinciden exacto en
 tensión DC máxima (400V), potencia CA nominal (750W) y eficiencia máxima (96,80%). Difieren en la
-ventana MPPT (ficha 2020: 50-400V más amplia; pantalla PVsyst: 60-350V) — se usó la de PVsyst por
+ventana MPPT (ficha 2020: 50-400V más amplia; pantalla la referencia estándar internacional: 60-350V) — se usó la de la referencia estándar internacional por
 ser la efectivamente validada, con la discrepancia documentada en el campo "Notas" del catálogo,
 no oculta. Potencia FV máx. recomendada (900W) real, de la ficha oficial ("Max. DC input power").
-Sin dato real de corriente máxima de entrada en ninguna de las 2 fuentes (PVsyst mostró "N/A") —
+Sin dato real de corriente máxima de entrada en ninguna de las 2 fuentes (la referencia estándar internacional mostró "N/A") —
 se dejó en blanco inicialmente.
 
 **Corrección el mismo día**: al pedir "verifica que el nuevo inversor calcule bien en
@@ -3806,7 +3807,7 @@ por incompatibilidad real. Corregido con un valor DERIVADO (no inventado): 900W 
 máxima real) / 60V (Vmppt mínimo real) = 15A — el peor caso físico real de corriente a máxima
 potencia en el extremo inferior de la ventana MPPT, documentado como derivado en el campo Notas.
 Verificado con la config real: `compatible=True`, ratio DC:AC=1,01 🟢, `alerta_margen=True` (Voc en
-frío 381,5V cerca del límite de 400V — coincide con lo ya visto en las capturas reales de PVsyst).
+frío 381,5V cerca del límite de 400V — coincide con lo ya visto en las capturas reales de la referencia estándar internacional).
 
 3 tests (`tests/test_inversor_invt_mg750tl.py`), script de agregado/actualización
 (`datos/agregar_inversor_invt_mg750tl.py`, mismo patrón que `agregar_inversores_apsystems.py`,
@@ -3818,8 +3819,8 @@ Cierre de la investigación del vacío mensual de PR de CdTe (secciones 25u/25v)
 corrección espectral, V_bi genérico y sesgo de Pnom, y agotar el ajuste de parámetros del SDM
 (Rs, Rsh, Gamma, recombinación), se encontró la causa raíz: el modelo de un diodo con Rsh
 exponencial produce una "joroba" de eficiencia >100% entre G=100-300 W/m² que ni una corrida real
-de PVsyst 8.1.5 ni el modelo empírico JRC/Huld (Huld et al. 2011, ya en el repo como segunda
-opinión desde el 31-ago) reproducen. Comparado mes a mes contra PVsyst real: SDM r=-0,142 (sin
+de la referencia estándar internacional ni el modelo empírico JRC/Huld (Huld et al. 2011, ya en el repo como segunda
+opinión desde el 31-ago) reproducen. Comparado mes a mes contra la referencia estándar internacional real: SDM r=-0,142 (sin
 relación), JRC/Huld r=0,545 (correlación real), RMSE 16,2 vs. 13,2 puntos.
 
 **Cambio**: `calculos/produccion.py::_calcular_pmax_vectorizado()` usa JRC/Huld como motor
@@ -3828,7 +3829,7 @@ patrón de baja irradiancia a cambio de no capturar la inconsistencia real de fi
 Vmpp×Impp≠Pmax). **Alcance acotado a energía**: Motor IV (`produccion_iv.py`), mismatch/bypass y
 MPPT compartido siguen exclusivamente en el SDM — JRC/Huld solo predice Pmax, no da curva I-V
 (Voc/Isc/Vmp/Imp) que esos 3 módulos necesitan. Afecta 7/7 paneles ASP-ST1 y 53/76 del catálogo
-Excel (clasificados CdTe); solo ASP-ST1-T40 tiene validación numérica directa contra PVsyst, el
+Excel (clasificados CdTe); solo ASP-ST1-T40 tiene validación numérica directa contra la referencia estándar internacional, el
 resto se beneficia por el mismo argumento estructural (defecto de la ecuación, no de calibración
 por panel).
 
@@ -3844,12 +3845,12 @@ Suite completa: **939/939**. Ver `DIAGNOSTICO_JRC_HULD_PRIMARIO_CDTE.md`.
 
 ## 25v. Anexo — Actualizaciones del 2 de septiembre de 2026 (recombinación en capa intrínseca CdTe: implementada, no activada)
 
-Validando el motor CdTe contra una corrida real de PVsyst 8.1.5 (ASP-ST1-T40, Teusaquillo),
+Validando el motor CdTe contra una corrida real de la referencia estándar internacional (ASP-ST1-T40, Teusaquillo),
 quedó un patrón mensual sin explicar: nuestro PR aislado (irradiancia+temperatura) es casi plano
-todo el año (88-104%), mientras PVsyst real varía fuerte por mes (67%-81%, mínimo en marzo/
-septiembre). PVsyst mostró un parámetro real y activo que no modelamos: `d²/µτ=1,13 1/V` (pestaña
+todo el año (88-104%), mientras la referencia estándar internacional real varía fuerte por mes (67%-81%, mínimo en marzo/
+septiembre). La referencia estándar internacional mostró un parámetro real y activo que no modelamos: `d²/µτ=1,13 1/V` (pestaña
 "Pérdida de recombinación"), del modelo de Merten et al. 1998 (IEEE Trans. Electron Devices 45,
-423-429) para uniones p-i-n de capa fina, que PVsyst adopta para CdTe/a-Si. Agrega una corriente
+423-429) para uniones p-i-n de capa fina, que la referencia estándar internacional adopta para CdTe/a-Si. Agrega una corriente
 de recombinación aditiva: `I_rec = I_L·(d²/µτ)/[N_s·V_bi−(V+I·Rs)]`.
 
 **Implementado**: `pvlib.singlediode.bishop88_mpp/_i_from_v/_v_from_i` (verificado que soportan
@@ -3860,28 +3861,28 @@ Por defecto (`d2mutau` ausente) el mecanismo queda inactivo y reproduce EXACTO e
 (verificado bit-a-bit, rtol=1e-9, 5 paneles reales).
 
 **NO se activó para ningún panel real**: agregar `d2mutau=0,885V` (=1/1,13, unidad reconciliada
-con el usuario — pantalla real en 1/V, pvlib/PVsyst documentan V) sobre el R_s=25,51Ω YA calibrado
+con el usuario — pantalla real en 1/V, pvlib/la referencia estándar internacional documentan V) sobre el R_s=25,51Ω YA calibrado
 de ASP-ST1-T40 (sin ese término) rompió la validación real de laboratorio: FF@G=200W/m² cayó a
 47,06% contra el 76,28% real medido — el R_s real ya absorbe implícitamente el efecto, sumarlo
 aparte lo cuenta dos veces. Activarlo bien requiere re-calibrar I_L_ref/I_o_ref/R_s/R_sh_ref TODOS
 JUNTOS contra los 10 puntos reales del XLSM con el término incluido desde el inicio — no se hizo
 por no tener esos puntos crudos disponibles en la sesión.
 
-**Validación del mecanismo aislado** (con el set completo de parámetros reales que PVsyst ajustó
+**Validación del mecanismo aislado** (con el set completo de parámetros reales que la referencia estándar internacional ajustó
 para ese módulo, sin mezclar con nuestros valores de laboratorio): Pmax_STC=60,87W vs 60,59W
-implícito de PVsyst (0,5%) — el mecanismo replica bien el ajuste real de PVsyst. Pero NO cierra la
+implícito de la referencia estándar internacional (0,5%) — el mecanismo replica bien el ajuste real de la referencia estándar internacional. Pero NO cierra la
 brecha mensual buscada (89,9-91,0% de nuestro motor vs 67-81% real, brecha similar a sin el
 término) — el patrón estacional real sigue sin explicarse.
 
 **Actualización (mismo día)**: de las 3 hipótesis abiertas, 2 quedaron descartadas tras
-investigarlas. (1) Corrección espectral de PVsyst (dos modelos reales: CREST/a-Si y FirstSolar/
+investigarlas. (1) Corrección espectral de la referencia estándar internacional (dos modelos reales: CREST/a-Si y FirstSolar/
 CdTe, éste vía `pvlib.spectrum.spectral_factor_firstsolar`, presente en la versión pineada) —
 magnitud real calculada para Teusaquillo (AMₐ 0,7-1,8, Pw 1-4cm): solo ±2-4%, orden de magnitud
 menor a la brecha buscada; descartada. (2) V_bi=0,9V — confirmado que ES el valor por defecto real
-que PVsyst usa para cualquier unión simple (a-Si o CdTe, no solo a-Si); ya se usaba correctamente;
+que la referencia estándar internacional usa para cualquier unión simple (a-Si o CdTe, no solo a-Si); ya se usaba correctamente;
 descartada. (3) Granularidad sub-horaria/desfase TMY: verificado que nuestro propio pipeline
 (`calcular_poa()`) pasa limpio el chequeo de cierre físico anti-desfase horario (0/4109 horas
-inconsistentes) — el problema no está de nuestro lado; no se pudo verificar del lado de PVsyst por
+inconsistentes) — el problema no está de nuestro lado; no se pudo verificar del lado de la referencia estándar internacional por
 falta de exportación horaria real. Sin causa identificada adicional tras esta ronda.
 
 Bug real encontrado en el camino: `calcular_pmax_vectorizado()` usaba `np.asarray()` en vez de
@@ -3891,22 +3892,22 @@ los 3 llamadores (`pmax[G<5.0]=0.0`) — 49 tests fallaron en cascada hasta corr
 6 tests nuevos (`tests/test_recombinacion_cdte.py`). Suite completa: **933/933**. Ver
 `DIAGNOSTICO_RECOMBINACION_CDTE.md`.
 
-## 25t. Anexo — Actualizaciones del 2 de septiembre de 2026 (migración del motor SDM: De Soto 2006 → PVsyst v6)
+## 25t. Anexo — Actualizaciones del 2 de septiembre de 2026 (migración del motor SDM: De Soto 2006 → modelo de un diodo v6 de la referencia estándar internacional)
 
-Tras el fix del Rsh (sección 25s), quedaba un residual de ~4-5 puntos porcentuales entre esta app y PVsyst real incluso usando los parámetros de diodo EXACTOS de PVsyst — replicado además de forma independiente contra un paper real (Mohammadi & Gezegin 2022, panel Suntech STP320S). Causa real: esta app usaba el modelo académico De Soto 2006, mientras PVsyst usa su propio modelo (PVsyst v6, Sauer/Roessler/Hansen 2015, IEEE J. Photovoltaics — `pvlib.pvsystem.calcparams_pvsyst`), con fórmulas distintas de I_L(T), I_o(T), Rsh(G) y un factor de idealidad Gamma que PVsyst permite variar con la temperatura (`mu_gamma`).
+Tras el fix del Rsh (sección 25s), quedaba un residual de ~4-5 puntos porcentuales entre esta app y la referencia estándar internacional real incluso usando los parámetros de diodo EXACTOS de la referencia estándar internacional — replicado además de forma independiente contra un paper real (Mohammadi & Gezegin 2022, panel Suntech STP320S). Causa real: esta app usaba el modelo académico De Soto 2006, mientras la referencia estándar internacional usa su propio modelo (modelo de un diodo v6 de la referencia estándar internacional, Sauer/Roessler/Hansen 2015, IEEE J. Photovoltaics — una función interna), con fórmulas distintas de I_L(T), I_o(T), Rsh(G) y un factor de idealidad Gamma que la referencia estándar internacional permite variar con la temperatura (`mu_gamma`).
 
-Se encontró documentación oficial de PVsyst con sus reglas reales por defecto ("Standard Model", usado cuando no hay caracterización de laboratorio propia): `Rsh_ref = Vmp/(0,2×(Isc−Imp))` (validado: 192,2Ω vs 190,0Ω real para XTP 50-17B, 1,2% de diferencia), `Rsh_0 ≈ 4×Rsh_ref` para cristalino, `Rsh_exp=5,5` "constante independiente de la tecnología" (excepción real CdTe~3).
+Se encontró documentación oficial de la referencia estándar internacional con sus reglas reales por defecto ("Standard Model", usado cuando no hay caracterización de laboratorio propia): `Rsh_ref = Vmp/(0,2×(Isc−Imp))` (validado: 192,2Ω vs 190,0Ω real para XTP 50-17B, 1,2% de diferencia), `Rsh_0 ≈ 4×Rsh_ref` para cristalino, `Rsh_exp=5,5` "constante independiente de la tecnología" (excepción real CdTe~3).
 
-**Migrado** el motor completo (`calculos/modelo_iv.py::trasladar_parametros_gt()` + `estimar_sdm_desde_ficha()`) de `calcparams_desoto` a `calcparams_pvsyst`. `R_s` se resuelve para reproducir el Pmax exacto de la ficha en STC (no el criterio oficial "-3%@200W/m²" de PVsyst, que se probó primero y dejaba solo 19/76 paneles del catálogo activando el Motor IV). `I_L_ref`/`I_o_ref` por autoconsistencia en Isc/Voc; `mu_gamma` resuelto para reproducir Tk_gamma de la ficha.
+**Migrado** el motor completo (`calculos/modelo_iv.py::trasladar_parametros_gt()` + `estimar_sdm_desde_ficha()`) de `calcparams_desoto` a una función interna. `R_s` se resuelve para reproducir el Pmax exacto de la ficha en STC (no el criterio oficial "-3%@200W/m²" de la referencia estándar internacional, que se probó primero y dejaba solo 19/76 paneles del catálogo activando el Motor IV). `I_L_ref`/`I_o_ref` por autoconsistencia en Isc/Voc; `mu_gamma` resuelto para reproducir Tk_gamma de la ficha.
 
-**Validado contra el caso real de PVsyst 8.1.5** (XTP 50-17B, Teusaquillo): con parámetros derivados 100% de la ficha (sin espiar ningún valor de PVsyst), PR=96,0% vs 95,9% real — 0,1 puntos de diferencia. El pipeline real completo (con inversor) da PR=92,2% para este caso, cerrando más brecha hacia el 77,03% real de PVsyst (el resto es IAM/mismatch/óhmico, ya documentado en sección 25p).
+**Validado contra el caso real de la referencia estándar internacional** (XTP 50-17B, Teusaquillo): con parámetros derivados 100% de la ficha (sin espiar ningún valor de la referencia estándar internacional), PR=96,0% vs 95,9% real — 0,1 puntos de diferencia. El pipeline real completo (con inversor) da PR=92,2% para este caso, cerrando más brecha hacia el 77,03% real de la referencia estándar internacional (el resto es IAM/mismatch/óhmico, ya documentado en sección 25p).
 
-Las 4 implementaciones fuera de `modelo_iv.py` ahora centralizan en `trasladar_parametros_gt()` en vez de reimplementar la llamada por su cuenta. Catálogo real: 74/76 paneles activan el Motor IV (antes 72/76), con tolerancia de validación STC ampliada de 5% a 6% (Pmax ahora exacto por construcción, a cambio de que Vmp/Imp individuales varíen un poco más). Suite completa: **927/927**. Ver `DIAGNOSTICO_MOTOR_PVSYST.md`.
+Las 4 implementaciones fuera de `modelo_iv.py` ahora centralizan en `trasladar_parametros_gt()` en vez de reimplementar la llamada por su cuenta. Catálogo real: 74/76 paneles activan el Motor IV (antes 72/76), con tolerancia de validación STC ampliada de 5% a 6% (Pmax ahora exacto por construcción, a cambio de que Vmp/Imp individuales varíen un poco más). Suite completa: **927/927**. Ver un documento interno de diagnóstico.
 
 ## 25u. Anexo — Actualizaciones del 2 de septiembre de 2026 (investigación bibliográfica: razón Rsh_0/Rsh_ref de CdTe en la literatura)
 
-Tras la migración a PVsyst v6 (sección 25t), quedó documentado que la razón `R_sh_0/R_sh_ref`
-para CdTe/CIGS (≈13,76) no tiene fórmula oficial de PVsyst como sí la tiene cristalino
+Tras la migración a modelo de un diodo v6 de la referencia estándar internacional (sección 25t), quedó documentado que la razón `R_sh_0/R_sh_ref`
+para CdTe/CIGS (≈13,76) no tiene fórmula oficial de la referencia estándar internacional como sí la tiene cristalino
 (`4×Rsh_ref`) — se reutiliza la razón real calibrada del único panel CdTe con datos de laboratorio
 propios (ASP-ST1-T40). El usuario pidió buscar en la literatura académica algo que valide o
 mejore ese fallback. **Investigación bibliográfica pura — no se modificó ningún valor.**
@@ -3925,17 +3926,17 @@ IOPscience, ResearchGate agotados), sin recurrir a ningún método ilegítimo.
 
 **Conclusión**: ambas fuentes reales (≈4,2 de cota inferior vs. ≈280-300) bracket amplio y
 dependiente del dispositivo/antigüedad — ninguna es una fuente autorizada equivalente a la fórmula
-oficial de PVsyst para cristalino. El fallback actual (13,76) queda dentro de ese rango real, ni
+oficial de la referencia estándar internacional para cristalino. El fallback actual (13,76) queda dentro de ese rango real, ni
 absurdamente bajo ni absurdamente alto. Sin cambios de código; documento de referencia únicamente.
 Ver `DIAGNOSTICO_CDTE_RSH_LITERATURA.md`.
 
 ## 25s. Anexo — Actualizaciones del 1 de septiembre de 2026 (bug real: el modelo Rsh de capa fina CdTe se aplicaba a silicio cristalino)
 
-El usuario corrió PVsyst 8.1.5 en paralelo con un panel de silicio cristalino real (XTP 50-17B, base de datos original de PVsyst), mismo inversor, mismo sitio (Teusaquillo). PVsyst dio PR=77,03% (típico); esta app, mismo panel/sitio, dio PR=104,4%. La investigación descartó primero el modelo de temperatura (NOCT vs Faiman, solo explicaba ~2 de 13 puntos) y luego una falsa alarma propia sobre el factor Gamma (error de unidades en la propia verificación, corregido — Gamma real resultó 0,94, cercano al 1,070 de PVsyst, no 36 como se reportó por error).
+El usuario corrió la referencia estándar internacional en paralelo con un panel de silicio cristalino real (XTP 50-17B, base de datos original de la referencia estándar internacional), mismo inversor, mismo sitio (Teusaquillo). La referencia estándar internacional dio PR=77,03% (típico); esta app, mismo panel/sitio, dio PR=104,4%. La investigación descartó primero el modelo de temperatura (NOCT vs Faiman, solo explicaba ~2 de 13 puntos) y luego una falsa alarma propia sobre el factor Gamma (error de unidades en la propia verificación, corregido — Gamma real resultó 0,94, cercano al 1,070 de la referencia estándar internacional, no 36 como se reportó por error).
 
-La causa real, confirmada de forma decisiva: insertando los parámetros EXACTOS de PVsyst en el motor de esta app con T=25°C fijo (aislando solo irradiancia), seguía dando +3,2% de ganancia donde PVsyst midió -3,90% de pérdida real. Encontrado en el código: `calcular_rsh_cdte()` (modelo Rsh exponencial saturado, Mermoud 2005, validado para el comportamiento real de capa fina CdTe — Batzner et al. 2001) se aplicaba en las 5 implementaciones del SDM (`modelo_iv.py`, `produccion.py`, `produccion_iv.py`, `mismatch_bypass.py`, `mppt_combinado.py`) SIN verificar la tecnología del panel. `datos/tecnologias_bipv.py` ya tenía `c_Rsh=5.5` idéntico para CdTe/Mono-Si/Poli-Si, pero nada evitaba que el modelo de capa fina se usara también para cristalino, que no tiene ese comportamiento real.
+La causa real, confirmada de forma decisiva: insertando los parámetros EXACTOS de la referencia estándar internacional en el motor de esta app con T=25°C fijo (aislando solo irradiancia), seguía dando +3,2% de ganancia donde la referencia estándar internacional midió -3,90% de pérdida real. Encontrado en el código: `calcular_rsh_cdte()` (modelo Rsh exponencial saturado, Mermoud 2005, validado para el comportamiento real de capa fina CdTe — Batzner et al. 2001) se aplicaba en las 5 implementaciones del SDM (`modelo_iv.py`, `produccion.py`, `produccion_iv.py`, `mismatch_bypass.py`, `mppt_combinado.py`) SIN verificar la tecnología del panel. `datos/tecnologias_bipv.py` ya tenía `c_Rsh=5.5` idéntico para CdTe/Mono-Si/Poli-Si, pero nada evitaba que el modelo de capa fina se usara también para cristalino, que no tiene ese comportamiento real.
 
-**Corregido**: las 5 implementaciones ahora solo aplican `calcular_rsh_cdte()` si `tecnologia in ("CdTe", "CIGS")` — para Mono-Si/Poli-Si se usa el Rsh estándar que `pvlib.calcparams_desoto()` ya calculaba internamente y se descartaba. Ningún panel CdTe cambia de comportamiento (verificado, incluido ASP-ST1-T40 de Teusaquillo). Con el fix, el caso real de comparación (XTP 50-17B) mejoró de PR=104,4% a **PR=95,9%** (PVsyst real: 77,03%) — cierra ~38% de la brecha de irradiancia; el resto sigue siendo lo ya documentado (IAM, calidad de módulo, mismatch, óhmico no modelados, ver sección 25p).
+**Corregido**: las 5 implementaciones ahora solo aplican `calcular_rsh_cdte()` si `tecnologia in ("CdTe", "CIGS")` — para Mono-Si/Poli-Si se usa el Rsh estándar que `pvlib.calcparams_desoto()` ya calculaba internamente y se descartaba. Ningún panel CdTe cambia de comportamiento (verificado, incluido ASP-ST1-T40 de Teusaquillo). Con el fix, el caso real de comparación (XTP 50-17B) mejoró de PR=104,4% a **PR=95,9%** (la referencia estándar internacional real: 77,03%) — cierra ~38% de la brecha de irradiancia; el resto sigue siendo lo ya documentado (IAM, calidad de módulo, mismatch, óhmico no modelados, ver sección 25p).
 
 10 tests nuevos/extendidos (`tests/test_rsh_gating_tecnologia.py` + `tests/test_consistencia_sdm_entre_modulos.py` extendido con caso Poli-Si). Suite completa: **927/927**. Ver `DIAGNOSTICO_RSH_TECNOLOGIA.md`.
 
@@ -4019,17 +4020,17 @@ Módulo renombrado `calculos/modelo_jrc_cdte.py` → `calculos/modelo_jrc_huld.p
 
 ## 25j. Anexo — Actualizaciones del 31 de agosto de 2026 (verificación cruzada CdTe: literatura académica + modelo JRC/Huld independiente para el PR>100% de Teusaquillo)
 
-El usuario pidió analizar "como un científico" un paper académico real sobre CdTe BIPV bajo clima tropical (Kumar/Sudhakar/Samykano, 3 papers relacionados) para sacarle provecho a la duda abierta del PR>100% en Teusaquillo (fachada CdTe vertical, `FICHA_PVSYST_TEUSAQUILLO.md`). Se descargó y leyó el texto completo (no solo el resumen) de uno de los papers — corrección importante: usa **PVGIS**, no PVsyst como el usuario asumía inicialmente. La literatura real (3 estudios, mismo grupo de autores, clima tropical de Malasia) nunca reporta PR por encima de 78% para CdTe BIPV, ni en techo ni en fachada (rango real: 66,4%-77,4%).
+El usuario pidió analizar "como un científico" un paper académico real sobre CdTe BIPV bajo clima tropical (Kumar/Sudhakar/Samykano, 3 papers relacionados) para sacarle provecho a la duda abierta del PR>100% en Teusaquillo (fachada CdTe vertical, un documento interno de diagnóstico). Se descargó y leyó el texto completo (no solo el resumen) de uno de los papers — corrección importante: usa **PVGIS**, no la referencia estándar internacional como el usuario asumía inicialmente. La literatura real (3 estudios, mismo grupo de autores, clima tropical de Malasia) nunca reporta PR por encima de 78% para CdTe BIPV, ni en techo ni en fachada (rango real: 66,4%-77,4%).
 
 **Verificación implementada**: `calculos/modelo_jrc_cdte.py` reimplementa el power-rating model de Huld et al. (2011) con los coeficientes específicos de CdTe citados en el paper (t1 a t6, más n=23,37/n*=5,44 para el modelo de temperatura Faiman) — un modelo completamente independiente del SDM De Soto que usa el motor principal de la app. `scripts/verificar_jrc_cdte.py <slug>` lo corre sobre el TMY REAL de Bogotá (mismo pipeline `calculos.solar` que usa la app en producción, POA coincide exactamente: 807,8 kWh/m²/año).
 
 **Generalizado el mismo día** (pedido explícito: "generalízalo para leer cualquier proyecto guardado"): ya no está fijo a Teusaquillo — `extraer_parametros_proyecto()` lee cualquier proyecto de `datos/proyectos/*.json` (panel, ciudad, geometría, potencia STC), rechazando con mensaje claro si el panel no es CdTe o si falta Dimensionamiento. `--listar` muestra los proyectos disponibles. Verificado que reproduce el mismo resultado exacto (PR=89,41%) al correrlo contra un JSON sintético con los valores reales de Teusaquillo.
 
-**Resultado real**: el modelo JRC/Huld da PR=89,4% (vs. 100,6% del motor principal) — 11,2 puntos más bajo, para los MISMOS datos horarios reales. Sigue por encima de la literatura tropical (66-77%), pero eso tiene explicación física razonable (Bogotá es mucho más fría que Malasia, y CdTe rinde mejor en frío). La brecha de 11 puntos frente a un modelo independiente, sí calibrado para CdTe, es evidencia (no prueba definitiva) de que el >100% es un artefacto de la curva FF-vs-irradiancia calibrada del ASP-ST1-T40 en el SDM, no un comportamiento físico genuino. El resultado real de PVsyst sigue pendiente y sería el punto de comparación más decisivo.
+**Resultado real**: el modelo JRC/Huld da PR=89,4% (vs. 100,6% del motor principal) — 11,2 puntos más bajo, para los MISMOS datos horarios reales. Sigue por encima de la literatura tropical (66-77%), pero eso tiene explicación física razonable (Bogotá es mucho más fría que Malasia, y CdTe rinde mejor en frío). La brecha de 11 puntos frente a un modelo independiente, sí calibrado para CdTe, es evidencia (no prueba definitiva) de que el >100% es un artefacto de la curva FF-vs-irradiancia calibrada del ASP-ST1-T40 en el SDM, no un comportamiento físico genuino. El resultado real de la referencia estándar internacional sigue pendiente y sería el punto de comparación más decisivo.
 
 6 tests nuevos anclados a condiciones STC exactas (P=P_STC cuando I'=1, T'=0) y casos sintéticos. Suite completa: **827/827**. Herramienta de diagnóstico puntual en `scripts/`, no integrada a la UI de la app. Ver `DIAGNOSTICO_VERIFICACION_JRC_CDTE_TEUSAQUILLO.md`.
 
-**Decisión explícita del usuario sobre integrarlo a la app**: se le explicó qué ganaría si el modelo JRC quedara instalado como función permanente (segunda opinión automática por proyecto sin depender de PVsyst, una alerta tipo la de relación DC/AC si el PR del motor principal se aleja del modelo independiente, respaldo citable frente a un evaluador externo, guardia de calidad para futuros paneles CdTe del catálogo) y qué NO — solo aplica a tecnología CdTe, no a c-Si/CIS, y es una segunda opinión, no un tribunal, puede diferir del motor principal por razones legítimas. El usuario decidió dejarlo **solo como herramienta de diagnóstico manual** (correr `scripts/verificar_jrc_cdte.py <slug>` a mano, con `--listar` para ver los proyectos disponibles), sin integrarlo a la UI ni agregar la alerta automática, hasta tener el resultado real de PVsyst.
+**Decisión explícita del usuario sobre integrarlo a la app**: se le explicó qué ganaría si el modelo JRC quedara instalado como función permanente (segunda opinión automática por proyecto sin depender de la referencia estándar internacional, una alerta tipo la de relación DC/AC si el PR del motor principal se aleja del modelo independiente, respaldo citable frente a un evaluador externo, guardia de calidad para futuros paneles CdTe del catálogo) y qué NO — solo aplica a tecnología CdTe, no a c-Si/CIS, y es una segunda opinión, no un tribunal, puede diferir del motor principal por razones legítimas. El usuario decidió dejarlo **solo como herramienta de diagnóstico manual** (correr `scripts/verificar_jrc_cdte.py <slug>` a mano, con `--listar` para ver los proyectos disponibles), sin integrarlo a la UI ni agregar la alerta automática, hasta tener el resultado real de la referencia estándar internacional.
 
 ## 25i. Anexo — Actualizaciones del 31 de agosto de 2026 (auditoría de la alerta de vigencia: 2 páginas sin cubrir + 1 riesgo de falso positivo)
 
@@ -4223,17 +4224,17 @@ Auditoría real con fichas MUST (PV3500/PV3600/PV3300 TLV Series) pedidas por el
 
 ## 32. Anexo — Actualizaciones del 30 de agosto de 2026 (Motor Óptico: default de montaje k_BIPV; ficha de conversión a referencia estándar)
 
-Versión anterior (30 de agosto de 2026): 🔆 Motor Óptico — corregido default binario de "Tipo de montaje"/k_BIPV: antes solo "Granja fotovoltaica" defaulteaba a Ventilado libre (k=1,0); los otros 5 tipos, incluidos Techo plano con soporte, Pérgola/sombreadero y Marquesina/voladizo (estructuras elevadas y ventiladas, no fachadas selladas), heredaban Fachada confinada (k=1,3) sin justificación física. Ahora solo Fachada BIPV y Techo inclinado (BIPV) defaultean a k=1,3. Además, para poder validar proyectos BIPV contra una referencia estándar internacional (cuyo catálogo no trae paneles BIPV): nueva tabla de equivalencia k_BIPV↔Uc/Uv y `calculos/ficha_pvsyst.py::generar_ficha_conversion_pvsyst()`, que genera por panel los parámetros de datasheet + el ajuste térmico Uc/Uv sugerido para crear el módulo custom equivalente en esa referencia.
+Versión anterior (30 de agosto de 2026): 🔆 Motor Óptico — corregido default binario de "Tipo de montaje"/k_BIPV: antes solo "Granja fotovoltaica" defaulteaba a Ventilado libre (k=1,0); los otros 5 tipos, incluidos Techo plano con soporte, Pérgola/sombreadero y Marquesina/voladizo (estructuras elevadas y ventiladas, no fachadas selladas), heredaban Fachada confinada (k=1,3) sin justificación física. Ahora solo Fachada BIPV y Techo inclinado (BIPV) defaultean a k=1,3. Además, para poder validar proyectos BIPV contra una referencia estándar internacional (cuyo catálogo no trae paneles BIPV): nueva tabla de equivalencia k_BIPV↔Uc/Uv y una función interna, que genera por panel los parámetros de datasheet + el ajuste térmico Uc/Uv sugerido para crear el módulo custom equivalente en esa referencia.
 
-🔴 **Auto-auditoría contra el plan original, pedida explícitamente por el usuario ("cero fallas, cero incoherencias")**: encontrado 1 bug real en `ficha_pvsyst.py` recién agregado — leía solo el esquema de campos del catálogo Excel (`marca`, `Imp`, sin coeficiente de Isc); el panel REAL de Teusaquillo (`ASP-ST1-T40`, esquema `MODULOS_BIPV`: `fabricante`, `Imp_stc`, `Tk_alfa`) habría mostrado "—" en Fabricante/Imp y "μIsc no disponible" pese a que esos 3 datos sí existen. Se encontró precisamente porque la Fase 3 del plan pedía anclar el test al caso real de Teusaquillo — el test original (recién escrito) usaba el panel de Urabá (esquema Excel) como fixture, lo que ocultó el bug hasta hacer la auditoría con el panel correcto. Corregido con el mismo fallback `Tk_alfa or alpha_sc` que ya usa `modelo_iv.py:449`. 4 tests nuevos anclados al panel real de Teusaquillo.
+🔴 **Auto-auditoría contra el plan original, pedida explícitamente por el usuario ("cero fallas, cero incoherencias")**: encontrado 1 bug real en un módulo interno recién agregado — leía solo el esquema de campos del catálogo Excel (`marca`, `Imp`, sin coeficiente de Isc); el panel REAL de Teusaquillo (`ASP-ST1-T40`, esquema `MODULOS_BIPV`: `fabricante`, `Imp_stc`, `Tk_alfa`) habría mostrado "—" en Fabricante/Imp y "μIsc no disponible" pese a que esos 3 datos sí existen. Se encontró precisamente porque la Fase 3 del plan pedía anclar el test al caso real de Teusaquillo — el test original (recién escrito) usaba el panel de Urabá (esquema Excel) como fixture, lo que ocultó el bug hasta hacer la auditoría con el panel correcto. Corregido con el mismo fallback `Tk_alfa or alpha_sc` que ya usa `modelo_iv.py:449`. 4 tests nuevos anclados al panel real de Teusaquillo.
 
-Además, la auditoría encontró 1 desviación real (no un bug, una decisión de alcance no confirmada) del plan original: el default de k_BIPV para Pérgola/Marquesina había quedado en k=1,0 (ventilado libre pleno), pero el plan original describía "Pérgola/Marquesina → semi-ventilado" — un nivel intermedio. Puesto a elegir explícitamente, el usuario pidió ser fiel al plan: `K_BIPV_POR_MONTAJE` gana un 4to valor real, **"Semi-ventilado (k=1,15)"**, documentado como interpolación sin calibración propia (no un dato medido); nueva función pura `indice_montaje_default()` resuelve el default por valor de k_BIPV en vez de por índice fijo. Tabla de equivalencia Uc/Uv extendida a 4 filas. 5 tests de `test_motor_optico.py` (reemplazan a los 4 anteriores) + 1 test nuevo de equivalencia en `test_ficha_pvsyst.py`.
+Además, la auditoría encontró 1 desviación real (no un bug, una decisión de alcance no confirmada) del plan original: el default de k_BIPV para Pérgola/Marquesina había quedado en k=1,0 (ventilado libre pleno), pero el plan original describía "Pérgola/Marquesina → semi-ventilado" — un nivel intermedio. Puesto a elegir explícitamente, el usuario pidió ser fiel al plan: `K_BIPV_POR_MONTAJE` gana un 4to valor real, **"Semi-ventilado (k=1,15)"**, documentado como interpolación sin calibración propia (no un dato medido); nueva función pura `indice_montaje_default()` resuelve el default por valor de k_BIPV en vez de por índice fijo. Tabla de equivalencia Uc/Uv extendida a 4 filas. 5 tests de `test_motor_optico.py` (reemplazan a los 4 anteriores) + 1 test nuevo de equivalencia en un módulo interno.
 
 19 tests nuevos en total entre ambas rondas de esta auditoría. Suite completa: **759/759**. Ver sección 7 y `DIAGNOSTICO_MODELO_TERMICO_UC_UV.md`.
 
 ## 32b. Anexo — Actualizaciones del 30 de agosto de 2026 (redacción legal ampliada: nombre de la referencia estándar quitado del texto de usuario en 3 páginas más y en la ficha generada)
 
-🟣 Pedida explícitamente por el usuario ("por cuestiones legales"): al preguntar si `ficha_pvsyst.py` era visible en algún módulo, se auditó TODA la app con `grep` (no solo el archivo preguntado) y se encontraron **3 fugas reales del nombre de la referencia estándar en texto de UI** que el fix del 29-ago-2026 (solo cubrió la alarma DC/AC) había dejado pasar: caption de 🌳 Sombras SketchUp, tooltip de "Factor mismatch" en 🔀 Mismatch, y texto del expander "Modelo P90" en 💰 Financiero — las 3 corregidas a "referencia estándar internacional". Además, el usuario decidió explícitamente que `ficha_pvsyst.py` (que no es visible en la app, solo se genera bajo demanda) también debe redactar ese nombre en TODO el texto que genera, pese al costo funcional real: ya no cita la ruta de menú exacta del software de referencia, solo indica que existe una sección de pérdidas térmicas donde introducir Uc/Uv. **Se encontró además que este mismo archivo (`base_conocimiento_asistente.md`) es el corpus que lee el chatbot 🧭 Asistente y puede citarlo textualmente a un cliente real** — no es documentación puramente interna como los `DIAGNOSTICO_*.md` de la raíz del repo. Se redactaron las ~40 apariciones acumuladas de varias sesiones en este archivo, y se renombró `DIAGNOSTICO_VALIDACION_TEUSAQUILLO_PVSYST.md` → `DIAGNOSTICO_VALIDACION_TEUSAQUILLO_REFERENCIA_ESTANDAR.md` (era citado por nombre desde aquí). 1 test nuevo ancla que la ficha generada nunca nombra la referencia. Suite completa: **760/760**. Ver `DIAGNOSTICO_MODELO_TERMICO_UC_UV.md`, sección (e).
+🟣 Pedida explícitamente por el usuario ("por cuestiones legales"): al preguntar si un módulo interno era visible en algún módulo, se auditó TODA la app con `grep` (no solo el archivo preguntado) y se encontraron **3 fugas reales del nombre de la referencia estándar en texto de UI** que el fix del 29-ago-2026 (solo cubrió la alarma DC/AC) había dejado pasar: caption de 🌳 Sombras SketchUp, tooltip de "Factor mismatch" en 🔀 Mismatch, y texto del expander "Modelo P90" en 💰 Financiero — las 3 corregidas a "referencia estándar internacional". Además, el usuario decidió explícitamente que un módulo interno (que no es visible en la app, solo se genera bajo demanda) también debe redactar ese nombre en TODO el texto que genera, pese al costo funcional real: ya no cita la ruta de menú exacta del software de referencia, solo indica que existe una sección de pérdidas térmicas donde introducir Uc/Uv. **Se encontró además que este mismo archivo (`base_conocimiento_asistente.md`) es el corpus que lee el chatbot 🧭 Asistente y puede citarlo textualmente a un cliente real** — no es documentación puramente interna como los `DIAGNOSTICO_*.md` de la raíz del repo. Se redactaron las ~40 apariciones acumuladas de varias sesiones en este archivo, y se renombró un documento interno de diagnóstico → `DIAGNOSTICO_VALIDACION_TEUSAQUILLO_REFERENCIA_ESTANDAR.md` (era citado por nombre desde aquí). 1 test nuevo ancla que la ficha generada nunca nombra la referencia. Suite completa: **760/760**. Ver `DIAGNOSTICO_MODELO_TERMICO_UC_UV.md`, sección (e).
 
 
 ────────────────────────────────────────────────────────────
@@ -4682,12 +4683,12 @@ Si un recuadro mostraba cifras como «(48.76MCOP)|TIR:∗∗16.8» en letra curs
 
 ### PVGIS 5.2 o 5.3 — qué es y por qué se puede elegir
 
-**Qué es:** PVGIS es la base de datos gratuita de la Comisión Europea (JRC) de donde ☀️ Recurso Solar descarga el **año típico** (TMY): 8.760 horas de sol, temperatura y viento de un año «representativo» del sitio. Hay dos versiones en servicio: **5.2** y **5.3**. **PVsyst 8 descarga PVGIS 5.3**; la app descargaba siempre 5.2.
+**Qué es:** PVGIS es la base de datos gratuita de la Comisión Europea (JRC) de donde ☀️ Recurso Solar descarga el **año típico** (TMY): 8.760 horas de sol, temperatura y viento de un año «representativo» del sitio. Hay dos versiones en servicio: **5.2** y **5.3**. **La referencia estándar internacional descarga PVGIS 5.3**; la app descargaba siempre 5.2.
 
 **Por qué importa:** cada versión arma su propio año típico. Para cada mes escoge, entre todos los años de su periodo, el mes más representativo; como las dos versiones tienen bases de radiación y periodos distintos, escogen años distintos. El total del año suele parecerse; el reparto mes a mes no.
 
 **Qué hace la app ahora:** en ☀️ Recurso Solar aparece «🛰️ Versión de PVGIS».
-- **Proyecto nuevo:** 5.3 (la misma de PVsyst 8).
+- **Proyecto nuevo:** 5.3 (la misma de la referencia estándar internacional).
 - **Proyecto guardado antes del 29-sep-2026:** 5.2, con la que se calculó; sus resultados no cambian. La versión se guarda con el proyecto.
 - **Cambiar la versión** borra el recurso solar y todo lo que depende de él (producción, financiero, CO₂), igual que cambiar las coordenadas. Hay que volver a presionar «🌐 Descargar TMY de PVGIS».
 
@@ -4697,17 +4698,17 @@ Debajo de la tabla de irradiancia mensual está el recuadro con la versión, la 
 
 **Qué hacer:** si dos estudios del mismo sitio no coinciden mes a mes, mira el año escogido para cada mes en los dos. Si son años distintos, la diferencia mensual es del clima, no del cálculo.
 
-### PVGIS 5.2 o 5.3 — comparar la app con un informe de PVsyst (caso Apartadó)
+### PVGIS 5.2 o 5.3 — comparar la app con un informe de la referencia estándar internacional (caso Apartadó)
 
-**Ejemplo real (29-sep-2026):** proyecto agrivoltaico de Apartadó, 7.8830 / −76.6259, calculado en PVsyst 8.1.5. Con PVGIS 5.2 la app obtuvo GHI **1,606** kWh/m² y POA frontal **1,607** kWh/m²; PVsyst, con PVGIS 5.3, **1,683** y **1,716** (−4.6 % y −6.4 %). La verificación cruzada de la app con PVWatts (NSRDB de NREL) dio **1,707** kWh/m² de POA frontal: casi lo mismo que PVsyst. La diferencia venía de la base de datos, no del cálculo.
+**Ejemplo real (29-sep-2026):** proyecto agrivoltaico de Apartadó, 7.8830 / −76.6259, calculado en la referencia estándar internacional. Con PVGIS 5.2 la app obtuvo GHI **1,606** kWh/m² y POA frontal **1,607** kWh/m²; la referencia estándar internacional, con PVGIS 5.3, **1,683** y **1,716** (−4.6 % y −6.4 %). La verificación cruzada de la app con PVWatts (NSRDB de NREL) dio **1,707** kWh/m² de POA frontal: casi lo mismo que la referencia estándar internacional. La diferencia venía de la base de datos, no del cálculo.
 
-**La regla en palabras:** para comparar con un informe de PVsyst 8, elige **PVGIS 5.3** y las mismas coordenadas del informe. Así la radiación de partida es la misma y lo que quede de diferencia es del cálculo (pérdidas, temperatura, inversor). Compara primero los valores **anuales**; y el **PR**, que no depende de cuánto sol hay.
+**La regla en palabras:** para comparar con un informe de la referencia estándar internacional, elige **PVGIS 5.3** y las mismas coordenadas del informe. Así la radiación de partida es la misma y lo que quede de diferencia es del cálculo (pérdidas, temperatura, inversor). Compara primero los valores **anuales**; y el **PR**, que no depende de cuánto sol hay.
 
 ## 80. Dimensionamiento: «Proyecto completo» cuenta strings que caben, no inversores llenos (29-sep-2026)
 
 ### Proyecto completo — qué pasaba (caso Apartadó)
 
-**Qué pasaba:** «🏭 Proyecto completo» de 📐 Dimensionamiento armaba un inversor con todos sus MPPT llenos y redondeaba hacia arriba cuántos inversores cabían. En el proyecto agrivoltaico de Apartadó (2,393 m² × 40 % = 957 m² útiles; JA Solar JAM66D46-720/LB, 28 en serie; Growatt MAX 100KTL3 LV con 10 MPPT) un inversor lleno son 280 módulos en 870 m², y la página decía **2 inversores, 560 módulos, 403 kWp en 1,740 m²**: casi el doble de lo que cabe. PVsyst tiene **308 módulos (11 strings), 222 kWp**. La «Cobertura 100 %» escondía el exceso porque tenía tope.
+**Qué pasaba:** «🏭 Proyecto completo» de 📐 Dimensionamiento armaba un inversor con todos sus MPPT llenos y redondeaba hacia arriba cuántos inversores cabían. En el proyecto agrivoltaico de Apartadó (2,393 m² × 40 % = 957 m² útiles; JA Solar JAM66D46-720/LB, 28 en serie; Growatt MAX 100KTL3 LV con 10 MPPT) un inversor lleno son 280 módulos en 870 m², y la página decía **2 inversores, 560 módulos, 403 kWp en 1,740 m²**: casi el doble de lo que cabe. La referencia estándar internacional tiene **308 módulos (11 strings), 222 kWp**. La «Cobertura 100 %» escondía el exceso porque tenía tope.
 
 **Por qué importa:** ese total de módulos llega a 📊 Producción, al ⚡ Diagrama Unifilar, a la 📋 Ficha RETIE y a los comparadores. Una potencia inflada un 82 % infla la energía y el financiero.
 
@@ -4715,9 +4716,9 @@ Debajo de la tabla de irradiancia mensual está el recuadro con la versión, la 
 
 1. **Strings:** si escribiste «N total de cadenas», se usan esas. Si no, los strings completos que caben: área útil ÷ (módulos en serie × área de un módulo), redondeado **hacia abajo**. Apartadó: 957 ÷ (28 × 3.106) = 11.0 → **11 strings**.
 2. **Inversores:** strings ÷ strings que admite un inversor (MPPT × strings por MPPT), redondeado hacia arriba. Apartadó: 11 ÷ 10 → **2 inversores**.
-3. **Reparto parejo:** 11 strings en 2 inversores → **6 + 5**, igual que PVsyst.
+3. **Reparto parejo:** 11 strings en 2 inversores → **6 + 5**, igual que la referencia estándar internacional.
 4. **Módulos y potencia:** 11 × 28 = **308 módulos**; 308 × 720 W = **221.8 kWp**; área 957 m² (cobertura 100 %).
-5. **Relación DC/AC del proyecto:** potencia DC total ÷ potencia AC de todos los inversores: 221.8 ÷ (2 × 100) = **1.11** 🟢, la «Proporción Pnom» de PVsyst. También se muestra el inversor más cargado (6 strings: 121 kWp ÷ 100 = 1.21).
+5. **Relación DC/AC del proyecto:** potencia DC total ÷ potencia AC de todos los inversores: 221.8 ÷ (2 × 100) = **1.11** 🟢, la «Proporción Pnom» de la referencia estándar internacional. También se muestra el inversor más cargado (6 strings: 121 kWp ÷ 100 = 1.21).
 
 ### Proyecto completo — cómo leerlo en pantalla y qué hacer
 
@@ -4727,27 +4728,27 @@ Debajo de la tabla de irradiancia mensual está el recuadro con la versión, la 
 - Si no cabe ni un string, el aviso 🔴 dice cuántos m² necesita uno.
 - Para que la relación DC/AC aparezca, el inversor debe tener su potencia AC en 📋 Catálogo Inversores.
 
-## 81. Calidad del módulo y mismatch por separado, como PVsyst (29-sep-2026)
+## 81. Calidad del módulo y mismatch por separado, como la referencia estándar internacional (29-sep-2026)
 
 ### Calidad del módulo y mismatch — qué es cada una
 
-**Qué es:** son dos pérdidas distintas del módulo, que PVsyst muestra en dos filas de su diagrama de pérdidas:
+**Qué es:** son dos pérdidas distintas del módulo, que la referencia estándar internacional muestra en dos filas de su diagrama de pérdidas:
 - **Calidad del módulo** («Module quality loss»): cuánto rinde el módulo real frente a lo que dice su ficha. Si el fabricante entrega módulos con tolerancia positiva (por ejemplo 0/+5 W), puede ser **negativa**, es decir, una ganancia.
 - **Mismatch** («Mismatch loss, modules and strings»): los módulos de un string y los strings de un MPPT no son idénticos; la corriente la marca el más débil y se pierde un poco.
 
-**Por qué se separaron:** antes la app tenía un solo control, «Mismatch de fabricación», de 0 a 3 %. Un informe de PVsyst con las dos pérdidas no se podía copiar.
+**Por qué se separaron:** antes la app tenía un solo control, «Mismatch de fabricación», de 0 a 3 %. Un informe de la referencia estándar internacional con las dos pérdidas no se podía copiar.
 
 ### Calidad del módulo y mismatch — fórmula en palabras y caso Apartadó
 
 **La fórmula en palabras:** la potencia del módulo se multiplica primero por (1 − calidad) y después por (1 − mismatch). No se suman: se aplican una detrás de la otra.
 
-**Ejemplo real:** en el informe de PVsyst del proyecto agrivoltaico de Apartadó la calidad es 3.00 % y el mismatch 2.10 %. Juntas: 0.97 × 0.979 = 0.950, una pérdida de **5.04 %**. Con el control único, que llegaba a 3 %, la app daba unos 2 % más energía que PVsyst solo por esto.
+**Ejemplo real:** en el informe de la referencia estándar internacional del proyecto agrivoltaico de Apartadó la calidad es 3.00 % y el mismatch 2.10 %. Juntas: 0.97 × 0.979 = 0.950, una pérdida de **5.04 %**. Con el control único, que llegaba a 3 %, la app daba unos 2 % más energía que la referencia estándar internacional solo por esto.
 
 ### Calidad del módulo y mismatch — cómo leerlo en pantalla y qué hacer
 
 - En 🔀 Mismatch, sección «⚙️ 3. Otras pérdidas del sistema», hay dos controles: «🏷️ Calidad del módulo» (−2 a 5 %) y «🔩 Mismatch módulos y strings» (0 a 4 %).
 - En 📊 Producción, el diagrama de pérdidas muestra la fila «②c0 Calidad del módulo» y la fila «②c Mismatch módulos y strings», cada una con sus kWh.
-- **Qué hacer:** para comparar con PVsyst, copia los dos valores de su página «PV Array Characteristics». Si no tienes datos del fabricante, deja la calidad en 0 y el mismatch entre 1 y 2 %.
+- **Qué hacer:** para comparar con la referencia estándar internacional, copia los dos valores de su página «PV Array Characteristics». Si no tienes datos del fabricante, deja la calidad en 0 y el mismatch entre 1 y 2 %.
 - Los proyectos guardados antes de este cambio quedan con calidad 0: su energía no cambia.
 
 ## 82. Temperaturas de diseño de Dimensionamiento: de dónde salen y por qué ya no se pierden (29-sep-2026)
@@ -4763,7 +4764,7 @@ Debajo de la tabla de irradiancia mensual está el recuadro con la versión, la 
 
 ### Temperaturas de diseño — qué pasaba antes (salían 20 / 55 / 64 o en cero)
 
-El 29-sep-2026, en la comparación con PVsyst de Apartadó, salieron en 0 y luego en **20.0 / 55.0 / 64.0**, los valores fijos de referencia de la ciudad. Con 20.0 °C el Voc sube a 1,389 V, el margen baja a 7.4 % y N = 28 salía en ALERTA («Ningún N válido»). Tres causas, ya corregidas:
+El 29-sep-2026, en la comparación con la referencia estándar internacional de Apartadó, salieron en 0 y luego en **20.0 / 55.0 / 64.0**, los valores fijos de referencia de la ciudad. Con 20.0 °C el Voc sube a 1,389 V, el margen baja a 7.4 % y N = 28 salía en ALERTA («Ningún N válido»). Tres causas, ya corregidas:
 1. Al abrir otra página se borraba el valor de los campos y al volver quedaban los de la ciudad.
 2. «💾 Guardar configuración» de 🏠 Proyecto escribía los valores de la ciudad encima de los del año típico.
 3. Solo se recalculaban al cambiar de ciudad; no al cambiar la versión de PVGIS, las coordenadas o el panel.
@@ -4774,6 +4775,83 @@ El 29-sep-2026, en la comparación con PVsyst de Apartadó, salieron en 0 y lueg
 - Si dice «Sin año típico», abre primero ☀️ Recurso Solar (restaura el año típico en segundos) y vuelve a 📐 Dimensionamiento: se recalculan solas.
 - Puedes escribirlas a mano (por ejemplo, la mínima histórica de una estación del IDEAM): la app las respeta mientras no cambie el año típico ni el panel.
 - Se guardan con el proyecto.
+
+## 83. Motor Óptico — constantes y métricas explicadas con cálculos simples (29-sep-2026)
+
+Guía de 🔆 Motor Óptico para quien está aprendiendo: qué es cada constante, la fórmula en palabras, un cálculo con números y cómo leerla en pantalla. Ejemplo real: el proyecto agrivoltaico de Apartadó (JA Solar JAM66D46-720/LB, 10° al sur, comparado con la referencia estándar internacional).
+
+### Motor Óptico — b₀: el coeficiente del vidrio (IAM directo, fórmula ASHRAE)
+
+**Qué es:** el vidrio refleja más luz cuanto más inclinado llega el rayo. **b₀** dice cuánto refleja ese vidrio. IAM (Incidence Angle Modifier) es la fracción que sí entra.
+
+**Fórmula en palabras:** fracción que entra = 1 − b₀ × (1 ÷ coseno del ángulo − 1). El ángulo se mide entre el rayo y la perpendicular al panel.
+
+**Cálculo con b₀ = 0,05 (vidrio templado estándar):**
+
+| Ángulo | 1 ÷ cos | Cuenta | IAM | la referencia estándar internacional «Fresnel, n = 1,526» |
+|---|---|---|---|---|
+| 0° | 1,000 | 1 − 0,05 × 0 | 1,000 | 1,000 |
+| 30° | 1,155 | 1 − 0,05 × 0,155 | 0,992 | 0,998 |
+| 60° | 2,000 | 1 − 0,05 × 1,000 | 0,950 | 0,948 |
+| 70° | 2,924 | 1 − 0,05 × 1,924 | 0,904 | 0,862 |
+| 80° | 5,759 | 1 − 0,05 × 4,759 | 0,762 | 0,636 |
+
+Hasta 60° dan casi lo mismo; en ángulos muy rasantes la referencia estándar internacional pierde más, pero esas horas traen poca energía. Con b₀ = 0,12 (vidrio laminado de CdTe), a 60° entra 1 − 0,12 × 1 = **0,88**. **En pantalla:** «b₀ ASHRAE seleccionado» y la métrica «Pérdida IAM total». En Apartadó la referencia estándar internacional reporta −2,35 % por IAM.
+
+### Motor Óptico — IAM difusa (f_iam_dif = 0,95)
+
+**Qué es:** la luz difusa (la del cielo, las nubes) llega de todas las direcciones a la vez, así que no tiene un solo ángulo. Se usa un factor promedio fijo: **0,95** para vidrio plano (norma IEC 61853-3); 0,90–0,93 para vidrio texturado o CdTe laminado.
+
+**Cálculo:** por cada 100 kWh/m² de luz difusa sobre el panel se pierden 100 × (1 − 0,95) = **5 kWh/m²**. En Apartadó la difusa horizontal del año es 704 kWh/m² (la referencia estándar internacional); del orden de 35 kWh/m² se perderían por este factor.
+
+### Motor Óptico — suciedad (soiling) y auto-limpieza vertical
+
+**Qué es:** polvo y contaminación que tapan el vidrio. La app usa un porcentaje por mes para Colombia: enero 5 %, febrero 6 %, marzo 4 %, abril 2 %, mayo 2 %, junio 4 %, julio 5 %, agosto 6 %, septiembre 4 %, octubre 2 %, noviembre 1 %, diciembre 4 % (promedio **3,75 %**). Una superficie de 75° o más se ensucia menos (la lluvia la lava): se multiplica por el factor de auto-limpieza, **0,65**.
+
+**Cálculo:** febrero en un techo: la luz se multiplica por 1 − 0,06 = **0,94**. Febrero en una fachada vertical: 6 % × 0,65 = 3,9 % → × **0,961**. **Qué hacer:** para comparar con un informe de la referencia estándar internacional que no trae suciedad, marca «Usar factores de soiling personalizados» y pon 0 en los 12 meses.
+
+### Motor Óptico — transparencia τ (área sin celda)
+
+**Qué es:** en un vidrio BIPV semitransparente, parte del área no tiene celda y deja pasar la luz sin producir. El «Factor de área activa» es 1 − τ.
+
+**Cálculo:** con τ = 20 %, de 1.000 kWh/m² solo 1.000 × 0,80 = **800 kWh/m²** caen sobre celda. Un módulo opaco (como el JA Solar) lleva τ = 0 %.
+
+### Motor Óptico — temperatura de la celda: NOCT, k_BIPV y γ
+
+**Fórmula en palabras:** temperatura de la celda = temperatura del aire + luz × (NOCT − 20) ÷ 800 × k_BIPV. NOCT es la temperatura que alcanza el panel con 800 W/m², 20 °C de aire y 1 m/s de viento (dato de la ficha). k_BIPV dice cuánto peor se ventila que un panel libre (1,0 libre; 1,15 semi-ventilado; 1,3 fachada confinada; 1,5 sellado).
+
+**Cálculo (Apartadó, NOCT 45 °C, k = 1,15, mediodía con 30 °C y 800 W/m²):** 30 + 800 × (45 − 20) ÷ 800 × 1,15 = 30 + 28,75 = **58,75 °C**.
+
+**Cuánto pierde:** γ es cuánto baja la potencia por cada °C sobre 25 °C (ficha: −0,29 %/°C). En esa hora: (58,75 − 25) × 0,29 % = **9,8 %** menos potencia. En el año la referencia estándar internacional reporta −6,52 % por temperatura: las mañanas y las tardes son más frescas que el mediodía.
+
+### Motor Óptico — Uc y Uv de la referencia estándar internacional y su equivalente k_BIPV
+
+**Qué es:** la referencia estándar internacional no usa NOCT; usa un balance de calor: temperatura de la celda = aire + luz × α × (1 − η) ÷ (Uc + Uv × viento).
+- **α** = 0,9: fracción de la luz que el panel absorbe.
+- **η**: eficiencia del módulo (JA Solar 720 W: 23,2 %).
+- **Uc** (W/m²K): cuánto calor pierde el panel por cada grado, sin viento. Más alto = mejor ventilado. Libre (free standing) 29; semi-integrado 20; integrado 15.
+- **Uv**: lo que suma el viento (en el informe de Apartadó, 0).
+
+**Cálculo (Apartadó, Uc = 20, Uv = 0):** grados por cada W/m² = 0,9 × (1 − 0,232) ÷ 20 = **0,0346**. Con 800 W/m²: 0,0346 × 800 = **27,6 °C** sobre el aire.
+
+**En la app:** grados por cada W/m² = (NOCT − 20) ÷ 800 × k = (45 − 20) ÷ 800 × k = **0,03125 × k**.
+- Con k = 1,0: 0,0313 → **10 % menos caliente** que la referencia estándar internacional (25,0 °C sobre el aire a 800 W/m²).
+- Con k = 1,15: 0,0359 → **4 % más caliente** (28,7 °C).
+- Con k = 1,3: 0,0406 → **17,5 % más caliente** (32,5 °C).
+
+**Por eso k = 1,15 es la opción más cercana al Uc = 20 de ese informe.** La fórmula para cualquier caso: k equivalente = α × (1 − η) ÷ Uc ÷ ((NOCT − 20) ÷ 800). Con NOCT 45 °C y η 23,2 %: Uc 29 → k 0,76; Uc 24,5 → k 0,90; Uc 20 → k 1,11; Uc 15 → k 1,47. La tabla de «presets» por tipo de montaje (sección más arriba) es solo orientativa: para igualar un informe concreto usa esta fórmula.
+
+### Motor Óptico — cómo leer las métricas de la pantalla
+
+La cascada va de la luz que llega a la que usa la celda, en kWh/m² al año:
+1. **POA bruta:** luz sobre el plano del panel, sin correcciones (☀️ Recurso Solar).
+2. **Pérdida IAM total:** lo que refleja el vidrio (directa con b₀ + difusa con f_iam_dif).
+3. **Pérdida soiling:** lo que tapa la suciedad.
+4. **Pérdida térmica:** la potencia que se pierde por calor, expresada como kWh/m² equivalentes.
+5. **POA efectiva → Producción:** lo que queda. 📊 Producción recibe la POA sin el término térmico y calcula la temperatura una sola vez en su modelo eléctrico, para no contarla dos veces.
+6. **Factor de área activa (1 − τ)** y **POA aprovechable por la celda:** solo cambian si el vidrio es semitransparente.
+
+«Factores promedio (horas con sol)» muestra cada factor como fracción (por ejemplo, Factor IAM promedio 0,97 = pierde 3 %).
 
 Calculadora BIPV — Innovación Química
 

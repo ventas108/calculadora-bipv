@@ -63,6 +63,19 @@ Regla de consumo:
 	`P_ac_nom_W` sale solo de la ficha del catálogo (`calculos/potencia_ac_inversor.py`);
 	no se estima con `P_dc_max_W`. Sin el dato, la relación DC/AC es «no evaluable»
 	y la página explica dónde completarlo.
+- Proyecto completo (29-sep-2026, Spec `03-dimensionamiento/proyecto-completo`):
+	`calculos/dimensionamiento.proyecto_completo` cuenta strings completos (los
+	declarados en «N total de cadenas» o ⌊área útil ÷ (N_serie × área del
+	módulo)⌋), inversores = ⌈strings ÷ (MPPT × strings por MPPT)⌉ y reparto
+	parejo. Publica `N_inv_total`, `N_paneles_granja`, `P_dc_total_kWp` y
+	`reparto_strings_inversores`; nunca más módulos de los que caben sin
+	cadenas declaradas. La relación DC/AC se evalúa con el sistema real.
+- Temperaturas de diseño (29-sep-2026, Spec `03-dimensionamiento/temperaturas-diseno`):
+	`T_min_diseno`, `T_cel_realista` y `T_cel_extremo` son claves de datos (se
+	guardan con el proyecto); sus campos usan `campo_persistente`. Se recalculan
+	desde el TMY solo si cambia `dim_temps_tmy_firma` (T2m del TMY + NOCT), si
+	falta alguna o si las tres están en 0. «Guardar configuración» de
+	🏠 Proyecto no las pisa si hay firma; el cambio de ciudad borra la firma.
 
 ### 04-produccion-energia
 
@@ -94,6 +107,18 @@ Regla de consumo:
 - Con Motor Óptico activo, Producción y bypass consumen solo
 	`poa_sin_termico_df`; el término térmico se calcula una única vez dentro del
 	SDM. Recalcular la cascada invalida resultados dependientes de su POA.
+- Pérdidas de módulo (29-sep-2026, Spec `05-perdidas-y-temperatura/calidad-y-mismatch`):
+	`pct_calidad_modulo` («Module quality loss», −2 a 5 %, por defecto 0) y
+	`pct_mismatch_fab` («Mismatch loss, modules and strings», 0 a 4 %). Los dos
+	motores de Producción las aplican en cadena sobre Pmax
+	(`(1 − calidad)(1 − mismatch)`); consumidores sin motor propio (cadena
+	multi-superficie, comparadores, 🤖 Análisis IA) usan
+	`calculos.mismatch.pct_perdida_modulos`. La calidad entra en la firma de
+	Producción solo si se aplica.
+- Equivalencia térmica con PVsyst (29-sep-2026): para igualar un informe con
+	Uc/Uv, k_BIPV = α(1 − η)/(Uc + Uv·v) ÷ ((NOCT − 20)/800); la tabla de
+	presets por tipo de montaje del Asistente es solo orientativa (ver sección 83
+	de la base de conocimiento).
 
 #### Energía multi-superficie (Vista 3D)
 

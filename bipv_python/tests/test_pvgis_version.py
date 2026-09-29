@@ -183,7 +183,7 @@ def test_pagina_2_detecta_el_cambio_de_version_y_usa_la_elegida():
 
 # ── Criterio 6: manual del Asistente ─────────────────────────────────────────
 @pytest.mark.parametrize("pregunta, texto", [
-    ("que version de PVGIS usa la app y cual usa PVsyst", "PVsyst 8 descarga PVGIS 5.3"),
+    ("que version de PVGIS usa la app y cual usa PVsyst", "La referencia estándar internacional descarga PVGIS 5.3"),
     ("por que la radiacion de la app no coincide con PVsyst en Apartado", "1,606"),
     ("por que los meses del año tipico TMY no coinciden con PVsyst", "año escogido para cada mes"),
 ])

@@ -441,7 +441,7 @@ with st.expander("🔄 Simulación bifacial (ganancia de la cara trasera)",
 # versión → 5.2 (lo fija proyectos_manager.cargar_proyecto).
 _versiones_pvgis = list(PVGIS_URLS_TMY)
 _etiquetas_pvgis = {
-    "5.3": "PVGIS 5.3 — la que descarga PVsyst 8",
+    "5.3": "PVGIS 5.3 — la que descarga la referencia estándar internacional",
     "5.2": "PVGIS 5.2 — la de los proyectos anteriores al 29-sep-2026",
 }
 pvgis_version = st.radio(
@@ -450,7 +450,7 @@ pvgis_version = st.radio(
     index=_versiones_pvgis[::-1].index(version_pvgis_de_estado(st.session_state)),
     format_func=lambda v: _etiquetas_pvgis.get(v, f"PVGIS {v}"),
     horizontal=True,
-    help="Para comparar con un informe de PVsyst 8 usa 5.3: así la diferencia "
+    help="Para comparar con un informe de la referencia estándar internacional usa 5.3: así la diferencia "
          "que quede es del cálculo y no del clima. Cambiar la versión borra el "
          "recurso solar y todo lo que depende de él.",
 )
