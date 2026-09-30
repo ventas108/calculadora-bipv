@@ -5219,6 +5219,48 @@ La fila «↳ Solo horas calientes» del balance mostraba `Tk_gamma=—%/°C` au
 - **Qué hacer:** para granjas usa siempre el botón después de diseñar el campo. Si quieres compararte con la referencia estándar internacional, pon 5 % y 10 % en la cara trasera. Si cambias la separación o las mesas, vuelve a presionar el botón y recalcula.
 - **Límite conocido:** si hay un horizonte lejano cargado en el modelo bifacial, la app lo aplica a la luz directa sin distinguir la parte ya sombreada por la fila de adelante; el efecto es muy pequeño en granjas de poca inclinación.
 
+## 95. 🌱 Granja FV fase 3: agrivoltaica — luz que llega al cultivo y paso de la maquinaria (30-sep-2026)
+
+### Agrivoltaica — qué es y por qué importa
+
+**Qué es:** en un proyecto agrivoltaico el mismo terreno produce energía **y** comida (o pasto). Los paneles le quitan luz al cultivo. La sección **6 de 🌾 Granja FV** calcula la **luz que llega al cultivo** en cada punto del suelo, bajo las mesas y entre las filas, comparada con el mismo terreno sin paneles, en **%** y en **kWh/m² al año**. También muestra el **mapa de sombra** mes a mes y revisa si la **maquinaria** cabe.
+
+**Por qué importa:** es lo que diferencia de verdad un proyecto agrivoltaico de una granja solar. Un cultivo que necesita mucho sol no crece bien con 40 % de luz; uno de sombra (café, cacao, algunos pastos y hortalizas de hoja) tolera bastante menos luz. Y si el tractor no pasa, el terreno no se puede trabajar.
+
+### Agrivoltaica — fórmula en palabras y cuenta real
+
+- La app mira un **corte de perfil** entre dos filas largas (la misma idea del modelo de filas infinitas) y divide el suelo en 60 franjas.
+- **Luz directa:** cada hora, una franja recibe la luz directa si no cae en la sombra de ninguna fila. La sombra de una mesa en el suelo depende de la altura, la inclinación y la posición del sol.
+- **Luz difusa (del cielo):** cada franja recibe la difusa según la **fracción de cielo** que ve; las filas le tapan una parte del cielo.
+- **% de luz** = luz en la franja ÷ luz del terreno sin paneles (la radiación global horizontal del año típico).
+- **Homogeneidad** = luz del punto más oscuro ÷ luz del punto más iluminado (1 = luz pareja).
+- No se suma la luz que reflejan el suelo y la cara de abajo de los paneles: el resultado queda del lado seguro (unos pocos % por debajo).
+- La app se comprobó contra las funciones de filas de pvlib: la fracción de cielo y la fracción de suelo con sol dan lo mismo.
+
+**Ejemplo (Apartadó):** mesas de 2 módulos, inclinación 10°, separación 6,60 m, GCR 39,8 %, altura libre 2,4 m.
+- Luz media en el suelo ≈ **60 %**. Tiene sentido: los paneles cubren ≈ 40 % del suelo (GCR), así que llega ≈ 1 − 0,40.
+- Bajo las mesas ≈ 40–45 %, entre las filas ≈ 70–74 %, homogeneidad ≈ 0,3–0,45 (luz dispareja: franjas de sombra). El rango depende del clima: con más cielo despejado la sombra es más marcada; con más nubes la luz difusa la suaviza.
+- Si subes la altura libre a 4,0 m, la luz media sigue en ≈ 60 %, pero la homogeneidad sube a ≈ 0,7–0,8: la sombra se reparte en vez de quedarse siempre en el mismo sitio.
+- Si separas las filas a 20 m, la luz media sube a ≈ 87 %.
+
+**Categorías (DIN SPEC 91434, referencia alemana para agrivoltaica):**
+- **Categoría I:** altura libre ≥ **2,10 m**; se cultiva debajo de los paneles.
+- **Categoría II:** altura libre menor; el cultivo va entre las filas.
+- La referencia pide además que el rendimiento agrícola no baje de ≈ 66 % del terreno sin paneles. **Luz no es lo mismo que rendimiento:** cada cultivo responde distinto; consulta al agrónomo.
+
+**Maquinaria:**
+- **Por debajo:** pasa si altura libre ≥ altura de la máquina + 0,30 m. Apartadó: 2,40 m frente a un tractor de 2,50 m, que necesitaría 2,80 m, así que no pasa.
+- **Por el corredor:** pasa si el corredor libre ≥ ancho de la máquina + 0,25 m por lado. Apartadó: corredor 4,01 m frente a una máquina de 2,20 m, que necesita 2,70 m, así que pasa.
+
+### Agrivoltaica — cómo leerlo en pantalla y qué hacer
+
+- **Altura y ancho de la maquinaria:** escribe los de tu máquina más grande (se guardan con el proyecto).
+- **Avisos:** 🟢 categoría I o pasa; 🟡 categoría II; 🟠 la máquina no pasa (por debajo o por el corredor). Si pasa por debajo, el corredor angosto no es problema.
+- **«🌱 Calcular la luz en el suelo»** (necesita el recurso solar de ☀️ Recurso Solar): muestra luz media (%), luz media anual (kWh/m²), bajo las mesas, entre las filas y homogeneidad.
+- **Gráfica de perfil:** la luz de cada punto entre el borde inferior de una mesa y la siguiente; la franja azul es el suelo bajo la mesa.
+- **Mapa de sombra en el suelo:** cada fila es un mes y cada columna un punto del suelo; verde oscuro = más luz. Sirve para ver en qué meses y en qué franjas conviene sembrar.
+- **Qué hacer:** si la luz es muy poca para tu cultivo, separa las filas (baja el GCR) o usa mesas más angostas; si la luz es muy dispareja, sube la altura libre. Cada cambio del campo pide recalcular la luz (la app oculta el resultado viejo) y, si cambió la geometría, volver a usar el botón de la sección 5 para la energía.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

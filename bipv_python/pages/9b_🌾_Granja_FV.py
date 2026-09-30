@@ -18,6 +18,7 @@ mostrar_proyecto_activo()
 from calculos.campos_editor import sincronizar_campo
 from calculos.campos_persistentes import campo_persistente
 from datos.ciudades_colombia import CIUDADES
+from calculos.agrivoltaica import luz_en_el_suelo, paso_maquinaria
 from calculos.granja_fv import (
     CAMPOS_EDITABLES,
     aplicar_geometria_a_energia,
@@ -36,8 +37,9 @@ st.title("🌾 Granja FV — campo de filas")
 st.caption(
     "Diseño del campo de una granja solar o agrivoltaica: terreno, mesas, filas, separación "
     "(pitch), GCR y altura. Usa los mismos datos del proyecto que 📐 Dimensionamiento, 📊 "
-    "Producción y ☀️ Recurso Solar. En esta fase el campo **no cambia la energía**: muestra si "
-    "tu geometría coincide con la que usan los cálculos. Las fachadas y techos BIPV siguen en "
+    "Producción y ☀️ Recurso Solar. Comprueba que tu geometría coincide con la que usan los "
+    "cálculos, lleva la sombra entre filas a la energía (sección 5) y calcula la luz que recibe el "
+    "cultivo y el paso de la maquinaria (sección 6). Las fachadas y techos BIPV siguen en "
     "🗺️ Vista 3D."
 )
 
@@ -198,8 +200,72 @@ if _tmy_g is not None and _lat_g is not None and _lon_g is not None and not camp
 else:
     st.caption("📏 Para estimar la sombra entre filas, calcula primero el recurso solar en ☀️ Recurso Solar.")
 
-# ── 6. Vista 3D del campo ────────────────────────────────────────────────────
-st.markdown("### 6. Vista 3D del campo")
+# ── 6. Agrivoltaica: luz para el cultivo y maquinaria (fase 3) ─────────────
+st.markdown("### 6. 🌱 Agrivoltaica: luz para el cultivo y paso de la maquinaria")
+st.caption(
+    "Cuánta luz del sol llega al suelo bajo las mesas y entre las filas, comparada con el mismo "
+    "terreno sin paneles, y si la maquinaria agrícola cabe. Corte de perfil entre dos filas largas; "
+    "no se suma la luz que reflejan el suelo y la cara de abajo de los paneles (resultado del lado seguro)."
+)
+m1, m2 = st.columns(2)
+with m1:
+    campo_persistente(ss, st.number_input, "Altura de la maquinaria (m)",
+                      "granja_altura_maquinaria_m", float(ss.get("granja_altura_maquinaria_m", 2.5)),
+                      min_value=0.5, max_value=6.0, step=0.1,
+                      help="La máquina más alta que debe pasar (tractor con cabina ≈ 2,5–3,0 m).")
+with m2:
+    campo_persistente(ss, st.number_input, "Ancho de la maquinaria (m)",
+                      "granja_ancho_maquinaria_m", float(ss.get("granja_ancho_maquinaria_m", 2.2)),
+                      min_value=0.5, max_value=10.0, step=0.1,
+                      help="Ancho de la máquina o del implemento más ancho.")
+if not campo["errores"] and campo["gcr"] > 0:
+    for _c in paso_maquinaria(campo, float(ss["granja_altura_maquinaria_m"]),
+                              float(ss["granja_ancho_maquinaria_m"])):
+        {"🟠": st.warning, "🟢": st.success}.get(_c["nivel"], st.info)(f"{_c['nivel']} {_c['texto']}")
+_firma_luz = {k: round(float(campo[k]), 4) for k in ("gcr", "huella_ns_m", "altura_superior_m",
+                                                      "tilt_deg", "azimut_deg")}
+if _tmy_g is not None and _lat_g is not None and _lon_g is not None and not campo["errores"]:
+    if st.button("🌱 Calcular la luz en el suelo"):
+        with st.spinner("Calculando la luz en el suelo hora a hora…"):
+            ss["granja_luz_suelo"] = {"firma": _firma_luz, **luz_en_el_suelo(
+                _tmy_g, float(_lat_g), float(_lon_g), float(_alt_g or 0.0), campo)}
+    _luz = ss.get("granja_luz_suelo")
+    if _luz and _luz.get("firma") == _firma_luz:
+        l1, l2, l3, l4, l5 = st.columns(5)
+        l1.metric("Luz media en el suelo", f"{_luz['media_pct']:.0f} %",
+                  help="Promedio entre dos filas, frente al terreno sin paneles.")
+        l2.metric("Luz media anual", f"{_luz['media_kwh_m2']:,.0f} kWh/m²",
+                  help=f"Sin paneles: {_luz['referencia_kwh_m2']:,.0f} kWh/m² al año.")
+        l3.metric("Bajo las mesas", f"{_luz['bajo_mesa_pct']:.0f} %")
+        l4.metric("Entre las filas", f"{_luz['entre_filas_pct']:.0f} %")
+        l5.metric("Homogeneidad", f"{_luz['homogeneidad']:.2f}",
+                  help="Punto más oscuro ÷ punto más iluminado: 1 = luz pareja en todo el suelo.")
+        _gy = _luz["geometria"]
+        _fp = go.Figure(go.Scatter(x=_luz["y_m"], y=_luz["pct"], mode="lines", name="Luz anual",
+                                   line=dict(color="rgb(46,125,50)", width=3),
+                                   hovertemplate="%{x:.2f} m · %{y:.0f} %<extra></extra>"))
+        _fp.add_vrect(x0=0, x1=_gy["huella"], fillcolor="rgb(52,101,164)", opacity=0.15, line_width=0,
+                      annotation_text="bajo la mesa", annotation_position="top left")
+        _fp.update_layout(height=320, margin=dict(l=0, r=0, t=30, b=0), yaxis_title="Luz (% del campo abierto)",
+                          xaxis_title="Posición desde el borde inferior de una mesa hasta la siguiente (m)",
+                          yaxis_range=[0, 100], title="Luz anual en el suelo entre dos filas")
+        st.plotly_chart(_fp, use_container_width=True)
+        _meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+        _fm = go.Figure(go.Heatmap(z=_luz["mensual_pct"], x=_luz["y_m"], y=_meses, zmin=0, zmax=100,
+                                   colorscale="YlGn", colorbar=dict(title="%"),
+                                   hovertemplate="%{y} · %{x:.2f} m · %{z:.0f} %<extra></extra>"))
+        _fm.add_vline(x=_gy["huella"], line_dash="dash", line_color="rgb(52,101,164)")
+        _fm.update_layout(height=380, margin=dict(l=0, r=0, t=30, b=0),
+                          xaxis_title="Posición entre dos filas (m) — la línea marca el fin de la mesa",
+                          title="Mapa de sombra en el suelo: luz de cada mes (% del campo abierto)")
+        st.plotly_chart(_fm, use_container_width=True)
+        st.caption(f"🌱 Bajo la mesa: 0 a {_gy['huella']:.2f} m · entre las filas: {_gy['huella']:.2f} a "
+                   f"{_gy['pitch']:.2f} m · luz mínima {_luz['min_pct']:.0f} %, máxima {_luz['max_pct']:.0f} %.")
+else:
+    st.caption("🌱 Para calcular la luz en el suelo, calcula primero el recurso solar en ☀️ Recurso Solar.")
+
+# ── 7. Vista 3D del campo ────────────────────────────────────────────────────
+st.markdown("### 7. Vista 3D del campo")
 _fig = go.Figure(data=trazas_campo(campo))
 _fig.update_layout(
     scene=dict(xaxis_title="A lo largo de la fila (m)", yaxis_title="Adelante → atrás (m)",
