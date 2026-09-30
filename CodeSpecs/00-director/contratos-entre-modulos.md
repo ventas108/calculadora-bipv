@@ -70,6 +70,14 @@ Regla de consumo:
 	parejo. Publica `N_inv_total`, `N_paneles_granja`, `P_dc_total_kWp` y
 	`reparto_strings_inversores`; nunca más módulos de los que caben sin
 	cadenas declaradas. La relación DC/AC se evalúa con el sistema real.
+- Recorte por inversor en Vista 3D (29-sep-2026, Spec `05-perdidas-y-temperatura/recorte-inversor-multisuperficie`):
+	`cadena_superficie` devuelve `perfil_ac` (forma horaria de la AC, suma 1);
+	`cadena_superficies_estado`, después del cruce, aplica
+	`recorte_inversores_multisup.factores_recorte`: por inversor con
+	`P_ac_nom_W`, suma horaria de sus grupos (módulos donde están), recorte a
+	la potencia AC y reparto por aporte horario; `pr` × `f_recorte`,
+	`recorte_kWh` y `recorte_inversores` por superficie. `firma_cadena` incluye
+	potencias AC y grupos solo si hay inversores con potencia AC y grupos.
 - Cantidad de inversores (29-sep-2026, Spec `03-dimensionamiento/inversores-del-proyecto`):
 	`N_inversores_proyecto` (0 = automática) y `N_inversores_proyecto_ref`
 	(modelo para el que se fijó) son claves de datos. `resolver_inversores`

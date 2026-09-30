@@ -365,7 +365,7 @@ def test_relacion_dc_ac_mensaje_muestra_porcentaje_real_no_frase_fija():
 def test_relacion_dc_ac_uraba_sobredimensionado_pero_no_critico():
     # Proyecto real Urabá: 220.32 kWp + 2x Growatt MAX 100KTL3 LV
     # (249.6 kW CA total) -- ratio 0.883, por debajo del rango típico
-    # (0.95-1.35) pero no en el rango "muy sobredimensionado" (<0.75).
+    # (1.00-1.35) pero no en el rango "muy sobredimensionado" (<0.75).
     resultado = evaluar_relacion_dc_ac(P_dc_stc_kW=220.32, P_ac_nom_W=249_600)
 
     assert resultado["evaluable"] is True

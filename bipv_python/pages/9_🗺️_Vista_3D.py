@@ -1,10 +1,12 @@
 """Página 9 — Vista 3D del sitio: mapa geolocalizado y modelo volumétrico BIPV."""
 import math
 import streamlit as st
+from calculos.recorte_inversores_multisup import tabla_recorte
 from calculos.cadena_perdidas_multisup import (
     CLAVE_PUBLICACION as CLAVE_CADENA_PUB, MONTAJE_AUTOMATICO, OPCIONES_MONTAJE,
     K_BIPV_POR_TIPO, aviso_cadena_vencida, aviso_origen_parametros, cadena_superficies_estado,
     parametros_cadena, pr_por_superficie, registro_publicacion, tabla_desglose,
+    recorte_por_inversor,
 )
 import plotly.graph_objects as go
 
@@ -1967,6 +1969,19 @@ with tab_solar:
                             "fachadas verticales). Temperatura: NOCT y γ del panel con el montaje "
                             "de la superficie (k_BIPV). Mismatch, cables y sombra de horizonte: "
                             "🔀 Mismatch. Inversor: η del inversor de sus grupos."
+                        )
+                    # Spec 05/recorte-inversor-multisuperficie: lo que cada
+                    # inversor no deja pasar por encima de su potencia AC.
+                    _rec_inv_g = recorte_por_inversor(_cad_g)
+                    if _rec_inv_g:
+                        st.markdown("###### ✂️ Recorte por inversor (hora a hora)")
+                        st.dataframe(_pd.DataFrame(tabla_recorte(_rec_inv_g)),
+                                     use_container_width=True, hide_index=True)
+                        st.caption(
+                            "Cada hora se suma la AC de todos los grupos del inversor (aunque "
+                            "estén en superficies distintas) y lo que pasa de su potencia AC "
+                            "nominal se pierde. Ya está restado en el PR de cada superficie "
+                            "(columna «Recorte inversor») y en la energía que se publica."
                         )
 
             # ── Integrar al análisis financiero ──────────────────────────────

@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from calculos.dimensionamiento import (
+    texto_inversores_automaticos,
     mapear_inversores_catalogo,
     optimizar_n_serie,
     dimensionar_sistema,
@@ -391,6 +392,15 @@ with col2:
             "usan esta cantidad."
         ),
     ))
+    if N_inv_fijado == 0:
+        # En 0 el campo parece vacío: se dice cuántos calcula la app (pedido
+        # del usuario, 29-sep-2026).
+        st.caption(texto_inversores_automaticos(
+            int(N_total_cadenas), _res_n_str_tr["n_trackers"], int(N_str_tr),
+            publicado=(st.session_state.get("N_inv_total")
+                       if st.session_state.get("N_paneles_granja_inversor_ref") == inversor_nombre
+                       else None),
+        ))
     col_nm1, col_nm2 = st.columns(2)
     with col_nm1:
         # Auto-calcular N_min eléctrico desde MPPT del inversor para evitar que
