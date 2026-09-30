@@ -16,6 +16,7 @@ from calculos.produccion_vigencia import (
 )
 from calculos.persistencia_resultados import CLAVE_PAYLOAD_FIRMA
 from calculos.formato_produccion import FORMATO_TABLA_MENSUAL
+from calculos.motor_optico_ficha import diferencias_ficha, texto_aviso_ficha
 from calculos.mismatch_bypass import exigir_poa_sin_termico, seleccionar_poa_bypass
 from calculos.mismatch import aplicar_factor_horario, factores_mismatch_produccion
 from calculos.produccion_iv import simular_produccion_iv, panel_apto_para_iv, preparar_para_iv
@@ -576,6 +577,15 @@ if btn_sim and (not _compat_inversor_ok or not _diseno_cfg["vigente"]):
 # Cuando Motor Óptico está activo, el NOCT usado en cascada_optica() es la
 # fuente de verdad. Se inyecta en el panel para garantizar que el SDM
 # calcula T_cell con los mismos parámetros térmicos.
+# Spec 05/motor-optico-ficha-termica: avisar si ese NOCT (y el γ del Motor
+# Óptico) no es el de la ficha del panel -- p. ej. valores viejos de un
+# proyecto guardado (Apartadó: 35 °C en vez de 45 °C).
+if _motor_ok and _noct_mo is not None:
+    _gamma_mo = st.session_state.get("motor_optico_coef_temp")
+    _dif_ficha_p = diferencias_ficha(
+        _noct_mo, None if _gamma_mo is None else float(_gamma_mo) * 100.0, panel)
+    if _dif_ficha_p:
+        st.warning(texto_aviso_ficha(_dif_ficha_p, panel_nombre, k_bipv=_k_bipv_sim))
 _panel_sdm = panel
 if _motor_ok and _noct_mo is not None:
     _panel_sdm = dict(panel)          # copia superficial; no muta original
