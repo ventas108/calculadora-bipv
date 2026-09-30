@@ -5436,6 +5436,30 @@ Proyecto de referencia: 308 × JAM66D46-720/LB (2,384 × 1,303 m), 221,76 kWp, 2
   - Recorrido de cables en L, sin ruta real de zanjas.
   - Sin cajas combinadoras ni centros de transformación de granjas grandes.
 
+## 99. 🔆 Motor Óptico: NOCT, γ y demás campos ya no vuelven a su mínimo (30-sep-2026)
+
+### Motor Óptico — qué pasaba y por qué
+
+**Qué pasaba:** en el proyecto de Urabá ponías **NOCT 45 °C y γ −0,29 %/°C** (los de la ficha), guardabas y, al volver a 🔆 Motor Óptico, aparecían otra vez **35 °C y −0,70 %/°C**. Esos dos números no venían de ningún lado: son el **mínimo** de cada campo.
+
+**Por qué:** cada campo de la página usaba la misma «clave» para el dato y para el cuadro de la pantalla. La aplicación borra las claves de los cuadros cuando abres otra página o recargas. Al volver, el cuadro arrancaba en su mínimo y, si guardabas el proyecto desde 🏠 Proyecto, se guardaba ese mínimo. Como 📊 Producción usa el NOCT del Motor Óptico para la temperatura de celda, la energía salía más alta de la real en silencio: 35 °C en vez de 45 °C son ≈ 12,5 °C menos de celda con 1000 W/m².
+
+**El arreglo:** el dato se guarda aparte (no se borra) y el cuadro se llena desde el dato cada vez. Así funcionan también los campos de 💰 Financiero desde el 27-sep-2026. Quedaron arreglados los 8 campos de la página:
+- NOCT y γ.
+- Tipo de vidrio y b₀ personalizado.
+- Transparencia.
+- Tipo de montaje.
+- Soiling personalizado, auto-limpieza e IAM difusa.
+
+Si un proyecto viejo no tiene el dato, la app toma el último NOCT y γ con que calculaste la cascada o, si no hay, los de la ficha del panel. Nunca el mínimo.
+
+### Motor Óptico — cómo comprobarlo y qué hacer
+
+1. Abre tu proyecto. Si en 🔆 Motor Óptico ves el aviso 🟠 «Los datos térmicos… no coinciden con la ficha», presiona **«↩️ Usar los de la ficha»**: el proyecto se guardó antes con 35 y −0,70.
+2. Ve a otra página (por ejemplo 🏠 Proyecto) y vuelve: ✅ siguen **45** y **−0,29**.
+3. Presiona **«🚀 Calcular cascada óptica»**, guarda el proyecto en 🏠 Proyecto, ciérralo y ábrelo: ✅ siguen 45 y −0,29.
+4. Vuelve a simular 📊 Producción: con 45 °C la pérdida por temperatura es la real (≈ 6 %).
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
