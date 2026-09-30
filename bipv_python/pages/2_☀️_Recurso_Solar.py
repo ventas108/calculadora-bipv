@@ -401,7 +401,7 @@ with st.expander("🔄 Simulación bifacial (ganancia de la cara trasera)",
         _gcr_ini = min(max(_gcr_ini, 0.10), 0.90)
         gcr = cb4.slider(
             "GCR (cobertura del suelo)", min_value=0.10, max_value=0.90,
-            value=_gcr_ini, step=0.05,
+            value=_gcr_ini, step=0.01,
             help="Ancho del panel ÷ separación entre filas. Fila única o aislada: 0.20–0.30. "
                  "Filas juntas (menos luz trasera): 0.5+. "
                  "🌱 Agrivoltaica: usa el mismo valor que el factor de ocupación de 🏠 Proyecto.",
@@ -419,12 +419,37 @@ with st.expander("🔄 Simulación bifacial (ganancia de la cara trasera)",
                 f"Sugerido: GCR ≈ **{min(max(_f_ocup_rs/100.0, 0.10), 0.90):.2f}**.",
                 icon="🌱",
             )
+        # Spec 05/sombra-entre-filas (granja FV fase 2): ancho de la mesa (antes
+        # fijo en 2,0 m sin mostrarse), sombra de la estructura sobre la cara
+        # trasera y mismatch trasero. 🌾 Granja FV los puede llenar con el campo.
+        cb5, cb6, cb7 = st.columns(3)
+        ancho_colector_m = cb5.number_input(
+            "Ancho de la mesa en la pendiente (m)", min_value=0.3, max_value=12.0,
+            value=float(_bif_def.get("ancho_colector_m", 2.0)), step=0.01,
+            help="Ancho inclinado de una fila (por ejemplo 2 módulos horizontales ≈ 2,6 m). "
+                 "Con el GCR fija la separación entre filas: separación = ancho ÷ GCR.",
+        )
+        sombra_trasera_pct = cb6.number_input(
+            "Sombra de la estructura en la cara trasera (%)", min_value=0.0, max_value=30.0,
+            value=float(_bif_def.get("sombra_trasera_pct", 0.0)), step=0.5,
+            help="Vigas, rieles y postes tapan parte de la luz trasera. Típico 3–7 % "
+                 "(la referencia estándar internacional usa 5 %). 0 = sin descontar.",
+        )
+        mismatch_trasero_pct = cb7.number_input(
+            "Mismatch por luz trasera no uniforme (%)", min_value=0.0, max_value=30.0,
+            value=float(_bif_def.get("mismatch_trasero_pct", 0.0)), step=0.5,
+            help="La luz trasera llega dispareja entre módulos; se pierde una parte de "
+                 "ese aporte. Típico 5–10 % del aporte trasero (la referencia usa 10 %).",
+        )
         bifacial_cfg = {
             "bifacialidad":          bif_pct / 100.0,
             "altura_m":              altura_m,
             "albedo_trasero":        albedo_rear,
             "gcr":                   gcr,
             "factor_vista_trasera":  factor_vista_trasera,
+            "ancho_colector_m":      ancho_colector_m,
+            "sombra_trasera_pct":    sombra_trasera_pct,
+            "mismatch_trasero_pct":  mismatch_trasero_pct,
         }
         if _es_fachada:
             st.warning(
@@ -435,6 +460,13 @@ with st.expander("🔄 Simulación bifacial (ganancia de la cara trasera)",
                 "reflejante detrás del panel.",
                 icon="🏢",
             )
+
+# ── Sombra entre filas (Spec 05/sombra-entre-filas, granja FV fase 2) ───────
+# Geometría de filas que usa la POA: la del modelo bifacial o, con paneles
+# monofaciales, la que 🌾 Granja FV aplicó a la energía («filas_energia»).
+from calculos.granja_fv import geometria_poa
+_filas_energia = None if bifacial_cfg else (st.session_state.get("filas_energia") or None)
+_geom_poa = geometria_poa(bifacial_cfg, _filas_energia)
 
 # ── Versión de PVGIS (Spec 02-recurso-solar/pvgis-5-3, 29-sep-2026) ─────────
 # Proyecto nuevo → 5.3 (la que descarga PVsyst 8). Proyecto guardado sin
@@ -574,6 +606,10 @@ if not st.session_state.get("recurso_solar_ok"):
             _poa_r = calcular_poa(_tmy_r, lat, lon, alt_m, tilt, azimuth,
                                   albedo=albedo, bifacial=bifacial_cfg,
                                   reduccion_diffusa_isotropica=factor_svf)
+        elif _filas_energia:
+            _poa_r = calcular_poa(_tmy_r, lat, lon, alt_m, tilt, azimuth,
+                                  albedo=albedo, filas=_filas_energia,
+                                  reduccion_diffusa_isotropica=factor_svf)
         _poa_anual_r = _poa_r["poa_global"].sum() / 1000.0
         _ghi_anual_r = _tmy_r["G_h"].sum() / 1000.0
         _t_media_r   = _tmy_r["T2m"].mean()
@@ -597,6 +633,7 @@ if not st.session_state.get("recurso_solar_ok"):
             "t_media_anual":       round(_t_media_r, 1),
             "zona_geo_coords":     _zona_por_coords_rs(lat, lon),
             "recurso_solar_ok":    True,
+            "poa_geometria_filas": _geom_poa,
             # ── #64/#172 — Guardar coords y geometría para detectar drift ────
             "_solar_lat_guardada": lat,
             "_solar_lon_guardada": lon,
@@ -707,6 +744,11 @@ if _descarga_btn:
         with st.spinner("🔄 Calculando ganancia bifacial (pvlib infinite_sheds)..."):
             poa = calcular_poa(tmy, lat, lon, alt_m, tilt, azimuth,
                                albedo=albedo, bifacial=bifacial_cfg,
+                               reduccion_diffusa_isotropica=factor_svf)
+    elif _filas_energia:
+        with st.spinner("🌾 Calculando la sombra entre filas del campo (pvlib infinite_sheds)..."):
+            poa = calcular_poa(tmy, lat, lon, alt_m, tilt, azimuth,
+                               albedo=albedo, filas=_filas_energia,
                                reduccion_diffusa_isotropica=factor_svf)
     monthly = resumen_mensual(tmy, poa)
     # ── Métricas anuales ─────────────────────────────────────────────────────
@@ -863,6 +905,7 @@ if _descarga_btn:
     st.session_state["albedo_suelo"]          = albedo
     st.session_state["bifacial_activo"]       = bool(bifacial_cfg)
     st.session_state["bifacial_cfg"]          = bifacial_cfg or {}
+    st.session_state["poa_geometria_filas"]   = _geom_poa
     st.session_state["ganancia_bifacial_pct"] = round(ganancia_bif_pct, 2)
     # ── #64/#172 — Guardar coords y geometría usadas para detectar drift ─────
     st.session_state["_solar_lat_guardada"] = lat

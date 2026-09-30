@@ -77,6 +77,16 @@ Regla de consumo:
 	`N_paneles_final` (Producción) o `N_paneles_granja`. Inclinación y azimut
 	vienen de 🏠 Proyecto. En esta fase no escribe `bifacial_cfg` ni cambia
 	la energía: `coherencia_campo` avisa si el GCR o la altura no coinciden.
+- 🌾 Granja FV, fase 2 (30-sep-2026, Spec `05-perdidas-y-temperatura/sombra-entre-filas`):
+	el botón «⚡ Usar la geometría del campo en la energía»
+	(`granja_fv.aplicar_geometria_a_energia`) escribe `filas_energia`
+	(`gcr`, `altura_m`, `ancho_colector_m`) y, con el modelo bifacial activo,
+	los mismos tres datos en `bifacial_cfg`. ☀️ Recurso Solar pasa
+	`filas=filas_energia` a `solar.calcular_poa` solo con paneles monofaciales
+	(con bifacial la cara frontal de `infinite_sheds` ya incluye la sombra) y
+	publica `poa_geometria_filas`; `coherencia_campo` la compara (`poa_filas`).
+	`bifacial_cfg` suma `ancho_colector_m` (antes 2,0 fijo), `sombra_trasera_pct`
+	y `mismatch_trasero_pct` (0 = sin cambio) que multiplican el aporte trasero.
 - NOCT y γ del Motor Óptico frente a la ficha (30-sep-2026, Spec `05-perdidas-y-temperatura/motor-optico-ficha-termica`):
 	`motor_optico_noct` sigue siendo la fuente de la temperatura de celda en
 	Producción; `calculos/motor_optico_ficha.diferencias_ficha` lo compara con

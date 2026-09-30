@@ -279,11 +279,85 @@ def coherencia_campo(campo: Mapping[str, Any], estado: Mapping[str, Any]) -> lis
                     "🗺️ Vista 3D tiene energía multi-superficie publicada: 💰 Financiero, 🌿 CO₂ y 🔋 "
                     "Baterías usan esa energía y no la de 📊 Producción. Si el proyecto es solo esta "
                     "granja, desactívala en 🗺️ Vista 3D › Integrar al análisis financiero."})
+    if n > 0 and not campo["errores"]:
+        out.append(estado_poa_filas(campo, estado))
     tipo = str(estado.get("tipo_instalacion") or "")
     if tipo and tipo != "Granja fotovoltaica":
         out.append({"id": "tipo", "nivel": "🟡", "texto":
                     f"El proyecto es tipo «{tipo}» en 🏠 Proyecto; este módulo está pensado para granjas."})
     return out
+
+
+# ── Fase 2: la geometría del campo en la energía (Spec 05/sombra-entre-filas) ──
+def geometria_filas(campo: Mapping[str, Any]) -> dict:
+    """GCR, altura del centro y ancho de la mesa del campo, para la POA."""
+    return {"gcr": round(float(campo["gcr"]), 4), "altura_m": round(float(campo["altura_centro_m"]), 3),
+            "ancho_colector_m": round(float(campo["ancho_mesa_m"]), 3)}
+
+
+def geometria_poa(bifacial_cfg: Mapping[str, Any] | None, filas: Mapping[str, Any] | None) -> dict | None:
+    """Geometría de filas con la que se calcula la POA (bifacial o monofacial)."""
+    if bifacial_cfg:
+        return {"gcr": float(bifacial_cfg.get("gcr", 0.25)), "altura_m": float(bifacial_cfg.get("altura_m", 1.0)),
+                "ancho_colector_m": float(bifacial_cfg.get("ancho_colector_m", 2.0))}
+    if filas:
+        return {k: float(filas[k]) for k in ("gcr", "altura_m", "ancho_colector_m")}
+    return None
+
+
+def mismas_filas(a: Mapping[str, Any] | None, b: Mapping[str, Any] | None) -> bool:
+    if not a or not b:
+        return False
+    return (abs(float(a["gcr"]) - float(b["gcr"])) <= TOL_GCR
+            and abs(float(a["altura_m"]) - float(b["altura_m"])) <= TOL_ALTURA_M
+            and abs(float(a["ancho_colector_m"]) - float(b["ancho_colector_m"])) <= 0.05)
+
+
+def aplicar_geometria_a_energia(estado, campo: Mapping[str, Any]) -> dict:
+    """Escribe la geometría del campo donde la lee ☀️ Recurso Solar.
+
+    Con paneles monofaciales la guarda en ``filas_energia`` (sombra entre
+    filas); con el modelo bifacial activo actualiza también GCR, altura y
+    ancho de ``bifacial_cfg``. La POA vigente queda vencida hasta recalcular.
+    """
+    geo = geometria_filas(campo)
+    estado["filas_energia"] = dict(geo)
+    if estado.get("bifacial_activo") and estado.get("bifacial_cfg"):
+        cfg = dict(estado["bifacial_cfg"])
+        cfg.update(geo)
+        estado["bifacial_cfg"] = cfg
+    return geo
+
+
+def estado_poa_filas(campo: Mapping[str, Any], estado: Mapping[str, Any]) -> dict:
+    """¿La POA vigente se calculó con la geometría del campo? ``{nivel, texto}``."""
+    usada = estado.get("poa_geometria_filas")
+    geo = geometria_filas(campo)
+    if mismas_filas(usada, geo):
+        return {"id": "poa_filas", "nivel": "🟢", "texto":
+                f"La energía usa la geometría del campo (GCR {geo['gcr']:.2f}, altura {geo['altura_m']:.2f} m, "
+                f"mesa {geo['ancho_colector_m']:.2f} m): la sombra entre filas y la cara trasera ya están "
+                "incluidas."}
+    if not usada:
+        texto = ("La POA vigente no incluye la sombra entre filas del campo. Presiona «⚡ Usar la geometría "
+                 "del campo en la energía» y vuelve a calcular en ☀️ Recurso Solar.")
+    else:
+        texto = (f"La POA vigente se calculó con otra geometría (GCR {float(usada['gcr']):.2f}, altura "
+                 f"{float(usada['altura_m']):.2f} m, mesa {float(usada['ancho_colector_m']):.2f} m). Presiona "
+                 "«⚡ Usar la geometría del campo en la energía» y vuelve a calcular en ☀️ Recurso Solar.")
+    return {"id": "poa_filas", "nivel": "🟠", "texto": texto}
+
+
+def sombra_filas_estimada(tmy, lat: float, lon: float, alt_m: float, tilt: float, azimut: float,
+                          albedo: float, campo: Mapping[str, Any]) -> dict:
+    """Pérdida anual de la cara frontal por sombra entre filas (sin el campo → con el campo)."""
+    from calculos.solar import calcular_poa
+
+    sin = calcular_poa(tmy, lat, lon, alt_m, tilt, azimut, albedo=albedo)
+    con = calcular_poa(tmy, lat, lon, alt_m, tilt, azimut, albedo=albedo, filas=geometria_filas(campo))
+    a, b = float(sin["poa_global"].sum()) / 1000.0, float(con["poa_global"].sum()) / 1000.0
+    return {"poa_sin_kwh_m2": a, "poa_con_kwh_m2": b,
+            "perdida_frontal_pct": (1.0 - b / a) * 100.0 if a > 0 else 0.0}
 
 
 def trazas_campo(campo: Mapping[str, Any], color: str = "rgb(52,101,164)") -> list:
