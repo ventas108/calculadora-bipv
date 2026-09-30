@@ -5156,6 +5156,38 @@ La fila «↳ Solo horas calientes» del balance mostraba `Tk_gamma=—%/°C` au
 - **Qué hacer:** presiona **«Usar los de la ficha»**, vuelve a **calcular la cascada** y a simular Producción; luego **guarda el proyecto** en 🏠 Proyecto para que queden los valores buenos. Solo déjalos distintos si tienes un dato **medido** del panel instalado.
 - **Recuerda también el montaje:** en una granja la app preselecciona «Ventilado libre» (k = 1,0). Si tu referencia usa un montaje menos ventilado (por ejemplo Uc = 20 W/m²K ≈ k 1,11 con NOCT 45), elige «Semi-ventilado» (k = 1,15).
 
+## 93. 🌾 Granja FV: campo de filas para granjas solares y agrivoltaicas (fase 1, 30-sep-2026)
+
+### Granja FV — qué es y por qué existe
+
+**Qué es:** la página **🌾 Granja FV** diseña el campo de una granja solar o agrivoltaica: tamaño del terreno, **mesas** (módulos en la pendiente × módulos a lo largo), **filas**, **separación entre filas (pitch)** y **altura libre** bajo la mesa. Muestra el campo en 3D, cuántos módulos caben, el **GCR**, el **ángulo límite de sombra**, el corredor libre y el suelo que queda para el cultivo.
+
+**Por qué existe:** 🗺️ Vista 3D está hecho para BIPV (fachadas, techos, pérgolas). Una granja se diseña por filas y no por superficies del edificio; dentro de Vista 3D aparecían incoherencias (por ejemplo «288 módulos» cuando el proyecto tenía 308). Ahora la granja tiene su página y Vista 3D la dibuja con **el mismo cálculo**.
+
+**Qué no hace todavía (fase 1):** no cambia la energía. Solo compara tu campo con lo que usan los cálculos (módulos, GCR y altura del modelo bifacial) y avisa si no coinciden. La sombra entre filas por geometría llega en la fase 2.
+
+### Granja FV — fórmulas en palabras y cuenta real
+
+- **Ancho de la mesa en la pendiente** = módulos en la pendiente × lado del módulo en la pendiente + 2 cm entre módulos.
+- **Huella de adelante hacia atrás** = ancho de la mesa × cos(inclinación).
+- **GCR** = ancho de la mesa ÷ separación entre filas.
+- **Ángulo límite de sombra** = atan( ancho × sen(inclinación) ÷ (separación − ancho × cos(inclinación)) ). Con el sol más bajo que ese ángulo (visto de perfil), una fila sombrea a la siguiente.
+- **Corredor libre** = separación − huella.
+
+**Ejemplo (Apartadó, igual al informe de la referencia estándar internacional):** JAM66D46-720/LB de 2,384 × 1,303 m, mesas de **2 módulos horizontales**, inclinación **10°**, separación **6,60 m**.
+- Ancho de la mesa = 2 × 1,303 + 0,02 = **2,626 m** (la referencia usa 2,65 m).
+- GCR = 2,626 ÷ 6,60 = **39,8 %** (referencia: 39,8 % de sombra y 40,1 % bifacial).
+- Ángulo límite = atan(2,626 × sen 10° ÷ (6,60 − 2,626 × cos 10°)) = atan(0,456 ÷ 4,014) = **6,5°** (referencia: 6,5°).
+- 5 filas de 31 × 2 módulos alojan los **308** módulos (221,76 kWp).
+
+### Granja FV — cómo leerlo en pantalla y qué hacer
+
+- **1. Datos del proyecto:** módulos (los que simuló 📊 Producción, o los de 📐 Dimensionamiento), panel, dimensiones de la ficha e inclinación · azimut de 🏠 Proyecto (se cambian allá, porque son los de la energía).
+- **2. Terreno, mesas y filas:** los datos del campo. **🪄 Sugerir distribución** propone la menor cantidad de filas (una mesa por fila) en la que caben todos los módulos.
+- **3. Resultados:** módulos ubicados, kWp, GCR, ángulo límite, corredor y suelo libre.
+- **4. Coherencia:** 🟢 todo coincide; 🔴 no caben los módulos o las filas se tocan (cambia terreno, mesas o separación); 🟠 el GCR o la altura del **modelo bifacial** de ☀️ Recurso Solar no son los del campo (cámbialos allá al valor que muestra el aviso, porque la cara trasera se calcula con esos datos); 🟠 Producción y Dimensionamiento tienen distinto número de módulos (vuelve a simular); 🟠 hay energía **multi-superficie** publicada desde Vista 3D (Financiero usaría esa y no la de Producción: desactívala si el proyecto es solo la granja); 🟡 el factor de ocupación o el área del terreno de 🏠 Proyecto no coinciden con el campo.
+- **Qué hacer:** usa 🌾 Granja FV para granjas y 🗺️ Vista 3D para BIPV. Guarda el proyecto: la geometría del campo se guarda con él.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
