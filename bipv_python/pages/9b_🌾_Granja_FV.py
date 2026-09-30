@@ -17,8 +17,12 @@ mostrar_proyecto_activo()
 
 from calculos.campos_editor import sincronizar_campo
 from calculos.campos_persistentes import campo_persistente
+from datos.ciudades_colombia import CIUDADES
 from calculos.granja_fv import (
     CAMPOS_EDITABLES,
+    aplicar_geometria_a_energia,
+    geometria_filas,
+    sombra_filas_estimada,
     calcular_campo,
     coherencia_campo,
     dimensiones_modulo,
@@ -154,8 +158,48 @@ for _c in coherencia_campo(campo, ss):
     {"🔴": st.error, "🟠": st.warning}.get(_c["nivel"], st.success if _c["nivel"] == "🟢" else st.info)(
         f"{_c['nivel']} {_c['texto']}")
 
-# ── 5. Vista 3D del campo ────────────────────────────────────────────────────
-st.markdown("### 5. Vista 3D del campo")
+# ── 5. Sombra entre filas y cara trasera en la energía (fase 2) ─────────────
+st.markdown("### 5. Sombra entre filas y cara trasera en la energía")
+st.caption(
+    "Con la geometría del campo, ☀️ Recurso Solar calcula hora a hora la sombra que cada fila le "
+    "hace a la siguiente (luz directa, difusa del cielo y reflejada del suelo) y, con paneles "
+    "bifaciales, la luz que llega a la cara trasera según la altura y la separación reales."
+)
+_geo_e = geometria_filas(campo)
+if not campo["errores"] and proy["n"]:
+    st.button("⚡ Usar la geometría del campo en la energía", type="primary",
+              on_click=aplicar_geometria_a_energia, args=(ss, campo),
+              help=f"GCR {_geo_e['gcr']:.3f} · altura del centro {_geo_e['altura_m']:.2f} m · mesa "
+                   f"{_geo_e['ancho_colector_m']:.3f} m. Luego vuelve a calcular en ☀️ Recurso Solar.")
+    if ss.get("filas_energia") and ss.get("poa_geometria_filas") != ss.get("filas_energia"):
+        st.info("ℹ️ Geometría enviada a la energía. Ahora ve a **☀️ Recurso Solar** y presiona el botón de "
+                "cálculo para recalcular la POA; después vuelve a simular 📊 Producción.")
+_tmy_g = ss.get("tmy_df")
+# Mismas coordenadas que ☀️ Recurso Solar: predio exacto, si no el centro de la ciudad
+_ciudad_g = CIUDADES.get(ss.get("ciudad", ""), {})
+_lat_g = ss.get("lat_proyecto", _ciudad_g.get("lat"))
+_lon_g = ss.get("lon_proyecto", _ciudad_g.get("lon"))
+_alt_g = ss.get("alt_proyecto", _ciudad_g.get("alt_m", 0))
+if _tmy_g is not None and _lat_g is not None and _lon_g is not None and not campo["errores"]:
+    if st.button("📏 Estimar la sombra entre filas de este campo"):
+        with st.spinner("Calculando 8.760 horas con pvlib infinite_sheds…"):
+            ss["granja_sombra_estimada"] = {
+                "geo": _geo_e,
+                **sombra_filas_estimada(_tmy_g, float(_lat_g), float(_lon_g), float(_alt_g or 0.0),
+                                        geo["tilt_deg"], geo["azimut_deg"],
+                                        float(ss.get("albedo_suelo", 0.20)), campo),
+            }
+    _est = ss.get("granja_sombra_estimada")
+    if _est and _est.get("geo") == _geo_e:
+        e1, e2, e3 = st.columns(3)
+        e1.metric("POA frontal sin filas vecinas", f"{_est['poa_sin_kwh_m2']:,.0f} kWh/m²")
+        e2.metric("POA frontal con el campo", f"{_est['poa_con_kwh_m2']:,.0f} kWh/m²")
+        e3.metric("Pérdida por sombra entre filas", f"{_est['perdida_frontal_pct']:.2f} %")
+else:
+    st.caption("📏 Para estimar la sombra entre filas, calcula primero el recurso solar en ☀️ Recurso Solar.")
+
+# ── 6. Vista 3D del campo ────────────────────────────────────────────────────
+st.markdown("### 6. Vista 3D del campo")
 _fig = go.Figure(data=trazas_campo(campo))
 _fig.update_layout(
     scene=dict(xaxis_title="A lo largo de la fila (m)", yaxis_title="Adelante → atrás (m)",

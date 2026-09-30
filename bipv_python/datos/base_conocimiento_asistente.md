@@ -5164,7 +5164,7 @@ La fila «↳ Solo horas calientes» del balance mostraba `Tk_gamma=—%/°C` au
 
 **Por qué existe:** 🗺️ Vista 3D está hecho para BIPV (fachadas, techos, pérgolas). Una granja se diseña por filas y no por superficies del edificio; dentro de Vista 3D aparecían incoherencias (por ejemplo «288 módulos» cuando el proyecto tenía 308). Ahora la granja tiene su página y Vista 3D la dibuja con **el mismo cálculo**.
 
-**Qué no hace todavía (fase 1):** no cambia la energía. Solo compara tu campo con lo que usan los cálculos (módulos, GCR y altura del modelo bifacial) y avisa si no coinciden. La sombra entre filas por geometría llega en la fase 2.
+**Fase 1:** compara tu campo con lo que usan los cálculos (módulos, GCR y altura del modelo bifacial) y avisa si no coinciden. **Fase 2 (sección 94):** el botón «⚡ Usar la geometría del campo en la energía» lleva la sombra entre filas y la cara trasera a la energía.
 
 ### Granja FV — fórmulas en palabras y cuenta real
 
@@ -5187,6 +5187,37 @@ La fila «↳ Solo horas calientes» del balance mostraba `Tk_gamma=—%/°C` au
 - **3. Resultados:** módulos ubicados, kWp, GCR, ángulo límite, corredor y suelo libre.
 - **4. Coherencia:** 🟢 todo coincide; 🔴 no caben los módulos o las filas se tocan (cambia terreno, mesas o separación); 🟠 el GCR o la altura del **modelo bifacial** de ☀️ Recurso Solar no son los del campo (cámbialos allá al valor que muestra el aviso, porque la cara trasera se calcula con esos datos); 🟠 Producción y Dimensionamiento tienen distinto número de módulos (vuelve a simular); 🟠 hay energía **multi-superficie** publicada desde Vista 3D (Financiero usaría esa y no la de Producción: desactívala si el proyecto es solo la granja); 🟡 el factor de ocupación o el área del terreno de 🏠 Proyecto no coinciden con el campo.
 - **Qué hacer:** usa 🌾 Granja FV para granjas y 🗺️ Vista 3D para BIPV. Guarda el proyecto: la geometría del campo se guarda con él.
+
+## 94. 🌾 Granja FV fase 2: sombra entre filas y cara trasera en la energía (30-sep-2026)
+
+### Sombra entre filas — qué es y por qué importa
+
+**Qué es:** en una granja las filas están una detrás de otra. Cuando el sol está bajo (mañana, tarde), la fila de adelante tapa la parte baja de la fila de atrás; además cada fila "ve" menos cielo y menos suelo iluminado porque la de adelante le estorba. Eso es la **sombra entre filas** (sombra mutua) y le quita energía a la **cara frontal** de los paneles.
+
+**Por qué importa:** antes la app solo la calculaba con paneles **bifaciales** (con un ancho de mesa fijo de 2,0 m que no se veía en pantalla). Con paneles **monofaciales** la granja se calculaba como si cada fila estuviera sola. Ahora la energía usa la geometría real de tu campo en los dos casos.
+
+**La cara trasera (bifaciales):** la luz de atrás no llega completa. Las vigas, rieles y postes de la estructura tapan una parte (**sombra de la estructura en la cara trasera**) y la luz trasera llega dispareja entre módulos, así que una parte de ese aporte se pierde (**mismatch por luz trasera no uniforme**). Valores típicos: **5 %** de sombra de estructura y **10 %** de mismatch trasero, los mismos que usa la referencia estándar internacional. Por defecto la app pone 0 % (sin descontar) para no cambiar los proyectos guardados.
+
+### Sombra entre filas — fórmula en palabras y cuenta real
+
+- La app calcula la irradiancia hora a hora con el modelo de **filas infinitas** de pvlib (infinite_sheds) dos veces: con el **GCR de tu campo** y con una **fila aislada** (GCR 0,01).
+- La razón «con filas ÷ fila aislada» de cada parte de la luz (directa, difusa del cielo y reflejada del suelo) multiplica la irradiancia normal del plano del panel. Así solo entra el efecto de las filas, sin cambiar el modelo de cielo.
+- **Cara trasera:** aporte trasero final = aporte trasero × (1 − sombra de la estructura) × (1 − mismatch trasero).
+- **Separación entre filas** = Ancho de la mesa ÷ GCR.
+
+**Ejemplo (Apartadó):** mesas de 2 módulos horizontales, **Ancho de la mesa** 2,626 m, inclinación 10°, GCR 39,8 %, altura del centro 2,63 m.
+- Pérdida frontal por sombra entre filas: la referencia estándar internacional da **0,20 %**; la app da del orden de **0,1–0,4 %** según el clima del año típico. Con 10° de inclinación y filas separadas 6,60 m la sombra es pequeña.
+- Si juntas las filas a GCR 60 % la pérdida sube a ≈ 0,7 %; a GCR 80 % ≈ 1,6 %.
+- Cara trasera con 5 % y 10 %: aporte trasero × 0,95 × 0,90 = aporte trasero × **0,855** (se pierde 14,5 % de lo que da la cara de atrás, no de toda la energía).
+
+### Sombra entre filas — cómo leerlo en pantalla y qué hacer
+
+- **🌾 Granja FV, sección 5:** presiona **«⚡ Usar la geometría del campo en la energía»**. La app guarda el GCR, la altura del centro de la mesa y el **Ancho de la mesa** de tu campo. Si el modelo bifacial está activo también actualiza esos tres datos en ☀️ Recurso Solar.
+- **«📏 Estimar la sombra entre filas de este campo»** muestra la irradiancia anual sin filas, con filas y la **pérdida frontal (%)**, sin cambiar nada todavía.
+- **Coherencia (🌾 Granja FV):** 🟢 «La energía usa la geometría del campo»; 🟠 la POA vigente no incluye la sombra entre filas o se calculó con otra geometría: presiona el botón y recalcula.
+- **☀️ Recurso Solar:** después del botón, presiona el botón de cálculo de la irradiancia para recalcular la POA y luego vuelve a simular 📊 Producción. En el bloque bifacial ahora ves **Ancho de la mesa en la pendiente (m)**, **Sombra de la estructura en la cara trasera (%)** y **Mismatch por luz trasera no uniforme (%)**.
+- **Qué hacer:** para granjas usa siempre el botón después de diseñar el campo. Si quieres compararte con la referencia estándar internacional, pon 5 % y 10 % en la cara trasera. Si cambias la separación o las mesas, vuelve a presionar el botón y recalcula.
+- **Límite conocido:** si hay un horizonte lejano cargado en el modelo bifacial, la app lo aplica a la luz directa sin distinguir la parte ya sombreada por la fila de adelante; el efecto es muy pequeño en granjas de poca inclinación.
 
 Calculadora BIPV — Innovación Química
 

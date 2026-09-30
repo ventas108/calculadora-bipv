@@ -305,6 +305,52 @@ def _aplicar_reduccion_svf_isotropica(
     return salida
 
 
+GCR_FILA_AISLADA = 0.01
+
+
+def aplicar_sombra_filas(poa: pd.DataFrame, tmy: pd.DataFrame, solar_pos: pd.DataFrame,
+                         dni_extra, tilt: float, azimuth: float, albedo: float,
+                         filas: dict) -> pd.DataFrame:
+    """Sombra mutua entre filas sobre la cara frontal (paneles monofaciales).
+
+    Spec ``05-perdidas-y-temperatura/sombra-entre-filas``. Se calcula con
+    ``pvlib.bifacial.infinite_sheds`` dos veces --con el GCR del campo y con
+    una fila aislada (GCR 0,01)-- y la razón de cada componente (directa,
+    difusa del cielo, reflejada del suelo) multiplica la POA clásica. Así se
+    aísla el efecto de las filas sin cambiar el modelo de transposición.
+    """
+    from pvlib.bifacial import infinite_sheds
+
+    gcr = min(max(float(filas.get("gcr", 0.25)), 0.02), 0.95)
+    ancho = float(filas.get("ancho_colector_m", 2.0))
+    altura = float(filas.get("altura_m", 1.0))
+
+    def _front(g):
+        return infinite_sheds.get_irradiance(
+            surface_tilt=tilt, surface_azimuth=azimuth,
+            solar_zenith=solar_pos["apparent_zenith"], solar_azimuth=solar_pos["azimuth"],
+            gcr=g, height=altura, pitch=ancho / g, ghi=tmy["G_h"], dhi=tmy["Gd_h"],
+            dni=tmy["Gb_n"], albedo=albedo, model="haydavies", dni_extra=dni_extra,
+            bifaciality=0.0,
+        ).fillna(0.0)
+
+    con, aislada = _front(gcr), _front(GCR_FILA_AISLADA)
+
+    def _razon(col):
+        den = aislada[col].to_numpy(dtype=float)
+        num = con[col].to_numpy(dtype=float)
+        return np.clip(np.divide(num, den, out=np.ones_like(den), where=den > 1e-9), 0.0, 1.0)
+
+    out = poa.copy()
+    out["poa_direct"] = poa["poa_direct"] * _razon("poa_front_direct")
+    out["poa_sky_diffuse"] = poa["poa_sky_diffuse"] * _razon("poa_front_sky_diffuse")
+    out["poa_ground_diffuse"] = poa["poa_ground_diffuse"] * _razon("poa_front_ground_diffuse")
+    out["poa_diffuse"] = out["poa_sky_diffuse"] + out["poa_ground_diffuse"]
+    out["poa_global"] = (out["poa_direct"] + out["poa_diffuse"]).clip(lower=0.0)
+    out.attrs = dict(poa.attrs)
+    return out.fillna(0.0)
+
+
 def calcular_poa(
     tmy: pd.DataFrame,
     lat: float,
@@ -315,6 +361,7 @@ def calcular_poa(
     albedo: float = 0.20,
     bifacial: dict | None = None,
     reduccion_diffusa_isotropica: float = 1.0,
+    filas: dict | None = None,
 ) -> pd.DataFrame:
     """
     Calcula irradiancia POA (Plane of Array) para la orientación dada.
@@ -396,6 +443,11 @@ def calcular_poa(
         )
 
     if not bifacial:
+        # Spec 05/sombra-entre-filas (granja FV fase 2): con la geometría de
+        # filas del campo, la cara frontal pierde la sombra mutua (directa,
+        # difusa del cielo y reflejada del suelo) hora a hora.
+        if filas:
+            poa = aplicar_sombra_filas(poa, tmy, solar_pos, dni_extra, tilt, azimuth, albedo, filas)
         return poa
 
     # ── Modelo bifacial: pvlib infinite_sheds (estándar de la industria) ──────
@@ -414,6 +466,10 @@ def calcular_poa(
     # ganancia bifacial); 1 = trasera plenamente expuesta. Retro-compatible:
     # sin la clave, el factor es 1.0 y el comportamiento es idéntico.
     factor_vista = min(max(float(bifacial.get("factor_vista_trasera", 1.0)), 0.0), 1.0)
+    # Spec 05/sombra-entre-filas: sombra de la estructura sobre la cara
+    # trasera y mismatch por irradiancia trasera no uniforme (0 = sin cambio).
+    f_rear_extra = ((1.0 - min(max(float(bifacial.get("sombra_trasera_pct", 0.0) or 0.0), 0.0), 100.0) / 100.0)
+                    * (1.0 - min(max(float(bifacial.get("mismatch_trasero_pct", 0.0) or 0.0), 0.0), 100.0) / 100.0))
 
     poa_bif = infinite_sheds.get_irradiance(
         surface_tilt=tilt,
@@ -444,8 +500,8 @@ def calcular_poa(
     # poa_global = poa_front + bifacialidad × factor × poa_back
     # poa_rear se reporta YA multiplicada por el factor de vista.
     out["poa_front"] = _front
-    out["poa_rear"] = (_rear * factor_vista).clip(lower=0.0)
-    out["poa_global"] = (_front + bifacialidad * factor_vista * _rear).clip(lower=0.0)
+    out["poa_rear"] = (_rear * factor_vista * f_rear_extra).clip(lower=0.0)
+    out["poa_global"] = (_front + bifacialidad * factor_vista * f_rear_extra * _rear).clip(lower=0.0)
     return out.fillna(0.0)
 
 
