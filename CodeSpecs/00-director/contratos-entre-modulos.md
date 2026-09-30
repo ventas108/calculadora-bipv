@@ -70,6 +70,13 @@ Regla de consumo:
 	parejo. Publica `N_inv_total`, `N_paneles_granja`, `P_dc_total_kWp` y
 	`reparto_strings_inversores`; nunca más módulos de los que caben sin
 	cadenas declaradas. La relación DC/AC se evalúa con el sistema real.
+- 🌾 Granja FV, fase 1 (30-sep-2026, Spec `03-dimensionamiento/granja-fv-campo`):
+	`granja_fv` (geometría del campo) se guarda con el proyecto;
+	`calculos/granja_fv.calcular_campo` es el único cálculo del campo y lo
+	usan 🌾 Granja FV y la rama de granja de 🗺️ Vista 3D. Módulos a ubicar:
+	`N_paneles_final` (Producción) o `N_paneles_granja`. Inclinación y azimut
+	vienen de 🏠 Proyecto. En esta fase no escribe `bifacial_cfg` ni cambia
+	la energía: `coherencia_campo` avisa si el GCR o la altura no coinciden.
 - NOCT y γ del Motor Óptico frente a la ficha (30-sep-2026, Spec `05-perdidas-y-temperatura/motor-optico-ficha-termica`):
 	`motor_optico_noct` sigue siendo la fuente de la temperatura de celda en
 	Producción; `calculos/motor_optico_ficha.diferencias_ficha` lo compara con

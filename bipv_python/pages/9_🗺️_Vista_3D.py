@@ -666,126 +666,32 @@ with tab_modelo:
 
     # ── #167 — Vista de granja agrivoltaica: matrices elevadas sobre el cultivo ─
     if _es_granja_3d:
-        _lado_eq = math.sqrt(max(area_m2, 1.0))
-        with st.expander("🌱 Geometría de la granja agrivoltaica", expanded=False):
-            _c1, _c2, _c3 = st.columns(3)
-            _W_ter = _c1.number_input(
-                "Ancho del terreno E-O (m)", 5.0, 2000.0,
-                float(st.session_state.get("terreno_ancho_3d", _lado_eq)), step=1.0,
-                help="Lado del terreno paralelo a las filas de paneles.")
-            _L_ter = _c2.number_input(
-                "Largo del terreno N-S (m)", 5.0, 2000.0,
-                float(st.session_state.get("terreno_largo_3d",
-                      max(area_m2 / max(_W_ter, 1.0), 5.0))), step=1.0,
-                help="Lado perpendicular a las filas. Ancho × largo ≈ área del terreno.")
-            _h0 = _c3.number_input(
-                "Altura libre al suelo (m)", 0.5, 8.0,
-                float(st.session_state.get("altura_libre_3d",
-                      3.0 if _f_ocup_3d < 100.0 else 0.8)), step=0.5,
-                help="Borde inferior del panel — espacio para el cultivo y la maquinaria.")
-            _c4, _c5, _c6 = st.columns(3)
-            _filas_m = int(_c4.number_input("Filas de paneles por matriz", 1, 6,
-                           int(st.session_state.get("matriz_filas_3d", 2))))
-            _cols_m  = int(_c5.number_input("Paneles por fila de matriz", 1, 40,
-                           int(st.session_state.get("matriz_cols_3d", 9))))
-            _pas_x   = _c6.number_input("Pasillo entre matrices (m)", 0.0, 20.0,
-                           float(st.session_state.get("pasillo_matrices_3d", 3.0)), step=0.5)
-        st.session_state["terreno_ancho_3d"]    = _W_ter
-        st.session_state["terreno_largo_3d"]    = _L_ter
-        st.session_state["altura_libre_3d"]     = _h0
-        st.session_state["matriz_filas_3d"]     = _filas_m
-        st.session_state["matriz_cols_3d"]      = _cols_m
-        st.session_state["pasillo_matrices_3d"] = _pas_x
-
-        _gcr3d  = max(_f_ocup_3d / 100.0, 0.05)
-        _tilt_g = float(st.session_state.get("tilt_fachada",
-                        st.session_state.get("tilt_default", 20)) or 20)
-        _tilt_g = min(max(_tilt_g, 5.0), 45.0)          # granja: 5–45°
-
-        # Panel apaisado: lado largo (ph) horizontal, lado corto (pw) en la pendiente
-        _mat_w  = _cols_m * ph                           # ancho de la matriz (m)
-        _cw     = _filas_m * pw                          # colector en la pendiente (m)
-        _dy     = _cw * math.cos(math.radians(_tilt_g))  # huella N-S de la matriz
-        _dz     = _cw * math.sin(math.radians(_tilt_g))
-        _pitch  = max(_cw / _gcr3d, _dy + 0.5)           # separación entre ejes de filas
-
-        _pan_mat = _filas_m * _cols_m                    # paneles por matriz
-        _n_mat_nec = max(1, math.ceil(N_paneles / _pan_mat)) if N_paneles > 0 else 1
-        # Capacidad real: una matriz que no cabe en el terreno NO cuenta
-        _cabe_matriz = (_mat_w <= _W_ter) and (_dy <= _L_ter)
-        _n_mat_x = int((_W_ter + _pas_x) // (_mat_w + _pas_x)) if _cabe_matriz else 0
-        _n_row_y = (int((_L_ter - _dy) // _pitch) + 1) if _cabe_matriz else 0
-        _n_mat_cap = _n_mat_x * _n_row_y
-        _n_mat = min(_n_mat_nec, _n_mat_cap)
-        n_shown = min(N_paneles, _n_mat * _pan_mat) if N_paneles > 0 else _n_mat * _pan_mat
-        n_rows, n_cols = _n_row_y, _n_mat_x
-
-        # Suelo verde = cultivo (forma real del terreno)
-        _area_pan_real = n_shown * area_panel
-        _pct_libre = max(0.0, 100.0 * (1 - _area_pan_real / max(_W_ter * _L_ter, 1.0)))
-        _suelo = go.Mesh3d(
-            x=[0, _W_ter, _W_ter, 0], y=[0, 0, _L_ter, _L_ter], z=[0, 0, 0, 0],
-            i=[0, 0], j=[1, 2], k=[2, 3],
-            color='rgb(46,125,50)', opacity=0.95, name='Cultivo',
-            hovertext=f'🌱 Cultivo — {_pct_libre:.0f}% del terreno libre bajo y entre paneles',
-            hoverinfo='text', showlegend=True,
+        # Spec 03/granja-fv-campo: la granja se dibuja con el MISMO cálculo que
+        # 🌾 Granja FV (antes Vista 3D tenía su propia cuenta de matrices y
+        # mostraba otros módulos que el proyecto, p. ej. 288 en vez de 308).
+        from calculos.granja_fv import (
+            calcular_campo, dimensiones_modulo, geometria_desde_estado,
+            modulos_del_proyecto, trazas_campo,
         )
-        # Matrices de paneles elevadas, con pasillos y corredores de cultivo.
-        # La última matriz se dibuja PARCIAL (solo las columnas con paneles reales)
-        # para que la malla coincida con n_shown.
-        _xs, _ys, _zs, _fi, _fj, _fk = [], [], [], [], [], []
-        _usadas, _pan_rest = 0, n_shown
-        _filas_reales = min(_n_row_y, math.ceil(_n_mat / _n_mat_x)) if _n_mat_x else 0
-        _marg_y = max((_L_ter - (max(_filas_reales - 1, 0) * _pitch + _dy)) / 2.0, 0.0)
-        for _r in range(_filas_reales):
-            _en_fila = min(_n_mat - _usadas, _n_mat_x)
-            if _en_fila <= 0 or _pan_rest <= 0:
-                break
-            _ancho_fila = _en_fila * _mat_w + (_en_fila - 1) * _pas_x
-            _marg_x = max((_W_ter - _ancho_fila) / 2.0, 0.0)
-            _y0 = _marg_y + _r * _pitch
-            for _c in range(_en_fila):
-                if _pan_rest <= 0:
-                    break
-                _pan_este = min(_pan_mat, _pan_rest)
-                _w_este = min(_mat_w, math.ceil(_pan_este / _filas_m) * ph)
-                _x0 = _marg_x + _c * (_mat_w + _pas_x)
-                _b  = len(_xs)
-                _xs += [_x0, _x0 + _w_este, _x0 + _w_este, _x0]
-                _ys += [_y0, _y0, _y0 + _dy, _y0 + _dy]
-                _zs += [_h0, _h0, _h0 + _dz, _h0 + _dz]
-                _fi += [_b, _b]; _fj += [_b + 1, _b + 2]; _fk += [_b + 2, _b + 3]
-                _pan_rest -= _pan_este
-            _usadas += _en_fila
-        _filas_mesh = go.Mesh3d(
-            x=_xs, y=_ys, z=_zs, i=_fi, j=_fj, k=_fk,
-            color=_color_poa(poa_mes, poa_min_m, poa_max_m), opacity=1.0,
-            name='Matrices de paneles',
-            hovertext=(f'☀️ {_n_mat} matrices de {_filas_m}×{_cols_m} '
-                       f'({_pan_mat} paneles c/u) · tilt {_tilt_g:.0f}° · '
-                       f'altura libre {_h0:.1f} m · corredor {_pitch - _dy:.1f} m'),
-            hoverinfo='text', showlegend=True,
-        )
-        traces = [_suelo, _filas_mesh]
-        _corr = _pitch - _dy
-        if not _cabe_matriz:
-            st.error(
-                f"❌ Una matriz de {_filas_m}×{_cols_m} paneles ocupa "
-                f"**{_mat_w:.1f} × {_dy:.1f} m** y no cabe en el terreno de "
-                f"{_W_ter:.0f} × {_L_ter:.0f} m. Reduce los paneles por matriz "
-                f"o amplía el terreno."
-            )
+        _dims_g = dimensiones_modulo(panel_dict or {"area_m2": area_panel})
+        _n_g = modulos_del_proyecto(st.session_state)["n"] or N_paneles
+        _campo_g = calcular_campo(geometria_desde_estado(st.session_state, _dims_g), _dims_g,
+                                  _n_g, pmax_panel)
+        _W_ter, _L_ter = _campo_g["ancho_terreno_m"], _campo_g["largo_terreno_m"]
+        traces = trazas_campo(_campo_g, color=_color_poa(poa_mes, poa_min_m, poa_max_m))
+        n_shown = _campo_g["modulos_colocados"]
+        n_rows, n_cols = _campo_g["filas_usadas"], _campo_g["mesas_por_fila"]
         st.info(
-            f"🌱 **Granja agrivoltaica** — terreno **{_W_ter:.0f} × {_L_ter:.0f} m**: "
-            f"**{_n_mat} matrices** de {_filas_m}×{_cols_m} paneles "
-            f"({n_shown} paneles, {round(n_shown * pmax_panel / 1000, 1)} kWp) "
-            f"elevadas a **{_h0:.1f} m**, con corredores de cultivo de "
-            f"**{_corr:.1f} m** entre filas y pasillos de **{_pas_x:.1f} m** entre "
-            f"matrices. El **{_pct_libre:.0f}%** del suelo queda libre para el cultivo."
-            + (f" ⚠️ El terreno solo aloja {_n_mat_cap * _pan_mat} de los "
-               f"{N_paneles} paneles del Dimensionamiento — amplía el terreno o "
-               f"reduce los corredores." if N_paneles > _n_mat_cap * _pan_mat else "")
+            f"🌾 **Granja** — {n_shown} de {_n_g} módulos en {n_rows} filas · GCR "
+            f"**{_campo_g['gcr'] * 100:.1f} %** · corredor **{_campo_g['corredor_m']:.1f} m** · "
+            f"suelo libre **{_campo_g['suelo_libre_pct']:.0f} %**. La geometría del campo se edita en "
+            "**🌾 Granja FV** (Vista 3D queda para fachadas y techos BIPV)."
         )
+        if not _campo_g["cabe"]:
+            st.warning(
+                "🟠 " + (" ".join(_campo_g["errores"]) or
+                         f"El campo aloja {n_shown} de {_n_g} módulos: ajústalo en 🌾 Granja FV.")
+            )
     else:
         mesh_ed, wire_ed = building_box_traces(ancho_m, profundidad_m, altura_m, opac_ed)
         mesh_pan, frame_pan, n_shown, n_rows, n_cols = panel_grid_traces(
