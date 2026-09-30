@@ -16,7 +16,7 @@
   - 📊 Producción con el Motor Óptico en 35 °C: aviso 🟠 antes de simular; en
     45 °C, sin aviso.
 - [x] Pruebas existentes del Motor Óptico y del Asistente siguen verdes.
-- [x] Suite completa de `bipv_python`.
+- [x] Suite completa de `bipv_python`: 2163 pruebas pasan.
 
 ## Resultado
 
