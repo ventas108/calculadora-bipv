@@ -22,7 +22,7 @@
     4,01 m; 🟠 altura del modelo bifacial 1,00 m frente a 2,63 m del campo.
   - 🗺️ Vista 3D con esa geometría: «308 de 308 módulos en 5 filas · GCR
     39.8 %», métrica «Paneles visualizados» 308 (antes 288).
-- [x] Suite completa de `bipv_python`.
+- [x] Suite completa de `bipv_python`: 2185 pruebas pasan.
 
 ## Resultado
 
