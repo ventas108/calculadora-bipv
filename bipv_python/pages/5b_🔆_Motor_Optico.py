@@ -120,6 +120,42 @@ if _panel_detectado and _panel_cambio:
     # Marcar panel como referencia para detectar futuros cambios
     st.session_state["mo_panel_ref"] = _panel_nombre_actual
 
+# ── Datos persistentes de los campos (30-sep-2026) ───────────────────────────
+# Bug real: los campos usaban la MISMA clave para el dato y para el widget
+# (la clave «mo_noct» en los dos). Streamlit borra la clave de un widget al abrir otra página o
+# recargar; al volver, el campo arrancaba en su mínimo (NOCT 35 °C, γ −0,70
+# %/°C) y así se guardaba el proyecto. Ahora el dato vive en «mo_*» y el
+# campo en «_w_mo_*», sincronizados (mismo patrón que 💰 Financiero, Spec
+# 06/parametros-persistentes). Si falta el dato se toma el último valor con
+# que se calculó la cascada y, si no, la ficha del panel.
+from calculos.campos_editor import sincronizar_campo as _sinc_mo
+
+_ficha_mo = ficha_termica(_panel_dict) if _panel_detectado else {"noct": None, "gamma_pct": None}
+if st.session_state.get("mo_noct") is None:
+    st.session_state["mo_noct"] = float(st.session_state.get("motor_optico_noct")
+                                        or _ficha_mo["noct"] or 45.0)
+if st.session_state.get("mo_coef_temp") is None:
+    _gamma_prev = st.session_state.get("motor_optico_coef_temp")
+    st.session_state["mo_coef_temp"] = float(_gamma_prev * 100.0 if _gamma_prev is not None
+                                             else (_ficha_mo["gamma_pct"] or -0.45))
+
+
+def _campo_mo(widget, etiqueta, clave, defecto, **kwargs):
+    """Widget «_w_<clave>» ligado al dato persistente «clave»."""
+    valor = st.session_state.get(clave, defecto)
+    if valor is None:
+        valor = defecto
+    if "min_value" in kwargs and "max_value" in kwargs:
+        valor = min(max(type(defecto)(valor), type(defecto)(kwargs["min_value"])),
+                    type(defecto)(kwargs["max_value"]))
+    if "options" in kwargs and valor not in kwargs["options"]:
+        valor = defecto
+    _sinc_mo(st.session_state, f"_w_{clave}", valor)
+    resultado = widget(etiqueta, key=f"_w_{clave}", **kwargs)
+    st.session_state[clave] = resultado
+    return resultado
+
+
 # ── Banner informativo sobre auto-llenado ─────────────────────────────────────
 if _panel_detectado:
     _tecno_disp = _panel_dict.get("tecnologia", "—")
@@ -252,26 +288,23 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     st.markdown("**Óptica del vidrio**")
-    vidrio_sel = st.selectbox(
-        "Tipo de vidrio",
+    vidrio_sel = _campo_mo(
+        st.selectbox, "Tipo de vidrio", "mo_vidrio_sel", _B0_DEFAULT_KEY,
         options=list(B0_POR_VIDRIO.keys()),
-        key="mo_vidrio_sel",
     )
     if vidrio_sel == "Personalizado":
-        b0 = st.number_input(
-            "b₀ ASHRAE personalizado",
-            min_value=0.01, max_value=0.25, value=0.05, step=0.01,
-            format="%.3f", key="mo_b0_custom",
+        b0 = _campo_mo(
+            st.number_input, "b₀ ASHRAE personalizado", "mo_b0_custom", 0.05,
+            min_value=0.01, max_value=0.25, step=0.01, format="%.3f",
         )
     else:
         b0 = B0_POR_VIDRIO[vidrio_sel]
         _origen_b0 = " (desde panel)" if _panel_detectado else ""
         st.metric("b₀ ASHRAE seleccionado", f"{b0:.3f}", help=f"Coeficiente ASHRAE inferido de la tecnología{_origen_b0}.")
 
-    transparencia = st.slider(
-        "Transparencia τ del vidrio (%)",
+    transparencia = _campo_mo(
+        st.slider, "Transparencia τ del vidrio (%)", "mo_transparencia", 0,
         min_value=0, max_value=70, step=5,
-        key="mo_transparencia",
         help="Porcentaje de área transparente (sin celda activa). Tomado de la ficha del panel.",
     ) / 100.0
 
@@ -309,11 +342,10 @@ with col2:
             "este tipo de instalación. Cámbialo si tu proyecto real tiene una "
             "condición de montaje distinta."
         )
-    montaje_sel = st.selectbox(
-        "Tipo de montaje",
+    montaje_sel = _campo_mo(
+        st.selectbox, "Tipo de montaje", "mo_montaje",
+        list(K_BIPV_POR_MONTAJE.keys())[_idx_montaje_default],
         options=list(K_BIPV_POR_MONTAJE.keys()),
-        index=_idx_montaje_default,
-        key="mo_montaje",
     )
     k_bipv = K_BIPV_POR_MONTAJE[montaje_sel]
     st.metric(
@@ -322,39 +354,34 @@ with col2:
         help="Factor de confinamiento térmico. Ver tabla explicativa arriba (📘 k_BIPV).",
     )
 
-    noct = st.number_input(
-        "NOCT (°C)",
+    noct = _campo_mo(
+        st.number_input, "NOCT (°C)", "mo_noct", 45.0,
         min_value=35.0, max_value=65.0, step=1.0,
-        key="mo_noct",
         help="Temperatura nominal de operación (G=800 W/m², T=20°C, v=1 m/s). Tomado de la ficha del panel.",
     )
 
 with col3:
     st.markdown("**Coeficiente térmico**")
-    coef_pct = st.number_input(
-        "γ — Coef. temperatura (%/°C)",
+    coef_pct = _campo_mo(
+        st.number_input, "γ — Coef. temperatura (%/°C)", "mo_coef_temp", -0.45,
         min_value=-0.70, max_value=-0.10, step=0.01,
         format="%.2f",
-        key="mo_coef_temp",
         help="Negativo siempre. Tomado de la ficha del panel. Silicio cristalino ≈ −0.45, CdTe ≈ −0.21.",
     )
     coef_temp = coef_pct / 100.0  # convertir a decimal/°C
     st.metric("γ (decimal/°C)", f"{coef_temp:.4f}")
 
     st.markdown("**Soiling y auto-limpieza**")
-    usar_soiling_custom = st.checkbox(
-        "Usar factores de soiling personalizados",
-        value=False, key="mo_soiling_custom",
+    usar_soiling_custom = _campo_mo(
+        st.checkbox, "Usar factores de soiling personalizados", "mo_soiling_custom", False,
     )
     _tilt_actual = st.session_state.get("tilt_fachada", 90)
     _es_vertical = _tilt_actual >= 75
     _k_vert_default = 0.65 if _es_vertical else 1.0
-    k_soiling_vert = st.slider(
-        "Factor auto-limpieza vertical",
+    k_soiling_vert = _campo_mo(
+        st.slider, "Factor auto-limpieza vertical", "mo_k_soiling_vert", float(_k_vert_default),
         min_value=0.30, max_value=1.00, step=0.05,
-        value=float(st.session_state.get("mo_k_soiling_vert", _k_vert_default)),
         format="%.2f",
-        key="mo_k_soiling_vert",
         help=(
             "Fachadas verticales se ensucian ~35% menos que superficies inclinadas "
             "(lluvia los limpia con mayor eficacia). "
@@ -365,12 +392,10 @@ with col3:
         st.caption(f"🧹 Auto-limpieza vertical activa (k={k_soiling_vert:.2f})")
 
     st.markdown("**IAM difusa**")
-    f_iam_dif = st.slider(
-        "Factor IAM difusa (f_iam_dif)",
+    f_iam_dif = _campo_mo(
+        st.slider, "Factor IAM difusa (f_iam_dif)", "mo_f_iam_dif", 0.95,
         min_value=0.80, max_value=1.00, step=0.01,
-        value=float(st.session_state.get("mo_f_iam_dif", 0.95)),
         format="%.2f",
-        key="mo_f_iam_dif",
         help=(
             "Factor IAM para la componente difusa (llega de todos los ángulos). "
             "IEC 61853-3 recomienda 0.95 para vidrio plano. "
