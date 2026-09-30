@@ -9,7 +9,7 @@ si la maquinaria cabe, con la misma geometría que usa la energía.
 
 ## Alternativa recomendada
 
-Aprobada por el usuario el 30-sep-2026 («continua con lo pendiente»).
+Aprobada por el usuario el 30-sep-2026 («continúa con lo que sigue»: agrivoltaica).
 
 - `calculos/agrivoltaica.py`: corte de perfil entre dos filas infinitas
   (misma hipótesis que `infinite_sheds`), 60 franjas de suelo.

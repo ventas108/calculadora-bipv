@@ -24,7 +24,7 @@ energía», lo que dejó de ser cierto con la fase 2.
 
 ## Contexto
 
-Pedido del usuario el 30-sep-2026 («continua con lo pendiente … Agrivoltaica.
+Pedido del usuario el 30-sep-2026 («continúa con lo que sigue» — Agrivoltaica:
 Luz que llega al cultivo bajo y entre filas (% y kWh/m²), mapa de sombra en
 el suelo y altura libre para maquinaria»). Fases siguientes: seguidor de un
 eje y eléctrico por bloques.
