@@ -70,6 +70,11 @@ Regla de consumo:
 	parejo. Publica `N_inv_total`, `N_paneles_granja`, `P_dc_total_kWp` y
 	`reparto_strings_inversores`; nunca más módulos de los que caben sin
 	cadenas declaradas. La relación DC/AC se evalúa con el sistema real.
+- NOCT y γ del Motor Óptico frente a la ficha (30-sep-2026, Spec `05-perdidas-y-temperatura/motor-optico-ficha-termica`):
+	`motor_optico_noct` sigue siendo la fuente de la temperatura de celda en
+	Producción; `calculos/motor_optico_ficha.diferencias_ficha` lo compara con
+	la ficha (`NOCT`, `Tk_gamma`/`gamma_mp`/`beta_mp`) y Motor Óptico y
+	Producción avisan en 🟠; «Usar los de la ficha» los repone.
 - Recorte por inversor en Vista 3D (29-sep-2026, Spec `05-perdidas-y-temperatura/recorte-inversor-multisuperficie`):
 	`cadena_superficie` devuelve `perfil_ac` (forma horaria de la AC, suma 1);
 	`cadena_superficies_estado`, después del cruce, aplica

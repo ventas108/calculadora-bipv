@@ -3,6 +3,7 @@ Página 5b — Motor Óptico BIPV
 Cascada de correcciones reales: IAM · Soiling · Modelo Térmico Confinado
 Auto-llenado desde el panel configurado en Proyecto.
 """
+from calculos.motor_optico_ficha import diferencias_ficha, ficha_termica, texto_aviso_ficha
 import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
@@ -96,19 +97,18 @@ if _panel_detectado and _panel_cambio:
     _b0_key = _B0_POR_TECH.get(_tecno, _B0_DEFAULT_KEY)
     st.session_state["mo_vidrio_sel"] = _b0_key
 
-    # ── NOCT (°C) ──────────────────────────────────────────────────────────
-    _noct_raw = _panel_dict.get("NOCT")
+    # ── NOCT (°C) y γ (%/°C) de la ficha ──────────────────────────────────
+    # Spec 05/motor-optico-ficha-termica: misma lectura (y prioridad de γ:
+    # Tk_gamma, gamma_mp, beta_mp) que usa el modelo del panel en Producción.
+    _ficha_t = ficha_termica(_panel_dict)
+    _noct_raw = _ficha_t["noct"]
     if _noct_raw and 35.0 <= float(_noct_raw) <= 65.0:
         st.session_state["mo_noct"] = float(_noct_raw)
     else:
         st.session_state["mo_noct"] = 50.0   # BIPV sin datahoja → conservador
 
-    # ── γ coeficiente temperatura (%/°C) ──────────────────────────────────
-    # Usar `is None` para no tratar 0.0 como falsy
-    _gamma_raw = _panel_dict.get("gamma_mp")
-    if _gamma_raw is None:
-        _gamma_raw = _panel_dict.get("beta_mp")
-    if _gamma_raw and -0.70 <= float(_gamma_raw) <= -0.05:
+    _gamma_raw = _ficha_t["gamma_pct"]
+    if _gamma_raw and -0.70 <= float(_gamma_raw) <= -0.10:
         st.session_state["mo_coef_temp"] = float(_gamma_raw)
     else:
         st.session_state["mo_coef_temp"] = -0.45
@@ -226,6 +226,27 @@ with st.expander("📘 ¿Qué es k_BIPV y cómo elegirlo?", expanded=False):
     | k = 1.3 (confinado típico) | T_cel media ≈ 37°C → pérdida ~5.4% |
     | k = 1.5 (sellado) | T_cel media ≈ 41°C → pérdida ~7.2% |
     """)
+
+# ── NOCT y γ frente a la ficha del panel (Spec 05/motor-optico-ficha-termica) ─
+# El auto-llenado corre solo cuando cambia el panel: al abrir un proyecto
+# guardado vuelven sus valores viejos. Producción usa este NOCT para la
+# temperatura de celda, así que se avisa y se ofrece volver a la ficha.
+if _panel_detectado:
+    _dif_ficha = diferencias_ficha(st.session_state.get("mo_noct"),
+                                   st.session_state.get("mo_coef_temp"), _panel_dict)
+    if _dif_ficha:
+        _k_aviso = K_BIPV_POR_MONTAJE.get(st.session_state.get("mo_montaje"), 1.0)
+        st.warning(texto_aviso_ficha(_dif_ficha, _panel_nombre_actual, k_bipv=_k_aviso))
+
+        def _usar_ficha_termica(ficha=ficha_termica(_panel_dict)):
+            if ficha["noct"] is not None:
+                st.session_state["mo_noct"] = min(max(float(ficha["noct"]), 35.0), 65.0)
+            if ficha["gamma_pct"] is not None:
+                st.session_state["mo_coef_temp"] = min(max(float(ficha["gamma_pct"]), -0.70), -0.10)
+
+        st.button("↩️ Usar los de la ficha", key="mo_usar_ficha_termica",
+                  on_click=_usar_ficha_termica,
+                  help="Pone el NOCT y el γ de la ficha del panel. Luego vuelve a calcular la cascada.")
 
 col1, col2, col3 = st.columns(3)
 

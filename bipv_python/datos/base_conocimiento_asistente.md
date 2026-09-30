@@ -5132,6 +5132,30 @@ La fila «↳ Solo horas calientes» del balance mostraba `Tk_gamma=—%/°C` au
 - **Qué hacer:** si un inversor recorta más de 2–3 % al año, agrega otro inversor en ⚡ Diseño eléctrico y reparte los grupos, o elige un modelo de más potencia. Lo usual es DC/AC entre 1,1 y 1,3.
 - **Límite:** en el modo bypass el recorte se calcula antes de restar la sombra del CSV (horas con sombra producen menos y recortan menos), así que puede quedar un poco por encima del real.
 
+## 92. 🔆 Motor Óptico: NOCT y γ deben ser los de la ficha del panel (30-sep-2026)
+
+### NOCT y γ del Motor Óptico — qué son y por qué importan
+
+**Qué son:** el **NOCT** es la temperatura que alcanza la celda con 800 W/m², 20 °C de aire y 1 m/s de viento (dato de la ficha del panel). El **γ** es cuánto baja la potencia por cada grado que sube la celda (%/°C).
+
+**Por qué importan:** 📊 Producción calcula la temperatura de celda con el **NOCT del 🔆 Motor Óptico** (y el k del montaje). Si ese NOCT no es el de la ficha, la energía cambia **en silencio**. El γ del Motor Óptico solo cambia la «Pérdida térmica» que muestra esa página; la energía usa el γ del modelo del panel.
+
+**Qué se corrigió (caso real Apartadó, 30-sep-2026):** al abrir el proyecto guardado, el Motor Óptico quedó con **NOCT 35 °C y γ −0,70 %/°C** (valores viejos del proyecto), pero la ficha del JAM66D46-720/LB dice **45 °C y −0,29 %/°C**. El auto-llenado solo corre cuando cambias de panel, así que no los corrigió. Producción calculó 3,8 % de pérdida por temperatura en vez de ≈ 6,3 % y dio ≈ 9.000 kWh de más.
+
+### NOCT y γ — fórmula en palabras y cuenta real
+
+- Temperatura de celda = temperatura del aire + irradiancia × (NOCT − 20) ÷ 800 × k del montaje.
+- Diferencia por un NOCT distinto = (NOCT del Motor Óptico − NOCT de la ficha) ÷ 800 × 1000 × k.
+
+**Ejemplo (Apartadó, k = 1,0):** (35 − 45) ÷ 800 × 1000 × 1,0 = **12,5 °C más fría** con 1000 W/m². Con γ −0,29 %/°C eso son ≈ 3,6 % más de potencia en las horas de sol fuerte.
+
+### NOCT y γ — cómo leerlo en pantalla y qué hacer
+
+- **🔆 Motor Óptico:** si el NOCT o el γ no coinciden con la ficha, sale **🟠 «Los datos térmicos del Motor Óptico no coinciden con la ficha…»** con los dos valores y cuántos grados más fría o caliente queda la celda, y el botón **«↩️ Usar los de la ficha»**.
+- **📊 Producción:** el mismo aviso 🟠 aparece antes de simular.
+- **Qué hacer:** presiona **«Usar los de la ficha»**, vuelve a **calcular la cascada** y a simular Producción; luego **guarda el proyecto** en 🏠 Proyecto para que queden los valores buenos. Solo déjalos distintos si tienes un dato **medido** del panel instalado.
+- **Recuerda también el montaje:** en una granja la app preselecciona «Ventilado libre» (k = 1,0). Si tu referencia usa un montaje menos ventilado (por ejemplo Uc = 20 W/m²K ≈ k 1,11 con NOCT 45), elige «Semi-ventilado» (k = 1,15).
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
