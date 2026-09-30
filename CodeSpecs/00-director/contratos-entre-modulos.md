@@ -93,6 +93,12 @@ Regla de consumo:
 	`granja_luz_suelo` con la firma de la geometría (se oculta si cambia).
 	`paso_maquinaria` lee `granja_altura_maquinaria_m` y
 	`granja_ancho_maquinaria_m`. No cambia la energía.
+- 🌾 Granja FV, fase 4 — seguidor de un eje (30-sep-2026, Spec `05-perdidas-y-temperatura/seguidor-un-eje`):
+	`calculos/seguidor.comparar_seguidor_fijo` compara la luz frontal del
+	campo fijo (`granja_fv.calcular_campo`) con un seguidor Norte–Sur con y
+	sin backtracking; lee `granja_seg_*` y guarda `granja_seguidor` con su
+	firma. Solo compara: 📊 Producción sigue con la estructura fija;
+	`energia_estimada` usa `E_ac_anual_kWh` como estimación de primer orden.
 - NOCT y γ del Motor Óptico frente a la ficha (30-sep-2026, Spec `05-perdidas-y-temperatura/motor-optico-ficha-termica`):
 	`motor_optico_noct` sigue siendo la fuente de la temperatura de celda en
 	Producción; `calculos/motor_optico_ficha.diferencias_ficha` lo compara con
