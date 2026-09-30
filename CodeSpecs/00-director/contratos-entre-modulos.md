@@ -87,6 +87,12 @@ Regla de consumo:
 	publica `poa_geometria_filas`; `coherencia_campo` la compara (`poa_filas`).
 	`bifacial_cfg` suma `ancho_colector_m` (antes 2,0 fijo), `sombra_trasera_pct`
 	y `mismatch_trasero_pct` (0 = sin cambio) que multiplican el aporte trasero.
+- 🌾 Granja FV, fase 3 — agrivoltaica (30-sep-2026, Spec `03-dimensionamiento/granja-agrivoltaica`):
+	`calculos/agrivoltaica.luz_en_el_suelo` usa el resultado de
+	`granja_fv.calcular_campo` y el TMY (`G_h`, `Gd_h`); guarda
+	`granja_luz_suelo` con la firma de la geometría (se oculta si cambia).
+	`paso_maquinaria` lee `granja_altura_maquinaria_m` y
+	`granja_ancho_maquinaria_m`. No cambia la energía.
 - NOCT y γ del Motor Óptico frente a la ficha (30-sep-2026, Spec `05-perdidas-y-temperatura/motor-optico-ficha-termica`):
 	`motor_optico_noct` sigue siendo la fuente de la temperatura de celda en
 	Producción; `calculos/motor_optico_ficha.diferencias_ficha` lo compara con
