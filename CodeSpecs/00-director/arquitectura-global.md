@@ -17,6 +17,11 @@ Se completa durante la Fase 0 (arquitectura y contratos), antes de modificar fó
 | Energía mensual/anual | _(pendiente de confirmar)_ | |
 | Performance Ratio (PR) | _(pendiente de confirmar)_ | |
 | Dimensionamiento eléctrico | _(pendiente de confirmar)_ | |
+| Geometría de granja (Streamlit) | Campo de filas único para 🌾 Granja FV y 🗺️ Vista 3D | `bipv_python/calculos/granja_fv.py` (`calcular_campo`) |
+| Sombra entre filas y cara trasera (Streamlit) | POA con la geometría del campo | `bipv_python/calculos/solar.py` (`calcular_poa(filas=…)`, `aplicar_sombra_filas`) |
+| Luz para el cultivo (Streamlit) | Corte de perfil entre filas, validado contra pvlib | `bipv_python/calculos/agrivoltaica.py` |
+| Seguidor de un eje (Streamlit, solo comparación) | pvlib `singleaxis` + `infinite_sheds` + `direct_martinez` | `bipv_python/calculos/seguidor.py` |
+| Eléctrico de granja (Streamlit) | Strings, bloques, cables y caída de tensión | `bipv_python/calculos/granja_electrico.py` (`diseno_desde_estado`) |
 | Finanzas (Streamlit) | Flujo de caja con reparto autoconsumo/excedentes (`frac_exportada`, tarifa de excedentes) y precios vigentes de los catálogos | `bipv_python/calculos/financiero.py`, `calculos/indicadores_excedentes.py`, `calculos/costos_catalogo.py` |
 
 ## Flujo funcional entre módulos

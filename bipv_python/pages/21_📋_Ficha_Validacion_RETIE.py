@@ -253,6 +253,13 @@ else:
     )
     calc = calcular_retie(config)
     checks = validar_retie(config, calc)
+    # Spec 07/granja-electrico-bloques: strings, bloques y caída de tensión del
+    # campo de 🌾 Granja FV (mismo diseño que usa el Unifilar).
+    from calculos.granja_electrico import checks_retie, diseno_desde_estado
+    _dis_retie = (diseno_desde_estado(st.session_state)
+                  if st.session_state.get("tipo_instalacion") == "Granja fotovoltaica" else None)
+    if _dis_retie:
+        checks = checks + checks_retie(_dis_retie)
     svg = generar_ficha_svg(config, calc, checks)
 
 st.subheader(f"{config['proyecto']['nombre_proyecto']}")

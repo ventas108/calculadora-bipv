@@ -133,7 +133,73 @@ def avisos_coherencia(estado: Mapping[str, Any]) -> list[str]:
     if estado.get("csv_fs_sketchup_bytes") is not None and estado.get("bypass_result") is None:
         avisos.append("Tienes un CSV de Sombras SketchUp listo para usar: ábrelo en 🔀 Mismatch "
                       "con el botón «🌳 Usar el CSV generado en Sombras SketchUp».")
+    avisos.extend(avisos_granja(estado))
     return avisos
+
+
+def _es_granja(estado: Mapping[str, Any]) -> bool:
+    return str(estado.get("tipo_instalacion") or "") == "Granja fotovoltaica"
+
+
+def avisos_granja(estado: Mapping[str, Any]) -> list[str]:
+    """Avisos de 🌾 Granja FV (Specs de granja fases 1 a 5, 30-sep-2026)."""
+    if not _es_granja(estado):
+        return []
+    if not estado.get("granja_fv"):
+        return ["El proyecto es una granja y todavía no diseñaste el campo: abre 🌾 Granja FV "
+                "(terreno, mesas, filas y separación)."]
+    avisos = []
+    if not estado.get("poa_geometria_filas"):
+        avisos.append("La energía todavía no usa la geometría del campo: en 🌾 Granja FV, sección 5, presiona "
+                      "«⚡ Usar la geometría del campo en la energía» y recalcula en ☀️ Recurso Solar.")
+    if estado.get("res_produccion") is not None and not estado.get("perdida_ohmica_unifilar"):
+        avisos.append("📊 Producción usa el % fijo de pérdida en cables: en ⚡ Diagrama Unifilar marca "
+                      "«🌾 Usar los cables de 🌾 Granja FV» para usar los cables reales del campo.")
+    return avisos
+
+
+def resumen_granja(estado: Mapping[str, Any]) -> list[str]:
+    """Líneas con los resultados de 🌾 Granja FV para el contexto del Asistente."""
+    if not _es_granja(estado) or not estado.get("granja_fv"):
+        return []
+    lineas = []
+    r = estado.get("granja_fv_resultado") or {}
+    if r:
+        lineas.append(
+            f"🌾 Campo de la granja: {r.get('modulos_colocados')} de {r.get('modulos_proyecto')} módulos, "
+            f"{r.get('filas_usadas')} filas, GCR {float(r.get('gcr') or 0) * 100:.1f} %, ángulo límite "
+            f"{float(r.get('angulo_limite_deg') or 0):.1f}°, corredor {float(r.get('corredor_m') or 0):.2f} m, "
+            f"centro de la mesa a {float(r.get('altura_centro_m') or 0):.2f} m.")
+    geo = estado.get("poa_geometria_filas")
+    if geo:
+        lineas.append(f"🌾 La POA vigente usa la geometría de filas GCR {float(geo['gcr']):.3f}, altura "
+                      f"{float(geo['altura_m']):.2f} m, mesa {float(geo['ancho_colector_m']):.3f} m.")
+    est = estado.get("granja_sombra_estimada")
+    if est:
+        lineas.append(f"🌾 Sombra entre filas estimada: {est['perdida_frontal_pct']:.2f} % de la luz frontal.")
+    luz = estado.get("granja_luz_suelo")
+    if luz:
+        lineas.append(f"🌱 Luz en el suelo: media {luz['media_pct']:.0f} % del campo abierto "
+                      f"({luz['media_kwh_m2']:,.0f} kWh/m²), bajo las mesas {luz['bajo_mesa_pct']:.0f} %, "
+                      f"entre filas {luz['entre_filas_pct']:.0f} %, homogeneidad {luz['homogeneidad']:.2f}.")
+    seg = estado.get("granja_seguidor")
+    if seg:
+        lineas.append(f"☀️ Seguidor de un eje frente a la fija: {seg['ganancia_backtracking_pct']:+.1f} % con "
+                      f"backtracking, {seg['ganancia_sin_backtracking_pct']:+.1f} % sin backtracking "
+                      f"(sombra eléctrica {seg['perdida_sombra_electrica_pct']:.1f} %). Solo comparación: "
+                      "Producción sigue con estructura fija.")
+    try:
+        from calculos.granja_electrico import diseno_desde_estado
+        d = diseno_desde_estado(estado)
+    except Exception:
+        d = None
+    if d:
+        lineas.append(
+            f"⚡ Eléctrico por bloques: {d['n_strings']} strings de {d['n_serie']} "
+            f"({' + '.join(str(x) for x in d['reparto'])} por inversor), {d['strings_cruzan_filas']} cruzan filas, "
+            f"caída DC máx. {d['caida_dc_max_pct'] or 0:.2f} %, caída AC máx. {d['caida_ac_max_pct'] or 0:.2f} %, "
+            f"pérdida DC a STC {d['perdida_dc_stc_pct'] or 0:.2f} %.")
+    return lineas
 
 
 # ═════════════════════════ NIVEL 2: CHAT CON EL MANUAL ══════════════════════
@@ -253,6 +319,7 @@ def contexto_sesion(estado: Mapping[str, Any]) -> str:
         lineas.append(f"👉 Siguiente paso sugerido: {sig['pagina']}")
     for a in avisos_coherencia(estado):
         lineas.append(f"⚠️ {a}")
+    lineas.extend(resumen_granja(estado))
     # Segunda opinión JRC/Huld (31-ago-2026, pedido explícito del usuario:
     # "el asistente si se le pregunta ayude a explicar de forma asertiva
     # dicha comparacion de acuerdo a los valores calculados") -- escrita en
@@ -301,7 +368,7 @@ def contexto_sesion(estado: Mapping[str, Any]) -> str:
 
 
 PROMPT_SISTEMA = """Eres el Asistente de la Calculadora BIPV (fotovoltaica integrada en \
-edificios, mercado colombiano). Tu ÚNICA fuente de verdad es el MANUAL adjunto y el \
+edificios, y también granjas solares y agrivoltaicas con 🌾 Granja FV; mercado colombiano). Tu ÚNICA fuente de verdad es el MANUAL adjunto y el \
 ESTADO DE LA SESIÓN del usuario. Reglas estrictas:
 1. Responde SOLO con información del manual o del estado de la sesión. Si la respuesta \
 no está ahí, di claramente: «Eso no está cubierto en el manual» y sugiere a qué página \

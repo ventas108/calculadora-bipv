@@ -5297,6 +5297,145 @@ La fila «↳ Solo horas calientes» del balance mostraba `Tk_gamma=—%/°C` au
 - **Aviso 🟠:** el borde del seguidor queda a menos de 0,5 m del suelo con el giro máximo. Sube el eje o baja el ángulo.
 - **Qué hacer:** si la ganancia justifica el costo extra del seguidor (estructura, motores, mantenimiento), considéralo; en 💰 Financiero compara con la estructura fija. La energía de 📊 Producción **sigue calculada con la estructura fija**: esta sección solo compara.
 
+## 97. ⚡ Granja FV fase 5: eléctrico por bloques — strings, inversores y cables desde el campo (30-sep-2026)
+
+### Eléctrico por bloques — qué es y por qué importa
+
+**Qué es:** la sección **8 de 🌾 Granja FV** ubica en el campo los **strings** de 📐 Dimensionamiento. Luego agrupa las filas en un **bloque por inversor** y calcula el **largo de los cables**: DC de cada string a su inversor y AC de cada inversor al punto de conexión. Con eso calcula la **caída de tensión**. Dibuja además un plano con cada string del color de su inversor.
+
+**Por qué importa:** antes, en ⚡ Diagrama Unifilar había que escribir a mano un solo largo de cable DC. Si se dejaba en 0, 📊 Producción usaba un % fijo de pérdida en cables. Ahora el largo sale de la geometría real, string por string, y la 📋 Ficha RETIE revisa la caída de tensión.
+
+### Eléctrico por bloques — fórmula en palabras y cuenta real
+
+- **Strings por fila:** la app recorre cada fila de izquierda a derecha, columna por columna de la mesa. Cada N módulos (los módulos en serie) forman un string. Si la fila no es múltiplo de N, el string que sobra sigue en la fila siguiente y se necesita cable extra entre filas (aviso 🟠).
+- **Bloques:** los strings, en orden, llenan los inversores según el reparto de Dimensionamiento. Así cada inversor recibe filas vecinas.
+- **Largo DC de un string** (un conductor, de ida) = (recorrido en L desde el extremo más cercano del string hasta su inversor + medio largo del string + bajada desde la mesa) × (1 + holgura). El medio largo del string se suma porque un polo sale del otro extremo y vuelve por la fila.
+- **Largo AC** = recorrido en L del inversor al punto de conexión + 2 m de bajadas, × (1 + holgura).
+- **Caída de tensión DC** = 2 × largo × ρ × I_mp ÷ (calibre × V_mp del string). ρ es la resistividad del cobre a 45 °C.
+- **Caída de tensión AC (trifásica)** = √3 × largo × ρ × I ÷ (calibre × V de línea), con I = P_AC ÷ (√3 × V).
+- **Límite:** 3 % por circuito, la recomendación de la NTC 2050.
+- **Resistencia DC efectiva:** es la misma que usa el Unifilar. Cada string es un tramo con su propio largo, así que la pérdida se suma string por string, exacta.
+
+**Ejemplo (Apartadó):** 308 módulos JAM66D46-720/LB, 28 en serie = **11 strings**, 2 inversores de 100 kW con reparto **6 + 5**. Filas de 62 módulos, con inversores en la cabecera y cable DC de 6 mm².
+- 62 no es múltiplo de 28, así que **4 strings cruzan de una fila a la siguiente** (aviso 🟠). Con 56 módulos por fila (2 strings exactos) no cruzaría ninguno.
+- String más lejano ≈ 71 m de cable. Caída DC ≈ 0,7 %, dentro del 3 %.
+- AC con 70 mm² a 400 V: ≈ 144 A por inversor. Caída AC ≈ 0,5 %.
+- Resistencia DC efectiva ≈ 28 mΩ, pérdida DC a STC ≈ **0,46 %**. La referencia estándar internacional usa por defecto **1,5 %** a STC (88 mΩ). Con la geometría real la pérdida sale menor; con 4 mm² subiría a ≈ 0,7 %.
+
+### Eléctrico por bloques — cómo leerlo en pantalla y qué hacer
+
+- **🌾 Granja FV, sección 8:** elige dónde van los inversores (cabecera de las filas o centro de cada bloque), el punto de conexión (una esquina del terreno), los calibres DC y AC, la tensión AC de línea y la holgura de cable. Todo se guarda con el proyecto.
+- **Avisos:** 🟢 strings completos y reparto; 🔴 los módulos no forman strings completos; 🟠 strings que cruzan filas; 🟢/🟠 caída de tensión DC y AC frente al 3 %.
+- **Tarjetas y tabla:** strings, cable DC y AC total, resistencia DC efectiva, pérdida DC a STC y, por inversor, sus strings, filas, largo DC medio y máximo, largo AC, corriente y caída AC.
+- **⚡ Diagrama Unifilar:** en una granja aparece la casilla **«🌾 Usar los cables de 🌾 Granja FV»** (marcada). Pone un tramo DC por string y el AC medio; así 📊 Producción calcula la pérdida real en cables hora a hora.
+- **📋 Ficha RETIE:** suma las validaciones «Granja: strings y bloques por inversor», «strings que cruzan filas» y «caída de tensión DC/AC».
+- **Qué hacer:** si la caída pasa del 3 %, sube el calibre o acerca el inversor (prueba «Centro de su bloque»). Si hay strings que cruzan filas, ajusta los módulos por fila a un múltiplo de los módulos en serie. La tensión AC de esta sección debe ser la misma del punto de conexión del Unifilar y la Ficha RETIE.
+
+## 98. 🌾 Granja FV — guía completa del módulo (fases 1 a 5, 30-sep-2026)
+
+### Granja FV — qué es el módulo completo y cuándo usarlo
+
+**Qué es:** 🌾 Granja FV es la página para diseñar **granjas solares y proyectos agrivoltaicos**: paneles en filas de mesas sobre el terreno. Las fachadas, techos, pérgolas y marquesinas BIPV siguen en 🗺️ Vista 3D. Las dos páginas usan los mismos datos del proyecto (panel, módulos, inclinación, recurso solar) y 🗺️ Vista 3D dibuja la granja con el mismo cálculo.
+
+**Cuándo usarlo:** siempre que en 🏠 Proyecto el tipo de instalación sea **«Granja fotovoltaica»**. El Asistente avisa si el proyecto es una granja y todavía no tiene campo.
+
+**Las 5 fases (todas ya en la app):**
+- **Fase 1 — campo de filas (sección 93):** terreno, mesas, filas, separación (pitch), altura, GCR, ángulo límite de sombra, corredor, suelo libre, 3D y coherencia con el resto del proyecto.
+- **Fase 2 — sombra entre filas y cara trasera (sección 94):** lleva la geometría del campo a la energía.
+- **Fase 3 — agrivoltaica (sección 95):** luz que llega al cultivo, mapa de sombra en el suelo y paso de la maquinaria.
+- **Fase 4 — seguidor de un eje (sección 96):** con y sin backtracking, frente a la estructura fija.
+- **Fase 5 — eléctrico por bloques (sección 97):** strings por fila, inversores por bloque, cables y caída de tensión, que alimentan ⚡ Diagrama Unifilar y 📋 Ficha RETIE.
+
+### Granja FV — orden de trabajo paso a paso
+
+1. **🏠 Proyecto:** tipo «Granja fotovoltaica», ciudad o coordenadas del predio, área del terreno, factor de ocupación, inclinación y azimut.
+2. **☀️ Recurso Solar:** descarga el TMY (año típico). Si el panel es bifacial, activa el modelo bifacial.
+3. **📐 Dimensionamiento:** panel, módulos en serie, cantidad de inversores y reparto de strings (por ejemplo 6 + 5).
+4. **🌾 Granja FV, secciones 1 a 4:** terreno, mesas, filas y separación. Usa «🪄 Sugerir distribución» y revisa la coherencia (🟢/🟠/🔴).
+5. **🌾 Granja FV, sección 5:** «📏 Estimar» y luego **«⚡ Usar la geometría del campo en la energía»**.
+6. **☀️ Recurso Solar:** vuelve a calcular la irradiancia. Con bifacial, revisa el ancho de la mesa, la sombra trasera y el mismatch trasero.
+7. **🌾 Granja FV, sección 6 (si es agrivoltaica):** altura y ancho de la maquinaria y «🌱 Calcular la luz en el suelo».
+8. **🌾 Granja FV, sección 7 (si evalúas seguidor):** «🔄 Comparar seguidor y estructura fija».
+9. **🌾 Granja FV, sección 8:** inversores, punto de conexión, calibres, tensión y holgura. Revisa los strings que cruzan filas y las caídas de tensión.
+10. **🔆 Motor Óptico → 🔀 Mismatch → 📊 Producción:** calcula la energía con la POA que ya incluye las filas.
+11. **⚡ Diagrama Unifilar:** deja marcada «🌾 Usar los cables de 🌾 Granja FV». Luego vuelve a simular 📊 Producción para que use la pérdida real en cables.
+12. **📋 Ficha RETIE:** revisa las validaciones «Granja: …».
+13. **💰 Financiero, 🔋 Baterías y 📄 Reporte**, como en cualquier proyecto. Guarda el proyecto en 🏠 Proyecto: el campo, la maquinaria, el seguidor y el diseño eléctrico se guardan con él.
+
+### Granja FV — qué cambia la energía y qué solo compara
+
+- **Cambian la energía:**
+  - **Sección 5**, a través de ☀️ Recurso Solar: sombra entre filas, ancho de la mesa, cara trasera.
+  - **Sección 8**, a través de ⚡ Diagrama Unifilar y 📊 Producción: pérdida real en cables.
+- **Solo informan o comparan (no cambian la energía):**
+  - Secciones 1 a 4 (campo y coherencia).
+  - **Sección 6** (luz para el cultivo y maquinaria).
+  - **Sección 7** (seguidor frente a la fija; 📊 Producción sigue con estructura fija).
+- **Siempre al día:** ⚡ Diagrama Unifilar y 📋 Ficha RETIE recalculan el diseño eléctrico cada vez con los datos guardados, así que nunca usan un resultado viejo. Las secciones 6 y 7 esconden su resultado si cambia la geometría; presiona su botón otra vez.
+
+### Granja FV — glosario
+
+- **Mesa:** estructura con módulos en la pendiente × módulos a lo largo de la fila.
+- **Fila:** una o varias mesas en línea. **Separación entre filas (pitch):** distancia de una fila a la siguiente medida en el suelo.
+- **Ancho de la mesa:** medida inclinada de la mesa, de abajo hacia arriba. **Huella:** lo que ocupa la mesa en el suelo de adelante hacia atrás (ancho × cos inclinación).
+- **GCR:** ancho de la mesa ÷ separación entre filas. Mide qué tan juntas están las filas.
+- **Ángulo límite de sombra:** con el sol más bajo que este ángulo (visto de perfil), una fila sombrea a la siguiente.
+- **Corredor libre:** espacio en el suelo entre la huella de una fila y la siguiente.
+- **Altura libre:** del suelo al borde inferior de la mesa.
+- **Categoría I / II (agrivoltaica):**
+  - Categoría I: altura libre ≥ 2,10 m, se cultiva debajo de los paneles.
+  - Categoría II: el cultivo va entre las filas.
+- **Homogeneidad:** luz del punto más oscuro ÷ luz del más iluminado (1 = pareja).
+- **Seguidor de un eje:** fila que gira de Este a Oeste siguiendo al sol.
+- **Backtracking:** el seguidor se devuelve al amanecer y al atardecer para no hacerse sombra.
+- **Bloque de celdas (bypass):** grupo de celdas protegido por un diodo. Una sombra parcial lo apaga completo.
+- **String:** módulos conectados en serie. **Bloque (eléctrico):** filas vecinas que van a un mismo inversor.
+- **Caída de tensión:** voltaje que se pierde en el cable. La NTC 2050 recomienda no pasar de 3 % por circuito.
+- **Holgura de cable:** metros extra por curvas, cajas y remates.
+
+### Granja FV — tabla de alarmas y qué hacer
+
+| Dónde | Alarma | Qué significa | Qué hacer |
+|---|---|---|---|
+| Sección 3 / 4 | 🔴 No caben los módulos / las filas se tocan | El terreno o la separación no alcanzan | Amplía el terreno, agrega filas o módulos por mesa, o usa «🪄 Sugerir distribución» |
+| Sección 4 | 🟠 GCR o altura distintos del modelo bifacial | La cara trasera se calcula con otro espaciado | Usa el botón de la sección 5 y recalcula en ☀️ Recurso Solar |
+| Sección 4 / 5 | 🟠 La POA vigente no incluye la sombra entre filas | La energía no usa tu campo | «⚡ Usar la geometría del campo en la energía» y recalcula |
+| Sección 4 | 🟠 Producción y Dimensionamiento con distinto número de módulos | Una de las dos está vieja | Vuelve a simular 📊 Producción |
+| Sección 4 | 🟠 Energía multi-superficie publicada | Financiero usaría la de Vista 3D | Desactívala en 🗺️ Vista 3D si el proyecto es solo la granja |
+| Sección 6 | 🟡 Categoría II | Altura libre < 2,10 m | Cultivo entre filas, o sube la altura |
+| Sección 6 | 🟠 La máquina no pasa (por debajo o por el corredor) | Falta altura o ancho | Sube la altura libre, separa las filas o usa otra máquina |
+| Sección 7 | 🟠 Borde del seguidor a menos de 0,5 m | Con el giro máximo el borde queda casi en el suelo | Sube el eje o baja el ángulo máximo |
+| Sección 8 | 🔴 Los módulos no forman strings completos | Sobran módulos para el número en serie | Ajusta módulos del proyecto o módulos en serie en 📐 Dimensionamiento |
+| Sección 8 | 🟠 Strings que cruzan filas | Un string sigue en la fila siguiente | Usa módulos por fila múltiplo de los módulos en serie |
+| Sección 8 / RETIE | 🟠 Caída de tensión > 3 % | Cable largo o delgado | Sube el calibre o acerca el inversor (centro del bloque) |
+
+### Granja FV — Apartadó de punta a punta (valores esperados)
+
+Proyecto de referencia: 308 × JAM66D46-720/LB (2,384 × 1,303 m), 221,76 kWp, 2 inversores de 100 kW, 11 strings de 28, inclinación 10°, separación 6,60 m, altura libre 2,4 m.
+
+- **Campo:** mesa de 2 módulos horizontales = **2,626 m**, GCR **39,8 %**, ángulo límite **6,5°**, 5 filas de 31 × 2.
+- **Sombra entre filas:** ≈ **0,19 %** de la luz frontal. La referencia estándar internacional da 0,20 %.
+- **Cara trasera (bifacial):** sombra de estructura 5 % y mismatch trasero 10 %, como la referencia. El aporte trasero queda × 0,855.
+- **Energía:** con NOCT 45 °C y γ −0,29 %/°C de la ficha y los 2 inversores, ≈ **340.000 kWh/año**. La referencia da 339.033 kWh.
+- **Luz en el suelo:** media ≈ **60 %** (≈ 1 − GCR); bajo las mesas ≈ 40–45 % y entre filas ≈ 70–74 %. Es **categoría I** (2,40 m ≥ 2,10 m).
+- **Maquinaria:** un tractor de 2,5 m no pasa bajo la mesa (necesita 2,80 m) y sí pasa por el corredor de 4,01 m.
+- **Seguidor 1P (GCR 0,35, eje 2,0 m, 60°):** +14 % a +25 % de luz con backtracking según el clima; sin backtracking ≈ 3 puntos menos por sombra eléctrica.
+- **Eléctrico:** 11 strings (6 + 5); 4 cruzan filas porque 62 módulos por fila no es múltiplo de 28. Caída DC ≈ 0,7 % y AC ≈ 0,5 %. Pérdida DC a STC ≈ 0,46 % con 6 mm²; la referencia asume 1,5 %.
+
+### Granja FV — preguntas frecuentes
+
+- **¿Por qué la luz en el suelo es ≈ 1 − GCR?** Los paneles interceptan la luz sobre una fracción del suelo parecida al GCR. Lo que no interceptan llega al suelo, aunque repartido distinto según la hora.
+- **¿Por qué el backtracking gana si la luz directa es casi la misma?** La fila vecina limita la luz directa que se puede captar, con sombra o sin ella. La diferencia es eléctrica: una franja de sombra apaga bloques de celdas enteros por los diodos de bypass.
+- **¿La app calcula la energía con seguidor?** No todavía: la sección 7 compara la luz y da una estimación de primer orden. La cadena completa (Motor Óptico, Producción) sigue con estructura fija.
+- **¿Por qué mi pérdida en cables es menor que el 1,5 % de la referencia?** La referencia usa un valor por defecto. La app calcula con el largo real de cada string y el calibre elegido; con cable más delgado o inversores lejos sube.
+- **¿Qué pasa si cambio el campo después de todo?** Vuelve a usar el botón de la sección 5 y recalcula ☀️ Recurso Solar y 📊 Producción. El Unifilar y la Ficha RETIE se actualizan solos. Las secciones 6 y 7 piden recalcular.
+- **Límites conocidos:**
+  - Filas infinitas: los bordes del campo no se modelan.
+  - Terreno plano.
+  - Sin luz reflejada por el suelo y los paneles en la luz del cultivo (lado seguro).
+  - Recorrido de cables en L, sin ruta real de zanjas.
+  - Sin cajas combinadoras ni centros de transformación de granjas grandes.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

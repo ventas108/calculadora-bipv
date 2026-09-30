@@ -70,6 +70,21 @@ Regla de consumo:
 	parejo. Publica `N_inv_total`, `N_paneles_granja`, `P_dc_total_kWp` y
 	`reparto_strings_inversores`; nunca más módulos de los que caben sin
 	cadenas declaradas. La relación DC/AC se evalúa con el sistema real.
+- 🌾 Granja FV — resumen de claves de sesión (fases 1 a 5, se guardan con el proyecto salvo las marcadas):
+
+	| Clave | Escribe | Leen |
+	|---|---|---|
+	| `granja_fv` | 🌾 Granja FV (secciones 2) | Granja FV, 🗺️ Vista 3D, `granja_electrico` |
+	| `granja_fv_resultado` | 🌾 Granja FV | Asistente (resumen) |
+	| `filas_energia` | botón «⚡ Usar la geometría…» | ☀️ Recurso Solar (`calcular_poa(filas=…)`) |
+	| `bifacial_cfg` (`gcr`, `altura_m`, `ancho_colector_m`, `sombra_trasera_pct`, `mismatch_trasero_pct`) | ☀️ Recurso Solar / botón de la sección 5 | `calcular_poa`, coherencia de la granja |
+	| `poa_geometria_filas` | ☀️ Recurso Solar | 🌾 Granja FV (coherencia `poa_filas`), Asistente |
+	| `granja_sombra_estimada` | sección 5 | Granja FV, Asistente |
+	| `granja_altura_maquinaria_m`, `granja_ancho_maquinaria_m` | sección 6 | `paso_maquinaria` |
+	| `granja_luz_suelo` (con `firma`) | sección 6 | Granja FV, Asistente |
+	| `granja_seg_*`, `granja_seguidor` (con `firma`) | sección 7 | Granja FV, Asistente |
+	| `granja_electrico_cfg` | sección 8 | `diseno_desde_estado` → Granja FV, ⚡ Unifilar, 📋 Ficha RETIE, Asistente |
+	| `perdida_ohmica_unifilar` | ⚡ Unifilar (con los tramos de la granja) | 📊 Producción |
 - 🌾 Granja FV, fase 1 (30-sep-2026, Spec `03-dimensionamiento/granja-fv-campo`):
 	`granja_fv` (geometría del campo) se guarda con el proyecto;
 	`calculos/granja_fv.calcular_campo` es el único cálculo del campo y lo
@@ -99,6 +114,14 @@ Regla de consumo:
 	sin backtracking; lee `granja_seg_*` y guarda `granja_seguidor` con su
 	firma. Solo compara: 📊 Producción sigue con la estructura fija;
 	`energia_estimada` usa `E_ac_anual_kWh` como estimación de primer orden.
+- 🌾 Granja FV, fase 5 — eléctrico por bloques (30-sep-2026, Spec `07-informes/granja-electrico-bloques`):
+	`calculos/granja_electrico.diseno_desde_estado` recalcula strings, bloques
+	y cables con `granja_fv`, `panel_dict`, `N_serie`,
+	`reparto_strings_inversores`, `inversor_dict_dim` y `granja_electrico_cfg`.
+	En proyectos tipo «Granja fotovoltaica» (superficie única) ⚡ Diagrama
+	Unifilar usa `tramos_para_unifilar` (un tramo DC por string) y el AC
+	medio para `perdida_ohmica_unifilar`, y 📋 Ficha RETIE suma
+	`checks_retie` (caída de tensión frente al 3 % de la NTC 2050).
 - NOCT y γ del Motor Óptico frente a la ficha (30-sep-2026, Spec `05-perdidas-y-temperatura/motor-optico-ficha-termica`):
 	`motor_optico_noct` sigue siendo la fuente de la temperatura de celda en
 	Producción; `calculos/motor_optico_ficha.diferencias_ficha` lo compara con
