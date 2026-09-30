@@ -1493,6 +1493,9 @@ if btn_sim or st.session_state.get("produccion_ok"):
     st.session_state["Y_f_kWh_kWp"]        = res["Y_f"]
     st.session_state["P_stc_kW_sistema"]   = P_stc_kW
     st.session_state["N_paneles_final"]     = N_paneles
+    # Spec 07/reporte-produccion-completo: inversores con que se simuló (para el reporte)
+    st.session_state["produccion_n_inversores"] = int(_n_inversores_dcac or 0)
+    st.session_state["produccion_p_ac_total_w"] = float(_p_ac_nom_w_total or 0.0)
     st.session_state["panel_nombre_final"]  = panel_nombre
     st.session_state["eta_inversor"]        = eta_inv_frac
     st.session_state["df_mensual_produccion"] = df_m   # para Página 11 Balance

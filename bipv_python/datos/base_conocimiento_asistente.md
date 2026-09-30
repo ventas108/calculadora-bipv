@@ -5480,6 +5480,41 @@ Si un proyecto viejo no tiene el dato, la app toma el último NOCT y γ con que 
 3. **📊 Producción:** enciende «🔬 Usar curva IV real del panel (Motor IV)», ve a otra página y vuelve. ✅ Sigue encendido.
 4. **Guardar y abrir:** guarda el proyecto en 🏠 Proyecto, ciérralo y ábrelo. ✅ Todos los valores siguen iguales.
 
+## 101. 📄 Reporte PDF de producción completo para el cliente (30-sep-2026)
+
+### Reporte PDF — qué trae ahora
+
+El reporte ya incluye todo lo que la app calcula para la producción:
+- **🔌 Sistema Eléctrico e Inversores** (casilla «Incluir sección Dimensionamiento», que antes no generaba nada):
+  - módulo, número de módulos y potencia pico;
+  - módulos en serie y strings;
+  - **cantidad de inversores** con su potencia AC y la potencia AC total;
+  - **reparto de strings** (por ejemplo 6 + 5), **relación DC/AC** y **recorte del inversor** en kWh y horas.
+- **📉 Diagrama de pérdidas:** la misma tabla de balance de 📊 Producción, de la irradiancia a la energía entregada. Incluye IAM, suciedad, irradiancia, temperatura, calidad del módulo, mismatch, cables, inversor y recorte, en kWh y %.
+- **Datos bifaciales completos:** GCR, ancho de la mesa, sombra de la estructura en la cara trasera y mismatch trasero, además de bifacialidad, altura, albedo y ganancia.
+- **🌾 Granja FV** (solo en granjas, se muestra lo que esté calculado):
+  - campo de filas (GCR, separación, ángulo límite, corredor, suelo libre) y si la energía ya usa la geometría del campo;
+  - pérdida por sombra entre filas;
+  - agrivoltaica: luz en el suelo y categoría;
+  - seguidor de un eje, como comparación;
+  - eléctrico por bloques: strings, reparto, cables, caídas de tensión y tabla por inversor.
+
+### Reporte PDF — cómo sacarlo solo con producción (sin la parte financiera)
+
+1. Antes, recorre la cadena en orden:
+   - 🔆 Motor Óptico: NOCT y γ de la ficha, y calcula la cascada.
+   - 🌾 Granja FV: secciones 5 a 8.
+   - 📊 Producción: simula.
+   - ⚡ Diagrama Unifilar: cables de la granja.
+   - Vuelve a simular 📊 Producción.
+2. En **📄 Reporte PDF → Opciones**:
+   - marca Motor Óptico, **Dimensionamiento (sistema eléctrico e inversores)**, Producción, **diagrama de pérdidas** y **Granja FV**;
+   - **desmarca** Financiero, Presupuesto, Estimación rápida y, si no aplica, Huella de CO₂.
+3. Confirma la TRM (el botón la pide aunque no haya parte financiera) y presiona **«📄 Generar Reporte»**.
+4. Descarga el archivo y ábrelo en el navegador: **Archivo → Imprimir → Guardar como PDF**.
+
+**Ojo:** el reporte muestra lo que está calculado en la sesión. Si cambiaste algo (por ejemplo el NOCT), vuelve a calcular la cascada y Producción antes de generar el reporte.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
