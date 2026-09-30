@@ -342,9 +342,12 @@ with col2:
     _res_n_str_tr = resolver_n_strings_tracker(
         inversor, inversor_nombre, st.session_state, N_total_cadenas=int(N_total_cadenas)
     )
-    N_str_tr = st.number_input(
-        "N_strings por tracker (vía combinadoras)",
-        min_value=1, key="N_str_tr",
+    # 30-sep-2026: dato «N_str_tr» y widget «_w_N_str_tr» separados; con la
+    # misma clave, al volver a esta página el campo arrancaba en 1 (su mínimo).
+    from calculos.campos_editor import campo_ligado
+    N_str_tr = campo_ligado(
+        st.session_state, st.number_input, "N_strings por tracker (vía combinadoras)", "N_str_tr",
+        int(_res_n_str_tr["valor"]), min_value=1,
         help=(
             f"{'Calculado desde el total declarado arriba' if _res_n_str_tr['fuente'] == 'total' else f'Autocalculado del catálogo: {inversor_nombre} soporta'} "
             f"{_res_n_str_tr['sugerido']} strings/tracker. Ajústalo si tu "

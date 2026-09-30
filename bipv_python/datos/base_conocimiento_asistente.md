@@ -5460,6 +5460,26 @@ Si un proyecto viejo no tiene el dato, la app toma el último NOCT y γ con que 
 3. Presiona **«🚀 Calcular cascada óptica»**, guarda el proyecto en 🏠 Proyecto, ciérralo y ábrelo: ✅ siguen 45 y −0,29.
 4. Vuelve a simular 📊 Producción: con 45 °C la pérdida por temperatura es la real (≈ 6 %).
 
+## 100. Campos que ya no se pierden al cambiar de página: Dimensionamiento, Mismatch y Producción (30-sep-2026)
+
+### Campos ligados — qué pasaba y por qué
+
+**Qué pasaba:** el mismo error del NOCT del Motor Óptico (sección 99) estaba en tres páginas más. Al ir a otra página y volver:
+- **📐 Dimensionamiento:** «N_strings por tracker (vía combinadoras)» volvía a **1**, su mínimo, y así entraba al diseño.
+- **🔀 Mismatch** (bypass): «Módulos en serie por string», «Strings en paralelo» y «Panel fotovoltaico» volvían al valor por defecto (por ejemplo 8 en serie o el panel ASP-ST1-T40).
+- **📊 Producción:** el interruptor **«🔬 Usar curva IV real del panel (Motor IV)»** se apagaba solo.
+
+**Por qué:** la aplicación borra los cuadros de la pantalla cuando cambias de página. Si el dato y el cuadro tienen el mismo nombre, el dato se pierde con el cuadro.
+
+**El arreglo:** todos estos campos guardan el dato aparte y el cuadro se llena desde el dato. Es la misma forma de 💰 Financiero y 🔆 Motor Óptico. Además, una prueba automática revisa **todas las páginas** y avisa si alguien vuelve a poner el mismo nombre a un dato que usan otras páginas, para que no vuelva a pasar.
+
+### Campos ligados — cómo comprobarlo
+
+1. **📐 Dimensionamiento:** cambia «N_strings por tracker», ve a otra página y vuelve. ✅ Sigue tu valor, no 1.
+2. **🔀 Mismatch**, configuración del bypass: cambia módulos en serie, strings en paralelo y panel, ve a otra página y vuelve. ✅ Siguen tus valores.
+3. **📊 Producción:** enciende «🔬 Usar curva IV real del panel (Motor IV)», ve a otra página y vuelve. ✅ Sigue encendido.
+4. **Guardar y abrir:** guarda el proyecto en 🏠 Proyecto, ciérralo y ábrelo. ✅ Todos los valores siguen iguales.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
