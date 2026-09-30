@@ -88,6 +88,28 @@ cambio de panel o de diseño eléctrico ──> retira publicación, bypass, MPP
 cambio de geometría o montaje ────────> invalida POA y sombra de esa superficie
 ```
 
+🌾 Granja FV (Streamlit, 29 y 30-sep-2026, fases 1 a 5):
+
+```text
+01 Proyecto (tipo «Granja fotovoltaica», terreno, tilt, azimut) ─┐
+03 Dimensionamiento (panel, N_serie, inversores, reparto) ───────┼─> granja_fv.calcular_campo (03)
+04 Producción (N_paneles_final) ─────────────────────────────────┘      │  (única geometría; también
+                                                                        │   la usa 🗺️ Vista 3D)
+      ├─ fase 2 ─> filas_energia / bifacial_cfg ──> 02 Recurso Solar: calcular_poa(filas=…)
+      │            (sombra entre filas monofacial; infinite_sheds bifacial + cara trasera)
+      │            ──> poa_df ──> 05 Motor Óptico / Mismatch ──> 04 Producción ──> 06, 07
+      ├─ fase 3 ─> agrivoltaica.luz_en_el_suelo + paso_maquinaria (solo informa)
+      ├─ fase 4 ─> seguidor.comparar_seguidor_fijo (solo compara; 04 sigue fija)
+      └─ fase 5 ─> granja_electrico.diseno_desde_estado (recalcula siempre)
+                   ├─> 07 Diagrama Unifilar: un tramo DC por string ──> perdida_ohmica_unifilar ──> 04
+                   └─> 07 Ficha RETIE: checks «Granja: …» (caída de tensión ≤ 3 %, NTC 2050)
+```
+
+- Unifilar y Ficha RETIE solo usan el diseño de la granja cuando el tipo de
+  instalación es «Granja fotovoltaica» y el proyecto es de superficie única.
+- Las secciones 6 y 7 de 🌾 Granja FV guardan su resultado con una firma de la
+  geometría y lo ocultan si cambia; la fase 5 no guarda resultado (se recalcula).
+
 Catálogos y análisis financiero (Streamlit, 26 y 27-sep-2026):
 
 ```text

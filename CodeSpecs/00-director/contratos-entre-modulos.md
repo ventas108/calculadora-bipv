@@ -70,6 +70,21 @@ Regla de consumo:
 	parejo. Publica `N_inv_total`, `N_paneles_granja`, `P_dc_total_kWp` y
 	`reparto_strings_inversores`; nunca más módulos de los que caben sin
 	cadenas declaradas. La relación DC/AC se evalúa con el sistema real.
+- 🌾 Granja FV — resumen de claves de sesión (fases 1 a 5, se guardan con el proyecto salvo las marcadas):
+
+	| Clave | Escribe | Leen |
+	|---|---|---|
+	| `granja_fv` | 🌾 Granja FV (secciones 2) | Granja FV, 🗺️ Vista 3D, `granja_electrico` |
+	| `granja_fv_resultado` | 🌾 Granja FV | Asistente (resumen) |
+	| `filas_energia` | botón «⚡ Usar la geometría…» | ☀️ Recurso Solar (`calcular_poa(filas=…)`) |
+	| `bifacial_cfg` (`gcr`, `altura_m`, `ancho_colector_m`, `sombra_trasera_pct`, `mismatch_trasero_pct`) | ☀️ Recurso Solar / botón de la sección 5 | `calcular_poa`, coherencia de la granja |
+	| `poa_geometria_filas` | ☀️ Recurso Solar | 🌾 Granja FV (coherencia `poa_filas`), Asistente |
+	| `granja_sombra_estimada` | sección 5 | Granja FV, Asistente |
+	| `granja_altura_maquinaria_m`, `granja_ancho_maquinaria_m` | sección 6 | `paso_maquinaria` |
+	| `granja_luz_suelo` (con `firma`) | sección 6 | Granja FV, Asistente |
+	| `granja_seg_*`, `granja_seguidor` (con `firma`) | sección 7 | Granja FV, Asistente |
+	| `granja_electrico_cfg` | sección 8 | `diseno_desde_estado` → Granja FV, ⚡ Unifilar, 📋 Ficha RETIE, Asistente |
+	| `perdida_ohmica_unifilar` | ⚡ Unifilar (con los tramos de la granja) | 📊 Producción |
 - 🌾 Granja FV, fase 1 (30-sep-2026, Spec `03-dimensionamiento/granja-fv-campo`):
 	`granja_fv` (geometría del campo) se guarda con el proyecto;
 	`calculos/granja_fv.calcular_campo` es el único cálculo del campo y lo
