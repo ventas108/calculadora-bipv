@@ -99,6 +99,14 @@ Regla de consumo:
 	sin backtracking; lee `granja_seg_*` y guarda `granja_seguidor` con su
 	firma. Solo compara: 📊 Producción sigue con la estructura fija;
 	`energia_estimada` usa `E_ac_anual_kWh` como estimación de primer orden.
+- 🌾 Granja FV, fase 5 — eléctrico por bloques (30-sep-2026, Spec `07-informes/granja-electrico-bloques`):
+	`calculos/granja_electrico.diseno_desde_estado` recalcula strings, bloques
+	y cables con `granja_fv`, `panel_dict`, `N_serie`,
+	`reparto_strings_inversores`, `inversor_dict_dim` y `granja_electrico_cfg`.
+	En proyectos tipo «Granja fotovoltaica» (superficie única) ⚡ Diagrama
+	Unifilar usa `tramos_para_unifilar` (un tramo DC por string) y el AC
+	medio para `perdida_ohmica_unifilar`, y 📋 Ficha RETIE suma
+	`checks_retie` (caída de tensión frente al 3 % de la NTC 2050).
 - NOCT y γ del Motor Óptico frente a la ficha (30-sep-2026, Spec `05-perdidas-y-temperatura/motor-optico-ficha-termica`):
 	`motor_optico_noct` sigue siendo la fuente de la temperatura de celda en
 	Producción; `calculos/motor_optico_ficha.diferencias_ficha` lo compara con

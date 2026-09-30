@@ -19,6 +19,10 @@ from calculos.campos_editor import sincronizar_campo
 from calculos.campos_persistentes import campo_persistente
 from datos.ciudades_colombia import CIUDADES
 from calculos.agrivoltaica import luz_en_el_suelo, paso_maquinaria
+from calculos.granja_electrico import (
+    CONFIG_DEFECTO as _CFG_EL, ESQUINAS, UBICACIONES_INVERSOR, avisos_bloques, diseno_desde_estado,
+)
+from calculos.diagrama_unifilar import CALIBRES_COMERCIALES_MM2
 from calculos.seguidor import SEGUIDOR_DEFECTO, comparar_seguidor_fijo, energia_estimada
 from calculos.granja_fv import (
     CAMPOS_EDITABLES,
@@ -41,7 +45,7 @@ st.caption(
     "Producción y ☀️ Recurso Solar. Comprueba que tu geometría coincide con la que usan los "
     "cálculos, lleva la sombra entre filas a la energía (sección 5) y calcula la luz que recibe el "
     "cultivo y el paso de la maquinaria (sección 6) y compara un seguidor de un eje con la estructura "
-    "fija (sección 7). Las fachadas y techos BIPV siguen en "
+    "fija (sección 7) y arma el diseño eléctrico por bloques (sección 8). Las fachadas y techos BIPV siguen en "
     "🗺️ Vista 3D."
 )
 
@@ -360,8 +364,90 @@ if _tmy_g is not None and _lat_g is not None and _lon_g is not None and not camp
 else:
     st.caption("☀️ Para comparar el seguidor, calcula primero el recurso solar en ☀️ Recurso Solar.")
 
-# ── 8. Vista 3D del campo ────────────────────────────────────────────────────
-st.markdown("### 8. Vista 3D del campo")
+# ── 8. Eléctrico por bloques (fase 5) ───────────────────────────────────────
+st.markdown("### 8. ⚡ Eléctrico por bloques: strings, inversores y cables")
+st.caption(
+    "Ubica en el campo los strings de 📐 Dimensionamiento (módulos en serie y reparto por inversor), "
+    "agrupa las filas en un bloque por inversor y estima el largo de los cables y la caída de tensión. "
+    "⚡ Diagrama Unifilar y 📋 Ficha RETIE usan este mismo diseño."
+)
+_cfg_el = {**_CFG_EL, **dict(ss.get("granja_electrico_cfg") or {})}
+e1, e2, e3, e4, e5, e6 = st.columns(6)
+_ubis, _esqs = list(UBICACIONES_INVERSOR), list(ESQUINAS)
+_tens = [220.0, 380.0, 400.0, 440.0, 480.0]
+with e1:
+    sincronizar_campo(ss, "_w_granja_el_ubicacion", _cfg_el["ubicacion_inversor"])
+    _cfg_el["ubicacion_inversor"] = st.selectbox("Inversores", _ubis, key="_w_granja_el_ubicacion",
+                                                 format_func=UBICACIONES_INVERSOR.get)
+with e2:
+    sincronizar_campo(ss, "_w_granja_el_poi", _cfg_el["punto_conexion"])
+    _cfg_el["punto_conexion"] = st.selectbox("Punto de conexión", _esqs, key="_w_granja_el_poi",
+                                             format_func=ESQUINAS.get)
+with e3:
+    sincronizar_campo(ss, "_w_granja_el_cal_dc", float(_cfg_el["calibre_dc_mm2"]))
+    _cfg_el["calibre_dc_mm2"] = st.selectbox("Calibre DC (mm²)", [float(c) for c in CALIBRES_COMERCIALES_MM2],
+                                             key="_w_granja_el_cal_dc")
+with e4:
+    sincronizar_campo(ss, "_w_granja_el_cal_ac", float(_cfg_el["calibre_ac_mm2"]))
+    _cfg_el["calibre_ac_mm2"] = st.selectbox("Calibre AC (mm²)", [float(c) for c in CALIBRES_COMERCIALES_MM2],
+                                             key="_w_granja_el_cal_ac")
+with e5:
+    sincronizar_campo(ss, "_w_granja_el_tension", float(_cfg_el["tension_ac_v"]))
+    _cfg_el["tension_ac_v"] = st.selectbox("Tensión AC de línea (V)", _tens, key="_w_granja_el_tension")
+with e6:
+    sincronizar_campo(ss, "_w_granja_el_holgura", float(_cfg_el["holgura"]) * 100.0)
+    _cfg_el["holgura"] = st.number_input("Holgura de cable (%)", min_value=0.0, max_value=50.0, step=5.0,
+                                         key="_w_granja_el_holgura",
+                                         help="Cable extra por curvas, cajas y remates. Típico 5–15 %.") / 100.0
+ss["granja_electrico_cfg"] = _cfg_el
+_dis = diseno_desde_estado(ss)
+if _dis is None:
+    st.caption("⚡ Para el diseño eléctrico hacen falta el campo sin errores y los módulos en serie de "
+               "📐 Dimensionamiento.")
+else:
+    for _a in avisos_bloques(_dis, proy["n"]):
+        {"🔴": st.error, "🟠": st.warning, "🟢": st.success}.get(_a["nivel"], st.info)(f"{_a['nivel']} {_a['texto']}")
+    q1, q2, q3, q4, q5 = st.columns(5)
+    q1.metric("Strings", f"{_dis['n_strings']} × {_dis['n_serie']}")
+    q2.metric("Cable DC (total)", f"{_dis['dc_total_m']:,.0f} m", help="Positivo y negativo de todos los strings.")
+    q3.metric("Cable AC (total)", f"{_dis['ac_total_m']:,.0f} m", help="Tres fases de cada inversor.")
+    q4.metric("Resistencia DC efectiva", f"{_dis['resistencia_dc_efectiva_mohm']:.1f} mΩ")
+    q5.metric("Pérdida DC a STC", f"{_dis['perdida_dc_stc_pct']:.2f} %" if _dis["perdida_dc_stc_pct"] is not None else "—")
+    st.dataframe([{"Inversor": f"INV-{b['inversor']}", "Strings": b["strings"], "Módulos": b["modulos"],
+                   "Filas": ", ".join(str(f + 1) for f in b["filas"]),
+                   "DC medio (m)": b["dc_media_m"], "DC máximo (m)": b["dc_max_m"],
+                   "AC (m)": b["longitud_ac_m"], "Corriente AC (A)": b["corriente_ac_a"],
+                   "Caída AC (%)": b["caida_ac_pct"]} for b in _dis["bloques"]],
+                 use_container_width=True, hide_index=True)
+    _colores = ["rgb(52,101,164)", "rgb(230,145,56)", "rgb(46,125,50)", "rgb(142,68,173)",
+                "rgb(192,57,43)", "rgb(22,160,133)"]
+    _fe = go.Figure()
+    _fe.add_shape(type="rect", x0=0, y0=0, x1=campo["ancho_terreno_m"], y1=campo["largo_terreno_m"],
+                  line=dict(color="rgb(46,125,50)"), fillcolor="rgba(46,125,50,0.06)")
+    for _b in _dis["bloques"]:
+        _c = _colores[(_b["inversor"] - 1) % len(_colores)]
+        for _s in (x for x in _dis["strings"] if x["inversor"] == _b["inversor"]):
+            _fe.add_scatter(x=[_s["x_min"], _s["x_max"]], y=[_s["y"], _s["y"]], mode="lines",
+                            line=dict(color=_c, width=6), showlegend=False,
+                            hovertext=f"String {_s['id']} · INV-{_b['inversor']} · DC {_s['longitud_dc_m']} m · "
+                                      f"caída {_s['caida_dc_pct']:.2f} %", hoverinfo="text")
+        _fe.add_scatter(x=[_b["x_inversor"]], y=[_b["y_inversor"]], mode="markers+text",
+                        marker=dict(symbol="square", size=14, color=_c), text=[f"INV-{_b['inversor']}"],
+                        textposition="middle left", name=f"INV-{_b['inversor']}")
+        _fe.add_scatter(x=[_b["x_inversor"], _dis["punto_conexion_xy"][0], _dis["punto_conexion_xy"][0]],
+                        y=[_b["y_inversor"], _b["y_inversor"], _dis["punto_conexion_xy"][1]], mode="lines",
+                        line=dict(color=_c, dash="dot"), showlegend=False, hoverinfo="skip")
+    _fe.add_scatter(x=[_dis["punto_conexion_xy"][0]], y=[_dis["punto_conexion_xy"][1]], mode="markers",
+                    marker=dict(symbol="star", size=16, color="black"), name="Punto de conexión")
+    _fe.update_layout(height=420, margin=dict(l=0, r=0, t=30, b=0), title="Plano eléctrico: strings por inversor",
+                      xaxis_title="A lo largo de la fila (m)", yaxis_title="Adelante → atrás (m)",
+                      yaxis=dict(scaleanchor="x"))
+    st.plotly_chart(_fe, use_container_width=True)
+    st.caption("🔌 ⚡ Diagrama Unifilar puede usar estos cables (un tramo DC por string y el AC medio) para que "
+               "📊 Producción calcule la pérdida real en cables.")
+
+# ── 9. Vista 3D del campo ────────────────────────────────────────────────────
+st.markdown("### 9. Vista 3D del campo")
 _fig = go.Figure(data=trazas_campo(campo))
 _fig.update_layout(
     scene=dict(xaxis_title="A lo largo de la fila (m)", yaxis_title="Adelante → atrás (m)",

@@ -435,6 +435,23 @@ else:
                     "longitud_m": _long_tr, "calibre_mm2": float(_calibre_tr),
                 })
     else:
+        # Spec 07/granja-electrico-bloques: con el campo de 🌾 Granja FV, un
+        # tramo DC por string con su largo real y el AC medio por inversor.
+        from calculos.granja_electrico import diseno_desde_estado, tramos_para_unifilar
+        _dis_granja = (diseno_desde_estado(st.session_state)
+                       if st.session_state.get("tipo_instalacion") == "Granja fotovoltaica" else None)
+        _usar_granja = False
+        if _dis_granja and _dis_granja["n_strings"] * _dis_granja["n_serie"] == int(n_paneles):
+            _usar_granja = st.checkbox(
+                f"🌾 Usar los cables de 🌾 Granja FV ({_dis_granja['n_strings']} strings, DC medio "
+                f"{sum(b['dc_media_m'] * b['strings'] for b in _dis_granja['bloques']) / _dis_granja['n_strings']:.1f} m "
+                f"en {_dis_granja['calibre_dc_mm2']:g} mm², AC medio {_dis_granja['ac_media_m']:.1f} m en "
+                f"{_dis_granja['calibre_ac_mm2']:g} mm²)", value=True, key="unif_usar_cables_granja",
+                help="Largo de cada string hasta su inversor y de cada inversor al punto de conexión, "
+                     "calculados con la geometría del campo (sección 8 de 🌾 Granja FV).")
+    if not superficies_val and _usar_granja:
+        tramos_dc_val = tramos_para_unifilar(_dis_granja)
+    elif not superficies_val:
         col_dc1, col_dc2 = st.columns(2)
         with col_dc1:
             _long_dc_unico = st.number_input(
@@ -450,13 +467,18 @@ else:
             })
 
     col_ac1, col_ac2 = st.columns(2)
-    with col_ac1:
-        longitud_ac_val = st.number_input(
-            "Longitud tramo AC — inversor → punto de conexión (m)",
-            min_value=0.0, step=1.0, value=0.0,
-        )
-    with col_ac2:
-        calibre_ac_val = st.selectbox("Calibre AC (mm²)", CALIBRES_COMERCIALES_MM2, index=5)
+    if not superficies_val and _usar_granja:
+        longitud_ac_val = float(_dis_granja["ac_media_m"])
+        calibre_ac_val = float(_dis_granja["calibre_ac_mm2"])
+        st.caption(f"🌾 Tramo AC desde 🌾 Granja FV: {longitud_ac_val:.1f} m en {calibre_ac_val:g} mm² por inversor.")
+    else:
+        with col_ac1:
+            longitud_ac_val = st.number_input(
+                "Longitud tramo AC — inversor → punto de conexión (m)",
+                min_value=0.0, step=1.0, value=0.0,
+            )
+        with col_ac2:
+            calibre_ac_val = st.selectbox("Calibre AC (mm²)", CALIBRES_COMERCIALES_MM2, index=5)
 
     if tramos_dc_val or longitud_ac_val:
         perdida_ohmica_result = calcular_perdida_ohmica(

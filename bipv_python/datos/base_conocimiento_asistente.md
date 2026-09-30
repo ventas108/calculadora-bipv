@@ -5297,6 +5297,40 @@ La fila «↳ Solo horas calientes» del balance mostraba `Tk_gamma=—%/°C` au
 - **Aviso 🟠:** el borde del seguidor queda a menos de 0,5 m del suelo con el giro máximo. Sube el eje o baja el ángulo.
 - **Qué hacer:** si la ganancia justifica el costo extra del seguidor (estructura, motores, mantenimiento), considéralo; en 💰 Financiero compara con la estructura fija. La energía de 📊 Producción **sigue calculada con la estructura fija**: esta sección solo compara.
 
+## 97. ⚡ Granja FV fase 5: eléctrico por bloques — strings, inversores y cables desde el campo (30-sep-2026)
+
+### Eléctrico por bloques — qué es y por qué importa
+
+**Qué es:** la sección **8 de 🌾 Granja FV** ubica en el campo los **strings** de 📐 Dimensionamiento. Luego agrupa las filas en un **bloque por inversor** y calcula el **largo de los cables**: DC de cada string a su inversor y AC de cada inversor al punto de conexión. Con eso calcula la **caída de tensión**. Dibuja además un plano con cada string del color de su inversor.
+
+**Por qué importa:** antes, en ⚡ Diagrama Unifilar había que escribir a mano un solo largo de cable DC. Si se dejaba en 0, 📊 Producción usaba un % fijo de pérdida en cables. Ahora el largo sale de la geometría real, string por string, y la 📋 Ficha RETIE revisa la caída de tensión.
+
+### Eléctrico por bloques — fórmula en palabras y cuenta real
+
+- **Strings por fila:** la app recorre cada fila de izquierda a derecha, columna por columna de la mesa. Cada N módulos (los módulos en serie) forman un string. Si la fila no es múltiplo de N, el string que sobra sigue en la fila siguiente y se necesita cable extra entre filas (aviso 🟠).
+- **Bloques:** los strings, en orden, llenan los inversores según el reparto de Dimensionamiento. Así cada inversor recibe filas vecinas.
+- **Largo DC de un string** (un conductor, de ida) = (recorrido en L desde el extremo más cercano del string hasta su inversor + medio largo del string + bajada desde la mesa) × (1 + holgura). El medio largo del string se suma porque un polo sale del otro extremo y vuelve por la fila.
+- **Largo AC** = recorrido en L del inversor al punto de conexión + 2 m de bajadas, × (1 + holgura).
+- **Caída de tensión DC** = 2 × largo × ρ × I_mp ÷ (calibre × V_mp del string). ρ es la resistividad del cobre a 45 °C.
+- **Caída de tensión AC (trifásica)** = √3 × largo × ρ × I ÷ (calibre × V de línea), con I = P_AC ÷ (√3 × V).
+- **Límite:** 3 % por circuito, la recomendación de la NTC 2050.
+- **Resistencia DC efectiva:** es la misma que usa el Unifilar. Cada string es un tramo con su propio largo, así que la pérdida se suma string por string, exacta.
+
+**Ejemplo (Apartadó):** 308 módulos JAM66D46-720/LB, 28 en serie = **11 strings**, 2 inversores de 100 kW con reparto **6 + 5**. Filas de 62 módulos, con inversores en la cabecera y cable DC de 6 mm².
+- 62 no es múltiplo de 28, así que **4 strings cruzan de una fila a la siguiente** (aviso 🟠). Con 56 módulos por fila (2 strings exactos) no cruzaría ninguno.
+- String más lejano ≈ 71 m de cable. Caída DC ≈ 0,7 %, dentro del 3 %.
+- AC con 70 mm² a 400 V: ≈ 144 A por inversor. Caída AC ≈ 0,5 %.
+- Resistencia DC efectiva ≈ 28 mΩ, pérdida DC a STC ≈ **0,46 %**. La referencia estándar internacional usa por defecto **1,5 %** a STC (88 mΩ). Con la geometría real la pérdida sale menor; con 4 mm² subiría a ≈ 0,7 %.
+
+### Eléctrico por bloques — cómo leerlo en pantalla y qué hacer
+
+- **🌾 Granja FV, sección 8:** elige dónde van los inversores (cabecera de las filas o centro de cada bloque), el punto de conexión (una esquina del terreno), los calibres DC y AC, la tensión AC de línea y la holgura de cable. Todo se guarda con el proyecto.
+- **Avisos:** 🟢 strings completos y reparto; 🔴 los módulos no forman strings completos; 🟠 strings que cruzan filas; 🟢/🟠 caída de tensión DC y AC frente al 3 %.
+- **Tarjetas y tabla:** strings, cable DC y AC total, resistencia DC efectiva, pérdida DC a STC y, por inversor, sus strings, filas, largo DC medio y máximo, largo AC, corriente y caída AC.
+- **⚡ Diagrama Unifilar:** en una granja aparece la casilla **«🌾 Usar los cables de 🌾 Granja FV»** (marcada). Pone un tramo DC por string y el AC medio; así 📊 Producción calcula la pérdida real en cables hora a hora.
+- **📋 Ficha RETIE:** suma las validaciones «Granja: strings y bloques por inversor», «strings que cruzan filas» y «caída de tensión DC/AC».
+- **Qué hacer:** si la caída pasa del 3 %, sube el calibre o acerca el inversor (prueba «Centro de su bloque»). Si hay strings que cruzan filas, ajusta los módulos por fila a un múltiplo de los módulos en serie. La tensión AC de esta sección debe ser la misma del punto de conexión del Unifilar y la Ficha RETIE.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
