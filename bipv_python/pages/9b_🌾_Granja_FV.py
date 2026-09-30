@@ -19,6 +19,7 @@ from calculos.campos_editor import sincronizar_campo
 from calculos.campos_persistentes import campo_persistente
 from datos.ciudades_colombia import CIUDADES
 from calculos.agrivoltaica import luz_en_el_suelo, paso_maquinaria
+from calculos.seguidor import SEGUIDOR_DEFECTO, comparar_seguidor_fijo, energia_estimada
 from calculos.granja_fv import (
     CAMPOS_EDITABLES,
     aplicar_geometria_a_energia,
@@ -39,7 +40,8 @@ st.caption(
     "(pitch), GCR y altura. Usa los mismos datos del proyecto que 📐 Dimensionamiento, 📊 "
     "Producción y ☀️ Recurso Solar. Comprueba que tu geometría coincide con la que usan los "
     "cálculos, lleva la sombra entre filas a la energía (sección 5) y calcula la luz que recibe el "
-    "cultivo y el paso de la maquinaria (sección 6). Las fachadas y techos BIPV siguen en "
+    "cultivo y el paso de la maquinaria (sección 6) y compara un seguidor de un eje con la estructura "
+    "fija (sección 7). Las fachadas y techos BIPV siguen en "
     "🗺️ Vista 3D."
 )
 
@@ -264,8 +266,102 @@ if _tmy_g is not None and _lat_g is not None and _lon_g is not None and not camp
 else:
     st.caption("🌱 Para calcular la luz en el suelo, calcula primero el recurso solar en ☀️ Recurso Solar.")
 
-# ── 7. Vista 3D del campo ────────────────────────────────────────────────────
-st.markdown("### 7. Vista 3D del campo")
+# ── 7. Seguidor de un eje frente a la estructura fija (fase 4) ─────────────
+st.markdown("### 7. ☀️ Seguidor de un eje frente a la estructura fija")
+st.caption(
+    "Compara la luz en la cara frontal del campo fijo con un seguidor de eje Norte–Sur que gira de Este a "
+    "Oeste, con y sin backtracking, usando el mismo modelo de filas. Sin backtracking la fila vecina "
+    "tapa una franja del seguidor al amanecer y al atardecer y los diodos de bypass apagan bloques de "
+    "celdas. La energía de 📊 Producción sigue calculada con la estructura fija."
+)
+s1, s2, s3, s4, s5 = st.columns(5)
+with s1:
+    campo_persistente(ss, st.number_input, "Módulos a lo ancho (vertical)", "granja_seg_modulos_ancho",
+                      int(ss.get("granja_seg_modulos_ancho", SEGUIDOR_DEFECTO["modulos_ancho"])),
+                      min_value=1, max_value=2, step=1, help="1P = un módulo en vertical; 2P = dos.")
+with s2:
+    campo_persistente(ss, st.number_input, "GCR del seguidor", "granja_seg_gcr",
+                      float(ss.get("granja_seg_gcr", SEGUIDOR_DEFECTO["gcr"])),
+                      min_value=0.15, max_value=0.70, step=0.01,
+                      help="Ancho del seguidor ÷ separación entre ejes. Típico 0,30–0,40.")
+with s3:
+    campo_persistente(ss, st.number_input, "Altura del eje (m)", "granja_seg_altura_eje_m",
+                      float(ss.get("granja_seg_altura_eje_m", SEGUIDOR_DEFECTO["altura_eje_m"])),
+                      min_value=0.8, max_value=6.0, step=0.1)
+with s4:
+    campo_persistente(ss, st.number_input, "Ángulo máximo de giro (°)", "granja_seg_angulo_max_deg",
+                      float(ss.get("granja_seg_angulo_max_deg", SEGUIDOR_DEFECTO["angulo_max_deg"])),
+                      min_value=30.0, max_value=75.0, step=5.0)
+with s5:
+    sincronizar_campo(ss, "_w_granja_seg_celdas_partidas",
+                      bool(ss.get("granja_seg_celdas_partidas", SEGUIDOR_DEFECTO["celdas_partidas"])))
+    ss["granja_seg_celdas_partidas"] = st.checkbox(
+        "Celdas partidas (half-cut)", key="_w_granja_seg_celdas_partidas",
+        help="Módulos de medias celdas: las dos mitades trabajan en paralelo y una sombra en el borde "
+             "apaga solo una mitad.")
+_cfg_seg = {"modulos_ancho": int(ss["granja_seg_modulos_ancho"]), "gcr": float(ss["granja_seg_gcr"]),
+            "altura_eje_m": float(ss["granja_seg_altura_eje_m"]),
+            "angulo_max_deg": float(ss["granja_seg_angulo_max_deg"]),
+            "celdas_partidas": bool(ss["granja_seg_celdas_partidas"])}
+_fijo_seg = {"tilt_deg": float(campo["tilt_deg"]), "azimut_deg": float(campo["azimut_deg"]),
+             "gcr": round(float(campo["gcr"]), 4), "altura_m": round(float(campo["altura_centro_m"]), 3),
+             "ancho_m": round(float(campo["ancho_mesa_m"]), 3)}
+_firma_seg = {"seg": _cfg_seg, "fijo": _fijo_seg, "largo": round(float(dims["largo_m"]), 4)}
+if _tmy_g is not None and _lat_g is not None and _lon_g is not None and not campo["errores"] and campo["gcr"] > 0:
+    if st.button("🔄 Comparar seguidor y estructura fija"):
+        with st.spinner("Calculando 8.760 horas con pvlib (seguidor con y sin backtracking)…"):
+            _r = comparar_seguidor_fijo(_tmy_g, float(_lat_g), float(_lon_g), float(_alt_g or 0.0),
+                                        float(ss.get("albedo_suelo", 0.20)), _fijo_seg, _cfg_seg,
+                                        float(dims["largo_m"]))
+            ss["granja_seguidor"] = {"firma": _firma_seg, **_r}
+    _seg = ss.get("granja_seguidor")
+    if _seg and _seg.get("firma") == _firma_seg:
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Estructura fija", f"{_seg['fijo']['poa_kwh_m2']:,.0f} kWh/m²",
+                  help="Luz anual en la cara frontal del campo actual (con la sombra entre filas).")
+        k2.metric("Seguidor con backtracking", f"{_seg['backtracking']['poa_kwh_m2']:,.0f} kWh/m²",
+                  f"{_seg['ganancia_backtracking_pct']:+.1f} % frente a la fija")
+        k3.metric("Seguidor sin backtracking", f"{_seg['sin_backtracking']['poa_kwh_m2']:,.0f} kWh/m²",
+                  f"{_seg['ganancia_sin_backtracking_pct']:+.1f} % frente a la fija")
+        k4.metric("Sombra eléctrica sin backtracking", f"{_seg['perdida_sombra_electrica_pct']:.1f} %",
+                  help=f"{_seg['sin_backtracking']['horas_sombra']:,} horas al año con una franja de sombra de "
+                       "la fila vecina; los diodos de bypass apagan los bloques de celdas tocados.")
+        _gs = _seg["geometria"]
+        st.caption(f"🔧 Seguidor de {_gs['ancho_m']:.2f} m de ancho · separación entre ejes {_gs['pitch_m']:.2f} m · "
+                   f"{_gs['bloques']} bloque(s) de celdas a lo ancho · borde más bajo a {_gs['borde_bajo_m']:.2f} m "
+                   f"con el giro máximo de {_gs['angulo_max_deg']:.0f}°.")
+        if _gs["borde_bajo_m"] < 0.5:
+            st.warning(f"🟠 Con el giro máximo el borde del seguidor queda a {_gs['borde_bajo_m']:.2f} m del "
+                       "suelo: sube la altura del eje o baja el ángulo máximo.")
+        _e_fijo = float(ss.get("E_ac_anual_kWh") or 0.0)
+        if _e_fijo > 0:
+            st.info(f"⚡ Estimación de primer orden: si 📊 Producción da {_e_fijo:,.0f} kWh/año con la estructura "
+                    f"fija, el seguidor con backtracking daría ≈ {energia_estimada(_e_fijo, _seg):,.0f} kWh/año "
+                    "(misma proporción que la luz frontal; no incluye el recorte extra del inversor, cambios de "
+                    "temperatura, bifacialidad ni costos).")
+        _meses_s = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+        _fb = go.Figure()
+        for _nom, _k, _col in (("Fija", "fijo", "rgb(120,120,120)"), ("Seguidor con backtracking", "backtracking",
+                                                                      "rgb(46,125,50)"),
+                               ("Seguidor sin backtracking", "sin_backtracking", "rgb(230,145,56)")):
+            _fb.add_bar(x=_meses_s, y=_seg[_k]["mensual_kwh_m2"], name=_nom, marker_color=_col)
+        _fb.update_layout(barmode="group", height=340, margin=dict(l=0, r=0, t=30, b=0),
+                          yaxis_title="kWh/m²", title="Luz en la cara frontal por mes")
+        st.plotly_chart(_fb, use_container_width=True)
+        _de = _seg["dia_ejemplo"]
+        _fa = go.Figure()
+        _fa.add_scatter(x=_de["hora"], y=_de["backtracking"], name="Con backtracking", mode="lines+markers",
+                        line=dict(color="rgb(46,125,50)"))
+        _fa.add_scatter(x=_de["hora"], y=_de["sin_backtracking"], name="Sin backtracking", mode="lines+markers",
+                        line=dict(color="rgb(230,145,56)", dash="dash"))
+        _fa.update_layout(height=300, margin=dict(l=0, r=0, t=30, b=0), xaxis_title="Hora local",
+                          yaxis_title="Giro (°): − Este, + Oeste", title="Giro del seguidor el 21 de marzo")
+        st.plotly_chart(_fa, use_container_width=True)
+else:
+    st.caption("☀️ Para comparar el seguidor, calcula primero el recurso solar en ☀️ Recurso Solar.")
+
+# ── 8. Vista 3D del campo ────────────────────────────────────────────────────
+st.markdown("### 8. Vista 3D del campo")
 _fig = go.Figure(data=trazas_campo(campo))
 _fig.update_layout(
     scene=dict(xaxis_title="A lo largo de la fila (m)", yaxis_title="Adelante → atrás (m)",

@@ -5261,6 +5261,42 @@ La fila «↳ Solo horas calientes» del balance mostraba `Tk_gamma=—%/°C` au
 - **Mapa de sombra en el suelo:** cada fila es un mes y cada columna un punto del suelo; verde oscuro = más luz. Sirve para ver en qué meses y en qué franjas conviene sembrar.
 - **Qué hacer:** si la luz es muy poca para tu cultivo, separa las filas (baja el GCR) o usa mesas más angostas; si la luz es muy dispareja, sube la altura libre. Cada cambio del campo pide recalcular la luz (la app oculta el resultado viejo) y, si cambió la geometría, volver a usar el botón de la sección 5 para la energía.
 
+## 96. ☀️ Granja FV fase 4: seguidor de un eje con backtracking frente a la estructura fija (30-sep-2026)
+
+### Seguidor de un eje — qué es y por qué importa
+
+**Qué es:** un **seguidor de un eje** es una fila de paneles montada sobre un eje horizontal Norte–Sur que gira durante el día: en la mañana mira al Este, al mediodía queda casi horizontal y en la tarde mira al Oeste. Así el panel recibe el sol más de frente que una **estructura fija**.
+
+**El problema de las filas:** al amanecer y al atardecer el sol está bajo y cada fila le hace sombra a la de al lado.
+- **Sin backtracking** (seguimiento puro): el seguidor apunta siempre al sol y acepta una **franja de sombra** en su borde.
+- **Con backtracking**: en esas horas el seguidor **se devuelve** (gira menos) justo lo necesario para que la fila vecina no lo sombree.
+
+**Dato clave (y poco intuitivo):** en luz, las dos formas reciben casi la **misma luz directa** en el año. La fila vecina limita lo que se puede atrapar, con sombra o sin ella. La diferencia real es **eléctrica**: con una franja de sombra, los **diodos de bypass** apagan los bloques de celdas tocados, aunque la sombra sea delgada. Por eso los seguidores comerciales usan backtracking.
+
+### Seguidor de un eje — fórmula en palabras y cuenta real
+
+- **Giro del seguidor:** lo calcula pvlib (seguidor de un eje), con el ángulo máximo de giro y el GCR del seguidor.
+- **Luz en la cara frontal:** el mismo modelo de filas para las tres opciones: estructura fija de tu campo, seguidor con backtracking y seguidor sin backtracking. La comparación es justa.
+- **Fracción sombreada sin backtracking** = 1 − cos(ψ) ÷ (GCR × cos(giro − ψ)), donde ψ es el ángulo del sol visto de perfil. Se comprobó igual a la función de pvlib.
+- **Pérdida eléctrica:** modelo de bloques de Martínez-Moreno (en pvlib). Si la sombra toca N de los M bloques de celdas a lo ancho, la luz directa se multiplica por (1 − fracción sombreada) × (1 − N ÷ (M + 1)).
+- **Bloques a lo ancho:** con el módulo en vertical, la sombra entra por el borde paralelo al eje y toca las tres columnas de celdas.
+  - Celdas enteras: se apaga todo el módulo (1 bloque).
+  - **Celdas partidas** (half-cut): las dos mitades trabajan en paralelo (2 bloques) y se pierde menos.
+- **Energía estimada** = energía de 📊 Producción con la estructura fija × luz del seguidor ÷ luz de la fija. Es una estimación de primer orden: no incluye el recorte extra del inversor (con más luz el inversor llega más horas a su límite: revisa la relación DC/AC), ni cambios de temperatura, bifacialidad o costos.
+
+**Ejemplo (Apartadó):** campo fijo a 10° con GCR 39,8 % frente a un seguidor 1P de 2,384 m, GCR 0,35, eje a 2,0 m, giro máximo 60°, celdas partidas.
+- Seguidor con backtracking: **+14 %** (año con muchas nubes) a **+24 %** (año despejado) más luz que la estructura fija. Cerca del ecuador el sol pasa alto y el seguidor gana sobre todo en la mañana y en la tarde.
+- Sin backtracking: unas 1.100 horas al año con franja de sombra y ≈ 2,5 % de pérdida eléctrica. Gana ≈ 3 puntos menos que con backtracking.
+- Con el giro de 60° el borde bajo del seguidor queda a 2,0 − 1,192 × sen 60° ≈ **0,97 m** del suelo.
+
+### Seguidor de un eje — cómo leerlo en pantalla y qué hacer
+
+- **🌾 Granja FV, sección 7:** elige los módulos a lo ancho (1P o 2P), el GCR del seguidor, la altura del eje, el ángulo máximo y si el módulo tiene celdas partidas. Presiona **«🔄 Comparar seguidor y estructura fija»** (necesita el recurso solar de ☀️ Recurso Solar).
+- **Tarjetas:** luz anual de la fija, del seguidor con backtracking y sin backtracking (con el % frente a la fija), y la sombra eléctrica sin backtracking.
+- **Gráficas:** luz por mes de las tres opciones y el giro del seguidor el 21 de marzo. Con backtracking, al amanecer y al atardecer el giro baja en vez de llegar al máximo.
+- **Aviso 🟠:** el borde del seguidor queda a menos de 0,5 m del suelo con el giro máximo. Sube el eje o baja el ángulo.
+- **Qué hacer:** si la ganancia justifica el costo extra del seguidor (estructura, motores, mantenimiento), considéralo; en 💰 Financiero compara con la estructura fija. La energía de 📊 Producción **sigue calculada con la estructura fija**: esta sección solo compara.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
