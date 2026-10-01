@@ -428,7 +428,8 @@ def _curva_electrica_svg(curva: dict, N_serie: int, T_frio: float, T_real: float
         p.append(f'<line x1="{ml}" y1="{y:.1f}" x2="{W-mr}" y2="{y:.1f}" '
                  f'stroke="#C62828" stroke-width="1.4" stroke-dasharray="5,3"/>')
         p.append(f'<text x="{ml+4}" y="{y-3:.1f}" font-size="8.5" fill="#C62828">'
-                 f'Vdc máx {vdc_max:.0f}V</text>')
+                 f'{"V máx. módulo" if curva.get("limite_voc_origen") == "modulo" else "Vdc máx"} '
+                 f'{vdc_max:.0f}V</text>')
 
     # Grid horizontal ligera
     for gi in range(1, 4):
@@ -814,10 +815,16 @@ def generar_html_reporte() -> str:
                 "son los mismos valores que evalúa el gate de compatibilidad de Dimensionamiento "
                 "y Producción — este gráfico no verifica nada distinto, solo lo visualiza."
             )
-            _mv_pdf = margen_voc(_ev_pdf.get("Voc_frio"), _inv_dim_pdf)
-            _fila_margen = ([("Margen frente a la tensión DC máxima del inversor",
+            # Spec 03/tension-maxima-modulo: el límite es el menor entre el
+            # inversor y la tensión máxima de sistema del módulo.
+            _mv_pdf = margen_voc(_ev_pdf.get("Voc_frio"), _inv_dim_pdf, _panel_dim_pdf)
+            _del_mod_pdf = bool(_mv_pdf) and _mv_pdf.get("origen") == "modulo"
+            _fila_margen = ([(("Margen frente a la tensión máxima del módulo" if _del_mod_pdf
+                               else "Margen frente a la tensión DC máxima del inversor"),
                               f"{_mv_pdf['nivel']} {_mv_pdf['margen_v']:,.0f}", "V",
-                              f"{_mv_pdf['margen_pct']:.1f} % de {_mv_pdf['vdc_max_v']:,.0f} V (ficha del inversor)")]
+                              f"{_mv_pdf['margen_pct']:.1f} % de {_mv_pdf['vdc_max_v']:,.0f} V "
+                              + ("(ficha del módulo: tensión máxima del sistema)" if _del_mod_pdf
+                                 else "(ficha del inversor)"))]
                             if _mv_pdf else [])
             _alertas_ficha_pdf = alertas_ficha_inversor(_inv_dim_pdf)
             html += tabla_kv([

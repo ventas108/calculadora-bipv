@@ -156,6 +156,13 @@ with col1:
             temperatura_minima_diseno_c = st.number_input(
                 "Temperatura mínima de diseño del sitio (°C)", step=1.0, value=0.0,
             )
+            # Spec 03/tension-maxima-modulo: el Voc en frío se compara con el
+            # menor entre el Vdc del inversor y esta tensión del módulo.
+            v_sistema_modulo_v = st.number_input(
+                "Tensión máxima del sistema del módulo (V)", min_value=0.0, step=50.0,
+                value=float(panel_dict.get("V_sistema_max") or 0),
+                help="De la ficha del panel (VSYS). 0 = sin dato: se usa solo el Vdc del inversor.",
+            )
 
 with col2:
     if usar_multi:
@@ -250,6 +257,7 @@ else:
         corriente_cortocircuito_pcc_ka=corriente_cortocircuito_pcc_ka or None,
         esquema_tierra=esquema_tierra,
         factor_bifacial=_factor_bif_retie,
+        v_sistema_modulo_v=v_sistema_modulo_v or None,
     )
     calc = calcular_retie(config)
     checks = validar_retie(config, calc)

@@ -146,6 +146,15 @@ _PATTERNS = {
         # de NOCT; 'battery' aquí es el módulo, no una batería)
         r'Rated\s+operating\s+temperature[^\n0-9]{0,30}([0-9]{2})\b',
     ],
+    # Tensión máxima del sistema (aislamiento del módulo, IEC 61730). Spec
+    # 03/tension-maxima-modulo: «Voltaje máximo del sistema VSYS(V) 1000»
+    # (SolTech), «Maximum System Voltage 1500V DC (IEC)», «Max. System
+    # Voltage [V] 1000». Con «600 V (UL) / 1000 V (IEC)» toma el primero
+    # (el menor, lado seguro).
+    "V_sistema": [
+        r'(?:Voltaje|Tensi[oó]n)\s+m[aá]xim[oa]\s+del?\s+sistema[^\n0-9]{0,25}([0-9]{3,4})(?![0-9])',
+        r'(?:Maximum|Max\.?)\s+System\s+Voltage[^\n0-9]{0,30}([0-9]{3,4})(?![0-9])',
+    ],
     "Bifacialidad": [
         # "Bifaciality: 80%±5%" / "Bifacialidad 70 ± 5 %" / "Bifacial factor 0.8"(→%)
         r'(?:Bifacialidad|Bifaciality|Bifacial\s+(?:factor|gain|coefficient|Faktor))'
@@ -1273,6 +1282,8 @@ def extraer_parametros_panel(pdf_bytes: bytes) -> dict:
         result["Isc"] = None
     if result.get("Pmax") and result["Pmax"] > 2000:
         result["Pmax"] = None
+    if result.get("V_sistema") and not (100 <= result["V_sistema"] <= 2000):
+        result["V_sistema"] = None
     # Ns plausible: 10–300 celdas en serie (2384 era la dimensión del panel).
     # Excepción: Ns derivado de conteo de semiceldas (#67) puede ser bajo
     # legítimamente (tejas/BIPV: 28 half-piece → Ns=14).

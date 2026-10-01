@@ -28,6 +28,7 @@ from calculos.dimensionamiento import (
     calcular_vmp_string,
 )
 from calculos.ficha_inversor import alertas_ficha_inversor
+from calculos.tension_modulo import limite_voc
 from calculos.financiero import calcular_flujo_caja, calcular_metricas
 
 FS_ISC_DEFECTO = 1.25  # mismo factor de seguridad NEC del dimensionamiento
@@ -88,6 +89,10 @@ def filtrar_inversores_compatibles(
             "motivo": "",
         }
         vdc_max = inv.get("Vdc_max") or 0
+        # Spec 03/tension-maxima-modulo: el menor entre inversor y módulo.
+        _lim = limite_voc(panel, inv) if vdc_max else {"limite_v": None, "origen": None}
+        _txt_max = "máx. del módulo" if _lim["origen"] == "modulo" else "máx."
+        vdc_max = _lim["limite_v"] or vdc_max
         vmppt_min = inv.get("Vmppt_activo_min") or inv.get("Vmppt_min") or 0
         vmppt_max = inv.get("Vmppt_max") or 0
         isc_lim = inv.get("Isc_max_tracker") or inv.get("I_max_tracker") or 0
@@ -107,7 +112,7 @@ def filtrar_inversores_compatibles(
             filas.append(fila)
             continue
         if voc > vdc_max:
-            fila["motivo"] = f"Voc frío {voc:,.0f} V > máx. {vdc_max:,.0f} V"
+            fila["motivo"] = f"Voc frío {voc:,.0f} V > {_txt_max} {vdc_max:,.0f} V"
             filas.append(fila)
             continue
         if vmp < vmppt_min:
@@ -709,7 +714,7 @@ def mejor_n_por_inversor(
         u_entradas = unidades_necesarias(strings, int(f["strings_max"]))
         u_dcac = math.ceil(p_dc / (DCAC_OBJETIVO * p_ac_kw) - 1e-9) if p_ac_kw else 0
         unidades = min(max(u_entradas, u_dcac), strings) if strings else 0
-        vdc = float(inv.get("Vdc_max") or 0.0)
+        vdc = float(limite_voc(panel, inv)["limite_v"] or 0.0)
         ns = [c[0] for c in candidatos]
         salida.append({
             **base, "compatible": strings > 0, "N_serie": n, "rango_N": f"{min(ns)}–{max(ns)}",

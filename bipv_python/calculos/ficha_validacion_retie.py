@@ -109,6 +109,7 @@ def construir_config_retie(
     corriente_cortocircuito_pcc_ka: float | None = None,
     esquema_tierra: str = "",
     factor_bifacial: float = 1.0,
+    v_sistema_modulo_v: float | None = None,
 ) -> dict:
     """
     Normaliza los datos de un proyecto FV/BIPV a la estructura que
@@ -138,6 +139,8 @@ def construir_config_retie(
             "coef_voc_pct_c": coef_voc_pct_c,
             # Spec 07/unifilar-retie-bifacial-cruce: 1 + 0,135 φ (BNPI).
             "factor_bifacial": float(factor_bifacial or 1.0),
+            # Spec 03/tension-maxima-modulo: VSYS de la ficha del módulo.
+            "v_sistema_max_v": v_sistema_modulo_v,
         },
         "inversor": {
             "nombre": inversor_nombre, "potencia_ac_kw_unidad": potencia_ac_kw_unidad,
@@ -311,12 +314,18 @@ def validar_retie(cfg: dict, calc: dict) -> list[dict]:
         out.append({"nivel": "PENDIENTE", "titulo": "Voc del string en frío",
                     "detalle": f"Voc frío calculado={calc['voc_string_frio_v']:.1f} V; falta Vdc máxima "
                                "oficial del inversor."})
-    elif calc["voc_string_frio_v"] < inv["vdc_max_v"]:
-        out.append({"nivel": "OK", "titulo": "Voc del string en frío",
-                    "detalle": f"{calc['voc_string_frio_v']:.1f} V < Vdc máx. {inv['vdc_max_v']:.1f} V."})
     else:
-        out.append({"nivel": "ERROR", "titulo": "Voc del string en frío",
-                    "detalle": f"{calc['voc_string_frio_v']:.1f} V >= Vdc máx. {inv['vdc_max_v']:.1f} V."})
+        # Spec 03/tension-maxima-modulo: el menor entre inversor y módulo.
+        from calculos.tension_modulo import limite_voc
+        _lim = limite_voc({"V_sistema_max": cfg["panel"].get("v_sistema_max_v")},
+                          {"Vdc_max": inv["vdc_max_v"]})
+        _nombre = "tensión máx. del módulo" if _lim["origen"] == "modulo" else "Vdc máx."
+        if calc["voc_string_frio_v"] < _lim["limite_v"]:
+            out.append({"nivel": "OK", "titulo": "Voc del string en frío",
+                        "detalle": f"{calc['voc_string_frio_v']:.1f} V < {_nombre} {_lim['limite_v']:.1f} V."})
+        else:
+            out.append({"nivel": "ERROR", "titulo": "Voc del string en frío",
+                        "detalle": f"{calc['voc_string_frio_v']:.1f} V >= {_nombre} {_lim['limite_v']:.1f} V."})
 
     if calc["vmp_string_stc_v"] is None or inv["vmppt_min_v"] is None or inv["vmppt_max_v"] is None:
         out.append({"nivel": "PENDIENTE", "titulo": "Ventana MPPT",

@@ -16,6 +16,13 @@ from datos.tecnologias_bipv import ASP_ST1_T40
 from datos.catalogo_inversores import INVERSORES
 
 GROWATT = INVERSORES["Growatt-MID15KTL3-X"]
+# Reproducción del XLSM auditado (hoja Optimizacion_String): esa hoja solo
+# comparaba con el Vdc del inversor. El ASP-ST1-T40 real tiene además 1.000 V
+# de tensión máxima del sistema (Spec 03/tension-maxima-modulo), con la que
+# 8 en serie a −5 °C (1.017 V) no cabe -- eso lo prueba
+# test_tension_maxima_modulo.py. Aquí se valida el algoritmo con los datos
+# del XLSM, sin ese dato.
+ASP_XLSM = {k: v for k, v in ASP_ST1_T40.items() if k != "V_sistema_max"}
 
 # ── Datos de referencia VBA (hoja FF_vs_Irradiancia, T=25°C) ─────────────────
 VALIDACION_FF_VBA = [
@@ -95,7 +102,7 @@ def test_validacion_stc_vs_ficha():
 ])
 def test_optimizar_n_serie(N, esperado_ok):
     """Reproducir tabla de verificación del XLSM (hoja Optimizacion_String)."""
-    resultados = optimizar_n_serie(ASP_ST1_T40, GROWATT,
+    resultados = optimizar_n_serie(ASP_XLSM, GROWATT,
                                    T_frio=-5, T_real=36.35, T_extremo=41.94,
                                    N_strings_tracker=8, N_min=N, N_max=N)
     r = resultados[0]

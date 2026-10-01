@@ -62,12 +62,22 @@ def alertas_ficha_inversor(inv: Mapping[str, Any] | None) -> list[dict]:
     return out
 
 
-def margen_voc(voc_frio: Any, inv: Mapping[str, Any] | None) -> dict | None:
-    """Margen del Voc en frío del string frente a la tensión DC máxima del inversor."""
+def margen_voc(voc_frio: Any, inv: Mapping[str, Any] | None,
+               panel: Mapping[str, Any] | None = None) -> dict | None:
+    """Margen del Voc en frío del string frente a su límite de tensión.
+
+    Con ``panel``, el límite es el menor entre el inversor y la tensión
+    máxima de sistema del módulo (Spec 03/tension-maxima-modulo); ``origen``
+    dice cuál manda.
+    """
+    from calculos.tension_modulo import limite_voc
+
     voc = _num(voc_frio)
-    vdc = _num((inv or {}).get("Vdc_max"))
-    if not voc or not vdc:
+    if not voc or not _num((inv or {}).get("Vdc_max")):
         return None
+    lim = limite_voc(panel, inv)
+    vdc = lim["limite_v"]
     margen = vdc - voc
-    return {"voc_v": voc, "vdc_max_v": vdc, "margen_v": margen, "margen_pct": 100.0 * margen / vdc,
+    return {"voc_v": voc, "vdc_max_v": vdc, "origen": lim["origen"],
+            "margen_v": margen, "margen_pct": 100.0 * margen / vdc,
             "nivel": "🔴" if margen < 0 else ("🟠" if 100.0 * margen / vdc < MARGEN_ALERTA_PCT else "🟢")}

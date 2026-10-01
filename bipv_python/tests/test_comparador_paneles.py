@@ -172,7 +172,10 @@ def test_comparar_paneles_columnas_esperadas_y_valores_positivos(df_base):
         assert fila["CAPEX (USD)"] > 0
 
     fila_t40 = df[df["Panel"] == "ASP-ST1-T40"].iloc[0]
-    assert fila_t40["Compatible"] == "✅"   # N_serie=8 con Growatt ya validado contra el XLSM
+    # Spec 03/tension-maxima-modulo: N_serie=8 a −5 °C da 1.017 V, más que
+    # la tensión máxima del sistema del ASP-ST1-T40 (1.000 V). El XLSM no
+    # tenía ese límite; con la ficha del módulo esta configuración no cabe.
+    assert fila_t40["Compatible"] == "❌"
 
 
 def test_comparar_paneles_ordena_por_lcoe_ascendente(df_base):

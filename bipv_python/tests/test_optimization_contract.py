@@ -30,6 +30,13 @@ from optimization.bankability import evaluar_bankability
 from tests.test_simulation_pipeline import _tmy_sintetico_offline, _config_base, LAT, LON, ALT_M
 
 GROWATT = INVERSORES["Growatt-MID15KTL3-X"]
+# Reproducción del XLSM auditado (hoja Optimizacion_String): esa hoja solo
+# comparaba con el Vdc del inversor. El ASP-ST1-T40 real tiene además 1.000 V
+# de tensión máxima del sistema (Spec 03/tension-maxima-modulo), con la que
+# 8 en serie a −5 °C (1.017 V) no cabe -- eso lo prueba
+# test_tension_maxima_modulo.py. Aquí se valida el algoritmo con los datos
+# del XLSM, sin ese dato.
+ASP_XLSM = {k: v for k, v in ASP_ST1_T40.items() if k != "V_sistema_max"}
 
 
 @pytest.fixture(scope="module")
@@ -110,7 +117,7 @@ def test_compatibilidad_electrica_n8_ok_n9_falla():
     # Docstring de calculos.dimensionamiento.optimizar_n_serie: N=8 → OK
     # (0 riesgos), N=9 → FALLA (Voc frío > 1100V) — validado contra el XLSM.
     cfg_n8 = dataclasses.replace(
-        _config_base(), panel=ASP_ST1_T40, inversor=GROWATT,
+        _config_base(), panel=ASP_XLSM, inversor=GROWATT,
         N_serie=8, N_strings_tracker=8,
     )
     cfg_n9 = dataclasses.replace(cfg_n8, N_serie=9)
@@ -130,7 +137,7 @@ def test_todas_cumplidas_exige_evaluabilidad_por_defecto():
 
 def test_evaluar_constraints_end_to_end(tmy_bogota):
     cfg = dataclasses.replace(
-        _config_base(), panel=ASP_ST1_T40, inversor=GROWATT,
+        _config_base(), panel=ASP_XLSM, inversor=GROWATT,
         N_serie=8, N_strings_tracker=8,
     )
     resultado = run_bipv_simulation(cfg, tmy=tmy_bogota)

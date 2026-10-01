@@ -11,6 +11,8 @@ import math
 from dataclasses import dataclass
 from typing import Literal
 
+from calculos.tension_modulo import limite_voc
+
 
 EstadoVerif = Literal["OK", "ALERTA", "FALLA"]
 UMBRAL_ALERTA_PCT = 7.5  # % — umbral de alerta (extraído de hoja Optimizacion_String L14)
@@ -152,6 +154,9 @@ def evaluar_compatibilidad_string(
             float(panel["Isc_stc"]) * int(N_strings_tracker) * float(FS_isc)
         )
         vdc_max = _numero_finito(inversor.get("Vdc_max"))
+        # Spec 03/tension-maxima-modulo: el límite del Voc es el menor entre
+        # el inversor y la tensión máxima de sistema del módulo.
+        _lim = limite_voc(panel, inversor) if vdc_max else {"limite_v": None, "origen": None}
         # Vmppt_activo_min PRIMERO -- es el piso de operación recomendado/típico
         # del inversor (ej. Growatt MAX 100KTL3 LV: 850 V), no el mínimo absoluto
         # de arranque (Vmppt_min, 200 V). El orden invertido (Vmppt_min primero)
@@ -220,8 +225,13 @@ def evaluar_compatibilidad_string(
     mensajes = []
     alerta_margen = False
 
+    vdc_max = _lim["limite_v"] or vdc_max
     if voc_frio > vdc_max:
-        mensajes.append(f"Voc en frío {voc_frio:.0f} V > Vdc máximo {vdc_max:.0f} V")
+        mensajes.append(
+            f"Voc en frío {voc_frio:.0f} V > tensión máxima del módulo {vdc_max:.0f} V"
+            if _lim["origen"] == "modulo"
+            else f"Voc en frío {voc_frio:.0f} V > Vdc máximo {vdc_max:.0f} V"
+        )
     elif semaforo(voc_frio, vdc_max, invertir=False) == "ALERTA":
         alerta_margen = True
 
@@ -264,6 +274,8 @@ def evaluar_compatibilidad_string(
         "Vmp_real": vmp_real,
         "Vmp_extremo": vmp_extremo,
         "Isc_equiv_tracker": isc_equiv,
+        "limite_voc_V": vdc_max,
+        "limite_voc_origen": _lim["origen"],
     }
 
 
@@ -328,7 +340,9 @@ def curva_electrica_temperatura(
         "temps": temps,
         "voc_curva": voc_curva,
         "vmp_curva": vmp_curva,
-        "vdc_max": _numero_finito(inversor.get("Vdc_max")) or None,
+        # Spec 03/tension-maxima-modulo: el menor entre inversor y módulo.
+        "vdc_max": limite_voc(panel, inversor)["limite_v"],
+        "limite_voc_origen": limite_voc(panel, inversor)["origen"],
         "vmppt_min": _numero_finito(
             inversor.get("Vmppt_activo_min") or inversor.get("Vmppt_min")
         ) or None,
@@ -364,23 +378,26 @@ def interpretar_curva_electrica(curva: dict) -> list[dict]:
     resultado: list[dict] = []
 
     voc_frio = ev.get("Voc_frio")
+    _del_modulo = curva.get("limite_voc_origen") == "modulo"
+    _limite_txt = "la tensión máxima del módulo" if _del_modulo else "el límite Vdc máximo del inversor"
+    _danio = "al aislamiento del módulo" if _del_modulo else "al inversor"
     if voc_frio is not None and vdc_max:
         margen_pct = (vdc_max - voc_frio) / vdc_max * 100
         if voc_frio > vdc_max:
             nivel, texto = "critico", (
-                f"Voc en frío ({voc_frio:.0f} V) SUPERA el límite Vdc máximo del "
-                f"inversor ({vdc_max:.0f} V) en {voc_frio - vdc_max:.0f} V — riesgo "
-                f"real de daño al inversor en la mañana más fría del año."
+                f"Voc en frío ({voc_frio:.0f} V) SUPERA {_limite_txt} "
+                f"({vdc_max:.0f} V) en {voc_frio - vdc_max:.0f} V — riesgo "
+                f"real de daño {_danio} en la mañana más fría del año."
             )
         elif margen_pct < 3:
             nivel, texto = "ajustado", (
-                f"Voc en frío ({voc_frio:.0f} V) queda a solo {margen_pct:.1f}% del "
-                f"límite Vdc máximo ({vdc_max:.0f} V) — margen de seguridad estrecho."
+                f"Voc en frío ({voc_frio:.0f} V) queda a solo {margen_pct:.1f}% de "
+                f"{_limite_txt} ({vdc_max:.0f} V) — margen de seguridad estrecho."
             )
         else:
             nivel, texto = "ok", (
                 f"Voc en frío ({voc_frio:.0f} V) queda {margen_pct:.1f}% por debajo "
-                f"del límite Vdc máximo ({vdc_max:.0f} V) — margen saludable."
+                f"de {_limite_txt} ({vdc_max:.0f} V) — margen saludable."
             )
         resultado.append({"punto": "Voc frío", "nivel": nivel, "texto": texto})
 
@@ -953,7 +970,9 @@ def optimizar_n_serie(panel: dict, inversor: dict,
         Vmp_ex  = calcular_vmp_string(N, panel["Vmp_stc"], panel["Tk_beta"], T_extremo)
         I_equiv = panel["Isc_stc"] * N_strings_tracker * FS_isc
 
-        v1 = semaforo(Voc_fr,  inversor["Vdc_max"],          invertir=False)
+        # Spec 03/tension-maxima-modulo: menor entre inversor y módulo.
+        v1 = semaforo(Voc_fr,  limite_voc(panel, inversor)["limite_v"] or inversor["Vdc_max"],
+                      invertir=False)
         v2 = semaforo(Vmp_re,  inversor["Vmppt_activo_min"], invertir=True)
         v3 = semaforo(Vmp_ex,  inversor["Vmppt_activo_min"], invertir=True)
         # Check 4-Isimax: comparar contra Isc_max_tracker (cortocircuito),
