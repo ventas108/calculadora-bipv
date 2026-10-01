@@ -27,6 +27,7 @@ from calculos.dimensionamiento import (
     calcular_voc_string,
     calcular_vmp_string,
 )
+from calculos.ficha_inversor import alertas_ficha_inversor
 from calculos.financiero import calcular_flujo_caja, calcular_metricas
 
 FS_ISC_DEFECTO = 1.25  # mismo factor de seguridad NEC del dimensionamiento
@@ -42,6 +43,7 @@ def filtrar_inversores_compatibles(
     T_frio: float = -5.0,
     T_real: float = 36.35,
     FS_isc: float = FS_ISC_DEFECTO,
+    T_extremo: float | None = None,
 ) -> pd.DataFrame:
     """
     Evalúa TODOS los inversores del catálogo contra el string actual.
@@ -50,9 +52,15 @@ def filtrar_inversores_compatibles(
       modelo, compatible (bool), modo ("normal" | "1 string/tracker" | "—"),
       strings_max (int), P_ac_nom_kW, costo_usd, motivo (str si no compatible).
 
-    Criterios (mismos de optimizar_n_serie):
+    Criterios (mismos de evaluar_compatibilidad_string, el gate de 📐
+    Dimensionamiento y 📊 Producción):
       • Voc_frío del string ≤ Vdc_max
       • Vmp_real ≥ Vmppt_activo_min  y  Vmp_real ≤ Vmppt_max
+      • con ``T_extremo``: también el Vmp a la temperatura extrema dentro del
+        MPPT (Spec 03/comparador-inversores-completo: antes no se revisaba y
+        el comparador aceptaba inversores que Dimensionamiento marcaba 🔴)
+      • ficha sin contradicciones 🔴 (``ficha_inversor.alertas_ficha_inversor``);
+        las 🟠 quedan en la columna ``ficha``
       • Corriente: Isc_panel × FS × strings_por_tracker ≤ Isc_max_tracker.
         Si no pasa con los strings nominales del tracker pero SÍ con 1 solo
         string, el inversor queda compatible en modo "1 string/tracker"
@@ -61,6 +69,8 @@ def filtrar_inversores_compatibles(
     filas = []
     voc = calcular_voc_string(N_serie, panel["Voc_stc"], panel["Tk_beta"], T_frio)
     vmp = calcular_vmp_string(N_serie, panel["Vmp_stc"], panel["Tk_beta"], T_real)
+    vmp_ext = (calcular_vmp_string(N_serie, panel["Vmp_stc"], panel["Tk_beta"], T_extremo)
+               if T_extremo is not None else None)
     isc = float(panel["Isc_stc"]) * FS_isc
 
     for nombre, inv in sorted(inversores.items()):
@@ -73,6 +83,8 @@ def filtrar_inversores_compatibles(
             "costo_usd": inv.get("costo_usd"),
             "Voc_string_frio (V)": round(voc, 0),
             "Vmp_string (V)": round(vmp, 0),
+            "margen_voc_pct": None,
+            "ficha": "",
             "motivo": "",
         }
         vdc_max = inv.get("Vdc_max") or 0
@@ -86,6 +98,14 @@ def filtrar_inversores_compatibles(
             fila["motivo"] = "Ficha incompleta (tensiones/corrientes/trackers)"
             filas.append(fila)
             continue
+        fila["margen_voc_pct"] = round(100.0 * (vdc_max - voc) / vdc_max, 1)
+        _alertas = alertas_ficha_inversor({**inv, "nombre": inv.get("nombre") or nombre})
+        fila["ficha"] = " ".join(f"{a['nivel']} {a['texto']}" for a in _alertas)
+        _rojas = [a for a in _alertas if a["nivel"] == "🔴"]
+        if _rojas:
+            fila["motivo"] = "Ficha contradictoria: " + _rojas[0]["texto"]
+            filas.append(fila)
+            continue
         if voc > vdc_max:
             fila["motivo"] = f"Voc frío {voc:,.0f} V > máx. {vdc_max:,.0f} V"
             filas.append(fila)
@@ -96,6 +116,14 @@ def filtrar_inversores_compatibles(
             continue
         if vmp > vmppt_max:
             fila["motivo"] = f"Vmp {vmp:,.0f} V > MPPT máx. {vmppt_max:,.0f} V"
+            filas.append(fila)
+            continue
+        if vmp_ext is not None and vmp_ext < vmppt_min:
+            fila["motivo"] = f"Vmp a T extrema {vmp_ext:,.0f} V < MPPT mín. {vmppt_min:,.0f} V"
+            filas.append(fila)
+            continue
+        if vmp_ext is not None and vmp_ext > vmppt_max:
+            fila["motivo"] = f"Vmp a T extrema {vmp_ext:,.0f} V > MPPT máx. {vmppt_max:,.0f} V"
             filas.append(fila)
             continue
 
@@ -601,4 +629,189 @@ def verificar_compatibilidad_ac(
         "avisos": avisos,
         "corriente_ac_total_A": round(corriente_total, 1) if corriente_total is not None else None,
         "potencia_ac_total_kVA": round(potencia_total_kva, 1) if potencia_total_kva is not None else None,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 5. Mejor configuración por inversor (Spec 03/comparador-inversores-completo)
+# ══════════════════════════════════════════════════════════════════════════════
+# Antes el comparador evaluaba todos los inversores con el MISMO N en serie: un
+# inversor de 1.500 V quedaba juzgado con strings pensados para uno de 1.100 V
+# (o al revés). Aquí cada inversor recibe su mejor N: el que reparte exacto los
+# módulos del proyecto, con margen de Voc y el string más largo.
+MARGEN_VOC_MIN_PCT = 3.0       # el mismo 🟠 de ficha_inversor.margen_voc
+
+
+def _reparto_parejo(strings: int, unidades: int) -> list[int]:
+    if unidades <= 0:
+        return []
+    return [strings // unidades + (1 if i < strings % unidades else 0) for i in range(unidades)]
+
+
+def mejor_n_por_inversor(
+    panel: dict,
+    inversores: dict,
+    n_modulos: int,
+    T_frio: float,
+    T_real: float,
+    T_extremo: float | None = None,
+    n_min: int = 4,
+    n_max: int = 40,
+    n_referencia: int | None = None,
+    FS_isc: float = FS_ISC_DEFECTO,
+) -> pd.DataFrame:
+    """Para cada inversor, el mejor N en serie para los ``n_modulos`` del proyecto.
+
+    Orden de preferencia entre los N compatibles: (1) reparte exacto los
+    módulos (sin sobrantes), (2) margen de Voc ≥ 3 % de la tensión máxima,
+    (3) string más largo (menos strings, cable y entradas). Unidades: las
+    que pidan las entradas (⌈strings ÷ strings que admite el equipo⌉) o, si
+    son más, las que dejan la relación DC/AC en 1,3 o menos (sin pasar de un
+    string por equipo); strings repartidos parejo.
+    """
+    from calculos.dimensionamiento import DCAC_OBJETIVO
+
+    n_modulos = int(n_modulos or 0)
+    por_modelo: dict[str, list[tuple[int, dict]]] = {}
+    motivo_ref: dict[str, str] = {}
+    n_ref = int(n_referencia or 0)
+    for n in range(max(int(n_min), 1), min(int(n_max), n_modulos) + 1):
+        df = filtrar_inversores_compatibles(panel, inversores, n, T_frio, T_real, FS_isc, T_extremo)
+        for fila in df.to_dict("records"):
+            por_modelo.setdefault(fila["modelo"], [])
+            if fila["compatible"]:
+                por_modelo[fila["modelo"]].append((n, fila))
+            elif n == n_ref or fila["modelo"] not in motivo_ref:
+                motivo_ref[fila["modelo"]] = fila["motivo"]
+
+    salida = []
+    for modelo, candidatos in por_modelo.items():
+        inv = inversores.get(modelo) or {}
+        p_ac_kw = (inv.get("P_ac_nom_W") or 0) / 1000.0 or None
+        base = {"modelo": modelo, "P_ac_nom_kW": p_ac_kw, "costo_usd": inv.get("costo_usd")}
+        if not candidatos:
+            salida.append({**base, "compatible": False, "N_serie": None, "rango_N": "—",
+                           "motivo": motivo_ref.get(modelo, "Ningún N compatible")})
+            continue
+
+        def _clave(c):
+            n, f = c
+            return (n_modulos % n == 0, (f["margen_voc_pct"] or 0) >= MARGEN_VOC_MIN_PCT, n)
+
+        n, f = max(candidatos, key=_clave)
+        strings = n_modulos // n
+        usados = strings * n
+        pmax = float(panel.get("Pmax_stc") or 0.0)
+        p_dc = usados * pmax / 1000.0
+        u_entradas = unidades_necesarias(strings, int(f["strings_max"]))
+        u_dcac = math.ceil(p_dc / (DCAC_OBJETIVO * p_ac_kw) - 1e-9) if p_ac_kw else 0
+        unidades = min(max(u_entradas, u_dcac), strings) if strings else 0
+        vdc = float(inv.get("Vdc_max") or 0.0)
+        ns = [c[0] for c in candidatos]
+        salida.append({
+            **base, "compatible": strings > 0, "N_serie": n, "rango_N": f"{min(ns)}–{max(ns)}",
+            "strings": strings, "modulos_usados": usados, "sobrantes": n_modulos - usados,
+            "modo": f["modo"], "strings_max": int(f["strings_max"]), "unidades": unidades,
+            "unidades_por_entradas": u_entradas,
+            "reparto": _reparto_parejo(strings, unidades),
+            "strings_por_tracker": 1 if f["modo"] == "1 string/tracker" else int(inv.get("n_strings_tracker") or 1),
+            "P_dc_kWp": round(p_dc, 2),
+            "dc_ac": round(p_dc / (p_ac_kw * unidades), 2) if p_ac_kw and unidades else None,
+            "Voc_frio_V": f["Voc_string_frio (V)"],
+            "margen_voc_V": round(vdc - f["Voc_string_frio (V)"], 0) if vdc else None,
+            "margen_voc_pct": f["margen_voc_pct"],
+            "nivel_voc": "🟢" if (f["margen_voc_pct"] or 0) >= MARGEN_VOC_MIN_PCT else "🟠",
+            "ficha": f["ficha"], "motivo": "" if strings > 0 else "Sin strings completos",
+        })
+    df = pd.DataFrame(salida)
+    if df.empty:
+        return df
+    df["_orden"] = (~df["compatible"].astype(bool)).astype(int)
+    return (df.sort_values(["_orden", "P_ac_nom_kW"], ascending=[True, False], na_position="last")
+              .drop(columns="_orden").reset_index(drop=True))
+
+
+def comparar_mejores(
+    df_mejor: pd.DataFrame,
+    p_ac_horaria_W,
+    n_modulos: int,
+    precios_usd: dict | None,
+    capex_sin_inversores_usd: float,
+    tarifa_cop_kwh: float,
+    tipo_cambio: float,
+    tasa_descuento: float = 0.10,
+    tasa_degradacion_pct: float = 0.4,
+    opex_pct_capex: float = 1.5,
+) -> pd.DataFrame:
+    """Energía con el recorte real de cada configuración y su financiero.
+
+    La serie horaria se escala por los módulos que usa cada configuración.
+    Sin precio (ni cotizado en la página ni en el catálogo) la fila muestra
+    energía y recorte, pero NO TIR/VPN/LCOE: compararían un CAPEX sin el
+    equipo contra otro con el equipo.
+    """
+    precios_usd = dict(precios_usd or {})
+    p = np.nan_to_num(np.asarray(p_ac_horaria_W, dtype=float), nan=0.0)
+    filas = []
+    if df_mejor is None or df_mejor.empty:
+        return pd.DataFrame()
+    for r in df_mejor[df_mejor["compatible"].astype(bool)].to_dict("records"):
+        if not (pd.notna(r.get("P_ac_nom_kW")) and r.get("P_ac_nom_kW")) or not r.get("unidades"):
+            continue
+        cotizado = precios_usd.get(r["modelo"])
+        precio = cotizado if cotizado else (r.get("costo_usd") if pd.notna(r.get("costo_usd")) else None)
+        fuente = "cotización" if cotizado else ("catálogo" if precio else "sin precio")
+        escala = r["modulos_usados"] / n_modulos if n_modulos else 1.0
+        cmp = comparar_configuraciones(
+            p * escala,
+            [{"nombre": r["modelo"], "p_ac_unidad_W": r["P_ac_nom_kW"] * 1000.0,
+              "n_unidades": r["unidades"], "costo_unidad_usd": precio or 0.0}],
+            r["P_dc_kWp"], capex_sin_inversores_usd=capex_sin_inversores_usd,
+            tarifa_cop_kwh=tarifa_cop_kwh, tipo_cambio=tipo_cambio, tasa_descuento=tasa_descuento,
+            tasa_degradacion_pct=tasa_degradacion_pct, opex_pct_capex=opex_pct_capex,
+        ).iloc[0].to_dict()
+        fila = {"Modelo": r["modelo"], "N en serie": r["N_serie"], "Strings": r["strings"],
+                "Unidades": r["unidades"], "Reparto": " + ".join(str(x) for x in r["reparto"]),
+                "Módulos": r["modulos_usados"], "AC total (kW)": cmp["AC total (kW)"],
+                "Ratio DC/AC": cmp["Ratio DC/AC"], "Margen Voc": f"{r['nivel_voc']} {r['margen_voc_pct']:.1f} %",
+                "E_ac (kWh/año)": cmp["E_ac (kWh/año)"], "Clipping (%)": cmp["Clipping (%)"],
+                "Precio (USD/u)": precio, "Precio": fuente}
+        for k in ("CAPEX (USD)", "TIR (%)", "VPN (USD)", "Payback (años)", "LCOE (USD/kWh)", "LCOE (COP/kWh)"):
+            fila[k] = cmp[k] if precio else None
+        filas.append(fila)
+    df = pd.DataFrame(filas)
+    if df.empty:
+        return df
+    return df.sort_values(["LCOE (USD/kWh)", "E_ac (kWh/año)"], ascending=[True, False],
+                          na_position="last").reset_index(drop=True)
+
+
+def estado_adopcion(fila: dict, inversor: dict, panel_nombre: str | None) -> dict:
+    """Claves que «Adoptar» escribe para que 📐 Dimensionamiento quede igual a lo adoptado.
+
+    Antes solo se guardaban el inversor, N en serie y las unidades: los
+    strings por MPPT y el reparto quedaban los anteriores. En el modo
+    «1 string por MPPT» Dimensionamiento volvía a 2 strings por MPPT y la
+    corriente superaba el límite (Urabá: 46,5 A > 40 A).
+    """
+    modelo = fila["modelo"]
+    strings = int(fila["strings"])
+    n_tr = int(inversor.get("n_trackers") or inversor.get("N_mppt") or 1)
+    str_tr = int(fila["strings_por_tracker"])
+    return {
+        "inversor_nombre_dim": modelo,
+        "inversor_dict_dim": dict(inversor),
+        "N_serie": int(fila["N_serie"]),
+        "N_str_tr": str_tr,
+        "N_str_tr_usado": str_tr,
+        # Firma del mecanismo «total de cadenas» de resolver_n_strings_tracker:
+        # con ella Dimensionamiento respeta los strings por MPPT adoptados.
+        "N_total_cadenas_proyecto": strings,
+        "N_str_tr_fuente_ref": ("total", modelo, strings, n_tr),
+        "N_inv_total": int(fila["unidades"]),
+        "N_inversores_proyecto": int(fila["unidades"]),
+        "N_inversores_proyecto_ref": modelo,
+        "reparto_strings_inversores": list(fila["reparto"]),
+        "N_serie_panel_ref": panel_nombre,
+        "N_serie_inversor_ref": modelo,
     }

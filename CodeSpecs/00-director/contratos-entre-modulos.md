@@ -132,6 +132,12 @@ Regla de consumo:
 	de `tabla_desglose`). Con `multisup_activo` y energía publicada, el 📄
 	Reporte PDF toma la energía del proyecto de la publicación multi-superficie
 	(`calculos/reporte_multisuperficie`), nunca de `res_produccion`.
+- Comparador de inversores completo (1-oct-2026, Spec `03-dimensionamiento/comparador-inversores-completo`):
+	«Adoptar» en ⚖️ Comparador escribe `comparador_inversores.estado_adopcion`:
+	`inversor_*_dim`, `N_serie`, `N_str_tr`/`N_str_tr_usado`, `N_total_cadenas_proyecto`
+	con la firma `N_str_tr_fuente_ref` de `resolver_n_strings_tracker`, `N_inv_total`,
+	`N_inversores_proyecto(_ref)` y `reparto_strings_inversores`; los precios
+	cotizados viven en `comp_precios_cotizados`.
 - Reporte de granja y ficha del inversor (1-oct-2026, Spec `07-informes/reporte-granja-completo`):
 	el 📄 Reporte PDF dibuja la granja con `calculos/reporte_granja` a partir del
 	mismo campo (`granja_fv.calcular_campo`) y diseño (`granja_electrico.diseno_desde_estado`)

@@ -5592,6 +5592,46 @@ Con los datos equivocados la app daba 🟢 a 28 módulos en serie, cuando su Voc
    - Si quieres más margen: 21 en serie × 15 strings (315 módulos, una fila más).
 3. Recalcula 🔀 Mismatch, 📊 Producción, 🌾 Granja FV, ⚡ Diagrama Unifilar y 📋 Ficha RETIE, y genera de nuevo el reporte.
 
+## 104. ⚖️ Comparador de Inversores completo: mejor N por inversor, precios y adopción (1-oct-2026)
+
+### Comparador de inversores — qué cambió y por qué
+
+Revisión del comparador con la Granja Apartadó (Urabá). Se encontraron seis problemas:
+1. Solo revisaba el Vmp a la temperatura de trabajo, no a la **temperatura extrema**. Podía aceptar un inversor que 📐 Dimensionamiento luego marcaba 🔴.
+2. No revisaba la **ficha del inversor**, así que un dato imposible del catálogo pasaba sin aviso.
+3. Comparaba todos los inversores con el **mismo N en serie**. Un inversor de 1.500 V quedaba juzgado con strings pensados para uno de 1.100 V.
+4. No mostraba el **margen de Voc** ni si los módulos se repartían exactos.
+5. Sin **precio** en el catálogo mostraba TIR y LCOE que no eran comparables: un CAPEX sin el equipo frente a otro con el equipo.
+6. **Adoptar** no guardaba los strings por MPPT ni el reparto. En el modo «1 string por MPPT», 📐 Dimensionamiento volvía a 2 strings por MPPT y la corriente superaba el límite (Urabá: 46,5 A > 40 A).
+
+**Ahora:**
+- La sección 1 tiene la **T. de celda extrema** y revisa el Vmp también en ese punto, igual que Dimensionamiento. Muestra el margen de Voc (%) y la columna «ficha»:
+  - 🔴 una ficha contradictoria descarta el inversor;
+  - 🟠 queda como aviso.
+- Sección nueva «🎯 **Mejor configuración para cada inversor**». Para los módulos del proyecto, cada inversor recibe su propio N en serie:
+  - primero, el que reparte exacto los módulos;
+  - luego, el que deja un margen de Voc de 3 % o más;
+  - luego, el string más largo.
+
+  Las unidades son las que piden las entradas o, si son más, las que dejan la relación DC/AC en 1,3 o menos. Se muestran el rango de N posibles, los strings, los sobrantes, el modo (normal o 1 string por MPPT), las unidades, el reparto, la relación DC/AC, el Voc en frío y su margen 🟢/🟠.
+- Ahí mismo se escribe el **precio cotizado** de cada inversor (USD por unidad). Un inversor sin precio muestra su energía y su recorte, pero no TIR ni LCOE.
+- «✅ **Adoptar**» (en las dos secciones) deja 📐 Dimensionamiento igual a lo adoptado: inversor, N en serie, strings por MPPT, total de cadenas, cantidad de inversores y reparto.
+
+### Comparador de inversores — cómo usarlo
+
+1. Completa en 🔌 Catálogo Inversores la **potencia AC** de los inversores que quieras evaluar. El precio puedes escribirlo en el comparador.
+2. Simula 📊 Producción con el diseño vigente.
+3. En el comparador, revisa las temperaturas de la sección 1 (frío, trabajo y extrema).
+4. En «🎯 Mejor configuración para cada inversor» lee la tabla, escribe los precios y compara la energía, el recorte, la TIR y el LCOE.
+5. Elige el inversor y pulsa «✅ Adoptar la mejor configuración de este inversor».
+6. Revisa 📐 Dimensionamiento y vuelve a simular 📊 Producción.
+
+**Caso Urabá** (308 × JAM66D46-720/LB, Growatt MAX 100KTL3 LV con su ficha oficial):
+- el comparador propone **22 en serie**, 14 strings, 2 inversores, reparto 7 + 7, **1 string por MPPT**;
+- DC/AC 1,11 y margen de Voc 🟠 1 % (11 V).
+
+Un inversor de 1.500 V, en cambio, quedaría con 28 en serie, 11 strings y 6 + 5.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

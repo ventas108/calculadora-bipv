@@ -37,9 +37,12 @@ init_trm()
 from calculos.comparador_inversores import (
     barrido_dc_ac,
     comparar_configuraciones,
+    comparar_mejores,
     comparar_todos_los_inversores_compatibles,
+    estado_adopcion,
     filtrar_inversores_compatibles,
     formatear_comparacion_inversores,
+    mejor_n_por_inversor,
     unidades_necesarias,
 )
 from calculos.invalidacion import invalidar_por_cambio_inversor
@@ -146,7 +149,7 @@ st.info(
 st.markdown("---")
 st.subheader("1️⃣ Inversores del catálogo compatibles con tu string")
 
-c1, c2, c3 = st.columns(3)
+c1, c2, c3, c4 = st.columns(4)
 with c1:
     N_serie = st.number_input(
         "Módulos en serie por string (N)",
@@ -168,6 +171,15 @@ with c3:
         value=float(st.session_state.get("T_cel_realista", 36.35)),
         help="Para el Vmp realista del string (verificación de ventana MPPT).",
     )
+with c4:
+    # Spec 03/comparador-inversores-completo: el mismo tercer punto de diseño
+    # que revisa 📐 Dimensionamiento (antes el comparador no lo miraba).
+    T_extremo = st.number_input(
+        "T. de celda extrema (°C)",
+        min_value=10.0, max_value=95.0,
+        value=float(st.session_state.get("T_cel_extremo", 41.94)),
+        help="Para el Vmp en el día más caliente: debe seguir dentro de la ventana MPPT.",
+    )
 
 _cat = {}
 if cargar_catalogo_inversores is not None:
@@ -178,7 +190,7 @@ if cargar_catalogo_inversores is not None:
 if not _cat:
     _cat = INVERSORES
 
-df_comp = filtrar_inversores_compatibles(panel, _cat, int(N_serie), T_frio, T_real)
+df_comp = filtrar_inversores_compatibles(panel, _cat, int(N_serie), T_frio, T_real, T_extremo=T_extremo)
 n_ok = int(df_comp["compatible"].sum())
 st.markdown(
     f"**{n_ok} de {len(df_comp)} inversores** del catálogo aceptan strings de "
@@ -190,7 +202,8 @@ st.markdown(
 _df_view = df_comp.copy()
 _df_view["compatible"] = _df_view["compatible"].map({True: "✅", False: "—"})
 st.dataframe(
-    _df_view[["modelo", "compatible", "modo", "strings_max", "P_ac_nom_kW", "costo_usd", "motivo"]],
+    _df_view[["modelo", "compatible", "modo", "strings_max", "P_ac_nom_kW", "margen_voc_pct", "costo_usd",
+              "motivo", "ficha"]],
     use_container_width=True, height=300,
 )
 st.caption(
@@ -305,10 +318,18 @@ if _sel:
         if st.button("✅ Adoptar esta configuración", type="primary"):
             _idx = _opciones.index(_elegida)
             _modelo_full = configs[_idx]["nombre"].replace(" (1 str/MPPT)", "")
-            st.session_state["inversor_nombre_dim"] = _modelo_full
-            st.session_state["inversor_dict_dim"] = _cat.get(_modelo_full, {})
-            st.session_state["N_inv_total"] = configs[_idx]["n_unidades"]
-            st.session_state["N_serie"] = int(N_serie)
+            _inv_full = _cat.get(_modelo_full, {})
+            _n_u = int(configs[_idx]["n_unidades"])
+            # Spec 03/comparador-inversores-completo: adopción completa (strings
+            # por MPPT, total de cadenas y reparto), no solo inversor y N.
+            for _k, _v in estado_adopcion({
+                "modelo": _modelo_full, "N_serie": int(N_serie), "strings": n_strings_total,
+                "unidades": _n_u,
+                "reparto": [n_strings_total // _n_u + (1 if i < n_strings_total % _n_u else 0) for i in range(_n_u)],
+                "strings_por_tracker": 1 if configs[_idx]["nombre"].endswith("(1 str/MPPT)")
+                else int(_inv_full.get("n_strings_tracker") or 1),
+            }, _inv_full, st.session_state.get("panel_nombre_dim")).items():
+                st.session_state[_k] = _v
             # Este botón es un 3er punto de confirmación del diseño eléctrico,
             # además de los 2 de Dimensionamiento -- sin esto, diseno_electrico_
             # confirmado() dispararía un FALSO POSITIVO de la alerta de vigencia
@@ -330,6 +351,80 @@ if _sel:
                 "📊 Producción y 💰 Financiero con la nueva configuración. "
                 "El Motor Óptico vigente se conservó."
             )
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 🎯 Mejor configuración para cada inversor (Spec 03/comparador-inversores-completo)
+# ══════════════════════════════════════════════════════════════════════════════
+# Cada inversor con SU mejor N en serie (reparto exacto de los módulos, margen
+# de Voc, string más largo) y las unidades que piden sus entradas y la
+# relación DC/AC; precios cotizados escritos aquí mismo.
+st.markdown("---")
+st.subheader("🎯 Mejor configuración para cada inversor")
+_n_mod_proy = int(st.session_state.get("N_paneles_final") or n_paneles or 0)
+st.caption(
+    f"Para los **{_n_mod_proy} módulos** del proyecto, cada inversor recibe su propio N en serie: el que "
+    "reparte exacto los módulos, con margen de Voc de 3 % o más y el string más largo. Así un inversor de "
+    "1.500 V no queda juzgado con strings pensados para uno de 1.100 V."
+)
+if _n_mod_proy <= 0:
+    st.info("Define los módulos del proyecto en 📐 Dimensionamiento y simula 📊 Producción.")
+else:
+    df_mejor = mejor_n_por_inversor(panel, _cat, _n_mod_proy, T_frio, T_real, T_extremo,
+                                    n_referencia=int(N_serie))
+    _mej_ok = df_mejor[df_mejor["compatible"].astype(bool) & df_mejor["P_ac_nom_kW"].notna()]
+    st.markdown(f"**{len(_mej_ok)} inversores** con potencia AC en el catálogo admiten el proyecto con algún N.")
+    if not _mej_ok.empty:
+        _vista = _mej_ok.assign(reparto=_mej_ok["reparto"].map(lambda r: " + ".join(str(x) for x in r)))
+        st.dataframe(
+            _vista[["modelo", "N_serie", "rango_N", "strings", "sobrantes", "modo", "unidades", "reparto",
+                    "P_ac_nom_kW", "dc_ac", "Voc_frio_V", "margen_voc_V", "nivel_voc", "ficha"]],
+            use_container_width=True, hide_index=True,
+        )
+        # Precios cotizados: dato propio (no la clave del widget), sobrevive al cambio de página.
+        _precios = dict(st.session_state.get("comp_precios_cotizados") or {})
+        _tabla_precios = pd.DataFrame({
+            "Modelo": _mej_ok["modelo"].tolist(),
+            "Precio cotizado (USD por unidad)": [_precios.get(m) for m in _mej_ok["modelo"]],
+        })
+        _editada = st.data_editor(_tabla_precios, key="_w_comp_precios", hide_index=True,
+                                  disabled=["Modelo"], use_container_width=True)
+        st.session_state["comp_precios_cotizados"] = {
+            r["Modelo"]: float(r["Precio cotizado (USD por unidad)"])
+            for r in _editada.to_dict("records")
+            if pd.notna(r["Precio cotizado (USD por unidad)"]) and r["Precio cotizado (USD por unidad)"] > 0
+        }
+        df_mej_cmp = comparar_mejores(
+            df_mejor, p_ac_W, _n_mod_proy, st.session_state["comp_precios_cotizados"],
+            capex_sin_inversores_usd=capex_sin_inv, tarifa_cop_kwh=tarifa, tipo_cambio=trm,
+            tasa_descuento=tasa_desc / 100.0, tasa_degradacion_pct=degradacion, opex_pct_capex=opex_pct,
+        )
+        if not df_mej_cmp.empty:
+            _sin_precio = int((df_mej_cmp["Precio"] == "sin precio").sum())
+            if _sin_precio:
+                st.warning(
+                    f"⚠️ {_sin_precio} de {len(df_mej_cmp)} inversores no tienen precio: se muestra su energía y "
+                    "su recorte, pero no su TIR ni su LCOE (sin el costo del equipo no son comparables). "
+                    "Escribe la cotización en la tabla de arriba."
+                )
+            st.dataframe(df_mej_cmp.style.format({
+                "E_ac (kWh/año)": "{:,.0f}", "Clipping (%)": "{:.2f}", "Precio (USD/u)": "{:,.0f}",
+                "CAPEX (USD)": "{:,.0f}", "VPN (USD)": "{:,.0f}", "TIR (%)": "{:.1f}",
+                "Payback (años)": "{:.1f}", "LCOE (USD/kWh)": "{:.4f}", "LCOE (COP/kWh)": "{:.0f}",
+            }, na_rep="—"), use_container_width=True, hide_index=True)
+            _elegido_m = st.selectbox("Inversor a adoptar con su mejor configuración", df_mej_cmp["Modelo"].tolist(),
+                                      key="_w_comp_mejor_elegido")
+            if st.button("✅ Adoptar la mejor configuración de este inversor", key="btn_adoptar_mejor"):
+                _fila_m = df_mejor[df_mejor["modelo"] == _elegido_m].iloc[0].to_dict()
+                for _k, _v in estado_adopcion(_fila_m, _cat.get(_elegido_m, {}),
+                                              st.session_state.get("panel_nombre_dim")).items():
+                    st.session_state[_k] = _v
+                _limpiadas_m = invalidar_por_cambio_inversor(st.session_state)
+                st.success(
+                    f"Adoptado: **{int(_fila_m['unidades'])} × {_elegido_m}**, {int(_fila_m['N_serie'])} en serie, "
+                    f"{int(_fila_m['strings'])} strings ({' + '.join(str(x) for x in _fila_m['reparto'])}), "
+                    f"{int(_fila_m['strings_por_tracker'])} string(s) por MPPT. Se invalidaron "
+                    f"{len(_limpiadas_m)} resultados: revisa 📐 Dimensionamiento y vuelve a simular 📊 Producción."
+                )
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Comparar TODOS los inversores compatibles + Analista de Producción
