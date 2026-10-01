@@ -631,7 +631,7 @@ def _bloque(d: _SVG, x, y, w, h, titulo, lineas, fill=COLORES["azul_claro"], str
 
 def _dibujar_validaciones(d: _SVG, validaciones: list[dict], x: float, y: float) -> None:
     d.text(x, y, "ESTADO DE VALIDACIÓN", 20, 700)
-    d.text(x + 245, y, "Verde: correcto · Naranja: pendiente · Rojo: corregir", 12, 400, COLORES["gris"])
+    d.text(x + 320, y, "Verde: correcto · Naranja: pendiente · Rojo: corregir", 12, 400, COLORES["gris"])
     columnas, ancho, alto, sep_x, sep_y = 4, 410, 92, 20, 16
     for n, v in enumerate(validaciones):
         fila, col = divmod(n, columnas)
@@ -877,12 +877,12 @@ def exportar_ficha_svg_bytes(svg: str) -> bytes:
 
 
 def exportar_ficha_png_bytes(svg: str, width: int = 2400) -> bytes | None:
-    """PNG vía CairoSVG (dependencia OPCIONAL, no agregada a requirements.txt
-    -- igual que el script original: si no está instalada, se degrada
-    devolviendo None en vez de reventar. El llamador (la página) decide si
-    muestra el botón de descarga PNG."""
+    """PNG de la ficha: CairoSVG si está instalada; si no, el dibujo con
+    Pillow de ``calculos.svg_a_png`` (Spec 07-informes/ficha-retie-word-pdf:
+    en el servidor no hay CairoSVG y la ficha solo bajaba en SVG)."""
     try:
         import cairosvg
     except ImportError:
-        return None
+        from calculos.svg_a_png import svg_a_png
+        return svg_a_png(svg, width)
     return cairosvg.svg2png(bytestring=svg.encode("utf-8"), output_width=width)

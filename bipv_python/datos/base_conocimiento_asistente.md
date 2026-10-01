@@ -5822,6 +5822,20 @@ Fachada PR ≈ 0,724 → ≈ 4.129 kWh/año; techo PR ≈ 0,828 → ≈ 1.815 kW
 
 **Cómo explicarlo al usuario:** el inversor y el módulo tienen cada uno un techo de tensión. El string debe quedar por debajo del más bajo, en la mañana más fría del año. Los módulos de silicio suelen tener 1.000 o 1.500 V; los vidrios BIPV, 1.000 V o menos. Revisa siempre ese renglón de la ficha.
 
+## 110. 📋 Ficha RETIE en Word editable, PDF y PNG (1-oct-2026)
+
+**Qué pasaba:** la 📋 Ficha RETIE solo se descargaba en **SVG**. El botón PNG necesitaba CairoSVG, que no está instalado en el servidor, y Word no muestra los SVG. Es el mismo problema que tenía el 📄 Reporte (sección 106).
+
+**Ahora** debajo de la ficha hay cuatro botones:
+- **⬇️ Word editable (.docx):**
+  - hoja 1: la ficha completa en una hoja carta horizontal;
+  - hoja 2: los datos del proyecto y la **tabla de validaciones editable** (estado, validación y detalle).
+- **⬇️ PDF:** lo mismo que el Word, listo para enviar al cliente o al operador de red.
+- **⬇️ PNG:** la ficha en imagen de alta resolución (2.400 px de ancho), para presentaciones.
+- **⬇️ SVG:** el dibujo vectorial original, para editarlo en Inkscape o Illustrator. No lo abras con Word.
+
+La ficha se dibuja en el servidor con el mismo conversor del Reporte, sin programas externos. El contenido es idéntico al de la pantalla: no se recalcula nada.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

@@ -7,6 +7,9 @@ eléctrica, producción mensual, vista 3D, luz en el suelo, mapa de sombra y
 plano eléctrico). Este módulo dibuja con Pillow el subconjunto de SVG que
 genera el propio reporte (``rect``, ``line``, ``polyline``, ``polygon``,
 ``circle`` y ``text`` con ``viewBox``), sin librerías externas de sistema.
+La 📋 Ficha RETIE agrega ``path`` de tramos rectos (M, L, H, V, Z) y flechas
+``marker-end`` (Spec ``07-informes/ficha-retie-word-pdf``); lo que está
+dentro de ``<defs>`` no se dibuja.
 Módulo puro: sin Streamlit.
 """
 from __future__ import annotations
@@ -85,6 +88,50 @@ def _linea_discontinua(draw, pts, color, ancho, patron):
             dibuja = not dibuja
 
 
+def _puntos_path(d: str, esc: float, dx: float, dy: float) -> list[list[tuple[float, float]]]:
+    """Tramos de un ``path`` con comandos rectos (M, L, H, V, Z; absolutos o relativos)."""
+    tramos: list[list[tuple[float, float]]] = []
+    x = y = 0.0
+    inicio = (0.0, 0.0)
+    for cmd, args in re.findall(r"([MLHVZmlhvz])([^MLHVZmlhvz]*)", d or ""):
+        nums = [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?(?:e-?\d+)?", args)]
+        rel = cmd.islower()
+        c = cmd.upper()
+        if c == "Z":
+            if tramos and tramos[-1]:
+                tramos[-1].append(tramos[-1][0])
+            x, y = inicio
+            continue
+        if c in ("M", "L"):
+            for i in range(0, len(nums) - 1, 2):
+                x, y = (x + nums[i], y + nums[i + 1]) if rel else (nums[i], nums[i + 1])
+                if c == "M" and i == 0:
+                    tramos.append([])
+                    inicio = (x, y)
+                if tramos:
+                    tramos[-1].append(((x - dx) * esc, (y - dy) * esc))
+        elif c in ("H", "V"):
+            for n in nums:
+                if c == "H":
+                    x = x + n if rel else n
+                else:
+                    y = y + n if rel else n
+                if tramos:
+                    tramos[-1].append(((x - dx) * esc, (y - dy) * esc))
+    return [t for t in tramos if len(t) >= 2]
+
+
+def _flecha(draw, p0, p1, color, ancho):
+    largo = ((p1[0] - p0[0]) ** 2 + (p1[1] - p0[1]) ** 2) ** 0.5
+    if largo == 0:
+        return
+    ux, uy = (p1[0] - p0[0]) / largo, (p1[1] - p0[1]) / largo
+    tam = max(ancho * 3.0, 6.0)
+    base = (p1[0] - ux * tam, p1[1] - uy * tam)
+    draw.polygon([p1, (base[0] - uy * tam / 2, base[1] + ux * tam / 2),
+                  (base[0] + uy * tam / 2, base[1] - ux * tam / 2)], fill=color)
+
+
 def svg_a_png(svg: str, ancho_px: int = 1600) -> bytes:
     """PNG (bytes) de un SVG del reporte, con ``ancho_px`` de ancho y fondo blanco."""
     raiz = etree.fromstring(svg.encode("utf-8"), parser=etree.XMLParser(recover=True, huge_tree=True))
@@ -107,6 +154,8 @@ def svg_a_png(svg: str, ancho_px: int = 1600) -> bytes:
 
     for el in raiz.iter():
         tag = etree.QName(el).localname if isinstance(el.tag, str) else ""
+        if any(isinstance(a.tag, str) and etree.QName(a).localname == "defs" for a in el.iterancestors()):
+            continue
         fill_op = _num(el.get("fill-opacity"), 1.0) * _num(el.get("opacity"), 1.0)
         fill = _color(el.get("fill", "black" if tag in ("rect", "polygon", "circle", "text") else "none"), fill_op)
         stroke = _color(el.get("stroke"), _num(el.get("stroke-opacity"), 1.0))
@@ -132,6 +181,14 @@ def svg_a_png(svg: str, ancho_px: int = 1600) -> bytes:
                    ((_num(el.get("x2")) - dx) * esc, (_num(el.get("y2")) - dy) * esc)]
             if stroke:
                 _linea_discontinua(draw, pts, stroke, ancho, patron)
+                if el.get("marker-end"):
+                    _flecha(draw, pts[0], pts[1], stroke, ancho)
+        elif tag == "path":
+            for tramo in _puntos_path(el.get("d"), esc, dx, dy):
+                if fill and len(tramo) >= 3:
+                    draw.polygon(tramo, fill=fill)
+                if stroke:
+                    _linea_discontinua(draw, tramo, stroke, ancho, patron)
         elif tag in ("polyline", "polygon"):
             pts = _puntos(el.get("points"), esc, dx, dy)
             if len(pts) >= 2:
