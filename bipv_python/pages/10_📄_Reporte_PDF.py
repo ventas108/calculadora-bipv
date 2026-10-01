@@ -91,8 +91,18 @@ with col_op1:
 with col_op2:
     balance_ok_ui   = st.session_state.get("balance_ok", False)
     incluir_motor   = st.checkbox("Incluir sección Motor Óptico",    value=motor_optico,   key="rep_inc_motor")
-    incluir_dim     = st.checkbox("Incluir sección Dimensionamiento", value=dimensionam_ok, key="rep_inc_dim")
+    incluir_dim     = st.checkbox("Incluir sección Dimensionamiento (sistema eléctrico e inversores)",
+                                  value=dimensionam_ok, key="rep_inc_dim")
     incluir_prod    = st.checkbox("Incluir sección Producción",      value=produccion_ok,  key="rep_inc_prod")
+    # Spec 07/reporte-produccion-completo (30-sep-2026)
+    incluir_perdidas = st.checkbox("📉 Incluir diagrama de pérdidas de Producción", value=produccion_ok,
+                                   key="rep_inc_perdidas",
+                                   help="Cada etapa, de la irradiancia a la energía entregada, en kWh y %.")
+    _granja_ui = (st.session_state.get("tipo_instalacion") == "Granja fotovoltaica"
+                  and bool(st.session_state.get("granja_fv")))
+    incluir_granja = st.checkbox("🌾 Incluir Granja FV (campo, sombra, agrivoltaica, seguidor, eléctrico)",
+                                 value=_granja_ui, key="rep_inc_granja", disabled=not _granja_ui,
+                                 help="Diseña el campo en 🌾 Granja FV primero.")
     _bypass_ok_rep  = st.session_state.get("bypass_ok", False)
     incluir_bypass  = st.checkbox("Incluir pérdidas bypass diodes",  value=_bypass_ok_rep, key="rep_inc_bypass")
     incluir_fin     = st.checkbox("Incluir sección Financiero",      value=financiero_ok,  key="rep_inc_fin")
@@ -464,6 +474,11 @@ def _curva_electrica_svg(curva: dict, N_serie: int, T_frio: float, T_real: float
     return "".join(p)
 
 
+from calculos.reporte_produccion import (
+    filas_bifacial, filas_perdidas, filas_sistema_electrico, secciones_granja,
+)
+
+
 def generar_html_reporte() -> str:
     # Colectar datos de session_state
     ciudad          = st.session_state.get("tmy_ciudad", st.session_state.get("ciudad", "—"))
@@ -708,7 +723,7 @@ def generar_html_reporte() -> str:
                 ("Altura de montaje",      _fmt(_bif_alt, 2),   "m",   "Separación al plano del suelo/fachada"),
                 ("Albedo trasero (suelo)", _fmt(_bif_alb, 2),   "",    "Reflectividad de la superficie tras el módulo"),
                 ("Ganancia bifacial anual", _fmt(_bif_gan, 1),  "%",   "Incremento de POA por el aporte de la cara trasera"),
-            ],
+            ] + filas_bifacial(st.session_state),
             nota="Con el modelo bifacial activo, la POA global ya integra el aporte de la cara trasera "
                  "calculado por pvlib (infinite_sheds). La ganancia anual mostrada indica cuánta "
                  "irradiación adicional aporta la cara posterior respecto a un módulo monofacial.")
@@ -801,6 +816,16 @@ def generar_html_reporte() -> str:
                  "curva continua entre ellos — el gráfico es para verificación visual, no agrega "
                  "precisión sobre el cálculo ya validado."
                  + (f" ⚠️ {_diseno_pdf['aviso']}" if _diseno_pdf["aviso"] else ""))
+            html += cierre()
+
+    # ── 2c. Sistema eléctrico e inversores (Spec 07/reporte-produccion-completo)
+    if incluir_dim and st.session_state.get("panel_dict"):
+        _filas_sis = filas_sistema_electrico(st.session_state, res_prod)
+        if len(_filas_sis) > 3:
+            html += seccion("Sistema Eléctrico e Inversores", "🔌")
+            html += tabla_kv(_filas_sis,
+                             nota="Datos confirmados en 📐 Dimensionamiento y usados en la simulación de "
+                                  "📊 Producción (cantidad de inversores, relación DC/AC y recorte).")
             html += cierre()
 
     # ── 3. Motor Óptico ───────────────────────────────────────────────────────
@@ -957,6 +982,52 @@ def generar_html_reporte() -> str:
             if _svg_mes:
                 html += _bloque_grafica(
                     _svg_mes, "Energía AC neta entregada por mes (kWh).")
+        html += cierre()
+
+    # ── 4a. Diagrama de pérdidas de Producción (Spec 07/reporte-produccion-completo)
+    if produccion_ok and incluir_perdidas and res_prod:
+        _perd = filas_perdidas(res_prod, st.session_state.get("poa_anual_kWh_m2", 0.0),
+                               st.session_state.get("motor_optico_summary") or {})
+        if _perd:
+            html += seccion("Diagrama de Pérdidas — de la Irradiancia a la Energía Entregada", "📉")
+            html += """<table style="width:100%;border-collapse:collapse;font-size:0.86em;">
+              <tr style="background:#1A569A;color:#fff;"><th style="padding:6px 8px;text-align:left;">Etapa</th>
+              <th style="padding:6px 8px;text-align:right;">kWh/año</th><th style="padding:6px 8px;text-align:right;">Δ kWh</th>
+              <th style="padding:6px 8px;text-align:right;">Δ %</th><th style="padding:6px 8px;text-align:left;">Nota</th></tr>"""
+            for _i, _p in enumerate(_perd):
+                _bg = "#f8f9fa" if _i % 2 == 0 else "white"
+                _col = "#c62828" if _p["delta_kwh"] < 0 else ("#1e8449" if _p["delta_kwh"] > 0 else "inherit")
+                html += (f'<tr style="background:{_bg};"><td style="padding:4px 8px;">{_esc_html(_p["etapa"])}</td>'
+                         f'<td style="padding:4px 8px;text-align:right;">{_p["kwh"]:,.0f}</td>'
+                         f'<td style="padding:4px 8px;text-align:right;color:{_col};">{_p["delta_kwh"]:+,.0f}</td>'
+                         f'<td style="padding:4px 8px;text-align:right;color:{_col};">{_p["pct"]:+.2f}%</td>'
+                         f'<td style="padding:4px 8px;color:#666;font-size:0.9em;">{_esc_html(_p["nota"])}</td></tr>')
+            html += "</table>"
+            html += caja_nota("Misma tabla de balance de 📊 Producción: cada fila es una etapa real de la "
+                              "simulación hora a hora; los % son sobre la energía de referencia a STC.")
+            html += cierre()
+
+    # ── 4a2. Granja FV (Spec 07/reporte-produccion-completo) ─────────────────
+    _gr = secciones_granja(st.session_state) if incluir_granja else {}
+    if _gr:
+        html += seccion("Granja FV — Campo, Sombra entre Filas, Agrivoltaica y Eléctrico", "🌾", COLOR_VERDE)
+        for _clave, _titulo in (("campo", "Campo de filas"), ("energia", "Sombra entre filas en la energía"),
+                                ("agrivoltaica", "Agrivoltaica: luz para el cultivo"),
+                                ("seguidor", "Seguidor de un eje (comparación; la energía usa estructura fija)"),
+                                ("electrico", "Eléctrico por bloques")):
+            if _gr.get(_clave):
+                html += f"<h4 style='margin:14px 0 6px;color:{COLOR_PRIMARIO};'>{_titulo}</h4>"
+                html += tabla_kv(_gr[_clave])
+        if _gr.get("bloques"):
+            html += """<table style="width:100%;border-collapse:collapse;font-size:0.86em;margin-top:8px;">
+              <tr style="background:#1A569A;color:#fff;"><th style="padding:5px 8px;">Inversor</th><th>Strings</th>
+              <th>Módulos</th><th>Filas</th><th>DC medio (m)</th><th>AC (m)</th><th>Caída AC (%)</th></tr>"""
+            for _b in _gr["bloques"]:
+                html += (f'<tr><td style="padding:4px 8px;">{_b["inversor"]}</td><td style="text-align:center;">{_b["strings"]}</td>'
+                         f'<td style="text-align:center;">{_b["modulos"]}</td><td style="text-align:center;">{_b["filas"]}</td>'
+                         f'<td style="text-align:center;">{_b["dc_medio_m"]:.1f}</td><td style="text-align:center;">{_b["ac_m"]:.1f}</td>'
+                         f'<td style="text-align:center;">{(_b["caida_ac_pct"] or 0):.2f}</td></tr>')
+            html += "</table>"
         html += cierre()
 
     # ── 4b. Diagnóstico PR real vs esperado ──────────────────────────────────
@@ -1915,6 +1986,7 @@ if st.button("📄 Generar Reporte", type="primary", use_container_width=True,
 
     html_bytes = html_str.encode("utf-8")
     st.session_state["reporte_generado"] = True  # lo lee el 🧭 Asistente
+    st.session_state["_reporte_html"] = html_str  # temporal (no se guarda con el proyecto)
 
     st.download_button(
         label="⬇️ Descargar reporte (.html → imprimir como PDF)",
