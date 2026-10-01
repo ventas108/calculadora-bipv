@@ -5875,6 +5875,8 @@ La ficha se dibuja en el servidor con el mismo conversor del Reporte, sin progra
 
 **Dónde se nota:** en 🔬 Motor IV, 📊 Producción con curva IV, y en el **modo físico de 🗺️ Vista 3D** (curva IV con diodos bypass y curva IV combinada por MPPT). El modo simplificado de Vista 3D no usa el modelo IV.
 
+**Nombres de tecnología en 📋 Catálogo de Paneles:** se usan **«CIGS»** y **«Poli-Si»**, los mismos del Excel real. El formulario y el lector de fichas decían «CIS» y «Poly-Si», y esos paneles quedaban con un valor que no estaba en la lista. Los valores viejos «CIS» y «Poly-Si» se muestran y se guardan con el nombre nuevo.
+
 **Silicio y el ASP-ST1 no cambian:** el silicio sigue igual, y el ASP-ST1 usa sus parámetros de laboratorio.
 
 **Cómo explicarlo al usuario:** los parámetros internos del modelo no vienen en las fichas. La app los deduce de lo que sí traen (Voc, Isc, Vmp, Imp, coeficientes) y del dato de 200 W/m² si existe. Para capa fina conviene buscar ese dato en la ficha y escribirlo. Los parámetros de laboratorio solo se necesitan para una certificación de energía.

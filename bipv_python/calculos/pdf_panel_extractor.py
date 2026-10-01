@@ -177,8 +177,10 @@ _PATTERNS = {
 
 _TECH_PATTERNS = [
     (r'(?:Mono(?:crystalline)?[- ]?Si(?:licon)?|Mono-Si|mSi|HJT|Heterojunction|TOPCon|PERC)', "Mono-Si"),
-    (r'(?:Poly(?:crystalline)?[- ]?Si(?:licon)?|Multi[- ]?Si|mPoly)', "Poly-Si"),
-    (r'(?:CIS|CIGS|Copper\s+Indium)', "CIS"),
+    (r'(?:Poly(?:crystalline)?[- ]?Si(?:licon)?|Multi[- ]?Si|mPoly)', "Poli-Si"),
+    # «CIGS» en el catálogo (Spec 04/sdm-capa-fina-bipv): el Excel real ya
+    # usa ese nombre; «CIS» dejaba los paneles fuera de la lista de opciones.
+    (r'(?:CIS|CIGS|Copper\s+Indium)', "CIGS"),
     (r'(?:CdTe|Cadmium\s+Telluride|Telururo\s+de\s+Cadmio)', "CdTe"),
     (r'(?:a-Si|Amorphous\s+Silicon)', "a-Si"),
     (r'(?:Thin\s+[Ff]ilm|Pel[ií]cula\s+[Dd]elgada)', "Thin Film"),

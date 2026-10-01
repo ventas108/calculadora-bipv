@@ -261,7 +261,7 @@ def _pestana_agregar_desde_pdf() -> None:
         )
         marca = c2.text_input("Marca / Fabricante", value=data.get("marca") or "")
 
-        _TECHS = ["", "Mono-Si", "Poly-Si", "CIS", "CdTe", "a-Si", "Thin Film", "HJT", "TOPCon", "Otro"]
+        _TECHS = ["", "Mono-Si", "Poli-Si", "CIGS", "CdTe", "a-Si", "Thin Film", "HJT", "TOPCon", "Otro"]
         _tech_val = data.get("tecnologia") or ""
         _tech_idx = _TECHS.index(_tech_val) if _tech_val in _TECHS else 0
         tecnologia = c3.selectbox("Tecnología", _TECHS, index=_tech_idx)
@@ -495,7 +495,7 @@ with tab_editar:
             "Marca":         st.column_config.TextColumn("Marca"),
             "Tecnología":    st.column_config.SelectboxColumn(
                 "Tecnología",
-                options=["", "Mono-Si", "Poly-Si", "HJT", "TOPCon", "CIS", "CdTe", "a-Si", "Thin Film", "Otro"],
+                options=["", "Mono-Si", "Poli-Si", "HJT", "TOPCon", "CIGS", "CdTe", "a-Si", "Thin Film", "Otro"],
             ),
             "Pmax (W)":      st.column_config.NumberColumn("Pmax (W)", format="%.1f", min_value=0),
             "Voc (V)":       st.column_config.NumberColumn("Voc (V)",  format="%.2f", min_value=0),

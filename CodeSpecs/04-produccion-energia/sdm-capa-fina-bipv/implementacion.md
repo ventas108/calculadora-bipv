@@ -11,7 +11,10 @@
   - ajuste a 200 W/m² con el factor de idealidad;
   - marcas de origen.
 - `datos/catalogo_paneles_excel.py`: `eficiencia_rel_200` desde
-  `EficRel200Pct`.
+  `EficRel200Pct`; `tecnologia_catalogo` («CIS» → «CIGS», «Poly-Si» →
+  «Poli-Si»).
+- `calculos/pdf_panel_extractor.py`: el lector de fichas escribe «CIGS» y
+  «Poli-Si».
 - `pages/14_📋_Catálogo_Paneles.py`: columna «η rel. 200 W/m² (%)».
 - `pages/3_🔬_Motor_IV.py`: bloque «Origen del modelo».
 - Manual del Asistente, sección 112; registro.
@@ -20,6 +23,7 @@
 
 - `bipv_python/calculos/modelo_iv.py`
 - `bipv_python/datos/catalogo_paneles_excel.py`
+- `bipv_python/calculos/pdf_panel_extractor.py`
 - `bipv_python/pages/14_📋_Catálogo_Paneles.py`
 - `bipv_python/pages/3_🔬_Motor_IV.py`
 - `bipv_python/tests/test_sdm_capa_fina_bipv.py`

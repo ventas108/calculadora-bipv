@@ -30,7 +30,12 @@ panel flexible CIGS como ejemplo»).
    probó primero y solo movía el resultado entre 91,1 y 92,0 %.
 5. Motor IV muestra el origen: tecnología usada, celdas estimadas, ajuste a
    200 W/m² o aviso de tecnología supuesta.
-6. Manual del Asistente, sección 112.
+6. Nombres del catálogo iguales a los del Excel real: «CIGS» y «Poli-Si»
+   en el formulario, la tabla de edición y el lector de fichas (antes «CIS»
+   y «Poly-Si»); los valores viejos se leen con el nombre nuevo
+   (`tecnologia_catalogo`). Pedido del usuario: «es para que no haya más
+   confusiones en el catálogo».
+7. Manual del Asistente, sección 112.
 
 ## Alternativas descartadas
 
