@@ -107,3 +107,18 @@ def test_manual_del_asistente():
         assert t in s, t
     assert i < kb.rindex("Calculadora BIPV — Innovación Química")
     assert "PVsyst" not in s and "pendiente" not in s
+
+
+def test_el_catalogo_dice_cigs_no_cis():
+    # El Excel real ya usa «CIGS»; el formulario, la tabla de edición y el
+    # lector de fichas ofrecían «CIS» y el valor de esos paneles quedaba
+    # fuera de la lista de opciones.
+    pag = (_RAIZ / "pages" / "14_📋_Catálogo_Paneles.py").read_text(encoding="utf-8")
+    assert '"CIS"' not in pag and pag.count('"CIGS"') >= 2
+    assert '"Poly-Si"' not in pag and pag.count('"Poli-Si"') >= 2       # el Excel usa «Poli-Si»
+    from calculos.pdf_panel_extractor import _detect_technology
+    assert _detect_technology("Cell Type Copper Indium Gallium Diselenide (CIGS)") == "CIGS"
+    from datos.catalogo_paneles_excel import tecnologia_catalogo
+    assert tecnologia_catalogo("CIS") == "CIGS" and tecnologia_catalogo(" cis ") == "CIGS"
+    assert tecnologia_catalogo("CIGS Teja") == "CIGS Teja" and tecnologia_catalogo("Mono-Si") == "Mono-Si"
+    assert tecnologia_catalogo("Poly-Si") == "Poli-Si" and tecnologia_catalogo(float("nan")) == ""

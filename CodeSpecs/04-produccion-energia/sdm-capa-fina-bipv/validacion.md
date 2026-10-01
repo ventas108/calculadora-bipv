@@ -13,7 +13,7 @@
   - Con el dato de la ficha (94, 97 y 99 %): reproducido ± 0,3 puntos.
 - [x] Silicio sin cambios (mismo factor de idealidad, sin ajuste).
 - [x] Guardia de física: el MiaSolé estimado entra en `test_consistencia_sdm_entre_modulos.py` (los 5 motores dan lo mismo).
-- [x] Suite completa de `bipv_python`: 2380 pruebas pasan.
+- [x] Suite completa de `bipv_python`: 2383 pruebas pasan.
 
 ## Resultado
 

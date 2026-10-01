@@ -67,6 +67,17 @@ def v_sistema_desde_fila(fila, nombre: str):
     return float(respaldo) if respaldo else None
 
 
+def tecnologia_catalogo(texto) -> str:
+    """Nombre de tecnología que muestra el catálogo: «CIS» y «Poly-Si»
+    (nombres antiguos del formulario y del lector de fichas) se muestran y
+    guardan como «CIGS» y «Poli-Si», los que ya usa el Excel real (Spec
+    04/sdm-capa-fina-bipv)."""
+    t = str(texto or "").strip()
+    if t.lower() in ("nan", "none"):
+        return ""
+    return {"CIS": "CIGS", "POLY-SI": "Poli-Si"}.get(t.upper(), t)
+
+
 def alfa_isc_desde_fila(fila, nombre: str):
     """Coeficiente de temperatura de Isc (α, %/°C): columna ``CoefIsc_C`` del
     Excel (la escribe «Agregar desde PDF» y la tabla de edición); sin ella,
@@ -117,7 +128,7 @@ def cargar_catalogo_paneles() -> dict:
         paneles[nombre] = {
             "nombre":            nombre,
             "marca":             str(r.get("Marca", "")).strip(),
-            "tecnologia":        str(r.get("Tecnologia", r.get("Tecnología", ""))).strip(),
+            "tecnologia":        tecnologia_catalogo(r.get("Tecnologia", r.get("Tecnología", ""))),
             "Pmax_stc":          pmax,
             "dimensiones_mm":    str(r.get("DimensionesMM", "")).strip(),
             "area_m2":           _parse_area(r.get("DimensionesMM")),

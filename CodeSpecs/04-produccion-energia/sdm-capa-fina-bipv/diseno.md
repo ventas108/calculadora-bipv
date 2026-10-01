@@ -43,3 +43,5 @@ pvlib (`calcparams_pvsyst`), las constantes existentes.
 4. «Thin Film»/«Otro» quedan como supuestos y Motor IV lo avisa.
 5. Catálogo: columna editable «η rel. 200 W/m² (%)».
 6. Manual del Asistente, sección 112.
+7. El catálogo ofrece y lee «CIGS» y «Poli-Si»; «CIS»/«Poly-Si» viejos se
+   muestran con el nombre nuevo.
