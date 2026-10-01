@@ -107,6 +107,8 @@ debes ejecutar el flujo desde el principio.
 
 Flujo recomendado para proyectos agrivoltaicos  ACTUALIZADO (26-ago-2026 — ahora incluye Motor Óptico)
 
+⚠️ Desde el 1-oct-2026 el orden completo y vigente de una granja (con 🌾 Granja FV, ⚡ Unifilar, ⚖️ Comparador y 📋 RETIE) está en la **sección 107**. Úsalo en lugar del resumen de abajo.
+
 1 Proyecto (tipo Granja fotovoltaica + factor de ocupación) → 2 Recurso Solar (verificar GCR sincronizado → Calcular POA) → 4 Dimensionamiento (área útil) → 5b Motor Óptico (IAM — ver nota abajo, montaje "Ventilado libre") → 9 Vista 3D (verificación visual de filas y cultivo) → 6 Producción → 7 Financiero → 8 Presupuesto → 10 Reporte PDF.
 
 Regla de oro agrivoltaica: factor de ocupación (Proyecto) = GCR (Recurso Solar). Si cambias uno, revisa el otro.
@@ -5652,6 +5654,93 @@ Los dos módulos recomiendan lo mismo.
 - 1 string por MPPT en los dos casos.
 
 En 📐 Dimensionamiento escribe N total de cadenas 15 o 16 y deja 1 string por tracker. Con «✅ Adoptar» del comparador queda la opción A sola.
+
+## 106. 📄 Reporte en Word editable y PDF sin perder gráficas (1-oct-2026)
+
+**Qué pasaba:** al guardar el reporte HTML como Word se perdían las gráficas. Word no lee el formato SVG en que vienen las 6 gráficas del reporte de la Granja Apartadó: curva eléctrica, producción mensual, vista 3D del campo, luz en el suelo, mapa de sombra y plano eléctrico. El .docx quedaba con las 13 tablas y **0 imágenes**.
+
+**Ahora** «Generar Reporte» ofrece tres botones:
+- **⬇️ Word editable (.docx):**
+  - tamaño carta, márgenes de 1,8 cm, letra Calibri;
+  - títulos, párrafos, notas sombreadas, listas y **tablas de Word editables**, con los colores de los encabezados;
+  - **todas las gráficas como imágenes** de alta resolución.
+- **⬇️ PDF:** tamaño carta, con las mismas tablas, notas e imágenes, listo para enviar. Los íconos de estado (🟢/🟠/🔴) salen como ● de color.
+- **⬇️ HTML:** la versión web, con las gráficas en máxima calidad. Para un PDF idéntico a la vista web: ábrelo en Chrome o Edge → Ctrl+P → Guardar como PDF y activa **Gráficos de fondo**. Ahora la impresión conserva los colores y no parte tablas ni gráficas entre páginas.
+
+**No abras el HTML con Word:** Word no muestra sus gráficas. Usa el botón Word.
+
+El Word y el PDF salen del mismo HTML del reporte: el contenido es idéntico, no se recalcula nada.
+
+## 107. 🌾 Corrida completa de una granja FV desde cero, en orden (caso Urabá, 1-oct-2026)
+
+**Para qué sirve:** es el orden correcto para correr una granja de principio a fin sin errores en el informe. Reemplaza al «Flujo recomendado para proyectos agrivoltaicos» de la sección 2, que no incluía 🌾 Granja FV, ⚡ Unifilar, ⚖️ Comparador ni 📋 RETIE.
+
+### Granja FV — reglas de oro
+
+1. Una sola sesión, sin recargar el navegador. Guarda el proyecto al final de cada bloque: 🏠 Proyecto › 📁 Mis Proyectos › 💾 Guardar.
+2. Cada pérdida en un solo lugar:
+   - la **suciedad** solo en 🔆 Motor Óptico (en 🔀 Mismatch va en 0);
+   - un **obstáculo** en la tabla de horizonte de 🔀 Mismatch **o** en el CSV de la calculadora hermana, nunca en los dos;
+   - la **sombra entre filas** la calcula 🌾 Granja FV, nunca el CSV.
+3. Si una página muestra 🟠 o 🔴, para y corrígelo antes de seguir.
+4. 🗺️ Vista 3D sin energía multi-superficie publicada: la granja es una sola superficie.
+
+### Granja FV — orden de las páginas
+
+1. **Preparación:** revisa las fichas en 🔌 Catálogo Inversores y 📋 Catálogo Paneles contra los PDF del fabricante. Si hay obstáculos, genera el CSV en la calculadora hermana.
+2. **🏠 Proyecto:**
+   - tipo Granja fotovoltaica, coordenadas del predio;
+   - área del terreno, factor de ocupación, inclinación y azimut;
+   - 💾 Guardar configuración.
+3. **☀️ Recurso Solar, primera pasada:** año típico de PVGIS y modelo bifacial activo.
+4. **📐 Dimensionamiento:**
+   - panel e inversor;
+   - **N total de cadenas** y **N strings por tracker**: ver la trampa más abajo;
+   - ▶️ Optimizar N paneles/string.
+5. **🌾 Granja FV, secciones 1 a 5:**
+   - terreno, mesas, pitch y altura libre;
+   - revisa que la sección 3 aloje todos los módulos;
+   - pulsa **⚡ Usar la geometría del campo en la energía**.
+6. **☀️ Recurso Solar, segunda pasada:** pulsa otra vez el botón de cálculo, ahora con la sombra entre filas y la cara trasera reales. La sección 4 de Granja FV debe quedar en 🟢.
+7. **🌾 Granja FV, secciones 5 a 9:**
+   - estimar la sombra entre filas;
+   - luz en el suelo y maquinaria real;
+   - seguidor (opcional);
+   - eléctrico por bloques: calibres y tensión de la red.
+8. **🔆 Motor Óptico:**
+   - montaje Ventilado libre (k = 1,0);
+   - NOCT y γ de la ficha;
+   - suciedad mensual de la zona (agrícola: 2–3 %).
+9. **🔀 Mismatch:**
+   - horizonte solo con obstáculos que no estén en el CSV;
+   - calidad del módulo y mismatch de fabricación;
+   - suciedad 0;
+   - bypass con el CSV si hay obstáculos.
+10. **⚡ Diagrama Unifilar:** deja marcada «🌾 Usar los cables de 🌾 Granja FV». Va antes de Producción porque da la pérdida real en cables.
+11. **📊 Producción:** ▶️ Simular producción. No debe quedar ningún aviso 🟠 de vigencia.
+12. **⚖️ Comparador de Inversores (verificación):** la fila del inversor elegido debe coincidir con Dimensionamiento. Si coincide, no pulses «Adoptar»: adoptar cambia el número de strings a la mejor configuración del comparador.
+13. **📋 Ficha RETIE:** todo en 🟢.
+14. **💼 Presupuesto, 💰 Financiero, 🌿 CO₂:** solo si van en el informe.
+15. **📄 Reporte:** marca las secciones, genera el reporte y descarga Word o PDF (sección 106).
+
+### Trampa: «N total de cadenas» y strings por tracker
+
+Con un total declarado, 📐 Dimensionamiento propone ⌈cadenas ÷ MPPT⌉ strings por tracker. En Urabá, 16 cadenas ÷ 10 MPPT = 2 por MPPT. Con el JAM66D46-720/LB eso da 2 × 18,59 A × 1,25 = 46,5 A por MPPT, más que los 40 A del Growatt: 🔴. Escribe **1** en «N strings por tracker»: 23,2 A 🟢, con 8 de los 10 MPPT usados por inversor. La app respeta ese ajuste mientras no cambies de inversor ni el total de cadenas. «✅ Adoptar» del ⚖️ Comparador lo deja en 1 solo.
+
+### El CSV de la calculadora hermana: ¿cuándo y qué columna?
+
+- **Hace falta solo si hay obstáculos** que sombreen los paneles: árboles de linderos, construcciones, torres. Con el terreno despejado no se usa y se salta el bypass.
+- La app toma **solo FS_geometrico** (sombra de obstáculos). FS_climatico (nubes) y FS_combinado se ignoran: las nubes ya están en el año típico de PVGIS. Cargar el CSV **no** duplica el efecto del clima.
+- En la calculadora hermana se dibujan solo los obstáculos externos, **nunca las filas de paneles**: esa sombra la calcula 🌾 Granja FV.
+- En los puntos de análisis se escribe «Campo» como fachada, un punto en el centro de cada fila expuesta, a la altura del centro de la mesa.
+- No se marca «Invertir FS».
+
+### Urabá — valores de referencia
+
+- **Diseño:** 320 × JAM66D46-720/LB = 230,4 kWp, 20 en serie × 16 strings, 2 × Growatt MAX 100KTL3 LV, reparto 8 + 8, DC/AC 1,15, Voc en frío 990 V (🟢 110 V de margen).
+- **Campo:** 14 filas de 2 × 12 módulos, pitch 6,60 m, altura libre 2,40 m, GCR 39,8 %.
+- **Recurso:** GHI ≈ 1.683 kWh/m², POA bruta ≈ 1.838 kWh/m², ganancia bifacial ≈ 8 %.
+- **Producción:** ≈ 345–355 MWh/año según la suciedad, PR ≈ 81–84 %.
 
 Calculadora BIPV — Innovación Química
 

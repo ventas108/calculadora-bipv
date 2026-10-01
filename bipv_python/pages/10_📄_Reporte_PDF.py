@@ -635,6 +635,10 @@ def generar_html_reporte() -> str:
     body {{ background:white; padding:0; }}
     .contenedor {{ box-shadow:none; padding:0; }}
     .no-print {{ display:none; }}
+    /* Spec 07/reporte-word-pdf: colores de encabezados y tablas también al
+       imprimir, y tablas y gráficas sin partirse entre páginas */
+    * {{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }}
+    table, svg, tr {{ break-inside:avoid; page-break-inside:avoid; }}
   }}
 </style>
 </head>
@@ -2112,32 +2116,54 @@ if st.button("📄 Generar Reporte", type="primary", use_container_width=True,
     st.session_state["reporte_generado"] = True  # lo lee el 🧭 Asistente
     st.session_state["_reporte_html"] = html_str  # temporal (no se guarda con el proyecto)
 
-    st.download_button(
-        label="⬇️ Descargar reporte (.html → imprimir como PDF)",
+    # Spec 07/reporte-word-pdf: Word editable y PDF armados del mismo HTML,
+    # con las gráficas como imágenes (Word no lee los SVG del HTML).
+    _base_archivo = f"Reporte_BIPV_{st.session_state.get('nombre_proyecto','proyecto').replace(' ','_')}"
+    try:
+        from calculos.reporte_documentos import documentos_reporte
+        with st.spinner("Preparando Word y PDF…"):
+            _docs = documentos_reporte(html_str)
+        st.session_state["_reporte_docx"] = _docs["docx"]   # temporales (no se guardan con el proyecto)
+        st.session_state["_reporte_pdf"] = _docs["pdf"]
+    except Exception as _e_docs:
+        _docs = None
+        st.warning(f"⚠️ No se pudieron preparar el Word y el PDF ({_e_docs}). Usa el HTML.")
+    _d1, _d2, _d3 = st.columns(3)
+    if _docs:
+        _d1.download_button(
+            label="⬇️ Word editable (.docx)", data=_docs["docx"], file_name=f"{_base_archivo}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True, key="btn_download_docx",
+        )
+        _d2.download_button(
+            label="⬇️ PDF", data=_docs["pdf"], file_name=f"{_base_archivo}.pdf", mime="application/pdf",
+            use_container_width=True, key="btn_download_pdf",
+        )
+    _d3.download_button(
+        label="⬇️ HTML (vista web)",
         data=html_bytes,
-        file_name=f"Reporte_BIPV_{st.session_state.get('nombre_proyecto','proyecto').replace(' ','_')}.html",
+        file_name=f"{_base_archivo}.html",
         mime="text/html",
         use_container_width=True,
         key="btn_download",
     )
     st.success(
-        "✅ Reporte generado. Haz clic en **Descargar** para guardarlo. "
-        "Para obtener un PDF: abre el archivo en tu navegador y usa **Archivo → Imprimir → Guardar como PDF**."
+        "✅ Reporte generado. **Word** para editarlo (tablas y textos editables, gráficas como imágenes), "
+        "**PDF** para enviarlo al cliente, **HTML** para verlo en el navegador. No abras el HTML con Word: "
+        "Word no muestra sus gráficas."
     )
 
 st.markdown("---")
 st.markdown("""
-### ℹ️ Instrucciones para obtener el PDF
+### ℹ️ Formatos del reporte
 
-1. **Haz clic en "Generar Reporte"** para crear el archivo HTML con todos tus resultados.
-2. **Descarga el archivo .html** usando el botón que aparece.
-3. **Abre el archivo** en Chrome, Edge o Firefox.
-4. Presiona **Ctrl+P** (Windows) o **⌘+P** (Mac) para abrir el diálogo de impresión.
-5. Selecciona **"Guardar como PDF"** como destino de impresión.
-6. Ajusta márgenes y escala si es necesario → **Guardar**.
+1. **Haz clic en "Generar Reporte"**.
+2. Descarga el formato que necesites:
+   - **⬇️ Word editable (.docx):** todas las tablas y textos se pueden editar en Word; las gráficas van como imágenes.
+   - **⬇️ PDF:** listo para enviar al cliente, en tamaño carta.
+   - **⬇️ HTML:** la versión web, con las gráficas en alta calidad. Para un PDF idéntico a la vista web: ábrelo en Chrome o Edge → **Ctrl+P** → **Guardar como PDF** y activa **Gráficos de fondo**.
 
-> 💡 El reporte está diseñado para impresión en formato A4 con márgenes normales.
-> En Chrome, elige "Sin márgenes" o "Mínimo" para aprovechar mejor el espacio.
+> 💡 No abras el HTML con Word: Word no muestra sus gráficas. Usa el botón Word.
 """)
 
 with st.expander("📋 Vista previa del reporte (HTML en pantalla)", expanded=False):
