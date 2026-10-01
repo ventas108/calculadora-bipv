@@ -77,12 +77,12 @@ def test_word_y_pdf_con_la_ficha_y_las_validaciones_en_texto():
 
 
 def _assert_pdf(pdf: bytes, checks):
-    import fitz
-    with fitz.open(stream=pdf, filetype="pdf") as d:
-        assert d.page_count >= 2
-        assert d[0].rect.width > d[0].rect.height             # ficha en horizontal
-        assert len(d[0].get_images()) == 1
-        texto = " ".join(p.get_text() for p in d)
+    import pdfplumber
+    with pdfplumber.open(io.BytesIO(pdf)) as d:
+        assert len(d.pages) >= 2
+        assert d.pages[0].width > d.pages[0].height             # ficha en horizontal
+        assert len(d.pages[0].images) == 1
+        texto = " ".join(p.extract_text() or "" for p in d.pages)
     assert "Validaciones" in texto and checks[0]["titulo"] in texto
 
 
