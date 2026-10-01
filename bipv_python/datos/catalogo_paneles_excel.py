@@ -126,6 +126,9 @@ def cargar_catalogo_paneles() -> dict:
             "V_sistema_max":     v_sistema_desde_fila(r, nombre),
             "CoefIsc_C":         alfa_isc_desde_fila(r, nombre),
             "Tk_alfa":           alfa_isc_desde_fila(r, nombre),
+            # Spec 04/sdm-capa-fina-bipv: eficiencia relativa a 200 W/m² (%
+            # de la de STC, p. ej. 97). Ajusta la baja luz del modelo IV.
+            "eficiencia_rel_200": _f(r.get("EficRel200Pct")),
             "beta_mp":           _f(r.get("CoefT_C")),
             "CoefVoc_C":         _f(r.get("CoefVoc_C")),
             "transparencia_pct": _f(r.get("TransparenciaPct"), 0),
