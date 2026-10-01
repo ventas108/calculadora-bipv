@@ -5546,6 +5546,52 @@ El reporte ya incluye todo lo que la app calcula para la producción:
 - Una con pocos **kWh/kWp** está mal orientada para ese sitio.
 - Una **relación DC/AC** muy alta en un inversor anticipa recorte.
 
+## 103. 📄 Reporte PDF de Granja FV completo y ficha del inversor (1-oct-2026)
+
+### Reporte de granja — qué cambió y por qué
+
+**Qué pasaba:** el reporte de la Granja Solar Apartadó (Urabá) traía las tablas de 🌾 Granja FV pero no sus gráficas. Faltaban la **Vista 3D del campo** (sección 9 de la página), el **Plano eléctrico** (sección 8), la luz en el suelo, el paso de la maquinaria y las revisiones de coherencia del campo. Además:
+- decía «Factor Mismatch aplicado 100 %» aunque la simulación aplicó 3 % de calidad del módulo y 2 % de mismatch (su propio diagrama de pérdidas los mostraba);
+- la **Altitud** salía siempre «—» (el reporte buscaba un dato que ninguna página guardaba);
+- usaba textos de fachada en una granja: «Área de fachada», «90° = fachada vertical», «Módulo BIPV», «entregada al edificio», «Bogotá», «módulos CdTe», «un proyecto de 100 m²»;
+- no avisaba que la **suciedad** estaba en 0 %.
+
+**Ahora el reporte de una granja trae:**
+- **Vista 3D del campo** a escala real, vista desde el frente: terreno, postes y cada módulo con el color de su inversor (dos tonos alternos separan un string del siguiente).
+- **Coherencia del campo** con el resto del proyecto (🟢/🟡/🟠/🔴), las mismas revisiones de la sección 4 de la página.
+- **Luz anual en el suelo** entre dos filas y el **mapa de sombra mensual**, más el **paso de la maquinaria agrícola** (altura y ancho guardados en la página).
+- **Plano eléctrico** visto desde arriba: módulos por inversor y string, número del string en su primer módulo, inversores, cable AC punteado y ★ punto de conexión. Si los strings pasan de una fila a la siguiente, una nota lo explica.
+- En Producción, las filas «Calidad del módulo (aplicada)» y «Mismatch módulos y strings (aplicado)» en lugar del «Factor Mismatch 100 %». «Otras pérdidas de 🔀 Mismatch» solo aparece si hay un factor adicional.
+- La **Altitud** del predio (🏠 Proyecto) o de la ciudad de referencia.
+- Textos según el tipo de instalación: en granja dice «Área del terreno», «Módulo fotovoltaico», «POA bruta (plano de los paneles)» y «entregada a la red». La nota de PR > 100 % solo aparece cuando el PR supera 100 %. El ejemplo del Motor Óptico usa la energía del proyecto.
+- Un aviso ⚠️ cuando la **suciedad** quedó en 0 % (en granjas en zona agrícola lo usual es 2–3 % al año).
+
+Los proyectos de fachada conservan sus textos de siempre.
+
+### Ficha del inversor y margen de tensión
+
+**Caso real:** el catálogo traía el **Growatt MAX 100KTL3 LV** con 1.500 V DC y MPPT 200–1.300 V. Su ficha oficial (MAX 100–125KTL3-X LV) dice:
+- tensión DC máxima **1.100 V**, arranque 195 V, nominal 600 V;
+- MPPT **180–1.000 V**, 10 MPPT con 2 strings cada uno;
+- 32 A por MPPT y 40 A de cortocircuito por MPPT.
+
+Con los datos equivocados la app daba 🟢 a 28 módulos en serie, cuando su Voc en frío (1.386 V) supera el máximo real de 1.100 V.
+
+**Ahora:**
+- 📐 Dimensionamiento muestra una alerta de **Ficha del inversor** cuando los datos se contradicen:
+  - 🔴 el MPPT supera la tensión máxima, o el mínimo del MPPT no es menor que su máximo;
+  - 🟠 la corriente de cortocircuito es menor que la de operación;
+  - 🟠 un inversor **LV** (salida 230/400 V) figura con más de 1.100 V DC.
+- El reporte agrega la fila «**Margen frente a la tensión DC máxima del inversor**»: 🟢 3 % o más, 🟠 menos de 3 %, 🔴 negativo.
+- El reporte repite la alerta de la ficha si la hay.
+
+**Qué hacer en Urabá:**
+1. Corrige la ficha en 🔌 Catálogo Inversores con los datos de la ficha oficial: 1.100 V, arranque 195 V, MPPT 180 a 1.000 V, mínimo activo 600 V, 32 A, 40 A, 100 kW.
+2. En 📐 Dimensionamiento usa **22 módulos en serie**: 14 strings × 22 = los mismos 308 módulos, reparto 7 + 7, 1 string por MPPT.
+   - Voc en frío ≈ 1.089 V, con 🟠 margen de 11 V.
+   - Si quieres más margen: 21 en serie × 15 strings (315 módulos, una fila más).
+3. Recalcula 🔀 Mismatch, 📊 Producción, 🌾 Granja FV, ⚡ Diagrama Unifilar y 📋 Ficha RETIE, y genera de nuevo el reporte.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
