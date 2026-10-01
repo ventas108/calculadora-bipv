@@ -8,7 +8,7 @@
   anterior: la función no existía).
 - [x] Motor IV sigue usando el SDM estimado para paneles del Excel: α no
   completa por sí solo los parámetros calibrados.
-- [x] Suite completa de `bipv_python`.
+- [x] Suite completa de `bipv_python`: 2360 pruebas pasan.
 
 ## Resultado
 
