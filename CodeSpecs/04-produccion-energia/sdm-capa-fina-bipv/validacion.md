@@ -13,7 +13,7 @@
   - Con el dato de la ficha (94, 97 y 99 %): reproducido ± 0,3 puntos.
 - [x] Silicio sin cambios (mismo factor de idealidad, sin ajuste).
 - [x] Guardia de física.
-- [x] Suite completa de `bipv_python`.
+- [x] Suite completa de `bipv_python`: 2380 pruebas pasan.
 
 ## Resultado
 
