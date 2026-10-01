@@ -41,10 +41,12 @@ def test_criterio_1_ficha_valida_cada_grupo_con_los_datos_del_diseno_electrico()
     topo, diag = _topo()
     _, checks = _ficha(topo, diag)
     voc = _por_titulo(checks, "Voc en frío")
-    assert [c["titulo"] for c in voc] == ["Voc en frío ≤ Vdc máximo — Fachada principal · G1",
+    # Spec 03/tension-maxima-modulo: en la fachada (ASP-ST1-T40, 1.000 V)
+    # manda el módulo; el techo (sin el dato) sigue con el inversor.
+    assert [c["titulo"] for c in voc] == ["Voc en frío ≤ tensión máx. del módulo — Fachada principal · G1",
                                           "Voc en frío ≤ Vdc máximo — Techo 1 · G2"]
     assert all(c["nivel"] == "OK" for c in voc)
-    assert "987,6" in voc[0]["detalle"] and "1100" in voc[0]["detalle"]      # igual a ⚡ Diseño eléctrico
+    assert "987,6" in voc[0]["detalle"] and "1000" in voc[0]["detalle"]      # igual a ⚡ Diseño eléctrico
     # DC/AC 1,67 (amarillo en Diseño eléctrico) → por revisar, nunca OK
     dcac = _por_titulo(checks, "Relación DC/AC — INV-1")
     assert len(dcac) == 1 and dcac[0]["nivel"] == "PENDIENTE"
@@ -56,7 +58,7 @@ def test_mapeo_de_colores_del_diagnostico():
     sups[0]["grupos"] = [_g("G1", "INV-1", 1, 10, 14)]                        # Voc frío > 1100 V
     topo, diag = _topo(sups, invs, paneles)
     _, checks = _ficha(topo, diag)
-    voc = _por_titulo(checks, "Voc en frío ≤ Vdc máximo — Fachada principal")[0]
+    voc = _por_titulo(checks, "Voc en frío ≤ tensión máx. del módulo — Fachada principal")[0]
     assert voc["nivel"] == "ERROR"
     assert {c["nivel"] for c in checks} <= {"OK", "PENDIENTE", "ERROR"}
 
@@ -231,7 +233,7 @@ def test_ficha_retie_en_la_pagina_valida_el_sistema_del_cliente(app_con_login):
     from tests.test_topologia_electrica import _estado_cliente
     at = app_con_login(PAG_RETIE, _estado_cliente())
     textos = " ".join(m.value for m in at.markdown)
-    assert "Voc en frío ≤ Vdc máximo — Fachada principal · G1" in textos
+    assert "Voc en frío ≤ tensión máx. del módulo — Fachada principal · G1" in textos
     assert "Caja combinadora — INV-1 · MPPT 1" in textos
 
 

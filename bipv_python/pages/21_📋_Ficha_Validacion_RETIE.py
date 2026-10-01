@@ -17,11 +17,11 @@ from calculos.ficha_validacion_retie import (
     validar_retie,
     generar_ficha_svg,
     exportar_ficha_svg_bytes,
-    exportar_ficha_png_bytes,
     calcular_retie_multisuperficie,
     validar_retie_multisuperficie,
 )
 from calculos.dimensionamiento import diseno_electrico_confirmado
+from calculos.ficha_retie_documentos import documentos_ficha_retie
 from calculos.topologia_electrica import topologia_desde_estado
 from calculos import ledger_auditoria as _ledger
 from utils.sistema_electrico_ui import mostrar_resumen_topologia, opciones_sistema_multisuperficie
@@ -156,6 +156,13 @@ with col1:
             temperatura_minima_diseno_c = st.number_input(
                 "Temperatura mínima de diseño del sitio (°C)", step=1.0, value=0.0,
             )
+            # Spec 03/tension-maxima-modulo: el Voc en frío se compara con el
+            # menor entre el Vdc del inversor y esta tensión del módulo.
+            v_sistema_modulo_v = st.number_input(
+                "Tensión máxima del sistema del módulo (V)", min_value=0.0, step=50.0,
+                value=float(panel_dict.get("V_sistema_max") or 0),
+                help="De la ficha del panel (VSYS). 0 = sin dato: se usa solo el Vdc del inversor.",
+            )
 
 with col2:
     if usar_multi:
@@ -250,6 +257,7 @@ else:
         corriente_cortocircuito_pcc_ka=corriente_cortocircuito_pcc_ka or None,
         esquema_tierra=esquema_tierra,
         factor_bifacial=_factor_bif_retie,
+        v_sistema_modulo_v=v_sistema_modulo_v or None,
     )
     calc = calcular_retie(config)
     checks = validar_retie(config, calc)
@@ -278,22 +286,44 @@ with st.expander("📋 Detalle completo de cada validación (el texto de las tar
 st.image(svg, use_column_width=True)
 
 _nombre_archivo = _nombre_archivo_seguro(config["proyecto"]["nombre_proyecto"])
-png_bytes = exportar_ficha_png_bytes(svg)
+# Spec 07-informes/ficha-retie-word-pdf: Word editable, PDF y PNG dibujados
+# con Pillow (sin CairoSVG, que no está en el servidor), como el 📄 Reporte.
+try:
+    _docs_retie = documentos_ficha_retie(svg, config, calc, checks)
+except Exception as _e_docs:  # una falla de conversión nunca tumba la página
+    _docs_retie = {}
+    st.warning(f"⚠️ No se pudieron preparar Word, PDF o PNG ({_e_docs}). El SVG sí se puede descargar.")
 
-col_dl1, col_dl2 = st.columns(2)
+st.caption(
+    "**Word editable** y **PDF**: la ficha en una hoja horizontal y, en la siguiente, los datos del "
+    "proyecto y la tabla de validaciones como texto. **PNG**: imagen de alta resolución. "
+    "**SVG**: el dibujo vectorial original (para Inkscape o Illustrator; Word no lo muestra)."
+)
+col_dl1, col_dl2, col_dl3, col_dl4 = st.columns(4)
 with col_dl1:
-    st.download_button(
-        "⬇️ Descargar SVG (editable)", data=exportar_ficha_svg_bytes(svg),
-        file_name=f"ficha_retie_{_nombre_archivo}.svg", mime="image/svg+xml",
-    )
-with col_dl2:
-    if png_bytes:
+    if _docs_retie.get("docx"):
         st.download_button(
-            "⬇️ Descargar PNG", data=png_bytes,
-            file_name=f"ficha_retie_{_nombre_archivo}.png", mime="image/png",
+            "⬇️ Word editable", data=_docs_retie["docx"], file_name=f"ficha_retie_{_nombre_archivo}.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True,
         )
-    else:
-        st.caption("ℹ️ Descarga en PNG no disponible en este servidor (requiere CairoSVG). El SVG sirve igual.")
+with col_dl2:
+    if _docs_retie.get("pdf"):
+        st.download_button(
+            "⬇️ PDF", data=_docs_retie["pdf"], file_name=f"ficha_retie_{_nombre_archivo}.pdf",
+            mime="application/pdf", use_container_width=True,
+        )
+with col_dl3:
+    if _docs_retie.get("png"):
+        st.download_button(
+            "⬇️ PNG", data=_docs_retie["png"], file_name=f"ficha_retie_{_nombre_archivo}.png",
+            mime="image/png", use_container_width=True,
+        )
+with col_dl4:
+    st.download_button(
+        "⬇️ SVG", data=exportar_ficha_svg_bytes(svg),
+        file_name=f"ficha_retie_{_nombre_archivo}.svg", mime="image/svg+xml", use_container_width=True,
+    )
 
 st.divider()
 if st.button("🔒 Sellar en el Ledger de Auditoría", type="secondary", use_container_width=True):

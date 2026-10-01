@@ -73,7 +73,9 @@ def test_los_4_sungrow_quedan_disponibles_en_el_optimizador_de_fase4():
 def test_sg5_0rt_evalua_compatible_contra_un_string_real():
     cat = cargar_catalogo_inversores()
     inv = cat["SG5.0RT"]
-    df = filtrar_inversores_compatibles(ASP_ST1_T40, {"SG5.0RT": inv}, N_serie=8)
+    # 7 en serie: con 8 el Voc a −5 °C (1.017 V) pasa la tensión máxima del
+    # sistema del ASP-ST1-T40 (1.000 V, Spec 03/tension-maxima-modulo).
+    df = filtrar_inversores_compatibles(ASP_ST1_T40, {"SG5.0RT": inv}, N_serie=7)
     fila = df.iloc[0]
     assert fila["compatible"] is True or bool(fila["compatible"]) is True, fila.get("motivo")
     assert fila["strings_max"] == 2  # N_mppt=2 x n_strings_tracker=1

@@ -54,6 +54,8 @@ def test_pagina_ficha_retie_no_hardcodea_cantidad_de_inversores():
 
 
 def test_pagina_ficha_retie_degrada_sin_cairosvg():
+    # Spec 07/ficha-retie-word-pdf: sin CairoSVG el PNG sale con Pillow
+    # (documentos_ficha_retie) y, si la conversión falla, queda el SVG.
     src = _leer(_PAG)
-    assert "exportar_ficha_png_bytes" in src
-    assert "no disponible en este servidor" in src
+    assert "documentos_ficha_retie" in src
+    assert "El SVG sí se puede descargar" in src

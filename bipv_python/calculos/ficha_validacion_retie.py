@@ -109,6 +109,7 @@ def construir_config_retie(
     corriente_cortocircuito_pcc_ka: float | None = None,
     esquema_tierra: str = "",
     factor_bifacial: float = 1.0,
+    v_sistema_modulo_v: float | None = None,
 ) -> dict:
     """
     Normaliza los datos de un proyecto FV/BIPV a la estructura que
@@ -138,6 +139,8 @@ def construir_config_retie(
             "coef_voc_pct_c": coef_voc_pct_c,
             # Spec 07/unifilar-retie-bifacial-cruce: 1 + 0,135 φ (BNPI).
             "factor_bifacial": float(factor_bifacial or 1.0),
+            # Spec 03/tension-maxima-modulo: VSYS de la ficha del módulo.
+            "v_sistema_max_v": v_sistema_modulo_v,
         },
         "inversor": {
             "nombre": inversor_nombre, "potencia_ac_kw_unidad": potencia_ac_kw_unidad,
@@ -311,12 +314,18 @@ def validar_retie(cfg: dict, calc: dict) -> list[dict]:
         out.append({"nivel": "PENDIENTE", "titulo": "Voc del string en frío",
                     "detalle": f"Voc frío calculado={calc['voc_string_frio_v']:.1f} V; falta Vdc máxima "
                                "oficial del inversor."})
-    elif calc["voc_string_frio_v"] < inv["vdc_max_v"]:
-        out.append({"nivel": "OK", "titulo": "Voc del string en frío",
-                    "detalle": f"{calc['voc_string_frio_v']:.1f} V < Vdc máx. {inv['vdc_max_v']:.1f} V."})
     else:
-        out.append({"nivel": "ERROR", "titulo": "Voc del string en frío",
-                    "detalle": f"{calc['voc_string_frio_v']:.1f} V >= Vdc máx. {inv['vdc_max_v']:.1f} V."})
+        # Spec 03/tension-maxima-modulo: el menor entre inversor y módulo.
+        from calculos.tension_modulo import limite_voc
+        _lim = limite_voc({"V_sistema_max": cfg["panel"].get("v_sistema_max_v")},
+                          {"Vdc_max": inv["vdc_max_v"]})
+        _nombre = "tensión máx. del módulo" if _lim["origen"] == "modulo" else "Vdc máx."
+        if calc["voc_string_frio_v"] < _lim["limite_v"]:
+            out.append({"nivel": "OK", "titulo": "Voc del string en frío",
+                        "detalle": f"{calc['voc_string_frio_v']:.1f} V < {_nombre} {_lim['limite_v']:.1f} V."})
+        else:
+            out.append({"nivel": "ERROR", "titulo": "Voc del string en frío",
+                        "detalle": f"{calc['voc_string_frio_v']:.1f} V >= {_nombre} {_lim['limite_v']:.1f} V."})
 
     if calc["vmp_string_stc_v"] is None or inv["vmppt_min_v"] is None or inv["vmppt_max_v"] is None:
         out.append({"nivel": "PENDIENTE", "titulo": "Ventana MPPT",
@@ -622,7 +631,7 @@ def _bloque(d: _SVG, x, y, w, h, titulo, lineas, fill=COLORES["azul_claro"], str
 
 def _dibujar_validaciones(d: _SVG, validaciones: list[dict], x: float, y: float) -> None:
     d.text(x, y, "ESTADO DE VALIDACIÓN", 20, 700)
-    d.text(x + 245, y, "Verde: correcto · Naranja: pendiente · Rojo: corregir", 12, 400, COLORES["gris"])
+    d.text(x + 320, y, "Verde: correcto · Naranja: pendiente · Rojo: corregir", 12, 400, COLORES["gris"])
     columnas, ancho, alto, sep_x, sep_y = 4, 410, 92, 20, 16
     for n, v in enumerate(validaciones):
         fila, col = divmod(n, columnas)
@@ -868,12 +877,12 @@ def exportar_ficha_svg_bytes(svg: str) -> bytes:
 
 
 def exportar_ficha_png_bytes(svg: str, width: int = 2400) -> bytes | None:
-    """PNG vía CairoSVG (dependencia OPCIONAL, no agregada a requirements.txt
-    -- igual que el script original: si no está instalada, se degrada
-    devolviendo None en vez de reventar. El llamador (la página) decide si
-    muestra el botón de descarga PNG."""
+    """PNG de la ficha: CairoSVG si está instalada; si no, el dibujo con
+    Pillow de ``calculos.svg_a_png`` (Spec 07-informes/ficha-retie-word-pdf:
+    en el servidor no hay CairoSVG y la ficha solo bajaba en SVG)."""
     try:
         import cairosvg
     except ImportError:
-        return None
+        from calculos.svg_a_png import svg_a_png
+        return svg_a_png(svg, width)
     return cairosvg.svg2png(bytestring=svg.encode("utf-8"), output_width=width)

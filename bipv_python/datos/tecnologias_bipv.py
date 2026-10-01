@@ -110,6 +110,12 @@ ASP_ST1_T40 = {
     # ── Temperatura nominal ────────────────────────────────────────────────
     "NOCT":     45.0,    # °C
 
+    # ── Tensión máxima del sistema (ficha: «Voltaje máximo del sistema
+    # VSYS(V) 1000», igual para T10–T70). Spec 03/tension-maxima-modulo:
+    # el Voc en frío del string no puede superarla aunque el inversor
+    # aguante 1.100 V. La ficha NO trae NOCT: 45 °C es un valor típico.
+    "V_sistema_max": 1000.0,   # V
+
     # ── Dimensiones ───────────────────────────────────────────────────────
     "largo_mm": 1200,
     "ancho_mm":  600,

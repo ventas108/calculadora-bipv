@@ -1186,6 +1186,18 @@ if st.button("▶️ Optimizar N paneles/string", type="primary"):
 
     df = pd.DataFrame(filas)
 
+    # Spec 03/tension-maxima-modulo: la columna «1-Voc≤Vdc» usa el menor
+    # entre el inversor y la tensión máxima de sistema del módulo.
+    from calculos.tension_modulo import limite_voc as _limite_voc
+    _lim_dim = _limite_voc(panel, inversor)
+    if _lim_dim["origen"] == "modulo":
+        st.info(
+            f"🔒 El límite del Voc lo pone el **módulo**: su ficha dice "
+            f"{_lim_dim['v_sistema_modulo_v']:,.0f} V de tensión máxima del sistema, menos que "
+            f"los {_lim_dim['vdc_inversor_v']:,.0f} V del inversor. La columna «1-Voc≤Vdc» "
+            "compara con ese valor."
+        )
+
     def colorear(val):
         if val == "FALLA":
             return "background-color: #FFCCCC; color: #CC0000; font-weight: bold"

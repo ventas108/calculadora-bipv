@@ -21,6 +21,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from calculos.potencia_ac_inversor import MENSAJE_SIN_POTENCIA_AC
+from calculos.tension_modulo import limite_voc
 from calculos.dimensionamiento import (
     calcular_vmp_string,
     calcular_voc_string,
@@ -155,6 +156,8 @@ def rango_n_serie(panel: Mapping[str, Any], ficha: Mapping[str, Any],
     if limites is None:
         return None
     vdc, vmin, vmax = limites
+    # Spec 03/tension-maxima-modulo: el menor entre inversor y módulo.
+    vdc = limite_voc(panel, {"Vdc_max": vdc})["limite_v"] or vdc
     validos = []
     for n in range(1, 200):
         voc_frio = calcular_voc_string(n, voc, beta, float(temps["T_frio"]))
@@ -431,13 +434,17 @@ def validar_diseno_electrico(
                 g["estado"] = _peor(g["estado"], "amarillo")
                 avisos.append(f"«{g['superficie']} · {g['gid']}»: no validado ({fuente}).")
                 continue
-            vdc = ficha.get("Vdc_max")
+            # Spec 03/tension-maxima-modulo: límite = menor entre inversor y módulo.
+            vdc = compat.get("limite_voc_V") or ficha.get("Vdc_max")
+            _del_modulo = compat.get("limite_voc_origen") == "modulo"
             vmin = ficha.get("Vmppt_activo_min") or ficha.get("Vmppt_min")
             vmax = ficha.get("Vmppt_max")
             estado_c = "rojo" if not compat["compatible"] else ("amarillo" if compat.get("alerta_margen") else "verde")
             g["checks"].extend([
-                _check("Voc en frío ≤ Vdc máximo", round(compat["Voc_frio"], 1), vdc, "V",
-                       f"N × Voc × (1 + β·(T mín − 25)); {t_txt}", fuente,
+                _check("Voc en frío ≤ tensión máx. del módulo" if _del_modulo else "Voc en frío ≤ Vdc máximo",
+                       round(compat["Voc_frio"], 1), vdc, "V",
+                       f"N × Voc × (1 + β·(T mín − 25)); {t_txt}",
+                       "ficha del panel (tensión máxima del sistema)" if _del_modulo else fuente,
                        "rojo" if compat["Voc_frio"] > vdc else "verde"),
                 _check("Vmp real dentro del MPPT", round(compat["Vmp_real"], 1), f"{vmin:g}–{vmax:g}", "V",
                        f"N × Vmp × (1 + β·(T celda − 25)); {t_txt}", fuente,

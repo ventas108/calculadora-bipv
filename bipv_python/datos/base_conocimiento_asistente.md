@@ -91,6 +91,8 @@ Cuándo usar Página 5a — Sombras SketchUp: si el sitio tiene obstáculos cerc
 
 ⚠️ Regla de orden con el SVF (nueva, 6-sep-2026, ver sección 59): a diferencia del resto del flujo (que es lineal), el SVF cierra un CICLO — se calcula en 5a pero se aplica en 2. Si calculas o recalculas el SVF en 5a Sombras SketchUp DESPUÉS de ya haber corrido 2 Recurso Solar, el resultado de Recurso Solar se invalida automáticamente solo (`recurso_solar_ok` se pone en falso) — no hace falta limpiar caché ni tocar tilt/azimut a mano, basta con volver a abrir 2 Recurso Solar y se recalcula. Si el SVF quedó en 1,000 (sin reducción), verifica antes con una resolución de grilla más fina (0,5-1,0°, campo en la misma sección) que no sea un obstáculo angosto colándose entre los rayos — un SVF real de 1,000 es válido y coherente (ej. si el obstáculo queda fuera del hemisferio frontal del panel), pero conviene descartar primero la otra causa.
 
+⚠️ Desde el 1-oct-2026 el orden completo de un proyecto BIPV de **varias superficies** (fachada + techo, con 🗺️ Vista 3D, ⚡ Unifilar y 📋 RETIE) está en la **sección 108**, con el caso Teusaquillo.
+
 Cuándo usar Página 9 — Vista 3D: Si el proyecto tiene más de una superficie
 
 (ej. fachada sur + techo plano + pérgola), ejecuta la Página 9 para combinar las
@@ -5741,6 +5743,98 @@ Con un total declarado, 📐 Dimensionamiento propone ⌈cadenas ÷ MPPT⌉ stri
 - **Campo:** 14 filas de 2 × 12 módulos, pitch 6,60 m, altura libre 2,40 m, GCR 39,8 %.
 - **Recurso:** GHI ≈ 1.683 kWh/m², POA bruta ≈ 1.838 kWh/m², ganancia bifacial ≈ 8 %.
 - **Producción:** ≈ 345–355 MWh/año según la suciedad, PR ≈ 81–84 %.
+
+## 108. 🗺️ Corrida completa de un proyecto BIPV de varias superficies (caso Teusaquillo, 1-oct-2026)
+
+**Para qué sirve:** el orden para correr de cero un proyecto con fachada y techo, y las trampas que encontramos al revisar Teusaquillo contra las fichas del fabricante.
+
+### Teusaquillo — diseño revisado
+
+| Dato | Valor |
+|---|---|
+| Ubicación | Bogotá: latitud 4,711, longitud −74,072, altitud 2.600 m; T mínima de diseño 5 °C |
+| Fachada | 112 × ASP-ST1-T40 (CdTe, 63 W), vertical, sur, k_BIPV 1,3: **7 en serie × 16 strings** |
+| Techo | 4 × SPR-E20-327, inclinación 10°, sur, k_BIPV 1,0: 4 en serie × 1 string |
+| Inversor | 1 × Sungrow **SG8.0RT** (8 kW, 2 MPPT de 1 entrada, MPPT 160–1.000 V, 18 A de cortocircuito por MPPT) |
+| Reparto | MPPT 1 = los 16 strings de fachada por **caja combinadora** con un fusible gPV de 2 A por string; MPPT 2 = el techo |
+| Potencia | 8,36 kWp DC; DC/AC 1,05 🟢 |
+
+### Teusaquillo — por qué no el diseño anterior
+
+1. **Growatt MID15KTL3-X (15 kW):** DC/AC 0,56 🔴 («muy sobredimensionado»). Además, el techo de 4 SPR da Vmp 212 V, por debajo de su MPPT activo de 293 V, así que no arranca. El SG8.0RT arranca desde 160 V.
+2. **8 en serie en la fachada:** la ficha del ASP dice **tensión máxima del sistema 1.000 V**. El Voc en frío es 988 V a 5 °C y 1.002 V a 0 °C. Con 7 en serie: 864 V a 5 °C y 882 V a −2 °C. Ver sección 109.
+3. **Faltan MPPT:** con 2 MPPT, si la fachada ocupa los dos (7 + 7), el techo queda sin MPPT propio. Mezclarlo con la fachada (583 V contra 212 V) pierde casi todo el techo.
+4. **Fusibles:** la ficha del ASP limita el fusible de string a 2,0 A y la corriente inversa a 2,5 A. Con 16 strings en paralelo, a un string en falla le llegan hasta ≈ 15 A de los demás: cada string lleva su fusible de 2 A.
+5. **NOCT:** la ficha del ASP **no trae NOCT**. El 51,1 °C del catálogo Excel es una estimación por fórmula (lo dice su nota). Usa **45 °C**: el calentamiento de la fachada ya entra con k_BIPV 1,3. La diferencia cambia la energía de la fachada en menos de 1 %. Para cerrarlo, pídele el NOCT o NMOT a SolTech.
+6. **Inversor duplicado en el catálogo:** existe un «MID 15KTL3-X» genérico al lado del «Growatt MID15KTL3-X». Si alguien usa el Growatt, debe elegir el que tiene marca.
+
+### Teusaquillo — orden de las páginas
+
+1. **📋 Catálogo de Paneles:** en el ASP-ST1-T40, revisa que «V sistema máx» diga 1.000 V. Si el NOCT dice 51,1, déjalo en 45 y guarda.
+2. **🏠 Proyecto:** tipo «Fachada BIPV», Bogotá, 💾 Guardar configuración.
+3. **☀️ Recurso Solar:** 🌐 Descargar TMY de PVGIS y calcular POA.
+4. **📐 Dimensionamiento (solo la fachada):**
+   - panel ASP-ST1-T40, inversor SG8.0RT;
+   - N total de cadenas 16;
+   - ▶️ Optimizar.
+   - ✅ Sale el aviso 🔒 «el límite del Voc lo pone el módulo», con N = 8 en 🟡 ALERTA y **N óptimo = 7**.
+   - La corriente de esta página es por MPPT. El reparto real (16 strings en el MPPT 1) se arma en Vista 3D.
+5. **🔬 Motor IV y 🔆 Motor Óptico:**
+   - en CdTe la referencia de energía es JRC/Huld;
+   - en Motor Óptico pulsa «↩️ Usar los de la ficha» (NOCT 45 °C, γ −0,214 %/°C) y luego 🚀 Calcular cascada óptica (b₀ = 0,12).
+6. **🔀 Mismatch:** solo si hay sombras reales de vecinos (CSV de la calculadora hermana, solo FS_geometrico).
+7. **🗺️ Vista 3D › 🌞 Diagrama Solar › ⚙️ Superficies BIPV:**
+   - crea Fachada (90°, 180°, **81 m² o más**: 112 × 0,72 = 80,64 m²; con 80,6 la app bloquea) y Techo (10°, 180°, 7 m²);
+   - elige el panel y el montaje térmico de cada una;
+   - ⚡ Calcular POA para todas las superficies (fachada ≈ 808 y techo ≈ 1.675 kWh/m²/año).
+8. **🔌 Inversor y grupos:**
+   - ➕ Agregar inversor INV-1 con la ficha SG8.0RT;
+   - fachada: MPPT 1, N serie 7, N paralelo 16;
+   - techo: MPPT 2, N serie 4, N paralelo 1.
+   - ✅ Inversor en 🟢; en el MPPT 1 un 🟡 de caja combinadora (16,0 A de 18 A), que es correcto.
+9. **🔗 Usar sistema multi-superficie en Financiero.** El modo físico es opcional.
+10. **⚡ Unifilar y 📋 RETIE:** origen «🗺️ Sistema multi-superficie (Vista 3D)»; ninguna fila en 🔴.
+11. **💰 Financiero** (usa la energía de Vista 3D) y **📄 Reporte** (Word o PDF).
+
+### Teusaquillo — valores de referencia
+
+Fachada PR ≈ 0,724 → ≈ 4.129 kWh/año; techo PR ≈ 0,828 → ≈ 1.815 kWh/año; total ≈ 5.944 kWh/año, PR ponderado 0,753 (sección 75). Esos valores son del cálculo con el inversor de 15 kW. Con el SG8.0RT deben salir iguales o un poco mayores. 7 en serie en vez de 8 no cambia la energía: son los mismos 112 módulos.
+
+## 109. 🔒 Tensión máxima del sistema del módulo: el otro límite del Voc (1-oct-2026)
+
+**Qué pasaba:** la app comparaba el Voc en frío del string solo con el **Vdc máximo del inversor**. Pero cada módulo tiene su propia **tensión máxima del sistema** (VSYS, por su aislamiento según IEC 61730). Si el string la supera, se arriesga el aislamiento del módulo, aunque el inversor aguante. En Teusaquillo, el ASP-ST1-T40 (1.000 V) con un inversor de 1.100 V: 8 en serie daban 1.002 V a 0 °C y la app los aprobaba.
+
+**Ahora** el límite es **el menor de los dos**, en todas las páginas:
+- 📐 Dimensionamiento:
+  - columna «1-Voc≤Vdc» y optimizador;
+  - aviso 🔒 «el límite del Voc lo pone el módulo».
+- 📊 Producción: compatibilidad del string.
+- ⚖️ Comparador: filtro, margen y mejor N. El motivo dice «máx. del módulo».
+- 🗺️ Vista 3D: comprobación «Voc en frío ≤ tensión máx. del módulo» y rango de N en serie.
+- 📋 Ficha RETIE: campo «Tensión máxima del sistema del módulo».
+- 📄 Reporte: margen y línea roja del gráfico.
+
+**De dónde sale el dato:**
+- 📋 Catálogo de Paneles: campo «Tensión máxima del sistema (V)» al agregar, y columna «V sistema máx» en la tabla de edición.
+- La lectura de fichas PDF lo toma de «Voltaje máximo del sistema», «Maximum System Voltage» o «Max. System Voltage».
+- Si el Excel no lo tiene, la familia ASP-ST1 usa los 1.000 V de su ficha.
+- **Sin el dato, todo queda como antes**: solo el inversor.
+
+**Cómo explicarlo al usuario:** el inversor y el módulo tienen cada uno un techo de tensión. El string debe quedar por debajo del más bajo, en la mañana más fría del año. Los módulos de silicio suelen tener 1.000 o 1.500 V; los vidrios BIPV, 1.000 V o menos. Revisa siempre ese renglón de la ficha.
+
+## 110. 📋 Ficha RETIE en Word editable, PDF y PNG (1-oct-2026)
+
+**Qué pasaba:** la 📋 Ficha RETIE solo se descargaba en **SVG**. El botón PNG necesitaba CairoSVG, que no está instalado en el servidor, y Word no muestra los SVG. Es el mismo problema que tenía el 📄 Reporte (sección 106).
+
+**Ahora** debajo de la ficha hay cuatro botones:
+- **⬇️ Word editable (.docx):**
+  - hoja 1: la ficha completa en una hoja carta horizontal;
+  - hoja 2: los datos del proyecto y la **tabla de validaciones editable** (estado, validación y detalle).
+- **⬇️ PDF:** lo mismo que el Word, listo para enviar al cliente o al operador de red.
+- **⬇️ PNG:** la ficha en imagen de alta resolución (2.400 px de ancho), para presentaciones.
+- **⬇️ SVG:** el dibujo vectorial original, para editarlo en Inkscape o Illustrator. No lo abras con Word.
+
+La ficha se dibuja en el servidor con el mismo conversor del Reporte, sin programas externos. El contenido es idéntico al de la pantalla: no se recalcula nada.
 
 Calculadora BIPV — Innovación Química
 

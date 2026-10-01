@@ -54,6 +54,19 @@ def _parse_area(dims):
     return round(float(m.group(1)) * float(m.group(2)) / 1e6, 4) if m else None
 
 
+def v_sistema_desde_fila(fila, nombre: str):
+    """Tensión máxima de sistema del módulo (V): columna ``VsistemaMaxV`` del
+    Excel; sin ella, la de ``datos/tecnologias_bipv.py`` para el mismo modelo
+    (Spec 03/tension-maxima-modulo). El Excel del servidor no se reescribe:
+    la columna la crea el primer guardado desde 📋 Catálogo de Paneles."""
+    v = _f(fila.get("VsistemaMaxV")) if fila is not None else None
+    if v and v > 0:
+        return v
+    from datos.tecnologias_bipv import MODULOS_BIPV
+    respaldo = (MODULOS_BIPV.get(str(nombre or "").strip()) or {}).get("V_sistema_max")
+    return float(respaldo) if respaldo else None
+
+
 def excel_mtime() -> float:
     """mtime del Excel de paneles -- mismo patrón #26 que ya usa
     datos/catalogo_inversores_excel.py::excel_mtime_inv(). Agregado
@@ -96,6 +109,7 @@ def cargar_catalogo_paneles() -> dict:
             "area_m2":           _parse_area(r.get("DimensionesMM")),
             "costo_usd":         costo if (costo and costo > 0) else None,
             "NOCT":              _f(r.get("NOCT_C")),
+            "V_sistema_max":     v_sistema_desde_fila(r, nombre),
             "beta_mp":           _f(r.get("CoefT_C")),
             "CoefVoc_C":         _f(r.get("CoefVoc_C")),
             "transparencia_pct": _f(r.get("TransparenciaPct"), 0),

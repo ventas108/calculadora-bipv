@@ -275,6 +275,15 @@ def _pestana_agregar_desde_pdf() -> None:
         Isc  = d3.number_input("Isc (A) *",  value=float(data.get("Isc")  or 0), min_value=0.0, step=0.01, format="%.3f")
         Vmp  = d4.number_input("Vmp (V) *",  value=float(data.get("Vmp")  or 0), min_value=0.0, step=0.1, format="%.2f")
         Imp  = d5.number_input("Imp (A) *",  value=float(data.get("Imp")  or 0), min_value=0.0, step=0.01, format="%.3f")
+        # Spec 03/tension-maxima-modulo: el Voc en frío del string no puede
+        # superar este valor aunque el inversor aguante más.
+        v_sistema = st.number_input(
+            "Tensión máxima del sistema (V)", value=float(data.get("V_sistema") or 0),
+            min_value=0.0, step=50.0, format="%.0f",
+            help="De la ficha: «Voltaje máximo del sistema», «Maximum System Voltage» o VSYS "
+                 "(1.000 V o 1.500 V en la mayoría de módulos). El Voc en frío de cada string se "
+                 "compara con el menor entre este valor y el Vdc máximo del inversor. 0 = sin dato.",
+        )
 
         st.divider()
         st.markdown("**🌡️ Coeficientes de temperatura** (%/°C, típicamente negativos para Voc y Pmax)")
@@ -347,6 +356,7 @@ def _pestana_agregar_desde_pdf() -> None:
             "CoefIsc_C":          coef_isc  if coef_isc  != 0 else None,
             "CoefT_C":            coef_pmax if coef_pmax != 0 else None,
             "NOCT_C":             noct if noct > 0 else None,
+            "VsistemaMaxV":       v_sistema if v_sistema > 0 else None,
             "Ns (Celdas Serie)":  n_s  if n_s  > 0 else None,
             "DimensionesMM":      dims.strip() or None,
             "TransparenciaPct":   transp if transp > 0 else None,
@@ -465,6 +475,7 @@ with tab_editar:
             "β Voc (%/°C)":       p.get("CoefVoc_C"),
             "γ Pmax (%/°C)":      p.get("beta_mp"),
             "NOCT (°C)":          p.get("NOCT"),
+            "V sistema máx (V)":  p.get("V_sistema_max"),
             "Transparencia (%)":  p.get("transparencia_pct"),
             "Costo USD":          p.get("costo_usd"),
         })
@@ -493,6 +504,9 @@ with tab_editar:
             "β Voc (%/°C)":      st.column_config.NumberColumn("β Voc",         format="%.4f"),
             "γ Pmax (%/°C)":     st.column_config.NumberColumn("γ Pmax",        format="%.4f"),
             "NOCT (°C)":         st.column_config.NumberColumn("NOCT",           format="%.1f", min_value=0),
+            "V sistema máx (V)": st.column_config.NumberColumn(
+                "V sistema máx", format="%.0f", min_value=0,
+                help="Tensión máxima del sistema del módulo (ficha). Límite del Voc en frío del string."),
             "Transparencia (%)": st.column_config.NumberColumn("Transparencia %",format="%.1f", min_value=0, max_value=100),
             "Costo USD":         st.column_config.NumberColumn("Costo USD",      format="%.2f", min_value=0),
         },
@@ -533,6 +547,7 @@ with tab_editar:
                 "CoefVoc_C":         row_ed["β Voc (%/°C)"],
                 "CoefT_C":           row_ed["γ Pmax (%/°C)"],
                 "NOCT_C":            row_ed["NOCT (°C)"],
+                "VsistemaMaxV":      row_ed["V sistema máx (V)"],
                 "TransparenciaPct":  row_ed["Transparencia (%)"],
                 "CostoUSD":          row_ed["Costo USD"],
             }
