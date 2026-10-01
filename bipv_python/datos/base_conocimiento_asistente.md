@@ -5836,6 +5836,21 @@ Fachada PR ≈ 0,724 → ≈ 4.129 kWh/año; techo PR ≈ 0,828 → ≈ 1.815 kW
 
 La ficha se dibuja en el servidor con el mismo conversor del Reporte, sin programas externos. El contenido es idéntico al de la pantalla: no se recalcula nada.
 
+## 111. 📋 Coeficiente de temperatura de Isc (α) en el catálogo de paneles (1-oct-2026)
+
+**Qué pasaba:** 🔬 Motor IV avisaba «Coef. Temp. Isc (α) no definido — se usará default por tecnología» para los paneles del catálogo. El Excel real del catálogo nunca tuvo esa columna: solo trae β Voc y γ Pmax. «Agregar desde PDF» sí guardaba α, pero la app no lo leía.
+
+**Ahora:**
+- La tabla de 📋 Catálogo de Paneles › Editar tiene la columna **«α Isc (%/°C)»**.
+- Escribe el valor de la ficha del fabricante: es **positivo y pequeño**, por ejemplo +0,045 %/°C en silicio o +0,06 %/°C en el ASP-ST1 de CdTe. Luego pulsa «💾 Guardar cambios editados».
+- La columna se crea en el Excel con el primer guardado.
+- Motor IV y la simulación IV lo usan y el aviso desaparece.
+- Si la celda está vacía, la app usa el valor de su ficha interna (familia ASP-ST1) o un valor típico por tecnología, como antes.
+
+**Cuánto importa:** poco. α hace que la corriente suba un poco con la temperatura; cambia la energía en menos de 0,1 %. Es un dato para completar la ficha, no una corrección de energía.
+
+**Ojo:** el aviso «Parámetros SDM estimados — no calibrados» es otra cosa. Sigue saliendo mientras el fabricante no publique los parámetros del modelo de un diodo (I_L, I_o, Rs, Rsh, a_ref). No hay que pulsar «Validar y usar SDM real» con los campos en 0: ese botón es solo para parámetros reales medidos o publicados.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

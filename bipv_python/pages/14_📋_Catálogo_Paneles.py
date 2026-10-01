@@ -473,6 +473,7 @@ with tab_editar:
             "Imp (A)":       p.get("Imp"),
             "Ns":            p.get("N_s"),
             "β Voc (%/°C)":       p.get("CoefVoc_C"),
+            "α Isc (%/°C)":       p.get("CoefIsc_C"),
             "γ Pmax (%/°C)":      p.get("beta_mp"),
             "NOCT (°C)":          p.get("NOCT"),
             "V sistema máx (V)":  p.get("V_sistema_max"),
@@ -502,6 +503,9 @@ with tab_editar:
             "Imp (A)":       st.column_config.NumberColumn("Imp (A)",  format="%.3f", min_value=0),
             "Ns":            st.column_config.NumberColumn("Ns",       format="%d",   min_value=0, step=1),
             "β Voc (%/°C)":      st.column_config.NumberColumn("β Voc",         format="%.4f"),
+            "α Isc (%/°C)":      st.column_config.NumberColumn(
+                "α Isc", format="%.4f",
+                help="Coeficiente de temperatura de Isc de la ficha (%/°C, positivo; ej. +0,045)."),
             "γ Pmax (%/°C)":     st.column_config.NumberColumn("γ Pmax",        format="%.4f"),
             "NOCT (°C)":         st.column_config.NumberColumn("NOCT",           format="%.1f", min_value=0),
             "V sistema máx (V)": st.column_config.NumberColumn(
@@ -545,6 +549,7 @@ with tab_editar:
                 "Imp_STC":           row_ed["Imp (A)"],
                 "Ns (Celdas Serie)": row_ed["Ns"],
                 "CoefVoc_C":         row_ed["β Voc (%/°C)"],
+                "CoefIsc_C":         row_ed["α Isc (%/°C)"],
                 "CoefT_C":           row_ed["γ Pmax (%/°C)"],
                 "NOCT_C":            row_ed["NOCT (°C)"],
                 "VsistemaMaxV":      row_ed["V sistema máx (V)"],
