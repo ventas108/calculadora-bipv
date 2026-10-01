@@ -57,7 +57,21 @@ XTP_50_17B = {
     "NOCT": 45.0,
 }
 
-_PANELES_PRUEBA = {"CdTe (ASP_ST1_T40)": ASP_ST1_T40, "Poli-Si (XTP_50_17B)": XTP_50_17B}
+# MiaSolé FLEX-03 90N (CIGS flexible BIPV) -- ficha real (1-oct-2026), sin
+# número de celdas ni dato de 200 W/m². SDM estimado con las constantes de
+# CIGS, N_s estimado y ajuste de baja luz por defecto (Spec
+# 04/sdm-capa-fina-bipv): los 5 motores deben dar lo mismo también con él.
+from calculos.modelo_iv import estimar_sdm_desde_ficha  # noqa: E402
+
+_MIASOLE_FICHA = {
+    "nombre": "MiaSolé FLEX-03 90N", "tecnologia": "CIS",
+    "Voc_stc": 26.3, "Isc_stc": 4.41, "Vmp_stc": 21.8, "Imp_stc": 4.14, "Pmax_stc": 90.0,
+    "Tk_beta": -0.28, "Tk_gamma": -0.38, "Tk_alfa": 0.008, "NOCT": 48.0,
+}
+MIASOLE_90N = {**_MIASOLE_FICHA, **estimar_sdm_desde_ficha(_MIASOLE_FICHA)}
+
+_PANELES_PRUEBA = {"CdTe (ASP_ST1_T40)": ASP_ST1_T40, "Poli-Si (XTP_50_17B)": XTP_50_17B,
+                   "CIGS (MiaSolé 90N, estimado)": MIASOLE_90N}
 
 
 @pytest.mark.parametrize("nombre_panel,panel", _PANELES_PRUEBA.items())

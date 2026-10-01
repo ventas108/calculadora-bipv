@@ -23,5 +23,6 @@
 - `bipv_python/pages/14_📋_Catálogo_Paneles.py`
 - `bipv_python/pages/3_🔬_Motor_IV.py`
 - `bipv_python/tests/test_sdm_capa_fina_bipv.py`
+- `bipv_python/tests/test_consistencia_sdm_entre_modulos.py`
 - `bipv_python/datos/base_conocimiento_asistente.md`
 - `CodeSpecs/00-director/registro-de-decisiones.md`
