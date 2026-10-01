@@ -5582,14 +5582,13 @@ Con los datos equivocados la app daba 🟢 a 28 módulos en serie, cuando su Voc
   - 🔴 el MPPT supera la tensión máxima, o el mínimo del MPPT no es menor que su máximo;
   - 🟠 la corriente de cortocircuito es menor que la de operación;
   - 🟠 un inversor **LV** (salida 230/400 V) figura con más de 1.100 V DC.
-- El reporte agrega la fila «**Margen frente a la tensión DC máxima del inversor**»: 🟢 3 % o más, 🟠 menos de 3 %, 🔴 negativo.
+- El reporte agrega la fila «**Margen frente a la tensión DC máxima del inversor**»: 🟢 7,5 % o más (el margen del optimizador de 📐 Dimensionamiento), 🟠 menos de 7,5 %, 🔴 negativo.
 - El reporte repite la alerta de la ficha si la hay.
 
 **Qué hacer en Urabá:**
 1. Corrige la ficha en 🔌 Catálogo Inversores con los datos de la ficha oficial: 1.100 V, arranque 195 V, MPPT 180 a 1.000 V, mínimo activo 600 V, 32 A, 40 A, 100 kW.
-2. En 📐 Dimensionamiento usa **22 módulos en serie**: 14 strings × 22 = los mismos 308 módulos, reparto 7 + 7, 1 string por MPPT.
-   - Voc en frío ≈ 1.089 V, con 🟠 margen de 11 V.
-   - Si quieres más margen: 21 en serie × 15 strings (315 módulos, una fila más).
+2. En 📐 Dimensionamiento usa **20 módulos en serie** (el «N óptimo» del optimizador), 1 string por MPPT. Ver la sección 105.
+   - 22 en serie cumple la ficha (Voc en frío ≈ 1.089 V), pero con solo 11 V de margen queda en 🟡 ALERTA.
 3. Recalcula 🔀 Mismatch, 📊 Producción, 🌾 Granja FV, ⚡ Diagrama Unifilar y 📋 Ficha RETIE, y genera de nuevo el reporte.
 
 ## 104. ⚖️ Comparador de Inversores completo: mejor N por inversor, precios y adopción (1-oct-2026)
@@ -5609,8 +5608,8 @@ Revisión del comparador con la Granja Apartadó (Urabá). Se encontraron seis p
   - 🔴 una ficha contradictoria descarta el inversor;
   - 🟠 queda como aviso.
 - Sección nueva «🎯 **Mejor configuración para cada inversor**». Para los módulos del proyecto, cada inversor recibe su propio N en serie:
-  - primero, el que reparte exacto los módulos;
-  - luego, el que deja un margen de Voc de 3 % o más;
+  - primero, el que deja un margen de Voc de 7,5 % o más (el mismo de 📐 Dimensionamiento; sección 105);
+  - luego, el que reparte exacto los módulos;
   - luego, el string más largo.
 
   Las unidades son las que piden las entradas o, si son más, las que dejan la relación DC/AC en 1,3 o menos. Se muestran el rango de N posibles, los strings, los sobrantes, el modo (normal o 1 string por MPPT), las unidades, el reparto, la relación DC/AC, el Voc en frío y su margen 🟢/🟠.
@@ -5627,10 +5626,32 @@ Revisión del comparador con la Granja Apartadó (Urabá). Se encontraron seis p
 6. Revisa 📐 Dimensionamiento y vuelve a simular 📊 Producción.
 
 **Caso Urabá** (308 × JAM66D46-720/LB, Growatt MAX 100KTL3 LV con su ficha oficial):
-- el comparador propone **22 en serie**, 14 strings, 2 inversores, reparto 7 + 7, **1 string por MPPT**;
-- DC/AC 1,11 y margen de Voc 🟠 1 % (11 V).
+- el comparador propone **20 en serie**, 15 strings, 2 inversores, reparto 8 + 7, **1 string por MPPT**, DC/AC 1,08 y margen de Voc 🟢 10 %;
+- 22 en serie (7 + 7, los 308 módulos exactos) solo deja 11 V de margen (🟠), por eso ya no es la recomendada.
 
 Un inversor de 1.500 V, en cambio, quedaría con 28 en serie, 11 strings y 6 + 5.
+
+## 105. ⚖️ Comparador y 📐 Dimensionamiento con el mismo margen de Voc (1-oct-2026)
+
+**Qué pasaba:** con el Growatt MAX 100KTL3 LV corregido a su ficha (1.100 V), el optimizador de 📐 Dimensionamiento daba **N óptimo = 20**, pero el ⚖️ Comparador proponía **22 en serie**.
+- El optimizador exige un margen del **7,5 %** entre el Voc en frío y la tensión máxima del inversor. Es el criterio de la hoja Excel original.
+- 21 en serie (1.040 V) y 22 en serie (**1.089 V**, 11 V de margen) cumplen la ficha, pero quedan en 🟡 ALERTA.
+- El comparador usaba un margen del 3 % y ponía primero el reparto exacto de los módulos.
+
+**Ahora** el comparador y el reporte usan el mismo **7,5 %**, y el orden de preferencia es:
+1. margen de seguridad;
+2. reparto exacto;
+3. string más largo.
+
+Los dos módulos recomiendan lo mismo.
+
+**Urabá** (308 × JAM66D46-720/LB):
+- **20 en serie** (Voc 990 V, 110 V de margen 🟢); 308 no se divide exacto entre 20;
+- opción A: 15 strings = 300 módulos, 216 kWp, reparto **8 + 7**, DC/AC 1,08 (sobran 8 módulos);
+- opción B: 16 strings = 320 módulos, 230,4 kWp, 8 + 8, DC/AC 1,15 (una fila 14 en 🌾 Granja FV);
+- 1 string por MPPT en los dos casos.
+
+En 📐 Dimensionamiento escribe N total de cadenas 15 o 16 y deja 1 string por tracker. Con «✅ Adoptar» del comparador queda la opción A sola.
 
 Calculadora BIPV — Innovación Química
 

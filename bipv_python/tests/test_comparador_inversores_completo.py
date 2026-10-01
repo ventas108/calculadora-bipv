@@ -64,9 +64,11 @@ def test_ficha_contradictoria_y_margen_de_voc():
 def test_mejor_n_para_cada_inversor():
     df = mejor_n_por_inversor(JAM, {"G": GROWATT, "X": X1500}, 308, **T, T_extremo=63.6)
     g, x = _fila(df, "G"), _fila(df, "X")
-    assert (g["N_serie"], g["strings"], g["sobrantes"], g["unidades"]) == (22, 14, 0, 2)
-    assert g["reparto"] == [7, 7] and g["strings_por_tracker"] == 1 and g["nivel_voc"] == "🟠"
-    assert g["dc_ac"] == 1.11
+    # Spec 03/comparador-margen-voc: primero el margen de 7,5 % de 📐 Dimensionamiento
+    # (22 y 21 quedan en ALERTA), luego el reparto exacto: 20 × 15 = 300 de 308
+    assert (g["N_serie"], g["strings"], g["sobrantes"], g["unidades"]) == (20, 15, 8, 2)
+    assert g["reparto"] == [8, 7] and g["strings_por_tracker"] == 1 and g["nivel_voc"] == "🟢"
+    assert g["dc_ac"] == 1.08
     # 1.500 V: strings de 28 y 2 unidades por la relación DC/AC (las entradas pedirían 1)
     assert (x["N_serie"], x["strings"], x["unidades"], x["unidades_por_entradas"]) == (28, 11, 2, 1)
     assert x["reparto"] == [6, 5] and x["nivel_voc"] == "🟢"
@@ -86,10 +88,10 @@ def test_sin_precio_no_hay_tir_ni_lcoe():
     g, x = (cmp[cmp["Modelo"] == m].iloc[0] for m in ("G", "X"))
     assert g["Precio"] == "cotización" and g["LCOE (USD/kWh)"] > 0 and g["CAPEX (USD)"] == 158_600
     assert x["Precio"] == "sin precio" and pd.isna(x["LCOE (USD/kWh)"]) and pd.isna(x["TIR (%)"])
-    # 310 no se reparte exacto con ningún N: gana el margen de Voc (21 en serie, 14
-    # strings = 294 módulos) y la energía se escala por los módulos usados
-    assert (g["N en serie"], g["Módulos"]) == (21, 294)
-    assert abs(g["E_ac (kWh/año)"] - pac.sum() / 1000 * 294 / 310) < 1.0
+    # 310 con margen de 7,5 %: 20 en serie, 15 strings = 300 módulos; la energía
+    # se escala por los módulos usados
+    assert (g["N en serie"], g["Módulos"]) == (20, 300)
+    assert abs(g["E_ac (kWh/año)"] - pac.sum() / 1000 * 300 / 310) < 1.0
     assert cmp.iloc[0]["Modelo"] == "G"
 
 
@@ -99,7 +101,7 @@ def test_adoptar_deja_dimensionamiento_igual():
     e = {"N_total_cadenas_proyecto": 11, "N_str_tr": 2, "N_str_tr_usado": 2,
          "N_str_tr_fuente_ref": ("total", "G", 11, 10), "reparto_strings_inversores": [6, 5]}
     e.update(estado_adopcion(fila, GROWATT, "JAM66D46-720/LB"))
-    assert e["N_serie"] == 22 and e["N_str_tr_usado"] == 1 and e["reparto_strings_inversores"] == [7, 7]
+    assert e["N_serie"] == 20 and e["N_str_tr_usado"] == 1 and e["reparto_strings_inversores"] == [8, 7]
     assert e["N_inversores_proyecto"] == 2 and e["N_inversores_proyecto_ref"] == "G"
     # 📐 Dimensionamiento resuelve los strings por MPPT con el total adoptado y respeta 1
     r = resolver_n_strings_tracker(GROWATT, "G", e, N_total_cadenas=e["N_total_cadenas_proyecto"])
@@ -137,3 +139,39 @@ def test_manual_del_asistente_lo_explica():
                   "Adoptar", "22"):
         assert texto in seccion, texto
     assert "PVsyst" not in seccion
+
+
+# ── Spec 03/comparador-margen-voc: el comparador y 📐 Dimensionamiento coinciden ──
+def test_mismo_n_que_el_optimizador_de_dimensionamiento():
+    from calculos.dimensionamiento import UMBRAL_ALERTA_PCT, optimizar_n_serie
+    from calculos.comparador_inversores import MARGEN_VOC_MIN_PCT
+    assert MARGEN_VOC_MIN_PCT == UMBRAL_ALERTA_PCT == 7.5
+    inv = {**GROWATT, "N_mppt": 10}
+    filas = optimizar_n_serie(JAM, inv, 20.9, 54.2, 63.6, N_strings_tracker=1, N_min=15, N_max=22)
+    optimo = max(r.N_serie for r in filas if r.riesgos == 0)            # el «N óptimo» de la página
+    mejor = _fila(mejor_n_por_inversor(JAM, {"G": GROWATT}, 308, **T, T_extremo=63.6), "G")
+    assert optimo == mejor["N_serie"] == 20
+
+
+def test_reparto_exacto_solo_entre_los_que_tienen_margen():
+    # 300 módulos: 20 en serie reparte exacto y tiene margen → 20 (15 strings, sin sobrantes)
+    g = _fila(mejor_n_por_inversor(JAM, {"G": GROWATT}, 300, **T, T_extremo=63.6), "G")
+    assert (g["N_serie"], g["strings"], g["sobrantes"]) == (20, 15, 0)
+    # 1.500 V: 28 en serie tiene 7,6 % de margen y reparte exacto 308 → se mantiene
+    x = _fila(mejor_n_por_inversor(JAM, {"X": X1500}, 308, **T, T_extremo=63.6), "X")
+    assert x["N_serie"] == 28
+
+
+def test_margen_voc_del_reporte_usa_el_mismo_umbral():
+    from calculos.dimensionamiento import UMBRAL_ALERTA_PCT
+    from calculos.ficha_inversor import MARGEN_ALERTA_PCT, margen_voc
+    assert MARGEN_ALERTA_PCT == UMBRAL_ALERTA_PCT
+    assert margen_voc(1039.5, GROWATT)["nivel"] == "🟠"                # 21 en serie: 5,5 %
+    assert margen_voc(990.0, GROWATT)["nivel"] == "🟢"                 # 20 en serie: 10 %
+
+
+def test_manual_explica_el_margen():
+    kb = (RAIZ / "datos" / "base_conocimiento_asistente.md").read_text(encoding="utf-8")
+    seccion = kb[kb.index("## 105."):]
+    for texto in ("7,5 %", "20 en serie", "8 + 7", "1.089 V", "Dimensionamiento"):
+        assert texto in seccion, texto
