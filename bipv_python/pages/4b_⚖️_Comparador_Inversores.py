@@ -363,7 +363,7 @@ st.subheader("🎯 Mejor configuración para cada inversor")
 _n_mod_proy = int(st.session_state.get("N_paneles_final") or n_paneles or 0)
 st.caption(
     f"Para los **{_n_mod_proy} módulos** del proyecto, cada inversor recibe su propio N en serie: el que "
-    "reparte exacto los módulos, con margen de Voc de 3 % o más y el string más largo. Así un inversor de "
+    "deja un margen de Voc de 7,5 % o más (el mismo de 📐 Dimensionamiento), reparte exacto los módulos y tiene el string más largo. Así un inversor de "
     "1.500 V no queda juzgado con strings pensados para uno de 1.100 V."
 )
 if _n_mod_proy <= 0:

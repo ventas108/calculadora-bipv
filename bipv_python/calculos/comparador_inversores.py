@@ -639,7 +639,10 @@ def verificar_compatibilidad_ac(
 # inversor de 1.500 V quedaba juzgado con strings pensados para uno de 1.100 V
 # (o al revés). Aquí cada inversor recibe su mejor N: el que reparte exacto los
 # módulos del proyecto, con margen de Voc y el string más largo.
-MARGEN_VOC_MIN_PCT = 3.0       # el mismo 🟠 de ficha_inversor.margen_voc
+# El mismo margen del optimizador de 📐 Dimensionamiento (Spec
+# 03/comparador-margen-voc): con 3 % el comparador proponía 22 en serie para
+# el Growatt de Urabá (Voc 1.089 V, 11 V de margen) y Dimensionamiento 20.
+from calculos.dimensionamiento import UMBRAL_ALERTA_PCT as MARGEN_VOC_MIN_PCT  # noqa: E402
 
 
 def _reparto_parejo(strings: int, unidades: int) -> list[int]:
@@ -662,9 +665,9 @@ def mejor_n_por_inversor(
 ) -> pd.DataFrame:
     """Para cada inversor, el mejor N en serie para los ``n_modulos`` del proyecto.
 
-    Orden de preferencia entre los N compatibles: (1) reparte exacto los
-    módulos (sin sobrantes), (2) margen de Voc ≥ 3 % de la tensión máxima,
-    (3) string más largo (menos strings, cable y entradas). Unidades: las
+    Orden de preferencia entre los N compatibles: (1) margen de Voc ≥ 7,5 %
+    de la tensión máxima (el de 📐 Dimensionamiento), (2) reparte exacto los
+    módulos (sin sobrantes), (3) string más largo (menos strings, cable y entradas). Unidades: las
     que pidan las entradas (⌈strings ÷ strings que admite el equipo⌉) o, si
     son más, las que dejan la relación DC/AC en 1,3 o menos (sin pasar de un
     string por equipo); strings repartidos parejo.
@@ -696,7 +699,7 @@ def mejor_n_por_inversor(
 
         def _clave(c):
             n, f = c
-            return (n_modulos % n == 0, (f["margen_voc_pct"] or 0) >= MARGEN_VOC_MIN_PCT, n)
+            return ((f["margen_voc_pct"] or 0) >= MARGEN_VOC_MIN_PCT, n_modulos % n == 0, n)
 
         n, f = max(candidatos, key=_clave)
         strings = n_modulos // n

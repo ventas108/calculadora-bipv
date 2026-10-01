@@ -16,6 +16,9 @@ from typing import Any
 
 # Inversores «LV» de string (salida 230/400 V): 1.100 V DC como máximo.
 VDC_MAX_LV = 1100.0
+# Margen del Voc en frío: el mismo 7,5 % del optimizador de 📐 Dimensionamiento
+# (UMBRAL_ALERTA_PCT); se repite aquí para no importar ese módulo.
+MARGEN_ALERTA_PCT = 7.5
 _PATRON_LV = re.compile(r"(?<![A-Za-z])LV(?![A-Za-z])")
 
 
@@ -67,4 +70,4 @@ def margen_voc(voc_frio: Any, inv: Mapping[str, Any] | None) -> dict | None:
         return None
     margen = vdc - voc
     return {"voc_v": voc, "vdc_max_v": vdc, "margen_v": margen, "margen_pct": 100.0 * margen / vdc,
-            "nivel": "🔴" if margen < 0 else ("🟠" if margen < 0.03 * vdc else "🟢")}
+            "nivel": "🔴" if margen < 0 else ("🟠" if 100.0 * margen / vdc < MARGEN_ALERTA_PCT else "🟢")}
