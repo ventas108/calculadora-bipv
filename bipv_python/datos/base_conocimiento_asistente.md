@@ -5851,6 +5851,34 @@ La ficha se dibuja en el servidor con el mismo conversor del Reporte, sin progra
 
 **Ojo:** el aviso «Parámetros SDM estimados — no calibrados» es otra cosa. Sigue saliendo mientras el fabricante no publique los parámetros del modelo de un diodo (I_L, I_o, Rs, Rsh, a_ref). No hay que pulsar «Validar y usar SDM real» con los campos en 0: ese botón es solo para parámetros reales medidos o publicados.
 
+## 112. 🔬 Paneles BIPV de capa fina (CIGS) sin parámetros de laboratorio (1-oct-2026)
+
+**La pregunta del usuario:** «faltan I_L, I_o, Rs, Rsh y a_ref… muchas fichas no los traen; ¿cómo lo resolvemos para Vista 3D con paneles BIPV?».
+
+**Respuesta corta:** no hace falta conseguirlos. La app estima el modelo IV desde la ficha y lo comprueba contra ella (≤ 6 %). Lo que faltaba era tratar bien la capa fina, y ya está resuelto.
+
+**Qué pasaba** (caso real: MiaSolé FLEX-03N 90 W, CIGS flexible):
+- El catálogo escribe la tecnología como «CIS», pero el modelo no la reconocía y trataba el panel **como silicio**.
+- La ficha no trae el número de celdas, y sin ese dato el modelo no se podía estimar.
+- Con la poca luz de fachadas y días nublados, la capa fina se comporta distinto al silicio, y eso no se tenía en cuenta.
+
+**Ahora:**
+1. **Tecnología:**
+   - «CIS», «CIGS» y «Copper Indium» usan las constantes de CIGS.
+   - HJT, TOPCon y PERC usan las de silicio.
+   - «a-Si», «Thin Film», «Otro» o vacío se tratan como silicio **marcado como supuesto**, y 🔬 Motor IV lo avisa. Corrige la tecnología en 📋 Catálogo de Paneles.
+2. **Celdas en serie:** si la ficha no las trae, se estiman con Voc ÷ el Voc típico por celda. En el MiaSolé salen 40 (26,3 V). Motor IV avisa que son estimadas.
+3. **Poca luz (200 W/m²):** es lo que más pesa en BIPV.
+   - Si la ficha trae la eficiencia relativa a 200 W/m² (p. ej. «−3 %» o «97 %»), escríbela en la columna **«η rel. 200 W/m² (%)»** de 📋 Catálogo de Paneles › Editar. El modelo se ajusta para reproducirla y sigue reproduciendo la potencia de la ficha.
+   - Si la ficha no la trae y el panel es CIGS, se usa el valor por defecto de la referencia estándar internacional: **97 %**. Con los valores típicos de CIGS sin ajustar salía 91,6 %, demasiado pesimista.
+4. **🔬 Motor IV** muestra el «Origen del modelo»: tecnología usada, celdas estimadas y de dónde salió el ajuste de baja luz.
+
+**Dónde se nota:** en 🔬 Motor IV, 📊 Producción con curva IV, y en el **modo físico de 🗺️ Vista 3D** (curva IV con diodos bypass y curva IV combinada por MPPT). El modo simplificado de Vista 3D no usa el modelo IV.
+
+**Silicio y el ASP-ST1 no cambian:** el silicio sigue igual, y el ASP-ST1 usa sus parámetros de laboratorio.
+
+**Cómo explicarlo al usuario:** los parámetros internos del modelo no vienen en las fichas. La app los deduce de lo que sí traen (Voc, Isc, Vmp, Imp, coeficientes) y del dato de 200 W/m² si existe. Para capa fina conviene buscar ese dato en la ficha y escribirlo. Los parámetros de laboratorio solo se necesitan para una certificación de energía.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

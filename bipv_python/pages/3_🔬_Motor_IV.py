@@ -95,6 +95,27 @@ if _panel_ss and _panel_nom_ss:
                     f"(catálogo Excel). Parámetros SDM estimados por **{_metodo_est}** "
                     f"desde ficha técnica. Resultados orientativos.{_adv_lines}"
                 )
+                # ── Spec 04/sdm-capa-fina-bipv: de dónde sale cada parámetro ──
+                _origen_lineas = [f"Tecnología usada por el modelo: **{_sdm_est.get('tecnologia', '?')}**."]
+                if _sdm_est.get("_tecnologia_supuesta"):
+                    _origen_lineas.append(
+                        "⚠️ La ficha no dice una tecnología con modelo propio (vacía, «Thin Film», «Otro» "
+                        "o a-Si): se asume silicio. Corrige la tecnología en 📋 Catálogo de Paneles si es "
+                        "capa fina (CdTe o CIS/CIGS).")
+                if _sdm_est.get("_ns_estimado"):
+                    _origen_lineas.append(
+                        f"Celdas en serie **estimadas: {_sdm_est.get('N_s')}** (Voc ÷ Voc típico por celda); "
+                        "la ficha no las trae. Si las conoces, escríbelas en «Ns» del catálogo.")
+                if _sdm_est.get("_ajuste_200") == "ficha":
+                    _origen_lineas.append(
+                        f"Baja luz ajustada con el dato de la ficha: **{_sdm_est.get('_rel_200_modelo')} %** "
+                        "de la eficiencia a 200 W/m² frente a 1.000 W/m².")
+                elif _sdm_est.get("_ajuste_200") == "defecto":
+                    _origen_lineas.append(
+                        f"Baja luz con el valor por defecto de la referencia estándar internacional "
+                        f"(**{_sdm_est.get('_rel_200_modelo')} %** a 200 W/m²): la ficha no trae el dato. "
+                        "Si lo trae, escríbelo en «η rel. 200 W/m² (%)» del catálogo.")
+                st.info("🔎 **Origen del modelo:**  \n" + "  \n".join(f"- {l}" for l in _origen_lineas))
                 # ── #67 — Aviso si N_s fue corregido por half-cut ────────────
                 if _sdm_est.get("_ns_corregido"):
                     _hci = _sdm_est.get("_ns_halfcut_info", {})

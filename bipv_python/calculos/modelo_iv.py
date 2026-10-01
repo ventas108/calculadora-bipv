@@ -745,6 +745,43 @@ def _valor_entero_positivo(valor, alternativo=None):
     return 0
 
 
+# Spec 04-produccion-energia/sdm-capa-fina-bipv: tecnología del catálogo →
+# constantes del estimador. «CIS»/«CIGS» antes caían a Mono-Si (las
+# constantes de CIGS existían pero no se usaban). Sin constantes propias
+# (a-Si, «Thin Film», «Otro», vacío) → Mono-Si marcado como SUPUESTO.
+_TECNOLOGIAS_SDM = (
+    (("cigs", "cis", "copper indium", "cuinga", "cu(in,ga)"), "CIGS"),
+    (("cdte", "cd te", "cadmium telluride", "telururo"), "CdTe"),
+    (("poli", "poly", "multi"), "Poli-Si"),
+    (("mono", "hjt", "heterojun", "topcon", "perc", "ibc", "n-type", "p-type"), "Mono-Si"),
+)
+
+
+def normalizar_tecnologia(texto) -> tuple[str, bool]:
+    """``(tecnología con constantes del estimador, supuesta)``.
+
+    ``supuesta`` es True cuando la ficha no permite saberla (vacía, «Thin
+    Film», «Otro», a-Si sin constantes): se usa Mono-Si y se avisa."""
+    t = str(texto or "").strip().lower()
+    if not t:
+        return "Mono-Si", True
+    if t in ("a-si", "asi", "amorfo", "amorphous", "a-si:h") or "amorph" in t or "amorf" in t:
+        return "Mono-Si", True
+    for claves, tec in _TECNOLOGIAS_SDM:
+        if any(c in t for c in claves):
+            return tec, False
+    return "Mono-Si", True
+
+
+# Rendimiento relativo a 200 W/m² que usa la referencia estándar
+# internacional cuando la ficha no trae el dato (−3 %).
+REL_200_DEFECTO_PCT = 97.0
+
+_N_TIPICO = {"CdTe": 1.09, "Mono-Si": 1.05, "Poli-Si": 1.10, "CIGS": 1.35}
+_BETA_VOC_TIPICO = {"CdTe": -0.30, "Mono-Si": -0.37, "Poli-Si": -0.40, "CIGS": -0.30}
+_ALFA_ISC_TIPICO = {"CdTe": 0.02, "Mono-Si": 0.05, "Poli-Si": 0.05, "CIGS": 0.01}
+
+
 def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
     """
     Estima parámetros SDM (De Soto 2006) a partir de datos básicos de ficha técnica.
@@ -766,22 +803,26 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
 
     if not all([Voc > 0, Isc > 0, Vmp > 0, Imp > 0]):
         return None
-    if N_s <= 0 and NsA <= 0:
-        return None
 
-    # ── Normalizar tecnología ──────────────────────────────────────────────────
-    tec_raw = str(panel.get("tecnologia", "")).strip().lower()
-    _MAP = {
-        "mono-si": "Mono-Si", "mono si": "Mono-Si", "monocrystalline": "Mono-Si",
-        "monocristalino": "Mono-Si", "mono": "Mono-Si",
-        "poli-si": "Poli-Si", "poly-si": "Poli-Si", "poly": "Poli-Si",
-        "policristalino": "Poli-Si", "polycrystalline": "Poli-Si",
-        "multicrystalline": "Poli-Si",
-        "cdte": "CdTe", "cd te": "CdTe", "cadmium telluride": "CdTe",
-    }
-    tec_norm = _MAP.get(tec_raw, "Mono-Si")
+    # ── Normalizar tecnología (Spec 04/sdm-capa-fina-bipv) ─────────────────────
+    tec_norm, _tec_supuesta = normalizar_tecnologia(panel.get("tecnologia"))
     if tec_norm not in CONSTANTES_TECNOLOGIA:
-        tec_norm = "Mono-Si"
+        tec_norm, _tec_supuesta = "Mono-Si", True
+
+    # ── Número de celdas ─────────────────────────────────────────────────────
+    # Un N_s/NsA explícito inválido («0», texto) sigue invalidando la
+    # estimación. Si la ficha no lo trae (habitual en capa fina), se estima
+    # con Voc ÷ Voc por celda típica de la tecnología (punto medio del rango
+    # de verificar_ns_halfcut) y se marca como estimado.
+    _ns_estimado = False
+    if N_s <= 0 and NsA <= 0:
+        _dados = [panel.get(k) for k in ("N_s", "NsA")]
+        if any(v not in (None, "") and not (isinstance(v, float) and v != v) for v in _dados):
+            return None
+        _r_min, _r_max = _VOC_POR_CELDA_RANGO.get(tec_norm, _VOC_POR_CELDA_DEFAULT)
+        N_s = max(int(round(Voc / ((_r_min + _r_max) / 2.0))), 1)
+        panel = {**panel, "N_s": N_s}
+        _ns_estimado = True
 
     const  = CONSTANTES_TECNOLOGIA[tec_norm]
     EgRef  = const["Eg_ref"]
@@ -793,7 +834,7 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
     _ns_original      = None
     _ns_halfcut_info  = None
 
-    n_typ = {"CdTe": 1.09, "Mono-Si": 1.05, "Poli-Si": 1.10}.get(tec_norm, 1.05)
+    n_typ = _N_TIPICO.get(tec_norm, 1.05)
     if NsA:
         # ── #67: el camino NsA TAMBIÉN se verifica contra half-cut ──────────
         # NsA = n × Ns viene del mismo catálogo/ficha: si el Ns registrado es
@@ -826,7 +867,7 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
             a_ref = float(NsA) * Vt_ref
             N_s_est = _N_s_deriv
     elif N_s:
-        n_typ = {"CdTe": 1.09, "Mono-Si": 1.05, "Poli-Si": 1.10}.get(tec_norm, 1.05)
+        n_typ = _N_TIPICO.get(tec_norm, 1.05)
         # ── Verificar si N_s es incorrecto por half-cut (tarea #67) ──────────
         _hc = verificar_ns_halfcut(panel)
         if _hc and _hc["tipo"] == "ns_duplicado":
@@ -851,14 +892,14 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
     if Tk_beta:
         beta_voc_V = float(Tk_beta) / 100.0 * Voc
     else:
-        beta_pct = {"CdTe": -0.30, "Mono-Si": -0.37, "Poli-Si": -0.40}.get(tec_norm, -0.37)
+        beta_pct = _BETA_VOC_TIPICO.get(tec_norm, -0.37)
         beta_voc_V = beta_pct / 100.0 * Voc
 
     # alpha_sc en A/°C
     if Tk_alfa:
         alpha_sc_A = float(Tk_alfa) / 100.0 * Isc
     else:
-        alpha_pct = {"CdTe": 0.02, "Mono-Si": 0.05, "Poli-Si": 0.05}.get(tec_norm, 0.05)
+        alpha_pct = _ALFA_ISC_TIPICO.get(tec_norm, 0.05)
         alpha_sc_A = alpha_pct / 100.0 * Isc
 
     # ── Estimación SDM: modelo PVsyst v6 (calcparams_pvsyst) ───────────────────
@@ -968,6 +1009,82 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
             mu_gamma = 0.0
             _metodo = "heurístico"
 
+    # ── Ajuste con el rendimiento a 200 W/m² (Spec 04/sdm-capa-fina-bipv) ──
+    # Sin datos de laboratorio, la referencia estándar internacional fija el
+    # rendimiento relativo a 200 W/m² (dato de la ficha o, sin él, −3 %) con
+    # la resistencia en serie y vuelve a anclar la potencia STC con el factor
+    # de idealidad. Aquí se busca gamma_ref (con R_s re-anclado a Pmax de la
+    # ficha) que reproduce el objetivo. Se aplica si la ficha trae el dato o,
+    # para capa fina CIGS sin él, con el −3 % por defecto (el factor de
+    # idealidad típico de CIGS solo daba ~91,6 % a 200 W/m²).
+    _ajuste_200 = None
+    _rel_200_modelo = None
+    _err_cal = None
+    _objetivo_200 = _valor_flotante_positivo(panel.get("eficiencia_rel_200"))
+    if 50.0 <= _objetivo_200 <= 110.0:
+        _ajuste_200 = "ficha"
+    elif tec_norm == "CIGS":
+        _objetivo_200, _ajuste_200 = REL_200_DEFECTO_PCT, "defecto"
+    if _ajuste_200 and _metodo == "pvsyst_v6_defaults":
+        def _con_gamma(g):
+            rs = _resolver_Rs_pvsyst_por_pmax(
+                Voc=Voc, Isc=Isc, Vmp=Vmp, Imp=Imp, alpha_sc=alpha_sc_A,
+                gamma_ref=g, R_sh_ref=R_sh_ref, R_sh_0=R_sh_0,
+                R_sh_exp=R_sh_exp, N_s=N_s_est, EgRef=EgRef,
+            )
+            il, io = _resolver_IL_Io_stc(Voc, Isc, rs, R_sh_ref, g * N_s_est * Vt_ref)
+            args = dict(alpha_sc=alpha_sc_A, gamma_ref=g, mu_gamma=0.0, I_L_ref=il,
+                        I_o_ref=io, R_sh_ref=R_sh_ref, R_sh_0=R_sh_0, R_sh_exp=R_sh_exp,
+                        R_s=rs, N_s=N_s_est, EgRef=EgRef)
+            p200 = _pmax_pvsyst_a_G(200.0, 25.0, **args)
+            p1000 = _pmax_pvsyst_a_G(1000.0, 25.0, **args)
+            return 100.0 * (p200 / 200.0) / (p1000 / 1000.0), rs, il, io
+
+        def _rel_seguro(g):
+            try:
+                r, rs, il, io = _con_gamma(g)
+                ok = np.isfinite(r) and rs > 0 and il > 0 and io > 0
+                return r if ok else None
+            except Exception:
+                return None
+
+        try:
+            # Malla en gamma: se descartan los valores donde el modelo deja de
+            # ser físico y se refina entre los dos que encierran el objetivo.
+            malla = [(g, _rel_seguro(g)) for g in np.linspace(0.75, max(gamma_ref, 0.8), 25)]
+            malla = [(g, r) for g, r in malla if r is not None]
+            if not malla:
+                raise ValueError("ningún factor de idealidad da un modelo físico")
+            g_sel = min(malla, key=lambda gr: abs(gr[1] - _objetivo_200))[0]
+            for (g1, r1), (g2, r2) in zip(malla, malla[1:]):
+                if (r1 - _objetivo_200) * (r2 - _objetivo_200) <= 0:
+                    lo, hi, r_lo = g1, g2, r1
+                    for _ in range(40):
+                        mid = 0.5 * (lo + hi)
+                        r_mid = _rel_seguro(mid)
+                        if r_mid is None:
+                            break
+                        if (r_mid - _objetivo_200) * (r_lo - _objetivo_200) > 0:
+                            lo, r_lo = mid, r_mid
+                        else:
+                            hi = mid
+                    g_sel = 0.5 * (lo + hi)
+                    break
+            _rel, R_s, I_L, I_o = _con_gamma(g_sel)
+            gamma_ref = g_sel
+            mu_gamma = _resolver_mu_gamma_pvsyst(
+                Pmax_stc=Pmax_stc_ficha, Tk_gamma_pct=Tk_gamma_pct,
+                alpha_sc=alpha_sc_A, gamma_ref=gamma_ref, I_L_ref=I_L, I_o_ref=I_o,
+                R_sh_ref=R_sh_ref, R_sh_0=R_sh_0, R_sh_exp=R_sh_exp, R_s=R_s,
+                N_s=N_s_est, EgRef=EgRef,
+            )
+            R_sh = R_sh_ref
+            _rel_200_modelo = round(float(_rel), 2)
+            _metodo = "pvsyst_v6_calibrado_200"
+        except Exception as _e_cal:
+            _err_cal = repr(_e_cal)
+            _ajuste_200 = None
+
     a_ref_unitless = gamma_ref * N_s_est   # convención existente (n × Ns)
 
     return {
@@ -991,6 +1108,12 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
         "_estimado":         True,
         "_metodo":           _metodo,
         "_tec_norm":         tec_norm,
+        "_tecnologia_supuesta": _tec_supuesta,
+        "_ns_estimado":      _ns_estimado,
+        "_calibrado_200":    _ajuste_200 is not None,
+        "_ajuste_200":       _ajuste_200,
+        "_rel_200_modelo":   _rel_200_modelo,
+        "_error_ajuste_200": _err_cal,
         # ── Corrección half-cut N_s (tarea #67) ──────────────────────────────
         "_ns_corregido":     _ns_corregido,
         "_ns_original":      _ns_original,
