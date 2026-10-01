@@ -5515,6 +5515,37 @@ El reporte ya incluye todo lo que la app calcula para la producción:
 
 **Ojo:** el reporte muestra lo que está calculado en la sesión. Si cambiaste algo (por ejemplo el NOCT), vuelve a calcular la cascada y Producción antes de generar el reporte.
 
+## 102. 📄 Reporte PDF de proyectos multi-superficie (🗺️ Vista 3D) (1-oct-2026)
+
+### Reporte multi-superficie — qué cambió y por qué
+
+**Qué pasaba:** en un proyecto diseñado en 🗺️ Vista 3D (varias fachadas o techos), el reporte mostraba en «Producción Anual» la energía de 📊 Producción, que es de **una sola superficie**. En otra sección mostraba la energía multi-superficie. El cliente veía **dos cifras** distintas sin saber cuál valía. Además faltaban casi todos los datos de diseño de Vista 3D.
+
+**Ahora**, con energía multi-superficie publicada (🗺️ Vista 3D › Integrar):
+- «📊 **Producción Anual del Proyecto — Multi-Superficie**» reemplaza a la de superficie única. Muestra:
+  - la energía del proyecto, la misma que usan Financiero, Baterías y CO₂;
+  - la potencia pico, el rendimiento en kWh/kWp, la densidad en kWh/m² y el método de cálculo (simplificado, bypass o físico);
+  - el estado del diseño eléctrico (🟢/🟡/🔴) y la gráfica **mensual**.
+  - Desaparecen las secciones de superficie única que confundían: compatibilidad string–inversor y sistema eléctrico de 📐 Dimensionamiento, y el diagrama de pérdidas de 📊 Producción.
+- «🏗️ **Producción Multi-Superficie**» trae:
+  - **por superficie:** tipo, inclinación y azimut, panel, módulos (contados donde están), kWp, área, POA, energía, % del total, **kWh/kWp** y **PR**;
+  - módulos por modelo de panel;
+  - **inversores:** potencia AC, superficies que alimenta, strings, módulos, kWp y relación DC/AC;
+  - **pérdidas de cada superficie:** IAM, suciedad, temperatura con su k_BIPV, mismatch, cables, inversor, horizonte, string que cruza, recorte del inversor y PR;
+  - los **strings que cruzan** de una superficie a otra, con cuántos módulos;
+  - el bypass por superficie, como antes.
+
+### Reporte multi-superficie — cómo sacarlo
+
+1. En 🗺️ Vista 3D › **Integrar**, **vuelve a publicar** la energía. Las publicaciones anteriores solo guardaban el PR de cada superficie, no su tabla de pérdidas; el reporte te avisa si falta.
+2. En 📄 Reporte PDF deja marcadas «Producción» y «🏗️ Incluir desglose Multi-Superficie». Desmarca lo financiero si no lo necesitas.
+3. Genera el reporte y guárdalo como PDF desde el navegador.
+
+**Para leerlo:**
+- Una superficie con **PR bajo** suele ser una fachada caliente (k_BIPV alto), sombreada o con un string que cruza.
+- Una con pocos **kWh/kWp** está mal orientada para ese sitio.
+- Una **relación DC/AC** muy alta en un inversor anticipa recorte.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

@@ -479,6 +479,9 @@ from calculos.reporte_produccion import (
 )
 
 
+import calculos.reporte_multisuperficie as rms
+
+
 def generar_html_reporte() -> str:
     # Colectar datos de session_state
     ciudad          = st.session_state.get("tmy_ciudad", st.session_state.get("ciudad", "—"))
@@ -519,6 +522,7 @@ def generar_html_reporte() -> str:
 
     # Producción
     res_prod     = st.session_state.get("res_produccion", {})
+    _ms_proy     = rms.activo(st.session_state)   # Spec 07/reporte-multisuperficie
     n_paneles    = st.session_state.get("N_paneles_final", st.session_state.get("N_paneles_dim", "—"))
     panel_nombre = st.session_state.get("panel_nombre_final", "ASP-ST1-T40")
     p_stc_kw     = st.session_state.get("P_stc_kW_sistema", "—")
@@ -771,7 +775,7 @@ def generar_html_reporte() -> str:
     _N_serie_pdf = _diseno_pdf["N_serie"]
     _panel_dim_pdf = st.session_state.get("panel_dict")
     _inv_dim_pdf = st.session_state.get("inversor_dict_dim")
-    if _N_serie_pdf and _panel_dim_pdf and _inv_dim_pdf:
+    if _N_serie_pdf and _panel_dim_pdf and _inv_dim_pdf and not _ms_proy:
         try:
             from calculos.dimensionamiento import curva_electrica_temperatura
             _T_frio_pdf = st.session_state.get("T_min_diseno", -5.0)
@@ -819,7 +823,7 @@ def generar_html_reporte() -> str:
             html += cierre()
 
     # ── 2c. Sistema eléctrico e inversores (Spec 07/reporte-produccion-completo)
-    if incluir_dim and st.session_state.get("panel_dict"):
+    if incluir_dim and st.session_state.get("panel_dict") and not _ms_proy:
         _filas_sis = filas_sistema_electrico(st.session_state, res_prod)
         if len(_filas_sis) > 3:
             html += seccion("Sistema Eléctrico e Inversores", "🔌")
@@ -946,7 +950,24 @@ def generar_html_reporte() -> str:
         html += cierre()
 
     # ── 4. Producción ─────────────────────────────────────────────────────────
-    if produccion_ok and incluir_prod and res_prod:
+    # ── 4·. Producción del proyecto multi-superficie (Spec 07/reporte-multisuperficie)
+    # Con energía multi-superficie publicada, esa es la energía del proyecto
+    # (la usan Financiero, Baterías y CO₂): se muestra aquí y no la de
+    # 📊 Producción de superficie única, para no dar dos cifras distintas.
+    if _ms_proy and incluir_prod:
+        html += seccion("Producción Anual del Proyecto — Multi-Superficie (🗺️ Vista 3D)", "📊")
+        html += tabla_kv(rms.resumen(st.session_state),
+                         nota="Esta es la energía del proyecto: la misma que usan el análisis financiero, "
+                              "las baterías y la huella de carbono. El detalle por superficie, inversor y "
+                              "pérdidas está en la sección Multi-Superficie.")
+        _ms_mes = rms.mensual(st.session_state)
+        if _ms_mes:
+            _svg_ms = _barras_mensuales_svg(_ms_mes)
+            if _svg_ms:
+                html += _bloque_grafica(_svg_ms, "Energía AC del proyecto por mes (kWh).")
+        html += cierre()
+
+    if produccion_ok and incluir_prod and res_prod and not _ms_proy:
         E_ac  = res_prod.get("E_ac_anual_kWh", 0)
         E_dc  = res_prod.get("E_dc_anual_kWh", 0)
         PR    = res_prod.get("PR", 0) * 100
@@ -985,7 +1006,7 @@ def generar_html_reporte() -> str:
         html += cierre()
 
     # ── 4a. Diagrama de pérdidas de Producción (Spec 07/reporte-produccion-completo)
-    if produccion_ok and incluir_perdidas and res_prod:
+    if produccion_ok and incluir_perdidas and res_prod and not _ms_proy:
         _perd = filas_perdidas(res_prod, st.session_state.get("poa_anual_kWh_m2", 0.0),
                                st.session_state.get("motor_optico_summary") or {})
         if _perd:
@@ -1217,42 +1238,86 @@ def generar_html_reporte() -> str:
     if _inc_ms and _ms_activo and _ms_desglose and _ms_e_ac > 0:
         html += seccion("Producción Multi-Superficie — Desglose por Superficie BIPV", "🏗️", "#6c3483")
 
-        # Tabla de desglose
-        html += """
-        <table style="width:100%;border-collapse:collapse;font-size:0.88em;margin-bottom:14px;">
+        # Tabla por superficie (Spec 07/reporte-multisuperficie): orientación,
+        # panel, módulos, kWp, POA, energía, kWh/kWp y PR.
+        _th = 'style="padding:5px 7px;text-align:right;"'
+        html += f"""
+        <table style="width:100%;border-collapse:collapse;font-size:0.82em;margin-bottom:14px;">
         <thead><tr style="background:#6c3483;color:#fff;">
-          <th style="padding:6px 10px;text-align:left;">Superficie</th>
-          <th style="padding:6px 10px;text-align:left;">Tipo</th>
-          <th style="padding:6px 10px;text-align:right;">Área (m²)</th>
-          <th style="padding:6px 10px;text-align:right;">% área</th>
-          <th style="padding:6px 10px;text-align:right;">POA (kWh/m²/año)</th>
-          <th style="padding:6px 10px;text-align:right;">E_ac (kWh/año)</th>
-          <th style="padding:6px 10px;text-align:right;">% E_ac</th>
+          <th style="padding:5px 7px;text-align:left;">Superficie</th><th style="padding:5px 7px;text-align:left;">Tipo</th>
+          <th {_th}>Incl. / azimut</th><th style="padding:5px 7px;text-align:left;">Panel</th>
+          <th {_th}>Módulos</th><th {_th}>kWp</th><th {_th}>Área (m²)</th><th {_th}>POA (kWh/m²)</th>
+          <th {_th}>E_ac (kWh/año)</th><th {_th}>% E_ac</th><th {_th}>kWh/kWp</th><th {_th}>PR</th>
         </tr></thead><tbody>"""
-        for _ri, _s in enumerate(_ms_desglose):
+        for _ri, _s in enumerate(rms.tabla_superficies(st.session_state)):
             _bg = "#f4f6f7" if _ri % 2 == 0 else "white"
-            _pct_a = _s.get("area_m2", 0) / max(1.0, _ms_area) * 100
-            _pct_e = _s.get("e_ac_kWh", 0) / max(1.0, _ms_e_ac) * 100
+            _or = (f"{_fmt(_s['inclinacion'], 0)}° / {_fmt(_s['azimut'], 0)}°"
+                   if _s["inclinacion"] is not None else "—")
             html += f"""
             <tr style="background:{_bg};">
-              <td style="padding:5px 10px;font-weight:600;">{_s.get('nombre','—')}</td>
-              <td style="padding:5px 10px;color:#666;">{_s.get('tipo','—')}</td>
-              <td style="padding:5px 10px;text-align:right;">{_s.get('area_m2',0):.1f}</td>
-              <td style="padding:5px 10px;text-align:right;color:#888;">{_pct_a:.1f}%</td>
-              <td style="padding:5px 10px;text-align:right;">{_s.get('poa_kWh_m2',0):,.0f}</td>
-              <td style="padding:5px 10px;text-align:right;font-weight:700;">{_s.get('e_ac_kWh',0):,.0f}</td>
-              <td style="padding:5px 10px;text-align:right;color:#6c3483;">{_pct_e:.1f}%</td>
+              <td style="padding:4px 7px;font-weight:600;">{_esc_html(_s['nombre'])}</td>
+              <td style="padding:4px 7px;color:#666;">{_esc_html(_s['tipo'])}</td>
+              <td {_th}>{_or}</td><td style="padding:4px 7px;">{_esc_html(_s['panel'])}</td>
+              <td {_th}>{_s['modulos'] or '—'}</td><td {_th}>{_fmt(_s['kwp'], 2)}</td>
+              <td {_th}>{_s['area_m2']:.1f}</td><td {_th}>{_s['poa_kwh_m2']:,.0f}</td>
+              <td style="padding:5px 7px;text-align:right;font-weight:700;">{_s['e_ac_kwh']:,.0f}</td>
+              <td {_th}>{_s['e_ac_kwh'] / max(1.0, _ms_e_ac) * 100:.1f}%</td>
+              <td {_th}>{_fmt(_s['yield_kwh_kwp'], 0)}</td><td {_th}>{_fmt(_s['pr'], 3)}</td>
             </tr>"""
         html += f"""
             <tr style="background:#6c3483;color:white;font-weight:bold;">
-              <td style="padding:6px 10px;" colspan="2">TOTAL SISTEMA</td>
-              <td style="padding:6px 10px;text-align:right;">{_ms_area:.1f}</td>
-              <td style="padding:6px 10px;text-align:right;">100%</td>
-              <td style="padding:6px 10px;text-align:right;">—</td>
-              <td style="padding:6px 10px;text-align:right;">{_ms_e_ac:,.0f}</td>
-              <td style="padding:6px 10px;text-align:right;">100%</td>
+              <td style="padding:5px 7px;" colspan="6">TOTAL SISTEMA</td>
+              <td {_th}>{_ms_area:.1f}</td><td {_th}>—</td><td {_th}>{_ms_e_ac:,.0f}</td>
+              <td {_th}>100%</td><td {_th} colspan="2"></td>
             </tr>
         </tbody></table>"""
+
+        _por_panel = rms.filas_por_panel(st.session_state)
+        if _por_panel:
+            html += "<p style='margin:14px 0 6px;font-weight:600;color:#6c3483;'>🧩 Módulos por modelo de panel</p>"
+            html += tabla_kv(_por_panel)
+
+        _invs_ms = rms.tabla_inversores(st.session_state)
+        if _invs_ms:
+            html += "<p style='margin:16px 0 6px;font-weight:600;color:#6c3483;'>🔌 Inversores</p>"
+            html += f"""<table style="width:100%;border-collapse:collapse;font-size:0.84em;margin-bottom:12px;">
+              <tr style="background:#1A569A;color:#fff;"><th style="padding:5px 7px;text-align:left;">Inversor</th>
+              <th style="padding:5px 7px;text-align:left;">Modelo</th><th {_th}>P AC (kW)</th>
+              <th style="padding:5px 7px;text-align:left;">Superficies</th><th {_th}>Strings</th>
+              <th {_th}>Módulos</th><th {_th}>kWp</th><th {_th}>DC/AC</th></tr>"""
+            for _iv in _invs_ms:
+                html += (f'<tr><td style="padding:4px 7px;font-weight:600;">{_esc_html(_iv["inversor"])}</td>'
+                         f'<td style="padding:4px 7px;">{_esc_html(_iv["modelo"])}</td>'
+                         f'<td {_th}>{_fmt(_iv["p_ac_kw"], 1)}</td>'
+                         f'<td style="padding:4px 7px;">{_esc_html(_iv["superficies"])}</td>'
+                         f'<td {_th}>{_iv["strings"]}</td><td {_th}>{_iv["modulos"]}</td>'
+                         f'<td {_th}>{_fmt(_iv["kwp"], 2)}</td><td {_th}>{_fmt(_iv["dc_ac"], 2)}</td></tr>')
+            html += "</table>"
+
+        _cad_ms = rms.cadena_por_superficie(st.session_state)
+        if _cad_ms:
+            _cols = list(_cad_ms[0].keys())
+            html += ("<p style='margin:16px 0 6px;font-weight:600;color:#6c3483;'>📉 Pérdidas de cada superficie "
+                     "(de dónde sale su PR)</p>")
+            html += '<table style="width:100%;border-collapse:collapse;font-size:0.8em;margin-bottom:12px;"><tr style="background:#1A569A;color:#fff;">'
+            html += "".join(f'<th style="padding:4px 6px;">{_esc_html(c)}</th>' for c in _cols) + "</tr>"
+            for _ci, _fila in enumerate(_cad_ms):
+                _bg = "#f8f9fa" if _ci % 2 == 0 else "white"
+                html += f'<tr style="background:{_bg};">' + "".join(
+                    f'<td style="padding:3px 6px;text-align:center;">{_esc_html(_fila.get(c, ""))}</td>'
+                    for c in _cols) + "</tr>"
+            html += "</table>"
+        elif rms.tabla_superficies(st.session_state):
+            html += caja_nota("La tabla de pérdidas por superficie aparece al volver a publicar la energía en "
+                              "🗺️ Vista 3D › Integrar (la publicación anterior solo guardó el PR de cada superficie).")
+
+        _cr_ms = rms.cruces(st.session_state)
+        if _cr_ms:
+            html += caja_nota("Strings que cruzan de una superficie a otra: " + "; ".join(
+                f"{_esc_html(c['origen'])} → {_esc_html(c['destino'])} ({c['k']} de {c['n_serie']} módulos en "
+                f"serie, {c['n_paralelo']} string(s))" for c in _cr_ms)
+                + ". Su pérdida por orientación distinta ya está en el PR de esas superficies.",
+                color="#fef9e7", borde="#f39c12", icono="🔀")
 
         # Tabla bypass por superficie (si está disponible)
         if _ms_bp_ok and _ms_bp_rows:
