@@ -62,3 +62,31 @@ def clave_con_opciones(base: str, opciones) -> str:
 
     firma = zlib.crc32("\x1f".join(map(str, opciones)).encode("utf-8"))
     return f"{base}__{firma:08x}"
+
+
+def campo_ligado(estado: MutableMapping[str, Any], widget, etiqueta: str, clave: str, defecto: Any,
+                 **kwargs: Any) -> Any:
+    """Widget ``_w_<clave>`` ligado al dato persistente ``clave`` (30-sep-2026).
+
+    Streamlit borra la clave de un widget al abrir otra página o recargar. Si
+    el dato y el widget comparten clave, al volver el campo arranca en su
+    valor por defecto o en su mínimo (caso real: NOCT 35 °C y γ −0,70 %/°C en
+    🔆 Motor Óptico). Aquí el dato vive en ``clave`` (se guarda con el
+    proyecto) y el widget en ``_w_<clave>``; ``sincronizar_campo`` los une.
+    Sin dato se usa ``defecto``; un dato fuera de rango se recorta y una
+    opción que ya no existe vuelve a ``defecto``.
+    """
+    valor = estado.get(clave, defecto)
+    if valor is None:
+        valor = defecto
+    if "min_value" in kwargs and valor is not None:
+        valor = max(type(defecto)(valor), type(defecto)(kwargs["min_value"]))
+    if "max_value" in kwargs and valor is not None:
+        valor = min(type(defecto)(valor), type(defecto)(kwargs["max_value"]))
+    if "options" in kwargs and valor not in list(kwargs["options"]):
+        valor = defecto
+    w = f"_w_{clave}"
+    sincronizar_campo(estado, w, valor)
+    resultado = widget(etiqueta, key=w, **kwargs)
+    estado[clave] = resultado
+    return resultado

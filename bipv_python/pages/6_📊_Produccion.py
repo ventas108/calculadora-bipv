@@ -493,10 +493,12 @@ if _panel_apto_iv:
         if _sdm_origen == "calibrado"
         else "SDM **estimado desde la ficha** (Voc/Isc/Vmp/Imp + Ns, fit De Soto)"
     )
-    usar_iv = st.toggle(
-        "🔬 Usar curva IV real del panel (Motor IV)",
-        value=st.session_state.get("produccion_usar_iv", False),
-        key="produccion_usar_iv",
+    # 30-sep-2026: dato «produccion_usar_iv» y widget «_w_produccion_usar_iv»
+    # separados; con la misma clave el modo Motor IV se apagaba solo al volver.
+    from calculos.campos_editor import campo_ligado
+    usar_iv = campo_ligado(
+        st.session_state, st.toggle, "🔬 Usar curva IV real del panel (Motor IV)",
+        "produccion_usar_iv", False,
         help=(
             "Deriva la potencia Pmp(G, Tcell) de la curva I-V single-diode "
             "(De Soto 2006 + Rsh CdTe), en lugar del modelo lineal genérico. "

@@ -1526,11 +1526,13 @@ if csv_ok and df_fs_raw is not None:
     col_bp1, col_bp2, col_bp3 = st.columns(3)
 
     with col_bp1:
-        panel_bp_nombre = st.selectbox(
-            "Panel fotovoltaico",
-            list(MODULOS_BIPV.keys()),
-            index=list(MODULOS_BIPV.keys()).index("ASP-ST1-T40"),
-            key="bypass_panel",
+        # 30-sep-2026: dato «bypass_*» y widget «_w_bypass_*» separados; con la
+        # misma clave, al volver a esta página los campos regresaban al valor
+        # por defecto y el bypass se recalculaba con otro string.
+        from calculos.campos_editor import campo_ligado
+        panel_bp_nombre = campo_ligado(
+            st.session_state, st.selectbox, "Panel fotovoltaico", "bypass_panel", "ASP-ST1-T40",
+            options=list(MODULOS_BIPV.keys()),
             help="Debe coincidir con el panel de Producción",
         )
         panel_bp = MODULOS_BIPV[panel_bp_nombre]
@@ -1544,12 +1546,11 @@ if csv_ok and df_fs_raw is not None:
             # Apuntar a ~400V DC → N_series ≈ 400 / Voc_stc
             n_series_default = max(4, min(20, int(round(400 / Voc_stc))))
 
-        N_series_bp = st.number_input(
-            "Módulos en serie por string (N_series)",
+        N_series_bp = campo_ligado(
+            st.session_state, st.number_input, "Módulos en serie por string (N_series)",
+            "bypass_n_series", int(n_series_default),
             min_value=2, max_value=30,
-            value=n_series_default,
             step=1,
-            key="bypass_n_series",
             help="Número de módulos conectados en serie en cada string",
         )
 
@@ -1558,12 +1559,11 @@ if csv_ok and df_fs_raw is not None:
             n_par_default = max(1, round(_n_total / N_series_bp))
         else:
             n_par_default = 4
-        N_parallel_bp = st.number_input(
-            "Strings en paralelo (N_parallel)",
+        N_parallel_bp = campo_ligado(
+            st.session_state, st.number_input, "Strings en paralelo (N_parallel)",
+            "bypass_n_parallel", int(n_par_default),
             min_value=1, max_value=200,
-            value=n_par_default,
             step=1,
-            key="bypass_n_parallel",
             help="Número de strings en paralelo en el array",
         )
         st.caption(

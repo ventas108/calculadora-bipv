@@ -122,6 +122,11 @@ Regla de consumo:
 	Unifilar usa `tramos_para_unifilar` (un tramo DC por string) y el AC
 	medio para `perdida_ohmica_unifilar`, y 📋 Ficha RETIE suma
 	`checks_retie` (caída de tensión frente al 3 % de la NTC 2050).
+- Campos ligados (30-sep-2026, Spec `08-interfaz/campos-ligados`): un dato que
+	lee otra página o un cálculo (`N_str_tr`, `bypass_*`, `produccion_usar_iv`,
+	`mo_*`, parámetros de Financiero) nunca es la clave de un widget; el widget
+	usa `_w_<clave>` con `campos_editor.campo_ligado`. `tests/test_campos_ligados.py`
+	falla si una página vuelve a usar la clave del dato como widget.
 - NOCT y γ del Motor Óptico frente a la ficha (30-sep-2026, Spec `05-perdidas-y-temperatura/motor-optico-ficha-termica`):
 	`motor_optico_noct` sigue siendo la fuente de la temperatura de celda en
 	Producción; `calculos/motor_optico_ficha.diferencias_ficha` lo compara con
