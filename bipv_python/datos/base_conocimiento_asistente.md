@@ -5653,6 +5653,22 @@ Los dos módulos recomiendan lo mismo.
 
 En 📐 Dimensionamiento escribe N total de cadenas 15 o 16 y deja 1 string por tracker. Con «✅ Adoptar» del comparador queda la opción A sola.
 
+## 106. 📄 Reporte en Word editable y PDF sin perder gráficas (1-oct-2026)
+
+**Qué pasaba:** al guardar el reporte HTML como Word se perdían las gráficas. Word no lee el formato SVG en que vienen las 6 gráficas del reporte de la Granja Apartadó: curva eléctrica, producción mensual, vista 3D del campo, luz en el suelo, mapa de sombra y plano eléctrico. El .docx quedaba con las 13 tablas y **0 imágenes**.
+
+**Ahora** «Generar Reporte» ofrece tres botones:
+- **⬇️ Word editable (.docx):**
+  - tamaño carta, márgenes de 1,8 cm, letra Calibri;
+  - títulos, párrafos, notas sombreadas, listas y **tablas de Word editables**, con los colores de los encabezados;
+  - **todas las gráficas como imágenes** de alta resolución.
+- **⬇️ PDF:** tamaño carta, con las mismas tablas, notas e imágenes, listo para enviar. Los íconos de estado (🟢/🟠/🔴) salen como ● de color.
+- **⬇️ HTML:** la versión web, con las gráficas en máxima calidad. Para un PDF idéntico a la vista web: ábrelo en Chrome o Edge → Ctrl+P → Guardar como PDF y activa **Gráficos de fondo**. Ahora la impresión conserva los colores y no parte tablas ni gráficas entre páginas.
+
+**No abras el HTML con Word:** Word no muestra sus gráficas. Usa el botón Word.
+
+El Word y el PDF salen del mismo HTML del reporte: el contenido es idéntico, no se recalcula nada.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
