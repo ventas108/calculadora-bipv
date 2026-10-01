@@ -475,8 +475,11 @@ def _curva_electrica_svg(curva: dict, N_serie: int, T_frio: float, T_real: float
 
 
 from calculos.reporte_produccion import (
-    filas_bifacial, filas_perdidas, filas_sistema_electrico, secciones_granja,
+    altitud_proyecto, aviso_soiling, etiquetas_tipo, filas_bifacial, filas_mismatch, filas_perdidas,
+    filas_sistema_electrico, nota_poa, nota_pr, secciones_granja,
 )
+import calculos.reporte_granja as rgr          # Spec 07/reporte-granja-completo
+from calculos.ficha_inversor import alertas_ficha_inversor, margen_voc
 
 
 import calculos.reporte_multisuperficie as rms
@@ -511,6 +514,7 @@ def generar_html_reporte() -> str:
             else "Clima extraído de base TMY/PVGIS"
         )
     area_m2         = st.session_state.get("area_fachada_m2", "—")
+    _tx             = etiquetas_tipo(st.session_state.get("tipo_instalacion"))  # textos por tipo de instalación
     orientacion     = st.session_state.get("orientacion_label", "—")
     tilt            = st.session_state.get("tilt_fachada", "—")
     poa_bruta       = st.session_state.get("poa_anual_kWh_m2", 0.0)
@@ -681,10 +685,10 @@ def generar_html_reporte() -> str:
     html += tabla_kv([
         ("Nombre del proyecto",  nombre_proyecto,          "",         ""),
         ("Ciudad / Localización", _localizacion_pdf,         "",         _localizacion_nota),
-        ("Área de fachada",      _fmt(area_m2, 1),         "m²",       "Superficie total disponible para BIPV"),
-        ("Orientación",          str(orientacion),          "",         "Azimut de la fachada"),
-        ("Inclinación (tilt)",   str(tilt),                "°",        "90° = fachada vertical típica"),
-        ("Panel seleccionado",   panel_nombre,              "",         "Módulo BIPV"),
+        (_tx["area"][0],         _fmt(area_m2, 1),         "m²",       _tx["area"][1]),
+        ("Orientación",          str(orientacion),          "",         _tx["orientacion"]),
+        ("Inclinación (tilt)",   str(tilt),                "°",        _tx["inclinacion"]),
+        ("Panel seleccionado",   panel_nombre,              "",         _tx["panel"]),
         ("N° de módulos",        str(n_paneles),            "módulos",  "Resultado de Dimensionamiento"),
         ("Potencia instalada",   _fmt(p_stc_kw, 2),        "kWp",      "Potencia pico DC en STC"),
         # #54 — zona horaria explícita para auditabilidad de gráficos horarios
@@ -699,7 +703,8 @@ def generar_html_reporte() -> str:
     if recurso_ok:
         html += seccion("Recurso Solar y POA del Sitio", "☀️")
         tmy_fuente = st.session_state.get("tmy_fuente", "PVGIS ERA-5")
-        alt_m      = st.session_state.get("alt_m", "—")
+        # Antes leía "alt_m", que ninguna página guarda: la altitud salía siempre «—».
+        alt_m      = altitud_proyecto(st.session_state)
         ghi_anual  = st.session_state.get("ghi_anual_kWh_m2", "—")
         t_media    = st.session_state.get("t_media_anual", "—")
         html += tabla_kv([
@@ -707,11 +712,9 @@ def generar_html_reporte() -> str:
             ("Altitud",              _fmt(alt_m, 0),           "m s.n.m.",     "Afecta presión atmosférica y temperatura"),
             ("GHI anual",            _fmt(ghi_anual, 0),       "kWh/m²/año",  "Irradiación global horizontal en plano"),
             ("T° ambiente media",    _fmt(t_media, 1),         "°C",           "Media anual del año típico"),
-            ("POA bruta (fachada)",  _fmt(poa_bruta, 0),       "kWh/m²/año",  "Irradiación en el plano de la fachada sin correcciones"),
+            (_tx["poa"][0],          _fmt(poa_bruta, 0),       "kWh/m²/año",  _tx["poa"][1]),
         ],
-        nota="POA (Plane Of Array): irradiación sobre el plano inclinado del panel. "
-             "Para fachadas verticales, POA es menor que GHI porque los rayos llegan con mayor ángulo. "
-             "Esta es la energía disponible ANTES de descontar reflexión, suciedad y temperatura.")
+        nota=nota_poa(poa_bruta, ghi_anual, _tx["fachada"]))
 
         # ── Ganancia bifacial (solo si el modelo está activo) ─────────────────
         if st.session_state.get("bifacial_activo", False):
@@ -807,19 +810,29 @@ def generar_html_reporte() -> str:
                 "son los mismos valores que evalúa el gate de compatibilidad de Dimensionamiento "
                 "y Producción — este gráfico no verifica nada distinto, solo lo visualiza."
             )
+            _mv_pdf = margen_voc(_ev_pdf.get("Voc_frio"), _inv_dim_pdf)
+            _fila_margen = ([("Margen frente a la tensión DC máxima del inversor",
+                              f"{_mv_pdf['nivel']} {_mv_pdf['margen_v']:,.0f}", "V",
+                              f"{_mv_pdf['margen_pct']:.1f} % de {_mv_pdf['vdc_max_v']:,.0f} V (ficha del inversor)")]
+                            if _mv_pdf else [])
+            _alertas_ficha_pdf = alertas_ficha_inversor(_inv_dim_pdf)
             html += tabla_kv([
                 ("Estado", _estado_pdf, "", "Veredicto real del gate de compatibilidad eléctrica"),
                 ("N° módulos en serie", str(int(_N_serie_pdf)), "", ""),
                 ("Voc en frío", _fmt(_ev_pdf.get("Voc_frio"), 0), "V", f"a T mín {_T_frio_pdf:.1f}°C"),
                 ("Vmp en condición real", _fmt(_ev_pdf.get("Vmp_real"), 0), "V", f"a T real {_T_real_pdf:.1f}°C"),
                 ("Vmp en condición extrema", _fmt(_ev_pdf.get("Vmp_extremo"), 0), "V", f"a T extremo {_T_extr_pdf:.1f}°C"),
-            ] + ([("Observaciones", "; ".join(_ev_pdf.get("mensajes", [])), "", "")]
+            ] + _fila_margen + ([("Observaciones", "; ".join(_ev_pdf.get("mensajes", [])), "", "")]
                  if _ev_pdf.get("mensajes") else []),
             nota="Voc y Vmp son funciones lineales de la temperatura de celda: verificar los "
                  "3 puntos de diseño (frío, real, extremo) cubre con certeza matemática toda la "
                  "curva continua entre ellos — el gráfico es para verificación visual, no agrega "
                  "precisión sobre el cálculo ya validado."
                  + (f" ⚠️ {_diseno_pdf['aviso']}" if _diseno_pdf["aviso"] else ""))
+            if _alertas_ficha_pdf:
+                html += caja_nota("<strong>Ficha del inversor:</strong> " + " ".join(
+                    _esc_html(f"{a['nivel']} {a['texto']}") for a in _alertas_ficha_pdf),
+                    color="#fff4e5", borde="#e67e22", icono="⚠️")
             html += cierre()
 
     # ── 2c. Sistema eléctrico e inversores (Spec 07/reporte-produccion-completo)
@@ -893,8 +906,7 @@ def generar_html_reporte() -> str:
               <td style="padding:7px 12px;text-align:right;color:#c0392b;">−{(1-f_iam)*100:.1f}%</td>
               <td style="padding:7px 12px;color:#888;">
                 El vidrio refleja parte de la luz solar cuando el ángulo de incidencia es alto
-                (mañanas, tardes, invierno). En fachadas verticales esta pérdida es la mayor
-                de las tres porque los ángulos son siempre oblicuos.
+                (mañanas, tardes, invierno). {_tx["iam"]}
               </td>
             </tr>
             <tr style="background:#f8f9fa;">
@@ -914,9 +926,8 @@ def generar_html_reporte() -> str:
               <td style="padding:7px 12px;text-align:right;color:#c0392b;">−{p_term:,.1f} kWh/m²/año</td>
               <td style="padding:7px 12px;text-align:right;color:#c0392b;">−{(1-f_term)*100:.1f}%</td>
               <td style="padding:7px 12px;color:#888;">
-                La celda fotovoltaica pierde eficiencia cuando supera 25°C. En BIPV de fachada,
-                la cámara trasera restringida eleva la temperatura (k_BIPV={k_bipv}). La pérdida
-                neta depende del clima local (Bogotá es favorecida por su temperatura fresca).
+                La celda fotovoltaica pierde eficiencia cuando supera 25°C. {_tx["termico"]}
+                (k_BIPV={k_bipv}). La pérdida neta depende de la temperatura del sitio.
               </td>
             </tr>
             <tr style="background:{COLOR_VERDE};color:white;font-weight:bold;">
@@ -939,14 +950,19 @@ def generar_html_reporte() -> str:
         )}
         </div>"""
 
+        _e_ac_mo = float((res_prod or {}).get("E_ac_anual_kWh") or 0.0)
+        _ej_mo = (f"En este proyecto equivale a ≈ {_e_ac_mo * (1 / f_global - 1):,.0f} kWh/año de diferencia "
+                  "en la predicción. " if _e_ac_mo > 0 and 0 < f_global < 1 else "")
         html += caja_nota(
             f"<strong>¿Por qué importa?</strong> Sin el Motor Óptico, la calculadora usa la POA bruta "
             f"({poa_bruta:,.0f} kWh/m²/año) y sobreestima la producción en "
             f"<strong>{(poa_bruta - poa_efectiva):,.0f} kWh/m²/año ({(1-f_global)*100:.1f}%)</strong>. "
-            f"Para un proyecto de 100 m², esto representa ~{(poa_bruta-poa_efectiva)*100*0.12:.0f} kWh/año "
-            f"de diferencia en la predicción. El Motor Óptico da el número correcto.",
+            f"{_ej_mo}El Motor Óptico da el número correcto.",
             color="#e9f7ef", borde=COLOR_VERDE, icono="💡"
         )
+        _aviso_soil = aviso_soiling(mo_sum, _tx["granja"])
+        if _aviso_soil:
+            html += caja_nota(_aviso_soil, color="#fff4e5", borde="#e67e22", icono="⚠️")
         html += cierre()
 
     # ── 4. Producción ─────────────────────────────────────────────────────────
@@ -978,24 +994,25 @@ def generar_html_reporte() -> str:
         # El factor que usó de verdad la corrida de Producción (Spec
         # 05/mismatch-horizonte-coherente); factor_global_mismatch solo como
         # respaldo para resultados guardados antes de ese cambio.
-        mismatch_f = st.session_state.get("factor_mismatch_aplicado", st.session_state.get("factor_global_mismatch", 1.0))
+        # Spec 07/reporte-granja-completo: las pérdidas de 🔀 Mismatch que aplicó
+        # de verdad la simulación (calidad + mismatch); el factor escalar solo
+        # aparece si es distinto de 1 (antes salía «100 %» con 5 % aplicado).
+        _filas_mm = filas_mismatch(st.session_state, res_prod)
         fuente_poa = "Motor Óptico (IAM+Soiling+Térmico)" if motor_optico else "POA bruta"
 
         html += seccion("Producción Anual — Simulación IEC 61724", "📊")
         html += tabla_kv([
             ("Fuente de irradiación usada",  fuente_poa,          "",         "POA aplicada en la simulación"),
-            ("Factor Mismatch aplicado",     _fmt(mismatch_f*100, 1), "%",   "Pérdida por desajuste de strings"),
+        ] + _filas_mm + [
             ("Eficiencia del inversor",      _fmt(eta, 1),         "%",        "Eficiencia CEC weighted"),
             ("E_dc anual (generación DC)",   _fmt(E_dc, 0),        "kWh/año", "Energía generada por los módulos"),
-            ("E_ac anual (entrega a red)",   _fmt(E_ac, 0),        "kWh/año", "Energía AC neta entregada al edificio"),
+            ("E_ac anual (entrega a red)",   _fmt(E_ac, 0),        "kWh/año", _tx["destino"]),
             ("Performance Ratio (PR)",       _fmt(PR, 1),          "%",        "IEC 61724: PR = Y_f / Y_r · Bueno: >75%"),
             ("Y_f — Final yield",            _fmt(Yf, 0),          "kWh/kWp", "Horas equivalentes a plena carga AC"),
             ("Y_r — Reference yield",        _fmt(Yr, 0),          "h",        "Horas sol pico equivalentes en el sitio"),
             ("Factor de Planta",             _fmt(CF, 2),          "%",        "E_ac / (P_STC × 8 760 h)"),
         ],
-        nota="Performance Ratio > 100%: posible en climas fríos de alta altitud (Bogotá, Medellín) "
-             "donde los módulos CdTe operan por debajo de 25°C muchas horas, ganando eficiencia "
-             "respecto a las condiciones STC. IEC 61724 permite PR > 100% — es un resultado físicamente correcto.")
+        nota=nota_pr(PR))
         # ── #4/#108 — Gráfica de barras de producción mensual ────────────────
         _df_m_pdf = st.session_state.get("df_mensual_produccion")
         if _df_m_pdf is not None and "E_ac (kWh)" in getattr(_df_m_pdf, "columns", []):
@@ -1032,13 +1049,55 @@ def generar_html_reporte() -> str:
     _gr = secciones_granja(st.session_state) if incluir_granja else {}
     if _gr:
         html += seccion("Granja FV — Campo, Sombra entre Filas, Agrivoltaica y Eléctrico", "🌾", COLOR_VERDE)
+        # Spec 07/reporte-granja-completo: las gráficas de la página (vista 3D,
+        # plano eléctrico, luz en el suelo) redibujadas en SVG fijo, más el paso
+        # de la maquinaria y las revisiones de coherencia del campo.
+        _campo_r = rgr.campo_desde_estado(st.session_state)
+        try:
+            from calculos.granja_electrico import diseno_desde_estado as _dis_estado
+            _dis_r = _dis_estado(st.session_state)
+        except Exception:
+            _dis_r = None
+        _luz_r = st.session_state.get("granja_luz_suelo")
+
+        def _h4(t):
+            return f"<h4 style='margin:14px 0 6px;color:{COLOR_PRIMARIO};'>{t}</h4>"
+
         for _clave, _titulo in (("campo", "Campo de filas"), ("energia", "Sombra entre filas en la energía"),
                                 ("agrivoltaica", "Agrivoltaica: luz para el cultivo"),
                                 ("seguidor", "Seguidor de un eje (comparación; la energía usa estructura fija)"),
                                 ("electrico", "Eléctrico por bloques")):
             if _gr.get(_clave):
-                html += f"<h4 style='margin:14px 0 6px;color:{COLOR_PRIMARIO};'>{_titulo}</h4>"
+                html += _h4(_titulo)
                 html += tabla_kv(_gr[_clave])
+            if _clave == "campo" and _campo_r:
+                _svg_3d = rgr.svg_campo_3d(_campo_r, _dis_r)
+                if _svg_3d:
+                    html += _bloque_grafica(_svg_3d, "Vista 3D del campo a escala real, vista desde el frente: "
+                                                     "cada módulo con el color del inversor al que se conecta.")
+                _coh = rgr.coherencia(st.session_state, _campo_r)
+                if _coh:
+                    html += _h4("Coherencia del campo con el resto del proyecto")
+                    html += rgr.html_revisiones(_coh)
+            if _clave == "agrivoltaica" and _campo_r:
+                for _svg_l, _pie_l in ((rgr.svg_luz_suelo(_luz_r), "Luz que llega al suelo a lo largo de una "
+                                        "franja entre dos filas, frente al mismo terreno sin paneles."),
+                                       (rgr.svg_mapa_luz_mensual(_luz_r), "Luz de cada mes en cada punto entre "
+                                        "dos filas: más oscuro = más luz para el cultivo.")):
+                    if _svg_l:
+                        html += _bloque_grafica(_svg_l, _pie_l)
+                _maq = rgr.maquinaria(st.session_state, _campo_r)
+                if _maq:
+                    html += _h4("Paso de la maquinaria agrícola")
+                    html += rgr.html_revisiones(_maq)
+        if _campo_r and _dis_r:
+            _svg_pl = rgr.svg_plano_electrico(_campo_r, _dis_r)
+            if _svg_pl:
+                html += _bloque_grafica(_svg_pl, "Plano eléctrico visto desde arriba: cada módulo con el color de "
+                                                 "su inversor, los inversores y el cable AC hasta el punto de conexión.")
+            _cruzan = rgr.texto_strings_cruzan(_dis_r, _campo_r)
+            if _cruzan:
+                html += caja_nota(_cruzan)
         if _gr.get("bloques"):
             html += """<table style="width:100%;border-collapse:collapse;font-size:0.86em;margin-top:8px;">
               <tr style="background:#1A569A;color:#fff;"><th style="padding:5px 8px;">Inversor</th><th>Strings</th>

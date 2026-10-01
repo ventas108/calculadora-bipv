@@ -626,6 +626,12 @@ if inversor.get("costo_usd"):
 # Propagar inversor a session_state para compatibilidad baterías (#25)
 st.session_state["inversor_nombre_dim"] = inversor_nombre
 st.session_state["inversor_dict_dim"]   = inversor
+# Spec 07/reporte-granja-completo: datos de la ficha que se contradicen (caso
+# real: Growatt MAX 100KTL3 LV con 1.500 V en el catálogo; la ficha dice 1.100 V).
+from calculos.ficha_inversor import alertas_ficha_inversor
+for _af in alertas_ficha_inversor(inversor):
+    (st.error if _af["nivel"] == "🔴" else st.warning)(
+        f"{_af['nivel']} **Ficha del inversor:** {_af['texto']} Corrígela en 🔌 Catálogo Inversores.")
 
 # ── 🔋 Compatibilidad con la batería ya configurada (hueco #1, 1-sep-2026) ────
 # Antes, este selector no sabía nada de baterías -- se podía cambiar

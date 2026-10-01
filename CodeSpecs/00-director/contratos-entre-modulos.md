@@ -132,6 +132,13 @@ Regla de consumo:
 	de `tabla_desglose`). Con `multisup_activo` y energía publicada, el 📄
 	Reporte PDF toma la energía del proyecto de la publicación multi-superficie
 	(`calculos/reporte_multisuperficie`), nunca de `res_produccion`.
+- Reporte de granja y ficha del inversor (1-oct-2026, Spec `07-informes/reporte-granja-completo`):
+	el 📄 Reporte PDF dibuja la granja con `calculos/reporte_granja` a partir del
+	mismo campo (`granja_fv.calcular_campo`) y diseño (`granja_electrico.diseno_desde_estado`)
+	que la página; el módulo k es del string `k // N_serie + 1`, como en
+	`armar_strings`. Las pérdidas de 🔀 Mismatch del reporte salen de
+	`res_produccion` (`pct_*_aplicado`); la altitud de `alt_proyecto` o la ciudad.
+	`ficha_inversor.alertas_ficha_inversor` revisa la ficha en 📐 Dimensionamiento.
 - NOCT y γ del Motor Óptico frente a la ficha (30-sep-2026, Spec `05-perdidas-y-temperatura/motor-optico-ficha-termica`):
 	`motor_optico_noct` sigue siendo la fuente de la temperatura de celda en
 	Producción; `calculos/motor_optico_ficha.diferencias_ficha` lo compara con
