@@ -371,6 +371,9 @@ def registro_publicacion(estado: Mapping[str, Any], resultados: Mapping[str, Map
         "firma": firma_cadena(parametros_cadena(estado), superficies,
                               list(estado.get("multisup_inversores") or [])),
         "pr": {n: round(float(r["pr"]), 5) for n, r in resultados.items()},
+        # Spec 07/reporte-multisuperficie: la tabla de pérdidas de cada
+        # superficie viaja con la publicación para el 📄 Reporte PDF.
+        "desglose": tabla_desglose(resultados),
     }
 
 
