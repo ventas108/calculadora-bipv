@@ -67,6 +67,20 @@ def v_sistema_desde_fila(fila, nombre: str):
     return float(respaldo) if respaldo else None
 
 
+def alfa_isc_desde_fila(fila, nombre: str):
+    """Coeficiente de temperatura de Isc (α, %/°C): columna ``CoefIsc_C`` del
+    Excel (la escribe «Agregar desde PDF» y la tabla de edición); sin ella,
+    el ``Tk_alfa`` de ``datos/tecnologias_bipv.py`` para el mismo modelo
+    (Spec 01-datos-proyecto/coef-isc-catalogo). Antes el catálogo nunca lo
+    leía y 🔬 Motor IV avisaba «Coef. Temp. Isc (α) no definido»."""
+    v = _f(fila.get("CoefIsc_C")) if fila is not None else None
+    if v is not None and v != 0:
+        return v
+    from datos.tecnologias_bipv import MODULOS_BIPV
+    respaldo = (MODULOS_BIPV.get(str(nombre or "").strip()) or {}).get("Tk_alfa")
+    return float(respaldo) if respaldo else None
+
+
 def excel_mtime() -> float:
     """mtime del Excel de paneles -- mismo patrón #26 que ya usa
     datos/catalogo_inversores_excel.py::excel_mtime_inv(). Agregado
@@ -110,6 +124,8 @@ def cargar_catalogo_paneles() -> dict:
             "costo_usd":         costo if (costo and costo > 0) else None,
             "NOCT":              _f(r.get("NOCT_C")),
             "V_sistema_max":     v_sistema_desde_fila(r, nombre),
+            "CoefIsc_C":         alfa_isc_desde_fila(r, nombre),
+            "Tk_alfa":           alfa_isc_desde_fila(r, nombre),
             "beta_mp":           _f(r.get("CoefT_C")),
             "CoefVoc_C":         _f(r.get("CoefVoc_C")),
             "transparencia_pct": _f(r.get("TransparenciaPct"), 0),
