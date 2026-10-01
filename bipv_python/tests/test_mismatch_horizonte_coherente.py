@@ -245,7 +245,14 @@ def test_produccion_avisa_si_mismatch_no_se_abrio():
 
 
 def test_reporte_muestra_el_factor_aplicado():
-    assert 'st.session_state.get("factor_mismatch_aplicado"' in _src(_PAG10)
+    # Spec 07/reporte-granja-completo: el reporte arma las filas de 🔀 Mismatch
+    # con filas_mismatch, que usa el factor aplicado por Producción y solo
+    # recurre a factor_global_mismatch si falta.
+    from calculos.reporte_produccion import filas_mismatch
+    assert "filas_mismatch(st.session_state, res_prod)" in _src(_PAG10)
+    filas = {f[0]: f[1] for f in filas_mismatch(
+        {"factor_mismatch_aplicado": 0.97, "factor_global_mismatch": 0.90}, {})}
+    assert filas["Otras pérdidas de 🔀 Mismatch"] == "3.0"
 
 
 # ── Criterio 9: bifacial sin Motor Óptico ────────────────────────────────────

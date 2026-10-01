@@ -23,6 +23,7 @@
 - `bipv_python/pages/10_📄_Reporte_PDF.py`
 - `bipv_python/pages/4_📐_Dimensionamiento.py`
 - `bipv_python/tests/test_reporte_granja_completo.py`
+- `bipv_python/tests/test_mismatch_horizonte_coherente.py`
 - `bipv_python/datos/base_conocimiento_asistente.md`
 - `CodeSpecs/00-director/contratos-entre-modulos.md`
 - `CodeSpecs/00-director/registro-de-decisiones.md`
