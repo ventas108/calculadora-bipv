@@ -17,7 +17,7 @@
   y Pmax 70,2 W en STC (ficha 70 W, +5/−0).
 - [x] El SDM estimado trae NOCT 48 °C; sin NOCT en la ficha no agrega la clave.
 - [x] Guardia de física: los 5 motores dan lo mismo con el caso nuevo.
-- [x] Suite completa de `bipv_python`: ver el PR.
+- [x] Suite completa de `bipv_python`: 2392 pruebas pasan.
 
 ## Resultado
 
