@@ -9,6 +9,9 @@
 - 🏠 Proyecto: desplegable «🧭 Ruta del proyecto» debajo del tipo de
   instalación.
 
+- Corrección: `_tiene(valor)` decide si una página guardó resultado sin
+  comparar con `==` (las tablas de pandas no tienen valor de verdad).
+
 ## Archivos modificados
 
 - `bipv_python/calculos/ruta_proyecto.py`

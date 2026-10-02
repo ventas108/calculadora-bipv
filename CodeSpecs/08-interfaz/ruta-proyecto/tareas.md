@@ -5,3 +5,4 @@
 - [x] Desplegable en 🏠 Proyecto debajo del tipo de instalación.
 - [x] Prueba de humo con AppTest (Fachada → 11 pasos, Granja → 15 estaciones).
 - [x] Manual del Asistente (sección 121), registro, suite y PR.
+- [x] Corrección del error con tablas de pandas al volver a 🏠 Proyecto.
