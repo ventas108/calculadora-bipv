@@ -5881,6 +5881,26 @@ La ficha se dibuja en el servidor con el mismo conversor del Reporte, sin progra
 
 **Cómo explicarlo al usuario:** los parámetros internos del modelo no vienen en las fichas. La app los deduce de lo que sí traen (Voc, Isc, Vmp, Imp, coeficientes) y del dato de 200 W/m² si existe. Para capa fina conviene buscar ese dato en la ficha y escribirlo. Los parámetros de laboratorio solo se necesitan para una certificación de energía.
 
+## 113. 🔬 Baja luz de CIGS con factor de forma bajo y «Origen del modelo» en el selector (1-oct-2026)
+
+**El caso:** el usuario eligió el **FLEX-03-70N** (CIGS, 70 W) en el selector «Panel del catálogo interno» de 🔬 Motor IV y no vio «Origen del modelo».
+
+**Qué pasaba:**
+- «Origen del modelo» solo salía con el panel que llega de 📐 Dimensionamiento. Ahora sale también con el panel elegido en el selector.
+- La ficha de ese panel tiene factor de forma bajo y el catálogo trae Ns = 40. El modelo daba **~110 % a 200 W/m²**, es decir, más eficiente con poca luz que a plena luz, algo que no es físico y sobrestima la energía en fachadas. El ajuste solo podía bajar el factor de idealidad y aquí había que subirlo.
+
+**Qué cambió:**
+- El ajuste busca el factor de idealidad entre 0,75 y 2,2. El 70N queda en ✅ **97 %** a 200 W/m² y la ficha se sigue reproduciendo en STC.
+- Si el objetivo no se alcanza, «Origen del modelo» lo avisa con ⚠️ y pide revisar Vmp, Imp e Isc de la ficha.
+- El MiaSolé FLEX-03 90N y los paneles de silicio no cambian.
+
+**Qué debe ver el usuario** en 🔬 Motor IV › «Origen del modelo» con el 70N:
+- ✅ Tecnología CIGS.
+- ✅ Baja luz con el valor por defecto (97 %).
+- La línea de «celdas estimadas» no aparece, porque el catálogo ya trae Ns = 40.
+
+**Sobre el formulario «Introducir parámetros SDM reales»:** muestra los valores **estimados** para que el usuario los vea. No hay que pulsar «Validar y usar SDM real» si no tiene parámetros de laboratorio.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
