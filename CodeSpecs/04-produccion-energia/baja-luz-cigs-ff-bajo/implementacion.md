@@ -9,6 +9,7 @@
 - `_error_ajuste_200` cuando el objetivo no se alcanza.
 - `_mostrar_origen_modelo` en 🔬 Motor IV, llamada desde Dimensionamiento y
   desde el selector.
+- Panel del selector guardado en la sesión (`motor_iv_panel_usado`).
 - Ficha de la prueba reconstruida a partir de lo que mostró Motor IV: Voc 23,3 V,
   Isc 4,67 A, Vmp 18,0 V, Imp 3,9 A y N_s 40. Con ella el modelo reproduce
   R_s ≈ 0,93 Ω y R_sh ≈ 115 Ω, como en la pantalla del usuario.

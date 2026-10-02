@@ -14,6 +14,9 @@ avisado. Y «Origen del modelo» debe salir siempre que el modelo sea estimado.
   la ficha, así que el STC se sigue reproduciendo.
 - `_error_ajuste_200` cuando el resultado queda a más de 1 punto del objetivo.
 - Llamar `_mostrar_origen_modelo` también desde el selector de 🔬 Motor IV.
+- Guardar el panel del selector en la sesión (`motor_iv_panel_usado`) para que
+  todas las acciones de la página lo sigan usando. Se descarta si cambia el
+  panel de 📐 Dimensionamiento.
 
 ## Alternativas descartadas
 

@@ -5893,6 +5893,7 @@ La ficha se dibuja en el servidor con el mismo conversor del Reporte, sin progra
 - El ajuste busca el factor de idealidad entre 0,75 y 2,2. El 70N queda en ✅ **97 %** a 200 W/m² y la ficha se sigue reproduciendo en STC.
 - Si el objetivo no se alcanza, «Origen del modelo» lo avisa con ⚠️ y pide revisar Vmp, Imp e Isc de la ficha.
 - El MiaSolé FLEX-03 90N y los paneles de silicio no cambian.
+- El panel elegido con «Usar este panel» se mantiene al pulsar los demás botones de la página: la curva, «Ejecutar validación» y «Generar comparación FF vs G». Antes, la gráfica FF vs G volvía al **ASP-ST1-T40** por defecto. La elección se descarta si cambias el panel en 📐 Dimensionamiento.
 
 **Qué debe ver el usuario** en 🔬 Motor IV › «Origen del modelo» con el 70N:
 - ✅ Tecnología CIGS.

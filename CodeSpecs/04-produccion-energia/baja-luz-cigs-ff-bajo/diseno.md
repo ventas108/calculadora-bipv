@@ -15,6 +15,10 @@ Ficha del catálogo: Voc, Isc, Vmp, Imp, N_s (opcional), tecnología y
 - 🔬 Motor IV muestra «Origen del modelo» en los dos caminos (Dimensionamiento y
   selector), con la línea ⚠️ si el ajuste no llegó al objetivo.
 
+- `st.session_state["motor_iv_panel_usado"] = {"panel", "panel_dim"}`: se
+  aplica en cada recarga mientras `panel_dim` coincida con el panel actual de
+  Dimensionamiento.
+
 ## Tipos de datos
 
 `_error_ajuste_200: str | None`; `gamma_ref: float`.
@@ -38,3 +42,6 @@ Ficha del catálogo: Voc, Isc, Vmp, Imp, N_s (opcional), tecnología y
 3. Objetivo de 60 %: `_error_ajuste_200` lo explica.
 4. Los 5 motores dan lo mismo con el caso nuevo (guardia de física).
 5. «Origen del modelo» llamado desde los dos caminos de 🔬 Motor IV.
+6. Prueba con AppTest: elegir un panel CIGS del catálogo, pulsar «Usar este
+   panel» y luego «Generar comparación FF vs G». La gráfica usa ese panel y no
+   el ASP-ST1-T40.

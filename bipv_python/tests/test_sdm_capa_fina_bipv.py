@@ -160,7 +160,33 @@ def test_manual_del_asistente_seccion_113():
     kb = (_RAIZ / "datos" / "base_conocimiento_asistente.md").read_text(encoding="utf-8")
     i = kb.index("## 113.")
     s = kb[i:kb.find("\n## ", i + 5) if kb.find("\n## ", i + 5) > 0 else None]
-    for t in ("FLEX-03-70N", "Origen del modelo", "200 W/m²", "97 %", "0,75 y 2,2"):
+    for t in ("FLEX-03-70N", "Origen del modelo", "200 W/m²", "97 %", "0,75 y 2,2", "Usar este panel",
+              "Generar comparación FF vs G"):
         assert t in s, t
     assert i < kb.rindex("Calculadora BIPV — Innovación Química")
     assert "PVsyst" not in s and "pendiente" not in s
+
+
+def test_el_panel_elegido_en_el_selector_sigue_en_ff_vs_g(monkeypatch):
+    # Caso real (1-oct-2026): tras «Usar este panel» con el FLEX-03-70N, el
+    # botón «Generar comparación FF vs G» recargaba la página y la gráfica
+    # volvía al ASP-ST1-T40 por defecto.
+    import json
+    AppTest = pytest.importorskip("streamlit.testing.v1").AppTest
+    from datos.catalogo_paneles_excel import cargar_catalogo_paneles
+    cat = cargar_catalogo_paneles()
+    nombre = next(k for k, v in cat.items() if v.get("tecnologia") == "CIGS"
+                  and (v.get("Voc") or 0) > 10 and (v.get("Imp") or 0) > 0.05)
+    import calculos.auth as auth
+    monkeypatch.setattr(auth, "requerir_login",
+                        lambda solo_admin=False: {"email": "t@t", "rol": "admin", "activo": True})
+    at = AppTest.from_file(str(_RAIZ / "pages" / "3_🔬_Motor_IV.py"), default_timeout=180).run()
+    assert not at.exception
+    at.selectbox(key="motor_iv_panel_manual").set_value(nombre).run()
+    at.button(key="btn_panel_manual").click().run()
+    at.button(key="btn_ff_g").click().run()
+    assert not at.exception
+    figuras = [json.loads(e.proto.spec) for e in at.get("plotly_chart")]
+    nombres = [t.get("name") for f in figuras for t in f.get("data", [])]
+    assert nombre in nombres and "ASP-ST1-T40" not in nombres
+    assert any("Origen del modelo" in i.value for i in at.info)

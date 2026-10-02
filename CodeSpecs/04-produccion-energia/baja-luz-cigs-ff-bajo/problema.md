@@ -23,6 +23,11 @@ se encontraron tres fallas:
    13 puntos por encima del objetivo, lo que sobrestima la energía en fachadas
    con mucha luz difusa.
 
+4. **El panel elegido en el selector no se mantenía.** «Usar este panel» solo
+   valía en la recarga en que se pulsaba. Al pulsar otro botón, como «Generar
+   comparación FF vs G», la página volvía al ASP-ST1-T40 por defecto. El usuario
+   lo vio en la gráfica FF vs G (1-oct-2026).
+
 ## Contexto
 
 Viene de la Spec `04/sdm-capa-fina-bipv`, que se probó con el FLEX-03 90N: sin

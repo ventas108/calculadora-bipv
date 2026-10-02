@@ -11,6 +11,8 @@
   - STC reproducido.
 - [x] MiaSolé FLEX-03 90N sin cambios: factor de idealidad 1,053 y 97,0 %.
 - [x] Objetivo inalcanzable (60 %): queda avisado en `_error_ajuste_200`.
+- [x] AppTest: tras «Usar este panel», FF vs G usa el panel CIGS elegido. Con
+  el código anterior la gráfica mostraba el ASP-ST1-T40.
 - [x] Guardia de física: los 5 motores dan lo mismo con el caso nuevo.
 - [x] Suite completa de `bipv_python`: ver el PR.
 

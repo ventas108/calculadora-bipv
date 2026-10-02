@@ -252,7 +252,23 @@ with st.expander(
                 f"🟡 **Catálogo Excel** — SDM estimado desde ficha. Resultados orientativos.{_msg_adv}"
             )
 
+    # El botón solo vale «True» en la recarga en que se pulsa. La elección se
+    # guarda en la sesión para que las demás acciones de la página (curva,
+    # validación @ STC, FF vs G) sigan usando este panel y no vuelvan al
+    # ASP-ST1-T40 por defecto. Se descarta si cambia el panel de 📐 Dimensionamiento.
     if st.button("▶️ Usar este panel", key="btn_panel_manual", disabled=_es_separador):
+        st.session_state["motor_iv_panel_usado"] = {
+            "panel": _panel_manual_nom,
+            "panel_dim": st.session_state.get("panel_nombre_dim", ""),
+        }
+    _sel_guardada = st.session_state.get("motor_iv_panel_usado") or {}
+    _panel_usado = _sel_guardada.get("panel")
+    if (
+        _panel_usado
+        and _sel_guardada.get("panel_dim") == st.session_state.get("panel_nombre_dim", "")
+        and (_panel_usado in MODULOS_BIPV or _panel_usado in _cat_excel)
+    ):
+        _panel_manual_nom = _panel_usado
         if _panel_manual_nom in MODULOS_BIPV:
             _panel_activo = MODULOS_BIPV[_panel_manual_nom]
             _estimado     = False
