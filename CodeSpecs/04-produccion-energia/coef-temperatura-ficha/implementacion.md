@@ -6,7 +6,8 @@
 
 - `_voc_pvsyst_a_T` y `_coeficientes_temperatura_modelo`.
 - Paso final en `estimar_sdm_desde_ficha`:
-  - malla de 9 Eg en ±0,4 eV y bisección del cruce con β;
+  - secante en Eg desde la nominal (2 a 4 ajustes, límites ±0,4 eV); si β ya
+    está a ±0,003 de la ficha no se re-ajusta (0,25 s por panel, antes 0,12 s);
   - mu_gamma re-ajustado a γ en cada Eg.
 - `EgRef` en el resolutor común.
 - `_rs_min = 0,01 · Vmp/Imp` en el ajuste de baja luz. La teja ya no
@@ -18,7 +19,7 @@ Resultados (resolutor común):
 
 | Panel | β ficha | β antes | β ahora | γ ficha | γ ahora |
 |---|---|---|---|---|---|
-| JA Solar 730 W | −0,25 | −0,255 | −0,250 | −0,29 | −0,290 |
+| JA Solar 730 W | −0,25 | −0,255 | −0,255 (dentro de ±0,005) | −0,29 | −0,290 |
 | LR6-60HIBD 305 | −0,267 | −0,289 | −0,267 | −0,338 | −0,338 |
 | EINNOVA ESM-550T | −0,26 | −0,752 | −0,259 | −0,36 | −0,359 (antes −0,88) |
 | Teja Hanergy 32 W | −0,36 | −0,248 | −0,299 ⚠️ | −0,40 | −0,400 |

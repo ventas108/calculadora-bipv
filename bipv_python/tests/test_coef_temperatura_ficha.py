@@ -83,10 +83,16 @@ def test_miasole_70n_dentro_de_tolerancia():
 
 
 def test_el_resolutor_usa_la_eg_del_panel():
+    # El JA Solar ya cae a ±0,003 de su β con la Eg nominal (no se re-ajusta);
+    # con otra Eg el Voc en caliente debe cambiar en el resolutor común.
     sdm = _sdm(JAM_730)
+    assert sdm["EgRef"] == pytest.approx(1.121, abs=0.01)
     v_hot = resolver_curva_iv(1000, 60, sdm, n_puntos=0)["Voc"]
-    v_hot_nominal = resolver_curva_iv(1000, 60, {**sdm, "EgRef": None}, n_puntos=0)["Voc"]
-    assert abs(v_hot - v_hot_nominal) > 0.05
+    v_hot_otra_eg = resolver_curva_iv(1000, 60, {**sdm, "EgRef": 1.5}, n_puntos=0)["Voc"]
+    assert abs(v_hot - v_hot_otra_eg) > 0.05
+    # Y la Eg ajustada de la teja (≠ nominal) es la que usa el resolutor.
+    teja = _sdm(TEJA_32)
+    assert teja["EgRef"] < 1.0 and _coef(teja)[0] == pytest.approx(teja["_beta_voc_modelo"], abs=0.01)
 
 
 def test_motor_iv_muestra_beta_y_gamma():

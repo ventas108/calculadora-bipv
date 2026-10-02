@@ -1354,34 +1354,47 @@ def _estimar_sdm_desde_ficha_calculo(panel: dict) -> "dict | None":
                 return None
 
         _eg_lo, _eg_hi = max(0.6, EgRef - 0.4), EgRef + 0.4
-        _sel = None
-        if _beta_ficha is not None:
-            _cands = [(eg, _seguro(eg)) for eg in np.linspace(_eg_lo, _eg_hi, 9)]
-            _cands = [(eg, r) for eg, r in _cands if r is not None]
-            if _cands:
-                _sel = min(_cands, key=lambda c: abs(c[1][1] - _beta_ficha))
-                for (e1, r1), (e2, r2) in zip(_cands, _cands[1:]):
-                    if (r1[1] - _beta_ficha) * (r2[1] - _beta_ficha) <= 0:
-                        lo, hi, b_lo = e1, e2, r1[1]
-                        for _ in range(20):
-                            if hi - lo < 1e-3:
-                                break
-                            mid = 0.5 * (lo + hi)
-                            r_mid = _seguro(mid)
-                            if r_mid is None:
-                                break
-                            if (r_mid[1] - _beta_ficha) * (b_lo - _beta_ficha) > 0:
-                                lo, b_lo = mid, r_mid[1]
-                            else:
-                                hi = mid
-                        _r = _seguro(0.5 * (lo + hi))
-                        if _r is not None:
-                            _sel = (0.5 * (lo + hi), _r)
+        # Punto de partida: Eg nominal. En los caminos PVsyst mu_gamma ya está
+        # ajustado a γ con esa Eg y basta medir β (sin re-ajustar).
+        _r0 = None
+        if _metodo.startswith("pvsyst") and np.isfinite(mu_gamma):
+            try:
+                import warnings as _warnings
+                with _warnings.catch_warnings(), np.errstate(all="ignore"):
+                    _warnings.simplefilter("ignore", RuntimeWarning)
+                    _b0, _g0 = _coeficientes_temperatura_modelo(
+                        _pmax_t, alpha_sc_A, gamma_ref, mu_gamma, I_L, I_o, R_sh, _r0_t,
+                        _rexp_t, R_s, N_s_est, EgRef)
+                if abs(_g0 - Tk_gamma_pct) < 0.005:
+                    _r0 = (mu_gamma, _b0, _g0)
+            except Exception:
+                _r0 = None
+        if _r0 is None:
+            _r0 = _seguro(EgRef)
+        _sel = (EgRef, _r0) if _r0 is not None else None
+        # β cambia casi en línea recta con Eg (mu_gamma re-ajustado a γ en cada
+        # punto): secante desde la nominal, 2 a 4 ajustes en vez de una malla.
+        if _sel is not None and _beta_ficha is not None and abs(_r0[1] - _beta_ficha) > 0.003:
+            _pts = [(EgRef, _r0)]
+            _e1 = min(EgRef + 0.2, _eg_hi)
+            _r1 = _seguro(_e1)
+            if _r1 is not None:
+                _pts.append((_e1, _r1))
+                for _ in range(2):
+                    (ea, ra), (eb, rb) = _pts[-2], _pts[-1]
+                    if abs(rb[1] - ra[1]) < 1e-9:
                         break
-        if _sel is None:
-            _r = _seguro(EgRef)
-            if _r is not None:
-                _sel = (EgRef, _r)
+                    e_new = eb + (_beta_ficha - rb[1]) * (eb - ea) / (rb[1] - ra[1])
+                    e_new = float(min(max(e_new, _eg_lo), _eg_hi))
+                    if any(abs(e_new - e) < 1e-4 for e, _ in _pts):
+                        break
+                    r_new = _seguro(e_new)
+                    if r_new is None:
+                        break
+                    _pts.append((e_new, r_new))
+                    if abs(r_new[1] - _beta_ficha) < 0.002 or e_new in (_eg_lo, _eg_hi):
+                        break
+            _sel = min(_pts, key=lambda c: abs(c[1][1] - _beta_ficha))
         if _sel is not None:
             _eg_efectiva = float(_sel[0])
             mu_gamma, _beta_modelo, _gamma_modelo = _sel[1]
