@@ -769,7 +769,9 @@ def generar_html_reporte() -> str:
             _delta_pdf = _cmp_pdf.get("diferencia_pct_anual")
             if _delta_pdf is not None:
                 html += tabla_kv([
-                    ("POA PVGIS (fuente oficial)", _fmt(_cmp_pdf["poa_pvgis_anual_kwh_m2"], 0), "kWh/m²/año", ""),
+                    (("POA PVGIS — cara frontal" if _cmp_pdf.get("solo_cara_frontal") else "POA PVGIS (fuente oficial)"),
+                     _fmt(_cmp_pdf["poa_pvgis_anual_kwh_m2"], 0), "kWh/m²/año",
+                     ("Sin la cara trasera: PVWatts es monofacial" if _cmp_pdf.get("solo_cara_frontal") else "")),
                     ("POA PVWatts (NREL/NLR)",     _fmt(_cmp_pdf["poa_pvwatts_anual_kwh_m2"], 0), "kWh/m²/año",
                      f"Fuente: {_pvwatts_pdf.get('fuente') or 'PVWatts/NSRDB'}"),
                     ("Diferencia anual",           _fmt(_delta_pdf, 1, "%"), "",
@@ -2031,9 +2033,14 @@ def generar_html_reporte() -> str:
             </span>
         </div>"""
 
+        # Spec 07/coherencia-reporte: el texto decía «la fachada BIPV» también en granjas.
+        _tipo_inst_co2 = str(st.session_state.get("tipo_instalacion") or "")
+        _sujeto_co2 = ("la granja solar" if "granja" in _tipo_inst_co2.lower()
+                       else "la fachada BIPV" if "fachada" in _tipo_inst_co2.lower()
+                       else "el sistema fotovoltaico")
         html += caja_nota(
             "<strong>Este proyecto no es solo una inversión financiera — es una declaración de liderazgo climático.</strong> "
-            "Cada kWh generado por la fachada BIPV desplaza energía de una red que aún depende de combustibles fósiles "
+            f"Cada kWh generado por {_sujeto_co2} desplaza energía de una red que aún depende de combustibles fósiles "
             "en épocas de sequía. Al instalar este sistema, la organización puede reportar emisiones evitadas ante el "
             "RETC, acreditar ante la ANLA y posicionarse como empresa carbono-comprometida frente a clientes, "
             "inversionistas y entidades financiadoras.",
@@ -2097,8 +2104,28 @@ _nota_sello_rep = st.text_input(
     placeholder="Ej.: Versión final entregada al cliente",
 )
 
+# ── Spec 07/coherencia-reporte: revisión antes de generar ─────────────────────
+# El informe junta el último cálculo de cada página; si alguna no se volvió a
+# ejecutar, mezclaría momentos distintos (Granja Apartadó 3: «3 inversores» con
+# reparto 7+7+7+7 y CO₂ con 50.000 kWh de ejemplo).
+from calculos.coherencia_reporte import revisar_coherencia_reporte
+_problemas_rep = revisar_coherencia_reporte(st.session_state)
+_errores_rep = [p for p in _problemas_rep if p["nivel"] == "error"]
+if _errores_rep:
+    st.error(
+        "🔴 **El reporte tendría datos contradictorios.** Corrige esto antes de entregarlo:  \n"
+        + "  \n".join(f"- **{p['titulo']}:** {p['detalle']} → {p['accion']}" for p in _errores_rep)
+    )
+    _forzar_rep = st.checkbox(
+        "Generar de todas formas (solo para revisión interna)", value=False,
+        key="rep_generar_incoherente",
+    )
+else:
+    st.success("✅ Datos coherentes entre Dimensionamiento, Producción, CO₂ y Financiero.")
+    _forzar_rep = True
+
 if st.button("📄 Generar Reporte", type="primary", use_container_width=True,
-             key="btn_generar", disabled=not _trm_ok_rep,
+             key="btn_generar", disabled=(not _trm_ok_rep) or (not _forzar_rep),
              help="La TRM debe estar confirmada antes de generar el reporte."
                   if not _trm_ok_rep else None):
     with st.spinner("Generando reporte…"):

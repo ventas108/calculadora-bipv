@@ -5989,6 +5989,26 @@ Los avisos de las cuatro primeras etapas están escritos para el cliente. Explic
 
 La etapa elegida se recuerda mientras dure la sesión.
 
+## 118. 🔎 Revisión de coherencia antes de generar el Reporte (2-oct-2026)
+
+**El caso:** el informe de la Granja Solar Apartadó 3 (403,2 kWp) traía datos de momentos distintos:
+- decía «**3** × Growatt MAX 100KTL3 LV · DC/AC 1,34» y, en la línea siguiente, «reparto **7 + 7 + 7 + 7**», que son 4 inversores;
+- no traía la sección de Producción;
+- el CO₂ era de **6,3 t/año**. Eso sale de los **50.000** kWh de ejemplo que 🌿 Impacto CO₂ ofrece cuando no hay Producción; la granja produce ~604 MWh, que son ~76 t/año.
+
+**Por qué pasa:** cada página guarda su último cálculo. Si cambias algo, como poner 4 inversores en 📐 Dimensionamiento, y no vuelves a ejecutar ⚡ Producción, 🌿 Impacto CO₂ y 💰 Financiero, el reporte junta datos viejos con nuevos.
+
+**Qué cambió:**
+1. Antes del botón «📄 Generar Reporte» hay una **revisión automática**, que compara:
+   - los **inversores** de Producción frente al reparto y a la cantidad fijada en Dimensionamiento;
+   - la **energía** de Producción frente a la usada en 🌿 Impacto CO₂ y en 💰 Financiero (tolerancia 2 %), o si se escribió a mano;
+   - que exista la Producción.
+2. Si hay contradicciones, aparece 🔴 con cada problema y **qué página volver a ejecutar**. El botón queda bloqueado hasta corregir, o hasta marcar «**Generar de todas formas** (solo para revisión interna)».
+3. **Verificación PVGIS vs PVWatts:** con paneles bifaciales ahora compara solo la **cara frontal**, porque PVWatts es monofacial. En Apartadó, la diferencia correcta es ~0,4 % y no −7,1 %. Este cambio aplica al volver a abrir ☀️ Recurso Solar.
+4. El texto de CO₂ ya no dice «fachada BIPV» en granjas: dice «la granja solar».
+
+**Orden recomendado antes del reporte:** 📐 Dimensionamiento → ⚡ Producción → 🌿 Impacto CO₂ → 💰 Financiero → 📄 Reporte.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
