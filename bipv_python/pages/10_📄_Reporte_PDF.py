@@ -89,6 +89,19 @@ with col_op1:
             st.session_state.pop("empresa_logo_b64", None)
             st.rerun()
 with col_op2:
+    # Spec 07/etapa-documento (2-oct-2026): reemplaza el «BORRADOR» fijo.
+    from calculos.etapa_documento import ETAPA_DEFECTO, ETAPAS
+    _claves_etapa = list(ETAPAS)
+    # La elección se guarda aparte («reporte_etapa»): la clave del widget se
+    # borra al cambiar de página y el reporte volvería a la etapa por defecto.
+    _etapa_guardada = st.session_state.get("reporte_etapa", ETAPA_DEFECTO)
+    st.session_state["reporte_etapa"] = st.selectbox(
+        "Etapa del documento", _claves_etapa,
+        index=_claves_etapa.index(_etapa_guardada if _etapa_guardada in ETAPAS else ETAPA_DEFECTO),
+        format_func=lambda k: ETAPAS[k]["nombre"], key="rep_etapa",
+        help="Define la etiqueta junto al título y el aviso del encabezado (también en Word y PDF). "
+             "«Borrador interno» solo para tus revisiones: su aviso está dirigido a ti, no al cliente.",
+    )
     balance_ok_ui   = st.session_state.get("balance_ok", False)
     incluir_motor   = st.checkbox("Incluir sección Motor Óptico",    value=motor_optico,   key="rep_inc_motor")
     incluir_dim     = st.checkbox("Incluir sección Dimensionamiento (sistema eléctrico e inversores)",
@@ -613,6 +626,9 @@ def generar_html_reporte() -> str:
         </div>"""
 
     # ── Encabezado ────────────────────────────────────────────────────────────
+    # Spec 07/etapa-documento: etiqueta y aviso según la etapa elegida.
+    from calculos.etapa_documento import encabezado_etapa
+    _badge_etapa, _aviso_etapa = encabezado_etapa(st.session_state.get("reporte_etapa"))
     html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -628,8 +644,7 @@ def generar_html_reporte() -> str:
   h2 {{ margin:0; }}
   .badge {{ display:inline-block; padding:3px 10px; border-radius:12px; font-size:0.78em;
             font-weight:bold; margin-left:8px; }}
-  .badge-borrador {{ background:#fdebd0; color:#d35400; }}
-  .aviso-borrador {{ background:#fef9e7; border:2px solid {COLOR_ACENTO}; padding:10px 16px;
+  .aviso-etapa {{ background:#fef9e7; border:2px solid {COLOR_ACENTO}; padding:10px 16px;
                      border-radius:6px; margin:16px 0; font-size:0.9em; }}
   table {{ width:100%; }}
   @media print {{
@@ -654,7 +669,7 @@ def generar_html_reporte() -> str:
        if st.session_state.get("empresa_contacto") else ''}
       <div style="font-size:1.15em;font-weight:bold;color:{COLOR_TEXTO};">
         REPORTE TÉCNICO — SISTEMA BIPV
-        <span class="badge badge-borrador">BORRADOR</span>
+        {_badge_etapa}
       </div>
       <div style="color:#888;margin-top:4px;font-size:0.92em;">
         Versión 2026 · Generado el {fecha_hoy} · Calculadora BIPV Colombia
@@ -666,10 +681,7 @@ def generar_html_reporte() -> str:
      else f'<div style="text-align:right;color:{COLOR_PRIMARIO};font-size:1.8em;line-height:1;">☀️</div>'}
   </div>
 
-  <div class="aviso-borrador">
-    ⚠️ <strong>BORRADOR:</strong> Este reporte es preliminar y fue generado automáticamente
-    por la Calculadora BIPV Colombia. Verifique los datos de entrada antes de presentarlo al cliente.
-  </div>
+  {_aviso_etapa}
 """
 
     # ── 1. Resumen del Proyecto ───────────────────────────────────────────────

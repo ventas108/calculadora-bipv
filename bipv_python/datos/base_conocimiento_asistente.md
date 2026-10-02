@@ -5971,6 +5971,24 @@ A 300 W/m² el modelo no baja de ~90 %. Además, la misma ficha se contradice en
 
 **Si la app vuelve a ponerse lenta:** anota en qué página y qué botón, y avísale al equipo técnico. Hay una prueba automática que impide que el catálogo vuelva a quedar sin caché.
 
+## 117. 📄 Etapa del documento en el Reporte (adiós al «BORRADOR» fijo) (2-oct-2026)
+
+**El caso:** el reporte de Urabá seguía saliendo con «BORRADOR» y con el aviso «Verifique los datos de entrada antes de presentarlo al cliente», aunque el usuario lo había borrado antes en Word. Ese texto estaba fijo en la app y volvía en cada reporte nuevo.
+
+**Qué cambió:** en 📄 Reporte PDF › Opciones del reporte hay un selector **«Etapa del documento»**. La etapa elegida define la etiqueta junto al título y el aviso del encabezado, en HTML, **Word** y PDF.
+
+| Etapa | Etiqueta | Cuándo usarla |
+|---|---|---|
+| **Estudio de prefactibilidad** (por defecto) | ESTUDIO DE PREFACTIBILIDAD | Antes de la visita técnica y la ingeniería de detalle; es el término que usan bancos e inversionistas en Colombia |
+| **Propuesta técnica** | PROPUESTA TÉCNICA | Cuando el reporte acompaña una cotización |
+| **Diseño conceptual** | DISEÑO CONCEPTUAL | Proyectos de arquitectura BIPV (fachadas, cubiertas) |
+| **Versión para revisión del cliente** | VERSIÓN PARA REVISIÓN DEL CLIENTE | Cuando esperas comentarios antes de cerrar |
+| **Borrador interno** | BORRADOR INTERNO | Solo para tus revisiones; su aviso está dirigido a ti, no al cliente |
+
+Los avisos de las cuatro primeras etapas están escritos para el cliente. Explican que el estudio usa simulación hora a hora y modelo eléctrico de cada módulo, y que los valores definitivos se confirman en la ingeniería de detalle. Así protegen sin sonar incompletos.
+
+La etapa elegida se recuerda mientras dure la sesión.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
