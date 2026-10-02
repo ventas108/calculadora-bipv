@@ -731,6 +731,44 @@ def _valor_flotante_positivo(valor, alternativo=None):
     return 0.0
 
 
+def parsear_curva_baja_irradiancia(valor) -> list[tuple[float, float]]:
+    """Puntos (G W/m², η relativa %) de la gráfica de baja irradiancia de la ficha.
+
+    Spec ``04/curva-baja-irradiancia-ficha``. Acepta texto ``"300:80; 400:88"``
+    (coma o punto decimal), una lista de pares o un dict. Fracciones (0,80) se
+    pasan a %. Se ignoran G fuera de 50-999 W/m² (1.000 es la referencia) y
+    η fuera de 30-115 %. Devuelve los puntos ordenados por G; ``[]`` si no hay.
+    """
+    if valor is None or (isinstance(valor, float) and valor != valor):
+        return []
+    if isinstance(valor, dict):
+        pares = list(valor.items())
+    elif isinstance(valor, (list, tuple)):
+        pares = [tuple(x) for x in valor if isinstance(x, (list, tuple)) and len(x) == 2]
+    else:
+        pares = []
+        for trozo in str(valor).replace("\n", ";").split(";"):
+            if ":" not in trozo:
+                continue
+            g, eta = trozo.split(":", 1)
+            pares.append((g.strip().replace(",", "."), eta.strip().replace("%", "").replace(",", ".")))
+    puntos = []
+    for g, eta in pares:
+        try:
+            g, eta = float(g), float(eta)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(g) and math.isfinite(eta):
+            puntos.append((g, eta))
+    if puntos and all(eta <= 1.5 for _, eta in puntos):
+        puntos = [(g, eta * 100.0) for g, eta in puntos]
+    vistos = {}
+    for g, eta in puntos:
+        if 50.0 <= g < 1000.0 and 30.0 <= eta <= 115.0:
+            vistos[round(g, 3)] = round(eta, 4)
+    return sorted(vistos.items())
+
+
 def _valor_entero_positivo(valor, alternativo=None):
     """Convierte un valor a entero positivo, rechazando ceros/NoN/strings inválidas."""
     for raw in (valor, alternativo):
@@ -782,7 +820,47 @@ _BETA_VOC_TIPICO = {"CdTe": -0.30, "Mono-Si": -0.37, "Poli-Si": -0.40, "CIGS": -
 _ALFA_ISC_TIPICO = {"CdTe": 0.02, "Mono-Si": 0.05, "Poli-Si": 0.05, "CIGS": 0.01}
 
 
+_CACHE_ESTIMACION: dict = {}
+
+
+def _clave_estimacion(panel: dict):
+    """Clave con los valores simples del panel; None si alguno no es simple."""
+    try:
+        items = []
+        for k, v in sorted((panel or {}).items(), key=lambda kv: str(kv[0])):
+            if isinstance(v, float) and v != v:
+                v = "nan"
+            elif isinstance(v, (list, tuple)):
+                v = tuple(tuple(x) if isinstance(x, (list, tuple)) else x for x in v)
+            elif isinstance(v, dict):
+                v = tuple(sorted(v.items()))
+            hash(v)
+            items.append((str(k), v))
+        return tuple(items)
+    except TypeError:
+        return None
+
+
 def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
+    """Estimación SDM desde ficha, guardada en memoria por panel.
+
+    La calibración de baja luz resuelve el modelo decenas de veces (varios
+    segundos) y 🔬 Motor IV, Producción y Vista 3D piden el mismo panel en
+    cada recarga. Mismos datos → mismo resultado (cada llamada recibe su propia copia).
+    """
+    import copy
+    clave = _clave_estimacion(panel)
+    if clave is not None and clave in _CACHE_ESTIMACION:
+        return copy.deepcopy(_CACHE_ESTIMACION[clave])
+    resultado = _estimar_sdm_desde_ficha_calculo(panel)
+    if clave is not None:
+        if len(_CACHE_ESTIMACION) > 512:
+            _CACHE_ESTIMACION.clear()
+        _CACHE_ESTIMACION[clave] = copy.deepcopy(resultado)
+    return resultado
+
+
+def _estimar_sdm_desde_ficha_calculo(panel: dict) -> "dict | None":
     """
     Estima parámetros SDM (De Soto 2006) a partir de datos básicos de ficha técnica.
 
@@ -1021,7 +1099,14 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
     _rel_200_modelo = None
     _err_cal = None
     _objetivo_200 = _valor_flotante_positivo(panel.get("eficiencia_rel_200"))
-    if 50.0 <= _objetivo_200 <= 110.0:
+    # Spec 04/curva-baja-irradiancia-ficha: la gráfica completa de la ficha
+    # (varios puntos G:η) manda sobre el dato único de 200 W/m².
+    _curva = parsear_curva_baja_irradiancia(panel.get("curva_baja_irradiancia"))
+    _ajuste_curva = None
+    _desv_max_curva = None
+    if _curva:
+        _ajuste_200 = "curva"
+    elif 50.0 <= _objetivo_200 <= 110.0:
         _ajuste_200 = "ficha"
     elif tec_norm == "CIGS":
         _objetivo_200, _ajuste_200 = REL_200_DEFECTO_PCT, "defecto"
@@ -1051,45 +1136,143 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
             except Exception:
                 return None
 
-        try:
-            # Malla en gamma: se descartan los valores donde el modelo deja de
-            # ser físico y se refina entre los dos que encierran el objetivo.
-            # Llega hasta 2,2 (no solo hasta el gamma de partida): con fichas de
-            # FF bajo (MiaSolé FLEX-03 70N, N_s del catálogo) el modelo daba
-            # ~110 % a 200 W/m² y solo se podía bajar el factor de idealidad.
-            malla = [(g, _rel_seguro(g)) for g in np.linspace(0.75, max(gamma_ref, 2.2), 49)]
-            malla = [(g, r) for g, r in malla if r is not None]
-            if not malla:
-                raise ValueError("ningún factor de idealidad da un modelo físico")
-            g_sel = min(malla, key=lambda gr: abs(gr[1] - _objetivo_200))[0]
-            for (g1, r1), (g2, r2) in zip(malla, malla[1:]):
-                if (r1 - _objetivo_200) * (r2 - _objetivo_200) <= 0:
-                    lo, hi, r_lo = g1, g2, r1
-                    for _ in range(40):
-                        mid = 0.5 * (lo + hi)
-                        r_mid = _rel_seguro(mid)
-                        if r_mid is None:
-                            break
-                        if (r_mid - _objetivo_200) * (r_lo - _objetivo_200) > 0:
-                            lo, r_lo = mid, r_mid
+        def _rels_curva(g):
+            """η relativa del modelo (%) en los G de la curva, o None si no es físico."""
+            import warnings as _warnings
+            try:
+                with _warnings.catch_warnings(), np.errstate(all="ignore"):
+                    _warnings.simplefilter("ignore", RuntimeWarning)
+                    rs = _resolver_Rs_pvsyst_por_pmax(
+                        Voc=Voc, Isc=Isc, Vmp=Vmp, Imp=Imp, alpha_sc=alpha_sc_A,
+                        gamma_ref=g, R_sh_ref=R_sh_ref, R_sh_0=R_sh_0,
+                        R_sh_exp=R_sh_exp, N_s=N_s_est, EgRef=EgRef,
+                    )
+                    il, io = _resolver_IL_Io_stc(Voc, Isc, rs, R_sh_ref, g * N_s_est * Vt_ref)
+                    if not (rs > 0 and il > 0 and io > 0):
+                        return None
+                    args = dict(alpha_sc=alpha_sc_A, gamma_ref=g, mu_gamma=0.0, I_L_ref=il,
+                                I_o_ref=io, R_sh_ref=R_sh_ref, R_sh_0=R_sh_0, R_sh_exp=R_sh_exp,
+                                R_s=rs, N_s=N_s_est, EgRef=EgRef)
+                    p1000 = _pmax_pvsyst_a_G(1000.0, 25.0, **args)
+                    rels = [100.0 * (_pmax_pvsyst_a_G(G_c, 25.0, **args) / G_c) / (p1000 / 1000.0)
+                            for G_c, _ in _curva]
+                return rels if all(np.isfinite(rels)) else None
+            except Exception:
+                return None
+
+        def _con_bordes(cruda, f):
+            """Puntos físicos de la malla más el borde de la zona física.
+
+            La malla es gruesa (13 puntos, por velocidad); el mejor ajuste suele
+            estar justo donde R_s llega a 0, entre un punto válido y uno que no
+            lo es. Ese borde se busca por bisección (10 pasos).
+            """
+            extra = []
+            for (g1, v1), (g2, v2) in zip(cruda, cruda[1:]):
+                if (v1 is None) != (v2 is None):
+                    ok, mal, v_ok = (g1, g2, v1) if v1 is not None else (g2, g1, v2)
+                    for _ in range(10):
+                        mid = 0.5 * (ok + mal)
+                        v_mid = f(mid)
+                        if v_mid is None:
+                            mal = mid
                         else:
-                            hi = mid
-                    g_sel = 0.5 * (lo + hi)
-                    break
-            _rel, R_s, I_L, I_o = _con_gamma(g_sel)
-            gamma_ref = g_sel
-            mu_gamma = _resolver_mu_gamma_pvsyst(
-                Pmax_stc=Pmax_stc_ficha, Tk_gamma_pct=Tk_gamma_pct,
-                alpha_sc=alpha_sc_A, gamma_ref=gamma_ref, I_L_ref=I_L, I_o_ref=I_o,
-                R_sh_ref=R_sh_ref, R_sh_0=R_sh_0, R_sh_exp=R_sh_exp, R_s=R_s,
-                N_s=N_s_est, EgRef=EgRef,
-            )
-            R_sh = R_sh_ref
-            _rel_200_modelo = round(float(_rel), 2)
-            _metodo = "pvsyst_v6_calibrado_200"
-            if abs(_rel_200_modelo - _objetivo_200) > 1.0:
-                _err_cal = (f"no se alcanzó {_objetivo_200:.1f} % a 200 W/m²; "
-                            f"el más cercano físico da {_rel_200_modelo:.1f} %")
+                            ok, v_ok = mid, v_mid
+                    extra.append((ok, v_ok))
+            return sorted([(g, v) for g, v in cruda if v is not None] + extra)
+
+        def _sse(g):
+            r = _rels_curva(g)
+            return None if r is None else sum((ri - eta) ** 2 for ri, (_, eta) in zip(r, _curva))
+
+        try:
+            if _ajuste_200 == "curva":
+                # Mínimos cuadrados sobre todos los puntos de la gráfica: malla en
+                # gamma y sección áurea entre los vecinos del mejor punto.
+                _gs = list(np.linspace(0.75, max(gamma_ref, 2.2), 13))
+                malla = _con_bordes([(g, _sse(g)) for g in _gs], _sse)
+                if not malla:
+                    raise ValueError("ningún factor de idealidad da un modelo físico")
+                i_min = min(range(len(malla)), key=lambda i: malla[i][1])
+                lo = malla[max(i_min - 1, 0)][0]
+                hi = malla[min(i_min + 1, len(malla) - 1)][0]
+                _phi = (5 ** 0.5 - 1) / 2
+                c1, c2 = hi - _phi * (hi - lo), lo + _phi * (hi - lo)
+                e1, e2 = _sse(c1), _sse(c2)
+                while hi - lo > 1e-3 and e1 is not None and e2 is not None:
+                    if e1 <= e2:
+                        hi, c2, e2 = c2, c1, e1
+                        c1 = hi - _phi * (hi - lo)
+                        e1 = _sse(c1)
+                    else:
+                        lo, c1, e1 = c1, c2, e2
+                        c2 = lo + _phi * (hi - lo)
+                        e2 = _sse(c2)
+                g_cand = 0.5 * (lo + hi)
+                g_sel = g_cand if (_sse(g_cand) is not None and _sse(g_cand) <= malla[i_min][1]) else malla[i_min][0]
+                _rels_sel = _rels_curva(g_sel)
+                _ajuste_curva = [
+                    {"G": G_c, "ficha": eta, "modelo": round(float(r), 2), "diferencia": round(float(r) - eta, 2)}
+                    for (G_c, eta), r in zip(_curva, _rels_sel)
+                ]
+                _peor = max(_ajuste_curva, key=lambda d: abs(d["diferencia"]))
+                _desv_max_curva = round(abs(_peor["diferencia"]), 2)
+                _rel, R_s, I_L, I_o = _con_gamma(g_sel)
+                gamma_ref = g_sel
+                mu_gamma = _resolver_mu_gamma_pvsyst(
+                    Pmax_stc=Pmax_stc_ficha, Tk_gamma_pct=Tk_gamma_pct,
+                    alpha_sc=alpha_sc_A, gamma_ref=gamma_ref, I_L_ref=I_L, I_o_ref=I_o,
+                    R_sh_ref=R_sh_ref, R_sh_0=R_sh_0, R_sh_exp=R_sh_exp, R_s=R_s,
+                    N_s=N_s_est, EgRef=EgRef,
+                )
+                R_sh = R_sh_ref
+                _rel_200_modelo = round(float(_rel), 2)
+                _metodo = "pvsyst_v6_calibrado_curva"
+                if _desv_max_curva > 3.0:
+                    _err_cal = (f"la curva de la ficha no se puede seguir en todos los puntos: a "
+                                f"{_peor['G']:.0f} W/m² la ficha dice {_peor['ficha']:.1f} % y el "
+                                f"modelo da {_peor['modelo']:.1f} %")
+            else:
+                # Malla en gamma: se descartan los valores donde el modelo deja de
+                # ser físico y se refina entre los dos que encierran el objetivo.
+                # Llega hasta 2,2 (no solo hasta el gamma de partida): con fichas de
+                # FF bajo (MiaSolé FLEX-03 70N, N_s del catálogo) el modelo daba
+                # ~110 % a 200 W/m² y solo se podía bajar el factor de idealidad.
+                malla = _con_bordes(
+                    [(g, _rel_seguro(g)) for g in np.linspace(0.75, max(gamma_ref, 2.2), 13)], _rel_seguro)
+                if not malla:
+                    raise ValueError("ningún factor de idealidad da un modelo físico")
+                g_sel = min(malla, key=lambda gr: abs(gr[1] - _objetivo_200))[0]
+                for (g1, r1), (g2, r2) in zip(malla, malla[1:]):
+                    if (r1 - _objetivo_200) * (r2 - _objetivo_200) <= 0:
+                        lo, hi, r_lo = g1, g2, r1
+                        for _ in range(40):
+                            if hi - lo < 1e-4:
+                                break
+                            mid = 0.5 * (lo + hi)
+                            r_mid = _rel_seguro(mid)
+                            if r_mid is None:
+                                break
+                            if (r_mid - _objetivo_200) * (r_lo - _objetivo_200) > 0:
+                                lo, r_lo = mid, r_mid
+                            else:
+                                hi = mid
+                        g_sel = 0.5 * (lo + hi)
+                        break
+                _rel, R_s, I_L, I_o = _con_gamma(g_sel)
+                gamma_ref = g_sel
+                mu_gamma = _resolver_mu_gamma_pvsyst(
+                    Pmax_stc=Pmax_stc_ficha, Tk_gamma_pct=Tk_gamma_pct,
+                    alpha_sc=alpha_sc_A, gamma_ref=gamma_ref, I_L_ref=I_L, I_o_ref=I_o,
+                    R_sh_ref=R_sh_ref, R_sh_0=R_sh_0, R_sh_exp=R_sh_exp, R_s=R_s,
+                    N_s=N_s_est, EgRef=EgRef,
+                )
+                R_sh = R_sh_ref
+                _rel_200_modelo = round(float(_rel), 2)
+                _metodo = "pvsyst_v6_calibrado_200"
+                if abs(_rel_200_modelo - _objetivo_200) > 1.0:
+                    _err_cal = (f"no se alcanzó {_objetivo_200:.1f} % a 200 W/m²; "
+                                f"el más cercano físico da {_rel_200_modelo:.1f} %")
         except Exception as _e_cal:
             _err_cal = repr(_e_cal)
             _ajuste_200 = None
@@ -1128,6 +1311,8 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
         "_ajuste_200":       _ajuste_200,
         "_rel_200_modelo":   _rel_200_modelo,
         "_error_ajuste_200": _err_cal,
+        "_ajuste_curva":     _ajuste_curva,
+        "_desv_max_curva":   _desv_max_curva,
         # ── Corrección half-cut N_s (tarea #67) ──────────────────────────────
         "_ns_corregido":     _ns_corregido,
         "_ns_original":      _ns_original,

@@ -108,6 +108,12 @@ def excel_mtime() -> float:
 
 
 @st.cache_data(ttl=3600)
+def _texto_celda(valor) -> str:
+    """Texto de una celda del Excel; vacío para NaN/None."""
+    t = str(valor if valor is not None else "").strip()
+    return "" if t.lower() in ("nan", "none") else t
+
+
 def cargar_catalogo_paneles() -> dict:
     df = pd.read_excel(_EXCEL, sheet_name=_SHEET, header=0)
     df.columns = [str(c).strip() for c in df.columns]
@@ -140,6 +146,9 @@ def cargar_catalogo_paneles() -> dict:
             # Spec 04/sdm-capa-fina-bipv: eficiencia relativa a 200 W/m² (%
             # de la de STC, p. ej. 97). Ajusta la baja luz del modelo IV.
             "eficiencia_rel_200": _f(r.get("EficRel200Pct")),
+            # Spec 04/curva-baja-irradiancia-ficha: puntos G:η de la gráfica
+            # «Performance at low irradiance» (p. ej. "300:80; 400:88; 600:96").
+            "curva_baja_irradiancia": _texto_celda(r.get("CurvaBajaIrradiancia")),
             "beta_mp":           _f(r.get("CoefT_C")),
             "CoefVoc_C":         _f(r.get("CoefVoc_C")),
             "transparencia_pct": _f(r.get("TransparenciaPct"), 0),
