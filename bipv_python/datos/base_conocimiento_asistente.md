@@ -5958,6 +5958,19 @@ A 300 W/m² el modelo no baja de ~90 %. Además, la misma ficha se contradice en
 
 **Revisión de la ficha SolTech ASP-LAM3 1200×1800:** Voc 181,4 V (el catálogo dice 181,0 en la T0), α Isc +0,06 y VSYS 1.000 V (vacíos en el catálogo). El Ns = 348 del catálogo da 0,52 V por celda, por debajo del rango típico de CdTe (0,76 a 1,2 V). La ficha no trae el número de celdas.
 
+## 116. ⚡ La app estaba lenta: caché del catálogo de paneles (2-oct-2026)
+
+**El síntoma:** después del despliegue del 2-oct, cada clic en 🔬 Motor IV, 📐 Dimensionamiento, ⚡ Producción o 💰 Financiero tardaba varios segundos.
+
+**La causa:** un cambio en el código del catálogo dejó sin caché la lectura del catálogo de paneles. Las 3.128 filas del Excel se volvían a leer en cada clic, de 5 a 9 segundos cada vez.
+
+**La solución:**
+- El catálogo se lee **una sola vez** y queda en memoria; las siguientes consultas toman ✅ **0,003 s**.
+- Cuando guardas, editas o borras un panel en 📋 Catálogo de Paneles, o se actualiza el servidor, la app lo detecta por la fecha del archivo y lo vuelve a leer sola.
+- La primera lectura después de reiniciar el servidor tarda ~1,5 s.
+
+**Si la app vuelve a ponerse lenta:** anota en qué página y qué botón, y avísale al equipo técnico. Hay una prueba automática que impide que el catálogo vuelva a quedar sin caché.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
