@@ -14,7 +14,7 @@
 - [x] Prioridad curva > 200 W/m² > 97 %; sin curva, sin cambios.
 - [x] Guardia de física: los 5 motores dan lo mismo con la teja calibrada.
 - [x] AppTest de Motor IV (selector + «Generar comparación FF vs G») sin errores.
-- [x] Suite completa de `bipv_python`: ver el PR.
+- [x] Suite completa de `bipv_python`: 2411 pruebas pasan.
 
 ## Resultado
 
