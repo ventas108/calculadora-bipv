@@ -72,7 +72,7 @@ def test_produccion_desactualizada_por_la_revision_del_reporte():
     assert siguiente(pasos)["clave"] == "sol_1"            # primero lo que falta antes
 
 
-def test_granja_con_cables_pendientes_siguiente_es_unifilar():
+def test_granja_sin_cables_reales_siguiente_es_unifilar():
     geo = dict(_GEO)
     estado = {"tipo_instalacion": "Granja fotovoltaica", "tmy_df": 1, "poa_df": pd.DataFrame(),
               "inversor_dict_dim": {}, "N_serie": 20, "filas_energia": geo, "poa_geometria_filas": geo,
