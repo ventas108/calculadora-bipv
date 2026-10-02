@@ -45,7 +45,8 @@
 ## Criterios de aceptación
 
 1. Teja de 32 W con su curva:
-   - ±1,5 puntos entre 500 y 900 W/m²;
+   - ±2 puntos entre 500 y 900 W/m² (±1,5 antes del R_s mínimo de la Spec
+     `04/coef-temperatura-ficha`);
    - al menos 4 puntos más cerca de la ficha que el 97 % por defecto a 300, 400
      y 500 W/m²;
    - STC reproducido.

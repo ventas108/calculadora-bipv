@@ -153,6 +153,32 @@ def _pmax_pvsyst_a_G(G, T_cel, alpha_sc, gamma_ref, mu_gamma, I_L_ref, I_o_ref,
     return float(r['p_mp'])
 
 
+def _voc_pvsyst_a_T(T_cel, alpha_sc, gamma_ref, mu_gamma, I_L_ref, I_o_ref,
+                    R_sh_ref, R_sh_0, R_sh_exp, R_s, N_s, EgRef):
+    """Voc (V) del modelo PVsyst v6 a 1.000 W/m² y T_cel (°C)."""
+    IL, I0, Rs_, Rsh_, nNsVth = pvlib.pvsystem.calcparams_pvsyst(
+        effective_irradiance=1000.0, temp_cell=T_cel, alpha_sc=alpha_sc,
+        gamma_ref=gamma_ref, mu_gamma=mu_gamma, I_L_ref=I_L_ref, I_o_ref=I_o_ref,
+        R_sh_ref=R_sh_ref, R_sh_0=R_sh_0, R_s=R_s, cells_in_series=N_s,
+        R_sh_exp=R_sh_exp, EgRef=EgRef,
+    )
+    return float(pvlib.pvsystem.v_from_i(0.0, IL, I0, Rs_, Rsh_, nNsVth))
+
+
+def _coeficientes_temperatura_modelo(Pmax_stc, alpha_sc, gamma_ref, mu_gamma, I_L_ref,
+                                     I_o_ref, R_sh_ref, R_sh_0, R_sh_exp, R_s, N_s,
+                                     EgRef, dT=0.5):
+    """(β Voc, γ Pmax) del modelo en %/°C, derivada centrada en 25 °C."""
+    args = (alpha_sc, gamma_ref, mu_gamma, I_L_ref, I_o_ref, R_sh_ref, R_sh_0,
+            R_sh_exp, R_s, N_s, EgRef)
+    v0 = _voc_pvsyst_a_T(25.0, *args)
+    beta = 100.0 * (_voc_pvsyst_a_T(25.0 + dT, *args) - _voc_pvsyst_a_T(25.0 - dT, *args)) / (2 * dT) / v0
+    p1 = _pmax_pvsyst_a_G(1000.0, 25.0 + dT, *args)
+    p2 = _pmax_pvsyst_a_G(1000.0, 25.0 - dT, *args)
+    gamma = 100.0 * (p1 - p2) / (2 * dT) / Pmax_stc
+    return beta, gamma
+
+
 def _resolver_Rs_pvsyst_por_pmax(Voc, Isc, Vmp, Imp, alpha_sc, gamma_ref,
                                   R_sh_ref, R_sh_0, R_sh_exp, N_s, EgRef):
     """
@@ -297,7 +323,8 @@ def trasladar_parametros_gt(G, T_cel_C, panel: dict):
         R_s                  = panel["R_s"],
         cells_in_series      = N_s,
         R_sh_exp             = constantes["c_Rsh"],
-        EgRef                = constantes["Eg_ref"],
+        # Eg efectiva por panel (Spec 04/coef-temperatura-ficha) o la nominal.
+        EgRef                = float(panel.get("EgRef") or constantes["Eg_ref"]),
         irrad_ref            = G_REF,
         temp_ref             = 25.0,
     )
@@ -1125,13 +1152,18 @@ def _estimar_sdm_desde_ficha_calculo(panel: dict) -> "dict | None":
             p1000 = _pmax_pvsyst_a_G(1000.0, 25.0, **args)
             return 100.0 * (p200 / 200.0) / (p1000 / 1000.0), rs, il, io
 
+        # Spec 04/coef-temperatura-ficha: R_s mínimo realista (1 % de Vmp/Imp).
+        # Sin él, el ajuste a curvas muy exigentes llevaba R_s a 0 Ω (teja
+        # Hanergy: 0,0001 Ω, cuando lo típico es 0,2-0,4 Ω).
+        _rs_min = 0.01 * Vmp / Imp
+
         def _rel_seguro(g):
             import warnings as _warnings
             try:
                 with _warnings.catch_warnings(), np.errstate(all="ignore"):
                     _warnings.simplefilter("ignore", RuntimeWarning)
                     r, rs, il, io = _con_gamma(g)
-                ok = np.isfinite(r) and rs > 0 and il > 0 and io > 0
+                ok = np.isfinite(r) and rs >= _rs_min and il > 0 and io > 0
                 return r if ok else None
             except Exception:
                 return None
@@ -1148,7 +1180,7 @@ def _estimar_sdm_desde_ficha_calculo(panel: dict) -> "dict | None":
                         R_sh_exp=R_sh_exp, N_s=N_s_est, EgRef=EgRef,
                     )
                     il, io = _resolver_IL_Io_stc(Voc, Isc, rs, R_sh_ref, g * N_s_est * Vt_ref)
-                    if not (rs > 0 and il > 0 and io > 0):
+                    if not (rs >= _rs_min and il > 0 and io > 0):
                         return None
                     args = dict(alpha_sc=alpha_sc_A, gamma_ref=g, mu_gamma=0.0, I_L_ref=il,
                                 I_o_ref=io, R_sh_ref=R_sh_ref, R_sh_0=R_sh_0, R_sh_exp=R_sh_exp,
@@ -1277,6 +1309,104 @@ def _estimar_sdm_desde_ficha_calculo(panel: dict) -> "dict | None":
             _err_cal = repr(_e_cal)
             _ajuste_200 = None
 
+    # ── Spec 04/coef-temperatura-ficha: β Voc y γ Pmax de la ficha ──────────
+    # γ: mu_gamma se ajusta a la ficha en todos los caminos (los de respaldo
+    # Batzelis/heurístico lo dejaban en 0 y daban γ de hasta −0,88 %/°C con
+    # ficha −0,36). β: el modelo de un diodo lo fija la física de la celda;
+    # se ajusta una Eg efectiva dentro de ±0,4 eV de la nominal de la
+    # tecnología (mu_gamma se re-ajusta a γ en cada prueba) y se informa lo
+    # que quede de diferencia. STC y baja luz (25 °C) no cambian.
+    _eg_efectiva = EgRef
+    _beta_modelo = _gamma_modelo = None
+    _aviso_temp = None
+    _beta_ficha = float(Tk_beta) if Tk_beta else None
+    try:
+        if not (np.isfinite(I_L) and np.isfinite(I_o) and I_L > 0 and I_o > 0 and R_s >= 0):
+            raise ValueError("SDM no físico")
+        _rexp_t = const["c_Rsh"]
+        if R_sh_0 is not None:
+            _r0_t = R_sh_0
+        elif tec_norm in ("CdTe", "CIGS"):
+            _r0_t = R_sh * np.exp(_rexp_t)
+        else:
+            _r0_t = 4.0 * R_sh
+        _pmax_t = Vmp * Imp
+
+        def _mu_y_beta(eg):
+            import warnings as _warnings
+            with _warnings.catch_warnings(), np.errstate(all="ignore"):
+                _warnings.simplefilter("ignore", RuntimeWarning)
+                mu = _resolver_mu_gamma_pvsyst(
+                    Pmax_stc=_pmax_t, Tk_gamma_pct=Tk_gamma_pct, alpha_sc=alpha_sc_A,
+                    gamma_ref=gamma_ref, I_L_ref=I_L, I_o_ref=I_o, R_sh_ref=R_sh,
+                    R_sh_0=_r0_t, R_sh_exp=_rexp_t, R_s=R_s, N_s=N_s_est, EgRef=eg,
+                )
+                b, g = _coeficientes_temperatura_modelo(
+                    _pmax_t, alpha_sc_A, gamma_ref, mu, I_L, I_o, R_sh, _r0_t, _rexp_t,
+                    R_s, N_s_est, eg,
+                )
+            return mu, b, g
+
+        def _seguro(eg):
+            try:
+                return _mu_y_beta(eg)
+            except Exception:
+                return None
+
+        _eg_lo, _eg_hi = max(0.6, EgRef - 0.4), EgRef + 0.4
+        # Punto de partida: Eg nominal. En los caminos PVsyst mu_gamma ya está
+        # ajustado a γ con esa Eg y basta medir β (sin re-ajustar).
+        _r0 = None
+        if _metodo.startswith("pvsyst") and np.isfinite(mu_gamma):
+            try:
+                import warnings as _warnings
+                with _warnings.catch_warnings(), np.errstate(all="ignore"):
+                    _warnings.simplefilter("ignore", RuntimeWarning)
+                    _b0, _g0 = _coeficientes_temperatura_modelo(
+                        _pmax_t, alpha_sc_A, gamma_ref, mu_gamma, I_L, I_o, R_sh, _r0_t,
+                        _rexp_t, R_s, N_s_est, EgRef)
+                if abs(_g0 - Tk_gamma_pct) < 0.005:
+                    _r0 = (mu_gamma, _b0, _g0)
+            except Exception:
+                _r0 = None
+        if _r0 is None:
+            _r0 = _seguro(EgRef)
+        _sel = (EgRef, _r0) if _r0 is not None else None
+        # β cambia casi en línea recta con Eg (mu_gamma re-ajustado a γ en cada
+        # punto): secante desde la nominal, 2 a 4 ajustes en vez de una malla.
+        if _sel is not None and _beta_ficha is not None and abs(_r0[1] - _beta_ficha) > 0.003:
+            _pts = [(EgRef, _r0)]
+            _e1 = min(EgRef + 0.2, _eg_hi)
+            _r1 = _seguro(_e1)
+            if _r1 is not None:
+                _pts.append((_e1, _r1))
+                for _ in range(2):
+                    (ea, ra), (eb, rb) = _pts[-2], _pts[-1]
+                    if abs(rb[1] - ra[1]) < 1e-9:
+                        break
+                    e_new = eb + (_beta_ficha - rb[1]) * (eb - ea) / (rb[1] - ra[1])
+                    e_new = float(min(max(e_new, _eg_lo), _eg_hi))
+                    if any(abs(e_new - e) < 1e-4 for e, _ in _pts):
+                        break
+                    r_new = _seguro(e_new)
+                    if r_new is None:
+                        break
+                    _pts.append((e_new, r_new))
+                    if abs(r_new[1] - _beta_ficha) < 0.002 or e_new in (_eg_lo, _eg_hi):
+                        break
+            _sel = min(_pts, key=lambda c: abs(c[1][1] - _beta_ficha))
+        if _sel is not None:
+            _eg_efectiva = float(_sel[0])
+            mu_gamma, _beta_modelo, _gamma_modelo = _sel[1]
+            _beta_modelo, _gamma_modelo = round(float(_beta_modelo), 3), round(float(_gamma_modelo), 3)
+            if _beta_ficha is not None and abs(_beta_modelo - _beta_ficha) > 0.03:
+                _aviso_temp = (f"el coeficiente del Voc del modelo es {_beta_modelo:.3f} %/°C y la ficha "
+                               f"dice {_beta_ficha:.3f} %/°C; el modelo de un diodo no llega con una Eg "
+                               f"física. La potencia (γ) sí sigue la ficha. El diseño de strings usa el "
+                               f"β de la ficha.")
+    except Exception:
+        pass
+
     a_ref_unitless = gamma_ref * N_s_est   # convención existente (n × Ns)
 
     return {
@@ -1311,6 +1441,12 @@ def _estimar_sdm_desde_ficha_calculo(panel: dict) -> "dict | None":
         "_ajuste_200":       _ajuste_200,
         "_rel_200_modelo":   _rel_200_modelo,
         "_error_ajuste_200": _err_cal,
+        "EgRef":             _eg_efectiva,
+        "_beta_voc_modelo":  _beta_modelo,
+        "_gamma_pmax_modelo": _gamma_modelo,
+        "_beta_voc_ficha":   _beta_ficha,
+        "_gamma_pmax_ficha": Tk_gamma_pct if Tk_gamma else None,
+        "_aviso_temperatura": _aviso_temp,
         "_ajuste_curva":     _ajuste_curva,
         "_desv_max_curva":   _desv_max_curva,
         # ── Corrección half-cut N_s (tarea #67) ──────────────────────────────

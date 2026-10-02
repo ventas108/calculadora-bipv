@@ -81,11 +81,18 @@ _TEJA_FICHA = {"nombre": "Hanergy HW-MQSB-V1 32 W", "tecnologia": "CIGS", "N_s":
                "Tk_beta": -0.36, "Tk_gamma": -0.40, "Tk_alfa": 0.003, "NOCT": 52.7,
                "curva_baja_irradiancia": "300:80; 400:88; 500:93; 600:96; 700:97,5; 800:98,5; 900:99"}
 TEJA_CURVA = {**_TEJA_FICHA, **estimar_sdm_desde_ficha(_TEJA_FICHA)}
+# EINNOVA ESM-550T (catálogo real): método de respaldo Batzelis con Eg
+# efectiva y mu_gamma ajustados a la ficha (Spec 04/coef-temperatura-ficha).
+_ESM_FICHA = {"nombre": "EINNOVA ESM-550T", "tecnologia": "N-Type TopCon Bifacial Mono",
+              "Voc_stc": 47.1, "Isc_stc": 14.43, "Vmp_stc": 39.8, "Imp_stc": 13.81, "Pmax_stc": 550.0,
+              "N_s": 132, "NsA": 171.6, "Tk_beta": -0.26, "Tk_gamma": -0.36}
+ESM_550T = {**_ESM_FICHA, **estimar_sdm_desde_ficha(_ESM_FICHA)}
 
 _PANELES_PRUEBA = {"CdTe (ASP_ST1_T40)": ASP_ST1_T40, "Poli-Si (XTP_50_17B)": XTP_50_17B,
                    "CIGS (MiaSolé 90N, estimado)": MIASOLE_90N,
                    "CIGS (MiaSolé 70N, N_s del catálogo)": CIGS_FF_BAJO,
-                   "CIGS (teja Hanergy, curva de la ficha)": TEJA_CURVA}
+                   "CIGS (teja Hanergy, curva de la ficha)": TEJA_CURVA,
+                   "TOPCon (EINNOVA, método de respaldo)": ESM_550T}
 
 
 @pytest.mark.parametrize("nombre_panel,panel", _PANELES_PRUEBA.items())
