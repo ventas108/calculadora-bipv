@@ -19,6 +19,9 @@ Ficha del catálogo: Voc, Isc, Vmp, Imp, N_s (opcional), tecnología y
   aplica en cada recarga mientras `panel_dim` coincida con el panel actual de
   Dimensionamiento.
 
+- `estimar_sdm_desde_ficha` agrega `NOCT` cuando la ficha lo trae; el control
+  de 🔬 Motor IV usa la clave `iv_NOCT_<panel>`.
+
 ## Tipos de datos
 
 `_error_ajuste_200: str | None`; `gamma_ref: float`.

@@ -13,6 +13,9 @@
 - [x] Objetivo inalcanzable (60 %): queda avisado en `_error_ajuste_200`.
 - [x] AppTest: tras «Usar este panel», FF vs G usa el panel CIGS elegido. Con
   el código anterior la gráfica mostraba el ASP-ST1-T40.
+- [x] Ficha real del 70N: 97,0 % a 200 W/m², factor de idealidad 1,56, FF 64,8 %
+  y Pmax 70,2 W en STC (ficha 70 W, +5/−0).
+- [x] El SDM estimado trae NOCT 48 °C; sin NOCT en la ficha no agrega la clave.
 - [x] Guardia de física: los 5 motores dan lo mismo con el caso nuevo.
 - [x] Suite completa de `bipv_python`: ver el PR.
 

@@ -28,6 +28,10 @@ se encontraron tres fallas:
    comparación FF vs G», la página volvía al ASP-ST1-T40 por defecto. El usuario
    lo vio en la gráfica FF vs G (1-oct-2026).
 
+5. **El NOCT arrancaba en 45 °C.** El SDM estimado no traía el NOCT de la
+   ficha (48 °C en el 70N), así que la temperatura de celda de Motor IV salía
+   3,75 °C más baja: 51,2 °C en vez de 55 °C a 1.000 W/m² y 20 °C de ambiente.
+
 ## Contexto
 
 Viene de la Spec `04/sdm-capa-fina-bipv`, que se probó con el FLEX-03 90N: sin

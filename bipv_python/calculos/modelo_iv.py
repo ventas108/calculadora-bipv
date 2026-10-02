@@ -1110,6 +1110,11 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
         "N_s":               N_s_est,
         "Tk_alfa":           float(Tk_alfa) if Tk_alfa else alpha_pct if "alpha_pct" in dir() else 0.05,
         "Tk_gamma":          Tk_gamma_pct,
+        # NOCT de la ficha: 🔬 Motor IV lo usa como valor inicial de la
+        # temperatura de celda (antes el SDM estimado no lo traía y quedaba
+        # 45 °C). Solo si la ficha lo trae, para no tapar un NOCT al combinar.
+        **({"NOCT": _valor_flotante_positivo(panel.get("NOCT"))}
+           if _valor_flotante_positivo(panel.get("NOCT")) > 0 else {}),
         "Voc_stc":           Voc,
         "Isc_stc":           Isc,
         "Pmax_stc":          Pmax_stc_ficha,

@@ -5895,6 +5895,14 @@ La ficha se dibuja en el servidor con el mismo conversor del Reporte, sin progra
 - El MiaSolé FLEX-03 90N y los paneles de silicio no cambian.
 - El panel elegido con «Usar este panel» se mantiene al pulsar los demás botones de la página: la curva, «Ejecutar validación» y «Generar comparación FF vs G». Antes, la gráfica FF vs G volvía al **ASP-ST1-T40** por defecto. La elección se descarta si cambias el panel en 📐 Dimensionamiento.
 
+- El control NOCT de Motor IV arranca con el NOCT de la ficha: 48 °C en el 70N. Antes arrancaba en 45 °C y la temperatura de celda salía 3,75 °C más baja.
+
+**Revisión con la ficha real** (MiaSolé FLEX-03N 1,7 m, 70N):
+- Voc 23,2 V, Isc 4,67 A, Vmp 18,1 V, Imp 3,88 A, Pmax 70 W (+5/−0), NOCT 48 °C, coeficientes −0,38 / −0,28 / +0,008 %/°C, VSYS 1.000 V y fusible máximo 10 A.
+- El catálogo del servidor tiene **Voc 23,3 V**: corrígelo a **23,2 V**. Es una diferencia pequeña, pero no coincide con la ficha.
+- El número de celdas (Ns = 40) no aparece en la ficha. Es coherente: 23,2 V ÷ 40 = 0,58 V por celda, dentro del rango típico de CIGS (0,52 a 0,80 V).
+- Con la ficha, el modelo da ✅ 97,0 % a 200 W/m², ✅ FF 64,8 % y ✅ Pmax 70,2 W en STC.
+
 **Qué debe ver el usuario** en 🔬 Motor IV › «Origen del modelo» con el 70N:
 - ✅ Tecnología CIGS.
 - ✅ Baja luz con el valor por defecto (97 %).

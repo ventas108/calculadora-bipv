@@ -10,9 +10,12 @@
 - `_mostrar_origen_modelo` en 🔬 Motor IV, llamada desde Dimensionamiento y
   desde el selector.
 - Panel del selector guardado en la sesión (`motor_iv_panel_usado`).
-- Ficha de la prueba reconstruida a partir de lo que mostró Motor IV: Voc 23,3 V,
-  Isc 4,67 A, Vmp 18,0 V, Imp 3,9 A y N_s 40. Con ella el modelo reproduce
-  R_s ≈ 0,93 Ω y R_sh ≈ 115 Ω, como en la pantalla del usuario.
+- El SDM estimado trae el NOCT de la ficha (solo si existe) y el control NOCT de
+  Motor IV usa una clave por panel.
+- Ficha real del MiaSolé FLEX-03N 1,7 m (la envió el usuario): 70N con Voc
+  23,2 V, Isc 4,67 A, Vmp 18,1 V, Imp 3,88 A, NOCT 48 °C y N_s 40 del catálogo.
+  Con el código anterior y el Voc del catálogo del servidor (23,3 V), el modelo
+  da R_s 0,930 Ω y R_sh 114,56 Ω, igual que la pantalla del usuario.
 
 ## Archivos modificados
 

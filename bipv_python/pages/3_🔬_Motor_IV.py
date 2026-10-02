@@ -407,8 +407,9 @@ with col1:
     NOCT  = st.slider(
         "NOCT (°C)",
         35, 55,
-        int(_panel_activo.get("NOCT") or 45),
-        key="iv_NOCT",
+        int(round(_panel_activo.get("NOCT") or 45)),
+        # La clave lleva el panel: al cambiar de panel arranca con su NOCT.
+        key=f"iv_NOCT_{_panel_nom_ss}",
     )
     T_cel = float(temperatura_celda_noct(G, T_amb, NOCT))
     st.metric("T_celda calculada", f"{T_cel:.1f} °C")

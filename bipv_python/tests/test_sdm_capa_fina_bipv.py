@@ -125,12 +125,14 @@ def test_el_catalogo_dice_cigs_no_cis():
 
 
 # ── Caso real 1-oct-2026: FLEX-03-70N elegido en el selector de Motor IV ──
-# Ficha de factor de forma bajo y N_s = 40 en el catálogo. El ajuste de baja
-# luz solo buscaba factores de idealidad por debajo del de partida (1,0 con
-# N_s explícito) y aceptaba ~110 % a 200 W/m² sin avisar; además «Origen del
-# modelo» no salía con el panel elegido en el selector de la página.
+# Ficha real (MiaSolé FLEX-03N 1,7 m, misma hoja que el 90N): 70N con
+# Voc 23,2 V, Isc 4,67 A, Vmp 18,1 V, Imp 3,88 A (FF 0,65) y N_s = 40 en el
+# catálogo. El ajuste de baja luz solo buscaba factores de idealidad por
+# debajo del de partida (1,0 con N_s explícito) y aceptaba ~110 % a 200 W/m²
+# sin avisar; además «Origen del modelo» no salía con el panel elegido en el
+# selector de la página.
 FF_BAJO_70N = {**MIASOLE_90N, "nombre": "FLEX-03-70N", "tecnologia": "CIGS", "N_s": 40,
-               "Voc_stc": 23.3, "Isc_stc": 4.67, "Vmp_stc": 18.0, "Imp_stc": 3.9, "Pmax_stc": 70.2}
+               "Voc_stc": 23.2, "Isc_stc": 4.67, "Vmp_stc": 18.1, "Imp_stc": 3.88, "Pmax_stc": 70.0}
 
 
 @pytest.mark.parametrize("n_s", [40, None])
@@ -160,7 +162,7 @@ def test_manual_del_asistente_seccion_113():
     kb = (_RAIZ / "datos" / "base_conocimiento_asistente.md").read_text(encoding="utf-8")
     i = kb.index("## 113.")
     s = kb[i:kb.find("\n## ", i + 5) if kb.find("\n## ", i + 5) > 0 else None]
-    for t in ("FLEX-03-70N", "Origen del modelo", "200 W/m²", "97 %", "0,75 y 2,2", "Usar este panel",
+    for t in ("FLEX-03-70N", "Origen del modelo", "200 W/m²", "97 %", "0,75 y 2,2", "Usar este panel", "48 °C", "23,2 V",
               "Generar comparación FF vs G"):
         assert t in s, t
     assert i < kb.rindex("Calculadora BIPV — Innovación Química")
@@ -190,3 +192,13 @@ def test_el_panel_elegido_en_el_selector_sigue_en_ff_vs_g(monkeypatch):
     nombres = [t.get("name") for f in figuras for t in f.get("data", [])]
     assert nombre in nombres and "ASP-ST1-T40" not in nombres
     assert any("Origen del modelo" in i.value for i in at.info)
+
+
+def test_el_sdm_estimado_trae_el_noct_de_la_ficha():
+    # Motor IV arrancaba la temperatura de celda con NOCT 45 °C aunque la ficha
+    # del 70N dice 48 °C: el SDM estimado no traía el NOCT.
+    assert estimar_sdm_desde_ficha(FF_BAJO_70N)["NOCT"] == 48.0
+    sin_noct = {k: v for k, v in FF_BAJO_70N.items() if k != "NOCT"}
+    assert "NOCT" not in estimar_sdm_desde_ficha(sin_noct)               # no tapa un NOCT al combinar
+    iv = (_RAIZ / "pages" / "3_🔬_Motor_IV.py").read_text(encoding="utf-8")
+    assert 'key=f"iv_NOCT_{_panel_nom_ss}"' in iv
