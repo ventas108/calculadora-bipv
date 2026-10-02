@@ -6091,6 +6091,25 @@ En todos los casos sigue luego con 📊 Producción, 💼 Presupuesto, 💰 Fina
    - Fachada, Techo inclinado, Pérgola y Marquesina: «SISTEMA BIPV».
 3. **Autos equivalentes calculados:** CO₂ del año ÷ (0,162 kg/km × 20.000 km al año de un auto a gasolina). Ejemplo: 76,4 t ÷ 3,24 t ≈ **24 autos**. Es el mismo supuesto de 20.000 km que ya usa 🌿 Impacto CO₂.
 
+## 121. 🧭 Ruta del proyecto en 🏠 Proyecto (2-oct-2026)
+
+**Qué es:** justo debajo de «Tipo de instalación», en 🏠 Proyecto, aparece la «🧭 Ruta del proyecto»: las páginas en el orden de la sección 119, dibujadas como estaciones de una línea de metro. La ruta cambia sola con el tipo: «Granja fotovoltaica» muestra 🌾 Granja FV y las dos pasadas de ☀️ Recurso Solar; los tipos BIPV muestran 🌳 Sombras SketchUp y 🗺️ Vista 3D como opcionales.
+
+**Qué significa cada símbolo:**
+- ✅ **listo:** la página ya guardó su resultado en esta sesión.
+- 🟠 **desactualizado:** cambiaste algo arriba después de ejecutarla. Ejemplos: los inversores, el diseño o los cables después de 📊 Producción; la energía de 🌿 Impacto CO₂ o 💰 Financiero; la geometría del campo sin volver a calcular ☀️ Recurso Solar. Es la misma revisión que hace el 📄 Reporte antes de generar.
+- ▶️ **siguiente:** el primer paso, en orden, que falta o quedó viejo.
+- ⬜ **por hacer.**
+- ⚪ **opcional:** Sombras SketchUp, Motor IV, Vista 3D, Baterías.
+- 🔎 **verificación:** 📋 Ficha RETIE, que se revisa pero no guarda resultado.
+
+**Cómo usarla:**
+1. Pasa el mouse sobre una estación para ver qué hacer ahí.
+2. El botón «Ir a … →» te lleva al paso siguiente.
+3. «¿Qué hago en cada paso?» lista todos los pasos con su consejo.
+
+**Ejemplo (Granja Apartadó):** con Producción simulada pero sin ⚡ Unifilar, la ruta marca 📊 Producción en 🟠 («Producción no usó los cables calculados») y ⚡ Unifilar como ▶️ siguiente. Primero el Unifilar, luego otra vez Producción.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

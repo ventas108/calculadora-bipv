@@ -300,6 +300,30 @@ with col1:
         f"Inclinación sugerida: **{cfg['tilt_def']}°**"
     )
 
+    # ── 🧭 Ruta del proyecto (Spec 08-interfaz/ruta-proyecto) ────────────────
+    # Las páginas en orden para este tipo de instalación y el estado de cada
+    # una según la sesión (manual del Asistente, sección 119).
+    from calculos.ruta_proyecto import SIMBOLO, estado_ruta, html_ruta, resumen, siguiente
+    _pasos_ruta = estado_ruta(tipo_instalacion, st.session_state)
+    _sig_ruta = siguiente(_pasos_ruta)
+    with st.expander(f"🧭 Ruta del proyecto — {resumen(_pasos_ruta)}"
+                     + (f" · siguiente: {_sig_ruta['icono']} {_sig_ruta['nombre']}" if _sig_ruta else " · ✅ completa"),
+                     expanded=True):
+        st.markdown(html_ruta(_pasos_ruta), unsafe_allow_html=True)
+        st.caption("✅ listo · 🟠 desactualizado (cambiaste algo arriba) · ▶️ siguiente · ⬜ por hacer · "
+                   "⚪ opcional · 🔎 verificación. Pasa el mouse sobre una estación para ver qué hacer ahí.")
+        if _sig_ruta:
+            st.markdown(f"**{SIMBOLO[_sig_ruta['estado']]} Siguiente: {_sig_ruta['icono']} {_sig_ruta['nombre']}** — "
+                        f"{_sig_ruta['consejo']}"
+                        + (f"  \n🟠 {_sig_ruta['motivo']}" if _sig_ruta["motivo"] else ""))
+            try:
+                st.page_link(_sig_ruta["pagina"], label=f"Ir a {_sig_ruta['nombre']} →", icon=_sig_ruta["icono"])
+            except Exception:   # fuera de la app multipágina (pruebas)
+                pass
+        with st.popover("¿Qué hago en cada paso?") if hasattr(st, "popover") else st.container():
+            for _i, _p in enumerate(_pasos_ruta, 1):
+                st.markdown(f"{SIMBOLO[_p['estado']]} **{_i}. {_p['icono']} {_p['nombre']}** — {_p['consejo']}")
+
     # Si cambió el tipo → resetear densidad, PR y tilt a los defaults del nuevo tipo
     if tipo_instalacion != _tipo_prev:
         st.session_state.pop("densidad_Wm2", None)
