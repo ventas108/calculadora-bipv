@@ -15,7 +15,9 @@ que el diseñador sepa qué página volver a ejecutar.
     Dimensionamiento;
   - energía de Producción frente a la de CO₂ y Financiero (2 %) o escrita a
     mano;
-  - que exista la Producción.
+  - que exista la Producción;
+  - el resumen del diseño guardado al simular Producción
+    (`produccion_resumen_diseno`) frente al diseño actual.
 - 📄 Reporte: errores 🔴 con su acción. El botón «Generar» queda bloqueado,
   salvo «Generar de todas formas (solo para revisión interna)».
 - 🌿 Impacto CO₂ y 💰 Financiero guardan la energía usada y si fue manual

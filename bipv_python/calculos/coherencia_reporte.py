@@ -77,6 +77,16 @@ def revisar_coherencia_reporte(estado: Mapping[str, Any]) -> list[dict]:
             "accion": "Vuelve a ejecutar 📊 Producción.",
         })
 
+    # ── Diseño cambiado después de simular ─────────────────────────────────
+    if e_ac > 0:
+        cambios = cambios_de_diseno(estado.get("produccion_resumen_diseno"), resumen_diseno(estado))
+        if cambios:
+            problemas.append({
+                "nivel": "error", "titulo": "El diseño cambió después de simular ⚡ Producción",
+                "detalle": "; ".join(cambios) + ". La energía del informe es la del diseño anterior.",
+                "accion": "Vuelve a ejecutar 📊 Producción (y luego 🌿 Impacto CO₂ y 💰 Financiero).",
+            })
+
     # ── 🌿 Impacto CO₂ ──────────────────────────────────────────────────────
     co2_t = _num(estado.get("co2_anual_t"))
     if co2_t > 0 and e_ac > 0:
@@ -104,3 +114,78 @@ def revisar_coherencia_reporte(estado: Mapping[str, Any]) -> list[dict]:
             "accion": "Abre 💰 Financiero después de 📊 Producción para recalcularlo.",
         })
     return problemas
+
+
+# ── Diseño vigente al simular ⚡ Producción ──────────────────────────────────
+# Producción guarda este resumen al simular; el Reporte lo compara con el
+# actual. Si el diseñador cambió el panel, la inclinación, el Motor Óptico o
+# las pérdidas después de simular, la energía del informe ya no es la de este
+# diseño. (clave, etiqueta, unidad)
+_CAMPOS_DISENO = (
+    ("panel", "Panel", ""),
+    ("inversor", "Inversor", ""),
+    ("N_paneles", "Número de módulos", ""),
+    ("N_serie", "Módulos en serie", ""),
+    ("ciudad", "Ciudad / clima", ""),
+    ("tilt", "Inclinación", "°"),
+    ("azimuth", "Orientación (azimut)", "°"),
+    ("poa_anual", "POA anual", " kWh/m²"),
+    ("motor_optico", "Motor Óptico", ""),
+    ("noct", "NOCT del Motor Óptico", " °C"),
+    ("k_bipv", "Montaje k_BIPV", ""),
+    ("pct_mismatch_fab", "Mismatch de fabricación", " %"),
+    ("pct_calidad_modulo", "Calidad del módulo", " %"),
+    ("pct_cableado_dc", "Cableado DC", " %"),
+    ("pct_cableado_ac", "Cableado AC", " %"),
+)
+
+
+def _poa_anual(df) -> float | None:
+    try:
+        return round(float(df["poa_global"].sum()) / 1000.0, 0)
+    except Exception:
+        return None
+
+
+def _redondeo(valor: Any, dec: int = 3):
+    if valor is None or isinstance(valor, (str, bool)):
+        return valor
+    v = _num(valor)
+    return round(v, dec)
+
+
+def resumen_diseno(estado: Mapping[str, Any]) -> dict:
+    """Datos de diseño que determinan la energía de 📊 Producción."""
+    mo = bool(estado.get("motor_optico_ok"))
+    return {
+        "panel": str(estado.get("panel_nombre_dim") or estado.get("panel_nombre_final") or "") or None,
+        "inversor": str(estado.get("inversor_nombre_dim") or "") or None,
+        "N_paneles": int(_num(estado.get("N_paneles_final"))) or None,
+        "N_serie": int(_num(estado.get("N_serie"))) or None,
+        "ciudad": str(estado.get("tmy_ciudad") or "") or None,
+        "tilt": _redondeo(estado.get("tilt_fachada"), 1),
+        "azimuth": _redondeo(estado.get("azimuth_fachada"), 1),
+        "poa_anual": _poa_anual(estado.get("poa_df")),
+        "motor_optico": "activo" if mo else "inactivo",
+        "noct": _redondeo(estado.get("motor_optico_noct"), 1) if mo else None,
+        "k_bipv": _redondeo(estado.get("motor_optico_k_bipv"), 2) if mo else None,
+        "pct_mismatch_fab": _redondeo(estado.get("pct_mismatch_fab"), 2),
+        "pct_calidad_modulo": _redondeo(estado.get("pct_calidad_modulo"), 2),
+        "pct_cableado_dc": _redondeo(estado.get("pct_cableado_dc"), 2),
+        "pct_cableado_ac": _redondeo(estado.get("pct_cableado_ac"), 2),
+    }
+
+
+def cambios_de_diseno(al_simular: Mapping[str, Any] | None, actual: Mapping[str, Any]) -> list[str]:
+    """Textos «Etiqueta: antes → ahora» de lo que cambió desde la simulación."""
+    if not al_simular:
+        return []
+    cambios = []
+    for clave, etiqueta, unidad in _CAMPOS_DISENO:
+        a, b = al_simular.get(clave), actual.get(clave)
+        if a is None or b is None or a == b:
+            continue
+        if isinstance(a, (int, float)) and isinstance(b, (int, float)) and abs(a - b) <= 1e-6 * max(1, abs(a)):
+            continue
+        cambios.append(f"{etiqueta}: {a}{unidad} al simular → {b}{unidad} ahora")
+    return cambios

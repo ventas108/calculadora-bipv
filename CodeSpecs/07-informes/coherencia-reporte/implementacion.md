@@ -4,8 +4,9 @@
 
 ## Cambios realizados
 
-- `calculos/coherencia_reporte.py`: `energia_vigente` y
-  `revisar_coherencia_reporte`.
+- `calculos/coherencia_reporte.py`: `energia_vigente`,
+  `revisar_coherencia_reporte`, `resumen_diseno` y `cambios_de_diseno`.
+- 📊 Producción: guarda `produccion_resumen_diseno` al simular.
 - 📄 Reporte:
   - revisión antes de «Generar»;
   - casilla `rep_generar_incoherente`;
@@ -20,6 +21,7 @@
 
 - `bipv_python/calculos/coherencia_reporte.py`
 - `bipv_python/pages/10_📄_Reporte_PDF.py`
+- `bipv_python/pages/6_📊_Produccion.py`
 - `bipv_python/pages/12_🌿_Impacto_CO2.py`
 - `bipv_python/pages/7_💰_Financiero.py`
 - `bipv_python/pages/2_☀️_Recurso_Solar.py`

@@ -22,6 +22,11 @@ Informe real «Granja Solar Apartadó 3» (403,2 kWp, 2-oct-2026):
    (+8,1 %) y PVWatts es monofacial. La cara frontal coincide (~0,4 %).
 5. El texto final de CO₂ decía «la fachada BIPV» en una granja.
 
+6. Aunque Producción esté al día en energía e inversores, el diseñador puede
+   cambiar después la inclinación, el panel, el NOCT del Motor Óptico o las
+   pérdidas. Las energías siguen coincidiendo entre sí, pero ya no son las
+   del diseño que muestra el informe.
+
 ## Contexto
 
 Cada página guarda su último cálculo en la sesión y el reporte los junta sin

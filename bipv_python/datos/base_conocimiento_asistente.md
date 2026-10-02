@@ -6002,7 +6002,8 @@ La etapa elegida se recuerda mientras dure la sesión.
 1. Antes del botón «📄 Generar Reporte» hay una **revisión automática**, que compara:
    - los **inversores** de Producción frente al reparto y a la cantidad fijada en Dimensionamiento;
    - la **energía** de Producción frente a la usada en 🌿 Impacto CO₂ y en 💰 Financiero (tolerancia 2 %), o si se escribió a mano;
-   - que exista la Producción.
+   - que exista la Producción;
+   - el **diseño**: al simular, ⚡ Producción guarda una «firma» del diseño (panel, inversor, número de módulos, ciudad, inclinación, orientación, Motor Óptico y pérdidas). Si cambias algo después, aparece «**El diseño cambió después de simular ⚡ Producción**» con el detalle, por ejemplo «Inclinación: 10.0° al simular → 15.0° ahora».
 2. Si hay contradicciones, aparece 🔴 con cada problema y **qué página volver a ejecutar**. El botón queda bloqueado hasta corregir, o hasta marcar «**Generar de todas formas** (solo para revisión interna)».
 3. **Verificación PVGIS vs PVWatts:** con paneles bifaciales ahora compara solo la **cara frontal**, porque PVWatts es monofacial. En Apartadó, la diferencia correcta es ~0,4 % y no −7,1 %. Este cambio aplica al volver a abrir ☀️ Recurso Solar.
 4. El texto de CO₂ ya no dice «fachada BIPV» en granjas: dice «la granja solar».

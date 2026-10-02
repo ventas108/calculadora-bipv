@@ -106,3 +106,45 @@ def test_manual_del_asistente_seccion_118():
         assert t in s, t
     assert i < kb.rindex("Calculadora BIPV — Innovación Química")
     assert "PVsyst" not in s and "pendiente" not in s
+
+
+# ── Diseño cambiado después de simular Producción ──────────────────────────
+def _estado_disenado(**cambios):
+    import pandas as pd
+    idx = pd.date_range("2025-01-01", periods=8760, freq="h")
+    base = {
+        **APARTADO_OK, "panel_nombre_dim": "JA Solar JAM66D46-720/LB",
+        "inversor_nombre_dim": "Growatt MAX 100KTL3 LV", "N_paneles_final": 560, "N_serie": 20,
+        "tmy_ciudad": "Apartadó (Urabá)", "tilt_fachada": 10, "azimuth_fachada": 180,
+        "poa_df": pd.DataFrame({"poa_global": [1838_000.0 / 8760] * 8760}, index=idx),
+        "motor_optico_ok": True, "motor_optico_noct": 45.0, "motor_optico_k_bipv": 1.0,
+        "pct_mismatch_fab": 1.0, "pct_calidad_modulo": 0.0,
+    }
+    from calculos.coherencia_reporte import resumen_diseno
+    base["produccion_resumen_diseno"] = resumen_diseno(base)
+    return {**base, **cambios}
+
+
+def test_sin_cambios_de_diseno_no_hay_error():
+    assert not any("diseño" in t.lower() for t in _titulos(revisar_coherencia_reporte(_estado_disenado())))
+
+
+@pytest.mark.parametrize("cambio, texto", [
+    ({"tilt_fachada": 15}, "Inclinación: 10.0° al simular → 15.0° ahora"),
+    ({"panel_nombre_dim": "JA Solar JAM66D46-730/LB"}, "Panel"),
+    ({"motor_optico_noct": 48.0}, "NOCT del Motor Óptico"),
+    ({"pct_cableado_dc": 1.5}, None),                                   # dato nuevo sin valor al simular: no cuenta
+    ({"N_paneles_final": 600}, "Número de módulos: 560 al simular → 600 ahora"),
+])
+def test_cambio_de_diseno_despues_de_simular(cambio, texto):
+    probs = revisar_coherencia_reporte(_estado_disenado(**cambio))
+    err = [p for p in probs if p["nivel"] == "error" and "diseño cambió" in p["titulo"]]
+    if texto is None:
+        assert not err
+    else:
+        assert err and texto in err[0]["detalle"] and "Producción" in err[0]["accion"]
+
+
+def test_produccion_guarda_el_resumen_del_diseno():
+    src = (_RAIZ / "pages" / "6_📊_Produccion.py").read_text(encoding="utf-8")
+    assert 'st.session_state["produccion_resumen_diseno"] = _resumen_diseno(st.session_state)' in src
