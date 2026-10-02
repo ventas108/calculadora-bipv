@@ -23,6 +23,7 @@ FACTOR_MARGINAL_KG_KWH = 0.300   # kg/kWh — OM≈0.25, BM≈0.35 → CM=(OM+BM
 KG_CO2_ARBOL_ANUAL     = 22.0     # kg CO₂/árbol/año — IDEAM 2010 (Bosque Húmedo)
 KWH_HOGAR_ANUAL         = 1_560.0  # kWh/año — UPME 2022 (130 kWh/mes residencial)
 KG_CO2_KM_VEHICULO      = 0.162    # kgCO₂/km — IDEAM FECOC 2022 (auto gasolina)
+KM_ANUALES_AUTO         = 20_000   # km/año de un auto promedio (mismo supuesto de 🌿 Impacto CO₂)
 KG_CO2_VUELO_BOG_MDE    = 89.0     # kg CO₂/pasajero/vuelo ida — ICAO 2023
 KG_CO2_BARRIL_PETROLEO  = 431.7    # kgCO₂/barril — EPA AP-42 (API 31°)
 KG_CO2_CILINDRO_GLP     = 55.6     # kgCO₂/cilindro 40 lb — IPCC 2006 Vol.2 cap.1
@@ -94,6 +95,21 @@ def equivalencias_impacto(co2_total_t: float, e_ac_total: float, n_anos: int):
         "barriles":      co2_total_t * 1000 / KG_CO2_BARRIL_PETROLEO,
         "cilindros_glp": co2_total_t * 1000 / KG_CO2_CILINDRO_GLP,
     }
+
+
+def vehiculos_equivalentes(co2_anual_t: float) -> float:
+    """Autos a gasolina que emiten en un año lo que el sistema evita en un año.
+
+    Spec 07-informes/reporte-cables-titulo-co2: el reporte decía siempre
+    «un vehículo», también con 76 t/año (≈ 24 autos)."""
+    return max(0.0, float(co2_anual_t or 0.0)) * 1000.0 / (KG_CO2_KM_VEHICULO * KM_ANUALES_AUTO)
+
+
+def texto_vehiculos(co2_anual_t: float) -> str:
+    n = max(1, round(vehiculos_equivalentes(co2_anual_t)))
+    autos = "1 auto" if n == 1 else f"{n:,} autos".replace(",", ".")
+    return (f"Equivale a sacar de circulación ≈ {autos} a gasolina durante 1 año "
+            f"({KM_ANUALES_AUTO:,} km/año cada uno)".replace(",", "."))
 
 
 def contribucion_ndc(co2_total_t: float, co2_anual_t: float):

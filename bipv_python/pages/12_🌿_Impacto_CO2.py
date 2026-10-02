@@ -380,7 +380,8 @@ eq_data = [
     {
         "Equivalencia": "🚗 Km en vehículo a gasolina",
         "Valor": f"{km_vehiculo:,.0f} mil km no recorridos",
-        "Detalle": f"≈ {km_vehiculo*1000/20_000:.0f} años de un auto promedio (20.000 km/año)",
+        "Detalle": (f"≈ {km_vehiculo*1000/co2_calc.KM_ANUALES_AUTO:.0f} años de un auto promedio "
+                    f"({co2_calc.KM_ANUALES_AUTO:,} km/año)".replace(",", ".")),
         "Fuente": "IDEAM FECOC 2022 — 0.162 kgCO₂/km (gasolina corriente)",
         "_num": km_vehiculo,
     },

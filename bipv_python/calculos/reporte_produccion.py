@@ -177,7 +177,15 @@ def etiquetas_tipo(tipo: str | None) -> dict:
     tipo = str(tipo or "")
     granja = tipo == "Granja fotovoltaica"
     fachada = tipo == "Fachada BIPV" or not tipo
+    # Spec 07-informes/reporte-cables-titulo-co2: el encabezado decía «SISTEMA
+    # BIPV» también en granjas en suelo y en techos planos con soporte.
+    titulo = ("SISTEMA FOTOVOLTAICO — GRANJA SOLAR" if granja else
+              "SISTEMA FOTOVOLTAICO" if tipo == "Techo plano (con soporte)" else "SISTEMA BIPV")
+    sujeto = ("la granja solar" if granja else "la fachada BIPV" if tipo == "Fachada BIPV"
+              else "el sistema fotovoltaico")
     return {
+        "titulo": titulo,
+        "sujeto": sujeto,
         "granja": granja,
         "fachada": fachada,
         "area": ("Área del terreno", "Terreno disponible para la granja") if granja else
