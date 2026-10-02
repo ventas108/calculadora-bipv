@@ -74,10 +74,18 @@ MIASOLE_90N = {**_MIASOLE_FICHA, **estimar_sdm_desde_ficha(_MIASOLE_FICHA)}
 _FF_BAJO_FICHA = {**_MIASOLE_FICHA, "nombre": "MiaSolé FLEX-03 70N", "N_s": 40,
                   "Voc_stc": 23.2, "Isc_stc": 4.67, "Vmp_stc": 18.1, "Imp_stc": 3.88, "Pmax_stc": 70.0}
 CIGS_FF_BAJO = {**_FF_BAJO_FICHA, **estimar_sdm_desde_ficha(_FF_BAJO_FICHA)}
+# Teja Hanergy HW-MQSB-V1 32 W calibrada con la curva de baja irradiancia de
+# su ficha (Spec 04/curva-baja-irradiancia-ficha).
+_TEJA_FICHA = {"nombre": "Hanergy HW-MQSB-V1 32 W", "tecnologia": "CIGS", "N_s": 19,
+               "Voc_stc": 10.8, "Isc_stc": 4.1, "Vmp_stc": 8.9, "Imp_stc": 3.6, "Pmax_stc": 32.0,
+               "Tk_beta": -0.36, "Tk_gamma": -0.40, "Tk_alfa": 0.003, "NOCT": 52.7,
+               "curva_baja_irradiancia": "300:80; 400:88; 500:93; 600:96; 700:97,5; 800:98,5; 900:99"}
+TEJA_CURVA = {**_TEJA_FICHA, **estimar_sdm_desde_ficha(_TEJA_FICHA)}
 
 _PANELES_PRUEBA = {"CdTe (ASP_ST1_T40)": ASP_ST1_T40, "Poli-Si (XTP_50_17B)": XTP_50_17B,
                    "CIGS (MiaSolé 90N, estimado)": MIASOLE_90N,
-                   "CIGS (MiaSolé 70N, N_s del catálogo)": CIGS_FF_BAJO}
+                   "CIGS (MiaSolé 70N, N_s del catálogo)": CIGS_FF_BAJO,
+                   "CIGS (teja Hanergy, curva de la ficha)": TEJA_CURVA}
 
 
 @pytest.mark.parametrize("nombre_panel,panel", _PANELES_PRUEBA.items())

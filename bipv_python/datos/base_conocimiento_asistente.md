@@ -5910,6 +5910,34 @@ La ficha se dibuja en el servidor con el mismo conversor del Reporte, sin progra
 
 **Sobre el formulario «Introducir parámetros SDM reales»:** muestra los valores **estimados** para que el usuario los vea. No hay que pulsar «Validar y usar SDM real» si no tiene parámetros de laboratorio.
 
+## 114. 📈 Curva de baja irradiancia de la ficha en 🔬 Motor IV (2-oct-2026)
+
+**La pregunta del usuario:** con la ficha de la teja solar Hanergy (CIGS, 25 a 32 W), que trae la gráfica «Performance at low irradiance», pidió que Motor IV se calibre con la gráfica de cada fabricante y no con el 97 % genérico.
+
+**Qué pasaba:** Motor IV solo aceptaba un dato de baja luz, «η rel. 200 W/m² (%)». Sin él, a los paneles CIGS les ponía el 97 % por defecto. Con la teja de 32 W, eso daba ~99 a 100 % entre 300 y 600 W/m², cuando la ficha dice 80 a 96 %: sobrestimaba la energía en días nublados.
+
+**Qué cambió:**
+1. **Nueva columna en 📋 Catálogo de Paneles: «Curva baja irradiancia (G:η %)».** Se escriben los puntos de la gráfica de la ficha como `G:η` separados por punto y coma, por ejemplo `300:80; 400:88; 500:93; 600:96; 700:97,5; 800:98,5; 900:99`.
+   - G va en W/m² y η en % de la eficiencia a 1.000 W/m².
+   - Acepta coma o punto decimal, y fracciones (0,80 = 80 %).
+2. **Motor IV ajusta el modelo a todos los puntos a la vez** (mínimos cuadrados). La curva manda sobre el dato de 200 W/m², y este sobre el 97 % por defecto. La ficha se sigue reproduciendo en STC.
+3. **«Origen del modelo»** muestra cuántos puntos se usaron y la desviación máxima frente a la ficha. Si algún punto se aleja más de 3 puntos porcentuales, aparece ⚠️ indicando en qué irradiancia.
+4. **Nueva gráfica «Eficiencia relativa vs G»** (al pulsar «Generar comparación FF vs G»): la curva del modelo y, en rombos rojos, los puntos de la ficha.
+5. **El ajuste se guarda en memoria por panel:** la primera vez tarda unos segundos y luego es inmediato.
+
+**Ejemplo con la teja Hanergy HW-MQSB-V1 de 32 W:**
+
+| G (W/m²) | Ficha | Antes (97 % por defecto) | Ahora (curva) |
+|---|---|---|---|
+| 300 | 80 % | ~99 % | ~90 % ⚠️ |
+| 500 | 93 % | ~100 % | ~94 % ✅ |
+| 600 | 96 % | ~100 % | ~96 % ✅ |
+| 800 | 98,5 % | ~100 % | ~98 % ✅ |
+
+A 300 W/m² el modelo no baja de ~90 %. Además, la misma ficha se contradice en ese punto: sus curvas I-V a 300 W/m² dan ~88 %, no 80 %. El aviso ⚠️ lo deja claro.
+
+**Cómo leer una gráfica de ficha:** toma 5 a 8 puntos sobre la curva, leyendo la eficiencia relativa en el eje vertical (1,0 = 100 %). No incluyas 1.000 W/m², que es la referencia. Las certificaciones (IEC 61646/61730, UL 790) aprueban la seguridad del producto, no esas gráficas: úsalas con criterio.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

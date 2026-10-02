@@ -475,6 +475,7 @@ with tab_editar:
             "β Voc (%/°C)":       p.get("CoefVoc_C"),
             "α Isc (%/°C)":       p.get("CoefIsc_C"),
             "η rel. 200 W/m² (%)": p.get("eficiencia_rel_200"),
+            "Curva baja irradiancia (G:η %)": p.get("curva_baja_irradiancia") or "",
             "γ Pmax (%/°C)":      p.get("beta_mp"),
             "NOCT (°C)":          p.get("NOCT"),
             "V sistema máx (V)":  p.get("V_sistema_max"),
@@ -508,6 +509,11 @@ with tab_editar:
                 "η rel. 200 W/m²", format="%.1f", min_value=0, max_value=110,
                 help="Eficiencia a 200 W/m² en % de la de STC, si la ficha la trae (p. ej. 97 = −3 %). "
                      "Ajusta el comportamiento con poca luz del modelo IV (capa fina BIPV)."),
+            "Curva baja irradiancia (G:η %)": st.column_config.TextColumn(
+                "Curva baja irradiancia (G:η %)", width="medium",
+                help="Puntos de la gráfica «Performance at low irradiance» de la ficha, "
+                     "G en W/m² y eficiencia relativa en %: 300:80; 400:88; 600:96; 800:98,5. "
+                     "Si la llenas, 🔬 Motor IV se calibra con ella en vez del 97 % por defecto."),
             "α Isc (%/°C)":      st.column_config.NumberColumn(
                 "α Isc", format="%.4f",
                 help="Coeficiente de temperatura de Isc de la ficha (%/°C, positivo; ej. +0,045)."),
@@ -556,6 +562,7 @@ with tab_editar:
                 "CoefVoc_C":         row_ed["β Voc (%/°C)"],
                 "CoefIsc_C":         row_ed["α Isc (%/°C)"],
                 "EficRel200Pct":     row_ed["η rel. 200 W/m² (%)"],
+                "CurvaBajaIrradiancia": str(row_ed["Curva baja irradiancia (G:η %)"] or "").strip(),
                 "CoefT_C":           row_ed["γ Pmax (%/°C)"],
                 "NOCT_C":            row_ed["NOCT (°C)"],
                 "VsistemaMaxV":      row_ed["V sistema máx (V)"],

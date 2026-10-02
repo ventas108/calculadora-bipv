@@ -55,7 +55,13 @@ def _mostrar_origen_modelo(_sdm_est: dict) -> None:
         _origen_lineas.append(
             f"Celdas en serie **estimadas: {_sdm_est.get('N_s')}** (Voc ÷ Voc típico por celda); "
             "la ficha no las trae. Si las conoces, escríbelas en «Ns» del catálogo.")
-    if _sdm_est.get("_ajuste_200") == "ficha":
+    if _sdm_est.get("_ajuste_200") == "curva":
+        _pts = _sdm_est.get("_ajuste_curva") or []
+        _origen_lineas.append(
+            f"Baja luz ajustada con la **curva de baja irradiancia de la ficha** ({len(_pts)} puntos, "
+            f"desviación máxima {_sdm_est.get('_desv_max_curva')} puntos). A 200 W/m² el modelo da "
+            f"**{_sdm_est.get('_rel_200_modelo')} %**. Mira «Eficiencia relativa vs G» más abajo.")
+    elif _sdm_est.get("_ajuste_200") == "ficha":
         _origen_lineas.append(
             f"Baja luz ajustada con el dato de la ficha: **{_sdm_est.get('_rel_200_modelo')} %** "
             "de la eficiencia a 200 W/m² frente a 1.000 W/m².")
@@ -63,7 +69,8 @@ def _mostrar_origen_modelo(_sdm_est: dict) -> None:
         _origen_lineas.append(
             f"Baja luz con el valor por defecto de la referencia estándar internacional "
             f"(**{_sdm_est.get('_rel_200_modelo')} %** a 200 W/m²): la ficha no trae el dato. "
-            "Si lo trae, escríbelo en «η rel. 200 W/m² (%)» del catálogo.")
+            "Si la ficha trae la gráfica de baja irradiancia, escribe sus puntos en «Curva baja "
+            "irradiancia (G:η %)» del catálogo (o el dato de 200 W/m² en «η rel. 200 W/m² (%)»).")
     if _sdm_est.get("_error_ajuste_200"):
         _origen_lineas.append(
             f"⚠️ El ajuste de baja luz no llegó al objetivo ({_sdm_est['_error_ajuste_200']}). "
@@ -562,6 +569,40 @@ if st.button("Generar comparación FF vs G (T=25°C isotérmico)", key="btn_ff_g
         xaxis_title="G (W/m²)", yaxis_title="FF (%)", height=350,
     )
     st.plotly_chart(fig2, use_container_width=True)
+
+    # ── Spec 04/curva-baja-irradiancia-ficha: eficiencia relativa vs G ──────
+    # La curva del modelo (25 °C) frente a los puntos de la gráfica de la
+    # ficha, si el catálogo los trae. Es la forma en que los fabricantes
+    # publican el comportamiento con poca luz.
+    from calculos.modelo_iv import calcular_pmax_vectorizado, parsear_curva_baja_irradiancia
+    _Gs_rel = np.array(list(range(100, 1001, 25)), dtype=float)
+    _p_rel = calcular_pmax_vectorizado(_Gs_rel, np.full(len(_Gs_rel), 25.0), _panel_activo)
+    _rel_mod = 100.0 * (_p_rel / _Gs_rel) / (_p_rel[-1] / 1000.0)
+    fig3 = go.Figure(go.Scatter(
+        x=_Gs_rel, y=_rel_mod, mode="lines", line=dict(color="#1F497D"),
+        name=f"Modelo — {_panel_nom_ss}",
+    ))
+    _ficha_curva = parsear_curva_baja_irradiancia(
+        (_panel_activo or {}).get("curva_baja_irradiancia")
+        or (_cat_excel.get(_panel_nom_ss) or {}).get("curva_baja_irradiancia")
+    )
+    if not _ficha_curva and _panel_activo.get("_ajuste_curva"):
+        _ficha_curva = [(d["G"], d["ficha"]) for d in _panel_activo["_ajuste_curva"]]
+    if _ficha_curva:
+        fig3.add_trace(go.Scatter(
+            x=[g for g, _ in _ficha_curva], y=[e for _, e in _ficha_curva], mode="markers",
+            name="Ficha del fabricante", marker=dict(color="#C0392B", size=10, symbol="diamond"),
+        ))
+    fig3.update_layout(
+        title="Eficiencia relativa vs G (25 °C) — modelo y ficha",
+        xaxis_title="G (W/m²)", yaxis_title="Eficiencia relativa (%)", height=330,
+    )
+    st.plotly_chart(fig3, use_container_width=True)
+    if not _ficha_curva:
+        st.caption(
+            "Sin puntos de la ficha: si la ficha trae la gráfica «Performance at low irradiance», "
+            "escribe sus puntos en 📋 Catálogo de Paneles › «Curva baja irradiancia (G:η %)»."
+        )
     if not _estimado:
         st.caption(
             "Los puntos rojos ✕ son referencias históricas del VBA; "
