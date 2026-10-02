@@ -9,7 +9,7 @@
 - [x] Segunda carga: 0,003 s.
 - [x] Catálogo idéntico (0 diferencias en 3.128 paneles).
 - [x] Modificar un panel devuelto no altera la caché.
-- [x] Suite completa de `bipv_python`: ver el PR.
+- [x] Suite completa de `bipv_python`: 2425 pruebas pasan.
 
 ## Resultado
 
