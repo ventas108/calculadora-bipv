@@ -800,10 +800,19 @@ if _descarga_btn:
     # desactiva solo (sin error visible) si no hay NREL_API_KEY configurada.
     _pvwatts_datos = obtener_produccion_pvwatts(lat, lon, tilt, azimuth)
     if _pvwatts_datos is not None:
+        # Spec 07/coherencia-reporte: PVWatts es monofacial. Con el modelo
+        # bifacial la POA de PVGIS ya suma la cara trasera (+8 % en Apartadó)
+        # y la diferencia salía −7,1 % cuando la cara frontal coincide (~0,4 %).
+        poa_pvgis_frontal_mensual = monthly["POA (kWh/m²)"].tolist()
+        _solo_frontal = bool(bifacial_cfg and "poa_front" in poa.columns)
+        if _solo_frontal:
+            _front_mes = poa["poa_front"].groupby(poa.index.month).sum() / 1000.0
+            poa_pvgis_frontal_mensual = [float(_front_mes.get(m, 0.0)) for m in range(1, 13)]
         _cmp_pvwatts = comparar_poa_pvgis_vs_pvwatts(
-            monthly["POA (kWh/m²)"].tolist(),
+            poa_pvgis_frontal_mensual,
             _pvwatts_datos["poa_monthly_kwh_m2"],
         )
+        _cmp_pvwatts["solo_cara_frontal"] = _solo_frontal
         if _cmp_pvwatts["diferencia_pct_anual"] is not None:
             # Persistir -- antes de este fix (6-sep-2026) el aviso solo vivía
             # en esta ejecución del script y desaparecía al recargar la

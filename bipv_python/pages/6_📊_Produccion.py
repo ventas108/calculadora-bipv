@@ -798,6 +798,11 @@ if btn_sim or st.session_state.get("produccion_ok"):
         st.session_state["PR_sistema"]             = res["PR"]
         st.session_state["produccion_run_signature_v1"] = _firma_produccion
         st.session_state[CLAVE_PAYLOAD_FIRMA]      = _payload_produccion
+        # Spec 07/coherencia-reporte: diseño con que se simuló, para que el
+        # 📄 Reporte detecte cambios posteriores (panel, inclinación, Motor
+        # Óptico, pérdidas…) y diga cuáles.
+        from calculos.coherencia_reporte import resumen_diseno as _resumen_diseno
+        st.session_state["produccion_resumen_diseno"] = _resumen_diseno(st.session_state)
     else:
         res       = st.session_state.get("res_produccion", {})
         res_base  = st.session_state.get("res_produccion_base", res)

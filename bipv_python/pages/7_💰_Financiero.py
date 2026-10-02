@@ -207,6 +207,11 @@ else:
         min_value=0, max_value=100000, value=_n_pan_default, step=1,
     )
 
+# Spec 07/coherencia-reporte: energía que usa este análisis (y si fue escrita a
+# mano) para que 📄 Reporte detecte si no coincide con 📊 Producción.
+st.session_state["fin_e_ac_kWh"] = float(e_ac or 0.0)
+st.session_state["fin_e_ac_manual"] = not ((prod_ok or _ms_activo) and e_ac > 0)
+
 
 # TRM — fuente de verdad (se actualiza en Sección 2)
 tipo_cambio = float(st.session_state.get("tipo_cambio", 4200.0))

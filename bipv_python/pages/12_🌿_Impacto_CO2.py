@@ -127,6 +127,12 @@ else:
     e_ac  = st.number_input("Energía AC anual (kWh/año)", 100.0, 2e6, 50_000.0, 1000.0)
     p_stc = st.number_input("Potencia instalada (kWp)", 0.1, 5000.0, 40.0, 0.5)
 
+# Spec 07/coherencia-reporte: energía usada y si es el valor manual de ejemplo
+# (Granja Apartadó 3: 6,3 t/año con los 50.000 kWh de ejemplo llegaron al reporte).
+st.session_state["co2_e_ac_kWh"] = float(e_ac or 0.0)
+st.session_state["co2_e_ac_manual"] = not (
+    _e_ac_base > 0 or (_bypass_ok and _e_ac_bypass > 0) or (_multisup_ok and _e_ac_multisup > 0))
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SECCIÓN 0 — GESTIÓN DEL FACTOR SIN (TAREA #42)
 # ─────────────────────────────────────────────────────────────────────────────
