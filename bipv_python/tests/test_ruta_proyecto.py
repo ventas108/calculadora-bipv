@@ -109,3 +109,20 @@ def test_manual_del_asistente_seccion_121():
         assert t in s, t
     assert i < kb.rindex("Calculadora BIPV — Innovación Química")
     assert "PVsyst" not in s and "pendiente" not in s
+
+
+def test_sesion_real_con_tablas_de_pandas():
+    # Error real en el servidor (2-oct-2026): al volver de ☀️ Recurso Solar a
+    # 🏠 Proyecto, «ValueError: The truth value of a DataFrame is ambiguous»:
+    # la comprobación de «listo» comparaba la tabla con {} y [].
+    tabla = pd.DataFrame({"poa_global": [1.0, 2.0]})
+    estado = {"tipo_instalacion": "Granja fotovoltaica", "tmy_df": tabla, "poa_df": tabla,
+              "sk_df_fs": tabla, "res_produccion": {"E": 1}, "inversor_dict_dim": {}, "N_serie": 20}
+    for tipo in ("Granja fotovoltaica", "Fachada BIPV"):
+        pasos = estado_ruta(tipo, estado)
+        assert next(x for x in pasos if x["clave"] in ("sol", "sol_1"))["estado"] == "listo"
+    assert next(x for x in estado_ruta("Fachada BIPV", estado) if x["clave"] == "sketchup")["estado"] == "listo"
+    vacios = {"tipo_instalacion": "Fachada BIPV", "poa_df": None, "res_produccion": {}, "pct_mismatch_fab": False}
+    pasos = estado_ruta("Fachada BIPV", vacios)
+    assert next(x for x in pasos if x["clave"] == "produccion")["estado"] == "por_hacer"
+    assert next(x for x in pasos if x["clave"] == "mismatch")["estado"] == "por_hacer"

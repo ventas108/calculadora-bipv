@@ -34,8 +34,18 @@ class Paso:
     opcional: bool = False
 
 
+def _tiene(valor: Any) -> bool:
+    """¿La página guardó un resultado? Sin comparar con ``==``: las tablas de
+    pandas no tienen un valor de verdad (ValueError en el servidor, 2-oct-2026)."""
+    if valor is None or valor is False:
+        return False
+    if isinstance(valor, (dict, list, tuple, set, str)):
+        return len(valor) > 0
+    return True
+
+
 def _hay(*claves: str) -> Callable[[Mapping[str, Any]], bool]:
-    return lambda e: any(e.get(k) not in (None, False, {}, []) for k in claves)
+    return lambda e: any(_tiene(e.get(k)) for k in claves)
 
 
 def _poa_con_campo(e: Mapping[str, Any]) -> bool:
