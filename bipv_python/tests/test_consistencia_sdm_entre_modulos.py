@@ -69,9 +69,15 @@ _MIASOLE_FICHA = {
     "Tk_beta": -0.28, "Tk_gamma": -0.38, "Tk_alfa": 0.008, "NOCT": 48.0,
 }
 MIASOLE_90N = {**_MIASOLE_FICHA, **estimar_sdm_desde_ficha(_MIASOLE_FICHA)}
+# MiaSolé FLEX-03 70N (ficha real, FF 0,65) con N_s = 40 en el catálogo:
+# el ajuste de 200 W/m² sube el factor de idealidad por encima de 1.
+_FF_BAJO_FICHA = {**_MIASOLE_FICHA, "nombre": "MiaSolé FLEX-03 70N", "N_s": 40,
+                  "Voc_stc": 23.2, "Isc_stc": 4.67, "Vmp_stc": 18.1, "Imp_stc": 3.88, "Pmax_stc": 70.0}
+CIGS_FF_BAJO = {**_FF_BAJO_FICHA, **estimar_sdm_desde_ficha(_FF_BAJO_FICHA)}
 
 _PANELES_PRUEBA = {"CdTe (ASP_ST1_T40)": ASP_ST1_T40, "Poli-Si (XTP_50_17B)": XTP_50_17B,
-                   "CIGS (MiaSolé 90N, estimado)": MIASOLE_90N}
+                   "CIGS (MiaSolé 90N, estimado)": MIASOLE_90N,
+                   "CIGS (MiaSolé 70N, N_s del catálogo)": CIGS_FF_BAJO}
 
 
 @pytest.mark.parametrize("nombre_panel,panel", _PANELES_PRUEBA.items())

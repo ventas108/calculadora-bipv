@@ -38,6 +38,39 @@ st.caption("Equivalente Python de SimuladorIV_CdTe_v2 + Mod_ModeloDiodo (VBA aud
 # 1. DETECCIÓN AUTOMÁTICA DEL PANEL DESDE DIMENSIONAMIENTO
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _mostrar_origen_modelo(_sdm_est: dict) -> None:
+    """🔎 Origen del modelo: tecnología, celdas y ajuste de baja luz.
+
+    Se muestra con el panel que llega de 📐 Dimensionamiento y con el que se
+    elige en el selector de esta página (antes solo en el primer caso).
+    """
+    # ── Spec 04/sdm-capa-fina-bipv: de dónde sale cada parámetro ──
+    _origen_lineas = [f"Tecnología usada por el modelo: **{_sdm_est.get('tecnologia', '?')}**."]
+    if _sdm_est.get("_tecnologia_supuesta"):
+        _origen_lineas.append(
+            "⚠️ La ficha no dice una tecnología con modelo propio (vacía, «Thin Film», «Otro» "
+            "o a-Si): se asume silicio. Corrige la tecnología en 📋 Catálogo de Paneles si es "
+            "capa fina (CdTe o CIS/CIGS).")
+    if _sdm_est.get("_ns_estimado"):
+        _origen_lineas.append(
+            f"Celdas en serie **estimadas: {_sdm_est.get('N_s')}** (Voc ÷ Voc típico por celda); "
+            "la ficha no las trae. Si las conoces, escríbelas en «Ns» del catálogo.")
+    if _sdm_est.get("_ajuste_200") == "ficha":
+        _origen_lineas.append(
+            f"Baja luz ajustada con el dato de la ficha: **{_sdm_est.get('_rel_200_modelo')} %** "
+            "de la eficiencia a 200 W/m² frente a 1.000 W/m².")
+    elif _sdm_est.get("_ajuste_200") == "defecto":
+        _origen_lineas.append(
+            f"Baja luz con el valor por defecto de la referencia estándar internacional "
+            f"(**{_sdm_est.get('_rel_200_modelo')} %** a 200 W/m²): la ficha no trae el dato. "
+            "Si lo trae, escríbelo en «η rel. 200 W/m² (%)» del catálogo.")
+    if _sdm_est.get("_error_ajuste_200"):
+        _origen_lineas.append(
+            f"⚠️ El ajuste de baja luz no llegó al objetivo ({_sdm_est['_error_ajuste_200']}). "
+            "Revisa Vmp, Imp e Isc de la ficha en 📋 Catálogo de Paneles.")
+    st.info("🔎 **Origen del modelo:**  \n" + "  \n".join(f"- {l}" for l in _origen_lineas))
+
+
 _panel_ss       = st.session_state.get("panel_dict")
 _panel_nom_ss   = st.session_state.get("panel_nombre_dim", "")
 
@@ -95,27 +128,7 @@ if _panel_ss and _panel_nom_ss:
                     f"(catálogo Excel). Parámetros SDM estimados por **{_metodo_est}** "
                     f"desde ficha técnica. Resultados orientativos.{_adv_lines}"
                 )
-                # ── Spec 04/sdm-capa-fina-bipv: de dónde sale cada parámetro ──
-                _origen_lineas = [f"Tecnología usada por el modelo: **{_sdm_est.get('tecnologia', '?')}**."]
-                if _sdm_est.get("_tecnologia_supuesta"):
-                    _origen_lineas.append(
-                        "⚠️ La ficha no dice una tecnología con modelo propio (vacía, «Thin Film», «Otro» "
-                        "o a-Si): se asume silicio. Corrige la tecnología en 📋 Catálogo de Paneles si es "
-                        "capa fina (CdTe o CIS/CIGS).")
-                if _sdm_est.get("_ns_estimado"):
-                    _origen_lineas.append(
-                        f"Celdas en serie **estimadas: {_sdm_est.get('N_s')}** (Voc ÷ Voc típico por celda); "
-                        "la ficha no las trae. Si las conoces, escríbelas en «Ns» del catálogo.")
-                if _sdm_est.get("_ajuste_200") == "ficha":
-                    _origen_lineas.append(
-                        f"Baja luz ajustada con el dato de la ficha: **{_sdm_est.get('_rel_200_modelo')} %** "
-                        "de la eficiencia a 200 W/m² frente a 1.000 W/m².")
-                elif _sdm_est.get("_ajuste_200") == "defecto":
-                    _origen_lineas.append(
-                        f"Baja luz con el valor por defecto de la referencia estándar internacional "
-                        f"(**{_sdm_est.get('_rel_200_modelo')} %** a 200 W/m²): la ficha no trae el dato. "
-                        "Si lo trae, escríbelo en «η rel. 200 W/m² (%)» del catálogo.")
-                st.info("🔎 **Origen del modelo:**  \n" + "  \n".join(f"- {l}" for l in _origen_lineas))
+                _mostrar_origen_modelo(_sdm_est)
                 # ── #67 — Aviso si N_s fue corregido por half-cut ────────────
                 if _sdm_est.get("_ns_corregido"):
                     _hci = _sdm_est.get("_ns_halfcut_info", {})
@@ -239,7 +252,23 @@ with st.expander(
                 f"🟡 **Catálogo Excel** — SDM estimado desde ficha. Resultados orientativos.{_msg_adv}"
             )
 
+    # El botón solo vale «True» en la recarga en que se pulsa. La elección se
+    # guarda en la sesión para que las demás acciones de la página (curva,
+    # validación @ STC, FF vs G) sigan usando este panel y no vuelvan al
+    # ASP-ST1-T40 por defecto. Se descarta si cambia el panel de 📐 Dimensionamiento.
     if st.button("▶️ Usar este panel", key="btn_panel_manual", disabled=_es_separador):
+        st.session_state["motor_iv_panel_usado"] = {
+            "panel": _panel_manual_nom,
+            "panel_dim": st.session_state.get("panel_nombre_dim", ""),
+        }
+    _sel_guardada = st.session_state.get("motor_iv_panel_usado") or {}
+    _panel_usado = _sel_guardada.get("panel")
+    if (
+        _panel_usado
+        and _sel_guardada.get("panel_dim") == st.session_state.get("panel_nombre_dim", "")
+        and (_panel_usado in MODULOS_BIPV or _panel_usado in _cat_excel)
+    ):
+        _panel_manual_nom = _panel_usado
         if _panel_manual_nom in MODULOS_BIPV:
             _panel_activo = MODULOS_BIPV[_panel_manual_nom]
             _estimado     = False
@@ -260,6 +289,7 @@ with st.expander(
                     _panel_activo = _sdm
                     _estimado     = True
                     _metodo_est   = _sdm.get("_metodo", "estimado")
+                    _mostrar_origen_modelo(_sdm)
                 else:
                     st.error(f"❌ No se pudo estimar SDM para **{_panel_manual_nom}**.")
                     _panel_activo = None
@@ -377,8 +407,9 @@ with col1:
     NOCT  = st.slider(
         "NOCT (°C)",
         35, 55,
-        int(_panel_activo.get("NOCT") or 45),
-        key="iv_NOCT",
+        int(round(_panel_activo.get("NOCT") or 45)),
+        # La clave lleva el panel: al cambiar de panel arranca con su NOCT.
+        key=f"iv_NOCT_{_panel_nom_ss}",
     )
     T_cel = float(temperatura_celda_noct(G, T_amb, NOCT))
     st.metric("T_celda calculada", f"{T_cel:.1f} °C")

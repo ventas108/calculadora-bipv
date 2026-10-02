@@ -1041,8 +1041,11 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
             return 100.0 * (p200 / 200.0) / (p1000 / 1000.0), rs, il, io
 
         def _rel_seguro(g):
+            import warnings as _warnings
             try:
-                r, rs, il, io = _con_gamma(g)
+                with _warnings.catch_warnings(), np.errstate(all="ignore"):
+                    _warnings.simplefilter("ignore", RuntimeWarning)
+                    r, rs, il, io = _con_gamma(g)
                 ok = np.isfinite(r) and rs > 0 and il > 0 and io > 0
                 return r if ok else None
             except Exception:
@@ -1051,7 +1054,10 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
         try:
             # Malla en gamma: se descartan los valores donde el modelo deja de
             # ser físico y se refina entre los dos que encierran el objetivo.
-            malla = [(g, _rel_seguro(g)) for g in np.linspace(0.75, max(gamma_ref, 0.8), 25)]
+            # Llega hasta 2,2 (no solo hasta el gamma de partida): con fichas de
+            # FF bajo (MiaSolé FLEX-03 70N, N_s del catálogo) el modelo daba
+            # ~110 % a 200 W/m² y solo se podía bajar el factor de idealidad.
+            malla = [(g, _rel_seguro(g)) for g in np.linspace(0.75, max(gamma_ref, 2.2), 49)]
             malla = [(g, r) for g, r in malla if r is not None]
             if not malla:
                 raise ValueError("ningún factor de idealidad da un modelo físico")
@@ -1081,6 +1087,9 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
             R_sh = R_sh_ref
             _rel_200_modelo = round(float(_rel), 2)
             _metodo = "pvsyst_v6_calibrado_200"
+            if abs(_rel_200_modelo - _objetivo_200) > 1.0:
+                _err_cal = (f"no se alcanzó {_objetivo_200:.1f} % a 200 W/m²; "
+                            f"el más cercano físico da {_rel_200_modelo:.1f} %")
         except Exception as _e_cal:
             _err_cal = repr(_e_cal)
             _ajuste_200 = None
@@ -1101,6 +1110,11 @@ def estimar_sdm_desde_ficha(panel: dict) -> "dict | None":
         "N_s":               N_s_est,
         "Tk_alfa":           float(Tk_alfa) if Tk_alfa else alpha_pct if "alpha_pct" in dir() else 0.05,
         "Tk_gamma":          Tk_gamma_pct,
+        # NOCT de la ficha: 🔬 Motor IV lo usa como valor inicial de la
+        # temperatura de celda (antes el SDM estimado no lo traía y quedaba
+        # 45 °C). Solo si la ficha lo trae, para no tapar un NOCT al combinar.
+        **({"NOCT": _valor_flotante_positivo(panel.get("NOCT"))}
+           if _valor_flotante_positivo(panel.get("NOCT")) > 0 else {}),
         "Voc_stc":           Voc,
         "Isc_stc":           Isc,
         "Pmax_stc":          Pmax_stc_ficha,

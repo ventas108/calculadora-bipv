@@ -122,3 +122,83 @@ def test_el_catalogo_dice_cigs_no_cis():
     assert tecnologia_catalogo("CIS") == "CIGS" and tecnologia_catalogo(" cis ") == "CIGS"
     assert tecnologia_catalogo("CIGS Teja") == "CIGS Teja" and tecnologia_catalogo("Mono-Si") == "Mono-Si"
     assert tecnologia_catalogo("Poly-Si") == "Poli-Si" and tecnologia_catalogo(float("nan")) == ""
+
+
+# ── Caso real 1-oct-2026: FLEX-03-70N elegido en el selector de Motor IV ──
+# Ficha real (MiaSolé FLEX-03N 1,7 m, misma hoja que el 90N): 70N con
+# Voc 23,2 V, Isc 4,67 A, Vmp 18,1 V, Imp 3,88 A (FF 0,65) y N_s = 40 en el
+# catálogo. El ajuste de baja luz solo buscaba factores de idealidad por
+# debajo del de partida (1,0 con N_s explícito) y aceptaba ~110 % a 200 W/m²
+# sin avisar; además «Origen del modelo» no salía con el panel elegido en el
+# selector de la página.
+FF_BAJO_70N = {**MIASOLE_90N, "nombre": "FLEX-03-70N", "tecnologia": "CIGS", "N_s": 40,
+               "Voc_stc": 23.2, "Isc_stc": 4.67, "Vmp_stc": 18.1, "Imp_stc": 3.88, "Pmax_stc": 70.0}
+
+
+@pytest.mark.parametrize("n_s", [40, None])
+def test_ficha_de_ff_bajo_llega_al_97_por_ciento(n_s):
+    est = estimar_sdm_desde_ficha({**FF_BAJO_70N, "N_s": n_s})
+    sdm = {**FF_BAJO_70N, "N_s": n_s, **est}
+    assert est["_ajuste_200"] == "defecto" and est["_error_ajuste_200"] is None
+    assert _rel_200(sdm) == pytest.approx(97.0, abs=0.3)                    # antes ~110 %
+    assert est["gamma_ref"] > 1.0
+    assert validar_sdm_vs_ficha(sdm)["validacion_ok"]
+
+
+def test_si_no_se_alcanza_el_objetivo_queda_avisado():
+    est = estimar_sdm_desde_ficha({**FF_BAJO_70N, "eficiencia_rel_200": 60.0})
+    assert est["_error_ajuste_200"] and "60.0 %" in est["_error_ajuste_200"]
+
+
+def test_origen_del_modelo_tambien_con_el_selector_de_la_pagina():
+    iv = (_RAIZ / "pages" / "3_🔬_Motor_IV.py").read_text(encoding="utf-8")
+    assert "def _mostrar_origen_modelo(" in iv
+    assert "_mostrar_origen_modelo(_sdm_est)\n" in iv                      # desde Dimensionamiento
+    assert "_mostrar_origen_modelo(_sdm)\n" in iv                          # desde el selector
+    assert "_error_ajuste_200" in iv
+
+
+def test_manual_del_asistente_seccion_113():
+    kb = (_RAIZ / "datos" / "base_conocimiento_asistente.md").read_text(encoding="utf-8")
+    i = kb.index("## 113.")
+    s = kb[i:kb.find("\n## ", i + 5) if kb.find("\n## ", i + 5) > 0 else None]
+    for t in ("FLEX-03-70N", "Origen del modelo", "200 W/m²", "97 %", "0,75 y 2,2", "Usar este panel", "48 °C", "23,2 V",
+              "Generar comparación FF vs G"):
+        assert t in s, t
+    assert i < kb.rindex("Calculadora BIPV — Innovación Química")
+    assert "PVsyst" not in s and "pendiente" not in s
+
+
+def test_el_panel_elegido_en_el_selector_sigue_en_ff_vs_g(monkeypatch):
+    # Caso real (1-oct-2026): tras «Usar este panel» con el FLEX-03-70N, el
+    # botón «Generar comparación FF vs G» recargaba la página y la gráfica
+    # volvía al ASP-ST1-T40 por defecto.
+    import json
+    AppTest = pytest.importorskip("streamlit.testing.v1").AppTest
+    from datos.catalogo_paneles_excel import cargar_catalogo_paneles
+    cat = cargar_catalogo_paneles()
+    nombre = next(k for k, v in cat.items() if v.get("tecnologia") == "CIGS"
+                  and (v.get("Voc") or 0) > 10 and (v.get("Imp") or 0) > 0.05)
+    import calculos.auth as auth
+    monkeypatch.setattr(auth, "requerir_login",
+                        lambda solo_admin=False: {"email": "t@t", "rol": "admin", "activo": True})
+    at = AppTest.from_file(str(_RAIZ / "pages" / "3_🔬_Motor_IV.py"), default_timeout=180).run()
+    assert not at.exception
+    at.selectbox(key="motor_iv_panel_manual").set_value(nombre).run()
+    at.button(key="btn_panel_manual").click().run()
+    at.button(key="btn_ff_g").click().run()
+    assert not at.exception
+    figuras = [json.loads(e.proto.spec) for e in at.get("plotly_chart")]
+    nombres = [t.get("name") for f in figuras for t in f.get("data", [])]
+    assert nombre in nombres and "ASP-ST1-T40" not in nombres
+    assert any("Origen del modelo" in i.value for i in at.info)
+
+
+def test_el_sdm_estimado_trae_el_noct_de_la_ficha():
+    # Motor IV arrancaba la temperatura de celda con NOCT 45 °C aunque la ficha
+    # del 70N dice 48 °C: el SDM estimado no traía el NOCT.
+    assert estimar_sdm_desde_ficha(FF_BAJO_70N)["NOCT"] == 48.0
+    sin_noct = {k: v for k, v in FF_BAJO_70N.items() if k != "NOCT"}
+    assert "NOCT" not in estimar_sdm_desde_ficha(sin_noct)               # no tapa un NOCT al combinar
+    iv = (_RAIZ / "pages" / "3_🔬_Motor_IV.py").read_text(encoding="utf-8")
+    assert 'key=f"iv_NOCT_{_panel_nom_ss}"' in iv

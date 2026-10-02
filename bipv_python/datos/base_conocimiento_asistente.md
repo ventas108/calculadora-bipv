@@ -5881,6 +5881,35 @@ La ficha se dibuja en el servidor con el mismo conversor del Reporte, sin progra
 
 **Cómo explicarlo al usuario:** los parámetros internos del modelo no vienen en las fichas. La app los deduce de lo que sí traen (Voc, Isc, Vmp, Imp, coeficientes) y del dato de 200 W/m² si existe. Para capa fina conviene buscar ese dato en la ficha y escribirlo. Los parámetros de laboratorio solo se necesitan para una certificación de energía.
 
+## 113. 🔬 Baja luz de CIGS con factor de forma bajo y «Origen del modelo» en el selector (1-oct-2026)
+
+**El caso:** el usuario eligió el **FLEX-03-70N** (CIGS, 70 W) en el selector «Panel del catálogo interno» de 🔬 Motor IV y no vio «Origen del modelo».
+
+**Qué pasaba:**
+- «Origen del modelo» solo salía con el panel que llega de 📐 Dimensionamiento. Ahora sale también con el panel elegido en el selector.
+- La ficha de ese panel tiene factor de forma bajo y el catálogo trae Ns = 40. El modelo daba **~110 % a 200 W/m²**, es decir, más eficiente con poca luz que a plena luz, algo que no es físico y sobrestima la energía en fachadas. El ajuste solo podía bajar el factor de idealidad y aquí había que subirlo.
+
+**Qué cambió:**
+- El ajuste busca el factor de idealidad entre 0,75 y 2,2. El 70N queda en ✅ **97 %** a 200 W/m² y la ficha se sigue reproduciendo en STC.
+- Si el objetivo no se alcanza, «Origen del modelo» lo avisa con ⚠️ y pide revisar Vmp, Imp e Isc de la ficha.
+- El MiaSolé FLEX-03 90N y los paneles de silicio no cambian.
+- El panel elegido con «Usar este panel» se mantiene al pulsar los demás botones de la página: la curva, «Ejecutar validación» y «Generar comparación FF vs G». Antes, la gráfica FF vs G volvía al **ASP-ST1-T40** por defecto. La elección se descarta si cambias el panel en 📐 Dimensionamiento.
+
+- El control NOCT de Motor IV arranca con el NOCT de la ficha: 48 °C en el 70N. Antes arrancaba en 45 °C y la temperatura de celda salía 3,75 °C más baja.
+
+**Revisión con la ficha real** (MiaSolé FLEX-03N 1,7 m, 70N):
+- Voc 23,2 V, Isc 4,67 A, Vmp 18,1 V, Imp 3,88 A, Pmax 70 W (+5/−0), NOCT 48 °C, coeficientes −0,38 / −0,28 / +0,008 %/°C, VSYS 1.000 V y fusible máximo 10 A.
+- El catálogo del servidor tiene **Voc 23,3 V**: corrígelo a **23,2 V**. Es una diferencia pequeña, pero no coincide con la ficha.
+- El número de celdas (Ns = 40) no aparece en la ficha. Es coherente: 23,2 V ÷ 40 = 0,58 V por celda, dentro del rango típico de CIGS (0,52 a 0,80 V).
+- Con la ficha, el modelo da ✅ 97,0 % a 200 W/m², ✅ FF 64,8 % y ✅ Pmax 70,2 W en STC.
+
+**Qué debe ver el usuario** en 🔬 Motor IV › «Origen del modelo» con el 70N:
+- ✅ Tecnología CIGS.
+- ✅ Baja luz con el valor por defecto (97 %).
+- La línea de «celdas estimadas» no aparece, porque el catálogo ya trae Ns = 40.
+
+**Sobre el formulario «Introducir parámetros SDM reales»:** muestra los valores **estimados** para que el usuario los vea. No hay que pulsar «Validar y usar SDM real» si no tiene parámetros de laboratorio.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
