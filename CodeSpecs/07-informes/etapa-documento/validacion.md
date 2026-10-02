@@ -8,7 +8,7 @@
   no existía).
 - [x] Pruebas existentes del reporte: 92 pasan.
 - [x] Word y PDF con «PROPUESTA TÉCNICA» y sin «BORRADOR».
-- [x] Suite completa de `bipv_python`: ver el PR.
+- [x] Suite completa de `bipv_python`: 2435 pruebas pasan.
 
 ## Resultado
 
