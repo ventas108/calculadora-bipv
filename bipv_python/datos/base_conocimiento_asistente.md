@@ -6076,6 +6076,21 @@ Las reglas de oro, la trampa de strings por tracker y el CSV de la calculadora h
 
 En todos los casos sigue luego con 📊 Producción, 💼 Presupuesto, 💰 Financiero, 🌿 Impacto CO₂ y 📄 Reporte. Si lo olvidas, el Reporte muestra «El diseño cambió después de simular ⚡ Producción» con el antes y el ahora.
 
+## 120. 🔌 Cables reales en Producción, título según la instalación y autos equivalentes (2-oct-2026)
+
+**El caso:** el informe de la Granja Solar Apartadó (606.522 kWh/año), ya con la revisión de coherencia (sección 118), todavía traía tres detalles:
+- el diagrama de pérdidas decía «Pérdida óhmica DC −0,85 % · Fuente: **% manual** configurado en Mismatch» y no tenía fila de cables AC, mientras 🌾 Granja FV daba **0,50 %** en DC y caídas AC de hasta **1,69 %**;
+- el encabezado decía «REPORTE TÉCNICO — SISTEMA BIPV» en una granja en suelo;
+- con 76,4 t de CO₂ al año, el texto decía «Equivale a sacar **un vehículo** de circulación». Son unos **24 autos**.
+
+**Qué cambió:**
+1. **Revisión de coherencia:** si ⚡ Diagrama Unifilar o 🌾 Granja FV ya calcularon los cables, pero 📊 Producción aplicó el % manual de 🔀 Mismatch, el 📄 Reporte muestra 🔴 «📊 Producción no usó los cables calculados». **Qué hacer:** abre ⚡ Diagrama Unifilar (en granjas, con «🌾 Usar los cables de 🌾 Granja FV» marcada) y vuelve a ejecutar 📊 Producción, 🌿 Impacto CO₂ y 💰 Financiero. ✅ La fila de cables DC dirá «Fuente: cálculo real del ⚡ Diagrama Unifilar» y aparecerá la fila de cables AC.
+2. **Título del reporte según el tipo de instalación:**
+   - Granja fotovoltaica: «SISTEMA FOTOVOLTAICO — GRANJA SOLAR»;
+   - Techo plano (con soporte): «SISTEMA FOTOVOLTAICO»;
+   - Fachada, Techo inclinado, Pérgola y Marquesina: «SISTEMA BIPV».
+3. **Autos equivalentes calculados:** CO₂ del año ÷ (0,162 kg/km × 20.000 km al año de un auto a gasolina). Ejemplo: 76,4 t ÷ 3,24 t ≈ **24 autos**. Es el mismo supuesto de 20.000 km que ya usa 🌿 Impacto CO₂.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

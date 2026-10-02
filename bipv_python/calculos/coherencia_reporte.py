@@ -87,6 +87,25 @@ def revisar_coherencia_reporte(estado: Mapping[str, Any]) -> list[dict]:
                 "accion": "Vuelve a ejecutar 📊 Producción (y luego 🌿 Impacto CO₂ y 💰 Financiero).",
             })
 
+    # ── Cables: Producción con el % manual habiendo cables calculados ───────
+    # Spec 07-informes/reporte-cables-titulo-co2. La cadena multi-superficie
+    # aplica sus propios cables.
+    res = estado.get("res_produccion")
+    granja_cables = (estado.get("tipo_instalacion") == "Granja fotovoltaica"
+                     and bool(estado.get("granja_electrico_cfg")))
+    unifilar = bool(estado.get("perdida_ohmica_unifilar"))
+    if (e_ac > 0 and isinstance(res, Mapping) and res and not estado.get("multisup_activo")
+            and (granja_cables or unifilar) and res.get("perdida_ohmica_dc_modo") != "calculado"):
+        origen = "🌾 Granja FV" if granja_cables else "⚡ Diagrama Unifilar"
+        problemas.append({
+            "nivel": "error", "titulo": "📊 Producción no usó los cables calculados",
+            "detalle": (f"Producción aplicó el % manual de 🔀 Mismatch para los cables "
+                        f"(DC {_num(estado.get('pct_cableado_dc')):.1f} %, AC {_num(estado.get('pct_cableado_ac')):.1f} %), "
+                        f"pero {origen} ya calculó los cables reales. El informe mostraría las dos cifras."),
+            "accion": ("Abre ⚡ Diagrama Unifilar" + (" con «🌾 Usar los cables de 🌾 Granja FV» marcada" if granja_cables else "")
+                       + " y vuelve a ejecutar 📊 Producción (y luego 🌿 Impacto CO₂ y 💰 Financiero)."),
+        })
+
     # ── 🌿 Impacto CO₂ ──────────────────────────────────────────────────────
     co2_t = _num(estado.get("co2_anual_t"))
     if co2_t > 0 and e_ac > 0:

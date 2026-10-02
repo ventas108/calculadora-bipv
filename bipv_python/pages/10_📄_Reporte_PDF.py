@@ -494,6 +494,7 @@ from calculos.reporte_produccion import (
 )
 import calculos.reporte_granja as rgr          # Spec 07/reporte-granja-completo
 from calculos.ficha_inversor import alertas_ficha_inversor, margen_voc
+from calculos.co2 import texto_vehiculos      # Spec 07/reporte-cables-titulo-co2
 
 
 import calculos.reporte_multisuperficie as rms
@@ -668,7 +669,7 @@ def generar_html_reporte() -> str:
       {f'<div style="color:#555;font-size:0.95em;margin-top:2px;">{_esc_html(st.session_state.get("empresa_contacto", ""))}</div>'
        if st.session_state.get("empresa_contacto") else ''}
       <div style="font-size:1.15em;font-weight:bold;color:{COLOR_TEXTO};">
-        REPORTE TÉCNICO — SISTEMA BIPV
+        REPORTE TÉCNICO — {_tx['titulo']}
         {_badge_etapa}
       </div>
       <div style="color:#888;margin-top:4px;font-size:0.92em;">
@@ -1970,7 +1971,7 @@ def generar_html_reporte() -> str:
             ("CO₂ evitado — año 1",
              f"{co2_anual_t:.2f} tCO₂/año",
              "",
-             "Equivale a sacar un vehículo de circulación durante 1 año completo"),
+             texto_vehiculos(co2_anual_t)),
             ("CO₂ evitado — 25 años (factor promedio SIN)",
              f"{co2_prom_t:,.1f} tCO₂",
              "",
@@ -2034,10 +2035,7 @@ def generar_html_reporte() -> str:
         </div>"""
 
         # Spec 07/coherencia-reporte: el texto decía «la fachada BIPV» también en granjas.
-        _tipo_inst_co2 = str(st.session_state.get("tipo_instalacion") or "")
-        _sujeto_co2 = ("la granja solar" if "granja" in _tipo_inst_co2.lower()
-                       else "la fachada BIPV" if "fachada" in _tipo_inst_co2.lower()
-                       else "el sistema fotovoltaico")
+        _sujeto_co2 = etiquetas_tipo(st.session_state.get("tipo_instalacion"))["sujeto"]
         html += caja_nota(
             "<strong>Este proyecto no es solo una inversión financiera — es una declaración de liderazgo climático.</strong> "
             f"Cada kWh generado por {_sujeto_co2} desplaza energía de una red que aún depende de combustibles fósiles "
