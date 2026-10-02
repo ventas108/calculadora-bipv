@@ -10,7 +10,7 @@
 - [x] Guardia de física: EINNOVA ESM-550T en
   `test_consistencia_sdm_entre_modulos.py`; los 5 motores dan lo mismo.
 - [x] STC y baja luz sin cambios (90N 97 %; 70N 97 %).
-- [x] Suite completa de `bipv_python`: ver el PR.
+- [x] Suite completa de `bipv_python`: 2422 pruebas pasan.
 
 ## Resultado
 
