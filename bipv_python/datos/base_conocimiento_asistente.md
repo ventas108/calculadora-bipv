@@ -91,6 +91,8 @@ Cuándo usar Página 5a — Sombras SketchUp: si el sitio tiene obstáculos cerc
 
 ⚠️ Regla de orden con el SVF (nueva, 6-sep-2026, ver sección 59): a diferencia del resto del flujo (que es lineal), el SVF cierra un CICLO — se calcula en 5a pero se aplica en 2. Si calculas o recalculas el SVF en 5a Sombras SketchUp DESPUÉS de ya haber corrido 2 Recurso Solar, el resultado de Recurso Solar se invalida automáticamente solo (`recurso_solar_ok` se pone en falso) — no hace falta limpiar caché ni tocar tilt/azimut a mano, basta con volver a abrir 2 Recurso Solar y se recalcula. Si el SVF quedó en 1,000 (sin reducción), verifica antes con una resolución de grilla más fina (0,5-1,0°, campo en la misma sección) que no sea un obstáculo angosto colándose entre los rayos — un SVF real de 1,000 es válido y coherente (ej. si el obstáculo queda fuera del hemisferio frontal del panel), pero conviene descartar primero la otra causa.
 
+⚠️ Desde el 2-oct-2026 el orden de las páginas **según el tipo de instalación** (BIPV de una superficie, BIPV de varias superficies y granja o agrivoltaica), y qué volver a ejecutar cuando cambias algo, está en la **sección 119**. Úsalo en lugar del esquema de arriba.
+
 ⚠️ Desde el 1-oct-2026 el orden completo de un proyecto BIPV de **varias superficies** (fachada + techo, con 🗺️ Vista 3D, ⚡ Unifilar y 📋 RETIE) está en la **sección 108**, con el caso Teusaquillo.
 
 Cuándo usar Página 9 — Vista 3D: Si el proyecto tiene más de una superficie
@@ -6009,6 +6011,70 @@ La etapa elegida se recuerda mientras dure la sesión.
 4. El texto de CO₂ ya no dice «fachada BIPV» en granjas: dice «la granja solar».
 
 **Orden recomendado antes del reporte:** 📐 Dimensionamiento → ⚡ Producción → 🌿 Impacto CO₂ → 💰 Financiero → 📄 Reporte.
+
+## 119. 🧭 Orden de las páginas según el tipo de instalación (2-oct-2026)
+
+**La regla de fondo:** cada página usa lo que guardaron las anteriores. Si cambias algo arriba, vuelve a ejecutar todo lo que está debajo. Antes de generar, el 📄 Reporte revisa la coherencia y marca en 🔴 lo que quedó viejo (sección 118).
+
+Elige la ruta según el «Tipo de instalación» de 🏠 Proyecto. Las páginas entre paréntesis son opcionales.
+
+### BIPV de una superficie: orden de las páginas
+
+Para Fachada BIPV, Techo inclinado (BIPV), Techo plano (con soporte), Pérgola / sombreadero y Marquesina / voladizo, con una sola orientación.
+
+1. **🏠 Proyecto:** tipo de instalación, ciudad o coordenadas, área y panel. 💾 Guardar configuración.
+2. **☀️ Recurso Solar:** año típico de PVGIS, inclinación y azimut de la superficie; montaje adosado o ventilado si el panel es bifacial.
+3. **(🌳 Sombras SketchUp):** solo si hay obstáculos cercanos (edificios vecinos, árboles, la propia edificación). Si calculas el Sky View Factor, vuelve a **☀️ Recurso Solar** y calcula otra vez.
+4. **🔬 Motor IV:** revisa «Origen del modelo» del panel, sin 🔴.
+5. **📐 Dimensionamiento:** inversor, módulos en serie, strings por MPPT y cantidad de inversores. (⚖️ Comparador de Inversores, 🧩 Comparador de Paneles y 🧭 Comparador de Orientación sirven para decidir; no son obligatorios.)
+6. **🔆 Motor Óptico:** montaje (k_BIPV 1,3 en fachada confinada), NOCT de la ficha y suciedad.
+7. **🔀 Mismatch:** calidad del módulo, mismatch de fabricación y bypass con el CSV de sombras si lo hay.
+8. **⚡ Diagrama Unifilar:** calibres y longitudes. Va antes de Producción porque da la pérdida real en los cables.
+9. **📊 Producción:** ▶️ Simular producción. Guarda la «firma» del diseño.
+10. **(🔋 Baterías y Balance):** solo si el proyecto lleva almacenamiento.
+11. **💼 Presupuesto → 💰 Financiero → 🌿 Impacto CO₂:** los tres usan la energía de Producción.
+12. **📋 Ficha RETIE:** todo en 🟢.
+13. **📄 Reporte:** «Etapa del documento» y revisión sin 🔴.
+
+### BIPV de varias superficies: orden de las páginas
+
+Fachada más techo, o dos fachadas con orientaciones distintas. Sigue la ruta de una superficie hasta 🔀 Mismatch y luego ve a **🗺️ Vista 3D**: superficies, inversores y grupos, y publica el sistema multi-superficie. Unifilar, RETIE, Financiero, CO₂ y Reporte usan después ese sistema publicado. El paso a paso completo, con el caso Teusaquillo, está en la **sección 108**.
+
+### Granja fotovoltaica y agrivoltaica: orden de las páginas
+
+Para Granja fotovoltaica, con o sin cultivo debajo (como Urabá o Apartadó). La diferencia con BIPV: **☀️ Recurso Solar se ejecuta dos veces**.
+
+1. **🏠 Proyecto:** tipo Granja fotovoltaica, coordenadas del predio, área del terreno y factor de ocupación.
+2. **☀️ Recurso Solar, primera pasada:** año típico de PVGIS y modelo bifacial activo. Granja FV la necesita para la sombra y la luz en el suelo.
+3. **(🔬 Motor IV):** revisa el panel.
+4. **📐 Dimensionamiento:** panel, inversor, módulos en serie, N total de cadenas y **«Cantidad de inversores del proyecto»**. Este último vuelve a 0 si cambias de inversor: escríbelo de nuevo.
+5. **🌾 Granja FV:** mesas, filas, pitch, GCR y altura libre; luz en el suelo y maquinaria; seguidor (opcional); eléctrico por bloques. Pulsa **⚡ Usar la geometría del campo en la energía**.
+6. **☀️ Recurso Solar, segunda pasada:** pulsa otra vez el botón de cálculo; ahora entran la sombra entre filas y la cara trasera reales. La comparación con PVWatts usa la cara frontal (diferencia esperada ≈ 0,4 % en Apartadó).
+7. **🔆 Motor Óptico:** montaje Ventilado libre (k = 1,0), NOCT de la ficha y suciedad de la zona (agrícola: 2–3 %).
+8. **🔀 Mismatch:** calidad del módulo y mismatch de fabricación; suciedad en 0 (ya está en Motor Óptico).
+9. **⚡ Diagrama Unifilar:** deja marcada «🌾 Usar los cables de 🌾 Granja FV».
+10. **📊 Producción:** ▶️ Simular producción, sin avisos 🟠 de vigencia.
+11. **(⚖️ Comparador de Inversores):** solo como verificación; no pulses «Adoptar» si coincide con Dimensionamiento.
+12. **📋 Ficha RETIE:** todo en 🟢.
+13. **💼 Presupuesto → 💰 Financiero → 🌿 Impacto CO₂.**
+14. **📄 Reporte:** etapa «Estudio de prefactibilidad» y revisión sin 🔴.
+
+Las reglas de oro, la trampa de strings por tracker y el CSV de la calculadora hermana están en la **sección 107**.
+
+### Si cambias algo: qué volver a ejecutar
+
+| Si cambias… | Vuelve a ejecutar desde… |
+|---|---|
+| La ciudad o las coordenadas | ☀️ Recurso Solar (todo lo de abajo caduca) |
+| La inclinación, el azimut o el albedo | ☀️ Recurso Solar |
+| Las filas, el pitch o el GCR en 🌾 Granja FV | ☀️ Recurso Solar (segunda pasada) |
+| El panel | 🔬 Motor IV y 📐 Dimensionamiento |
+| El inversor, los módulos en serie o la cantidad de inversores | 📐 Dimensionamiento y después ⚡ Diagrama Unifilar |
+| El NOCT, el montaje o la suciedad del Motor Óptico | 🔆 Motor Óptico |
+| Las pérdidas o el bypass | 🔀 Mismatch |
+| Los cables | ⚡ Diagrama Unifilar |
+
+En todos los casos sigue luego con 📊 Producción, 💼 Presupuesto, 💰 Financiero, 🌿 Impacto CO₂ y 📄 Reporte. Si lo olvidas, el Reporte muestra «El diseño cambió después de simular ⚡ Producción» con el antes y el ahora.
 
 Calculadora BIPV — Innovación Química
 
