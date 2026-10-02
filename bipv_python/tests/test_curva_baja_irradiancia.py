@@ -56,8 +56,10 @@ def test_la_teja_se_calibra_con_su_curva():
     assert validar_sdm_vs_ficha(sdm)["validacion_ok"]                       # STC sigue anclado
     puntos = {round(p["G"]): p for p in est["_ajuste_curva"]}
     assert set(puntos) == {300, 400, 500, 600, 700, 800, 900}
-    for g in (500, 600, 700, 800, 900):                                     # zona alta: ±1,5 puntos
-        assert abs(puntos[g]["modelo"] - puntos[g]["ficha"]) <= 1.5, g
+    # Zona alta: ±2 puntos. Con R_s ≥ 1 % de Vmp/Imp (Spec 04/coef-temperatura-
+    # ficha) el ajuste ya no puede llevar R_s a 0 Ω y a 500 W/m² queda ~1,9.
+    for g in (500, 600, 700, 800, 900):
+        assert abs(puntos[g]["modelo"] - puntos[g]["ficha"]) <= 2.0, g
     rel = dict(zip((300, 400, 500, 600), _rel(sdm, (300, 400, 500, 600))))
     assert rel[300] == pytest.approx(puntos[300]["modelo"], abs=0.05)
     # Mucho más cerca de la ficha que el 97 % genérico (que daba ~99-100 %).

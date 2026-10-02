@@ -5938,6 +5938,26 @@ A 300 W/m² el modelo no baja de ~90 %. Además, la misma ficha se contradice en
 
 **Cómo leer una gráfica de ficha:** toma 5 a 8 puntos sobre la curva, leyendo la eficiencia relativa en el eje vertical (1,0 = 100 %). No incluyas 1.000 W/m², que es la referencia. Las certificaciones (IEC 61646/61730, UL 790) aprueban la seguridad del producto, no esas gráficas: úsalas con criterio.
 
+## 115. 🌡️ Coeficientes de temperatura de la ficha en el modelo IV (2-oct-2026)
+
+**El caso:** con la teja Hanergy de 32 W, 🔬 Motor IV mostraba un Voc de **9,92 V** a 61 °C, cuando con el β de la ficha (−0,36 %/°C) debía ser **9,39 V**. Además, «Parámetros SDM» mostraba Rs = 0,000 Ω.
+
+**Qué pasaba:**
+- El modelo de un diodo solo ajustaba el coeficiente de la **potencia (γ)**. El del **Voc (β)** salía de la física de la celda y en capa fina se alejaba de la ficha: teja −0,22 frente a −0,36, y CdTe ASP-LAM3 −0,10 frente a −0,321.
+- Los paneles que caen al **método de respaldo** (12 de 3.128 en el catálogo, como los EINNOVA TopCon) tenían el γ mal: hasta **−0,88 %/°C** cuando la ficha dice −0,36. Eso sí distorsionaba la energía con calor.
+- Con la curva de baja irradiancia, el ajuste llevaba Rs hasta 0 Ω.
+
+**Qué cambió:**
+1. **γ Pmax** sigue la ficha en todos los paneles estimados, incluidos los del método de respaldo.
+2. **β Voc** se ajusta con una «energía de banda efectiva» dentro de ±0,4 eV de la nominal de la tecnología. En silicio queda exacto (JA Solar 730 W: −0,25 / −0,29). En capa fina mejora: la teja pasa de −0,22 a −0,30 y el FLEX 70N de −0,20 a −0,255.
+3. Si β queda a más de 0,03 %/°C de la ficha, **«Origen del modelo»** lo avisa con ⚠️. Pasa con la teja Hanergy y con los CdTe ASP-LAM3, donde el modelo de un diodo no llega con valores físicos.
+4. **Rs mínimo** de 1 % de Vmp/Imp en el ajuste de baja luz. La teja queda con 0,025 Ω y no con 0.
+5. «Origen del modelo» muestra **γ y β del modelo frente a los de la ficha**.
+
+**Qué no cambia:** STC, la baja luz (se calcula a 25 °C) ni la seguridad del diseño. 📐 **Dimensionamiento** calcula el Voc en frío con el **β de la ficha**, no con el del modelo. El aviso ⚠️ solo indica que la curva de Motor IV a alta temperatura muestra un Voc algo alto.
+
+**Revisión de la ficha SolTech ASP-LAM3 1200×1800:** Voc 181,4 V (el catálogo dice 181,0 en la T0), α Isc +0,06 y VSYS 1.000 V (vacíos en el catálogo). El Ns = 348 del catálogo da 0,52 V por celda, por debajo del rango típico de CdTe (0,76 a 1,2 V). La ficha no trae el número de celdas.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

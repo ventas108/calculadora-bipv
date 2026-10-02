@@ -71,6 +71,15 @@ def _mostrar_origen_modelo(_sdm_est: dict) -> None:
             f"(**{_sdm_est.get('_rel_200_modelo')} %** a 200 W/m²): la ficha no trae el dato. "
             "Si la ficha trae la gráfica de baja irradiancia, escribe sus puntos en «Curva baja "
             "irradiancia (G:η %)» del catálogo (o el dato de 200 W/m² en «η rel. 200 W/m² (%)»).")
+    # Spec 04/coef-temperatura-ficha: coeficientes de temperatura del modelo vs ficha.
+    if _sdm_est.get("_gamma_pmax_modelo") is not None:
+        _bf, _gf = _sdm_est.get("_beta_voc_ficha"), _sdm_est.get("_gamma_pmax_ficha")
+        _origen_lineas.append(
+            "Temperatura: γ Pmax del modelo **{:.3f} %/°C**{} · β Voc del modelo **{:.3f} %/°C**{}.".format(
+                _sdm_est["_gamma_pmax_modelo"], f" (ficha {_gf:.3f})" if _gf is not None else "",
+                _sdm_est["_beta_voc_modelo"], f" (ficha {_bf:.3f})" if _bf is not None else ""))
+    if _sdm_est.get("_aviso_temperatura"):
+        _origen_lineas.append(f"⚠️ Voc con la temperatura: {_sdm_est['_aviso_temperatura']}")
     if _sdm_est.get("_error_ajuste_200"):
         _origen_lineas.append(
             f"⚠️ El ajuste de baja luz no llegó al objetivo ({_sdm_est['_error_ajuste_200']}). "
