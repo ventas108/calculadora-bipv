@@ -107,18 +107,48 @@ def excel_mtime() -> float:
         return 0.0
 
 
-@st.cache_data(ttl=3600)
 def _texto_celda(valor) -> str:
     """Texto de una celda del Excel; vacío para NaN/None."""
     t = str(valor if valor is not None else "").strip()
     return "" if t.lower() in ("nan", "none") else t
 
 
+# Spec 01/cache-catalogo-paneles (2-oct-2026): el catálogo (3.138 paneles)
+# tarda 5-9 s en leerse del Excel. El PR #107 desplazó por error el
+# @st.cache_data a _texto_celda y se releía en cada clic; además st.cache_data
+# entrega una copia serializada (~2 s por llamada). Ahora: caché en memoria
+# con la ruta, fecha y tamaño del Excel (se invalida sola al guardar, borrar
+# o al actualizar el servidor) y copia ligera por llamada.
+_CACHE_CATALOGO: dict = {}
+
+
+def _clave_excel():
+    try:
+        st_ = _os.stat(_EXCEL)
+        return (str(_EXCEL), st_.st_mtime_ns, st_.st_size)
+    except OSError:
+        return (str(_EXCEL), None, None)
+
+
 def cargar_catalogo_paneles() -> dict:
+    """Catálogo de paneles {nombre: dict}. Cada llamada recibe sus propios
+    dicts de panel (copia ligera), así que modificarlos no altera la caché."""
+    clave = _clave_excel()
+    if _CACHE_CATALOGO.get("clave") != clave:
+        _CACHE_CATALOGO.clear()
+        _CACHE_CATALOGO["datos"] = _leer_catalogo_paneles()
+        _CACHE_CATALOGO["clave"] = clave
+    return {k: dict(v) for k, v in _CACHE_CATALOGO["datos"].items()}
+
+
+cargar_catalogo_paneles.clear = _CACHE_CATALOGO.clear
+
+
+def _leer_catalogo_paneles() -> dict:
     df = pd.read_excel(_EXCEL, sheet_name=_SHEET, header=0)
     df.columns = [str(c).strip() for c in df.columns]
     paneles = {}
-    for _, r in df.iterrows():
+    for r in df.to_dict("records"):          # mucho más rápido que iterrows (Spec 01/cache-catalogo-paneles)
         pmax = _f(r.get("PmaxWp"))
         if not pmax or pmax <= 0:
             continue
