@@ -94,6 +94,11 @@ def construir_proyecto_desde_session_state(session_state: Mapping[str, Any]) -> 
             # IAM + suciedad de esta superficie (antes, la POA bruta).
             sup["cadena_optica"] = cadena_optica_fisico(entrada, panel, parametros_cadena(session_state))
             sup["_firma_sombra"] = dict(entrada["firma_sombra"])
+            # Spec 05/sombra-por-string: con un punto por módulo, el bypass
+            # usa cuántos módulos tienen sombra y cuánta luz pierden.
+            if entrada.get("fraccion_modulos_sombra") is not None and entrada.get("profundidad_sombra") is not None:
+                sup["fraccion_modulos_sombra"] = np.asarray(entrada["fraccion_modulos_sombra"], dtype=float)
+                sup["profundidad_sombra"] = np.asarray(entrada["profundidad_sombra"], dtype=float)
             sup["superficie_origen"] = nombre
             sup["gid"] = gid
             sup["mppt"] = grupo.get("mppt")

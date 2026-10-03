@@ -302,10 +302,20 @@ def recalcular_fisica_superficie(
             tmy, poa_df, panel, float(superficie.get("k_bipv", 1.0)), superficie["cadena_optica"]))
         f_optico = float(G_eff.sum()) / _bruta if _bruta > 0 else 1.0
 
+    # Spec 05/sombra-por-string: con un punto por módulo, el bypass recibe
+    # cuántos módulos tienen sombra y cuánta luz pierden, no su promedio.
+    sombra_bypass = {"p_shade": p_shade}
+    fraccion = superficie.get("fraccion_modulos_sombra")
+    profundidad = superficie.get("profundidad_sombra")
+    if fraccion is not None and profundidad is not None:
+        sombra_bypass = {
+            "p_shade": _validar_serie_horaria("fraccion_modulos_sombra", fraccion),
+            "profundidad_sombra": _validar_serie_horaria("profundidad_sombra", profundidad),
+        }
     bypass = simular_bypass_horario(
         G_eff=G_eff,
         T_amb=t_amb,
-        p_shade=p_shade,
+        **sombra_bypass,
         N_series=int(superficie["n_serie"]),
         N_parallel=int(superficie["n_paralelo"]),
         panel=dict(panel),
@@ -550,6 +560,8 @@ def transicion_cambiar_geometria(
         sup = candidato["superficies"][nombre_superficie]
         sup.update(dict(geometria_nueva))
         sup["p_shade"] = _validar_p_shade(p_shade_nuevo)
+        sup.pop("fraccion_modulos_sombra", None)      # eran de la sombra anterior
+        sup.pop("profundidad_sombra", None)
 
         nueva_sup = recalcular_fisica_superficie(sup, tmy, lat, lon, alt_m)
         candidato["superficies"][nombre_superficie] = nueva_sup

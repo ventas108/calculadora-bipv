@@ -314,3 +314,27 @@ def test_mensaje_dc_ac_dice_el_rango_que_usa_el_calculo(ratio, nivel):
     assert "0.95" not in r["mensaje"]
     if ratio < 1.36:
         assert "1.00–1.35" in r["mensaje"]
+
+
+def test_bypass_separa_cuantos_modulos_de_cuanta_sombra():
+    """Spec 05/sombra-por-string (3-oct-2026): con un solo número, «1 de 18
+    módulos totalmente a la sombra» (p_shade medio = 1/18) se leía como «1
+    módulo con el 94 % de luz» y el bypass nunca actuaba. Con la fracción de
+    módulos y la profundidad por separado, ese módulo deja de producir. Sin
+    profundidad, el resultado es idéntico al de antes."""
+    from calculos.mismatch_bypass import simular_bypass_horario
+
+    sol = (np.arange(8760) % 24 >= 7) & (np.arange(8760) % 24 < 17)
+    g = np.where(sol, 700.0, 0.0)
+    t = np.full(8760, 20.0)
+    kw = dict(G_eff=g, T_amb=t, N_series=18, N_parallel=1, panel=ASP_ST1_T40)
+    frac = np.where(sol, 1 / 18, 0.0)
+
+    antes = simular_bypass_horario(p_shade=frac, **kw)
+    igual = simular_bypass_horario(p_shade=frac, profundidad_sombra=None, **kw)
+    nuevo = simular_bypass_horario(p_shade=frac, profundidad_sombra=np.where(sol, 1.0, 0.0), **kw)
+
+    assert igual["kwh_bypass_anual"] == antes["kwh_bypass_anual"]
+    assert antes["pct_bypass_anual"] < 1.0                        # el módulo «casi» no pierde
+    assert nuevo["pct_bypass_anual"] == pytest.approx(100 / 18, abs=0.6)   # pierde el módulo entero
+    assert nuevo["horas_bypass"] > 0

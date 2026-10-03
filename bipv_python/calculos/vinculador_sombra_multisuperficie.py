@@ -18,11 +18,16 @@ from calculos.sombras_3d import (
 from calculos.transicion_multisuperficie import recalcular_agregados_proyecto, recalcular_etapa_inversor_bus, recalcular_fisica_superficie
 from calculos.adaptador_multisuperficie import construir_proyecto_desde_session_state
 
-_CAMPOS_SOMBRA = ("p_shade", "firma_sombra", "cobertura_sombra", "advertencias_sombra", "calidad_confianza_sombra", "estado_sombra")
+_CAMPOS_SOMBRA = ("p_shade", "firma_sombra", "cobertura_sombra", "advertencias_sombra", "calidad_confianza_sombra", "estado_sombra",
+                  "fraccion_modulos_sombra", "profundidad_sombra")
 # Spec 08-interfaz/estado-sombra-superficie: en un estado no aceptable solo se
 # retira la sombra horaria; el estado, las advertencias y la calidad quedan
 # para explicar el motivo en la página.
-_CAMPOS_SOMBRA_HORARIA = ("p_shade", "firma_sombra", "cobertura_sombra")
+_CAMPOS_SOMBRA_HORARIA = ("p_shade", "firma_sombra", "cobertura_sombra",
+                          "fraccion_modulos_sombra", "profundidad_sombra")
+# Spec 05/sombra-por-string: cuántos módulos tienen sombra y cuánta luz
+# pierden; viajan con p_shade y caducan con ella.
+_CAMPOS_SOMBRA_POR_STRING = ("fraccion_modulos_sombra", "profundidad_sombra")
 _MOTIVOS_SOMBRA = ("sombra_invalidada_motivo", "sombra_bloqueo_motivo")
 _ETIQUETA_CAMPO = {
     "tilt_deg": "tilt", "azimuth_deg": "azimuth", "area_m2": "área",
@@ -51,6 +56,11 @@ def aplicar_sombra_a_superficies(superficies_bipv: list[dict], resultados_sombra
                 nueva["calidad_confianza_sombra"] = datos.get("calidad_confianza", "baja")
             else:
                 nueva["p_shade"] = np.asarray(datos["p_shade"], dtype=float)
+                for campo in _CAMPOS_SOMBRA_POR_STRING:
+                    if datos.get(campo) is not None:
+                        nueva[campo] = np.asarray(datos[campo], dtype=float)
+                    else:
+                        nueva.pop(campo, None)
                 nueva["firma_sombra"] = dict(datos["firma_sombra"])
                 nueva["cobertura_sombra"] = dict(datos.get("cobertura", {}))
                 nueva["advertencias_sombra"] = list(datos.get("advertencias", []))

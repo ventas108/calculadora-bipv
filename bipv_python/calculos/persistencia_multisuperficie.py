@@ -176,6 +176,8 @@ def _superficie_input(superficie: Mapping[str, Any]) -> dict[str, Any]:
     salida = {campo: superficie[campo] for campo in requeridos}
     for campo in (
         "n_serie", "n_paralelo", "inversor_id", "p_shade", "firma_sombra",
+        # Spec 05/sombra-por-string: módulos con sombra y cuánta luz pierden.
+        "fraccion_modulos_sombra", "profundidad_sombra",
         "firma_poa", "estado_sombra", "cobertura_sombra", "puntos_analisis",
         "malla_horizonte", "motor_optico_vigente",
         # Spec 05/panel-por-superficie: panel de cada superficie. Ausentes en
@@ -397,8 +399,9 @@ def restaurar_multisuperficie(
         for superficie in entradas["surfaces"]:
             restaurada = _restaurar_canonico(superficie)
             restaurada["activa"] = True
-            if "p_shade" in restaurada:
-                restaurada["p_shade"] = np.asarray(restaurada["p_shade"], dtype=float)
+            for campo in ("p_shade", "fraccion_modulos_sombra", "profundidad_sombra"):
+                if campo in restaurada:
+                    restaurada[campo] = np.asarray(restaurada[campo], dtype=float)
             superficies.append(restaurada)
         inversores = _restaurar_canonico(entradas["electrical"]["inversores"])
         resultados = payload["results"].get("session_state", {})
