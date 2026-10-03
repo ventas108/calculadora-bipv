@@ -1,0 +1,240 @@
+{
+  "puntos_Fachada-Sureste": [
+    {
+      "nombre": "SE-piso01",
+      "fachada": "Sureste",
+      "fila": 1,
+      "x": -2.2108,
+      "y": -19.6559,
+      "z": 1.4007,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SE-piso02",
+      "fachada": "Sureste",
+      "fila": 2,
+      "x": -2.2108,
+      "y": -19.6559,
+      "z": 4.2021,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SE-piso03",
+      "fachada": "Sureste",
+      "fila": 3,
+      "x": -2.2108,
+      "y": -19.6559,
+      "z": 7.0034,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SE-piso04",
+      "fachada": "Sureste",
+      "fila": 4,
+      "x": -2.2108,
+      "y": -19.6559,
+      "z": 9.8048,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SE-piso05",
+      "fachada": "Sureste",
+      "fila": 5,
+      "x": -2.2108,
+      "y": -19.6559,
+      "z": 12.6062,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SE-piso06",
+      "fachada": "Sureste",
+      "fila": 6,
+      "x": -2.2108,
+      "y": -19.6559,
+      "z": 15.4075,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SE-piso07",
+      "fachada": "Sureste",
+      "fila": 7,
+      "x": -2.2108,
+      "y": -19.6559,
+      "z": 18.2089,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SE-piso08",
+      "fachada": "Sureste",
+      "fila": 8,
+      "x": -2.2108,
+      "y": -19.6559,
+      "z": 21.0103,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SE-piso09",
+      "fachada": "Sureste",
+      "fila": 9,
+      "x": -2.2108,
+      "y": -19.6559,
+      "z": 23.8116,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SE-piso10",
+      "fachada": "Sureste",
+      "fila": 10,
+      "x": -2.2108,
+      "y": -19.6559,
+      "z": 26.613,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SE-piso11",
+      "fachada": "Sureste",
+      "fila": 11,
+      "x": -2.2108,
+      "y": -19.6559,
+      "z": 29.4144,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SE-piso12",
+      "fachada": "Sureste",
+      "fila": 12,
+      "x": -2.2108,
+      "y": -19.6559,
+      "z": 32.2157,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SE-piso13",
+      "fachada": "Sureste",
+      "fila": 13,
+      "x": -2.2108,
+      "y": -19.6559,
+      "z": 35.0171,
+      "modulos_representados_aprox": 5.38
+    }
+  ],
+  "puntos_Fachada-Suroeste": [
+    {
+      "nombre": "SO-piso01",
+      "fachada": "Suroeste",
+      "fila": 1,
+      "x": -13.8842,
+      "y": -14.088,
+      "z": 1.4007,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SO-piso02",
+      "fachada": "Suroeste",
+      "fila": 2,
+      "x": -13.8842,
+      "y": -14.088,
+      "z": 4.2021,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SO-piso03",
+      "fachada": "Suroeste",
+      "fila": 3,
+      "x": -13.8842,
+      "y": -14.088,
+      "z": 7.0034,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SO-piso04",
+      "fachada": "Suroeste",
+      "fila": 4,
+      "x": -13.8842,
+      "y": -14.088,
+      "z": 9.8048,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SO-piso05",
+      "fachada": "Suroeste",
+      "fila": 5,
+      "x": -13.8842,
+      "y": -14.088,
+      "z": 12.6062,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SO-piso06",
+      "fachada": "Suroeste",
+      "fila": 6,
+      "x": -13.8842,
+      "y": -14.088,
+      "z": 15.4075,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SO-piso07",
+      "fachada": "Suroeste",
+      "fila": 7,
+      "x": -13.8842,
+      "y": -14.088,
+      "z": 18.2089,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SO-piso08",
+      "fachada": "Suroeste",
+      "fila": 8,
+      "x": -13.8842,
+      "y": -14.088,
+      "z": 21.0103,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SO-piso09",
+      "fachada": "Suroeste",
+      "fila": 9,
+      "x": -13.8842,
+      "y": -14.088,
+      "z": 23.8116,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SO-piso10",
+      "fachada": "Suroeste",
+      "fila": 10,
+      "x": -13.8842,
+      "y": -14.088,
+      "z": 26.613,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SO-piso11",
+      "fachada": "Suroeste",
+      "fila": 11,
+      "x": -13.8842,
+      "y": -14.088,
+      "z": 29.4144,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SO-piso12",
+      "fachada": "Suroeste",
+      "fila": 12,
+      "x": -13.8842,
+      "y": -14.088,
+      "z": 32.2157,
+      "modulos_representados_aprox": 5.38
+    },
+    {
+      "nombre": "SO-piso13",
+      "fachada": "Suroeste",
+      "fila": 13,
+      "x": -13.8842,
+      "y": -14.088,
+      "z": 35.0171,
+      "modulos_representados_aprox": 5.38
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "TORRE central (SO=SE=17.29m)": {
+    "Fachada-Sureste": {
+      "estado_sombra": "sombra_cero_calculada",
+      "poa_anual_kWh_m2": 831.64,
+      "E_dc_anual_kWh": 20218.1,
+      "E_ac_anual_kWh": 19935.1,
+      "rendimiento_esp_kWh_kWp": 711.87,
+      "PR": 0.856,
+      "horas_shade_gt_1pct_pct": 0.0,
+      "perdida_sombra_media_pct": 0.0,
+      "cobertura": {
+        "horas_totales": 8760,
+        "horas_sin_sol": 4349,
+        "horas_con_sol_calculadas": 4411,
+        "horas_con_sol_no_calculadas": 0,
+        "estado": "sombra_cero_calculada"
+      }
+    },
+    "Fachada-Suroeste": {
+      "estado_sombra": "sombra_cero_calculada",
+      "poa_anual_kWh_m2": 831.35,
+      "E_dc_anual_kWh": 20392.9,
+      "E_ac_anual_kWh": 20107.4,
+      "rendimiento_esp_kWh_kWp": 718.02,
+      "PR": 0.8637,
+      "horas_shade_gt_1pct_pct": 0.0,
+      "perdida_sombra_media_pct": 0.0,
+      "cobertura": {
+        "horas_totales": 8760,
+        "horas_sin_sol": 4349,
+        "horas_con_sol_calculadas": 4411,
+        "horas_con_sol_no_calculadas": 0,
+        "estado": "sombra_cero_calculada"
+      }
+    }
+  },
+  "sensibilidad SO=12m": {
+    "Fachada-Sureste": {
+      "estado_sombra": "sombra_cero_calculada",
+      "poa_anual_kWh_m2": 831.64,
+      "E_dc_anual_kWh": 20218.1,
+      "E_ac_anual_kWh": 19935.1,
+      "rendimiento_esp_kWh_kWp": 711.87,
+      "PR": 0.856,
+      "horas_shade_gt_1pct_pct": 0.0,
+      "perdida_sombra_media_pct": 0.0,
+      "cobertura": {
+        "horas_totales": 8760,
+        "horas_sin_sol": 4349,
+        "horas_con_sol_calculadas": 4411,
+        "horas_con_sol_no_calculadas": 0,
+        "estado": "sombra_cero_calculada"
+      }
+    },
+    "Fachada-Suroeste": {
+      "estado_sombra": "sombra_cero_calculada",
+      "poa_anual_kWh_m2": 831.35,
+      "E_dc_anual_kWh": 20392.9,
+      "E_ac_anual_kWh": 20107.4,
+      "rendimiento_esp_kWh_kWp": 718.02,
+      "PR": 0.8637,
+      "horas_shade_gt_1pct_pct": 0.0,
+      "perdida_sombra_media_pct": 0.0,
+      "cobertura": {
+        "horas_totales": 8760,
+        "horas_sin_sol": 4349,
+        "horas_con_sol_calculadas": 4411,
+        "horas_con_sol_no_calculadas": 0,
+        "estado": "sombra_cero_calculada"
+      }
+    }
+  },
+  "sensibilidad SO=25m": {
+    "Fachada-Sureste": {
+      "estado_sombra": "sombra_cero_calculada",
+      "poa_anual_kWh_m2": 831.64,
+      "E_dc_anual_kWh": 20218.1,
+      "E_ac_anual_kWh": 19935.1,
+      "rendimiento_esp_kWh_kWp": 711.87,
+      "PR": 0.856,
+      "horas_shade_gt_1pct_pct": 0.0,
+      "perdida_sombra_media_pct": 0.0,
+      "cobertura": {
+        "horas_totales": 8760,
+        "horas_sin_sol": 4349,
+        "horas_con_sol_calculadas": 4411,
+        "horas_con_sol_no_calculadas": 0,
+        "estado": "sombra_cero_calculada"
+      }
+    },
+    "Fachada-Suroeste": {
+      "estado_sombra": "sombra_cero_calculada",
+      "poa_anual_kWh_m2": 831.35,
+      "E_dc_anual_kWh": 20392.9,
+      "E_ac_anual_kWh": 20107.4,
+      "rendimiento_esp_kWh_kWp": 718.02,
+      "PR": 0.8637,
+      "horas_shade_gt_1pct_pct": 0.0,
+      "perdida_sombra_media_pct": 0.0,
+      "cobertura": {
+        "horas_totales": 8760,
+        "horas_sin_sol": 4349,
+        "horas_con_sol_calculadas": 4411,
+        "horas_con_sol_no_calculadas": 0,
+        "estado": "sombra_cero_calculada"
+      }
+    }
+  },
+  "TORRE + arboles (central)": {
+    "Fachada-Sureste": {
+      "estado_sombra": "sombra_cero_calculada",
+      "poa_anual_kWh_m2": 831.64,
+      "E_dc_anual_kWh": 20218.1,
+      "E_ac_anual_kWh": 19935.1,
+      "rendimiento_esp_kWh_kWp": 711.87,
+      "PR": 0.856,
+      "horas_shade_gt_1pct_pct": 0.0,
+      "perdida_sombra_media_pct": 0.0,
+      "cobertura": {
+        "horas_totales": 8760,
+        "horas_sin_sol": 4349,
+        "horas_con_sol_calculadas": 4411,
+        "horas_con_sol_no_calculadas": 0,
+        "estado": "sombra_cero_calculada"
+      }
+    },
+    "Fachada-Suroeste": {
+      "estado_sombra": "calculado_completo",
+      "poa_anual_kWh_m2": 831.35,
+      "E_dc_anual_kWh": 19739.0,
+      "E_ac_anual_kWh": 19462.6,
+      "rendimiento_esp_kWh_kWp": 694.99,
+      "PR": 0.836,
+      "horas_shade_gt_1pct_pct": 16.473,
+      "perdida_sombra_media_pct": 1.972,
+      "cobertura": {
+        "horas_totales": 8760,
+        "horas_sin_sol": 4349,
+        "horas_con_sol_calculadas": 4411,
+        "horas_con_sol_no_calculadas": 0,
+        "estado": "calculado_completo"
+      }
+    }
+  }
+}

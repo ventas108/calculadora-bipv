@@ -1,0 +1,43 @@
+{
+  "Location": {
+    "latitude": 4.634,
+    "longitude": -74.148,
+    "timezone": -5,
+    "northOffset": 160.5,
+    "elevation": 2550.0
+  },
+  "Blocks": [
+    {
+      "min": [
+        0,
+        0,
+        0
+      ],
+      "max": [
+        25000.0,
+        17290.5,
+        36417.8
+      ],
+      "color": [
+        0.55,
+        0.55,
+        0.6,
+        1
+      ],
+      "majorAxis": 0,
+      "fixedSize": 0,
+      "isSolid": true,
+      "group": 0,
+      "blockSubclass": "TowerBlock",
+      "nombre_provisional": "Torre5_reconstruccion_provisional_so25m"
+    }
+  ],
+  "_metadatos_reconstruccion_provisional": {
+    "clasificacion": "B - reconstruccion provisional, NO exportada de Site Designer",
+    "fuente_ancho_SE": "Fig. 4 tesis La Salle 2021, p.35 (cota AutoCAD, medido)",
+    "fuente_alto": "Fig. 4 tesis La Salle 2021, p.35 (cota AutoCAD, medido, consistente con 13 pisos x 2.80m)",
+    "ancho_SO_mm": 25000.0,
+    "ancho_SO_supuesto": false,
+    "north_offset_derivacion": "idealiza esquina real 87 grados a 90 grados exactos (reparto 1.5 grados por cara), verificado numericamente con trimesh en derivar_geometria.py"
+  }
+}

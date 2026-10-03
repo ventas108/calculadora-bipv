@@ -1,0 +1,480 @@
+diff --git a/CodeSpecs/00-director/registro-de-decisiones.md b/CodeSpecs/00-director/registro-de-decisiones.md
+index 76ae3350..299d8521 100644
+--- a/CodeSpecs/00-director/registro-de-decisiones.md
++++ b/CodeSpecs/00-director/registro-de-decisiones.md
+@@ -25,3 +25,5 @@
+ | 2026-09-21 | Corregir 5 hallazgos bloqueantes de una auditoría sobre la ronda anterior (mismo día): (1) `tmy_fingerprint` firmaba un vector de ceros en vez de `T2m` real, así que ninguna firma de sombra podía pasar jamás `_validar_firma_sombra` — corregido para exigir el TMY real; (2) sombra incompleta/errónea solo advertía, nunca bloqueaba — se agregó un estado explícito por superficie con bloqueo real en dos capas independientes; (3) el botón "Adoptar" publicaba el candidato guardado sin revalidar — se unificó en una sola función que revalida contra el `session_state` actual antes de adoptar; (4) `inversores_multisuperficie.py` existía pero no estaba conectado a ningún flujo — ahora `construir_proyecto_desde_session_state` lo ejecuta siempre; (5) la invalidación geométrica solo miraba tilt/azimuth — se amplió a todas las entradas reales de la sombra más una invalidación separada por cambio de TMY. Batería focal `38 passed` original pasa a `116 passed`; regresión completa del proyecto sin fallos nuevos (ver `references/correccion-auditoria-multisuperficie.md`) | La implementación anterior parecía completa por sus propias pruebas (38 passed), pero esas pruebas nunca ejercitaron la validación cruzada real entre módulos (firma de sombra vs. validación de la transición, adopción vs. revalidación, inversores vs. flujo real) — los 5 hallazgos son bugs de integración reales, no estilo ni cobertura cosmética | `05-perdidas-y-temperatura` |
+ | 2026-09-21 | Publicar la primera integración opt-in multi-superficie en `main` y DigitalOcean (`c0caa2136`), manteniendo el modelo simplificado como default | Vista 3D carga Site Designer, recibe puntos `x,y,z` por superficie, valida inversores y permite comparar/adoptar el resultado físico solo después de revalidar el estado actual. La UI de puntos es manual y el Motor Óptico sigue global; la Spec continúa en validación operativa | `05-perdidas-y-temperatura`, `08-interfaz`, `09-despliegue` |
+ | 2026-09-21 | Adoptar persistencia canónica firmada para el estado físico multi-superficie, con restauración diferida hasta verificar el TMY y limpieza completa al cambiar de proyecto | `persistencia_multisuperficie` separa entradas, resultados, firmas y metadata de proveedores; Cargar no publica `multisup_*` antes de validar el TMY, la geometría, sombra, POA y configuración eléctrica. Un payload inválido o un cambio de proyecto no puede dejar vivo estado físico anterior. El modelo simplificado continúa siendo default y la restauración es todo-o-nada | `05-perdidas-y-temperatura`, `06-analisis-financiero`, `07-informes`, `08-interfaz` |
++| 2026-09-22 | Registrar la reconstrucción externa East2/SunPower E20-327 como evidencia parcial, no como validación científica de la APP | El artículo no publica energía anual agregada East2 ni entrega CAMS/ERA5, DSM original o ficha AC completa del Fronius. El caso reproduce ficha, geometría, 7S×2P y máscara de Tabla 4 bajo un TMY sintético; las anclas de POA/DC/AC son regresiones de esa reconstrucción, no valores del artículo. Una sombra antigua se rechaza al cambiar TMY; solo una nueva `p_shade` con `firma_sombra` regenerada permite recalcular. Ver `references/informe-validacion-east2-sunpower-e20327-app.md` y sus 101 pruebas focales/regresión | `05-perdidas-y-temperatura`, `08-interfaz` |
++| 2026-09-22 | Bloquear escenas Site Designer cuya ubicación no coincide con el proyecto activo y mantener bloqueada la validación SO/SE de La Salle hasta recibir una escena real de Bosques de Castilla y puntos legítimos por fachada | Los JSON disponibles son ejemplos a ~7,6 km y no representan la Torre 5 ni sus dos fachadas; la UI ya no conserva una malla incompatible en sesión. No se fabrica geometría ni se atribuye la asimetría a un defecto de la APP sin aislar meteorología, transposición y sombra real. Ver `references/experimento-bloqueado-geometria-real-lasalle-site-designer.md` | `05-perdidas-y-temperatura`, `08-interfaz` |
+diff --git a/bipv_python/calculos/mismatch_bypass.py b/bipv_python/calculos/mismatch_bypass.py
+index 0f5ed713..21a54bad 100644
+--- a/bipv_python/calculos/mismatch_bypass.py
++++ b/bipv_python/calculos/mismatch_bypass.py
+@@ -275,6 +275,14 @@ def simular_bypass_horario(
+                    (ventilado libre) si no se conoce el montaje del array.
+     umbral_shade : FS mínimo para tratar como sombra activa (filtra ruido)
+ 
++    Alcance radiativo
++    -----------------
++    `p_shade` representa bloqueo geométrico del haz directo, pero este modelo
++    recibe `G_eff` agregado y aplica la reducción como `G_eff × (1-p_shade)`.
++    Por tanto, la difusa no se separa aquí mediante un Sky View Factor. El
++    acoplamiento de sombra geométrica con reducción difusa es una limitación
++    conocida del flujo multisuperficie, no una medición de sombra difusa.
++
+     Física del modelo
+     -----------------
+     Para cada hora con p_shade > umbral:
+diff --git a/bipv_python/calculos/sitedesigner_marsh.py b/bipv_python/calculos/sitedesigner_marsh.py
+index 4554ccf5..340182a8 100644
+--- a/bipv_python/calculos/sitedesigner_marsh.py
++++ b/bipv_python/calculos/sitedesigner_marsh.py
+@@ -26,6 +26,7 @@ Regla de unidades (acordada — no adivinar):
+ """
+ from __future__ import annotations
+ 
++import hashlib
+ import json
+ 
+ import numpy as np
+@@ -63,10 +64,10 @@ def cargar_escena_sitedesigner(contenido):
+       (``_bipv_obstacle_id_by_face`` / ``_bipv_obstacle_name_by_face``),
+       lista para ``sombras_3d.calcular_fs_horario``.
+ 
+-    meta: dict con ``lat``, ``lon``, ``timezone``, ``elevacion_m``,
+-      ``north_offset_deg``, ``n_bloques`` y ``dim_m`` (x, y, z de la
+-      caja envolvente en metros) — para validar contra la sesión y para
+-      trazabilidad ("fuente: externa_marsh").
++        meta: dict con ``lat``, ``lon``, ``timezone``, ``elevacion_m``,
++            ``north_offset_deg``, ``n_bloques``, ``dim_m`` y ``malla_fingerprint``
++            (huella del contenido que afecta la escena) — para validar contra la
++            sesión y para trazabilidad ("fuente: externa_marsh").
+ 
+     Lanza ``ErrorSiteDesigner`` con mensaje claro si el archivo no es un
+     JSON de Site Designer válido. Nunca corrige en silencio.
+@@ -153,8 +154,21 @@ def cargar_escena_sitedesigner(contenido):
+     malla._bipv_obstacle_id_by_face = np.asarray(ids, dtype=object)
+     malla._bipv_obstacle_name_by_face = np.asarray(nombres, dtype=object)
+ 
++    contenido_huella = {
++        "blocks": bloques,
++        "latitude": lat,
++        "longitude": lon,
++        "northOffset": north_offset,
++        "timezone": loc.get("timezone"),
++        "elevation": loc.get("elevation"),
++    }
++    huella_escena = hashlib.sha256(
++        json.dumps(contenido_huella, sort_keys=True, separators=(",", ":")).encode("utf-8")
++    ).hexdigest()[:16]
++
+     meta = {
+         "fuente": "externa_marsh",
++        "malla_fingerprint": f"externa_marsh-{huella_escena}",
+         "lat": lat,
+         "lon": lon,
+         "timezone": loc.get("timezone"),
+diff --git a/bipv_python/calculos/sombras_3d.py b/bipv_python/calculos/sombras_3d.py
+index 05e66b87..bc898f20 100644
+--- a/bipv_python/calculos/sombras_3d.py
++++ b/bipv_python/calculos/sombras_3d.py
+@@ -446,6 +446,7 @@ def calcular_fs_horario_por_superficie(
+     malla_horizonte: str,
+     transparencia: float = 0.0,
+     n_modulos_serie_por_superficie: dict[str, int] | None = None,
++    fuente: str = "sombras_3d",
+ ) -> dict[str, dict]:
+     """Calcula FS geometrico horario y firma por superficie.
+ 
+@@ -503,12 +504,12 @@ def calcular_fs_horario_por_superficie(
+             "puntos_analisis": [dict(p) for p in puntos],
+             "malla_horizonte": str(malla_horizonte),
+             "tmy_fingerprint": tmy_fp,
+-            "fuente": "sombras_3d",
++            "fuente": str(fuente),
+             "tilt_deg": geometria.get("tilt_deg"),
+             "azimuth_deg": geometria.get("azimuth_deg"),
+             "transparencia": float(transparencia),
+             "version_algoritmo": VERSION_ALGORITMO_FS_POR_SUPERFICIE,
+-            "proveedor": "sombras_3d",
++            "proveedor": str(fuente),
+             "resolucion_espacial": f"{len(puntos)}_puntos",
+             "resolucion_temporal": "horaria_8760",
+             "zona_horaria": str(idx.tz),
+diff --git a/bipv_python/calculos/vinculador_sombra_multisuperficie.py b/bipv_python/calculos/vinculador_sombra_multisuperficie.py
+index a03378d3..a4fd5c13 100644
+--- a/bipv_python/calculos/vinculador_sombra_multisuperficie.py
++++ b/bipv_python/calculos/vinculador_sombra_multisuperficie.py
+@@ -101,6 +101,46 @@ def invalidar_sombra_por_cambio_tmy(superficies_bipv: list[dict], tmy: pd.DataFr
+     return salida
+ 
+ 
++def invalidar_sombra_por_cambio_malla(
++    superficies_bipv: list[dict], malla_fingerprint_actual: str | None,
++) -> list[dict]:
++    """Retira p_shade/firma_sombra de toda superficie cuya sombra fue
++    calculada contra una escena Site Designer (``malla_horizonte`` con
++    prefijo ``externa_marsh-``, ver calculos.sitedesigner_marsh) distinta de
++    la cargada actualmente en sesión. Simétrico a
++    invalidar_sombra_por_cambio_tmy: sin esto, subir una escena nueva y NO
++    volver a pulsar "Calcular sombra" dejaba una sombra obsoleta aplicada en
++    silencio (auditoría de integración Site Designer, 2026-09-22).
++
++    Deliberadamente NO toca superficies cuya firma no referencia una malla
++    externa (p.ej. estado_sombra=sombra_cero_calculada de los escenarios de
++    validación La Salle/East2, que no usan Site Designer) -- comparar
++    malla_fingerprint_actual=None contra una firma sin malla_horizonte no
++    debe invalidar nada que nunca dependió de una escena.
++    """
++    salida = []
++    for sup in superficies_bipv:
++        firma = sup.get("firma_sombra")
++        malla_firma = firma.get("malla_horizonte") if isinstance(firma, Mapping) else None
++        if (
++            isinstance(malla_firma, str)
++            and malla_firma.startswith("externa_marsh-")
++            and malla_firma != malla_fingerprint_actual
++        ):
++            nueva = dict(sup)
++            for campo in _CAMPOS_SOMBRA:
++                nueva.pop(campo, None)
++            nueva["sombra_bloqueo_motivo"] = (
++                f"La superficie '{sup.get('nombre')}' tenía sombra calculada "
++                "contra una escena Site Designer distinta de la cargada -- "
++                "vuelve a calcular la sombra con la escena actual."
++            )
++            salida.append(nueva)
++        else:
++            salida.append(dict(sup))
++    return salida
++
++
+ def construir_y_recalcular_proyecto_fisico(session_state: Mapping[str, Any], tmy: pd.DataFrame, lat: float, lon: float, alt_m: float) -> dict:
+     if not isinstance(tmy, pd.DataFrame) or "T2m" not in tmy.columns:
+         raise ValueError(
+@@ -113,6 +153,13 @@ def construir_y_recalcular_proyecto_fisico(session_state: Mapping[str, Any], tmy
+     superficies_frescas = invalidar_sombra_por_cambio_tmy(
+         list(session_state.get("superficies_bipv") or []), tmy,
+     )
++    # Simétrico al de arriba pero para la escena Site Designer -- ver
++    # invalidar_sombra_por_cambio_malla. No-op si nunca se cargó una escena
++    # ni ninguna superficie referencia una (session_state.get(...) -> None).
++    superficies_frescas = invalidar_sombra_por_cambio_malla(
++        superficies_frescas,
++        (session_state.get("multisup_malla_meta") or {}).get("malla_fingerprint"),
++    )
+     session_state_fresco = dict(session_state)
+     session_state_fresco["superficies_bipv"] = superficies_frescas
+ 
+diff --git a/bipv_python/datos/base_conocimiento_asistente.md b/bipv_python/datos/base_conocimiento_asistente.md
+index d7bf9576..27e202b8 100644
+--- a/bipv_python/datos/base_conocimiento_asistente.md
++++ b/bipv_python/datos/base_conocimiento_asistente.md
+@@ -949,6 +949,36 @@ botón explícito de Vista 3D.
+ - Una carga rechazada no activa `multisup_activo` ni debe interpretarse como
+   una restauración parcial.
+ 
++### Caso científico East2 — regla de interpretación
++
++Existe una reconstrucción reproducible del caso **East2, SunPower E20-327,
++CIEMAT Madrid**, basada en el artículo `10.3390/buildings16091668`.
++
++- Estado correcto: **parcialmente reproducido**.
++- Se reproducen la ficha del SunPower E20-327, la configuración `7S × 2P`,
++  los 14 módulos, la geometría documentada/inferida y la máscara angular de la
++  Tabla 4.
++- El artículo no publica una energía anual agregada East2. Las cifras de POA,
++  DC, AC, PR y sombra son anclas de una reconstrucción con TMY sintético, no
++  resultados científicos publicados ni mediciones del edificio.
++- No afirmar equivalencia con CAMS/ERA5, DSM LiDAR, medición real ni inversor
++  Fronius completo: esos insumos no están disponibles en el repositorio.
++- Las anclas actuales están fijadas por pruebas: 19 pruebas East2 y 101 en la
++  batería física relacionada. Si cambian los supuestos, deben cambiar también
++  el informe y sus anclas, explicando la causa.
++- `mensual` y `exacto` son modos de agregación de la misma máscara; no son dos
++  máscaras científicas distintas. Una prueba separada modifica realmente
++  `p_shade` y verifica el cambio de huella y energía.
++- Si cambia el TMY, la sombra anterior queda obsoleta. Debe rechazarse hasta
++  regenerar `p_shade` y `firma_sombra` con el TMY nuevo; después sí puede
++  recalcularse el proyecto.
++- QCRad del TMY East2 sintético es coherente (`0.0%` inconsistente), pero eso
++  no valida la correspondencia con CAMS/ERA5 ni elimina las limitaciones del
++  supuesto sintético.
++- No usar los nRMSE publicados de otras herramientas como tolerancia de la APP.
++- No recomendar cifras East2 como cifras de cliente ni como garantía de diseño.
++  Presentarlas siempre con fuente, supuesto y nivel de confianza.
++
+ ### Procedimiento seguro para usar la APP
+ 
+ 1. Crear o cargar el proyecto en 🏠 Proyecto y confirmar ciudad, coordenadas,
+@@ -2989,7 +3019,7 @@ Además de SketchUp y de la Calculadora de Sombreado 3D web, la app acepta escen
+ 
+ 20.1 Qué dibujar en Site Designer  NUEVO
+ 
+-- Primero fija la ubicación del proyecto en Site Designer (latitud/longitud o buscando la ciudad): esa ubicación viaja dentro del JSON y la calculadora la compara contra el proyecto activo — si no coincide, avisa.
++- Primero fija la ubicación del proyecto en Site Designer (latitud/longitud o buscando la ciudad): esa ubicación viaja dentro del JSON y la calculadora la compara contra el proyecto activo — si no coincide, la escena se rechaza y no queda activa para calcular sombras.
+ - Dibuja SOLO los obstáculos que producen sombra: edificios vecinos, muros, volúmenes de la propia edificación si sombrean la fachada. Cada obstáculo es un bloque (caja) con su posición y altura reales.
+ - NO dibujes los paneles ni la fachada de estudio: los puntos de análisis se definen después, dentro de la calculadora (igual que en la ruta SketchUp).
+ - Si Site Designer muestra el norte girado (northOffset), déjalo tal cual: el archivo lo registra y la calculadora aplica la corrección automáticamente.
+@@ -3009,7 +3039,13 @@ El archivo contiene la ubicación (latitud, longitud, zona horaria, elevación,
+ - Abre 🌳 Sombras y sube el archivo .json en el mismo cargador donde va el modelo de SketchUp. La app confirma cuántos obstáculos leyó, sus dimensiones en metros, el norte corregido y la ubicación del archivo.
+ - Define los puntos de análisis (una fila de módulos = un punto, con sus coordenadas x, y, z en metros en el mismo sistema de la escena) y pulsa ▶️ Calcular sombras.
+ - Envía el resultado a la Página 5 con «📤 Enviar a Mismatch»: de ahí en adelante la cadena es la de siempre — bypass → E_ac corregida → Producción → Financiero.
+-Si la app avisa que la ubicación del archivo no coincide con la del proyecto, verifica que la escena sea del sitio correcto antes de continuar: una escena de otro proyecto produce sombras sin sentido físico.
++Si la app rechaza la escena porque la ubicación del archivo no coincide con la del proyecto, verifica que sea el sitio correcto y vuelve a exportar el JSON: una escena de otro proyecto no puede producir sombras válidas.
++
++Para el caso La Salle/Bosques de Castilla no se deben usar los JSON de ejemplo
++existentes en `attached_assets`: corresponden a otra ubicación y no modelan la
++Torre 5 ni sus dos fachadas. La validación SO/SE queda bloqueada hasta recibir
++un JSON real de Site Designer en torno a lat=4.634, lon=-74.148 y puntos de
++análisis legítimos por fachada. No se deben inventar esos datos.
+ 
+ ────────────────────────────────────────────────────────────
+ 
+diff --git "a/bipv_python/pages/9_\360\237\227\272\357\270\217_Vista_3D.py" "b/bipv_python/pages/9_\360\237\227\272\357\270\217_Vista_3D.py"
+index c7b52ed5..0ab1d34c 100644
+--- "a/bipv_python/pages/9_\360\237\227\272\357\270\217_Vista_3D.py"
++++ "b/bipv_python/pages/9_\360\237\227\272\357\270\217_Vista_3D.py"
+@@ -916,7 +916,7 @@ with tab_solar:
+             color_tipo, color_poa_normalizado, color_fs,
+         )
+         from calculos.sitedesigner_marsh import cargar_escena_sitedesigner, verificar_ubicacion
+-        from calculos.sombras_3d import calcular_fs_horario_por_superficie
++        from calculos.sombras_3d import calcular_fs_horario_por_superficie, validar_puntos
+         from calculos.adaptador_multisuperficie import aplicar_proyecto_a_session_state
+         from calculos.inversores_multisuperficie import validar_inversores_y_asignaciones
+         from calculos.vinculador_sombra_multisuperficie import (
+@@ -1096,14 +1096,21 @@ with tab_solar:
+             if _archivo_sd is not None:
+                 try:
+                     _malla_sd, _meta_sd = cargar_escena_sitedesigner(_archivo_sd.getvalue())
+-                    st.session_state["multisup_malla_sombra"] = _malla_sd
+-                    st.session_state["multisup_malla_meta"] = _meta_sd
+-                    for _aviso in verificar_ubicacion(_meta_sd, float(lat), float(lon)):
+-                        st.warning(_aviso)
+-                    st.success(
+-                        f"Malla Site Designer cargada: {_meta_sd['n_bloques']} bloque(s), "
+-                        f"{_meta_sd['dim_m']['x']} × {_meta_sd['dim_m']['y']} × {_meta_sd['dim_m']['z']} m."
+-                    )
++                    _avisos_ubicacion = verificar_ubicacion(_meta_sd, float(lat), float(lon))
++                    if _avisos_ubicacion:
++                        st.session_state.pop("multisup_malla_sombra", None)
++                        st.session_state.pop("multisup_malla_meta", None)
++                        st.error(
++                            "No se aplicó la escena Site Designer: la ubicación no "
++                            "coincide con el proyecto. " + " | ".join(_avisos_ubicacion)
++                        )
++                    else:
++                        st.session_state["multisup_malla_sombra"] = _malla_sd
++                        st.session_state["multisup_malla_meta"] = _meta_sd
++                        st.success(
++                            f"Malla Site Designer cargada: {_meta_sd['n_bloques']} bloque(s), "
++                            f"{_meta_sd['dim_m']['x']} × {_meta_sd['dim_m']['y']} × {_meta_sd['dim_m']['z']} m."
++                        )
+                 except Exception as _error_sd:
+                     st.session_state.pop("multisup_malla_sombra", None)
+                     st.error(f"No se pudo cargar Site Designer: {_error_sd}")
+@@ -1142,13 +1149,26 @@ with tab_solar:
+                 _puntos_sombra.get(s["nombre"]) for s in _sups_actualizado if s.get("activa", True)
+             )
+             if st.button("🌳 Calcular sombra de todas las superficies", key="btn_calcular_sombra_multisup", disabled=not _sombra_lista):
+-                _resultados_sombra = calcular_fs_horario_por_superficie(
+-                    st.session_state["multisup_malla_sombra"], _puntos_sombra,
+-                    float(lat), float(lon), _tmy_sombra, _geometrias_sombra,
+-                    malla_horizonte=str(st.session_state.get("multisup_malla_meta", {}).get("fuente", "site_designer")),
+-                )
+-                st.session_state["superficies_bipv"] = aplicar_sombra_a_superficies(_sups_actualizado, _resultados_sombra)
+-                st.success("Sombra calculada por superficie; revisa el estado antes de adoptar resultados.")
++                _avisos_puntos = []
++                for _nombre_sombra, _puntos in _puntos_sombra.items():
++                    for _aviso in validar_puntos(
++                        st.session_state["multisup_malla_sombra"], _puntos
++                    ):
++                        _avisos_puntos.append(f"{_nombre_sombra}: {_aviso}")
++                if _avisos_puntos:
++                    st.error(
++                        "No se aplicó la sombra: corrige los puntos 3D antes de calcular. "
++                        + " | ".join(_avisos_puntos)
++                    )
++                else:
++                    _resultados_sombra = calcular_fs_horario_por_superficie(
++                        st.session_state["multisup_malla_sombra"], _puntos_sombra,
++                        float(lat), float(lon), _tmy_sombra, _geometrias_sombra,
++                        malla_horizonte=str(st.session_state.get("multisup_malla_meta", {}).get("malla_fingerprint", "site_designer")),
++                        fuente=str(st.session_state.get("multisup_malla_meta", {}).get("fuente", "externa_marsh")),
++                    )
++                    st.session_state["superficies_bipv"] = aplicar_sombra_a_superficies(_sups_actualizado, _resultados_sombra)
++                    st.success("Sombra calculada por superficie; revisa el estado antes de adoptar resultados.")
+             if not _sombra_lista:
+                 st.info("Completa la malla, el TMY y al menos un punto por superficie activa.")
+ 
+diff --git a/bipv_python/tests/test_flujo_fisico_multisuperficie_end_to_end.py b/bipv_python/tests/test_flujo_fisico_multisuperficie_end_to_end.py
+index 1075411d..52fcb559 100644
+--- a/bipv_python/tests/test_flujo_fisico_multisuperficie_end_to_end.py
++++ b/bipv_python/tests/test_flujo_fisico_multisuperficie_end_to_end.py
+@@ -139,6 +139,44 @@ def test_rechazo_de_tmy_alterado():
+         construir_y_recalcular_proyecto_fisico(session_state, tmy_alterado, lat=_LAT, lon=_LON, alt_m=_ALT_M)
+ 
+ 
++def test_construir_proyecto_invalida_por_cambio_de_escena_site_designer():
++    """Simétrico a test_rechazo_de_tmy_alterado, pero para la escena Site
++    Designer: subir una escena nueva (malla_fingerprint distinto) sin volver
++    a pulsar "Calcular sombra" no debe dejar aplicada en silencio la sombra
++    calculada contra la escena vieja -- construir_proyecto_desde_session_state
++    exige p_shade/firma_sombra en toda superficie activa, así que al
++    invalidarse una de las dos superficies del escenario mínimo, la
++    construcción completa del proyecto se rechaza (mismo comportamiento que
++    ya existía para el cambio de TMY)."""
++    tmy = _tmy()
++    session_state = _session_state_realista(tmy)
++    session_state["superficies_bipv"][0]["firma_sombra"]["malla_horizonte"] = "externa_marsh-escenavieja"
++    session_state["multisup_malla_meta"] = {"malla_fingerprint": "externa_marsh-escenanueva"}
++
++    with pytest.raises(ValueError, match="p_shade|firma_sombra"):
++        construir_y_recalcular_proyecto_fisico(session_state, tmy, lat=_LAT, lon=_LON, alt_m=_ALT_M)
++
++
++def test_construir_proyecto_conserva_sombra_si_escena_no_cambio():
++    """Cuando la firma referencia la MISMA escena que está cargada en
++    sesión, la invalidación no debe activarse y el resultado físico debe
++    ser idéntico al caso base sin ninguna referencia a Site Designer."""
++    tmy = _tmy()
++
++    session_base = _session_state_realista(tmy)
++    proyecto_base = construir_y_recalcular_proyecto_fisico(session_base, tmy, lat=_LAT, lon=_LON, alt_m=_ALT_M)
++
++    session_con_escena = _session_state_realista(tmy)
++    session_con_escena["superficies_bipv"][0]["firma_sombra"]["malla_horizonte"] = "externa_marsh-mismaescena"
++    session_con_escena["multisup_malla_meta"] = {"malla_fingerprint": "externa_marsh-mismaescena"}
++    proyecto_con_escena = construir_y_recalcular_proyecto_fisico(session_con_escena, tmy, lat=_LAT, lon=_LON, alt_m=_ALT_M)
++
++    assert (
++        proyecto_con_escena["superficies"]["Este"]["resultados_ac"]["E_ac_anual_kWh"]
++        == pytest.approx(proyecto_base["superficies"]["Este"]["resultados_ac"]["E_ac_anual_kWh"])
++    )
++
++
+ def test_rollback_si_falla_una_superficie():
+     tmy = _tmy()
+     session_state = _session_state_realista(tmy)
+diff --git a/bipv_python/tests/test_sitedesigner_marsh.py b/bipv_python/tests/test_sitedesigner_marsh.py
+index 5c45298d..2dd5e18c 100644
+--- a/bipv_python/tests/test_sitedesigner_marsh.py
++++ b/bipv_python/tests/test_sitedesigner_marsh.py
+@@ -41,6 +41,19 @@ def test_metadata_ubicacion():
+     assert meta["elevacion_m"] == pytest.approx(2548.4)
+ 
+ 
++def test_escenas_distintas_tienen_huellas_distintas():
++    _, meta_a = cargar_escena_sitedesigner(_escena(0, [
++        {"min": [0, 0, 0], "max": [1000, 1000, 1000]},
++    ]))
++    _, meta_b = cargar_escena_sitedesigner(_escena(0, [
++        {"min": [0, 0, 0], "max": [1000, 1000, 2000]},
++    ]))
++
++    assert meta_a["malla_fingerprint"].startswith("externa_marsh-")
++    assert meta_b["malla_fingerprint"].startswith("externa_marsh-")
++    assert meta_a["malla_fingerprint"] != meta_b["malla_fingerprint"]
++
++
+ def test_north_offset_rota_la_malla():
+     """northOffset=90 (horario) debe llevar un bloque al este del origen hacia el sur."""
+     bloque = [{"min": [1000, -500, 0], "max": [2000, 500, 3000]}]  # centrado en +X (este)
+diff --git a/bipv_python/tests/test_sombras_por_superficie.py b/bipv_python/tests/test_sombras_por_superficie.py
+index 9b663302..88a5ad64 100644
+--- a/bipv_python/tests/test_sombras_por_superficie.py
++++ b/bipv_python/tests/test_sombras_por_superficie.py
+@@ -122,3 +122,19 @@ def test_superficie_sin_puntos_bloquea():
+         calcular_fs_horario_por_superficie(
+             malla, puntos, 4.65, -74.08, tmy, geometria, malla_horizonte="box-test-v1",
+         )
++
++
++def test_firma_conserva_la_fuente_externa_marsh(monkeypatch):
++    tmy = _tmy_real()
++    malla = trimesh.creation.box(extents=[4.0, 4.0, 8.0])
++    puntos = {"A": [{"nombre": "P1", "fachada": "A", "x": 0.0, "y": -5.0, "z": 2.0}]}
++    geometria = {"A": {"tilt_deg": 90.0, "azimuth_deg": 180.0}}
++    monkeypatch.setattr(sombras_3d, "calcular_fs_horario", _fake_calcular_fs_horario)
++
++    datos = calcular_fs_horario_por_superficie(
++        malla, puntos, 4.65, -74.08, tmy, geometria,
++        malla_horizonte="externa_marsh", fuente="externa_marsh",
++    )["A"]
++
++    assert datos["firma_sombra"]["fuente"] == "externa_marsh"
++    assert datos["firma_sombra"]["proveedor"] == "externa_marsh"
+diff --git a/bipv_python/tests/test_vinculador_sombra_multisuperficie.py b/bipv_python/tests/test_vinculador_sombra_multisuperficie.py
+index 3573979f..0bd4dc10 100644
+--- a/bipv_python/tests/test_vinculador_sombra_multisuperficie.py
++++ b/bipv_python/tests/test_vinculador_sombra_multisuperficie.py
+@@ -11,6 +11,7 @@ from calculos.sombras_3d import ESTADOS_SOMBRA_ACEPTABLES
+ from calculos.produccion_vigencia import huella_horaria
+ from calculos.vinculador_sombra_multisuperficie import (
+     aplicar_sombra_a_superficies,
++    invalidar_sombra_por_cambio_malla,
+     invalidar_sombra_por_cambio_tmy,
+     preservar_o_invalidar_campos_fisicos,
+     resumen_estado_fisico_superficies,
+@@ -112,6 +113,58 @@ def test_invalidar_sombra_por_tmy_rechaza_tmy_invalido():
+         invalidar_sombra_por_cambio_tmy([_sup("A")], pd.DataFrame({"x": [1, 2, 3]}))
+ 
+ 
++# ── invalidar_sombra_por_cambio_malla (Site Designer) ──────────────────────
++def test_malla_distinta_invalida_p_shade_externa_marsh():
++    sup = _sup("A", p_shade=np.ones(_HORAS_ANIO),
++                firma_sombra={"malla_horizonte": "externa_marsh-aaaa1111"})
++    resultado = invalidar_sombra_por_cambio_malla([sup], "externa_marsh-bbbb2222")
++    assert "p_shade" not in resultado[0]
++    assert "firma_sombra" not in resultado[0]
++    assert "escena" in resultado[0]["sombra_bloqueo_motivo"].lower()
++
++
++def test_malla_igual_conserva_sombra():
++    sup = _sup("A", p_shade=np.ones(_HORAS_ANIO),
++                firma_sombra={"malla_horizonte": "externa_marsh-aaaa1111"})
++    resultado = invalidar_sombra_por_cambio_malla([sup], "externa_marsh-aaaa1111")
++    assert np.all(resultado[0]["p_shade"] == 1.0)
++    assert resultado[0]["firma_sombra"]["malla_horizonte"] == "externa_marsh-aaaa1111"
++
++
++def test_malla_sin_escena_cargada_invalida_sombra_externa():
++    """Si la escena se quitó de la sesión (malla_fingerprint_actual=None) pero
++    la firma sí depende de una escena externa, la sombra queda obsoleta --
++    no hay con qué confirmar que sigue vigente."""
++    sup = _sup("A", p_shade=np.ones(_HORAS_ANIO),
++                firma_sombra={"malla_horizonte": "externa_marsh-aaaa1111"})
++    resultado = invalidar_sombra_por_cambio_malla([sup], None)
++    assert "p_shade" not in resultado[0]
++
++
++def test_superficie_sin_malla_externa_no_se_toca_por_invalidacion_malla():
++    """Escenarios sin Site Designer (p.ej. sombra_cero_calculada de La Salle/
++    East2, o firma_sombra sin malla_horizonte) deben conservar su
++    comportamiento previo: comparar None contra None no debe invalidar."""
++    sup_sin_malla_horizonte = _sup("A", p_shade=np.ones(_HORAS_ANIO),
++                                    firma_sombra={"fuente": "sin_mascara_angular_publicada"})
++    sup_sin_firma = _sup("B", p_shade=np.ones(_HORAS_ANIO))
++    resultado = invalidar_sombra_por_cambio_malla(
++        [sup_sin_malla_horizonte, sup_sin_firma], None,
++    )
++    assert np.all(resultado[0]["p_shade"] == 1.0)
++    assert np.all(resultado[1]["p_shade"] == 1.0)
++
++
++def test_malla_no_prefijada_externa_marsh_no_se_toca():
++    """malla_horizonte con otro origen (p.ej. flujo SketchUp legacy, valores
++    de prueba como 'box-test-v1') no entra en este chequeo -- solo
++    Site Designer usa el prefijo 'externa_marsh-'."""
++    sup = _sup("A", p_shade=np.ones(_HORAS_ANIO),
++                firma_sombra={"malla_horizonte": "box-test-v1"})
++    resultado = invalidar_sombra_por_cambio_malla([sup], "externa_marsh-distinta")
++    assert np.all(resultado[0]["p_shade"] == 1.0)
++
++
+ # ── preservar_o_invalidar_campos_fisicos ──────────────────────────────────
+ def test_conserva_sombra_si_ninguna_entrada_cambio():
+     anterior = _sup(tilt=90.0, az=180.0, p_shade=np.ones(_HORAS_ANIO), firma_sombra={"x": 1},
