@@ -33,13 +33,13 @@ También la tabla comparativa anterior de la app (`tabla-comparativa-lasalle-app
 | Planta | 🟠 Dos bloques desplazados (planta escalonada), con un núcleo de escaleras más alto y oscuro en el centro de la fachada SO | Figs. 5, 6, 8 y 20 |
 | Área útil de fachada | ≈ 1.754 m² | ✅ Pág. 34 |
 
-## 3. Obstáculos que dan sombra (lo que la tesis modeló en PV·SOL)
+## 3. Obstáculos que dan sombra (lo que la tesis modeló en la app estándar de referencia)
 
 | Obstáculo | Datos | Fuente |
 |---|---|---|
 | **Balcones de la fachada SO** (la fuente principal de sombra) | En los 13 pisos. Vuelo 🟠 **≈ 1,68 m**: la cota «1,6800» de la Fig. 4 es lo que sobresale a la izquierda de la fachada SE. Barandas metálicas abiertas | ✅ Pág. 35-36 (los balcones) · 🟠 Fig. 4 (el vuelo) |
 | **Árboles junto a la fachada SO** | Altura **5–7 m**; cubren los **pisos 1 a 3** | ✅ Pág. 36, Fig. 8 |
-| **Edificios vecinos** | En el modelo 3D de PV·SOL (Fig. 17) hay **3 volúmenes vecinos**: un bloque bajo delante de la torre y dos bloques largos de ≈ 5-6 pisos | 🟠 Fig. 17 · ❓ posiciones y alturas exactas |
+| **Edificios vecinos** | En el modelo 3D de la app estándar de referencia (Fig. 17) hay **3 volúmenes vecinos**: un bloque bajo delante de la torre y dos bloques largos de ≈ 5-6 pisos | 🟠 Fig. 17 · ❓ posiciones y alturas exactas |
 | Fachadas SE y otras | Sin obstáculos cercanos relevantes; la sombra en la SE es baja | ✅ Tabla 20 |
 
 La tesis dice expresamente (pág. 48): «la mayor parte de las sombras que inciden en el sistema provienen de **los balcones con los que cuenta el edificio**». Para llegar al 3,7 % hay que modelar **los balcones y los árboles**; las torres vecinas pesan menos.
@@ -55,7 +55,7 @@ La tesis dice expresamente (pág. 48): «la mayor parte de las sombras que incid
 | Inversores | 4 × Fronius Primo 15.0-1 |
 | Cable | DC 2,5 mm²; AC 120 mm² |
 
-## 5. Resultados de PV·SOL para comparar
+## 5. Resultados de la app estándar de referencia para comparar
 
 | Magnitud | Fachadas | Referencia horizontal 10° sur |
 |---|---|---|
@@ -68,16 +68,16 @@ La tesis dice expresamente (pág. 48): «la mayor parte de las sombras que incid
 | POA fachada SO / SE | 858,0 / 777,3 kWh/m² | — |
 
 **Sombra por módulo (Tablas 19 y 20):** digitalizadas en
-`references/lasalle-sombra-por-modulo-pvsol-tablas-19-20.csv` (378 posiciones).
+`references/lasalle-sombra-por-modulo-referencia-tablas-19-20.csv` (378 posiciones).
 - Fachada SO: media 12,6 %. Las filas 17 a 21 (abajo, árboles) y las columnas 12 y 13 (junto al núcleo y los balcones) llegan a 40-60 %.
 - Fachada SE: media 3,0 %; crece hacia abajo y hacia la columna 5.
-- Los módulos elegidos (< 2 %) promedian ≈ 0,4 % de sombra en irradiación. El 3,7 % de PV·SOL es **pérdida de energía**, más alta por el efecto eléctrico de la sombra parcial en los strings (bypass).
+- Los módulos elegidos (< 2 %) promedian ≈ 0,4 % de sombra en irradiación. El 3,7 % de la app estándar de referencia es **pérdida de energía**, más alta por el efecto eléctrico de la sombra parcial en los strings (bypass).
 
 ## 6. Base climática: lo que explica la asimetría SO > SE
 
 | Fuente | POA SO | POA SE | SO/SE |
 |---|---|---|---|
-| PV·SOL (tesis) | 858,0 | 777,3 | **+10,4 %** |
+| La app estándar de referencia (tesis) | 858,0 | 777,3 | **+10,4 %** |
 | App con PVGIS (tabla anterior) | 986,2 | 852,2 | **+15,7 %** |
 | App con EPW IWEC El Dorado (3-oct) | 831,4 | 831,6 | 0 % |
 

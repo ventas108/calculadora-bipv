@@ -24,14 +24,14 @@ bloqueada hasta tener esa escena.
 | script 4 | Huella de la escena calculada en el script; sin el argumento `fuente=` | Ambos venían de los parches sin integrar; main no los tiene. |
 | script 4 y prueba La Salle | `read_epw(..., coerce_year=2023)` | El EPW IWEC de El Dorado mezcla 9 años (1982-1997) y el resumen mensual del Motor Óptico daba 180 meses. La app no lee EPW (usa PVGIS), así que no la afecta. |
 | prueba East2 | Anclas DC/AC/horas actualizadas | La física multi-superficie ahora aplica la cadena óptica, calidad del módulo, mismatch y cables: −8,1 % en DC. POA (1.038,81) y `p_shade` idénticas. |
-| prueba La Salle | El residual frente a PV·SOL pasa de «> 0» a «> −5 %» | La premisa «la app no modela cables ni mismatch» quedó obsoleta: hoy el residual es −2,2 %. |
+| prueba La Salle | El residual frente a la app estándar de referencia pasa de «> 0» a «> −5 %» | La premisa «la app no modela cables ni mismatch» quedó obsoleta: hoy el residual es −2,2 %. |
 
 La orientación de cada fachada se pasa en `geometria_por_superficie` (SE 162°,
 SO 249°); no aparece la advertencia `orientacion_desconocida` ✅.
 
 ## 2. Tabla comparativa (EPW IWEC Bogotá-El Dorado, SPR-MAX3-400, 10S×7P por fachada, Fronius Primo 15)
 
-| Magnitud | Fachada | 22-sep sin escena | 22-sep con escena central | **Hoy (main #113), escena central** | Hoy + árboles SO | Tesis / PV·SOL |
+| Magnitud | Fachada | 22-sep sin escena | 22-sep con escena central | **Hoy (main #113), escena central** | Hoy + árboles SO | Tesis / la app estándar de referencia |
 |---|---|---|---|---|---|---|
 | POA (kWh/m²) | SE | 831,73 | 831,73 | **831,64** | 831,64 | 777,3 |
 | POA (kWh/m²) | SO | 831,25 | 831,25 | **831,35** | 831,35 | 858,0 |
@@ -52,7 +52,7 @@ casos dan exactamente lo mismo, porque una torre aislada no sombrea sus propias
 fachadas. El 22-sep la asimetría iba de 14,6 % a 17,7 % según el ancho.
 
 Rendimiento agregado de la app (ambas fachadas): 714,9 kWh/kWp frente a 718,33
-de PV·SOL (−0,5 %).
+de la app estándar de referencia (−0,5 %).
 
 ## 3. Por qué cambió frente al 22-sep
 
@@ -66,18 +66,18 @@ de PV·SOL (−0,5 %).
    sombra baja de 21.766 a 19.935 kWh en SE (−8,4 %). Ahora entran la
    reflexión del vidrio y la suciedad del Motor Óptico, la calidad del módulo,
    el mismatch y los cables. El PR pasa de 0,93 (irreal) a 0,86, que coincide
-   con el 0,868 de PV·SOL.
+   con el 0,868 de la app estándar de referencia.
 
 ## 4. Veredicto
 
-- **Rendimiento y PR:** ✅ la app coincide con PV·SOL dentro de ±1 %
+- **Rendimiento y PR:** ✅ la app coincide con la app estándar de referencia dentro de ±1 %
   (714,9 frente a 718,3 kWh/kWp; PR 0,856-0,864 frente a 0,868).
-- **¿Se reproduce la asimetría SO > SE de PV·SOL?** Solo en dirección, no en
+- **¿Se reproduce la asimetría SO > SE de la app estándar de referencia?** Solo en dirección, no en
   magnitud: 0,86 % frente a 9,40 %.
 - **¿La pérdida por sombra se acerca al 3,7 %?** No sin entorno: 0 % con la
   torre sola y ≈ 1,6 % agregado con los árboles asumidos junto a SO.
 - **Causa probable de la asimetría: la base climática y la transposición, no
-  la sombra.** PV·SOL ya tiene la asimetría en la POA (SO 858,0 frente a SE
+  la sombra.** La app estándar de referencia ya tiene la asimetría en la POA (SO 858,0 frente a SE
   777,3, un 10,4 % más), y eso explica casi todo su 9,40 % en energía. Con el
   EPW IWEC, la app da la misma POA en las dos fachadas (831,4 y 831,6). La
   diferencia está en el recurso (otra base de datos meteorológica u otro
@@ -99,4 +99,4 @@ de PV·SOL (−0,5 %).
 - Pruebas de La Salle y East2 sobre main (PR #113): 29 pasan, tras los ajustes de la sección 1.
 - Suite completa de la rama: **2.508 pasan**, sin fallos.
 - Datos de la tesis para la escena real: `references/lasalle-torre5-datos-escena-real.md` y
-  `references/lasalle-sombra-por-modulo-pvsol-tablas-19-20.csv`.
+  `references/lasalle-sombra-por-modulo-referencia-tablas-19-20.csv`.

@@ -3,7 +3,7 @@
 **Clasificación:** escena estimada y calibrada, no medida. Todas las medidas
 son coherentes con los datos y las figuras de la tesis
 (`lasalle-torre5-datos-escena-real.md`). Los 3 datos sin cota se calibraron
-contra la sombra por módulo de PV·SOL (Tablas 19 y 20). Autorizado por el
+contra la sombra por módulo de la app estándar de referencia (Tablas 19 y 20). Autorizado por el
 usuario: «elabora unas mediciones coherentes con la información explícita y
 fotográfica de la tesis».
 
@@ -29,9 +29,9 @@ JSON para cargar en 🗺️ Vista 3D: `escena_torre5_completa_para_vista3d.json`
 (89 bloques). Los árboles también van aparte (`escena_torre5_arboles.json`),
 porque Site Designer no tiene transparencia: en la app quedarían sólidos.
 
-## 2. Sombra por módulo frente a PV·SOL (378 módulos)
+## 2. Sombra por módulo frente a la app estándar de referencia (378 módulos)
 
-| | App | PV·SOL |
+| | App | La app estándar de referencia |
 |---|---|---|
 | **SO**: sombra media (273 módulos) | **12,4 %** | **12,6 %** |
 | SO: error del perfil por altura | ±2,1 puntos | — |
@@ -50,7 +50,7 @@ cielo bloqueada (Sky View Factor).
   exacta de cada pila de balcones y de las columnas de módulos no se puede
   fijar con las fotos.
 
-## 3. Energía: pérdida por sombra frente al 3,7 % de PV·SOL
+## 3. Energía: pérdida por sombra frente al 3,7 % de la app estándar de referencia
 
 Módulos elegidos como en la tesis (sombra < 2 %): 130 (63 SO + 67 SE), frente
 a 148 instalados. Física de la app: bypass, temperatura e inversor.
@@ -61,21 +61,21 @@ a 148 instalados. Física de la app: bypass, temperatura e inversor.
 | Sombra en irradiación de los elegidos (con difusa) | 0,91 % | 0,06 % | ≈ 0,5 % |
 | Cota «peor borde del módulo» (5 puntos por módulo) | 0,67 % | 0,02 % | ≈ 0,35 % |
 | Cota «string sin bypass» (el peor módulo limita la columna) | 1,42 % | 0,09 % | ≈ 0,7 % |
-| **PV·SOL (Tabla 21)** | — | — | **3,7 %** |
+| **La app estándar de referencia (Tabla 21)** | — | — | **3,7 %** |
 
 ## 4. Veredicto
 
 1. **Geometría: reproducida.** Con medidas coherentes con la tesis, la sombra
-   media coincide con PV·SOL dentro de 0,2-0,3 puntos en las dos fachadas.
+   media coincide con la app estándar de referencia dentro de 0,2-0,3 puntos en las dos fachadas.
    Los balcones, la planta escalonada, los árboles y un edificio bajo frente
    a la SE explican la sombra; las torres vecinas altas no son necesarias.
 2. **Energía: no llega al 3,7 %.** Ni las cotas altas (≈ 0,7 % con el peor
    módulo limitando cada string) alcanzan el 3,7 %. Los módulos elegidos
-   tienen solo 0,4-0,9 % de sombra en irradiación, también según PV·SOL. Que
-   PV·SOL convierta eso en 3,7 % de energía apunta a su modelo eléctrico de
+   tienen solo 0,4-0,9 % de sombra en irradiación, también según la app estándar de referencia. Que
+   la app estándar de referencia convierta eso en 3,7 % de energía apunta a su modelo eléctrico de
    sombra parcial (celda a celda, curva I-V del string) o a pérdidas que
    agrupa bajo «sombreado». Eso solo se aclara con el informe detallado de
-   PV·SOL: su diagrama de flujo de energía.
+   la app estándar de referencia: su diagrama de flujo de energía.
 3. **Hallazgo para la app:** la sombra de cada superficie es el **promedio**
    de los puntos. En fachadas con sombra parcial de balcones, el módulo más
    sombreado limita la corriente del string, y el promedio subestima la
@@ -95,7 +95,7 @@ a 148 instalados. Física de la app: bypass, temperatura e inversor.
 ## 6. Siguientes pasos sugeridos
 
 1. Pedir a los autores, o buscar en el anexo de la tesis, el informe completo
-   de PV·SOL con el diagrama de pérdidas, para separar la sombra en
+   de la app estándar de referencia con el diagrama de pérdidas, para separar la sombra en
    irradiación del efecto eléctrico.
 2. Repetir con PVGIS cuando el entorno lo permita (`re.jrc.ec.europa.eu`)
    para la asimetría SO/SE.

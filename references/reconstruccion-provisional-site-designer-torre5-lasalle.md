@@ -183,7 +183,7 @@ Ejecutado con el motor real (`calcular_fs_horario_por_superficie`,
 esta sesión), panel SPR-MAX3-400, inversor Fronius Primo 15.0-1, sin cambios
 de código. Cuatro corridas (primaria + 2 de sensibilidad + con árboles):
 
-| Magnitud | Fachada | Sin Site Designer | **Con Site Designer (central)** | PV·SOL |
+| Magnitud | Fachada | Sin Site Designer | **Con Site Designer (central)** | La app estándar de referencia |
 |---|---|---:|---:|---:|
 | POA (kWh/m²) | SE | 831,73 | 831,73 (sin cambio — la POA no depende de `p_shade`) | 777,3 |
 | POA (kWh/m²) | SO | 831,25 | 831,25 | 858,0 |
@@ -239,15 +239,15 @@ Ninguno de código.
 ## Hallazgos importantes
 
 1. **La reconstrucción provisional invierte la dirección de la asimetría
-   respecto a PV·SOL, no la reproduce ni se acerca a ella.** Sin escena: SE>SO
+   respecto a la app estándar de referencia, no la reproduce ni se acerca a ella.** Sin escena: SE>SO
    por 0,11% (prácticamente empatadas). Con la escena provisional: SE>SO por
-   16,16% — la brecha con PV·SOL (que reporta SO>SE por 9,40%) se agranda, no
+   16,16% — la brecha con la app estándar de referencia (que reporta SO>SE por 9,40%) se agranda, no
    se cierra. Clasificación de interpretación (marco de la ronda anterior): **B
    — la escena cambia los resultados, pero no acerca la asimetría; persisten
    diferencias de meteorología, transposición, difusa y ahora también de la
    geometría real no verificada.**
 2. **La pérdida de energía por sombra que produce esta reconstrucción (26-38%)
-   es 7-10 veces mayor que el 3,7%/año que PV·SOL publica para las fachadas.**
+   es 7-10 veces mayor que el 3,7%/año que la app estándar de referencia publica para las fachadas.**
    Esto es más informativo que decepcionante: sugiere fuertemente que el
    footprint real de la torre NO es aproximadamente cuadrado como se asumió
    aquí — un footprint más alargado separaría las dos fachadas en su esquina
@@ -272,7 +272,7 @@ Ninguno de código.
 - La foto de los árboles es de 2012 — pueden haber cambiado sustancialmente en
   9 años hasta la fecha de la tesis (2021) y 14 hasta hoy.
 - Ningún edificio vecino modelado (solo se reconstruyó la propia Torre 5) —
-  PV·SOL, si modeló el entorno urbano completo, puede estar capturando
+  la app estándar de referencia, si modeló el entorno urbano completo, puede estar capturando
   sombra de edificios vecinos que esta reconstrucción no incluye en absoluto.
 - La idealización de la esquina real (87°→90°) introduce hasta 1,5° de error
   angular por cara — pequeño frente a las demás incertidumbres, documentado
@@ -283,7 +283,7 @@ Ninguno de código.
 **Escena: B — reconstrucción provisional, con incertidumbres explícitas.**
 **Interpretación de la asimetría: B — la escena cambia sustancialmente los
 resultados (pérdida de energía 26-38%, antes 0%), pero no acerca la app al
-9,40% de PV·SOL en dirección ni en magnitud — de hecho invierte el signo.**
+9,40% de la app estándar de referencia en dirección ni en magnitud — de hecho invierte el signo.**
 
 **No se declara "defecto de la app"**: el propio motor de ray-casting se
 comportó de forma físicamente coherente y verificable (autosombreado real
@@ -291,7 +291,7 @@ entre fachadas adyacentes de un volumen convexo, a una latitud donde el sol
 pasa cerca del cenit). **Tampoco se declara "limitación de entrada
 confirmada y cerrada"**: la magnitud del resultado es tan sensible al
 footprint asumido (evidenciado por la discrepancia de 7-10× frente al 3,7%
-de PV·SOL) que no se puede afirmar que esta reconstrucción representa
+de la app estándar de referencia) que no se puede afirmar que esta reconstrucción representa
 fielmente el edificio real sin una planta arquitectónica que confirme o
 corrija el footprint.
 

@@ -175,18 +175,18 @@ if __name__ == "__main__" and "--calibrar" not in sys.argv and "--energia" not i
 
 # ── Calibración contra las Tablas 19 y 20 (perfiles, no posiciones) ─────────
 def referencia():
-    t = pd.read_csv(RAIZ / "references" / "lasalle-sombra-por-modulo-pvsol-tablas-19-20.csv")
-    return t.rename(columns={"sombra_pct_pvsol": "pvsol"})
+    t = pd.read_csv(RAIZ / "references" / "lasalle-sombra-por-modulo-referencia-tablas-19-20.csv")
+    return t.rename(columns={"sombra_pct_ref": "ref"})
 
 def error_perfiles(sim: pd.DataFrame, ref: pd.DataFrame, fach: str) -> dict:
     s, r = sim[sim.fachada == fach], ref[ref.fachada == fach]
-    filas_s, filas_r = s.groupby("fila").sombra_pct.mean(), r.groupby("fila").pvsol.mean()
+    filas_s, filas_r = s.groupby("fila").sombra_pct.mean(), r.groupby("fila").ref.mean()
     cols_s = np.sort(s.groupby("col").sombra_pct.mean().to_numpy())
-    cols_r = np.sort(r.groupby("columna").pvsol.mean().to_numpy())
+    cols_r = np.sort(r.groupby("columna").ref.mean().to_numpy())
     return {"rmse_filas": float(np.sqrt(((filas_s - filas_r) ** 2).mean())),
             "rmse_columnas": float(np.sqrt(((cols_s - cols_r) ** 2).mean())),
-            "media_sim": float(s.sombra_pct.mean()), "media_pvsol": float(r.pvsol.mean()),
-            "n_menor_2_sim": int((s.sombra_pct < 2).sum()), "n_menor_2_pvsol": int((r.pvsol < 2).sum())}
+            "media_sim": float(s.sombra_pct.mean()), "media_ref": float(r.ref.mean()),
+            "n_menor_2_sim": int((s.sombra_pct < 2).sum()), "n_menor_2_ref": int((r.ref < 2).sum())}
 
 def calibrar():
     import copy, itertools
@@ -290,14 +290,25 @@ def energia():
             malla_e, {nombre_sup: [{k: v for k, v in q.items() if k not in ("fila", "col")} for q in sel]},
             LAT, LON, tmy, {nombre_sup: {"tilt_deg": 90.0, "azimuth_deg": az}},
             malla_horizonte=meta["malla_fingerprint"])[nombre_sup]
-        p_shade = np.mean([series[q["nombre"]] for q in sel], axis=0)
+        m = np.array([series[q["nombre"]] for q in sel])
+        p_shade = m.mean(axis=0)
+        # Spec 05/sombra-por-string: cuántos módulos tienen sombra (> 5 %) y
+        # cuánta luz pierden esos módulos, con edificios + árboles.
+        sombreado = m > 0.05
+        fraccion = sombreado.mean(axis=0)
+        profundidad = np.where(sombreado, m, 0.0).sum(axis=0) / np.maximum(sombreado.sum(axis=0), 1)
+        cero = np.zeros(len(d))
         energias = {}
-        for etiqueta, ps in (("sin_sombra", np.zeros(len(d))), ("con_sombra", p_shade)):
+        for etiqueta, ps, extra in (
+            ("sin_sombra", cero, {"fraccion_modulos_sombra": None, "profundidad_sombra": None}),
+            ("con_sombra", p_shade, {"fraccion_modulos_sombra": None, "profundidad_sombra": None}),
+            ("con_sombra_por_string", p_shade, {"fraccion_modulos_sombra": fraccion, "profundidad_sombra": profundidad}),
+        ):
             sup = superficie_nueva(nombre=nombre_sup, tipo="Fachada", tilt_deg=90.0, azimuth_deg=az,
                                    area_m2=panel["area_m2"] * n_serie * n_par, panel=panel, n_serie=n_serie,
                                    n_paralelo=n_par, inversor_id="Fronius-Primo-15", p_shade=np.zeros(len(d)), albedo=0.20)
             res = {nombre_sup: {**{k: v for k, v in base.items() if k != "df"}, "p_shade": ps,
-                                "estado_sombra": "calculado_completo"}}
+                                "estado_sombra": "calculado_completo", **extra}}
             [sup] = aplicar_sombra_a_superficies([sup], res)
             ss = {"panel_dict": panel, "superficies_bipv": [sup], "multisup_malla_meta": meta,
                   "multisup_inversores": [{"inversor_id": "Fronius-Primo-15", "tipo": "compartido",
@@ -311,11 +322,16 @@ def energia():
                            "sombra_irradiacion_media_pct": float(sim[(sim.fachada == fach) & (sim.sombra_pct < 2)].sombra_pct.mean()),
                            "p_shade_haz_medio_diurno": float(p_shade[tmy["Gb_n"].to_numpy() > 0].mean()),
                            **energias,
-                           "perdida_energia_sombra_pct": 100 * (1 - energias["con_sombra"]["E_ac"] / energias["sin_sombra"]["E_ac"])}
+                           "perdida_energia_sombra_pct": 100 * (1 - energias["con_sombra"]["E_ac"] / energias["sin_sombra"]["E_ac"]),
+                           "perdida_energia_sombra_por_string_pct": 100 * (1 - energias["con_sombra_por_string"]["E_ac"] / energias["sin_sombra"]["E_ac"]),
+                           "fraccion_modulos_sombra_media_diurna": float(fraccion[tmy["Gb_n"].to_numpy() > 0].mean())}
     e_sin = sum(r["sin_sombra"]["E_ac"] for r in resultado.values())
     e_con = sum(r["con_sombra"]["E_ac"] for r in resultado.values())
+    e_str = sum(r["con_sombra_por_string"]["E_ac"] for r in resultado.values())
     kwp = sum(r["con_sombra"]["kWp"] for r in resultado.values())
     resultado["total"] = {"perdida_energia_sombra_pct": 100 * (1 - e_con / e_sin),
+                          "perdida_energia_sombra_por_string_pct": 100 * (1 - e_str / e_sin),
+                          "rendimiento_por_string_kWh_kWp": e_str / kwp,
                           "rendimiento_kWh_kWp": e_con / kwp, "modulos": sum(r["modulos_elegidos"] for k, r in resultado.items())}
     (SALIDA / "energia.json").write_text(json.dumps(resultado, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(resultado, indent=2, ensure_ascii=False))

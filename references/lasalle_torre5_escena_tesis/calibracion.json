@@ -41,114 +41,114 @@
     "rmse_filas": 2.094398767887644,
     "rmse_columnas": 6.278678289577779,
     "media_sim": 12.40941391941392,
-    "media_pvsol": 12.558608058608057,
+    "media_ref": 12.558608058608057,
     "n_menor_2_sim": 63,
-    "n_menor_2_pvsol": 99
+    "n_menor_2_ref": 99
   },
   "SE": {
     "rmse_filas": 2.365244173441719,
     "rmse_columnas": 1.3462015597434813,
     "media_sim": 3.241047619047619,
-    "media_pvsol": 3.0095238095238095,
+    "media_ref": 3.0095238095238095,
     "n_menor_2_sim": 67,
-    "n_menor_2_pvsol": 57
+    "n_menor_2_ref": 57
   },
   "candidatos_SO": {
     "(-7.7, 1.5, 6.0)": {
       "rmse_filas": 3.9052142102083747,
       "rmse_columnas": 6.355903322653778,
       "media_sim": 12.33761904761905,
-      "media_pvsol": 12.558608058608057,
+      "media_ref": 12.558608058608057,
       "n_menor_2_sim": 66,
-      "n_menor_2_pvsol": 99
+      "n_menor_2_ref": 99
     },
     "(-7.7, 1.5, 7.0)": {
       "rmse_filas": 4.100262291536606,
       "rmse_columnas": 6.745655469503252,
       "media_sim": 13.873113553113553,
-      "media_pvsol": 12.558608058608057,
+      "media_ref": 12.558608058608057,
       "n_menor_2_sim": 63,
-      "n_menor_2_pvsol": 99
+      "n_menor_2_ref": 99
     },
     "(-7.7, 3.0, 6.0)": {
       "rmse_filas": 3.6952809495544123,
       "rmse_columnas": 6.229121290321594,
       "media_sim": 11.175201465201466,
-      "media_pvsol": 12.558608058608057,
+      "media_ref": 12.558608058608057,
       "n_menor_2_sim": 66,
-      "n_menor_2_pvsol": 99
+      "n_menor_2_ref": 99
     },
     "(-7.7, 3.0, 7.0)": {
       "rmse_filas": 2.094398767887644,
       "rmse_columnas": 6.278678289577779,
       "media_sim": 12.40941391941392,
-      "media_pvsol": 12.558608058608057,
+      "media_ref": 12.558608058608057,
       "n_menor_2_sim": 63,
-      "n_menor_2_pvsol": 99
+      "n_menor_2_ref": 99
     },
     "(0.0, 1.5, 6.0)": {
       "rmse_filas": 10.196489790976157,
       "rmse_columnas": 8.658619501961546,
       "media_sim": 12.141098901098903,
-      "media_pvsol": 12.558608058608057,
+      "media_ref": 12.558608058608057,
       "n_menor_2_sim": 107,
-      "n_menor_2_pvsol": 99
+      "n_menor_2_ref": 99
     },
     "(0.0, 1.5, 7.0)": {
       "rmse_filas": 11.347201564589476,
       "rmse_columnas": 8.909707544167121,
       "media_sim": 14.265384615384615,
-      "media_pvsol": 12.558608058608057,
+      "media_ref": 12.558608058608057,
       "n_menor_2_sim": 102,
-      "n_menor_2_pvsol": 99
+      "n_menor_2_ref": 99
     },
     "(0.0, 3.0, 6.0)": {
       "rmse_filas": 6.663889272118124,
       "rmse_columnas": 8.893252086301393,
       "media_sim": 10.138681318681318,
-      "media_pvsol": 12.558608058608057,
+      "media_ref": 12.558608058608057,
       "n_menor_2_sim": 107,
-      "n_menor_2_pvsol": 99
+      "n_menor_2_ref": 99
     },
     "(0.0, 3.0, 7.0)": {
       "rmse_filas": 7.348498818334645,
       "rmse_columnas": 8.653623419735705,
       "media_sim": 11.916703296703297,
-      "media_pvsol": 12.558608058608057,
+      "media_ref": 12.558608058608057,
       "n_menor_2_sim": 102,
-      "n_menor_2_pvsol": 99
+      "n_menor_2_ref": 99
     },
     "(7.7, 1.5, 6.0)": {
       "rmse_filas": 3.7921782107192747,
       "rmse_columnas": 8.364253421817045,
       "media_sim": 10.674542124542125,
-      "media_pvsol": 12.558608058608057,
+      "media_ref": 12.558608058608057,
       "n_menor_2_sim": 79,
-      "n_menor_2_pvsol": 99
+      "n_menor_2_ref": 99
     },
     "(7.7, 1.5, 7.0)": {
       "rmse_filas": 2.5110410291098786,
       "rmse_columnas": 8.5146830599894,
       "media_sim": 11.705457875457876,
-      "media_pvsol": 12.558608058608057,
+      "media_ref": 12.558608058608057,
       "n_menor_2_sim": 79,
-      "n_menor_2_pvsol": 99
+      "n_menor_2_ref": 99
     },
     "(7.7, 3.0, 6.0)": {
       "rmse_filas": 5.043255714826306,
       "rmse_columnas": 8.411928046258684,
       "media_sim": 9.747289377289379,
-      "media_pvsol": 12.558608058608057,
+      "media_ref": 12.558608058608057,
       "n_menor_2_sim": 79,
-      "n_menor_2_pvsol": 99
+      "n_menor_2_ref": 99
     },
     "(7.7, 3.0, 7.0)": {
       "rmse_filas": 3.2220082722245524,
       "rmse_columnas": 8.34717576121154,
       "media_sim": 10.622234432234432,
-      "media_pvsol": 12.558608058608057,
+      "media_ref": 12.558608058608057,
       "n_menor_2_sim": 79,
-      "n_menor_2_pvsol": 99
+      "n_menor_2_ref": 99
     }
   },
   "candidatos_SE": {
@@ -156,33 +156,33 @@
       "rmse_filas": 6.141767746147607,
       "rmse_columnas": 2.6728841209093828,
       "media_sim": 5.576666666666666,
-      "media_pvsol": 3.0095238095238095,
+      "media_ref": 3.0095238095238095,
       "n_menor_2_sim": 65,
-      "n_menor_2_pvsol": 57
+      "n_menor_2_ref": 57
     },
     "(14.0, 21.0)": {
       "rmse_filas": 11.42072737238245,
       "rmse_columnas": 7.482238954567185,
       "media_sim": 10.472761904761903,
-      "media_pvsol": 3.0095238095238095,
+      "media_ref": 3.0095238095238095,
       "n_menor_2_sim": 48,
-      "n_menor_2_pvsol": 57
+      "n_menor_2_ref": 57
     },
     "(22.0, 15.0)": {
       "rmse_filas": 2.484990677380232,
       "rmse_columnas": 1.3914280825265593,
       "media_sim": 3.2902857142857145,
-      "media_pvsol": 3.0095238095238095,
+      "media_ref": 3.0095238095238095,
       "n_menor_2_sim": 67,
-      "n_menor_2_pvsol": 57
+      "n_menor_2_ref": 57
     },
     "(22.0, 21.0)": {
       "rmse_filas": 5.087752651969144,
       "rmse_columnas": 3.327607476742769,
       "media_sim": 6.15695238095238,
-      "media_pvsol": 3.0095238095238095,
+      "media_ref": 3.0095238095238095,
       "n_menor_2_sim": 50,
-      "n_menor_2_pvsol": 57
+      "n_menor_2_ref": 57
     }
   }
 }

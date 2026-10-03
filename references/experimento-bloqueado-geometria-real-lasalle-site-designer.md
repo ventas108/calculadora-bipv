@@ -7,7 +7,7 @@ se detiene antes de necesitar ninguno (ver §1).
 
 ## Pregunta que se intentó cerrar
 
-> ¿La APP no reproduce la asimetría SO/SE de PV·SOL porque le faltaban la geometría
+> ¿La APP no reproduce la asimetría SO/SE de la app estándar de referencia porque le faltaban la geometría
 > 3D y las sombras reales, o existe un defecto interno en nuestros cálculos?
 
 **No se puede cerrar experimentalmente con datos reales.** El motivo exacto: no
@@ -111,7 +111,7 @@ Sin desplazamiento de huso horario detectado.
 | Fachada sureste | 90°/162° | 28,004 | 831,73 | 22.075,3 | 21.766,3 | 777,26 | 0,9345 |
 
 **Diferencia relativa SO/SE: 0,0577%** — prácticamente empatadas, con **sureste
-ligeramente por encima de suroeste** (dirección opuesta a PV·SOL). Reproducido dos
+ligeramente por encima de suroeste** (dirección opuesta a la app estándar de referencia). Reproducido dos
 veces con el mismo fixture: `E_ac` idéntico cifra por cifra en ambas corridas
 (determinismo, ver §10).
 
@@ -120,24 +120,24 @@ veces con el mismo fixture: `E_ac` idéntico cifra por cifra en ambas corridas
 **No disponibles — experimento bloqueado (§1-§3).** No se ejecutó ray-casting con
 geometría del edificio real porque no existe una escena válida.
 
-## 7. Resultados PV·SOL (publicados por la tesis, Fig. 23 y Tabla 23)
+## 7. Resultados de la app estándar de referencia (publicados por la tesis, Fig. 23 y Tabla 23)
 
-| Superficie | POA PV·SOL (kWh/m²/año) | Rend. esp. PV·SOL (kWh/kWp/año) |
+| Superficie | POA de la app estándar de referencia (kWh/m²/año) | Rend. esp. de la app estándar de referencia (kWh/kWp/año) |
 |---|---:|---:|
 | Horizontal / referencia 10° sur | 1.571,3 | 1.393,42 |
 | Fachada suroeste | 858,0 | 718,33* |
 | Fachada sureste | 777,3 | 718,33* |
 
-*PV·SOL solo publica un rendimiento específico agregado del sistema de fachadas
+*la app estándar de referencia solo publica un rendimiento específico agregado del sistema de fachadas
 (Tabla 21, no desglosado por fachada individual) — se usa como referencia conjunta
 para el residual de fachadas en §9, no como valor por-fachada.
 
-**Asimetría SO/SE de PV·SOL:** (858,0 − 777,3) / 858,0 = **9,40%**, con suroeste >
+**Asimetría SO/SE de la app estándar de referencia:** (858,0 − 777,3) / 858,0 = **9,40%**, con suroeste >
 sureste.
 
-## 8. Diferencias porcentuales (APP sin Site Designer vs. PV·SOL)
+## 8. Diferencias porcentuales (APP sin Site Designer vs. la app estándar de referencia)
 
-| Magnitud | APP sin escena | PV·SOL | Diferencia absoluta | Diferencia % |
+| Magnitud | APP sin escena | La app estándar de referencia | Diferencia absoluta | Diferencia % |
 |---|---:|---:|---:|---:|
 | POA Horizontal (kWh/m²) | 1.613,31 | 1.571,3 | +42,01 | **+2,67%** |
 | POA Fachada-Suroeste (kWh/m²) | 831,25 | 858,0 | −26,75 | **−3,12%** |
@@ -147,7 +147,7 @@ sureste.
 | Rendimiento normalizado, fachadas (prom.) | 763,98** | 718,33 | +45,65 | **+6,35%** |
 
 **Rendimiento normalizado por recurso: rendimiento específico de la app dividido
-por su exceso de POA frente a PV·SOL (misma metodología del bloque D del test),
+por su exceso de POA frente a la app estándar de referencia (misma metodología del bloque D del test),
 usando el EPW real en vez del TMY sintético.
 
 ## 9. Cambio de asimetría SO/SE al incorporar geometría real
@@ -164,7 +164,7 @@ mismo `p_shade=0`, mismo panel, mismo inversor):
 | Clear-sky sintético (Ineichen, pvlib, sin nubosidad) | ≈28% | SO > SE |
 | PVGIS histórico (TMY real descargado en sesión previa con red) | ≈13,6% | SO > SE |
 | **EPW real El Dorado (esta ronda, reproducido)** | **0,058%** | SE > SO (empate) |
-| PV·SOL (publicado por la tesis) | 9,40% | SO > SE |
+| La app estándar de referencia (publicado por la tesis) | 9,40% | SO > SE |
 
 La asimetría cambia en **más de dos órdenes de magnitud** (28% → 0,058%) solo por
 cambiar la base meteorológica, sin tocar geometría, panel, inversor ni ningún otro
@@ -224,7 +224,7 @@ Ninguno nuevo en esta ronda.
    original. No es un defecto de código, es una brecha de datos de entrada.
 2. **La asimetría SO/SE es extremadamente sensible a la fuente meteorológica**
    (28% → 13,6% → 0,058%, incluso cambio de signo con el EPW real), lo que hace
-   que comparar el 9,40% de PV·SOL contra cualquiera de estas corridas sea una
+   que comparar el 9,40% de la app estándar de referencia contra cualquiera de estas corridas sea una
    comparación entre bases de recurso solar distintas, no solo entre geometrías
    distintas. Esto ya estaba documentado antes de esta ronda; se reconfirma aquí.
 
@@ -239,9 +239,9 @@ Ninguno nuevo en esta ronda.
 - Reparto real de los 148 módulos entre fachadas no publicado (la reconstrucción
   usa 70+70=140 como supuesto propio, ya documentado y verificado como
   discrepancia explícita en `test_conteo_modulos_app_difiere_del_publicado_en_la_tesis`).
-- Base meteorológica de PV·SOL no declarada por el documento (Meteonorm u otra) —
-  ninguna de las 4 fuentes de esta tabla (clear-sky, PVGIS, EPW real, PV·SOL) es
-  necesariamente la misma que usó PV·SOL.
+- Base meteorológica de la app estándar de referencia no declarada por el documento (Meteonorm u otra) —
+  ninguna de las 4 fuentes de esta tabla (clear-sky, PVGIS, EPW real, la app estándar de referencia) es
+  necesariamente la misma que usó la app estándar de referencia.
 - La difusa no se separa mediante SVF en el flujo multisuperficie (§4) — esto
   afecta por igual a ambas fachadas (mismo tratamiento), así que no explica por sí
   solo una asimetría, pero es una simplificación real del motor que no se ha
