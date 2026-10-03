@@ -104,11 +104,6 @@ def test_vista_3d_bloquea_otra_ubicacion_y_firma_con_la_huella():
     assert '.get("fuente", "site_designer")),' not in src          # antes la firma solo decía «externa_marsh»
 
 
-def test_bypass_documenta_el_alcance_radiativo():
-    src = (_RAIZ / "calculos" / "mismatch_bypass.py").read_text(encoding="utf-8")
-    assert "Alcance radiativo" in src
-
-
 def test_manual_del_asistente_seccion_122():
     kb = (_RAIZ / "datos" / "base_conocimiento_asistente.md").read_text(encoding="utf-8")
     i = kb.index("## 122.")

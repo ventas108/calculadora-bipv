@@ -43,4 +43,4 @@ Huella: «externa_marsh-» + 16 caracteres hexadecimales.
    el resultado es idéntico.
 4. La protección contra sombras v1 sigue aplicando con escenas de Site Designer.
 5. Vista 3D rechaza otra ubicación y firma con la huella.
-6. Comentario de alcance radiativo en el bypass; sección 122 del manual.
+6. Sección 122 del manual, con el alcance radiativo del bypass.

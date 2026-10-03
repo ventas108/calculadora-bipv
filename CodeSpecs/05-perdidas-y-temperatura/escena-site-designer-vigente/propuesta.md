@@ -20,7 +20,9 @@ Autorizada por el usuario el 3-oct-2026 («haz ambas»).
   - retira la sombra calculada con otra escena cuando hay una escena
     cargada;
   - sin escena cargada, la conserva.
-- Comentario de alcance radiativo en el bypass.
+- Alcance radiativo del bypass explicado en el Manual del Asistente. No se
+  toca `mismatch_bypass.py`: la guardia de física exige sus pruebas de
+  validación aunque el cambio sea solo un comentario.
 - Manual del Asistente, sección 122 (East2 y La Salle) y registro.
 
 ## Alternativas descartadas

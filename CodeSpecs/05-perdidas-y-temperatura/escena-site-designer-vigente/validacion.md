@@ -4,7 +4,7 @@
 
 ## Checklist de validación del módulo
 
-- [x] 13 pruebas nuevas: rojas sin la función de invalidación, verdes con ella.
+- [x] 12 pruebas nuevas: rojas sin la función de invalidación, verdes con ella.
 - [x] Pruebas de sombras, Site Designer, vinculador y flujo físico: 89 pasan.
 - [x] Sin cambios en fórmulas del SDM.
 
