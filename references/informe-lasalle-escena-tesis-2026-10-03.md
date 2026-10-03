@@ -253,3 +253,45 @@ Solo 35 horas al año tienen el sol por debajo de ese horizonte, todas al
 amanecer o al atardecer, con irradiación casi nula. **El horizonte queda
 descartado**: no explica la brecha de las fachadas ni el 1 % de la
 referencia horizontal.
+
+## 10. Prueba de «🧮 Generar un punto por módulo» con la fachada SO (3-oct-2026)
+
+Script: `bipv_python/scripts/lasalle_torre5_7_puntos_automaticos.py`
+(salida `calibracion_columnas/prueba_puntos_automaticos.json`). Escena
+recalibrada por columnas (sección 9), módulo SPR-MAX3-400 de 1,690 × 1,046 m
+vertical, 21 filas con un paso de 1,7342 m (separación vertical 0,044 m).
+
+**1. Precisión.** La columna 12 generada (1 × 21) coincide con los puntos
+que arma el script de la escena por su cuenta: **error máximo 0,0 mm** ✅.
+El generador cuenta las filas desde abajo (F01 = fila 21 de la tesis).
+
+**2. Cuentas (13 columnas × 21 filas = 273 módulos, cableado por columnas):**
+
+| Strings | Resultado |
+|---|---|
+| 21 S × 13 P | ✅ 273 puntos, 13 strings, un string por columna |
+| 7 S × 39 P | ✅ 273 puntos, 39 strings (3 por columna) |
+| 2 grupos: 21 S × 7 P + 21 S × 6 P | ✅ 273 puntos, 13 strings |
+| 10 S × 7 P (70 módulos) | ❌ «El campo tiene 273 módulos y los grupos de strings suman 70…» |
+
+**3. Limitación encontrada: columnas con separación irregular.** Las 13
+columnas reales van entre ventanas y balcones con huecos de 1,1 m a 9,15 m.
+Un campo regular entre la primera y la última columna las desplaza hasta
+**7,5 m**: para esta fachada no sirve un solo campo regular. Con el
+generador actual hay que generar cada tramo regular como una superficie
+aparte o escribir los puntos a mano. Mejora propuesta: posiciones de columna
+a medida en el generador.
+
+**4. Sombra por string (puntos reales, un string de 21 módulos por columna):**
+
+| | Pérdida por bypass (directa) |
+|---|---|
+| **Por string** (método nuevo) | **3,9 %** |
+| Promedio de la superficie | 4,6 % |
+
+Pérdida por columna: c12 29,2 %, c13 12,3 %, c3 4,6 %, c7 3,9 %, c11 0,4 %
+y el resto < 0,2 %. Es el mismo patrón de franjas de la tabla de referencia
+(c12 47 %, c13 17 %, c3 11 %, c7 6,5 % de irradiación). Con la sombra
+concentrada en pocos strings enteros, el promedio de superficie la reparte
+entre todos y **sobrestima la pérdida en 0,7 puntos (18 %)**. Cielo visible
+de la fachada: 0,908. Sin árboles, porque esta prueba aísla los balcones.
