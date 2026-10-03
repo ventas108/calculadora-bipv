@@ -338,3 +338,19 @@ def test_bypass_separa_cuantos_modulos_de_cuanta_sombra():
     assert antes["pct_bypass_anual"] < 1.0                        # el módulo «casi» no pierde
     assert nuevo["pct_bypass_anual"] == pytest.approx(100 / 18, abs=0.6)   # pierde el módulo entero
     assert nuevo["horas_bypass"] > 0
+
+
+def test_bypass_la_sombra_solo_quita_la_luz_directa():
+    # Spec 05/difusa-sombra-por-string: un módulo a la sombra sigue
+    # recibiendo la difusa; con fraccion_directa=None todo queda igual.
+    from calculos.mismatch_bypass import simular_bypass_horario
+    sol = (np.arange(8760) % 24 >= 7) & (np.arange(8760) % 24 < 17)
+    g = np.where(sol, 700.0, 0.0); t = np.full(8760, 20.0)
+    kw = dict(G_eff=g, T_amb=t, N_series=18, N_parallel=1, panel=ASP_ST1_T40,
+              p_shade=np.where(sol, 1.0, 0.0), profundidad_sombra=np.where(sol, 1.0, 0.0))
+    todo = simular_bypass_horario(**kw)
+    igual = simular_bypass_horario(fraccion_directa=None, **kw)
+    con_difusa = simular_bypass_horario(fraccion_directa=np.where(sol, 0.6, 0.0), **kw)
+    assert igual["kwh_bypass_anual"] == todo["kwh_bypass_anual"]
+    assert todo["pct_bypass_anual"] == pytest.approx(100.0, abs=0.5)    # sin luz
+    assert 50 < con_difusa["pct_bypass_anual"] < 70                      # queda la difusa (40 %)

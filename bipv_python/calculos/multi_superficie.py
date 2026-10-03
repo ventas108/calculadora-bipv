@@ -107,6 +107,7 @@ def calcular_poa_superficie(
     superficie: dict,
     albedo: float = 0.20,
     bifacial: dict | None = None,
+    reduccion_diffusa_isotropica: float = 1.0,
 ) -> pd.DataFrame:
     """
     Calcula POA horaria para UNA superficie.
@@ -125,6 +126,7 @@ def calcular_poa_superficie(
         azimuth=float(superficie["azimuth_deg"]),
         albedo=float(superficie.get("albedo", albedo)),
         bifacial=superficie.get("bifacial", bifacial),
+        reduccion_diffusa_isotropica=reduccion_diffusa_isotropica,
     )
 
 

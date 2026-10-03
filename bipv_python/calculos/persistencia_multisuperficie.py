@@ -178,6 +178,8 @@ def _superficie_input(superficie: Mapping[str, Any]) -> dict[str, Any]:
         "n_serie", "n_paralelo", "inversor_id", "p_shade", "firma_sombra",
         # Spec 05/sombra-por-string: módulos con sombra y cuánta luz pierden.
         "fraccion_modulos_sombra", "profundidad_sombra",
+        # Spec 05/difusa-sombra-por-string: cielo visible de la superficie.
+        "factor_cielo_visible",
         "firma_poa", "estado_sombra", "cobertura_sombra", "puntos_analisis",
         "malla_horizonte", "motor_optico_vigente",
         # Spec 05/panel-por-superficie: panel de cada superficie. Ausentes en

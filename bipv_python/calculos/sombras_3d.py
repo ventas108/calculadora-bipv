@@ -540,6 +540,8 @@ def calcular_fs_horario(
 # Un punto cuenta como módulo sombreado si pierde más de 5 % de la luz
 # directa (el mismo umbral que usa simular_bypass_horario).
 _UMBRAL_PUNTO_SOMBREADO = 0.05
+# Paso de la grilla del cielo por punto: 10° ≈ 320 rayos (5° ≈ 1.300).
+_RESOLUCION_CIELO_DEG = 10.0
 
 
 def calcular_fs_horario_por_superficie(
@@ -624,6 +626,15 @@ def calcular_fs_horario_por_superficie(
         # Con un solo punto no se sabe cuántos módulos tienen sombra: se
         # mantiene el método del promedio.
         por_string = len(puntos) >= 2
+        # Spec 05/difusa-sombra-por-string: cielo que ven los puntos (la
+        # difusa tapada por balcones, aleros y vecinos), promedio de la
+        # superficie. Una malla semitransparente tapa en proporción.
+        factor_cielo = None
+        if tilt_sup is not None and az_sup is not None:
+            svf = calcular_svf_difuso(malla, puntos_calculo, float(tilt_sup), float(az_sup),
+                                      resolucion_deg=_RESOLUCION_CIELO_DEG)
+            tapado = 1.0 - float(svf["f_svf"].mean())
+            factor_cielo = float(np.clip(1.0 - tapado * (1.0 - float(transparencia)), 0.0, 1.0))
         no_calculadas = len(horas_sol.difference(calculadas))
         puntos_insuficientes = nombre in n_modulos_serie_por_superficie and len(puntos) < int(n_modulos_serie_por_superficie[nombre])
         advertencias = [f"error_geometrico: {a}" for a in avisos_geometricos]
@@ -655,6 +666,7 @@ def calcular_fs_horario_por_superficie(
             "p_shade": serie.to_numpy(float),
             "fraccion_modulos_sombra": fraccion.to_numpy(float) if por_string else None,
             "profundidad_sombra": profundidad.to_numpy(float) if por_string else None,
+            "factor_cielo_visible": factor_cielo,
             "firma_sombra": firma,
             "cobertura": {
                 "horas_totales": _HORAS_ANIO,

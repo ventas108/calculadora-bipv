@@ -302,6 +302,9 @@ def _aplicar_reduccion_svf_isotropica(
     salida["poa_global"] = (salida["poa_direct"] + salida["poa_diffuse"]).clip(lower=0.0)
     salida.attrs["qcrad"] = poa.attrs.get("qcrad")
     salida.attrs["factor_svf_isotropico"] = factor_svf
+    # Spec 05/difusa-sombra-por-string: la difusa alrededor del sol se tapa
+    # junto con el haz directo (sombra hora a hora), no con el SVF.
+    salida.attrs["poa_circumsolar"] = circumsolar.fillna(0.0).to_numpy(dtype=float)
     return salida
 
 
