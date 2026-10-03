@@ -154,6 +154,37 @@ def invalidar_sombra_por_cambio_tmy(superficies_bipv: list[dict], tmy: pd.DataFr
     return salida
 
 
+def invalidar_sombra_por_cambio_malla(
+    superficies_bipv: list[dict], malla_fingerprint_actual: str | None,
+) -> list[dict]:
+    """Retira la sombra calculada contra una escena Site Designer distinta de
+    la cargada (Spec 05/escena-site-designer-vigente). Antes, subir una escena
+    nueva sin volver a pulsar «Calcular sombra» dejaba aplicada en silencio la
+    sombra de la escena anterior.
+
+    Solo compara firmas con ``malla_horizonte`` «externa_marsh-<huella>». Sin
+    escena cargada (``None``: la escena no se guarda con el proyecto) la
+    sombra se conserva; si no, abrir un proyecto guardado la borraría.
+    """
+    salida = []
+    for sup in superficies_bipv:
+        firma = sup.get("firma_sombra")
+        malla = firma.get("malla_horizonte") if isinstance(firma, Mapping) else None
+        if (isinstance(malla_fingerprint_actual, str) and isinstance(malla, str)
+                and malla.startswith("externa_marsh-") and malla != malla_fingerprint_actual):
+            nueva = dict(sup)
+            for campo in _CAMPOS_SOMBRA:
+                nueva.pop(campo, None)
+            nueva["sombra_bloqueo_motivo"] = (
+                f"La superficie '{sup.get('nombre')}' tenía sombra calculada con otra "
+                "escena de Site Designer -- vuelve a calcular la sombra con la escena actual."
+            )
+            salida.append(nueva)
+        else:
+            salida.append(dict(sup))
+    return salida
+
+
 def invalidar_sombra_por_version_algoritmo(superficies_bipv: list[dict]) -> list[dict]:
     """Retira p_shade/firma_sombra de toda superficie cuya sombra calculó
     ``sombras_3d`` con una versión de algoritmo distinta de la vigente.
@@ -199,6 +230,9 @@ def construir_y_recalcular_proyecto_fisico(session_state: Mapping[str, Any], tmy
         list(session_state.get("superficies_bipv") or []), tmy,
     )
     superficies_frescas = invalidar_sombra_por_version_algoritmo(superficies_frescas)
+    superficies_frescas = invalidar_sombra_por_cambio_malla(
+        superficies_frescas, (session_state.get("multisup_malla_meta") or {}).get("malla_fingerprint"),
+    )
     session_state_fresco = dict(session_state)
     session_state_fresco["superficies_bipv"] = superficies_frescas
 

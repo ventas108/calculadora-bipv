@@ -6110,6 +6110,17 @@ En todos los casos sigue luego con 📊 Producción, 💼 Presupuesto, 💰 Fina
 
 **Ejemplo (Granja Apartadó):** con Producción simulada pero sin ⚡ Unifilar, la ruta marca 📊 Producción en 🟠 («Producción no usó los cables calculados») y ⚡ Unifilar como ▶️ siguiente. Primero el Unifilar, luego otra vez Producción.
 
+## 122. 🌳 Escena de Site Designer vigente y casos de validación East2 / La Salle (3-oct-2026)
+
+**Qué cambió en 🗺️ Vista 3D (sombra multi-superficie con Site Designer):**
+1. **Escena de otra ubicación:** si el JSON de Site Designer trae coordenadas distintas a las del proyecto (más de 0,1°), la app **ya no la aplica**: muestra «No se aplicó la escena Site Designer» y no guarda esa malla. Antes solo avisaba y la usaba igual. **Qué hacer:** fija en Site Designer la ubicación del proyecto y vuelve a exportar el JSON.
+2. **Cambio de escena:** cada escena tiene una huella (bloques, ubicación y norte). Si cargas otra escena y no vuelves a pulsar «🌳 Calcular sombra de todas las superficies», la sombra anterior **caduca**: la superficie muestra el motivo («tenía sombra calculada con otra escena de Site Designer») y el modo físico no la usa hasta recalcularla. Al abrir un proyecto guardado sin volver a cargar la escena, la sombra guardada se conserva: la escena no se guarda con el proyecto.
+3. **Alcance de la sombra en el bypass:** la fracción de sombra (p_shade) se calcula con el haz directo, pero el bypass la aplica a la irradiancia total; la luz difusa no se separa. Es una aproximación conocida.
+
+**Casos de validación — cómo hablar de ellos:**
+- **East2 (SunPower E20-327, CIEMAT Madrid):** es una **reconstrucción parcial**, no una validación científica. El artículo no publica la energía anual de East2; las cifras de la app son anclas de una reconstrucción con un año típico sintético. No se presentan como cifras de cliente ni como garantía.
+- **La Salle, Torre 5 de Bosques de Castilla:** la escena es una **reconstrucción provisional** (bloque único, ancho de la fachada SO asumido), sin las torres vecinas. Con la app actual (3-oct-2026), el rendimiento (≈ 715 kWh/kWp) y el PR (≈ 0,86) coinciden con la tesis dentro de ±1 %. La asimetría SO > SE de la tesis viene sobre todo de su base climática: la diferencia ya está en la irradiación de cada fachada, antes de cualquier sombra. Para una validación de sombra hacen falta la escena real con las torres vecinas y los datos climáticos de la tesis.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv
