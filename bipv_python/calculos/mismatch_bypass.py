@@ -249,6 +249,7 @@ def simular_bypass_horario(
     NOCT: float | None = None,
     k_bipv: float = 1.0,
     umbral_shade: float = 0.05,
+    profundidad_sombra: np.ndarray | pd.Series | None = None,
 ) -> dict:
     """
     Simulación hora a hora del array con bypass diodes activados por sombra parcial.
@@ -274,6 +275,9 @@ def simular_bypass_horario(
                    fuente que usa Producción (temperatura_celda_noct); default 1.0
                    (ventilado libre) si no se conoce el montaje del array.
     umbral_shade : FS mínimo para tratar como sombra activa (filtra ruido)
+    profundidad_sombra : cuánta luz pierden los módulos sombreados [0–1] por
+                   hora (Spec sombra-por-string). None = comportamiento
+                   anterior: la profundidad se toma igual a p_shade.
 
     Física del modelo
     -----------------
@@ -301,6 +305,8 @@ def simular_bypass_horario(
     T_amb   = np.asarray(T_amb,   dtype=float)
     p_shade = np.asarray(p_shade, dtype=float)
     n       = len(G_eff)
+    profundidad = (p_shade if profundidad_sombra is None
+                   else np.clip(np.asarray(profundidad_sombra, dtype=float), 0.0, 1.0))
 
     NOCT_val = float(NOCT if NOCT is not None else panel.get("NOCT", 45.0))
     T_cel    = temperatura_celda_noct(G_eff, T_amb, NOCT=NOCT_val, k_bipv=k_bipv)
@@ -323,7 +329,7 @@ def simular_bypass_horario(
         T_s   = T_cel[idx]
         ps    = p_shade[idx]
 
-        G_shade = G_s * (1.0 - ps)   # irradiancia sobre módulos sombreados
+        G_shade = G_s * (1.0 - profundidad[idx])   # irradiancia sobre módulos sombreados
         G_clear = G_s                  # irradiancia sobre módulos iluminados
 
         # SDM para los dos grupos
@@ -350,6 +356,10 @@ def simular_bypass_horario(
         P_string_mismatch = n_shade * Pmp_sh + n_clear * Vmp_cl * I_str
 
         P_string = np.where(bypass, P_string_bypass, P_string_mismatch)
+        if profundidad_sombra is not None:
+            # Con la profundidad aparte, todo el string puede estar sombreado
+            # (n_clear = 0): el MPPT busca el máximo global de los dos puntos.
+            P_string = np.maximum(P_string_bypass, P_string_mismatch)
         P_string = np.maximum(P_string, 0.0)
 
         P_dc_array_s    = P_string * N_parallel                   # W — con bypass

@@ -68,7 +68,7 @@ Línea base: las 10 suites de la prueba de cierre multisuperficie dan
    (SO 250,5°) de la irradiancia anual sobre fachadas verticales en Bogotá,
    toda difusa y reflejada. Con el cielo nublado real la fracción difusa es
    mayor, consistente con la pérdida del 26–38 % del informe provisional frente
-   al 3,7 % de PV·SOL.
+   al 3,7 % de la app estándar de referencia.
 
 ## Contexto
 

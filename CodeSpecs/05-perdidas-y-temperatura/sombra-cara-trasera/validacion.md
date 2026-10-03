@@ -43,4 +43,4 @@ cerrar la Spec como `completado`: CI en verde en el Pull Request, aprobación
 humana y merge a `main`, despliegue en las dos copias del servidor
 (Streamlit y app web) y la corrida real de Torre 5 en el Codespace con la
 orientación de cada fachada. Esa corrida es la que actualiza la tabla
-comparativa con PV·SOL; esta Spec no la sustituye.
+comparativa con la app estándar de referencia; esta Spec no la sustituye.
