@@ -101,6 +101,46 @@ def invalidar_sombra_por_cambio_tmy(superficies_bipv: list[dict], tmy: pd.DataFr
     return salida
 
 
+def invalidar_sombra_por_cambio_malla(
+    superficies_bipv: list[dict], malla_fingerprint_actual: str | None,
+) -> list[dict]:
+    """Retira p_shade/firma_sombra de toda superficie cuya sombra fue
+    calculada contra una escena Site Designer (``malla_horizonte`` con
+    prefijo ``externa_marsh-``, ver calculos.sitedesigner_marsh) distinta de
+    la cargada actualmente en sesión. Simétrico a
+    invalidar_sombra_por_cambio_tmy: sin esto, subir una escena nueva y NO
+    volver a pulsar "Calcular sombra" dejaba una sombra obsoleta aplicada en
+    silencio (auditoría de integración Site Designer, 2026-09-22).
+
+    Deliberadamente NO toca superficies cuya firma no referencia una malla
+    externa (p.ej. estado_sombra=sombra_cero_calculada de los escenarios de
+    validación La Salle/East2, que no usan Site Designer) -- comparar
+    malla_fingerprint_actual=None contra una firma sin malla_horizonte no
+    debe invalidar nada que nunca dependió de una escena.
+    """
+    salida = []
+    for sup in superficies_bipv:
+        firma = sup.get("firma_sombra")
+        malla_firma = firma.get("malla_horizonte") if isinstance(firma, Mapping) else None
+        if (
+            isinstance(malla_firma, str)
+            and malla_firma.startswith("externa_marsh-")
+            and malla_firma != malla_fingerprint_actual
+        ):
+            nueva = dict(sup)
+            for campo in _CAMPOS_SOMBRA:
+                nueva.pop(campo, None)
+            nueva["sombra_bloqueo_motivo"] = (
+                f"La superficie '{sup.get('nombre')}' tenía sombra calculada "
+                "contra una escena Site Designer distinta de la cargada -- "
+                "vuelve a calcular la sombra con la escena actual."
+            )
+            salida.append(nueva)
+        else:
+            salida.append(dict(sup))
+    return salida
+
+
 def construir_y_recalcular_proyecto_fisico(session_state: Mapping[str, Any], tmy: pd.DataFrame, lat: float, lon: float, alt_m: float) -> dict:
     if not isinstance(tmy, pd.DataFrame) or "T2m" not in tmy.columns:
         raise ValueError(
@@ -112,6 +152,13 @@ def construir_y_recalcular_proyecto_fisico(session_state: Mapping[str, Any], tmy
     # calculada contra un TMY viejo se aceptaba en silencio.
     superficies_frescas = invalidar_sombra_por_cambio_tmy(
         list(session_state.get("superficies_bipv") or []), tmy,
+    )
+    # Simétrico al de arriba pero para la escena Site Designer -- ver
+    # invalidar_sombra_por_cambio_malla. No-op si nunca se cargó una escena
+    # ni ninguna superficie referencia una (session_state.get(...) -> None).
+    superficies_frescas = invalidar_sombra_por_cambio_malla(
+        superficies_frescas,
+        (session_state.get("multisup_malla_meta") or {}).get("malla_fingerprint"),
     )
     session_state_fresco = dict(session_state)
     session_state_fresco["superficies_bipv"] = superficies_frescas

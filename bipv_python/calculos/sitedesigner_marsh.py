@@ -26,6 +26,7 @@ Regla de unidades (acordada — no adivinar):
 """
 from __future__ import annotations
 
+import hashlib
 import json
 
 import numpy as np
@@ -63,10 +64,10 @@ def cargar_escena_sitedesigner(contenido):
       (``_bipv_obstacle_id_by_face`` / ``_bipv_obstacle_name_by_face``),
       lista para ``sombras_3d.calcular_fs_horario``.
 
-    meta: dict con ``lat``, ``lon``, ``timezone``, ``elevacion_m``,
-      ``north_offset_deg``, ``n_bloques`` y ``dim_m`` (x, y, z de la
-      caja envolvente en metros) — para validar contra la sesión y para
-      trazabilidad ("fuente: externa_marsh").
+        meta: dict con ``lat``, ``lon``, ``timezone``, ``elevacion_m``,
+            ``north_offset_deg``, ``n_bloques``, ``dim_m`` y ``malla_fingerprint``
+            (huella del contenido que afecta la escena) — para validar contra la
+            sesión y para trazabilidad ("fuente: externa_marsh").
 
     Lanza ``ErrorSiteDesigner`` con mensaje claro si el archivo no es un
     JSON de Site Designer válido. Nunca corrige en silencio.
@@ -153,8 +154,21 @@ def cargar_escena_sitedesigner(contenido):
     malla._bipv_obstacle_id_by_face = np.asarray(ids, dtype=object)
     malla._bipv_obstacle_name_by_face = np.asarray(nombres, dtype=object)
 
+    contenido_huella = {
+        "blocks": bloques,
+        "latitude": lat,
+        "longitude": lon,
+        "northOffset": north_offset,
+        "timezone": loc.get("timezone"),
+        "elevation": loc.get("elevation"),
+    }
+    huella_escena = hashlib.sha256(
+        json.dumps(contenido_huella, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()[:16]
+
     meta = {
         "fuente": "externa_marsh",
+        "malla_fingerprint": f"externa_marsh-{huella_escena}",
         "lat": lat,
         "lon": lon,
         "timezone": loc.get("timezone"),

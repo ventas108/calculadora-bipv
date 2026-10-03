@@ -275,6 +275,14 @@ def simular_bypass_horario(
                    (ventilado libre) si no se conoce el montaje del array.
     umbral_shade : FS mínimo para tratar como sombra activa (filtra ruido)
 
+    Alcance radiativo
+    -----------------
+    `p_shade` representa bloqueo geométrico del haz directo, pero este modelo
+    recibe `G_eff` agregado y aplica la reducción como `G_eff × (1-p_shade)`.
+    Por tanto, la difusa no se separa aquí mediante un Sky View Factor. El
+    acoplamiento de sombra geométrica con reducción difusa es una limitación
+    conocida del flujo multisuperficie, no una medición de sombra difusa.
+
     Física del modelo
     -----------------
     Para cada hora con p_shade > umbral:

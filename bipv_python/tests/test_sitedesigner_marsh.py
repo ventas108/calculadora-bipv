@@ -41,6 +41,19 @@ def test_metadata_ubicacion():
     assert meta["elevacion_m"] == pytest.approx(2548.4)
 
 
+def test_escenas_distintas_tienen_huellas_distintas():
+    _, meta_a = cargar_escena_sitedesigner(_escena(0, [
+        {"min": [0, 0, 0], "max": [1000, 1000, 1000]},
+    ]))
+    _, meta_b = cargar_escena_sitedesigner(_escena(0, [
+        {"min": [0, 0, 0], "max": [1000, 1000, 2000]},
+    ]))
+
+    assert meta_a["malla_fingerprint"].startswith("externa_marsh-")
+    assert meta_b["malla_fingerprint"].startswith("externa_marsh-")
+    assert meta_a["malla_fingerprint"] != meta_b["malla_fingerprint"]
+
+
 def test_north_offset_rota_la_malla():
     """northOffset=90 (horario) debe llevar un bloque al este del origen hacia el sur."""
     bloque = [{"min": [1000, -500, 0], "max": [2000, 500, 3000]}]  # centrado en +X (este)

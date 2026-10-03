@@ -949,6 +949,36 @@ botón explícito de Vista 3D.
 - Una carga rechazada no activa `multisup_activo` ni debe interpretarse como
   una restauración parcial.
 
+### Caso científico East2 — regla de interpretación
+
+Existe una reconstrucción reproducible del caso **East2, SunPower E20-327,
+CIEMAT Madrid**, basada en el artículo `10.3390/buildings16091668`.
+
+- Estado correcto: **parcialmente reproducido**.
+- Se reproducen la ficha del SunPower E20-327, la configuración `7S × 2P`,
+  los 14 módulos, la geometría documentada/inferida y la máscara angular de la
+  Tabla 4.
+- El artículo no publica una energía anual agregada East2. Las cifras de POA,
+  DC, AC, PR y sombra son anclas de una reconstrucción con TMY sintético, no
+  resultados científicos publicados ni mediciones del edificio.
+- No afirmar equivalencia con CAMS/ERA5, DSM LiDAR, medición real ni inversor
+  Fronius completo: esos insumos no están disponibles en el repositorio.
+- Las anclas actuales están fijadas por pruebas: 19 pruebas East2 y 101 en la
+  batería física relacionada. Si cambian los supuestos, deben cambiar también
+  el informe y sus anclas, explicando la causa.
+- `mensual` y `exacto` son modos de agregación de la misma máscara; no son dos
+  máscaras científicas distintas. Una prueba separada modifica realmente
+  `p_shade` y verifica el cambio de huella y energía.
+- Si cambia el TMY, la sombra anterior queda obsoleta. Debe rechazarse hasta
+  regenerar `p_shade` y `firma_sombra` con el TMY nuevo; después sí puede
+  recalcularse el proyecto.
+- QCRad del TMY East2 sintético es coherente (`0.0%` inconsistente), pero eso
+  no valida la correspondencia con CAMS/ERA5 ni elimina las limitaciones del
+  supuesto sintético.
+- No usar los nRMSE publicados de otras herramientas como tolerancia de la APP.
+- No recomendar cifras East2 como cifras de cliente ni como garantía de diseño.
+  Presentarlas siempre con fuente, supuesto y nivel de confianza.
+
 ### Procedimiento seguro para usar la APP
 
 1. Crear o cargar el proyecto en 🏠 Proyecto y confirmar ciudad, coordenadas,
@@ -2989,7 +3019,7 @@ Además de SketchUp y de la Calculadora de Sombreado 3D web, la app acepta escen
 
 20.1 Qué dibujar en Site Designer  NUEVO
 
-- Primero fija la ubicación del proyecto en Site Designer (latitud/longitud o buscando la ciudad): esa ubicación viaja dentro del JSON y la calculadora la compara contra el proyecto activo — si no coincide, avisa.
+- Primero fija la ubicación del proyecto en Site Designer (latitud/longitud o buscando la ciudad): esa ubicación viaja dentro del JSON y la calculadora la compara contra el proyecto activo — si no coincide, la escena se rechaza y no queda activa para calcular sombras.
 - Dibuja SOLO los obstáculos que producen sombra: edificios vecinos, muros, volúmenes de la propia edificación si sombrean la fachada. Cada obstáculo es un bloque (caja) con su posición y altura reales.
 - NO dibujes los paneles ni la fachada de estudio: los puntos de análisis se definen después, dentro de la calculadora (igual que en la ruta SketchUp).
 - Si Site Designer muestra el norte girado (northOffset), déjalo tal cual: el archivo lo registra y la calculadora aplica la corrección automáticamente.
@@ -3009,7 +3039,13 @@ El archivo contiene la ubicación (latitud, longitud, zona horaria, elevación, 
 - Abre 🌳 Sombras y sube el archivo .json en el mismo cargador donde va el modelo de SketchUp. La app confirma cuántos obstáculos leyó, sus dimensiones en metros, el norte corregido y la ubicación del archivo.
 - Define los puntos de análisis (una fila de módulos = un punto, con sus coordenadas x, y, z en metros en el mismo sistema de la escena) y pulsa ▶️ Calcular sombras.
 - Envía el resultado a la Página 5 con «📤 Enviar a Mismatch»: de ahí en adelante la cadena es la de siempre — bypass → E_ac corregida → Producción → Financiero.
-Si la app avisa que la ubicación del archivo no coincide con la del proyecto, verifica que la escena sea del sitio correcto antes de continuar: una escena de otro proyecto produce sombras sin sentido físico.
+Si la app rechaza la escena porque la ubicación del archivo no coincide con la del proyecto, verifica que sea el sitio correcto y vuelve a exportar el JSON: una escena de otro proyecto no puede producir sombras válidas.
+
+Para el caso La Salle/Bosques de Castilla no se deben usar los JSON de ejemplo
+existentes en `attached_assets`: corresponden a otra ubicación y no modelan la
+Torre 5 ni sus dos fachadas. La validación SO/SE queda bloqueada hasta recibir
+un JSON real de Site Designer en torno a lat=4.634, lon=-74.148 y puntos de
+análisis legítimos por fachada. No se deben inventar esos datos.
 
 ────────────────────────────────────────────────────────────
 

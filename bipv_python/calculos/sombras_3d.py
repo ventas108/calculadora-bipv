@@ -446,6 +446,7 @@ def calcular_fs_horario_por_superficie(
     malla_horizonte: str,
     transparencia: float = 0.0,
     n_modulos_serie_por_superficie: dict[str, int] | None = None,
+    fuente: str = "sombras_3d",
 ) -> dict[str, dict]:
     """Calcula FS geometrico horario y firma por superficie.
 
@@ -503,12 +504,12 @@ def calcular_fs_horario_por_superficie(
             "puntos_analisis": [dict(p) for p in puntos],
             "malla_horizonte": str(malla_horizonte),
             "tmy_fingerprint": tmy_fp,
-            "fuente": "sombras_3d",
+            "fuente": str(fuente),
             "tilt_deg": geometria.get("tilt_deg"),
             "azimuth_deg": geometria.get("azimuth_deg"),
             "transparencia": float(transparencia),
             "version_algoritmo": VERSION_ALGORITMO_FS_POR_SUPERFICIE,
-            "proveedor": "sombras_3d",
+            "proveedor": str(fuente),
             "resolucion_espacial": f"{len(puntos)}_puntos",
             "resolucion_temporal": "horaria_8760",
             "zona_horaria": str(idx.tz),

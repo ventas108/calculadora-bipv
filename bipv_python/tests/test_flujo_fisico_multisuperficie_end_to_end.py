@@ -139,6 +139,44 @@ def test_rechazo_de_tmy_alterado():
         construir_y_recalcular_proyecto_fisico(session_state, tmy_alterado, lat=_LAT, lon=_LON, alt_m=_ALT_M)
 
 
+def test_construir_proyecto_invalida_por_cambio_de_escena_site_designer():
+    """Simétrico a test_rechazo_de_tmy_alterado, pero para la escena Site
+    Designer: subir una escena nueva (malla_fingerprint distinto) sin volver
+    a pulsar "Calcular sombra" no debe dejar aplicada en silencio la sombra
+    calculada contra la escena vieja -- construir_proyecto_desde_session_state
+    exige p_shade/firma_sombra en toda superficie activa, así que al
+    invalidarse una de las dos superficies del escenario mínimo, la
+    construcción completa del proyecto se rechaza (mismo comportamiento que
+    ya existía para el cambio de TMY)."""
+    tmy = _tmy()
+    session_state = _session_state_realista(tmy)
+    session_state["superficies_bipv"][0]["firma_sombra"]["malla_horizonte"] = "externa_marsh-escenavieja"
+    session_state["multisup_malla_meta"] = {"malla_fingerprint": "externa_marsh-escenanueva"}
+
+    with pytest.raises(ValueError, match="p_shade|firma_sombra"):
+        construir_y_recalcular_proyecto_fisico(session_state, tmy, lat=_LAT, lon=_LON, alt_m=_ALT_M)
+
+
+def test_construir_proyecto_conserva_sombra_si_escena_no_cambio():
+    """Cuando la firma referencia la MISMA escena que está cargada en
+    sesión, la invalidación no debe activarse y el resultado físico debe
+    ser idéntico al caso base sin ninguna referencia a Site Designer."""
+    tmy = _tmy()
+
+    session_base = _session_state_realista(tmy)
+    proyecto_base = construir_y_recalcular_proyecto_fisico(session_base, tmy, lat=_LAT, lon=_LON, alt_m=_ALT_M)
+
+    session_con_escena = _session_state_realista(tmy)
+    session_con_escena["superficies_bipv"][0]["firma_sombra"]["malla_horizonte"] = "externa_marsh-mismaescena"
+    session_con_escena["multisup_malla_meta"] = {"malla_fingerprint": "externa_marsh-mismaescena"}
+    proyecto_con_escena = construir_y_recalcular_proyecto_fisico(session_con_escena, tmy, lat=_LAT, lon=_LON, alt_m=_ALT_M)
+
+    assert (
+        proyecto_con_escena["superficies"]["Este"]["resultados_ac"]["E_ac_anual_kWh"]
+        == pytest.approx(proyecto_base["superficies"]["Este"]["resultados_ac"]["E_ac_anual_kWh"])
+    )
+
+
 def test_rollback_si_falla_una_superficie():
     tmy = _tmy()
     session_state = _session_state_realista(tmy)

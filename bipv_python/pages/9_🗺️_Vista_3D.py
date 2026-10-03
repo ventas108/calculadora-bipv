@@ -916,7 +916,7 @@ with tab_solar:
             color_tipo, color_poa_normalizado, color_fs,
         )
         from calculos.sitedesigner_marsh import cargar_escena_sitedesigner, verificar_ubicacion
-        from calculos.sombras_3d import calcular_fs_horario_por_superficie
+        from calculos.sombras_3d import calcular_fs_horario_por_superficie, validar_puntos
         from calculos.adaptador_multisuperficie import aplicar_proyecto_a_session_state
         from calculos.inversores_multisuperficie import validar_inversores_y_asignaciones
         from calculos.vinculador_sombra_multisuperficie import (
@@ -1096,14 +1096,21 @@ with tab_solar:
             if _archivo_sd is not None:
                 try:
                     _malla_sd, _meta_sd = cargar_escena_sitedesigner(_archivo_sd.getvalue())
-                    st.session_state["multisup_malla_sombra"] = _malla_sd
-                    st.session_state["multisup_malla_meta"] = _meta_sd
-                    for _aviso in verificar_ubicacion(_meta_sd, float(lat), float(lon)):
-                        st.warning(_aviso)
-                    st.success(
-                        f"Malla Site Designer cargada: {_meta_sd['n_bloques']} bloque(s), "
-                        f"{_meta_sd['dim_m']['x']} × {_meta_sd['dim_m']['y']} × {_meta_sd['dim_m']['z']} m."
-                    )
+                    _avisos_ubicacion = verificar_ubicacion(_meta_sd, float(lat), float(lon))
+                    if _avisos_ubicacion:
+                        st.session_state.pop("multisup_malla_sombra", None)
+                        st.session_state.pop("multisup_malla_meta", None)
+                        st.error(
+                            "No se aplicó la escena Site Designer: la ubicación no "
+                            "coincide con el proyecto. " + " | ".join(_avisos_ubicacion)
+                        )
+                    else:
+                        st.session_state["multisup_malla_sombra"] = _malla_sd
+                        st.session_state["multisup_malla_meta"] = _meta_sd
+                        st.success(
+                            f"Malla Site Designer cargada: {_meta_sd['n_bloques']} bloque(s), "
+                            f"{_meta_sd['dim_m']['x']} × {_meta_sd['dim_m']['y']} × {_meta_sd['dim_m']['z']} m."
+                        )
                 except Exception as _error_sd:
                     st.session_state.pop("multisup_malla_sombra", None)
                     st.error(f"No se pudo cargar Site Designer: {_error_sd}")
@@ -1142,13 +1149,26 @@ with tab_solar:
                 _puntos_sombra.get(s["nombre"]) for s in _sups_actualizado if s.get("activa", True)
             )
             if st.button("🌳 Calcular sombra de todas las superficies", key="btn_calcular_sombra_multisup", disabled=not _sombra_lista):
-                _resultados_sombra = calcular_fs_horario_por_superficie(
-                    st.session_state["multisup_malla_sombra"], _puntos_sombra,
-                    float(lat), float(lon), _tmy_sombra, _geometrias_sombra,
-                    malla_horizonte=str(st.session_state.get("multisup_malla_meta", {}).get("fuente", "site_designer")),
-                )
-                st.session_state["superficies_bipv"] = aplicar_sombra_a_superficies(_sups_actualizado, _resultados_sombra)
-                st.success("Sombra calculada por superficie; revisa el estado antes de adoptar resultados.")
+                _avisos_puntos = []
+                for _nombre_sombra, _puntos in _puntos_sombra.items():
+                    for _aviso in validar_puntos(
+                        st.session_state["multisup_malla_sombra"], _puntos
+                    ):
+                        _avisos_puntos.append(f"{_nombre_sombra}: {_aviso}")
+                if _avisos_puntos:
+                    st.error(
+                        "No se aplicó la sombra: corrige los puntos 3D antes de calcular. "
+                        + " | ".join(_avisos_puntos)
+                    )
+                else:
+                    _resultados_sombra = calcular_fs_horario_por_superficie(
+                        st.session_state["multisup_malla_sombra"], _puntos_sombra,
+                        float(lat), float(lon), _tmy_sombra, _geometrias_sombra,
+                        malla_horizonte=str(st.session_state.get("multisup_malla_meta", {}).get("malla_fingerprint", "site_designer")),
+                        fuente=str(st.session_state.get("multisup_malla_meta", {}).get("fuente", "externa_marsh")),
+                    )
+                    st.session_state["superficies_bipv"] = aplicar_sombra_a_superficies(_sups_actualizado, _resultados_sombra)
+                    st.success("Sombra calculada por superficie; revisa el estado antes de adoptar resultados.")
             if not _sombra_lista:
                 st.info("Completa la malla, el TMY y al menos un punto por superficie activa.")
 

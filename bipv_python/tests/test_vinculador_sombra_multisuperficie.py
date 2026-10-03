@@ -11,6 +11,7 @@ from calculos.sombras_3d import ESTADOS_SOMBRA_ACEPTABLES
 from calculos.produccion_vigencia import huella_horaria
 from calculos.vinculador_sombra_multisuperficie import (
     aplicar_sombra_a_superficies,
+    invalidar_sombra_por_cambio_malla,
     invalidar_sombra_por_cambio_tmy,
     preservar_o_invalidar_campos_fisicos,
     resumen_estado_fisico_superficies,
@@ -110,6 +111,58 @@ def test_superficie_sin_firma_sombra_no_falla_con_cambio_tmy():
 def test_invalidar_sombra_por_tmy_rechaza_tmy_invalido():
     with pytest.raises(ValueError, match="T2m"):
         invalidar_sombra_por_cambio_tmy([_sup("A")], pd.DataFrame({"x": [1, 2, 3]}))
+
+
+# ── invalidar_sombra_por_cambio_malla (Site Designer) ──────────────────────
+def test_malla_distinta_invalida_p_shade_externa_marsh():
+    sup = _sup("A", p_shade=np.ones(_HORAS_ANIO),
+                firma_sombra={"malla_horizonte": "externa_marsh-aaaa1111"})
+    resultado = invalidar_sombra_por_cambio_malla([sup], "externa_marsh-bbbb2222")
+    assert "p_shade" not in resultado[0]
+    assert "firma_sombra" not in resultado[0]
+    assert "escena" in resultado[0]["sombra_bloqueo_motivo"].lower()
+
+
+def test_malla_igual_conserva_sombra():
+    sup = _sup("A", p_shade=np.ones(_HORAS_ANIO),
+                firma_sombra={"malla_horizonte": "externa_marsh-aaaa1111"})
+    resultado = invalidar_sombra_por_cambio_malla([sup], "externa_marsh-aaaa1111")
+    assert np.all(resultado[0]["p_shade"] == 1.0)
+    assert resultado[0]["firma_sombra"]["malla_horizonte"] == "externa_marsh-aaaa1111"
+
+
+def test_malla_sin_escena_cargada_invalida_sombra_externa():
+    """Si la escena se quitó de la sesión (malla_fingerprint_actual=None) pero
+    la firma sí depende de una escena externa, la sombra queda obsoleta --
+    no hay con qué confirmar que sigue vigente."""
+    sup = _sup("A", p_shade=np.ones(_HORAS_ANIO),
+                firma_sombra={"malla_horizonte": "externa_marsh-aaaa1111"})
+    resultado = invalidar_sombra_por_cambio_malla([sup], None)
+    assert "p_shade" not in resultado[0]
+
+
+def test_superficie_sin_malla_externa_no_se_toca_por_invalidacion_malla():
+    """Escenarios sin Site Designer (p.ej. sombra_cero_calculada de La Salle/
+    East2, o firma_sombra sin malla_horizonte) deben conservar su
+    comportamiento previo: comparar None contra None no debe invalidar."""
+    sup_sin_malla_horizonte = _sup("A", p_shade=np.ones(_HORAS_ANIO),
+                                    firma_sombra={"fuente": "sin_mascara_angular_publicada"})
+    sup_sin_firma = _sup("B", p_shade=np.ones(_HORAS_ANIO))
+    resultado = invalidar_sombra_por_cambio_malla(
+        [sup_sin_malla_horizonte, sup_sin_firma], None,
+    )
+    assert np.all(resultado[0]["p_shade"] == 1.0)
+    assert np.all(resultado[1]["p_shade"] == 1.0)
+
+
+def test_malla_no_prefijada_externa_marsh_no_se_toca():
+    """malla_horizonte con otro origen (p.ej. flujo SketchUp legacy, valores
+    de prueba como 'box-test-v1') no entra en este chequeo -- solo
+    Site Designer usa el prefijo 'externa_marsh-'."""
+    sup = _sup("A", p_shade=np.ones(_HORAS_ANIO),
+                firma_sombra={"malla_horizonte": "box-test-v1"})
+    resultado = invalidar_sombra_por_cambio_malla([sup], "externa_marsh-distinta")
+    assert np.all(resultado[0]["p_shade"] == 1.0)
 
 
 # ── preservar_o_invalidar_campos_fisicos ──────────────────────────────────

@@ -122,3 +122,19 @@ def test_superficie_sin_puntos_bloquea():
         calcular_fs_horario_por_superficie(
             malla, puntos, 4.65, -74.08, tmy, geometria, malla_horizonte="box-test-v1",
         )
+
+
+def test_firma_conserva_la_fuente_externa_marsh(monkeypatch):
+    tmy = _tmy_real()
+    malla = trimesh.creation.box(extents=[4.0, 4.0, 8.0])
+    puntos = {"A": [{"nombre": "P1", "fachada": "A", "x": 0.0, "y": -5.0, "z": 2.0}]}
+    geometria = {"A": {"tilt_deg": 90.0, "azimuth_deg": 180.0}}
+    monkeypatch.setattr(sombras_3d, "calcular_fs_horario", _fake_calcular_fs_horario)
+
+    datos = calcular_fs_horario_por_superficie(
+        malla, puntos, 4.65, -74.08, tmy, geometria,
+        malla_horizonte="externa_marsh", fuente="externa_marsh",
+    )["A"]
+
+    assert datos["firma_sombra"]["fuente"] == "externa_marsh"
+    assert datos["firma_sombra"]["proveedor"] == "externa_marsh"
