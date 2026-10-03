@@ -237,3 +237,19 @@ detallado de la tesis.
 El JSON de Site Designer recibido el 3-oct (lat 4,702, lon −74,147, sin
 bloques) no sirve para esta escena: está a ≈ 7 km al norte de la Torre 5 y
 no trae edificios ni terreno.
+
+### 9.2 Horizonte real de PVGIS (3-oct-2026)
+
+Perfil descargado por el usuario de PVGIS 5.3 («Horizonte calculado», lat
+4,638, lon −74,148): `references/lasalle-horizonte-pvgis-4.638_-74.148.csv`.
+El horizonte más alto está al este-sureste, con **4,2°** (Cerros Orientales);
+el resto está entre 0,4° y 3,4°.
+
+| | SO | SE | Horizontal 10° S |
+|---|---|---|---|
+| Pérdida por horizonte (haz tapado / irradiación total) | < 0,01 % | < 0,01 % | < 0,01 % |
+
+Solo 35 horas al año tienen el sol por debajo de ese horizonte, todas al
+amanecer o al atardecer, con irradiación casi nula. **El horizonte queda
+descartado**: no explica la brecha de las fachadas ni el 1 % de la
+referencia horizontal.
