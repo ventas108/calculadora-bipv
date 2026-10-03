@@ -537,6 +537,11 @@ def calcular_fs_horario(
     return resultado
 
 
+# Un punto cuenta como módulo sombreado si pierde más de 5 % de la luz
+# directa (el mismo umbral que usa simular_bypass_horario).
+_UMBRAL_PUNTO_SOMBREADO = 0.05
+
+
 def calcular_fs_horario_por_superficie(
     malla,
     puntos_por_superficie: dict[str, list[dict]],
@@ -599,13 +604,26 @@ def calcular_fs_horario_por_superficie(
             ]
         df = calcular_fs_horario(malla, puntos_calculo, lat, lon, indice_tmy=idx, transparencia=transparencia)
         serie = pd.Series(0.0, index=idx, dtype=float)
+        fraccion = pd.Series(0.0, index=idx, dtype=float)
+        profundidad = pd.Series(0.0, index=idx, dtype=float)
         calculadas = pd.DatetimeIndex([], tz="UTC")
         if not df.empty:
             horas = pd.to_datetime(df["timestamp_utc"], utc=True)
-            valores = pd.Series(df["FS_geometrico"].to_numpy(float), index=horas).groupby(level=0).mean()
+            fs = pd.Series(df["FS_geometrico"].to_numpy(float), index=horas)
+            valores = fs.groupby(level=0).mean()
             comunes = valores.index.intersection(idx.tz_convert("UTC"))
             serie.loc[comunes.tz_convert(idx.tz)] = valores.loc[comunes].to_numpy()
+            # Spec sombra-por-string: cuántos puntos (módulos) tienen sombra y
+            # cuánta luz pierden esos puntos. El promedio mezcla las dos cosas.
+            sombreado = fs > _UMBRAL_PUNTO_SOMBREADO
+            frac_h = sombreado.groupby(level=0).mean()
+            prof_h = fs.where(sombreado).groupby(level=0).mean().fillna(0.0)
+            fraccion.loc[comunes.tz_convert(idx.tz)] = frac_h.loc[comunes].to_numpy()
+            profundidad.loc[comunes.tz_convert(idx.tz)] = prof_h.loc[comunes].to_numpy()
             calculadas = comunes
+        # Con un solo punto no se sabe cuántos módulos tienen sombra: se
+        # mantiene el método del promedio.
+        por_string = len(puntos) >= 2
         no_calculadas = len(horas_sol.difference(calculadas))
         puntos_insuficientes = nombre in n_modulos_serie_por_superficie and len(puntos) < int(n_modulos_serie_por_superficie[nombre])
         advertencias = [f"error_geometrico: {a}" for a in avisos_geometricos]
@@ -635,6 +653,8 @@ def calcular_fs_horario_por_superficie(
         }
         resultados[nombre] = {
             "p_shade": serie.to_numpy(float),
+            "fraccion_modulos_sombra": fraccion.to_numpy(float) if por_string else None,
+            "profundidad_sombra": profundidad.to_numpy(float) if por_string else None,
             "firma_sombra": firma,
             "cobertura": {
                 "horas_totales": _HORAS_ANIO,

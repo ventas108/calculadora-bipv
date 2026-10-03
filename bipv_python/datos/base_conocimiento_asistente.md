@@ -6110,6 +6110,31 @@ En todos los casos sigue luego con 📊 Producción, 💼 Presupuesto, 💰 Fina
 
 **Ejemplo (Granja Apartadó):** con Producción simulada pero sin ⚡ Unifilar, la ruta marca 📊 Producción en 🟠 («Producción no usó los cables calculados») y ⚡ Unifilar como ▶️ siguiente. Primero el Unifilar, luego otra vez Producción.
 
+## 122. 🌳 Escena de Site Designer vigente y casos de validación East2 / La Salle (3-oct-2026)
+
+**Qué cambió en 🗺️ Vista 3D (sombra multi-superficie con Site Designer):**
+1. **Escena de otra ubicación:** si el JSON de Site Designer trae coordenadas distintas a las del proyecto (más de 0,1°), la app **ya no la aplica**: muestra «No se aplicó la escena Site Designer» y no guarda esa malla. Antes solo avisaba y la usaba igual. **Qué hacer:** fija en Site Designer la ubicación del proyecto y vuelve a exportar el JSON.
+2. **Cambio de escena:** cada escena tiene una huella (bloques, ubicación y norte). Si cargas otra escena y no vuelves a pulsar «🌳 Calcular sombra de todas las superficies», la sombra anterior **caduca**: la superficie muestra el motivo («tenía sombra calculada con otra escena de Site Designer») y el modo físico no la usa hasta recalcularla. Al abrir un proyecto guardado sin volver a cargar la escena, la sombra guardada se conserva: la escena no se guarda con el proyecto.
+3. **Alcance de la sombra en el bypass:** la fracción de sombra (p_shade) se calcula con el haz directo, pero el bypass la aplica a la irradiancia total; la luz difusa no se separa. Es una aproximación conocida.
+
+**Casos de validación — cómo hablar de ellos:**
+- **East2 (SunPower E20-327, CIEMAT Madrid):** es una **reconstrucción parcial**, no una validación científica. El artículo no publica la energía anual de East2; las cifras de la app son anclas de una reconstrucción con un año típico sintético. No se presentan como cifras de cliente ni como garantía.
+- **La Salle, Torre 5 de Bosques de Castilla:** la escena es una **reconstrucción provisional** (bloque único, ancho de la fachada SO asumido), sin las torres vecinas. Con la app actual (3-oct-2026), el rendimiento (≈ 715 kWh/kWp) y el PR (≈ 0,86) coinciden con la tesis dentro de ±1 %. La asimetría SO > SE de la tesis viene sobre todo de su base climática: la diferencia ya está en la irradiación de cada fachada, antes de cualquier sombra. Para una validación de sombra hacen falta la escena real con las torres vecinas y los datos climáticos de la tesis.
+
+## 123. 🔌 Sombra por string: cuántos módulos tienen sombra y cuánta luz pierden (3-oct-2026)
+
+**Qué cambió en el modo físico multi-superficie (🗺️ Vista 3D → «🌳 Calcular sombra de todas las superficies»):**
+- Antes, la sombra de cada superficie era el **promedio** de sus puntos. Ejemplo: en un string de 18 módulos, un balcón tapa por completo 1 módulo. El promedio da 1/18 ≈ 5,6 %, y el cálculo de bypass lo leía como «1 módulo con 94 % de luz»: el diodo de bypass casi nunca se activaba y la pérdida salía muy baja.
+- Ahora la app separa dos datos por hora: **cuántos módulos del string tienen sombra** (puntos con más de 5 % de sombra) y **cuánta luz pierden esos módulos** (la sombra media de esos puntos). Con el mismo ejemplo: 1 módulo de 18 sin luz → el bypass lo puentea y el string pierde ≈ 1/18 de su energía ✅.
+- El inversor busca el mejor punto de trabajo del string: si todos los módulos tienen la misma sombra, el string produce con esa luz reducida, no cero.
+
+**Cómo aprovecharlo:**
+- Escribe **un punto por módulo** en los puntos 3D de cada superficie (o al menos uno por cada módulo de un string). Con más puntos, la app sabe cuántos módulos quedan a la sombra.
+- Con **un solo punto** por superficie no se sabe cuántos módulos tienen sombra: la app mantiene el método anterior (el promedio).
+- Los proyectos con sombra calculada antes de este cambio siguen igual hasta que pulses de nuevo «🌳 Calcular sombra». Los dos datos nuevos se guardan con el proyecto y caducan con la sombra (otro año típico, otra escena, otra geometría).
+
+**Por qué se hizo:** en la reconstrucción de La Salle (Torre 5, fachadas SO y SE), la sombra media por módulo de la app coincidió con la app estándar de referencia de la tesis (SO 12,4 % frente a 12,6 %; SE 3,2 % frente a 3,0 %). Pero la pérdida de energía por sombra salió en 0,28 %, frente a 3,7 % de la tesis. Parte de la diferencia venía de usar el promedio en el bypass: los balcones sombrean módulos enteros de un string, no un poco a todos. La Salle sigue siendo una reconstrucción provisional, no una validación.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

@@ -1198,14 +1198,21 @@ with tab_solar:
             if _archivo_sd is not None:
                 try:
                     _malla_sd, _meta_sd = cargar_escena_sitedesigner(_archivo_sd.getvalue())
-                    st.session_state["multisup_malla_sombra"] = _malla_sd
-                    st.session_state["multisup_malla_meta"] = _meta_sd
-                    for _aviso in verificar_ubicacion(_meta_sd, float(lat), float(lon)):
-                        st.warning(_aviso)
-                    st.success(
-                        f"Malla Site Designer cargada: {_meta_sd['n_bloques']} bloque(s), "
-                        f"{_meta_sd['dim_m']['x']} × {_meta_sd['dim_m']['y']} × {_meta_sd['dim_m']['z']} m."
-                    )
+                    # Spec 05/escena-site-designer-vigente: una escena de otra
+                    # ubicación no se aplica (antes solo avisaba y se usaba).
+                    _avisos_ubicacion = verificar_ubicacion(_meta_sd, float(lat), float(lon))
+                    if _avisos_ubicacion:
+                        st.session_state.pop("multisup_malla_sombra", None)
+                        st.session_state.pop("multisup_malla_meta", None)
+                        st.error("No se aplicó la escena Site Designer: la ubicación no coincide con el "
+                                 "proyecto. " + " | ".join(_avisos_ubicacion))
+                    else:
+                        st.session_state["multisup_malla_sombra"] = _malla_sd
+                        st.session_state["multisup_malla_meta"] = _meta_sd
+                        st.success(
+                            f"Malla Site Designer cargada: {_meta_sd['n_bloques']} bloque(s), "
+                            f"{_meta_sd['dim_m']['x']} × {_meta_sd['dim_m']['y']} × {_meta_sd['dim_m']['z']} m."
+                        )
                 except Exception as _error_sd:
                     st.session_state.pop("multisup_malla_sombra", None)
                     st.error(f"No se pudo cargar Site Designer: {_error_sd}")
@@ -1267,7 +1274,9 @@ with tab_solar:
                 _resultados_sombra = calcular_fs_horario_por_superficie(
                     _malla_sombra, _puntos_motor,
                     float(lat), float(lon), _tmy_sombra, _geometrias_sombra,
-                    malla_horizonte=str(st.session_state.get("multisup_malla_meta", {}).get("fuente", "site_designer")),
+                    # La firma guarda la huella de la escena: con otra escena, la sombra caduca.
+                    malla_horizonte=str(st.session_state.get("multisup_malla_meta", {}).get(
+                        "malla_fingerprint", "site_designer")),
                 )
                 _sups_actualizado = aplicar_sombra_a_superficies(_sups_actualizado, _resultados_sombra)
                 # La sección de inversores vuelve a guardar _sups_actualizado:

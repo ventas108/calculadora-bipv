@@ -26,6 +26,7 @@ Regla de unidades (acordada — no adivinar):
 """
 from __future__ import annotations
 
+import hashlib
 import json
 
 import numpy as np
@@ -153,8 +154,17 @@ def cargar_escena_sitedesigner(contenido):
     malla._bipv_obstacle_id_by_face = np.asarray(ids, dtype=object)
     malla._bipv_obstacle_name_by_face = np.asarray(nombres, dtype=object)
 
+    # Spec 05/escena-site-designer-vigente: huella de lo que define la sombra
+    # (bloques, ubicación y norte). La firma de sombra la guarda en
+    # malla_horizonte; si se carga otra escena, la sombra anterior caduca.
+    huella = hashlib.sha256(json.dumps({
+        "blocks": bloques, "latitude": lat, "longitude": lon, "northOffset": north_offset,
+        "timezone": loc.get("timezone"), "elevation": loc.get("elevation"),
+    }, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")).hexdigest()[:16]
+
     meta = {
         "fuente": "externa_marsh",
+        "malla_fingerprint": f"externa_marsh-{huella}",
         "lat": lat,
         "lon": lon,
         "timezone": loc.get("timezone"),

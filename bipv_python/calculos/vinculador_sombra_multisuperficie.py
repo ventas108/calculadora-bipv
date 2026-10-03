@@ -18,11 +18,16 @@ from calculos.sombras_3d import (
 from calculos.transicion_multisuperficie import recalcular_agregados_proyecto, recalcular_etapa_inversor_bus, recalcular_fisica_superficie
 from calculos.adaptador_multisuperficie import construir_proyecto_desde_session_state
 
-_CAMPOS_SOMBRA = ("p_shade", "firma_sombra", "cobertura_sombra", "advertencias_sombra", "calidad_confianza_sombra", "estado_sombra")
+_CAMPOS_SOMBRA = ("p_shade", "firma_sombra", "cobertura_sombra", "advertencias_sombra", "calidad_confianza_sombra", "estado_sombra",
+                  "fraccion_modulos_sombra", "profundidad_sombra")
 # Spec 08-interfaz/estado-sombra-superficie: en un estado no aceptable solo se
 # retira la sombra horaria; el estado, las advertencias y la calidad quedan
 # para explicar el motivo en la página.
-_CAMPOS_SOMBRA_HORARIA = ("p_shade", "firma_sombra", "cobertura_sombra")
+_CAMPOS_SOMBRA_HORARIA = ("p_shade", "firma_sombra", "cobertura_sombra",
+                          "fraccion_modulos_sombra", "profundidad_sombra")
+# Spec 05/sombra-por-string: cuántos módulos tienen sombra y cuánta luz
+# pierden; viajan con p_shade y caducan con ella.
+_CAMPOS_SOMBRA_POR_STRING = ("fraccion_modulos_sombra", "profundidad_sombra")
 _MOTIVOS_SOMBRA = ("sombra_invalidada_motivo", "sombra_bloqueo_motivo")
 _ETIQUETA_CAMPO = {
     "tilt_deg": "tilt", "azimuth_deg": "azimuth", "area_m2": "área",
@@ -51,6 +56,11 @@ def aplicar_sombra_a_superficies(superficies_bipv: list[dict], resultados_sombra
                 nueva["calidad_confianza_sombra"] = datos.get("calidad_confianza", "baja")
             else:
                 nueva["p_shade"] = np.asarray(datos["p_shade"], dtype=float)
+                for campo in _CAMPOS_SOMBRA_POR_STRING:
+                    if datos.get(campo) is not None:
+                        nueva[campo] = np.asarray(datos[campo], dtype=float)
+                    else:
+                        nueva.pop(campo, None)
                 nueva["firma_sombra"] = dict(datos["firma_sombra"])
                 nueva["cobertura_sombra"] = dict(datos.get("cobertura", {}))
                 nueva["advertencias_sombra"] = list(datos.get("advertencias", []))
@@ -154,6 +164,37 @@ def invalidar_sombra_por_cambio_tmy(superficies_bipv: list[dict], tmy: pd.DataFr
     return salida
 
 
+def invalidar_sombra_por_cambio_malla(
+    superficies_bipv: list[dict], malla_fingerprint_actual: str | None,
+) -> list[dict]:
+    """Retira la sombra calculada contra una escena Site Designer distinta de
+    la cargada (Spec 05/escena-site-designer-vigente). Antes, subir una escena
+    nueva sin volver a pulsar «Calcular sombra» dejaba aplicada en silencio la
+    sombra de la escena anterior.
+
+    Solo compara firmas con ``malla_horizonte`` «externa_marsh-<huella>». Sin
+    escena cargada (``None``: la escena no se guarda con el proyecto) la
+    sombra se conserva; si no, abrir un proyecto guardado la borraría.
+    """
+    salida = []
+    for sup in superficies_bipv:
+        firma = sup.get("firma_sombra")
+        malla = firma.get("malla_horizonte") if isinstance(firma, Mapping) else None
+        if (isinstance(malla_fingerprint_actual, str) and isinstance(malla, str)
+                and malla.startswith("externa_marsh-") and malla != malla_fingerprint_actual):
+            nueva = dict(sup)
+            for campo in _CAMPOS_SOMBRA:
+                nueva.pop(campo, None)
+            nueva["sombra_bloqueo_motivo"] = (
+                f"La superficie '{sup.get('nombre')}' tenía sombra calculada con otra "
+                "escena de Site Designer -- vuelve a calcular la sombra con la escena actual."
+            )
+            salida.append(nueva)
+        else:
+            salida.append(dict(sup))
+    return salida
+
+
 def invalidar_sombra_por_version_algoritmo(superficies_bipv: list[dict]) -> list[dict]:
     """Retira p_shade/firma_sombra de toda superficie cuya sombra calculó
     ``sombras_3d`` con una versión de algoritmo distinta de la vigente.
@@ -199,6 +240,9 @@ def construir_y_recalcular_proyecto_fisico(session_state: Mapping[str, Any], tmy
         list(session_state.get("superficies_bipv") or []), tmy,
     )
     superficies_frescas = invalidar_sombra_por_version_algoritmo(superficies_frescas)
+    superficies_frescas = invalidar_sombra_por_cambio_malla(
+        superficies_frescas, (session_state.get("multisup_malla_meta") or {}).get("malla_fingerprint"),
+    )
     session_state_fresco = dict(session_state)
     session_state_fresco["superficies_bipv"] = superficies_frescas
 
