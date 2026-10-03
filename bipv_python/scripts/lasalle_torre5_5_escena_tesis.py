@@ -303,11 +303,31 @@ def energia():
         fraccion = sombreado.mean(axis=0)
         profundidad = np.where(sombreado, m, 0.0).sum(axis=0) / np.maximum(sombreado.sum(axis=0), 1)
         cero = np.zeros(len(d))
+        # Spec 05/difusa-sombra-por-string: cielo visible de los módulos
+        # elegidos, como lo calcula la app (edificios sólidos, árboles con
+        # transparencia 0,3).
+        from calculos.sombras_3d import calcular_svf_difuso
+        _pts = [{k: v for k, v in q.items() if k not in ("fila", "col")} for q in sel]
+        _edif, _arb = escena(p)
+        _me, _ = cargar_escena_sitedesigner(_json(_edif))
+        svf_e = calcular_svf_difuso(_me, _pts, 90.0, az, resolucion_deg=10.0)["f_svf"].to_numpy()
+        if _arb:
+            import trimesh
+            _ma, _ = cargar_escena_sitedesigner(_json(_arb))
+            svf_ea = calcular_svf_difuso(trimesh.util.concatenate([_me, _ma]), _pts, 90.0, az,
+                                         resolucion_deg=10.0)["f_svf"].to_numpy()
+        else:
+            svf_ea = svf_e
+        tapado = (1 - svf_e) + (svf_e - svf_ea) * (1 - 0.3)
+        factor_cielo = float(1 - tapado.mean())
         energias = {}
         for etiqueta, ps, extra in (
-            ("sin_sombra", cero, {"fraccion_modulos_sombra": None, "profundidad_sombra": None}),
-            ("con_sombra", p_shade, {"fraccion_modulos_sombra": None, "profundidad_sombra": None}),
-            ("con_sombra_por_string", p_shade, {"fraccion_modulos_sombra": fraccion, "profundidad_sombra": profundidad}),
+            ("sin_sombra", cero, {"fraccion_modulos_sombra": None, "profundidad_sombra": None, "factor_cielo_visible": None}),
+            ("con_sombra", p_shade, {"fraccion_modulos_sombra": None, "profundidad_sombra": None, "factor_cielo_visible": None}),
+            ("con_sombra_por_string", p_shade, {"fraccion_modulos_sombra": fraccion, "profundidad_sombra": profundidad,
+                                                "factor_cielo_visible": None}),
+            ("con_difusa", p_shade, {"fraccion_modulos_sombra": fraccion, "profundidad_sombra": profundidad,
+                                     "factor_cielo_visible": factor_cielo}),
         ):
             sup = superficie_nueva(nombre=nombre_sup, tipo="Fachada", tilt_deg=90.0, azimuth_deg=az,
                                    area_m2=panel["area_m2"] * n_serie * n_par, panel=panel, n_serie=n_serie,
@@ -329,13 +349,17 @@ def energia():
                            **energias,
                            "perdida_energia_sombra_pct": 100 * (1 - energias["con_sombra"]["E_ac"] / energias["sin_sombra"]["E_ac"]),
                            "perdida_energia_sombra_por_string_pct": 100 * (1 - energias["con_sombra_por_string"]["E_ac"] / energias["sin_sombra"]["E_ac"]),
-                           "fraccion_modulos_sombra_media_diurna": float(fraccion[tmy["Gb_n"].to_numpy() > 0].mean())}
+                           "fraccion_modulos_sombra_media_diurna": float(fraccion[tmy["Gb_n"].to_numpy() > 0].mean()),
+                           "factor_cielo_visible": factor_cielo,
+                           "perdida_energia_con_difusa_pct": 100 * (1 - energias["con_difusa"]["E_ac"] / energias["sin_sombra"]["E_ac"])}
     e_sin = sum(r["sin_sombra"]["E_ac"] for r in resultado.values())
     e_con = sum(r["con_sombra"]["E_ac"] for r in resultado.values())
     e_str = sum(r["con_sombra_por_string"]["E_ac"] for r in resultado.values())
+    e_dif = sum(r["con_difusa"]["E_ac"] for r in resultado.values())
     kwp = sum(r["con_sombra"]["kWp"] for r in resultado.values())
     resultado["total"] = {"perdida_energia_sombra_pct": 100 * (1 - e_con / e_sin),
                           "perdida_energia_sombra_por_string_pct": 100 * (1 - e_str / e_sin),
+                          "perdida_energia_con_difusa_pct": 100 * (1 - e_dif / e_sin),
                           "rendimiento_por_string_kWh_kWp": e_str / kwp,
                           "rendimiento_kWh_kWp": e_con / kwp, "modulos": sum(r["modulos_elegidos"] for k, r in resultado.items())}
     (SALIDA / ("energia_seleccion_referencia.json" if "--seleccion-referencia" in sys.argv else "energia.json")).write_text(json.dumps(resultado, indent=2, ensure_ascii=False), encoding="utf-8")

@@ -130,3 +130,30 @@ Hallazgos:
    tesis: sombra parcial dentro del módulo (celdas y diodos), sombra de la
    difusa en el bypass (la app solo usa el haz directo) y pérdidas que la
    app estándar de referencia agrupa bajo «sombreado».
+
+## 8. Nueva corrida con la Spec «difusa en la sombra por string» (3-oct-2026)
+
+La app ahora resta la difusa del cielo que tapan balcones, árboles y
+vecinos (factor de cielo visible), y el bypass deja la difusa a los módulos
+a la sombra. Pérdida de energía por sombra:
+
+| Selección de módulos | Promedio | Por string | **Por string + difusa** | Cielo visible SO |
+|---|---|---|---|---|
+| Los que elige la app (130) | 0,28 % | 0,29 % | **0,56 %** | 0,98 |
+| Los que eligió la tesis (156) | 1,76 % | 1,88 % | **3,66 %** | 0,90 |
+| App estándar de referencia (tesis) | — | — | **3,7 %** | — |
+
+Por fachada, con los módulos de la tesis: SO 2,64 % → 2,83 % → **5,50 %**;
+SE 0,00 % → 0,01 % → 0,03 %.
+
+Lectura honesta:
+1. **La difusa era la pieza que faltaba en el cálculo de energía**: aporta
+   1,8 puntos de los 1,9 que separaban 1,88 % del 3,7 %.
+2. **La coincidencia (3,66 % frente a 3,7 %) es en el total, no módulo a
+   módulo.** Según la tabla de la tesis, sus módulos elegidos pierden solo
+   0,4 % de irradiación; en la escena reconstruida pierden ≈ 5 % en la SO.
+   La escena (posición de cada balcón) sigue siendo estimada; parte del
+   acuerdo puede venir de diferencias que se compensan.
+3. La Salle sigue siendo una **reconstrucción provisional**, no una
+   validación. Para validarla hacen falta la escena real y el diagrama de
+   pérdidas de la tesis.

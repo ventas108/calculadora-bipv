@@ -20,9 +20,16 @@
       "kWp": 21.603,
       "poa": 825.43
     },
+    "con_difusa": {
+      "E_ac": 15210.5,
+      "kWp": 21.603,
+      "poa": 820.09
+    },
     "perdida_energia_sombra_pct": 0.5174871604600728,
     "perdida_energia_sombra_por_string_pct": 0.5200908694435347,
-    "fraccion_modulos_sombra_media_diurna": 0.006172839506172839
+    "fraccion_modulos_sombra_media_diurna": 0.006172839506172839,
+    "factor_cielo_visible": 0.9789809523809524,
+    "perdida_energia_con_difusa_pct": 0.9907112682015606
   },
   "SE": {
     "modulos_elegidos": 67,
@@ -45,13 +52,21 @@
       "kWp": 21.603,
       "poa": 715.78
     },
+    "con_difusa": {
+      "E_ac": 12979.7,
+      "kWp": 21.603,
+      "poa": 715.46
+    },
     "perdida_energia_sombra_pct": 0.007700659946552335,
     "perdida_energia_sombra_por_string_pct": 0.010010857930520256,
-    "fraccion_modulos_sombra_media_diurna": 0.0002662528336908728
+    "fraccion_modulos_sombra_media_diurna": 0.0002662528336908728,
+    "factor_cielo_visible": 0.998731343283582,
+    "perdida_energia_con_difusa_pct": 0.04774409166864446
   },
   "total": {
     "perdida_energia_sombra_pct": 0.2839646402291507,
     "perdida_energia_sombra_por_string_pct": 0.28643389797026186,
+    "perdida_energia_con_difusa_pct": 0.5587577517055409,
     "rendimiento_por_string_kWh_kWp": 654.2470953108365,
     "rendimiento_kWh_kWp": 654.2632967643382,
     "modulos": 130
