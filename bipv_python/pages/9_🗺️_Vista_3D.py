@@ -42,6 +42,12 @@ st.caption(
     "Fase 3 — Módulo B-5A/B"
 )
 
+# Spec 08-interfaz/guia-vista-3d: guía paso a paso visible al entrar.
+from calculos.guia_vista_3d import AYUDA_PUNTOS, GUIA_TITULO, RESUMEN, guia_markdown
+st.info(RESUMEN)
+with st.expander(GUIA_TITULO, expanded=False):
+    st.markdown(guia_markdown())
+
 # ── Alarma de validación SDM (calculada en 📐 Dimensionamiento) ────────────────
 # El modo multi-superficie de esta página usa calculos.mismatch_bypass (sombra
 # parcial) y calculos.mppt_combinado (mismatch de MPPT compartido entre
@@ -1227,6 +1233,7 @@ with tab_solar:
             _malla_sombra = st.session_state.get("multisup_malla_sombra")
             _geometrias_sombra = {}
             _errores_puntos = {}
+            st.caption(AYUDA_PUNTOS)
             for _sup_idx, _sup_sombra in enumerate(_sups_actualizado):
                 if not _sup_sombra.get("activa", True):
                     continue
