@@ -214,3 +214,26 @@ la referencia modeló una fachada plana.
 5. Prueba siguiente: repetir con el perfil de horizonte de PVGIS
    (☀️ Recurso Solar en el servidor, o habilitando `re.jrc.ec.europa.eu` en
    la red del entorno).
+
+### 9.1 Comprobación del horizonte lejano (estimación)
+
+Horizonte supuesto: Cerros Orientales entre los azimuts 30° y 150°, con
+elevación de 4°, 6° u 8°, y 1° en el resto. Base: TMYx El Dorado, Perez.
+Pérdida = haz directo tapado / irradiación total.
+
+| Elevación de los cerros | SO | SE | Horizontal 10° S |
+|---|---|---|---|
+| 4° | 0,00 % | 0,79 % | 0,05 % |
+| 6° | 0,00 % | 1,42 % | 0,12 % |
+| 8° | 0,00 % | 1,90 % | 0,20 % |
+
+Con el peso de cada fachada (SO ≈ 2/3 de la energía), el horizonte suma
+como mucho ≈ 0,3-0,6 puntos al total. Tampoco explica el 1 % de la
+referencia horizontal. **La hipótesis del horizonte queda descartada como
+causa principal**; la brecha restante (≈ 2 puntos) sigue sin causa física
+identificada con los datos publicados. Hace falta el diagrama de pérdidas
+detallado de la tesis.
+
+El JSON de Site Designer recibido el 3-oct (lat 4,702, lon −74,147, sin
+bloques) no sirve para esta escena: está a ≈ 7 km al norte de la Torre 5 y
+no trae edificios ni terreno.
