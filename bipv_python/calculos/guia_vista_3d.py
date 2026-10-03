@@ -32,9 +32,9 @@ PASOS = (
      "Pestaña 🌞 Diagrama Solar → ⚙️ **Superficies BIPV**: agrega cada fachada o techo con su "
      "inclinación (fachada = 90°) y su azimut real (0 = N, 90 = E, 180 = S, 270 = O)."),
     ("Strings",
-     "En «🔌 **Inversores** por superficie», asigna inversor, módulos en serie y strings en "
-     "paralelo a cada superficie o grupo, y revisa los semáforos 🟢🟡🔴. Hazlo **antes** de "
-     "generar los puntos: así cada punto queda asignado a su string."),
+     "En «🔌 **Inversores** por superficie», elige para cada superficie el equipo, los módulos "
+     "en serie y los strings en paralelo, y revisa los semáforos 🟢🟡🔴. Hazlo **antes** de "
+     "generar los puntos: así cada punto queda ligado a su string."),
     ("Escena",
      "En «🌳 Sombra 3D por superficie», sube el JSON de **Site Designer** (File → Save Model "
      "File). Debe tener la misma ubicación del proyecto: si está a más de 0,1° la app la "
