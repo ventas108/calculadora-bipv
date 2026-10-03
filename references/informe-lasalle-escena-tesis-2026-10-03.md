@@ -99,4 +99,34 @@ a 148 instalados. Física de la app: bypass, temperatura e inversor.
    irradiación del efecto eléctrico.
 2. Repetir con PVGIS cuando el entorno lo permita (`re.jrc.ec.europa.eu`)
    para la asimetría SO/SE.
-3. Evaluar la Spec «sombra por string» del punto 4.3.
+3. ~~Evaluar la Spec «sombra por string» del punto 4.3.~~ Hecha (PR #115);
+   resultados en la sección 7.
+
+## 7. Nueva corrida con la Spec «sombra por string» (3-oct-2026)
+
+Script: `lasalle_torre5_5_escena_tesis.py --energia` y
+`--energia --seleccion-referencia`. Strings de 18 módulos. Salidas:
+`energia.json` y `energia_seleccion_referencia.json`.
+
+| Selección de módulos | Módulos | Sombra en irradiación SO | Pérdida, promedio | Pérdida, por string |
+|---|---|---|---|---|
+| Los que elige la app (< 2 % según la app) | 130 | 0,91 % | 0,28 % | **0,29 %** |
+| Los que eligió la tesis (< 2 % según su tabla) | 156 | 4,98 % | 1,76 % | **1,88 %** |
+| App estándar de referencia (tesis) | 148-158 | — | — | **3,7 %** |
+
+Hallazgos:
+1. **El método por string funciona**: los datos nuevos llegan al bypass y
+   la pérdida sube donde hay módulos enteros a la sombra (SO: 2,64 % → 2,83 %).
+   En este caso cambia poco porque la sombra de la escena es total en cada
+   punto (balcones y edificios sólidos): el promedio ya activaba el bypass.
+2. **Lo que más pesa es qué módulos se eligen.** Con los módulos de la tesis,
+   la pérdida pasa de 0,29 % a 1,88 %: la brecha con el 3,7 % se cierra a
+   la mitad. Varios módulos que la tesis ve con < 2 % de sombra tienen,
+   en la escena reconstruida, ≈ 5 % en la SO: la posición exacta de las
+   pilas de balcones no se puede fijar con las fotos (error por columnas
+   ±6 puntos, sección 2).
+3. **La brecha restante (≈ 1,8 puntos)** sigue sin explicación con los
+   datos publicados. Hipótesis por revisar con el informe detallado de la
+   tesis: sombra parcial dentro del módulo (celdas y diodos), sombra de la
+   difusa en el bypass (la app solo usa el haz directo) y pérdidas que la
+   app estándar de referencia agrupa bajo «sombreado».

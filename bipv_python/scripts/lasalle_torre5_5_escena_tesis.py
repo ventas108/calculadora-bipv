@@ -271,7 +271,12 @@ def energia():
              "largo_mm": 1690, "ancho_mm": 1046, "area_m2": 1.690 * 1.046}
     panel = {**ficha, **estimar_sdm_desde_ficha(ficha)}
     todos = puntos(p)
-    elegidos = {r.fachada + f"-f{int(r.fila):02d}-c{int(r.col):02d}" for r in sim.itertuples() if r.sombra_pct < 2.0}
+    if "--seleccion-referencia" in sys.argv:
+        # Los mismos módulos que eligió la tesis (< 2 % según su tabla).
+        ref = referencia()
+        elegidos = {r.fachada + f"-f{int(r.fila):02d}-c{int(r.columna):02d}" for r in ref.itertuples() if r.ref < 2.0}
+    else:
+        elegidos = {r.fachada + f"-f{int(r.fila):02d}-c{int(r.col):02d}" for r in sim.itertuples() if r.sombra_pct < 2.0}
     pts_sel = [q for q in todos if q["nombre"] in elegidos]
     series = _serie_fs(p, pts_sel, d)
     resultado = {}
@@ -319,7 +324,7 @@ def energia():
                                   "kWp": s_["resultados_ac"]["P_dc_stc_kW"],
                                   "poa": s_["resultados_dc"]["poa_anual_kWh_m2"]}
         resultado[fach] = {"modulos_elegidos": n, "n_serie": n_serie, "n_paralelo": n_par,
-                           "sombra_irradiacion_media_pct": float(sim[(sim.fachada == fach) & (sim.sombra_pct < 2)].sombra_pct.mean()),
+                           "sombra_irradiacion_media_pct": float(sim[(sim.fachada == fach) & (sim.fachada + "-f" + sim.fila.map("{:02d}".format) + "-c" + sim.col.map("{:02d}".format)).isin(elegidos)].sombra_pct.mean()),
                            "p_shade_haz_medio_diurno": float(p_shade[tmy["Gb_n"].to_numpy() > 0].mean()),
                            **energias,
                            "perdida_energia_sombra_pct": 100 * (1 - energias["con_sombra"]["E_ac"] / energias["sin_sombra"]["E_ac"]),
@@ -333,7 +338,7 @@ def energia():
                           "perdida_energia_sombra_por_string_pct": 100 * (1 - e_str / e_sin),
                           "rendimiento_por_string_kWh_kWp": e_str / kwp,
                           "rendimiento_kWh_kWp": e_con / kwp, "modulos": sum(r["modulos_elegidos"] for k, r in resultado.items())}
-    (SALIDA / "energia.json").write_text(json.dumps(resultado, indent=2, ensure_ascii=False), encoding="utf-8")
+    (SALIDA / ("energia_seleccion_referencia.json" if "--seleccion-referencia" in sys.argv else "energia.json")).write_text(json.dumps(resultado, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(resultado, indent=2, ensure_ascii=False))
 
 if __name__ == "__main__" and "--energia" in sys.argv:
