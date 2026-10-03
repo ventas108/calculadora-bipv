@@ -1,0 +1,16 @@
+{
+  "SO": {
+    "modulos": 63,
+    "perdida_haz_centro_pct": 0.018804529534195792,
+    "perdida_haz_media5_pct": 0.020348307410809754,
+    "perdida_peor_borde_total_pct": 0.6741719476255119,
+    "perdida_string_sin_bypass_pct": 1.4186324214086765
+  },
+  "SE": {
+    "modulos": 67,
+    "perdida_haz_centro_pct": 0.0017216180528917048,
+    "perdida_haz_media5_pct": 0.002201780499872242,
+    "perdida_peor_borde_total_pct": 0.02206961802406552,
+    "perdida_string_sin_bypass_pct": 0.0889821832764939
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "SO": {
+    "modulos_elegidos": 63,
+    "n_serie": 18,
+    "n_paralelo": 3,
+    "sombra_irradiacion_media_pct": 0.9085714285714286,
+    "p_shade_haz_medio_diurno": 0.006172839506172839,
+    "sin_sombra": {
+      "E_ac": 15362.7,
+      "kWp": 21.603,
+      "poa": 825.43
+    },
+    "con_sombra": {
+      "E_ac": 15283.2,
+      "kWp": 21.603,
+      "poa": 825.43
+    },
+    "perdida_energia_sombra_pct": 0.5174871604600728
+  },
+  "SE": {
+    "modulos_elegidos": 67,
+    "n_serie": 18,
+    "n_paralelo": 3,
+    "sombra_irradiacion_media_pct": 0.055970149253731345,
+    "p_shade_haz_medio_diurno": 0.0002662528336908728,
+    "sin_sombra": {
+      "E_ac": 12985.9,
+      "kWp": 21.603,
+      "poa": 715.78
+    },
+    "con_sombra": {
+      "E_ac": 12984.9,
+      "kWp": 21.603,
+      "poa": 715.78
+    },
+    "perdida_energia_sombra_pct": 0.007700659946552335
+  },
+  "total": {
+    "perdida_energia_sombra_pct": 0.2839646402291507,
+    "rendimiento_kWh_kWp": 654.2632967643382,
+    "modulos": 130
+  }
+}
