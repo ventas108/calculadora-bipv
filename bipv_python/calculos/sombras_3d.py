@@ -623,6 +623,26 @@ def calcular_fs_horario_por_superficie(
             fraccion.loc[comunes.tz_convert(idx.tz)] = frac_h.loc[comunes].to_numpy()
             profundidad.loc[comunes.tz_convert(idx.tz)] = prof_h.loc[comunes].to_numpy()
             calculadas = comunes
+        # Spec 05/puntos-automaticos-por-modulo: con los puntos asignados a
+        # su string, cada string recibe su fracción y su profundidad.
+        sombra_strings = None
+        if len(puntos) >= 2 and all(p.get("string") for p in puntos):
+            string_de = {p["nombre"]: p["string"] for p in puntos}
+            sombra_strings = {}
+            for etiqueta in dict.fromkeys(p["string"] for p in puntos):
+                fr_s = pd.Series(0.0, index=idx, dtype=float)
+                pr_s = pd.Series(0.0, index=idx, dtype=float)
+                if not df.empty:
+                    sel = df["Punto"].map(string_de).eq(etiqueta).to_numpy()
+                    fs_s = pd.Series(df["FS_geometrico"].to_numpy(float)[sel], index=horas[sel])
+                    somb_s = fs_s > _UMBRAL_PUNTO_SOMBREADO
+                    fr_h = somb_s.groupby(level=0).mean()
+                    pr_h = fs_s.where(somb_s).groupby(level=0).mean().fillna(0.0)
+                    com = fr_h.index.intersection(idx.tz_convert("UTC"))
+                    fr_s.loc[com.tz_convert(idx.tz)] = fr_h.loc[com].to_numpy()
+                    pr_s.loc[com.tz_convert(idx.tz)] = pr_h.loc[com].to_numpy()
+                sombra_strings[etiqueta] = {"fraccion": fr_s.to_numpy(float),
+                                            "profundidad": pr_s.to_numpy(float)}
         # Con un solo punto no se sabe cuántos módulos tienen sombra: se
         # mantiene el método del promedio.
         por_string = len(puntos) >= 2
@@ -667,6 +687,7 @@ def calcular_fs_horario_por_superficie(
             "fraccion_modulos_sombra": fraccion.to_numpy(float) if por_string else None,
             "profundidad_sombra": profundidad.to_numpy(float) if por_string else None,
             "factor_cielo_visible": factor_cielo,
+            "sombra_por_string": sombra_strings,
             "firma_sombra": firma,
             "cobertura": {
                 "horas_totales": _HORAS_ANIO,

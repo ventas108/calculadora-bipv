@@ -19,12 +19,14 @@ from calculos.transicion_multisuperficie import recalcular_agregados_proyecto, r
 from calculos.adaptador_multisuperficie import construir_proyecto_desde_session_state
 
 _CAMPOS_SOMBRA = ("p_shade", "firma_sombra", "cobertura_sombra", "advertencias_sombra", "calidad_confianza_sombra", "estado_sombra",
-                  "fraccion_modulos_sombra", "profundidad_sombra", "factor_cielo_visible")
+                  "fraccion_modulos_sombra", "profundidad_sombra", "factor_cielo_visible",
+                  "sombra_por_string")
 # Spec 08-interfaz/estado-sombra-superficie: en un estado no aceptable solo se
 # retira la sombra horaria; el estado, las advertencias y la calidad quedan
 # para explicar el motivo en la página.
 _CAMPOS_SOMBRA_HORARIA = ("p_shade", "firma_sombra", "cobertura_sombra",
-                          "fraccion_modulos_sombra", "profundidad_sombra", "factor_cielo_visible")
+                          "fraccion_modulos_sombra", "profundidad_sombra", "factor_cielo_visible",
+                          "sombra_por_string")
 # Spec 05/sombra-por-string: cuántos módulos tienen sombra y cuánta luz
 # pierden; viajan con p_shade y caducan con ella.
 _CAMPOS_SOMBRA_POR_STRING = ("fraccion_modulos_sombra", "profundidad_sombra")
@@ -61,6 +63,13 @@ def aplicar_sombra_a_superficies(superficies_bipv: list[dict], resultados_sombra
                         nueva[campo] = np.asarray(datos[campo], dtype=float)
                     else:
                         nueva.pop(campo, None)
+                # Spec 05/puntos-automaticos-por-modulo: sombra de cada string.
+                if datos.get("sombra_por_string"):
+                    nueva["sombra_por_string"] = {
+                        k: {c: np.asarray(v[c], dtype=float) for c in ("fraccion", "profundidad")}
+                        for k, v in datos["sombra_por_string"].items()}
+                else:
+                    nueva.pop("sombra_por_string", None)
                 # Spec 05/difusa-sombra-por-string: cielo visible (escalar).
                 if datos.get("factor_cielo_visible") is not None:
                     nueva["factor_cielo_visible"] = float(datos["factor_cielo_visible"])
