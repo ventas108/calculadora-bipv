@@ -862,6 +862,8 @@ with tab_solar:
             migrar_puntos_por_uid, parsear_puntos_3d, previsualizar_puntos,
             puntos_por_nombre,
         )
+        from calculos.puntos_modulo import etiquetar_strings, generar_puntos_modulos, texto_puntos
+        from calculos.panel_superficie import panel_de_superficie
         from calculos.diseno_electrico_multisup import (
             ICONO_ESTADO, campos_legacy_desde_grupos, diagnostico_electrico_estado,
             grupos_de_superficie,
@@ -1252,12 +1254,86 @@ with tab_solar:
                         f"{p['x']},{p['y']},{p['z']}"
                         for p in _puntos_sombra.get(_uid_sombra, [])
                     )
+                # Spec 05/puntos-automaticos-por-modulo: un punto por módulo,
+                # en metros, a la distancia pedida de la superficie y con su string.
+                _clave_meta = f"multisup_puntos_meta_{_uid_sombra}"
+                with st.expander(f"🧮 Generar un punto por módulo — {_nombre_sombra}"):
+                    st.caption(
+                        "Esquina = esquina **inferior izquierda** del campo de módulos vista desde "
+                        "afuera, sobre la superficie, en metros y en el marco de la escena "
+                        "(X = Este, Y = Norte, Z = arriba). La inclinación y el azimut son los de "
+                        "la superficie."
+                    )
+                    try:
+                        _ficha_gen = panel_de_superficie(
+                            _sup_sombra, st.session_state.get("panel_dict"),
+                            st.session_state.get("panel_nombre_dim"))["panel"]
+                    except Exception:
+                        _ficha_gen = {}
+                    _largo0 = float(_ficha_gen.get("largo_mm") or 1700) / 1000
+                    _ancho0 = float(_ficha_gen.get("ancho_mm") or 1000) / 1000
+                    _g1, _g2, _g3 = st.columns(3)
+                    _ex = _g1.number_input("Esquina x (m)", value=0.0, step=0.1, format="%.3f", key=f"gen_x_{_uid_sombra}")
+                    _ey = _g2.number_input("Esquina y (m)", value=0.0, step=0.1, format="%.3f", key=f"gen_y_{_uid_sombra}")
+                    _ez = _g3.number_input("Esquina z (m)", value=0.0, step=0.1, format="%.3f", key=f"gen_z_{_uid_sombra}")
+                    _g4, _g5, _g6 = st.columns(3)
+                    _filas = _g4.number_input("Filas", min_value=1, value=1, step=1, key=f"gen_f_{_uid_sombra}")
+                    _cols = _g5.number_input("Columnas", min_value=1, value=1, step=1, key=f"gen_c_{_uid_sombra}")
+                    _orient = _g6.selectbox("Módulo", ["vertical", "horizontal"], key=f"gen_o_{_uid_sombra}",
+                                            help="vertical = lado largo de abajo hacia arriba (cuesta arriba del plano)")
+                    _g7, _g8, _g9 = st.columns(3)
+                    _largo = _g7.number_input("Largo del módulo (m)", value=_largo0, step=0.001, format="%.3f",
+                                              key=f"gen_l_{_uid_sombra}")
+                    _ancho = _g8.number_input("Ancho del módulo (m)", value=_ancho0, step=0.001, format="%.3f",
+                                              key=f"gen_a_{_uid_sombra}")
+                    _cable = _g9.selectbox("Strings por", ["columnas", "filas"], key=f"gen_k_{_uid_sombra}",
+                                           help="Orden en que se cablean los módulos en serie")
+                    _g10, _g11, _g12 = st.columns(3)
+                    _sh = _g10.number_input("Separación horizontal (m)", min_value=0.0, value=0.02, step=0.01,
+                                            format="%.3f", key=f"gen_sh_{_uid_sombra}")
+                    _sv = _g11.number_input("Separación vertical (m)", min_value=0.0, value=0.02, step=0.01,
+                                            format="%.3f", key=f"gen_sv_{_uid_sombra}")
+                    _sd = _g12.number_input("Distancia a la superficie (m)", min_value=0.10, value=0.30, step=0.05,
+                                            format="%.2f", key=f"gen_sd_{_uid_sombra}")
+                    if st.button("🧮 Generar puntos", key=f"gen_btn_{_uid_sombra}"):
+                        try:
+                            _grupos_gen = grupos_de_superficie(_sup_sombra) or None
+                            _pts_gen = generar_puntos_modulos(
+                                _nombre_sombra, float(_sup_sombra["tilt_deg"]), float(_sup_sombra["azimuth_deg"]),
+                                (_ex, _ey, _ez), int(_filas), int(_cols), _largo, _ancho, orientacion=_orient,
+                                separacion_h_m=_sh, separacion_v_m=_sv, separacion_fachada_m=_sd,
+                                grupos=_grupos_gen, cableado=_cable,
+                            )
+                            _texto_gen = texto_puntos(_pts_gen)
+                            st.session_state[_clave_texto] = _texto_gen
+                            st.session_state[_clave_meta] = {"texto": _texto_gen,
+                                                             "strings": [p.get("string") for p in _pts_gen]}
+                            _n_str = len({p.get("string") for p in _pts_gen if p.get("string")})
+                            st.success(f"✅ {len(_pts_gen)} puntos generados"
+                                       + (f", asignados a {_n_str} strings." if _n_str else
+                                          " (la superficie aún no tiene grupos de strings: se asignarán al "
+                                          "volver a generar después de definir los inversores)."))
+                            _area_campo = int(_filas) * int(_cols) * _largo * _ancho
+                            if _area_campo > float(_sup_sombra.get("area_m2", 0) or 0) * 1.001:
+                                st.warning(f"⚠️ El campo ocupa {_area_campo:.1f} m² y la superficie tiene "
+                                           f"{float(_sup_sombra.get('area_m2', 0)):.1f} m².")
+                        except ValueError as _error_gen:
+                            st.error(f"❌ {_error_gen}")
                 _texto_sombra = st.text_area(
                     f"Puntos 3D — {_nombre_sombra} (x,y,z en metros; con coma decimal usa x;y;z)",
                     key=_clave_texto,
                     placeholder="8,0,2\n8,0,3.5\n8;0;5,5",
                 )
                 _puntos, _errores_linea = parsear_puntos_3d(_texto_sombra, _nombre_sombra)
+                _meta_gen = st.session_state.get(_clave_meta)
+                _puntos = etiquetar_strings(_puntos, _texto_sombra, _meta_gen)
+                if _puntos and all(p.get("string") for p in _puntos):
+                    st.caption(f"🔗 {len(_puntos)} puntos asignados a "
+                               f"{len({p['string'] for p in _puntos})} strings: la sombra se calcula por string.")
+                elif _meta_gen and _texto_sombra != _meta_gen.get("texto"):
+                    st.warning("⚠️ Editaste los puntos generados: ya no se sabe a qué string pertenece cada "
+                               "punto y la sombra se calculará por superficie. Vuelve a generarlos para "
+                               "calcularla por string.")
                 if _errores_linea:
                     _errores_puntos[_nombre_sombra] = _errores_linea
                     st.error(

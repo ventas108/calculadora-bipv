@@ -99,6 +99,19 @@ def construir_proyecto_desde_session_state(session_state: Mapping[str, Any]) -> 
             if entrada.get("fraccion_modulos_sombra") is not None and entrada.get("profundidad_sombra") is not None:
                 sup["fraccion_modulos_sombra"] = np.asarray(entrada["fraccion_modulos_sombra"], dtype=float)
                 sup["profundidad_sombra"] = np.asarray(entrada["profundidad_sombra"], dtype=float)
+            # Spec 05/puntos-automaticos-por-modulo: los strings de este grupo,
+            # en orden; si no cuadran con el grupo, la sombra está desactualizada.
+            sps = entrada.get("sombra_por_string")
+            if sps:
+                n_par = int(grupo["n_paralelo"])
+                claves = [f"{gid}-S{k}" for k in range(1, n_par + 1)]
+                if any(c not in sps for c in claves) or sum(1 for c in sps if c.startswith(f"{gid}-S")) != n_par:
+                    raise ValueError(
+                        f"La sombra por string de '{nombre}' no coincide con el grupo {gid} "
+                        f"({n_par} strings): genera de nuevo los puntos y pulsa «🌳 Calcular sombra».")
+                sup["sombra_strings"] = [
+                    (np.asarray(sps[c]["fraccion"], dtype=float), np.asarray(sps[c]["profundidad"], dtype=float))
+                    for c in claves]
             # Spec 05/difusa-sombra-por-string: difusa tapada por el entorno.
             if entrada.get("factor_cielo_visible") is not None:
                 sup["factor_cielo_visible"] = float(entrada["factor_cielo_visible"])

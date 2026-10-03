@@ -16,8 +16,10 @@ _PROHIBIDOS = ("PV" + "syst", "PV" + "·SOL", "PV" + " SOL", "PV" + "SOL", "pend
 
 def test_la_guia_cubre_el_flujo_en_orden():
     texto = guia_markdown()
-    claves = ["Recurso Solar", "Superficies BIPV", "Site Designer", "un punto por módulo",
-              "Calcular sombra", "estado", "Inversores", "comparación física", "Adoptar"]
+    # Spec 05/puntos-automaticos-por-modulo: los strings se definen antes de
+    # generar los puntos, para que cada punto quede asignado a su string.
+    claves = ["Recurso Solar", "Superficies BIPV", "Inversores", "Site Designer", "un punto por módulo",
+              "Calcular sombra", "estado", "comparación física", "Adoptar"]
     posiciones = [texto.index(c) for c in claves]
     assert posiciones == sorted(posiciones), "los pasos deben ir en el orden del flujo"
     assert len(PASOS) >= 7
@@ -43,7 +45,7 @@ def test_la_pagina_muestra_la_guia_al_entrar():
     assert "st.markdown(guia_markdown())" in src
     # Recordatorio junto a los puntos 3D
     i_puntos = src.index('f"Puntos 3D — {_nombre_sombra}')
-    assert "AYUDA_PUNTOS" in src[i_puntos - 1500:i_puntos + 600]
+    assert "AYUDA_PUNTOS" in src[i_puntos - 8000:i_puntos]          # antes del generador y del cuadro
 
 
 def test_manual_del_asistente_seccion_125():

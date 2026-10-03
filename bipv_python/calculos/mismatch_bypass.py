@@ -427,6 +427,63 @@ def simular_bypass_horario(
     }
 
 
+def simular_bypass_por_strings(
+    G_eff: np.ndarray | pd.Series,
+    T_amb: np.ndarray | pd.Series,
+    strings: list[tuple],
+    N_series: int,
+    panel: dict,
+    NOCT: float | None = None,
+    k_bipv: float = 1.0,
+    umbral_shade: float = 0.05,
+    fraccion_directa: np.ndarray | pd.Series | None = None,
+) -> dict:
+    """Bypass con la sombra de CADA string (Spec puntos-automaticos-por-modulo).
+
+    ``strings``: lista de ``(fraccion_modulos_sombra, profundidad_sombra)``,
+    una por string en paralelo (8760 valores cada una). Cada string se simula
+    con ``simular_bypass_horario`` (N_parallel = 1) y las potencias se suman.
+    Aproximación declarada: los strings en paralelo trabajan cada uno en su
+    punto de máxima potencia; la diferencia de tensión entre strings del mismo
+    MPPT no se modela aquí (ver calculos.mppt_combinado para la curva exacta).
+    Con strings idénticos el resultado es el de ``simular_bypass_horario``
+    con N_parallel = len(strings).
+    """
+    if not strings:
+        raise ValueError("simular_bypass_por_strings necesita al menos un string.")
+    parciales = [
+        simular_bypass_horario(G_eff=G_eff, T_amb=T_amb, p_shade=fr, N_series=N_series, N_parallel=1,
+                               panel=panel, NOCT=NOCT, k_bipv=k_bipv, umbral_shade=umbral_shade,
+                               profundidad_sombra=pr, fraccion_directa=fraccion_directa)
+        for fr, pr in strings
+    ]
+    P_dc = np.sum([r["P_dc_kW"] for r in parciales], axis=0)
+    P_loss = np.sum([r["P_bypass_loss_kW"] for r in parciales], axis=0)
+    P_unif = np.sum([r["P_dc_uniforme_kW"] for r in parciales], axis=0)
+    kwh_bypass, kwh_unif = float(P_loss.sum()), float(P_unif.sum())
+    df_m = sum(r["df_mensual_bypass"].drop(columns=["FS medio mensual"]) for r in parciales)
+    df_m.insert(2, "FS medio mensual",
+                sum(r["df_mensual_bypass"]["FS medio mensual"] for r in parciales) / len(parciales))
+    df_m["Horas bypass activo"] = np.max([r["df_mensual_bypass"]["Horas bypass activo"].to_numpy()
+                                          for r in parciales], axis=0)
+    df_m["Horas con sombra"] = np.max([r["df_mensual_bypass"]["Horas con sombra"].to_numpy()
+                                       for r in parciales], axis=0)
+    return {
+        "P_dc_kW": P_dc,
+        "P_bypass_loss_kW": P_loss,
+        "P_dc_uniforme_kW": P_unif,
+        "horas_bypass": int((P_loss > 0).sum()),
+        "horas_sombra": int(np.any([np.asarray(fr, dtype=float) > umbral_shade for fr, _ in strings],
+                                   axis=0).sum()),
+        "kwh_bypass_anual": round(kwh_bypass, 1),
+        "pct_bypass_anual": round((kwh_bypass / kwh_unif * 100) if kwh_unif > 0 else 0.0, 2),
+        "kwh_dc_uniforme": round(kwh_unif, 1),
+        "df_mensual_bypass": df_m,
+        "por_string": [{"kwh_bypass_anual": r["kwh_bypass_anual"], "pct_bypass_anual": r["pct_bypass_anual"]}
+                       for r in parciales],
+    }
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 3. Parser CSV de la Calculadora de Sombreado
 # ══════════════════════════════════════════════════════════════════════════════

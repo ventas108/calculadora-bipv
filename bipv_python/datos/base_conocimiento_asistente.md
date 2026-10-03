@@ -6156,11 +6156,11 @@ Al entrar a 🗺️ Vista 3D, la página muestra arriba el recuadro «📘 Cómo
 **Paso a paso:**
 1. **Antes de entrar.** Calcula el año típico en ☀️ **Recurso Solar** con la ubicación exacta del proyecto y elige el panel en 📐 Dimensionamiento. Sin año típico no se puede calcular la sombra.
 2. **Superficies.** Pestaña 🌞 Diagrama Solar → ⚙️ **Superficies BIPV**: agrega cada fachada o techo con su inclinación (fachada = 90°) y su azimut real (0 = N, 90 = E, 180 = S, 270 = O).
-3. **Escena.** En «🌳 Sombra 3D por superficie», sube el JSON de **Site Designer** (File → Save Model File). Debe tener la misma ubicación del proyecto: si está a más de 0,1° la app la rechaza. El `northOffset` del archivo gira la escena hacia el norte real.
-4. **Puntos 3D.** Para cada superficie escribe **un punto por módulo**: x,y,z en metros, 0,3 m delante de la fachada, en el centro de cada módulo. Si la escena tiene `northOffset` distinto de 0, los puntos van en la orientación real (X = Este, Y = Norte). Corrige toda línea en rojo y lee los avisos amarillos (punto dentro del edificio o pegado a él).
-5. **Calcular sombra.** Pulsa «🌳 **Calcular sombra** de todas las superficies». La app calcula, hora a hora, cuántos módulos quedan a la sombra y cuánta luz pierden (**sombra por string**), y qué parte del **cielo** tapan balcones, aleros y vecinos (**luz difusa**).
-6. **Revisar el estado.** Mira la tabla «Estado de la sombra por superficie»: cada superficie debe quedar en 🟢. Si aparece 🔴, lee las columnas «Motivo» y «Qué hacer», corrige y vuelve a calcular. La columna «Puntos» debe ser igual (o mayor) al número de módulos.
-7. **Inversores.** En «🔌 **Inversores** por superficie», asigna inversor, módulos en serie y strings en paralelo a cada superficie o grupo, y revisa los semáforos 🟢🟡🔴.
+3. **Strings.** En «🔌 **Inversores** por superficie», asigna inversor, módulos en serie y strings en paralelo a cada superficie o grupo, y revisa los semáforos 🟢🟡🔴. Hazlo **antes** de generar los puntos: así cada punto queda asignado a su string.
+4. **Escena.** En «🌳 Sombra 3D por superficie», sube el JSON de **Site Designer** (File → Save Model File). Debe tener la misma ubicación del proyecto: si está a más de 0,1° la app la rechaza. El `northOffset` del archivo gira la escena hacia el norte real.
+5. **Puntos 3D.** Abre «🧮 Generar un punto por módulo» de cada superficie: escribe la **esquina** inferior izquierda del campo de módulos (vista desde afuera, en metros, X = Este, Y = Norte), las filas, las columnas, la orientación del módulo y si los strings van por columnas o por filas, y pulsa «🧮 Generar puntos». Filas × columnas debe ser igual a módulos en serie × strings. La app pone **un punto por módulo**, a 0,3 m de la superficie. Si escribes los puntos a mano: metros, 0,3 m delante del centro de cada módulo. Corrige toda línea en rojo y lee los avisos amarillos (punto dentro del edificio o pegado a él).
+6. **Calcular sombra.** Pulsa «🌳 **Calcular sombra** de todas las superficies». La app calcula, hora a hora, cuántos módulos de **cada string** quedan a la sombra y cuánta luz pierden (**sombra por string**), y qué parte del **cielo** tapan balcones, aleros y vecinos (**luz difusa**).
+7. **Revisar el estado.** Mira la tabla «Estado de la sombra por superficie»: cada superficie debe quedar en 🟢. Si aparece 🔴, lee las columnas «Motivo» y «Qué hacer», corrige y vuelve a calcular. La columna «Puntos» debe ser igual al número de módulos.
 8. **Comparar y adoptar.** Pulsa «🧪 Calcular **comparación física** (sin adoptar)», revisa la energía, el PR y las pérdidas de cada superficie y, si todo es coherente, «✅ **Adoptar** cálculo físico». Luego sigue con 💰 Financiero.
 
 **⚠️ Errores frecuentes (los más comunes al correr un proyecto):**
@@ -6170,13 +6170,15 @@ Al entrar a 🗺️ Vista 3D, la página muestra arriba el recuadro «📘 Cómo
 - Subir una escena de otra ubicación: la app no la aplica. Fija en Site Designer la ubicación del proyecto y vuelve a exportar.
 - Cambiar la escena, la orientación o el año típico y no recalcular: la sombra anterior caduca y el modo físico no la usa. Pulsa de nuevo «🌳 Calcular sombra».
 - Abrir un proyecto guardado antes del 3-oct-2026 y esperar los cambios nuevos: hasta que vuelvas a calcular la sombra sigue el método anterior (promedio, sin difusa).
+- Cambiar los módulos en serie o los strings en paralelo después de generar los puntos: la sombra por string ya no coincide y el modo físico lo avisa. Vuelve a generar los puntos y a calcular la sombra.
+- Editar a mano los puntos generados: la app pierde a qué string pertenece cada punto y calcula la sombra por superficie. Si cambias algo, vuelve a generarlos.
 - Olvidar los árboles: Site Designer no tiene transparencia, así que un árbol se comporta como un bloque sólido y da más sombra de la real.
 
 **✅ Valores esperados:** cielo visible 0,9–1,0 en fachadas con balcones; pérdida por sombra de 0 % a pocos % en módulos bien ubicados; si una superficie pierde más de 20 %, revisa que los puntos no estén dentro o debajo de un obstáculo.
 
-**Recordatorio junto a los puntos 3D:** Escribe **un punto por módulo** (una línea por módulo: x,y,z en **metros**), **0,3 m** delante de la fachada, a la altura del centro del módulo. Site Designer trabaja en milímetros: divide sus coordenadas entre 1000. Con un solo punto la app no sabe cuántos módulos quedan a la sombra y usa el promedio.
+**Recordatorio junto a los puntos 3D:** Lo más seguro: «🧮 Generar un punto por módulo» (abajo, en cada superficie). Si los escribes a mano: **un punto por módulo** (una línea por módulo: x,y,z en **metros**), **0,3 m** delante de la fachada, a la altura del centro del módulo. Site Designer trabaja en milímetros: divide sus coordenadas entre 1000. Con un solo punto la app no sabe cuántos módulos quedan a la sombra y usa el promedio.
 
-**Ejemplo de puntos para una fachada sur (azimut 180°) en y = 0, con 3 módulos en fila de 1,05 m de ancho y su centro a 2 m de altura:**
+**Ejemplo de puntos escritos a mano para una fachada sur (azimut 180°) en y = 0, con 3 módulos en fila de 1,05 m de ancho y su centro a 2 m de altura:**
 ```
 0.5,-0.3,2
 1.55,-0.3,2
@@ -6184,7 +6186,37 @@ Al entrar a 🗺️ Vista 3D, la página muestra arriba el recuadro «📘 Cómo
 ```
 La fachada mira al sur (−Y), por eso los puntos van 0,3 m hacia −Y. Con coma decimal se escribe `0,5;-0,3;2`.
 
-Más detalle de los cambios: sección 123 (sombra por string) y sección 124 (difusa en la sombra).
+Más detalle: sección 123 (sombra por string), sección 124 (difusa en la sombra) y sección 126 (🧮 Generar puntos).
+
+## 126. 🧮 Generar un punto por módulo: puntos automáticos y sombra de cada string (3-oct-2026)
+
+**Dónde está:** 🗺️ Vista 3D → pestaña 🌞 Diagrama Solar → ⚙️ Superficies BIPV → «🌳 Sombra 3D por superficie» → recuadro «🧮 Generar un punto por módulo — (superficie)», justo encima del cuadro de puntos 3D.
+
+**Qué escribe el usuario:**
+1. **Esquina x, y, z (m):** la esquina **inferior izquierda** del campo de módulos, vista desde afuera, sobre la superficie, en **metros** y en el marco de la escena (X = Este, Y = Norte, Z = arriba). Si la escena de Site Designer tiene `northOffset` distinto de 0, las coordenadas van ya en la orientación real.
+2. **Filas y columnas** de módulos del campo.
+3. **Módulo vertical u horizontal:** vertical = lado largo de abajo hacia arriba, en el sentido de la inclinación (en una fachada, vertical).
+4. **Largo y ancho del módulo (m):** se llenan solos con la ficha del panel; revisa que estén en metros (1,690 × 1,046, no 1690 × 1046).
+5. **Strings por columnas o por filas:** el orden del cableado en serie.
+6. **Separaciones** entre módulos (por defecto 0,02 m) y **distancia a la superficie** (por defecto 0,3 m; mínimo 0,10 m).
+
+Luego pulsa «🧮 Generar puntos». La app escribe un punto por módulo, al milímetro, en el cuadro de puntos 3D, y muestra «🔗 N puntos asignados a M strings».
+
+**Cómo calcula (precisión):** con la inclinación y el azimut de la superficie arma tres direcciones: la normal hacia afuera, la horizontal del plano (hacia la derecha de quien mira desde afuera) y la dirección cuesta arriba del plano. El centro de cada módulo es la esquina más medio módulo y tantos módulos más separaciones como su fila y columna; el punto queda a la distancia pedida sobre la normal. Todos los puntos quedan exactamente a esa distancia del plano, en fachadas, techos inclinados o planos y con cualquier azimut.
+
+**Strings:** los módulos se reparten en orden de cableado: los primeros «módulos en serie» forman el string 1 del grupo G1, y así sucesivamente. Por eso **filas × columnas debe ser igual a módulos en serie × strings en paralelo**; si no cuadra, la app lo dice («El campo tiene 21 módulos y los grupos de strings suman 14…»). Define los grupos en «🔌 Inversores por superficie» **antes** de generar los puntos.
+
+**Qué gana el cálculo:** con los puntos asignados, «🌳 Calcular sombra» calcula la sombra de **cada string** (cuántos de sus módulos están a la sombra y cuánta luz pierden), y el modo físico simula el bypass string por string y suma las potencias. Ejemplo: 2 strings, uno entero a media luz y otro al sol: se pierde 25 % ✅. El promedio de superficie lo trataba como medio módulo apagado en cada string y perdía cerca del doble.
+
+**Errores que evita y avisos:**
+- Milímetros en lugar de metros, puntos dentro del edificio y un solo punto por superficie.
+- Si editas a mano los puntos generados, la app avisa que ya no sabe a qué string pertenece cada punto y calcula la sombra por superficie.
+- Si cambias los módulos en serie o los strings después de generar, el modo físico avisa que la sombra por string no coincide: vuelve a generar los puntos y pulsa «🌳 Calcular sombra».
+- Si el campo ocupa más área que la superficie, la app lo advierte.
+
+**Aproximación declarada:** los strings en paralelo del mismo MPPT se simulan cada uno en su punto de máxima potencia; la pequeña diferencia de tensión entre strings no se modela aquí (la curva exacta está en «🔀 Simular curva IV combinada por MPPT»).
+
+**Origen:** la reconstrucción de La Salle (Torre 5) mostró que los errores al escribir puntos a mano pesan más que cualquier otra brecha del cálculo de sombras, y que la sombra de balcones se concentra en ciertos strings.
 
 Calculadora BIPV — Innovación Química
 

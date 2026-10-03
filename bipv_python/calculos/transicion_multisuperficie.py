@@ -68,7 +68,7 @@ import numpy as np
 import pandas as pd
 
 from calculos.dimensionamiento import evaluar_compatibilidad_string, evaluar_relacion_dc_ac
-from calculos.mismatch_bypass import simular_bypass_horario
+from calculos.mismatch_bypass import simular_bypass_horario, simular_bypass_por_strings
 from calculos.multi_superficie import calcular_poa_superficie
 from calculos.produccion_vigencia import fingerprint_mapping, huella_horaria_opcional
 
@@ -326,16 +326,32 @@ def recalcular_fisica_superficie(
             directa = directa + np.asarray(circumsolar, dtype=float)
         sombra_bypass["fraccion_directa"] = np.divide(
             directa, total, out=np.zeros_like(total), where=total > 0)
-    bypass = simular_bypass_horario(
-        G_eff=G_eff,
-        T_amb=t_amb,
-        **sombra_bypass,
-        N_series=int(superficie["n_serie"]),
-        N_parallel=int(superficie["n_paralelo"]),
-        panel=dict(panel),
-        NOCT=float(panel["NOCT"]),
-        k_bipv=float(superficie.get("k_bipv", 1.0)),
-    )
+    # Spec 05/puntos-automaticos-por-modulo: con la sombra de cada string,
+    # cada string se simula por separado y las potencias se suman.
+    strings = superficie.get("sombra_strings")
+    if strings and len(strings) == int(superficie["n_paralelo"]):
+        bypass = simular_bypass_por_strings(
+            G_eff=G_eff,
+            T_amb=t_amb,
+            strings=[(_validar_serie_horaria("fraccion_string", fr),
+                      _validar_serie_horaria("profundidad_string", pr)) for fr, pr in strings],
+            N_series=int(superficie["n_serie"]),
+            panel=dict(panel),
+            NOCT=float(panel["NOCT"]),
+            k_bipv=float(superficie.get("k_bipv", 1.0)),
+            fraccion_directa=sombra_bypass.get("fraccion_directa"),
+        )
+    else:
+        bypass = simular_bypass_horario(
+            G_eff=G_eff,
+            T_amb=t_amb,
+            **sombra_bypass,
+            N_series=int(superficie["n_serie"]),
+            N_parallel=int(superficie["n_paralelo"]),
+            panel=dict(panel),
+            NOCT=float(panel["NOCT"]),
+            k_bipv=float(superficie.get("k_bipv", 1.0)),
+        )
 
     nueva = copy.deepcopy(dict(superficie))
     nueva["p_shade"] = p_shade
@@ -576,6 +592,7 @@ def transicion_cambiar_geometria(
         sup["p_shade"] = _validar_p_shade(p_shade_nuevo)
         sup.pop("fraccion_modulos_sombra", None)      # eran de la sombra anterior
         sup.pop("profundidad_sombra", None)
+        sup.pop("sombra_strings", None)
 
         nueva_sup = recalcular_fisica_superficie(sup, tmy, lat, lon, alt_m)
         candidato["superficies"][nombre_superficie] = nueva_sup
