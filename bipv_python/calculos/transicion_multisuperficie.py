@@ -278,10 +278,14 @@ def recalcular_fisica_superficie(
     p_shade = _validar_p_shade(superficie["p_shade"])
     t_amb = _validar_serie_horaria("T2m", tmy["T2m"].to_numpy(dtype=float))
 
+    # Spec 05/difusa-sombra-por-string: la difusa del cielo que tapa el
+    # entorno 3D (balcones, aleros, vecinos) baja la POA de la superficie.
+    factor_cielo = superficie.get("factor_cielo_visible")
     poa_df = calcular_poa_superficie(
         tmy, lat, lon, alt_m, superficie,
         albedo=superficie.get("albedo", 0.20),
         bifacial=superficie.get("bifacial"),
+        **({"reduccion_diffusa_isotropica": float(factor_cielo)} if factor_cielo is not None else {}),
     )
     if poa_df is None or poa_df.empty or "poa_global" not in poa_df.columns:
         raise ValueError(
@@ -312,6 +316,16 @@ def recalcular_fisica_superficie(
             "p_shade": _validar_serie_horaria("fraccion_modulos_sombra", fraccion),
             "profundidad_sombra": _validar_serie_horaria("profundidad_sombra", profundidad),
         }
+    if factor_cielo is not None and "poa_direct" in poa_df.columns:
+        # La sombra 3D tapa la directa (y la difusa alrededor del sol): el
+        # módulo a la sombra conserva la difusa del resto del cielo.
+        total = poa_df["poa_global"].to_numpy(dtype=float)
+        directa = poa_df["poa_direct"].to_numpy(dtype=float)
+        circumsolar = poa_df.attrs.get("poa_circumsolar")
+        if circumsolar is not None and len(circumsolar) == len(directa):
+            directa = directa + np.asarray(circumsolar, dtype=float)
+        sombra_bypass["fraccion_directa"] = np.divide(
+            directa, total, out=np.zeros_like(total), where=total > 0)
     bypass = simular_bypass_horario(
         G_eff=G_eff,
         T_amb=t_amb,

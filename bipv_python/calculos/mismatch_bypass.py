@@ -250,6 +250,7 @@ def simular_bypass_horario(
     k_bipv: float = 1.0,
     umbral_shade: float = 0.05,
     profundidad_sombra: np.ndarray | pd.Series | None = None,
+    fraccion_directa: np.ndarray | pd.Series | None = None,
 ) -> dict:
     """
     Simulación hora a hora del array con bypass diodes activados por sombra parcial.
@@ -278,6 +279,11 @@ def simular_bypass_horario(
     profundidad_sombra : cuánta luz pierden los módulos sombreados [0–1] por
                    hora (Spec sombra-por-string). None = comportamiento
                    anterior: la profundidad se toma igual a p_shade.
+    fraccion_directa : parte de G_eff que es luz directa [0–1] por hora
+                   (Spec difusa-sombra-por-string). La sombra 3D solo tapa
+                   la directa: el módulo a la sombra sigue recibiendo la
+                   difusa. None = comportamiento anterior (la sombra quita
+                   toda la luz).
 
     Física del modelo
     -----------------
@@ -307,6 +313,8 @@ def simular_bypass_horario(
     n       = len(G_eff)
     profundidad = (p_shade if profundidad_sombra is None
                    else np.clip(np.asarray(profundidad_sombra, dtype=float), 0.0, 1.0))
+    if fraccion_directa is not None:
+        profundidad = profundidad * np.clip(np.asarray(fraccion_directa, dtype=float), 0.0, 1.0)
 
     NOCT_val = float(NOCT if NOCT is not None else panel.get("NOCT", 45.0))
     T_cel    = temperatura_celda_noct(G_eff, T_amb, NOCT=NOCT_val, k_bipv=k_bipv)

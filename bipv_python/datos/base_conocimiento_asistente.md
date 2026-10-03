@@ -6135,6 +6135,18 @@ En todos los casos sigue luego con 📊 Producción, 💼 Presupuesto, 💰 Fina
 
 **Por qué se hizo:** en la reconstrucción de La Salle (Torre 5, fachadas SO y SE), la sombra media por módulo de la app coincidió con la app estándar de referencia de la tesis (SO 12,4 % frente a 12,6 %; SE 3,2 % frente a 3,0 %). Pero la pérdida de energía por sombra salió en 0,28 %, frente a 3,7 % de la tesis. Parte de la diferencia venía de usar el promedio en el bypass: los balcones sombrean módulos enteros de un string, no un poco a todos. La Salle sigue siendo una reconstrucción provisional, no una validación.
 
+## 124. ☁️ Difusa en la sombra por string: el cielo que tapan balcones, aleros y vecinos (3-oct-2026)
+
+**Qué es la luz difusa:** la luz que llega del cielo entero, no del rayo del sol. En Bogotá es cerca de la mitad de la energía de una fachada. Un balcón o un alero encima de un módulo le tapa una parte del cielo **todo el día**, no solo cuando le da sombra al sol.
+
+**Qué cambió en el modo físico multi-superficie (🗺️ Vista 3D → «🌳 Calcular sombra de todas las superficies»):**
+1. Cada superficie guarda su **factor de cielo visible**: el promedio, entre sus puntos 3D, de la parte del cielo que no tapa la escena. 1 = cielo libre ✅; 0,8 = el entorno tapa el 20 % del cielo. Con árboles semitransparentes, el cielo tapado se reduce en proporción.
+2. La irradiación de la superficie (POA) baja en esa proporción: se reduce la difusa del cielo, no la directa ni la reflejada por el suelo.
+3. El cálculo de bypass ahora sabe que un módulo a la sombra **sigue recibiendo la difusa**: la sombra 3D tapa el rayo directo y la luz de alrededor del sol, no todo.
+4. Los proyectos con sombra calculada antes de este cambio siguen igual hasta que pulses de nuevo «🌳 Calcular sombra».
+
+**Por qué se hizo:** en la reconstrucción de La Salle (Torre 5, fachada SO con balcones), la sombra en irradiación de los módulos elegidos era 4,98 %, pero la pérdida de energía salía en 2,83 %: la difusa tapada por los balcones no entraba al cálculo de energía. Con este cambio, esa parte también cuenta. La Salle sigue siendo una reconstrucción provisional, no una validación; la comparación con la app estándar de referencia de la tesis está en el informe de la rama de La Salle.
+
 Calculadora BIPV — Innovación Química
 
 Repositorio: github.com/ventas108/calculadora-bipv

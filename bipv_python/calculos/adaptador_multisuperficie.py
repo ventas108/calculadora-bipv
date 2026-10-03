@@ -99,6 +99,9 @@ def construir_proyecto_desde_session_state(session_state: Mapping[str, Any]) -> 
             if entrada.get("fraccion_modulos_sombra") is not None and entrada.get("profundidad_sombra") is not None:
                 sup["fraccion_modulos_sombra"] = np.asarray(entrada["fraccion_modulos_sombra"], dtype=float)
                 sup["profundidad_sombra"] = np.asarray(entrada["profundidad_sombra"], dtype=float)
+            # Spec 05/difusa-sombra-por-string: difusa tapada por el entorno.
+            if entrada.get("factor_cielo_visible") is not None:
+                sup["factor_cielo_visible"] = float(entrada["factor_cielo_visible"])
             sup["superficie_origen"] = nombre
             sup["gid"] = gid
             sup["mppt"] = grupo.get("mppt")

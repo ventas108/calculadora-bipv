@@ -19,12 +19,12 @@ from calculos.transicion_multisuperficie import recalcular_agregados_proyecto, r
 from calculos.adaptador_multisuperficie import construir_proyecto_desde_session_state
 
 _CAMPOS_SOMBRA = ("p_shade", "firma_sombra", "cobertura_sombra", "advertencias_sombra", "calidad_confianza_sombra", "estado_sombra",
-                  "fraccion_modulos_sombra", "profundidad_sombra")
+                  "fraccion_modulos_sombra", "profundidad_sombra", "factor_cielo_visible")
 # Spec 08-interfaz/estado-sombra-superficie: en un estado no aceptable solo se
 # retira la sombra horaria; el estado, las advertencias y la calidad quedan
 # para explicar el motivo en la página.
 _CAMPOS_SOMBRA_HORARIA = ("p_shade", "firma_sombra", "cobertura_sombra",
-                          "fraccion_modulos_sombra", "profundidad_sombra")
+                          "fraccion_modulos_sombra", "profundidad_sombra", "factor_cielo_visible")
 # Spec 05/sombra-por-string: cuántos módulos tienen sombra y cuánta luz
 # pierden; viajan con p_shade y caducan con ella.
 _CAMPOS_SOMBRA_POR_STRING = ("fraccion_modulos_sombra", "profundidad_sombra")
@@ -61,6 +61,11 @@ def aplicar_sombra_a_superficies(superficies_bipv: list[dict], resultados_sombra
                         nueva[campo] = np.asarray(datos[campo], dtype=float)
                     else:
                         nueva.pop(campo, None)
+                # Spec 05/difusa-sombra-por-string: cielo visible (escalar).
+                if datos.get("factor_cielo_visible") is not None:
+                    nueva["factor_cielo_visible"] = float(datos["factor_cielo_visible"])
+                else:
+                    nueva.pop("factor_cielo_visible", None)
                 nueva["firma_sombra"] = dict(datos["firma_sombra"])
                 nueva["cobertura_sombra"] = dict(datos.get("cobertura", {}))
                 nueva["advertencias_sombra"] = list(datos.get("advertencias", []))
