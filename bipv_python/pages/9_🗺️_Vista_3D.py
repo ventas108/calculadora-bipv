@@ -862,7 +862,9 @@ with tab_solar:
             migrar_puntos_por_uid, parsear_puntos_3d, previsualizar_puntos,
             puntos_por_nombre,
         )
-        from calculos.puntos_modulo import etiquetar_strings, generar_puntos_modulos, texto_puntos
+        from calculos.puntos_modulo import (
+            etiquetar_strings, generar_puntos_modulos, parsear_posiciones, texto_puntos,
+        )
         from calculos.panel_superficie import panel_de_superficie
         from calculos.diseno_electrico_multisup import (
             ICONO_ESTADO, campos_legacy_desde_grupos, diagnostico_electrico_estado,
@@ -1295,14 +1297,21 @@ with tab_solar:
                                             format="%.3f", key=f"gen_sv_{_uid_sombra}")
                     _sd = _g12.number_input("Distancia a la superficie (m)", min_value=0.10, value=0.30, step=0.05,
                                             format="%.2f", key=f"gen_sd_{_uid_sombra}")
+                    # Spec 05/columnas-a-medida: columnas entre ventanas, a distinta separación.
+                    _pos_txt = st.text_input(
+                        "Posición de cada columna (m, opcional)", key=f"gen_pos_{_uid_sombra}",
+                        placeholder="0; 1,1; 3,43",
+                        help="Distancia desde la esquina hasta el borde izquierdo de cada columna, vista "
+                             "desde afuera, separadas por «;». Vacío = columnas a la misma separación.")
                     if st.button("🧮 Generar puntos", key=f"gen_btn_{_uid_sombra}"):
                         try:
+                            _pos_cols = parsear_posiciones(_pos_txt)
                             _grupos_gen = grupos_de_superficie(_sup_sombra) or None
                             _pts_gen = generar_puntos_modulos(
                                 _nombre_sombra, float(_sup_sombra["tilt_deg"]), float(_sup_sombra["azimuth_deg"]),
                                 (_ex, _ey, _ez), int(_filas), int(_cols), _largo, _ancho, orientacion=_orient,
                                 separacion_h_m=_sh, separacion_v_m=_sv, separacion_fachada_m=_sd,
-                                grupos=_grupos_gen, cableado=_cable,
+                                grupos=_grupos_gen, cableado=_cable, posiciones_columnas_m=_pos_cols,
                             )
                             _texto_gen = texto_puntos(_pts_gen)
                             st.session_state[_clave_texto] = _texto_gen
