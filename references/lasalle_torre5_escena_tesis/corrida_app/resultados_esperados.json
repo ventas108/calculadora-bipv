@@ -1,0 +1,38 @@
+{
+ "superficies": {
+  "Fachada SO · G1": {
+   "kWp": 15.6,
+   "POA": 819.8,
+   "E_ac": 10752.0,
+   "E_ac_sin_sombra": 10884.0,
+   "perdida_sombra_pct": 1.22
+  },
+  "Fachada SO · G2": {
+   "kWp": 15.6,
+   "POA": 819.8,
+   "E_ac": 10762.0,
+   "E_ac_sin_sombra": 10884.0,
+   "perdida_sombra_pct": 1.12
+  },
+  "Fachada SO · G3": {
+   "kWp": 15.6,
+   "POA": 819.8,
+   "E_ac": 10710.0,
+   "E_ac_sin_sombra": 10884.0,
+   "perdida_sombra_pct": 1.6
+  },
+  "Fachada SE": {
+   "kWp": 15.6,
+   "POA": 718.3,
+   "E_ac": 9221.0,
+   "E_ac_sin_sombra": 9221.0,
+   "perdida_sombra_pct": 0.0
+  }
+ },
+ "total": {
+  "kWp": 62.4,
+  "E_ac": 41445,
+  "rendimiento_kWh_kWp": 664.2,
+  "perdida_sombra_pct": 1.02
+ }
+}
