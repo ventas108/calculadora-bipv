@@ -37,11 +37,11 @@ una en su propia sección, nunca mezcladas dentro de una misma tabla:
 - **PDF guardado:** `references/lasalle-2021-bipv-fachada-propiedad-horizontal.pdf`
   (91 páginas, SHA-256 `320c4fbc82b4da0996afe1d430d1d29cd1e6c8f0c89243796e6afcec2c40a4c5`).
   Leído íntegro: Generalidades, Marco teórico, Diseño (cargas, fachada, radiación
-  teórica, simulación PV·SOL, técnico-económico), Anexos.
-- **Herramienta de referencia del propio documento:** PV·SOL Premium (no la APP
+  teórica, simulación en la app estándar de referencia, técnico-económico), Anexos.
+- **Herramienta de referencia del propio documento:** la app estándar de referencia (no la APP
   de este repositorio) — el documento no es un artículo científico con datos de
   medición real, sino un trabajo de grado que compara un cálculo teórico
-  (Collares-Pereira y Rabl / Duffie-Beckman) contra una simulación PV·SOL.
+  (Collares-Pereira y Rabl / Duffie-Beckman) contra una simulación en la app estándar de referencia.
 
 ## 1. Caso descrito
 
@@ -71,7 +71,7 @@ correcta.
 (Fig. 21). Diseño limitado al 15% de la capacidad del transformador del conjunto
 (500 kW → 75 kW máx., CREG 030 art. 5).
 
-**Resultado publicado por PV·SOL** (Tabla 21, sistema en fachadas, con sombra):
+**Resultado publicado por la app estándar de referencia** (Tabla 21, sistema en fachadas, con sombra):
 PR 86.8%, 718.33 kWh/kWp/año, 42.560 kWh/año, reducción por sombreado 3.7%/año.
 **Sistema de referencia horizontal/óptimo** (Tabla 23, mismos 148 módulos a 10°
 sur, sin obstrucción): PR 89.6%, 1.393,42 kWh/kWp/año, 82.521 kWh/año,
@@ -85,11 +85,11 @@ publica:
 
 - Un **mapa de sombra por posición de panel** (Tablas 19/20: % de tiempo
   sombreado al año por cada posición V×H), sin serie horaria ni ángulos.
-- Las **pérdidas agregadas** que PV·SOL calculó internamente (3.7%/año y 1%/año),
+- Las **pérdidas agregadas** que la app estándar de referencia calculó internamente (3.7%/año y 1%/año),
   como salida, no como dato de entrada reconstruible.
 - **Ningún reparto publicado** de los 148 módulos entre fachada suroeste y
-  sureste (las Fig. 18/20 son capturas de pantalla de PV·SOL, no tablas).
-- **Ninguna base meteorológica declarada** para PV·SOL (el software normalmente
+  sureste (las Fig. 18/20 son capturas de pantalla de la app estándar de referencia, no tablas).
+- **Ninguna base meteorológica declarada** para la app estándar de referencia (el software normalmente
   usa Meteonorm o su propia base; el documento no lo menciona).
 
 Por regla del proyecto (no fabricar datos, `[[no-mezclar-apps-bipv]]` y
@@ -161,7 +161,7 @@ Agregado del proyecto (4 superficies, no solo fachadas): `E_ac_total ≈ 128.296
 
 **POA/energía absolutas — mucho más cercanas que con el TMY sintético:**
 
-| Superficie | PV·SOL (Fig. 23) | APP (EPW real) | Dif. % |
+| Superficie | La app estándar de referencia (Fig. 23) | APP (EPW real) | Dif. % |
 |---|---:|---:|---:|
 | Horizontal | 1.571,3 | 1.613,31 | **+2,7%** |
 | Fachada suroeste | 858,0 | 831,25 | **−3,1%** |
@@ -171,34 +171,34 @@ Comparar con el TMY sintético (§4bis): +94,8% / +74,6% / +39,3% de diferencia.
 El EPW real reduce la brecha en un orden de magnitud completo.
 
 **Hallazgo relevante (no ocultado) — la asimetría suroeste/sureste no se reproduce:**
-PV·SOL reporta suroeste (858,0) > sureste (777,3), una asimetría de **~9,4%**.
+La app estándar de referencia reporta suroeste (858,0) > sureste (777,3), una asimetría de **~9,4%**.
 Con el EPW real, ambas fachadas quedan **prácticamente empatadas**
 (831,25 vs. 831,73 kWh/m²/año, **0,058% de diferencia** —
-`test_fachadas_epw_real_no_reproduce_asimetria_de_pvsol`). El TMY sintético de
+`test_fachadas_epw_real_no_reproduce_asimetria_de_ref`). El TMY sintético de
 cielo despejado, en cambio, exageraba la asimetría en la dirección correcta
 pero a una magnitud irreal (~28%, §4bis). Ninguna de las dos fuentes de esta
-reconstrucción reproduce fielmente la asimetría que PV·SOL reporta: esto no es
+reconstrucción reproduce fielmente la asimetría que la app estándar de referencia reporta: esto no es
 un error del motor de la app, sino evidencia de que esa asimetría depende de
-la base meteorológica/modelo de transposición propio de PV·SOL, al que esta
+la base meteorológica/modelo de transposición propio de la app estándar de referencia, al que esta
 reconstrucción no tiene acceso.
 
 **Rendimiento normalizado por recurso (el chequeo de paridad real):**
 
-| Magnitud | Tesis/PV·SOL | APP (EPW real) | Dif. abs. | Dif. % | Lectura |
+| Magnitud | Tesis/la app estándar de referencia | APP (EPW real) | Dif. abs. | Dif. % | Lectura |
 |---|---:|---:|---:|---:|---|
 | Rend. normalizado — referencia (kWh/kWp) | 1.393,42 | 1.474,09 | +80,67 | **+5,79%** | Residual positivo y acotado (<25%) |
 | Rend. normalizado — fachadas prom. (kWh/kWp) | 718,33 | 763,91 | +45,58 | **+6,35%** | ≈0,56 pp por encima del residual de referencia |
 | PR — referencia óptimo 10° sur | 89,6% | 93,8% | +4,2 pp | +4,7% | Sin sombra publicada en ninguno de los dos casos |
 | PR — fachadas (prom. SO/SE) | 86,8% | 93,5% | +6,7 pp | +7,7% | Coherente con sombra 3,7%/cableado/mismatch/clipping no modelados |
 
-Esta corrida está fijada por `test_rendimiento_normalizado_por_recurso_queda_por_encima_de_pvsol`
+Esta corrida está fijada por `test_rendimiento_normalizado_por_recurso_queda_por_encima_de_ref`
 (residual > 0% y < 25%, calculado sobre la referencia) y documenta
-explícitamente cuatro pérdidas de PV·SOL que este escenario no modela: sombra
+explícitamente cuatro pérdidas de la app estándar de referencia que este escenario no modela: sombra
 real, cableado, mismatch entre módulos y autoconsumo/clipping del inversor
-(`PERDIDAS_PVSOL_NO_MODELADAS`). El residual de fachadas (+6,35%) queda
+(`PERDIDAS_REF_NO_MODELADAS`). El residual de fachadas (+6,35%) queda
 apenas por encima del de referencia (+5,79%) — mucho más cerca entre sí que
 con el TMY sintético (donde la brecha era de ~2,1 pp), otra pista de que la
-asimetría de sombra 3,7%/1,0% de PV·SOL no se refleja con la misma fuerza
+asimetría de sombra 3,7%/1,0% de la app estándar de referencia no se refleja con la misma fuerza
 bajo esta fuente meteorológica.
 
 Advertencia técnica esperable con datos reales: el chequeo QCRad
@@ -212,7 +212,7 @@ ninguna prueba.
 ## 4bis. Chequeo mecánico adicional (TMY sintético clear-sky — solo bloque B)
 
 El TMY sintético (clear-sky Ineichen, pvlib) ya no se usa para comparar contra
-PV·SOL (bloques C/D); se conserva únicamente para el bloque B (ejecución
+La app estándar de referencia (bloques C/D); se conserva únicamente para el bloque B (ejecución
 end-to-end, determinismo), donde el objetivo es verificar que el motor
 responde a la geometría, no que reproduce el clima real. Se documentan aquí
 sus valores solo para contraste con la §4:
@@ -225,10 +225,10 @@ sus valores solo para contraste con la §4:
 | Fachada sureste | 90°/162° | 1.082,85 | 1.019,23 | 0,941 |
 
 **POA/energía absolutas:** ❌ no comparables — el TMY sintético de cielo
-despejado sobreestima el recurso frente a PV·SOL en +74% a +95% según la
+despejado sobreestima el recurso frente a la app estándar de referencia en +74% a +95% según la
 superficie. Con este TMY, la asimetría SO/SE sí aparece (1.497,75 vs. 1.082,85,
 ~28%) en la dirección correcta, pero de magnitud muy superior a la real
-(PV·SOL: ~9,4%) — ver el análisis completo del hallazgo SO/SE en la §4.
+(la app estándar de referencia: ~9,4%) — ver el análisis completo del hallazgo SO/SE en la §4.
 
 ## 5. Corrida histórica de referencia (TMY real de PVGIS, sesión anterior con red — no reproducida por la suite actual)
 
@@ -238,7 +238,7 @@ sintético de la §4. Se conservan aquí solo como referencia histórica —
 **no se mezclan con la tabla de la §4** — porque usan una fuente de recurso
 solar distinta.
 
-| Superficie | tilt/az | POA app, PVGIS real (kWh/m²/año) | POA PV·SOL (Fig. 23) | dif. | Rend. esp. app (kWh/kWp) | PR app |
+| Superficie | tilt/az | POA app, PVGIS real (kWh/m²/año) | POA de la app estándar de referencia (Fig. 23) | dif. | Rend. esp. app (kWh/kWp) | PR app |
 |---|---|---:|---:|---:|---:|---:|
 | Horizontal | 0°/180° | 1.794,7 | 1.571,3 | **+14.2%** | 1.684,6 | 0.939 |
 | Óptimo 10° sur | 10°/180° | 1.797,1 | — (Tabla 23 combina PR+sombra) | — | 1.686,3 | 0.938 |
@@ -249,24 +249,24 @@ Residual normalizado de esta corrida histórica: referencia +6.0%, fachadas
 +6.8% — del mismo orden y signo que el residual reproducible de la §4
 (+4.88%/+6.99%), obtenido con un TMY completamente distinto. Esa estabilidad
 entre dos fuentes de recurso solar diferentes es evidencia adicional de que
-el residual refleja las pérdidas de PV·SOL no modeladas, no un artefacto del
+el residual refleja las pérdidas de la app estándar de referencia no modeladas, no un artefacto del
 TMY elegido.
 
 - El propio documento reporta esta misma clase de brecha **dentro de sí mismo**:
   su cálculo teórico Duffie-Beckman con datos IDEAM (1.457,0 kWh/m²/año
-  horizontal) difiere **7.84%** de su propia simulación PV·SOL (1.571,3
+  horizontal) difiere **7.84%** de su propia simulación en la app estándar de referencia (1.571,3
   kWh/m²/año) — Tabla 22 del documento.
 - El GHI anual de PVGIS para estas coordenadas exactas es **1.794,7 kWh/m²/año
   = 4,92 kWh/m²/día** — dentro del rango 4-5 kWh/m²/día que el propio documento
   cita de IDEAM (Fig. 2) para Bogotá.
 - **Asimetría SO/SE en esta corrida histórica:** suroeste (986,2) > sureste
-  (852,2), **~13,6%** — más cercana a la de PV·SOL (~9,4%) que a las otras dos
+  (852,2), **~13,6%** — más cercana a la de la app estándar de referencia (~9,4%) que a las otras dos
   fuentes de este informe (clear-sky ~28%, EPW real ~0,06%). Las tres fuentes
   de recurso solar usadas en este documento (PVGIS histórico, clear-sky
   sintético, EPW real) dan tres magnitudes de asimetría distintas — ninguna
-  reproduce exactamente el 9,4% de PV·SOL, pero la PVGIS histórica es la más
+  reproduce exactamente el 9,4% de la app estándar de referencia, pero la PVGIS histórica es la más
   próxima. Esto refuerza la lectura de la §4: la asimetría publicada por
-  PV·SOL depende de su propia base meteorológica/modelo de transposición, no
+  la app estándar de referencia depende de su propia base meteorológica/modelo de transposición, no
   solo de la geometría, y es sensible a la fuente de TMY elegida.
 
 ## 6. Veredicto
@@ -278,22 +278,22 @@ TMY elegido.
   tolerancia.
 - **Ubicación:** ✅ confirmada de forma independiente (altitud PVGIS = altitud
   de la foto de brújula).
-- **Paridad numérica exacta con PV·SOL:** ❌ no alcanzable con los datos
+- **Paridad numérica exacta con la app estándar de referencia:** ❌ no alcanzable con los datos
   publicados (faltan máscara angular horaria, reparto de módulos por fachada y
-  base meteorológica de PV·SOL) — y **no se fabricaron** esos datos.
+  base meteorológica de la app estándar de referencia) — y **no se fabricaron** esos datos.
 - **Paridad de orden de magnitud y de física:** ✅ residual reproducible con
   EPW real (§4) de **+5,79%** en referencia y **+6,35%** en fachadas —
   consistente con el residual de la corrida histórica con PVGIS real
   (+6,0%/+6,8%, §5) y con el del TMY sintético (+4,88%/+6,99%, §4bis), pese a
   usar tres fuentes de recurso solar distintas. La dirección y el orden de
   magnitud (todas en la banda +4,9% a +7,0%) son los esperados dado que
-  PV·SOL modela sombra y pérdidas de cableado/mismatch/clipping que este
+  la app estándar de referencia modela sombra y pérdidas de cableado/mismatch/clipping que este
   escenario deliberadamente no modela (sin datos para hacerlo sin inventar).
 - **Asimetría suroeste/sureste:** ⚠️ hallazgo honesto, no oculto — ninguna de
-  las tres fuentes de TMY reproduce fielmente el 9,4% de PV·SOL: EPW real da
+  las tres fuentes de TMY reproduce fielmente el 9,4% de la app estándar de referencia: EPW real da
   un empate casi perfecto (0,058%), clear-sky sintético exagera a ~28%, y
   PVGIS histórico da ~13,6% (la más cercana). Esto indica que la asimetría
-  publicada por PV·SOL depende de su propia base meteorológica/modelo de
+  publicada por la app estándar de referencia depende de su propia base meteorológica/modelo de
   transposición, no reconstruible sin acceso a esos datos internos.
 
 ## 7. Archivos de esta validación
@@ -308,5 +308,5 @@ TMY elegido.
   sintético offline): ficha/SDM del panel (bloque A), discrepancia de conteo
   de módulos verificada (bloque A), ejecución end-to-end y determinismo con
   TMY sintético (bloque B, chequeo mecánico), rangos de orden de magnitud de
-  POA frente a PV·SOL y hallazgo de casi-empate SO/SE con EPW real (bloque C),
-  y residual normalizado acotado frente a PV·SOL con EPW real (bloque D).
+  POA frente a la app estándar de referencia y hallazgo de casi-empate SO/SE con EPW real (bloque C),
+  y residual normalizado acotado frente a la app estándar de referencia con EPW real (bloque D).

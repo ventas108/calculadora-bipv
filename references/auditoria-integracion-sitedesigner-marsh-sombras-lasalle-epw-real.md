@@ -377,9 +377,9 @@ datos reales ni afecta el resultado de las aserciones.)
   tests/test_escenario_validacion_east2_sunpower.py -v
 29 passed, 95 warnings in 14.03s
 ```
-Incluye `test_fachadas_epw_real_no_reproduce_asimetria_de_pvsol` (PASSED) —
+Incluye `test_fachadas_epw_real_no_reproduce_asimetria_de_ref` (PASSED) —
 la prueba que verifica honestamente que el EPW real **no** reproduce el
-orden SO>SE de PV·SOL.
+orden SO>SE de la app estándar de referencia.
 
 **Estado posterior a la corrección: 119/119 pruebas en verde, 0 fallos, 0 errores.**
 Se añadieron pruebas para fingerprints de escenas y para el contrato radiativo
@@ -406,8 +406,8 @@ Recalculado fuera de pytest con
 - **Residual normalizado, fachadas (promedio SO/SE):** +6,35% (idéntico).
 - **Diferencia SO vs. SE:** 0,058% — **técnicamente invertida** (SE 831,73
   > SO 831,25 por 0,48 kWh/m²/año), dentro del ruido, no una asimetría real
-  reproducible. PV·SOL publica SO>SE por ~9,4%. **No se afirma que el EPW
-  real reproduzca el orden SO>SE de PV·SOL — no lo reproduce.**
+  reproducible. La app estándar de referencia publica SO>SE por ~9,4%. **No se afirma que el EPW
+  real reproduzca el orden SO>SE de la app estándar de referencia — no lo reproduce.**
 - **QCRad EPW real:** 333/4.103 horas de día (8,12%) inconsistentes —
   ver §3, interpretado como ruido de dato real, no como bug de zona
   horaria.
@@ -423,8 +423,8 @@ reproducible y no está fabricado.
 
 - El casi-empate/inversión SO/SE con el EPW real **no se puede explicar**
   con los datos disponibles: no hay máscara angular horaria publicada por
-  la tesis, ni la base meteorológica que usó PV·SOL, así que no es posible
-  determinar si la asimetría de PV·SOL (9,4%) es un artefacto de su propia
+  la tesis, ni la base meteorológica que usó la app estándar de referencia, así que no es posible
+  determinar si la asimetría de la app estándar de referencia (9,4%) es un artefacto de su propia
   fuente meteorológica/modelo de transposición o si el EPW real de El
   Dorado (~9 km del sitio exacto) simplemente no captura una asimetría
   real del microclima del sitio. Se declara "no comparable", no se

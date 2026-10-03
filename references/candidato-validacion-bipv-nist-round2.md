@@ -117,7 +117,7 @@ Si faltan esos datos, el resultado debe clasificarse como **parcialmente reprodu
 2. **Li et al., 2015, PV double-skin facade**, DOI `10.1002/pip.2727` — mejor validación estadística publicada, con RMSE mensual AC de 2.47%, pero exige modelar una doble piel semitransparente.
 3. **NIST Round 1**, DOI `10.1115/1.1385824` — primer conjunto de mediciones BIPV, útil para térmica e integración en fachada.
 4. **Facade-BIPV optimizer**, DOI `10.3390/buildings14123850` — útil para sombreado eléctrico y optimizadores, menos adecuado como validación anual principal.
-5. **BIPV 70.6 kWp PVSol**, DOI `10.17485/ijst/v18i7.3972` — resultados finales disponibles, pero menos cercano al problema de fachada y sombra por superficie.
+5. **BIPV 70.6 kWp (simulado en la app estándar de referencia)**, DOI `10.17485/ijst/v18i7.3972` — resultados finales disponibles, pero menos cercano al problema de fachada y sombra por superficie.
 
 ## Regla de interpretación
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Escenario de validación externa — Fachada BAPV "Bosques de Castilla" (Kennedy,
 Bogotá), tesis de pregrado Cardozo Sarmiento & Moreno Suarez (Universidad de La
-Salle, 2021), simulada por los autores en PV·SOL Premium.
+Salle, 2021), simulada por los autores en la app estándar de referencia.
 
 Fuente: ``references/lasalle-2021-bipv-fachada-propiedad-horizontal.pdf``
 (descargado de ciencia.lasalle.edu.co/ing_electrica/630), resumen y comparación
@@ -10,7 +10,7 @@ completa en ``references/informe-validacion-bapv-lasalle-bosques-castilla-2021.m
 Reconstruye en la APP, a través del pipeline FÍSICO multi-superficie real
 (``calculos.vinculador_sombra_multisuperficie.construir_y_recalcular_proyecto_fisico``),
 las dos fachadas verticales (suroeste y sureste) y el sistema de referencia
-horizontal/óptimo que la tesis simula en PV·SOL, usando:
+horizontal/óptimo que la tesis simula en la app estándar de referencia, usando:
 
 - el panel SunPower Maxeon 3 SPR-MAX3-400 (ficha real del fabricante — NO está en
   ``datos.tecnologias_bipv``, se construye aquí a partir de la ficha pública y se
@@ -25,12 +25,12 @@ horizontal/óptimo que la tesis simula en PV·SOL, usando:
   §4 (1.794,7 / 986,2 / 852,2 kWh/m²/año); ESTE archivo ya no repite esa
   descarga en cada corrida (frágil, no determinista, depende de red) — usa un
   fixture sintético fijo en su lugar. Las pruebas de POA por eso comparan
-  contra PV·SOL en bandas anchas (orden de magnitud), NO contra los valores
+  contra la app estándar de referencia en bandas anchas (orden de magnitud), NO contra los valores
   exactos del informe, que corresponden a un TMY real distinto de este fixture;
 - ``p_shade = 0`` (estado ``sombra_cero_calculada``, NUNCA ``calculado_completo``)
   en las cuatro superficies: la tesis NO publica una máscara angular de sombra
   (a diferencia del caso East2, que sí publica su Tabla 4) — solo publica
-  pérdidas de sombreado agregadas de PV·SOL (3.7%/año fachadas, 1%/año
+  pérdidas de sombreado agregadas de la app estándar de referencia (3.7%/año fachadas, 1%/año
   referencia horizontal) y un mapa de sombra por posición de panel
   (Tablas 19/20) sin serie horaria. Sustituir esto por una máscara inventada
   violaría la regla de no fabricar datos. La comparación se documenta siempre
@@ -38,16 +38,16 @@ horizontal/óptimo que la tesis simula en PV·SOL, usando:
 
 Este archivo NO valida contra la tesis como homologación numérica exacta (faltan:
 máscara angular horaria, conteo de módulos por fachada, y la base meteorológica
-que PV·SOL usó). Las pruebas están agrupadas en 4 bloques deliberadamente
+que la app estándar de referencia usó). Las pruebas están agrupadas en 4 bloques deliberadamente
 separados (ver los encabezados de sección más abajo):
 
   A. Validación de ficha de panel (SDM vs. datasheet) — independiente de TMY.
   B. Validación geométrica (ejecución end-to-end, determinismo, orden
      suroeste > sureste) — independiente de si el TMY es sintético o real.
-  C. Comparación de POA frente a PV·SOL — banda ancha, informativa, nunca
-     puntual, porque el recurso solar de entrada difiere del que usó PV·SOL.
+  C. Comparación de POA frente a la app estándar de referencia — banda ancha, informativa, nunca
+     puntual, porque el recurso solar de entrada difiere del que usó la app estándar de referencia.
   D. Comparación energética normalizada por recurso — informativa, documenta
-     explícitamente qué pérdidas de PV·SOL no se modelan aquí (sombra real,
+     explícitamente qué pérdidas de la app estándar de referencia no se modelan aquí (sombra real,
      cableado, mismatch, autoconsumo/clipping del inversor).
 
 Ninguna prueba compara energía TOTAL del sistema (kWh/año) contra los
@@ -104,7 +104,7 @@ def _tmy_bogota_clearsky_sintetico(t2m: float = 15.0) -> pd.DataFrame:
     esa descarga es frágil (depende de red, no es reproducible en un entorno
     sin acceso a internet) y no aportaba determinismo de prueba a prueba. Este
     fixture es intencionalmente sintético y NO reproduce el TMY real de
-    PVGIS/PV·SOL — las pruebas de POA (bloque C) por eso usan bandas anchas,
+    PVGIS/la app estándar de referencia — las pruebas de POA (bloque C) por eso usan bandas anchas,
     nunca un valor puntual del informe.
     """
     idx = pd.date_range("2023-01-01 00:00", "2023-12-31 23:00", freq="h", tz=TZ)
@@ -306,24 +306,24 @@ def test_escenario_lasalle_es_determinista():
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# C. Comparación de POA frente a PV·SOL — con el EPW REAL de El Dorado. Banda
+# C. Comparación de POA frente a la app estándar de referencia — con el EPW REAL de El Dorado. Banda
 #    ancha, pero mucho más ajustada que con el TMY sintético del bloque B:
 #    el recurso solar real está a +2.7% (horizontal) / -3.1% (SO) / +7.0% (SE)
-#    de PV·SOL, frente a +39%-+95% con clear-sky.
+#    de la app estándar de referencia, frente a +39%-+95% con clear-sky.
 # ══════════════════════════════════════════════════════════════════════════
 @pytest.mark.parametrize(
     ("nombre", "poa_min", "poa_max"),
     [
-        # PV·SOL (Fig. 23): horizontal 1571.3 kWh/m²/año. EPW real de El
+        # La app estándar de referencia (Fig. 23): horizontal 1571.3 kWh/m²/año. EPW real de El
         # Dorado da ~1613 kWh/m²/año (+2.7%) -- banda ajustada, ya no un
         # chequeo de orden de magnitud sino una comparación real de recurso.
         ("Horizontal", 1400.0, 1850.0),
-        # PV·SOL (Fig. 23): 858.0 (suroeste) y 777.3 (sureste) kWh/m²/año.
+        # La app estándar de referencia (Fig. 23): 858.0 (suroeste) y 777.3 (sureste) kWh/m²/año.
         ("Fachada-Suroeste", 700.0, 1000.0),
         ("Fachada-Sureste", 700.0, 1000.0),
     ],
 )
-def test_poa_anual_en_orden_de_magnitud_de_pvsol(nombre, poa_min, poa_max):
+def test_poa_anual_en_orden_de_magnitud_de_ref(nombre, poa_min, poa_max):
     panel = _panel_sunpower_max3_400()
     tmy = _tmy_bogota_epw_real()
     proyecto = construir_y_recalcular_proyecto_fisico(
@@ -333,15 +333,15 @@ def test_poa_anual_en_orden_de_magnitud_de_pvsol(nombre, poa_min, poa_max):
     assert poa_min < poa < poa_max
 
 
-def test_fachadas_epw_real_no_reproduce_asimetria_de_pvsol():
-    """Hallazgo honesto, no ocultado: PV·SOL reporta suroeste (858.0) >
+def test_fachadas_epw_real_no_reproduce_asimetria_de_ref():
+    """Hallazgo honesto, no ocultado: la app estándar de referencia reporta suroeste (858.0) >
     sureste (777.3) kWh/m²/año, una asimetría de ~9.4%. Con el EPW real de
     El Dorado, ambas fachadas quedan prácticamente empatadas (<1% de
     diferencia) -- ni el TMY sintético (que exageraba la asimetría a ~28%,
     en la dirección correcta pero magnitud irreal) ni el EPW real (que la
-    borra casi por completo) reproducen fielmente la asimetría de PV·SOL.
+    borra casi por completo) reproducen fielmente la asimetría de la app estándar de referencia.
     Esto no invalida el motor: confirma que la asimetría reportada por
-    PV·SOL depende de su propia base meteorológica/modelo de transposición,
+    la app estándar de referencia depende de su propia base meteorológica/modelo de transposición,
     no solo de la geometría, y esta reconstrucción no tiene acceso a esa
     base."""
     panel = _panel_sunpower_max3_400()
@@ -360,15 +360,15 @@ def test_fachadas_epw_real_no_reproduce_asimetria_de_pvsol():
 
 # ══════════════════════════════════════════════════════════════════════════
 # D. Comparación energética normalizada por recurso — informativa. Documenta
-#    explícitamente qué pérdidas de PV·SOL este escenario NO modela: sombra
+#    explícitamente qué pérdidas de la app estándar de referencia este escenario NO modela: sombra
 #    real (mapa Tablas 19/20, agregado 3.7%/1%/año), pérdidas de cableado,
 #    mismatch entre módulos y posible autoconsumo/clipping del inversor
 #    (P_ac_nom_W=None aquí -- sin recorte AC). El residual esperado, una vez
-#    descontado el exceso de recurso solar del TMY sintético frente a PV·SOL,
+#    descontado el exceso de recurso solar del TMY sintético frente a la app estándar de referencia,
 #    debe quedar del lado alto (la app sin esas pérdidas rinde más), nunca
 #    igualado ni invertido.
 # ══════════════════════════════════════════════════════════════════════════
-PERDIDAS_PVSOL_NO_MODELADAS = (
+PERDIDAS_REF_NO_MODELADAS = (
     "sombra_real_fachadas_3.7pct_referencia_1pct",
     "cableado_dc_ac",
     "mismatch_entre_modulos",
@@ -376,11 +376,11 @@ PERDIDAS_PVSOL_NO_MODELADAS = (
 )
 
 
-def test_rendimiento_normalizado_por_recurso_queda_por_encima_de_pvsol():
+def test_rendimiento_normalizado_por_recurso_queda_por_encima_de_ref():
     """Al dividir el rendimiento específico de la app por su propio exceso de
-    POA frente a PV·SOL, el residual debe seguir siendo positivo (la app,
-    que no modela las pérdidas de ``PERDIDAS_PVSOL_NO_MODELADAS``, rinde más
-    que PV·SOL) pero acotado -- un residual desbocado señalaría un error del
+    POA frente a la app estándar de referencia, el residual debe seguir siendo positivo (la app,
+    que no modela las pérdidas de ``PERDIDAS_REF_NO_MODELADAS``, rinde más
+    que la app estándar de referencia) pero acotado -- un residual desbocado señalaría un error del
     motor físico, no solo la ausencia de esas pérdidas."""
     panel = _panel_sunpower_max3_400()
     tmy = _tmy_bogota_epw_real()
@@ -392,16 +392,16 @@ def test_rendimiento_normalizado_por_recurso_queda_por_encima_de_pvsol():
     ac_ref = proyecto["superficies"]["Optimo-10-Sur"]["resultados_ac"]
     rendimiento_app = ac_ref["E_ac_anual_kWh"] / ac_ref["P_dc_stc_kW"]
 
-    poa_pvsol_referencia = 1571.3   # Fig. 23 de la tesis, kWh/m²/año
-    rendimiento_pvsol_referencia = 1393.42   # Tabla 23, kWh/kWp/año
+    poa_app_referencia = 1571.3   # Fig. 23 de la tesis, kWh/m²/año
+    rendimiento_app_referencia = 1393.42   # Tabla 23, kWh/kWp/año
 
-    exceso_recurso = poa_ref / poa_pvsol_referencia
+    exceso_recurso = poa_ref / poa_app_referencia
     rendimiento_normalizado = rendimiento_app / exceso_recurso
-    residual_pct = (rendimiento_normalizado / rendimiento_pvsol_referencia - 1.0) * 100.0
+    residual_pct = (rendimiento_normalizado / rendimiento_app_referencia - 1.0) * 100.0
 
     assert residual_pct > 0.0, (
-        "El residual debe ser positivo: PV·SOL modela "
-        f"{PERDIDAS_PVSOL_NO_MODELADAS} que este escenario no modela."
+        "El residual debe ser positivo: la app estándar de referencia modela "
+        f"{PERDIDAS_REF_NO_MODELADAS} que este escenario no modela."
     )
     assert residual_pct < 25.0, (
         "Un residual mayor a 25% tras normalizar por recurso ya no es "
