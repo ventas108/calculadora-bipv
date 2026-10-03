@@ -354,3 +354,26 @@ def test_bypass_la_sombra_solo_quita_la_luz_directa():
     assert igual["kwh_bypass_anual"] == todo["kwh_bypass_anual"]
     assert todo["pct_bypass_anual"] == pytest.approx(100.0, abs=0.5)    # sin luz
     assert 50 < con_difusa["pct_bypass_anual"] < 70                      # queda la difusa (40 %)
+
+
+def test_bypass_por_strings_individuales():
+    # Spec 05/puntos-automaticos-por-modulo: cada string con su propia sombra.
+    from calculos.mismatch_bypass import simular_bypass_horario, simular_bypass_por_strings
+    sol = (np.arange(8760) % 24 >= 7) & (np.arange(8760) % 24 < 17)
+    g = np.where(sol, 700.0, 0.0); t = np.full(8760, 20.0)
+    frac = np.where(sol, 1 / 3, 0.0); prof = np.where(sol, 1.0, 0.0)
+    kw = dict(G_eff=g, T_amb=t, N_series=3, panel=ASP_ST1_T40)
+    # Strings idénticos = el cálculo de superficie con N_parallel strings.
+    iguales = simular_bypass_por_strings(strings=[(frac, prof)] * 3, **kw)
+    sup = simular_bypass_horario(p_shade=frac, profundidad_sombra=prof, N_parallel=3, **kw)
+    assert np.allclose(iguales["P_dc_kW"], sup["P_dc_kW"], rtol=1e-12)
+    assert iguales["kwh_bypass_anual"] == pytest.approx(sup["kwh_bypass_anual"], abs=0.11)
+    # Un string entero a media luz y otro al sol: el sombreado produce la
+    # mitad; el promedio de superficie lo trataría como medio módulo apagado
+    # en cada string.
+    cero = np.zeros(8760); medio = np.where(sol, 0.5, 0.0); uno = np.where(sol, 1.0, 0.0)
+    por_string = simular_bypass_por_strings(strings=[(uno, medio), (cero, cero)], **kw)
+    promedio = simular_bypass_horario(p_shade=medio, profundidad_sombra=medio, N_parallel=2, **kw)
+    assert 23 < por_string["pct_bypass_anual"] < 27
+    assert promedio["pct_bypass_anual"] > por_string["pct_bypass_anual"] + 10
+    assert por_string["horas_bypass"] > 0 and len(por_string["df_mensual_bypass"]) == 12
