@@ -157,3 +157,60 @@ Lectura honesta:
 3. La Salle sigue siendo una **reconstrucción provisional**, no una
    validación. Para validarla hacen falta la escena real y el diagrama de
    pérdidas de la tesis.
+
+## 9. Recalibración por columnas (3-oct-2026)
+
+Script: `bipv_python/scripts/lasalle_torre5_6_calibrar_columnas.py`
+(`--biblioteca`, `--alas`, `--ajustar`, `--verificar`, `--energia-columnas`).
+Salidas en `references/lasalle_torre5_escena_tesis/calibracion_columnas/`.
+
+**Método.** La tabla de referencia de la fachada SO muestra franjas
+verticales constantes de la fila 2 a la 16, que es la huella de pilas de
+balcones que actúan como aletas. Con una biblioteca de sombra en función de
+la distancia a una pila (detrás de la pila 20-38 %; a 0,5 m ≈ 10-13 %; a 1 m
+≈ 5-8 %; a más de 2,5 m < 1,5 %), se ubicaron 3 pilas (las que describe la
+tesis) y las 13 columnas de módulos. Después se verificó con trazado de rayos
+completo.
+
+**El escalón entre alas se descarta.** Con el retranqueo de 7,7 m de la
+calibración anterior, toda el ala norte tendría sombra creciente hacia el
+núcleo (hasta 37 %). La tabla de referencia tiene 0 % en las columnas 1 y 4:
+la referencia modeló una fachada plana.
+
+| Fachada SO | Escena anterior | Escena por columnas | Referencia |
+|---|---|---|---|
+| Correlación módulo a módulo | 0,57 | **0,90** | — |
+| Sombra media (273 módulos) | 12,4 % | 14,3 % | 12,6 % |
+| Sombra de los 99 módulos elegidos por la tesis | 4,98 % | **1,08 %** | 0,46 % |
+| Elegidos con ≥ 2 % | 58 | 11 | 0 |
+
+**Energía con los módulos de la tesis (escena por columnas):**
+
+| | Promedio | Por string | Por string + difusa |
+|---|---|---|---|
+| SO | 0,67 % | 0,72 % | 1,36 % |
+| SE | 0,00 % | 0,00 % | 0,03 % |
+| **Total** | 0,45 % | 0,48 % | **0,91 %** |
+| Referencia | — | — | **3,7 %** |
+
+**Lectura física.**
+1. El 3,66 % de la sección 8 venía de una geometría equivocada: los
+   balcones sombreaban módulos que en la referencia están libres. Con la
+   sombra en su sitio, la app da 0,91 %. La app convierte la sombra en
+   pérdida de energía casi 1 a 1 (1,08 % de irradiación → 1,36 % de energía
+   en la SO).
+2. La referencia convierte 0,46 % de irradiación de sus módulos en 3,7 % de
+   energía: un factor ≈ 8. Las sombras cercanas no pueden explicarlo.
+3. La sombra dentro del módulo (bordes, celdas y diodos) tampoco basta: la
+   cota de «peor borde» de la sección 3 solo sumaba ≈ 0,07 puntos.
+4. **Candidato físico principal: el horizonte lejano.** La propia
+   referencia da 1 %/año de «reducción por sombreado» a un arreglo
+   horizontal de referencia en la cubierta, sin obstáculos cercanos. Eso
+   apunta a un perfil de horizonte (los Cerros Orientales tapan el sol bajo
+   de la mañana), que afecta a todos los módulos por igual y no aparece en
+   la tabla por módulo. Una fachada vertical depende más del sol bajo que
+   un arreglo horizontal, sobre todo la SE en la mañana. La corrida de la
+   app no tenía horizonte: PVGIS no es accesible desde este entorno.
+5. Prueba siguiente: repetir con el perfil de horizonte de PVGIS
+   (☀️ Recurso Solar en el servidor, o habilitando `re.jrc.ec.europa.eu` en
+   la red del entorno).

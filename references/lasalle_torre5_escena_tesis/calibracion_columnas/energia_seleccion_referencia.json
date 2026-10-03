@@ -1,0 +1,74 @@
+{
+  "SO": {
+    "modulos_elegidos": 99,
+    "n_serie": 18,
+    "n_paralelo": 5,
+    "sombra_irradiacion_media_pct": 1.0848484848484847,
+    "p_shade_haz_medio_diurno": 0.00843037922548626,
+    "sin_sombra": {
+      "E_ac": 25604.6,
+      "kWp": 36.006,
+      "poa": 825.43
+    },
+    "con_sombra": {
+      "E_ac": 25432.5,
+      "kWp": 36.006,
+      "poa": 825.43
+    },
+    "con_sombra_por_string": {
+      "E_ac": 25419.6,
+      "kWp": 36.006,
+      "poa": 825.43
+    },
+    "con_difusa": {
+      "E_ac": 25255.3,
+      "kWp": 36.006,
+      "poa": 819.16
+    },
+    "perdida_energia_sombra_pct": 0.6721448489724446,
+    "perdida_energia_sombra_por_string_pct": 0.7225264210337201,
+    "fraccion_modulos_sombra_media_diurna": 0.00843037922548626,
+    "factor_cielo_visible": 0.975340404040404,
+    "perdida_energia_con_difusa_pct": 1.3642079938760987
+  },
+  "SE": {
+    "modulos_elegidos": 57,
+    "n_serie": 18,
+    "n_paralelo": 3,
+    "sombra_irradiacion_media_pct": 0.028947368421052635,
+    "p_shade_haz_medio_diurno": 0.00012071463061323032,
+    "sin_sombra": {
+      "E_ac": 12985.9,
+      "kWp": 21.603,
+      "poa": 715.78
+    },
+    "con_sombra": {
+      "E_ac": 12985.8,
+      "kWp": 21.603,
+      "poa": 715.78
+    },
+    "con_sombra_por_string": {
+      "E_ac": 12985.4,
+      "kWp": 21.603,
+      "poa": 715.78
+    },
+    "con_difusa": {
+      "E_ac": 12982.7,
+      "kWp": 21.603,
+      "poa": 715.61
+    },
+    "perdida_energia_sombra_pct": 0.0007700659946596744,
+    "perdida_energia_sombra_por_string_pct": 0.0038503299732761676,
+    "fraccion_modulos_sombra_media_diurna": 0.00012071463061323032,
+    "factor_cielo_visible": 0.9993438596491228,
+    "perdida_energia_con_difusa_pct": 0.024642111828976354
+  },
+  "total": {
+    "perdida_energia_sombra_pct": 0.4462238115598316,
+    "perdida_energia_sombra_por_string_pct": 0.4806882522900735,
+    "perdida_energia_con_difusa_pct": 0.9134372449177919,
+    "rendimiento_por_string_kWh_kWp": 666.6493082678054,
+    "rendimiento_kWh_kWp": 666.8801749726606,
+    "modulos": 156
+  }
+}

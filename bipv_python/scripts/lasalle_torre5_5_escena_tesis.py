@@ -133,6 +133,8 @@ def sombra_por_modulo(p, pts, d, comp):
     out = []
     for fach in ("SO", "SE"):
         sub = [q for q in pts if q["fachada"] == fach]
+        if not sub:
+            continue
         svf = calcular_svf_difuso(malla_svf, sub, 90.0, AZ_SO if fach == "SO" else AZ_SE, resolucion_deg=10.0)
         svf = dict(zip(svf["Punto"], svf["f_svf"]))
         c = comp[fach]

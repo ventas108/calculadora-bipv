@@ -1,0 +1,74 @@
+{
+  "parametros": {
+    "retranqueo_norte": 0.0,
+    "baranda": 1.0,
+    "arboles": {
+      "dist": 3.0,
+      "prof": 4.0,
+      "alto": 7.0
+    },
+    "vecino": {
+      "x0": -25.0,
+      "x1": 10.0,
+      "dist": 22.0,
+      "prof": 15.0,
+      "alto": 15.0
+    },
+    "columnas_so_y": [
+      -37.83,
+      -36.73,
+      -34.4,
+      -26.48,
+      -25.38,
+      -21.6,
+      -12.45,
+      -11.35,
+      -10.25,
+      -9.1,
+      -7.37,
+      -4.12,
+      -2.14
+    ],
+    "columnas_se_x": [
+      15.5,
+      12.0,
+      8.6,
+      5.2,
+      1.5
+    ]
+  },
+  "pilas_balcon_so": {
+    "pila_1": [
+      -33.98,
+      -30.48
+    ],
+    "pila_2": [
+      -17.1,
+      -13.6
+    ],
+    "pila_3": [
+      -5.87,
+      -2.37
+    ]
+  },
+  "SO": {
+    "media_ref": 12.56,
+    "media_app": 14.31,
+    "correlacion_por_modulo": 0.9,
+    "error_medio_abs_por_modulo": 5.27,
+    "elegidos_tesis": 99,
+    "elegidos_ref_media": 0.46,
+    "elegidos_app_media": 1.08,
+    "elegidos_app_mayor_2": 11
+  },
+  "SE": {
+    "media_ref": 3.01,
+    "media_app": 3.24,
+    "correlacion_por_modulo": 0.801,
+    "error_medio_abs_por_modulo": 1.83,
+    "elegidos_tesis": 57,
+    "elegidos_ref_media": 0.38,
+    "elegidos_app_media": 0.03,
+    "elegidos_app_mayor_2": 0
+  }
+}
