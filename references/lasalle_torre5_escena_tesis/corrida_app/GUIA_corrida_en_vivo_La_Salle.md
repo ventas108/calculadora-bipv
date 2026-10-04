@@ -18,6 +18,7 @@ edificio, sin bloqueos eléctricos y con los valores esperados de la sección 10
 | Archivo (carpeta `references/lasalle_torre5_escena_tesis/corrida_app/`) | Para qué |
 |---|---|
 | `escena_lasalle_para_app.json` | La escena de Site Designer: 88 bloques (torre, núcleo, 3 pilas de balcones SO, balcones NE y edificio vecino frente a la SE). |
+| `escena_lasalle_site_designer.json` | **La misma escena** con el formato completo de una exportación de Site Designer (colores, `isSolid`, `group` y las demás secciones). Úsala para abrirla en Site Designer; también la acepta la app (malla idéntica). |
 | `puntos_fachada_SO.txt` | Los 117 puntos de la fachada SO, para comprobar lo que genera la app. |
 | `puntos_fachada_SE.txt` | Los 39 puntos de la fachada SE. |
 | `resultados_esperados.json` | Los valores esperados de la sección 10. |
