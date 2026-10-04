@@ -44,7 +44,9 @@ PASOS = (
      "izquierda del campo de módulos (vista desde afuera, en metros, X = Este, Y = Norte), las "
      "filas, las columnas, la orientación del módulo y si los strings van por columnas o por "
      "filas, y pulsa «🧮 Generar puntos». Filas × columnas debe ser igual a módulos en serie × "
-     "strings. La app pone **un punto por módulo**, a 0,3 m de la superficie. Si escribes los "
+     "strings. Si las columnas no están a la misma separación (columnas entre ventanas), escribe "
+     "la posición de cada columna desde la esquina, separadas por «;». La app pone **un punto por "
+     "módulo**, a 0,3 m de la superficie. Si escribes los "
      "puntos a mano: metros, 0,3 m delante del centro de cada módulo. Corrige toda línea en "
      "rojo y lee los avisos amarillos (punto dentro del edificio o pegado a él)."),
     ("Calcular sombra",

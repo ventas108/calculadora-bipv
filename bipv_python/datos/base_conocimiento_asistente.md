@@ -6158,7 +6158,7 @@ Al entrar a 🗺️ Vista 3D, la página muestra arriba el recuadro «📘 Cómo
 2. **Superficies.** Pestaña 🌞 Diagrama Solar → ⚙️ **Superficies BIPV**: agrega cada fachada o techo con su inclinación (fachada = 90°) y su azimut real (0 = N, 90 = E, 180 = S, 270 = O).
 3. **Strings.** En «🔌 **Inversores** por superficie», elige para cada superficie el equipo, los módulos en serie y los strings en paralelo, y revisa los semáforos 🟢🟡🔴. Hazlo **antes** de generar los puntos: así cada punto queda ligado a su string.
 4. **Escena.** En «🌳 Sombra 3D por superficie», sube el JSON de **Site Designer** (File → Save Model File). Debe tener la misma ubicación del proyecto: si está a más de 0,1° la app la rechaza. El `northOffset` del archivo gira la escena hacia el norte real.
-5. **Puntos 3D.** Abre «🧮 Generar un punto por módulo» de cada superficie: escribe la **esquina** inferior izquierda del campo de módulos (vista desde afuera, en metros, X = Este, Y = Norte), las filas, las columnas, la orientación del módulo y si los strings van por columnas o por filas, y pulsa «🧮 Generar puntos». Filas × columnas debe ser igual a módulos en serie × strings. La app pone **un punto por módulo**, a 0,3 m de la superficie. Si escribes los puntos a mano: metros, 0,3 m delante del centro de cada módulo. Corrige toda línea en rojo y lee los avisos amarillos (punto dentro del edificio o pegado a él).
+5. **Puntos 3D.** Abre «🧮 Generar un punto por módulo» de cada superficie: escribe la **esquina** inferior izquierda del campo de módulos (vista desde afuera, en metros, X = Este, Y = Norte), las filas, las columnas, la orientación del módulo y si los strings van por columnas o por filas, y pulsa «🧮 Generar puntos». Filas × columnas debe ser igual a módulos en serie × strings. Si las columnas no están a la misma separación (columnas entre ventanas), escribe la posición de cada columna desde la esquina, separadas por «;». La app pone **un punto por módulo**, a 0,3 m de la superficie. Si escribes los puntos a mano: metros, 0,3 m delante del centro de cada módulo. Corrige toda línea en rojo y lee los avisos amarillos (punto dentro del edificio o pegado a él).
 6. **Calcular sombra.** Pulsa «🌳 **Calcular sombra** de todas las superficies». La app calcula, hora a hora, cuántos módulos de **cada string** quedan a la sombra y cuánta luz pierden (**sombra por string**), y qué parte del **cielo** tapan balcones, aleros y vecinos (**luz difusa**).
 7. **Revisar el estado.** Mira la tabla «Estado de la sombra por superficie»: cada superficie debe quedar en 🟢. Si aparece 🔴, lee las columnas «Motivo» y «Qué hacer», corrige y vuelve a calcular. La columna «Puntos» debe ser igual al número de módulos.
 8. **Comparar y adoptar.** Pulsa «🧪 Calcular **comparación física** (sin adoptar)», revisa la energía, el PR y las pérdidas de cada superficie y, si todo es coherente, «✅ **Adoptar** cálculo físico». Luego sigue con 💰 Financiero.
@@ -6217,6 +6217,24 @@ Luego pulsa «🧮 Generar puntos». La app escribe un punto por módulo, al mil
 **Aproximación declarada:** los strings en paralelo del mismo MPPT se simulan cada uno en su punto de máxima potencia; la pequeña diferencia de tensión entre strings no se modela aquí (la curva exacta está en «🔀 Simular curva IV combinada por MPPT»).
 
 **Origen:** la reconstrucción de La Salle (Torre 5) mostró que los errores al escribir puntos a mano pesan más que cualquier otra brecha del cálculo de sombras, y que la sombra de balcones se concentra en ciertos strings.
+
+## 127. 📏 Columnas a medida en «🧮 Generar puntos»: fachadas con columnas entre ventanas (3-oct-2026)
+
+**Cuándo usarlo:** cuando las columnas de módulos de una fachada no están todas a la misma separación, por ejemplo columnas entre ventanas o junto a balcones. Sin esta opción, el generador reparte las columnas a la misma distancia y algunas quedarían lejos de su sitio real.
+
+**Dónde:** en «🧮 Generar un punto por módulo», campo «Posición de cada columna (m, opcional)», justo encima del botón «🧮 Generar puntos».
+
+**Qué escribir:** la distancia, en metros, desde la **esquina** del campo hasta el **borde izquierdo** de cada columna, vista desde afuera, en orden de izquierda a derecha y separadas por «;». Ejemplo para 3 columnas: `0; 1,1; 3,43`. La coma es decimal; también sirve `0 1.1 3.43`. La primera suele ser 0, porque la esquina es el borde izquierdo de la primera columna.
+
+**Reglas que revisa la app:**
+- Una posición por columna: si escribes 3 posiciones y el campo tiene 2 columnas, avisa «Hay 3 posiciones de columna y el campo tiene 2 columnas».
+- En orden de izquierda a derecha, sin números negativos.
+- Sin solaparse: dos columnas deben estar separadas al menos el ancho del módulo; si no, la app dice en qué posiciones se solapan.
+- Si dejas el campo vacío, las columnas se reparten con la «Separación horizontal».
+
+**Precisión:** cada columna queda exactamente donde quedaría si la generaras sola con su propia esquina (diferencia 0 mm). Las filas siguen siendo regulares: misma separación vertical para todas.
+
+**Ejemplo real, La Salle (Torre 5, fachada SO):** 13 columnas de 21 módulos, con huecos de 1,1 m a 9,15 m entre columnas. Con un campo regular, algunas columnas quedaban hasta 7,5 m fuera de su sitio. Con la posición de cada columna, los 273 puntos quedan en su sitio, y con 21 en serie × 13 strings cada columna es un string. La sombra por string dio 3,9 % de pérdida por bypass frente a 4,6 % con el promedio de la fachada.
 
 Calculadora BIPV — Innovación Química
 

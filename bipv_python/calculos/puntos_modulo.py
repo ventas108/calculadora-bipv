@@ -69,6 +69,45 @@ def _strings(grupos: Sequence[Mapping[str, Any]] | None, total: int) -> list[str
     return etiquetas
 
 
+def _offsets_columnas(columnas: int, w: float, sh: float,
+                      posiciones: Sequence[float] | None) -> list[float]:
+    """Distancia de la esquina al borde izquierdo de cada columna."""
+    if posiciones is None:
+        return [c * (w + sh) for c in range(columnas)]
+    pos = [float(x) for x in posiciones]
+    if len(pos) != columnas:
+        raise ValueError(f"Hay {len(pos)} posiciones de columna y el campo tiene {columnas} columnas: "
+                         "escribe una posición por columna.")
+    if not all(math.isfinite(x) for x in pos):
+        raise ValueError("Las posiciones de columna deben ser números en metros.")
+    if pos[0] < 0:
+        raise ValueError("La primera posición de columna no puede ser negativa: se mide desde la esquina.")
+    for a, b in zip(pos, pos[1:]):
+        if b < a:
+            raise ValueError("Escribe las posiciones de columna en orden, de izquierda a derecha.")
+        if b - a < w - 1e-9:
+            raise ValueError(f"Las columnas en {a:g} m y {b:g} m se solapan: deben estar separadas al menos "
+                             f"el ancho del módulo ({w:.3f} m).")
+    return pos
+
+
+def parsear_posiciones(texto: str | None) -> list[float] | None:
+    """«0; 1,1; 3,43» o «0 1.1 3.43» → [0.0, 1.1, 3.43]. Vacío → None.
+
+    Separadores: punto y coma o espacios; la coma es decimal."""
+    if texto is None or not str(texto).strip():
+        return None
+    partes = [t for t in str(texto).replace(";", " ").split() if t]
+    valores = []
+    for t in partes:
+        try:
+            valores.append(float(t.replace(",", ".")))
+        except ValueError:
+            raise ValueError(f"«{t}» no es un número: separa las posiciones con «;» "
+                             "(por ejemplo 0; 1,1; 3,43).") from None
+    return valores
+
+
 def generar_puntos_modulos(
     nombre_superficie: str,
     tilt_deg: float,
@@ -84,8 +123,14 @@ def generar_puntos_modulos(
     separacion_fachada_m: float = SEPARACION_FACHADA_M,
     grupos: Sequence[Mapping[str, Any]] | None = None,
     cableado: str = "columnas",
+    posiciones_columnas_m: Sequence[float] | None = None,
 ) -> list[dict]:
-    """Un punto por módulo, con fila, columna, string y posición en el string."""
+    """Un punto por módulo, con fila, columna, string y posición en el string.
+
+    ``posiciones_columnas_m`` (Spec 05/columnas-a-medida): distancia, sobre
+    ``u``, desde la esquina hasta el borde izquierdo de cada columna, vista
+    desde afuera. Si se da, reemplaza la separación horizontal regular.
+    """
     filas, columnas = int(filas), int(columnas)
     if filas < 1 or columnas < 1:
         raise ValueError("El campo necesita al menos 1 en filas y 1 en columnas de módulos.")
@@ -102,6 +147,7 @@ def generar_puntos_modulos(
         w, h = float(largo_m), float(ancho_m)
     else:
         raise ValueError("La orientación del módulo debe ser «vertical» u «horizontal».")
+    offsets = _offsets_columnas(columnas, w, float(separacion_h_m), posiciones_columnas_m)
     orden = _orden_cableado(filas, columnas, cableado)
     etiquetas = _strings(grupos, filas * columnas)
     n, u, v = vectores_superficie(tilt_deg, azimuth_deg)
@@ -111,7 +157,7 @@ def generar_puntos_modulos(
     posiciones: dict[str, int] = {}
     puntos = []
     for (r, c), etiqueta in zip(orden, etiquetas):
-        p = (e + u * (c * (w + float(separacion_h_m)) + w / 2)
+        p = (e + u * (offsets[c] + w / 2)
              + v * (r * (h + float(separacion_v_m)) + h / 2) + n * float(separacion_fachada_m))
         punto = {"nombre": f"{nombre_superficie}-F{r + 1:02d}-C{c + 1:02d}", "fachada": nombre_superficie,
                  "x": float(p[0]), "y": float(p[1]), "z": float(p[2]), "fila": r + 1, "columna": c + 1,
